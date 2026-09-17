@@ -1,6 +1,5 @@
 using HR.SharedKernel;
-using System.Net;
-using System.Net.Http.Json;
+using HR.SharedKernel.Http;
 using HR.Web.Models;
 
 namespace HR.Web.Services;
@@ -19,55 +18,40 @@ public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
         string? search = null,
         int? pageSize = null)
     {
-        try
-        {
-            var url = $"api/companies/{companyId}/vacancies";
-            var query = new List<string>();
-            if (!string.IsNullOrWhiteSpace(status)) query.Add($"status={status}");
-            if (positionProfileId is not null) query.Add($"positionProfileId={positionProfileId}");
-            if (departmentId is not null) query.Add($"departmentId={departmentId}");
-            if (excludeClosed) query.Add("excludeClosed=true");
-            search = FormText.OptionalSearch(search);
-            if (search is not null) query.Add($"search={Uri.EscapeDataString(search)}");
-            if (pageSize is > 0) query.Add($"pageSize={pageSize.Value}");
-            if (query.Count > 0) url += "?" + string.Join("&", query);
+        var url = $"api/companies/{companyId}/vacancies";
+        var query = new List<string>();
+        if (!string.IsNullOrWhiteSpace(status)) query.Add($"status={status}");
+        if (positionProfileId is not null) query.Add($"positionProfileId={positionProfileId}");
+        if (departmentId is not null) query.Add($"departmentId={departmentId}");
+        if (excludeClosed) query.Add("excludeClosed=true");
+        search = FormText.OptionalSearch(search);
+        if (search is not null) query.Add($"search={Uri.EscapeDataString(search)}");
+        if (pageSize is > 0) query.Add($"pageSize={pageSize.Value}");
+        if (query.Count > 0) url += "?" + string.Join("&", query);
 
-            return await Http.GetFromJsonAsync<ListVacanciesResponse>(url, HrApiJsonOptions.Default);
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
+        var result = await ApiResponseReader.ExecuteAsync<ListVacanciesResponse>(
+            ct => Http.GetAsync(url, ct), HrApiJsonOptions.Default);
+        return result.Success ? result.Value : null;
     }
 
     public async Task<GetStaleVacanciesResponse?> GetStaleVacanciesAsync(
         Guid companyId, int? staleAfterDays = null, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var url = $"api/companies/{companyId}/vacancies/stale";
-            if (staleAfterDays is not null) url += $"?staleAfterDays={staleAfterDays}";
+        var url = $"api/companies/{companyId}/vacancies/stale";
+        if (staleAfterDays is not null) url += $"?staleAfterDays={staleAfterDays}";
 
-            return await Http.GetFromJsonAsync<GetStaleVacanciesResponse>(url, HrApiJsonOptions.Default, cancellationToken);
-        }
-        catch
-        {
-            return null;
-        }
+        var result = await ApiResponseReader.ExecuteAsync<GetStaleVacanciesResponse>(
+            ct => Http.GetAsync(url, ct), HrApiJsonOptions.Default, cancellationToken);
+        return result.Success ? result.Value : null;
     }
 
     public async Task<GetPipelineSummaryResponse?> GetPipelineSummaryAsync(
         Guid companyId, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            return await Http.GetFromJsonAsync<GetPipelineSummaryResponse>(
-                $"api/companies/{companyId}/recruitment/pipeline-summary", HrApiJsonOptions.Default, cancellationToken);
-        }
-        catch
-        {
-            return null;
-        }
+        var result = await ApiResponseReader.ExecuteAsync<GetPipelineSummaryResponse>(
+            ct => Http.GetAsync($"api/companies/{companyId}/recruitment/pipeline-summary", ct),
+            HrApiJsonOptions.Default, cancellationToken);
+        return result.Success ? result.Value : null;
     }
 
     // ── DSH-03 non-swallowing siblings ──────────────────────────────────────
@@ -114,56 +98,44 @@ public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
         Http.GetFromJsonAsync<CandidatesInProgressMetricResponse>(
             $"api/companies/{companyId}/recruitment/metrics/candidates-in-progress", HrApiJsonOptions.Default, cancellationToken);
 
-    public Task<OffersAwaitingResponseMetricResponse?> GetOffersAwaitingResponseMetricOrThrowAsync(
-        Guid companyId, CancellationToken cancellationToken = default) =>
-        Http.GetFromJsonAsync<OffersAwaitingResponseMetricResponse>(
-            $"api/companies/{companyId}/recruitment/metrics/offers-awaiting-response", HrApiJsonOptions.Default, cancellationToken);
-
     // Swallowing sibling for non-DSH-03 consumers (OffersAwaitingResponseWidget).
     public async Task<OffersAwaitingResponseMetricResponse?> GetOffersAwaitingResponseMetricAsync(
         Guid companyId, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            return await GetOffersAwaitingResponseMetricOrThrowAsync(companyId, cancellationToken);
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
+        var result = await ApiResponseReader.ExecuteAsync<OffersAwaitingResponseMetricResponse>(
+            ct => Http.GetAsync($"api/companies/{companyId}/recruitment/metrics/offers-awaiting-response", ct),
+            HrApiJsonOptions.Default, cancellationToken);
+        return result.Success ? result.Value : null;
     }
+
+    // Non-swallowing sibling of GetOffersAwaitingResponseMetricAsync, for callers (e.g.
+    // OffersAwaitingResponseWidget) that use WidgetSourceLoader to distinguish a failed load from a
+    // genuine empty result rather than collapsing both into null.
+    public async Task<OffersAwaitingResponseMetricResponse?> GetOffersAwaitingResponseMetricOrThrowAsync(
+        Guid companyId, CancellationToken cancellationToken = default) =>
+        await Http.GetFromJsonAsync<OffersAwaitingResponseMetricResponse>(
+            $"api/companies/{companyId}/recruitment/metrics/offers-awaiting-response",
+            HrApiJsonOptions.Default, cancellationToken);
 
     public async Task<GetVacancyResponse?> GetVacancyAsync(Guid companyId, Guid id)
     {
-        try
-        {
-            return await Http.GetFromJsonAsync<GetVacancyResponse>(
-                $"api/companies/{companyId}/vacancies/{id}", HrApiJsonOptions.Default);
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
+        var result = await ApiResponseReader.ExecuteAsync<GetVacancyResponse>(
+            ct => Http.GetAsync($"api/companies/{companyId}/vacancies/{id}", ct), HrApiJsonOptions.Default);
+        return result.Success ? result.Value : null;
     }
 
     public async Task<(CreateVacancyResponse? Result, string? Error)> CreateVacancyAsync(Guid companyId, CreateVacancyRequest request)
     {
         var response = await Http.PostAsJsonAsync($"api/companies/{companyId}/vacancies", request);
-
-        if (response.IsSuccessStatusCode)
-            return (await response.Content.ReadFromJsonAsync<CreateVacancyResponse>(), null);
-
-        return (null, await ReadErrorAsync(response, "Failed to create vacancy."));
+        var result = await ApiResponseReader.ReadJsonAsync<CreateVacancyResponse>(response);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to create vacancy."));
     }
 
     public async Task<(UpdateVacancyResponse? Result, string? Error)> UpdateVacancyAsync(Guid companyId, Guid id, UpdateVacancyRequest request)
     {
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/vacancies/{id}", request);
-
-        if (response.IsSuccessStatusCode)
-            return (await response.Content.ReadFromJsonAsync<UpdateVacancyResponse>(), null);
-
-        return (null, await ReadErrorAsync(response, "Failed to update vacancy."));
+        var result = await ApiResponseReader.ReadJsonAsync<UpdateVacancyResponse>(response);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to update vacancy."));
     }
 
     public async Task<(CloseVacancyResponse? Result, string? Error)> CloseVacancyAsync(Guid companyId, Guid id, DateOnly? closedAt = null)
@@ -171,11 +143,8 @@ public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
         var response = await Http.PostAsJsonAsync(
             $"api/companies/{companyId}/vacancies/{id}/close",
             new CloseVacancyRequest(companyId, id, closedAt));
-
-        if (response.IsSuccessStatusCode)
-            return (await response.Content.ReadFromJsonAsync<CloseVacancyResponse>(), null);
-
-        return (null, await ReadErrorAsync(response, "Failed to close vacancy."));
+        var result = await ApiResponseReader.ReadJsonAsync<CloseVacancyResponse>(response);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to close vacancy."));
     }
 
     public async Task<(PublishVacancyResponse? Result, string? Error)> PublishVacancyAsync(Guid companyId, Guid id, DateOnly? openedAt = null)
@@ -183,11 +152,8 @@ public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
         var response = await Http.PostAsJsonAsync(
             $"api/companies/{companyId}/vacancies/{id}/publish",
             new PublishVacancyRequest(companyId, id, openedAt));
-
-        if (response.IsSuccessStatusCode)
-            return (await response.Content.ReadFromJsonAsync<PublishVacancyResponse>(), null);
-
-        return (null, await ReadErrorAsync(response, "Failed to publish vacancy."));
+        var result = await ApiResponseReader.ReadJsonAsync<PublishVacancyResponse>(response);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to publish vacancy."));
     }
 
     // ── IEditService<VacancyEditModel, Guid> ────────────────────────────────────
@@ -225,21 +191,18 @@ public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
             ExpectedVersion: expectedVersion);
 
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/vacancies/{id}", request);
+        var result = await ApiResponseReader.ReadJsonAsync<UpdateVacancyResponse>(response);
 
-        if (response.IsSuccessStatusCode)
-        {
-            var updated = await response.Content.ReadFromJsonAsync<UpdateVacancyResponse>();
-            return ApiSaveResult.Ok(updated?.Version);
-        }
+        if (result.Success)
+            return ApiSaveResult.Ok(result.Value?.Version);
 
-        if (response.StatusCode == HttpStatusCode.Conflict)
-            return ApiSaveResult.Fail(
-                await ReadErrorAsync(response, "Someone else changed this vacancy while you were editing.")
-                    ?? "Someone else changed this vacancy while you were editing.",
-                isConcurrencyConflict: true);
-
+        // The recruitment API returns no "code" on its 409 body, so ANY 409 is treated as a save conflict.
+        var isConflict = result.FailureKind is ApiFailureKind.Concurrency or ApiFailureKind.Conflict;
         return ApiSaveResult.Fail(
-            await ReadErrorAsync(response, "Failed to update vacancy.") ?? "Failed to update vacancy.");
+            result.DisplayMessage ?? (isConflict
+                ? "Someone else changed this vacancy while you were editing."
+                : "Failed to update vacancy."),
+            isConflict);
     }
 
     async Task<(VacancyEditModel? Result, string? Error)> IEditService<VacancyEditModel, Guid>.CreateAsync(Guid companyId, VacancyEditModel model)
@@ -272,22 +235,4 @@ public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
         var (updated, error) = await UpdateVacancyAsync(companyId, id, request);
         return (updated is null ? null : model, error);
     }
-
-    private static async Task<string?> ReadErrorAsync(HttpResponseMessage response, string fallback)
-    {
-        if (response.StatusCode is HttpStatusCode.NotFound)
-            return "Vacancy not found.";
-
-        try
-        {
-            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-            return body?.Error ?? fallback;
-        }
-        catch
-        {
-            return fallback;
-        }
-    }
-
-    private sealed record ErrorEnvelope(string? Error);
 }

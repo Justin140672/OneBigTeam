@@ -1,6 +1,5 @@
 using HR.SharedKernel;
-using System.Net;
-using System.Net.Http.Json;
+using HR.SharedKernel.Http;
 using HR.Web.Models;
 
 namespace HR.Web.Services;
@@ -12,15 +11,9 @@ public sealed class RecruitmentStageService(HrApiHttpClientFactory httpClientFac
 
     public async Task<ListRecruitmentStagesResponse?> ListStagesAsync(Guid companyId)
     {
-        try
-        {
-            return await Http.GetFromJsonAsync<ListRecruitmentStagesResponse>(
-                $"api/companies/{companyId}/recruitment-stages", HrApiJsonOptions.Default);
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
+        var result = await ApiResponseReader.ExecuteAsync<ListRecruitmentStagesResponse>(
+            ct => Http.GetAsync($"api/companies/{companyId}/recruitment-stages", ct), HrApiJsonOptions.Default);
+        return result.Success ? result.Value : null;
     }
 
     // DSH-03: non-swallowing sibling of ListStagesAsync.
@@ -33,11 +26,8 @@ public sealed class RecruitmentStageService(HrApiHttpClientFactory httpClientFac
     {
         var response = await Http.PostAsJsonAsync(
             $"api/companies/{companyId}/recruitment-stages", request, HrApiJsonOptions.Default);
-
-        if (response.IsSuccessStatusCode)
-            return (await response.Content.ReadFromJsonAsync<CreateRecruitmentStageResponse>(HrApiJsonOptions.Default), null);
-
-        return (null, await ReadErrorAsync(response, "Failed to create recruitment stage."));
+        var result = await ApiResponseReader.ReadJsonAsync<CreateRecruitmentStageResponse>(response, HrApiJsonOptions.Default);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to create recruitment stage."));
     }
 
     public async Task<(UpdateRecruitmentStageResponse? Result, string? Error)> UpdateAsync(
@@ -45,11 +35,8 @@ public sealed class RecruitmentStageService(HrApiHttpClientFactory httpClientFac
     {
         var response = await Http.PutAsJsonAsync(
             $"api/companies/{companyId}/recruitment-stages/{recruitmentStageId}", request, HrApiJsonOptions.Default);
-
-        if (response.IsSuccessStatusCode)
-            return (await response.Content.ReadFromJsonAsync<UpdateRecruitmentStageResponse>(HrApiJsonOptions.Default), null);
-
-        return (null, await ReadErrorAsync(response, "Failed to update recruitment stage."));
+        var result = await ApiResponseReader.ReadJsonAsync<UpdateRecruitmentStageResponse>(response, HrApiJsonOptions.Default);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to update recruitment stage."));
     }
 
     public async Task<(ReorderRecruitmentStagesResponse? Result, string? Error)> ReorderAsync(
@@ -58,11 +45,8 @@ public sealed class RecruitmentStageService(HrApiHttpClientFactory httpClientFac
         var request = new ReorderRecruitmentStagesRequest(companyId, orderedStageIds);
         var response = await Http.PostAsJsonAsync(
             $"api/companies/{companyId}/recruitment-stages/reorder", request, HrApiJsonOptions.Default);
-
-        if (response.IsSuccessStatusCode)
-            return (await response.Content.ReadFromJsonAsync<ReorderRecruitmentStagesResponse>(HrApiJsonOptions.Default), null);
-
-        return (null, await ReadErrorAsync(response, "Failed to reorder recruitment stages."));
+        var result = await ApiResponseReader.ReadJsonAsync<ReorderRecruitmentStagesResponse>(response, HrApiJsonOptions.Default);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to reorder recruitment stages."));
     }
 
     public async Task<(SetRecruitmentStageActiveStatusResponse? Result, string? Error)> SetActiveStatusAsync(
@@ -71,24 +55,16 @@ public sealed class RecruitmentStageService(HrApiHttpClientFactory httpClientFac
         var request = new SetRecruitmentStageActiveStatusRequest(companyId, recruitmentStageId, isActive);
         var response = await Http.PostAsJsonAsync(
             $"api/companies/{companyId}/recruitment-stages/{recruitmentStageId}/active-status", request, HrApiJsonOptions.Default);
-
-        if (response.IsSuccessStatusCode)
-            return (await response.Content.ReadFromJsonAsync<SetRecruitmentStageActiveStatusResponse>(HrApiJsonOptions.Default), null);
-
-        return (null, await ReadErrorAsync(response, "Failed to update active status."));
+        var result = await ApiResponseReader.ReadJsonAsync<SetRecruitmentStageActiveStatusResponse>(response, HrApiJsonOptions.Default);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to update active status."));
     }
 
     public async Task<GetRecruitmentStageUsageResponse?> GetUsageAsync(Guid companyId, Guid recruitmentStageId)
     {
-        try
-        {
-            return await Http.GetFromJsonAsync<GetRecruitmentStageUsageResponse>(
-                $"api/companies/{companyId}/recruitment-stages/{recruitmentStageId}/usage", HrApiJsonOptions.Default);
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
+        var result = await ApiResponseReader.ExecuteAsync<GetRecruitmentStageUsageResponse>(
+            ct => Http.GetAsync($"api/companies/{companyId}/recruitment-stages/{recruitmentStageId}/usage", ct),
+            HrApiJsonOptions.Default);
+        return result.Success ? result.Value : null;
     }
 
     // ── IEditService<RecruitmentStageEditModel, Guid> ────────────────────────
@@ -118,21 +94,18 @@ public sealed class RecruitmentStageService(HrApiHttpClientFactory httpClientFac
 
         var response = await Http.PutAsJsonAsync(
             $"api/companies/{companyId}/recruitment-stages/{id}", request, HrApiJsonOptions.Default);
+        var result = await ApiResponseReader.ReadJsonAsync<UpdateRecruitmentStageResponse>(response, HrApiJsonOptions.Default);
 
-        if (response.IsSuccessStatusCode)
-        {
-            var updated = await response.Content.ReadFromJsonAsync<UpdateRecruitmentStageResponse>(HrApiJsonOptions.Default);
-            return ApiSaveResult.Ok(updated?.Version);
-        }
+        if (result.Success)
+            return ApiSaveResult.Ok(result.Value?.Version);
 
-        if (response.StatusCode == HttpStatusCode.Conflict)
-            return ApiSaveResult.Fail(
-                await ReadErrorAsync(response, "Someone else changed this recruitment stage while you were editing.")
-                    ?? "Someone else changed this recruitment stage while you were editing.",
-                isConcurrencyConflict: true);
-
+        // The recruitment API returns no "code" on its 409 body, so ANY 409 is treated as a save conflict.
+        var isConflict = result.FailureKind is ApiFailureKind.Concurrency or ApiFailureKind.Conflict;
         return ApiSaveResult.Fail(
-            await ReadErrorAsync(response, "Failed to update recruitment stage.") ?? "Failed to update recruitment stage.");
+            result.DisplayMessage ?? (isConflict
+                ? "Someone else changed this recruitment stage while you were editing."
+                : "Failed to update recruitment stage."),
+            isConflict);
     }
 
     async Task<(RecruitmentStageEditModel? Result, string? Error)> IEditService<RecruitmentStageEditModel, Guid>.CreateAsync(
@@ -160,22 +133,4 @@ public sealed class RecruitmentStageService(HrApiHttpClientFactory httpClientFac
         var (updated, error) = await UpdateAsync(companyId, id, request);
         return (updated is null ? null : model, error);
     }
-
-    private static async Task<string?> ReadErrorAsync(HttpResponseMessage response, string fallback)
-    {
-        if (response.StatusCode is HttpStatusCode.NotFound)
-            return "Recruitment stage not found.";
-
-        try
-        {
-            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-            return body?.Error ?? fallback;
-        }
-        catch
-        {
-            return fallback;
-        }
-    }
-
-    private sealed record ErrorEnvelope(string? Error);
 }

@@ -1,8 +1,7 @@
 using System.Net.Http.Headers;
-using System.Net.Http.Json;
 using System.Text;
-using System.Text.Json;
 using HR.SharedKernel;
+using HR.SharedKernel.Http;
 using HR.Web.Models;
 using Microsoft.AspNetCore.Components.Forms;
 
@@ -208,62 +207,25 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
     public async Task<string?> AcknowledgeSharedCompanyDocumentAsync(
         Guid companyId, Guid documentId, Guid? taskId, bool confirmed, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await Http.PostAsJsonAsync(
-                $"api/companies/{companyId}/shared-documents/{documentId}/acknowledge",
-                new { TaskId = taskId, Confirmed = confirmed }, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-                return null;
-
-            try
-            {
-                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-                if (body.TryGetProperty("error", out var errorProp))
-                    return errorProp.GetString();
-            }
-            catch { }
-
-            return $"Acknowledge failed ({(int)response.StatusCode}).";
-        }
-        catch (Exception ex)
-        {
-            return ex.Message;
-        }
+        var response = await Http.PostAsJsonAsync(
+            $"api/companies/{companyId}/shared-documents/{documentId}/acknowledge",
+            new { TaskId = taskId, Confirmed = confirmed }, cancellationToken);
+        var result = await ApiResponseReader.ReadNoContentAsync(response, cancellationToken);
+        return result.Success ? null : (result.DisplayMessage ?? "Acknowledge failed.");
     }
 
-    // Ticket 2: shared parser — reads the round-tripped version on success and the
-    // { error, code: "concurrency" } envelope that flags a stale-save 409.
+    private sealed record VersionBody(int? Version);
+
+    // Ticket 2 / centralised response reading: reads the round-tripped version on success and
+    // classifies failures (including the { error, code: "concurrency" } envelope that flags a
+    // stale-save 409) via the shared ApiResponseReader, instead of a bespoke local parser.
     private static async Task<ApiSaveResult> ReadSaveResultAsync(
         HttpResponseMessage response, string fallbackError, CancellationToken cancellationToken)
     {
-        if (response.IsSuccessStatusCode)
-        {
-            try
-            {
-                var ok = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-                if (ok.ValueKind == JsonValueKind.Object
-                    && ok.TryGetProperty("version", out var versionProp)
-                    && versionProp.TryGetInt32(out var version))
-                    return ApiSaveResult.Ok(version);
-            }
-            catch { }
-
-            return ApiSaveResult.Ok(null);
-        }
-
-        string? error = null;
-        string? code = null;
-        try
-        {
-            var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-            if (body.TryGetProperty("error", out var errorProp)) error = errorProp.GetString();
-            if (body.TryGetProperty("code", out var codeProp)) code = codeProp.GetString();
-        }
-        catch { }
-
-        return ApiSaveResult.Fail(error ?? $"{fallbackError} ({(int)response.StatusCode}).", code == "concurrency");
+        var result = await ApiResponseReader.ReadJsonAsync<VersionBody>(response, HrApiJsonOptions.Default, cancellationToken);
+        return result.Success
+            ? ApiSaveResult.Ok(result.Value?.Version)
+            : ApiSaveResult.Fail(result.DisplayMessage ?? $"{fallbackError}.", result.IsConcurrencyConflict);
     }
 
     // Ticket 2: returns an ApiSaveResult carrying the new version and the stale-save 409 flag.
@@ -281,21 +243,14 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         int? expectedVersion = null,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var request = new UpdateSharedCompanyDocumentMetadataRequest(
-                companyId, documentId, FormText.Required(title), FormText.Optional(description), categoryId, effectiveDate, reviewDate,
-                reviewFrequency, customReviewFrequencyMonths, reviewOwnerEmployeeId, expectedVersion);
+        var request = new UpdateSharedCompanyDocumentMetadataRequest(
+            companyId, documentId, FormText.Required(title), FormText.Optional(description), categoryId, effectiveDate, reviewDate,
+            reviewFrequency, customReviewFrequencyMonths, reviewOwnerEmployeeId, expectedVersion);
 
-            var response = await Http.PutAsJsonAsync(
-                $"api/companies/{companyId}/shared-documents/{documentId}", request, cancellationToken);
+        var response = await Http.PutAsJsonAsync(
+            $"api/companies/{companyId}/shared-documents/{documentId}", request, cancellationToken);
 
-            return await ReadSaveResultAsync(response, "Update failed", cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            return ApiSaveResult.Fail(ex.Message);
-        }
+        return await ReadSaveResultAsync(response, "Update failed", cancellationToken);
     }
 
     // Ticket 2: returns an ApiSaveResult carrying the new version and the stale-save 409 flag.
@@ -309,177 +264,78 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         int? expectedVersion = null,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var request = new UpdateSharedCompanyDocumentAudienceRequest(
-                companyId, documentId, audienceDepartmentIds, audienceLocationIds, audiencePositionProfileIds,
-                audienceEmployeeIds, expectedVersion);
+        var request = new UpdateSharedCompanyDocumentAudienceRequest(
+            companyId, documentId, audienceDepartmentIds, audienceLocationIds, audiencePositionProfileIds,
+            audienceEmployeeIds, expectedVersion);
 
-            var response = await Http.PutAsJsonAsync(
-                $"api/companies/{companyId}/shared-documents/{documentId}/audience", request, cancellationToken);
+        var response = await Http.PutAsJsonAsync(
+            $"api/companies/{companyId}/shared-documents/{documentId}/audience", request, cancellationToken);
 
-            return await ReadSaveResultAsync(response, "Update failed", cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            return ApiSaveResult.Fail(ex.Message);
-        }
+        return await ReadSaveResultAsync(response, "Update failed", cancellationToken);
     }
 
     // Returns null on success, or an error message string on failure.
     public async Task<string?> PublishSharedCompanyDocumentAsync(
         Guid companyId, Guid documentId, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            // FastEndpoints rejects a bodyless POST with 415 Unsupported Media Type once it has
-            // no Content-Type to bind against — an empty JSON object is the minimal body that
-            // satisfies model binding for this action, same as the integration tests' EmptyJson().
-            var response = await Http.PostAsync(
-                $"api/companies/{companyId}/shared-documents/{documentId}/publish",
-                new StringContent("{}", Encoding.UTF8, "application/json"),
-                cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-                return null;
-
-            try
-            {
-                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-                if (body.TryGetProperty("error", out var errorProp))
-                    return errorProp.GetString();
-            }
-            catch { }
-
-            return $"Publish failed ({(int)response.StatusCode}).";
-        }
-        catch (Exception ex)
-        {
-            return ex.Message;
-        }
+        // FastEndpoints rejects a bodyless POST with 415 Unsupported Media Type once it has
+        // no Content-Type to bind against — an empty JSON object is the minimal body that
+        // satisfies model binding for this action, same as the integration tests' EmptyJson().
+        var response = await Http.PostAsync(
+            $"api/companies/{companyId}/shared-documents/{documentId}/publish",
+            new StringContent("{}", Encoding.UTF8, "application/json"),
+            cancellationToken);
+        var result = await ApiResponseReader.ReadNoContentAsync(response, cancellationToken);
+        return result.Success ? null : (result.DisplayMessage ?? "Publish failed.");
     }
 
     // Returns null on success, or an error message string on failure.
     public async Task<string?> ReissueSharedCompanyDocumentAcknowledgementAsync(
         Guid companyId, Guid documentId, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await Http.PostAsync(
-                $"api/companies/{companyId}/shared-documents/{documentId}/reissue-acknowledgement",
-                new StringContent("{}", Encoding.UTF8, "application/json"),
-                cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-                return null;
-
-            try
-            {
-                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-                if (body.TryGetProperty("error", out var errorProp))
-                    return errorProp.GetString();
-            }
-            catch { }
-
-            return $"Reissue failed ({(int)response.StatusCode}).";
-        }
-        catch (Exception ex)
-        {
-            return ex.Message;
-        }
+        var response = await Http.PostAsync(
+            $"api/companies/{companyId}/shared-documents/{documentId}/reissue-acknowledgement",
+            new StringContent("{}", Encoding.UTF8, "application/json"),
+            cancellationToken);
+        var result = await ApiResponseReader.ReadNoContentAsync(response, cancellationToken);
+        return result.Success ? null : (result.DisplayMessage ?? "Reissue failed.");
     }
 
     // Returns null on success, or an error message string on failure.
     public async Task<string?> ArchiveSharedCompanyDocumentAsync(
         Guid companyId, Guid documentId, string reason, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var request = new ArchiveSharedCompanyDocumentRequest(companyId, documentId, FormText.Required(reason));
-
-            var response = await Http.PostAsJsonAsync(
-                $"api/companies/{companyId}/shared-documents/{documentId}/archive", request, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-                return null;
-
-            try
-            {
-                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-                if (body.TryGetProperty("error", out var errorProp))
-                    return errorProp.GetString();
-            }
-            catch { }
-
-            return $"Archive failed ({(int)response.StatusCode}).";
-        }
-        catch (Exception ex)
-        {
-            return ex.Message;
-        }
+        var request = new ArchiveSharedCompanyDocumentRequest(companyId, documentId, FormText.Required(reason));
+        var response = await Http.PostAsJsonAsync(
+            $"api/companies/{companyId}/shared-documents/{documentId}/archive", request, cancellationToken);
+        var result = await ApiResponseReader.ReadNoContentAsync(response, cancellationToken);
+        return result.Success ? null : (result.DisplayMessage ?? "Archive failed.");
     }
 
     // Returns null on success, or an error message string on failure.
     public async Task<string?> ExpireSharedCompanyDocumentAsync(
         Guid companyId, Guid documentId, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            // FastEndpoints rejects a bodyless POST with 415 Unsupported Media Type once it has
-            // no Content-Type to bind against — an empty JSON object is the minimal body that
-            // satisfies model binding for this action, same as the integration tests' EmptyJson().
-            var response = await Http.PostAsync(
-                $"api/companies/{companyId}/shared-documents/{documentId}/expire",
-                new StringContent("{}", Encoding.UTF8, "application/json"),
-                cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-                return null;
-
-            try
-            {
-                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-                if (body.TryGetProperty("error", out var errorProp))
-                    return errorProp.GetString();
-            }
-            catch { }
-
-            return $"Expire failed ({(int)response.StatusCode}).";
-        }
-        catch (Exception ex)
-        {
-            return ex.Message;
-        }
+        // FastEndpoints rejects a bodyless POST with 415 Unsupported Media Type once it has
+        // no Content-Type to bind against — an empty JSON object is the minimal body that
+        // satisfies model binding for this action, same as the integration tests' EmptyJson().
+        var response = await Http.PostAsync(
+            $"api/companies/{companyId}/shared-documents/{documentId}/expire",
+            new StringContent("{}", Encoding.UTF8, "application/json"),
+            cancellationToken);
+        var result = await ApiResponseReader.ReadNoContentAsync(response, cancellationToken);
+        return result.Success ? null : (result.DisplayMessage ?? "Expire failed.");
     }
 
     // Returns null on success, or an error message string on failure.
     public async Task<string?> CompleteSharedCompanyDocumentReviewAsync(
         Guid companyId, Guid documentId, string reviewNotes, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var request = new CompleteSharedCompanyDocumentReviewRequest(companyId, documentId, FormText.Required(reviewNotes));
-
-            var response = await Http.PostAsJsonAsync(
-                $"api/companies/{companyId}/shared-documents/{documentId}/complete-review", request, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-                return null;
-
-            try
-            {
-                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-                if (body.TryGetProperty("error", out var errorProp))
-                    return errorProp.GetString();
-            }
-            catch { }
-
-            return $"Complete review failed ({(int)response.StatusCode}).";
-        }
-        catch (Exception ex)
-        {
-            return ex.Message;
-        }
+        var request = new CompleteSharedCompanyDocumentReviewRequest(companyId, documentId, FormText.Required(reviewNotes));
+        var response = await Http.PostAsJsonAsync(
+            $"api/companies/{companyId}/shared-documents/{documentId}/complete-review", request, cancellationToken);
+        var result = await ApiResponseReader.ReadNoContentAsync(response, cancellationToken);
+        return result.Success ? null : (result.DisplayMessage ?? "Complete review failed.");
     }
 
     // Ticket 2: returns an ApiSaveResult carrying the new version and the stale-save 409 flag.
@@ -492,21 +348,14 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         int? expectedVersion = null,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var request = new UpdateSharedCompanyDocumentAcknowledgementSettingsRequest(
-                companyId, documentId, requiresAcknowledgement, acknowledgementDueDate, acknowledgementStatement,
-                expectedVersion);
+        var request = new UpdateSharedCompanyDocumentAcknowledgementSettingsRequest(
+            companyId, documentId, requiresAcknowledgement, acknowledgementDueDate, acknowledgementStatement,
+            expectedVersion);
 
-            var response = await Http.PutAsJsonAsync(
-                $"api/companies/{companyId}/shared-documents/{documentId}/acknowledgement-settings", request, cancellationToken);
+        var response = await Http.PutAsJsonAsync(
+            $"api/companies/{companyId}/shared-documents/{documentId}/acknowledgement-settings", request, cancellationToken);
 
-            return await ReadSaveResultAsync(response, "Update failed", cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            return ApiSaveResult.Fail(ex.Message);
-        }
+        return await ReadSaveResultAsync(response, "Update failed", cancellationToken);
     }
 
     // Returns null on success, or an error message string on failure.
@@ -519,41 +368,23 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         string? acknowledgementStatement = null,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            using var content = new MultipartFormDataContent();
-            content.Add(new StringContent(FormText.Required(versionNote)), "VersionNote");
-            content.Add(new StringContent(requiresReacknowledgement.ToString()), "RequiresReacknowledgement");
-            var acknowledgement = FormText.Optional(acknowledgementStatement);
-            if (acknowledgement is not null)
-                content.Add(new StringContent(acknowledgement), "AcknowledgementStatement");
+        using var content = new MultipartFormDataContent();
+        content.Add(new StringContent(FormText.Required(versionNote)), "VersionNote");
+        content.Add(new StringContent(requiresReacknowledgement.ToString()), "RequiresReacknowledgement");
+        var acknowledgement = FormText.Optional(acknowledgementStatement);
+        if (acknowledgement is not null)
+            content.Add(new StringContent(acknowledgement), "AcknowledgementStatement");
 
-            await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
-            var fileContent = new StreamContent(stream);
-            fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
-            content.Add(fileContent, "File", file.Name);
+        await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
+        var fileContent = new StreamContent(stream);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+        content.Add(fileContent, "File", file.Name);
 
-            var response = await Http.PostAsync(
-                $"api/companies/{companyId}/shared-documents/{documentId}/versions",
-                content, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-                return null;
-
-            try
-            {
-                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-                if (body.TryGetProperty("error", out var errorProp))
-                    return errorProp.GetString();
-            }
-            catch { }
-
-            return $"Upload failed ({(int)response.StatusCode}).";
-        }
-        catch (Exception ex)
-        {
-            return ex.Message;
-        }
+        var response = await Http.PostAsync(
+            $"api/companies/{companyId}/shared-documents/{documentId}/versions",
+            content, cancellationToken);
+        var result = await ApiResponseReader.ReadNoContentAsync(response, cancellationToken);
+        return result.Success ? null : (result.DisplayMessage ?? "Upload failed.");
     }
 
     // Relative URL for the download redirect endpoint — bind directly to an <a href> so the
@@ -587,64 +418,46 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         Guid? reviewOwnerEmployeeId = null,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            using var content = new MultipartFormDataContent();
-            content.Add(new StringContent(FormText.Required(title)), "Title");
-            var normalizedDescription = FormText.Optional(description);
-            if (normalizedDescription is not null)
-                content.Add(new StringContent(normalizedDescription), "Description");
-            content.Add(new StringContent(categoryId.ToString()), "CategoryId");
-            if (effectiveDate.HasValue)
-                content.Add(new StringContent(effectiveDate.Value.ToString("yyyy-MM-dd")), "EffectiveDate");
-            if (reviewDate.HasValue)
-                content.Add(new StringContent(reviewDate.Value.ToString("yyyy-MM-dd")), "ReviewDate");
-            content.Add(new StringContent(reviewFrequency), "ReviewFrequency");
-            if (customReviewFrequencyMonths.HasValue)
-                content.Add(new StringContent(customReviewFrequencyMonths.Value.ToString()), "CustomReviewFrequencyMonths");
-            if (reviewOwnerEmployeeId.HasValue)
-                content.Add(new StringContent(reviewOwnerEmployeeId.Value.ToString()), "ReviewOwnerEmployeeId");
-            foreach (var id in audienceDepartmentIds)
-                content.Add(new StringContent(id.ToString()), "AudienceDepartmentIds");
-            foreach (var id in audienceLocationIds)
-                content.Add(new StringContent(id.ToString()), "AudienceLocationIds");
-            foreach (var id in audiencePositionProfileIds)
-                content.Add(new StringContent(id.ToString()), "AudiencePositionProfileIds");
-            foreach (var id in audienceEmployeeIds)
-                content.Add(new StringContent(id.ToString()), "AudienceEmployeeIds");
-            content.Add(new StringContent(requiresAcknowledgement.ToString()), "RequiresAcknowledgement");
-            if (acknowledgementDueDate.HasValue)
-                content.Add(new StringContent(acknowledgementDueDate.Value.ToString("yyyy-MM-dd")), "AcknowledgementDueDate");
-            var normalizedAcknowledgementStatement = FormText.Optional(acknowledgementStatement);
-            if (normalizedAcknowledgementStatement is not null)
-                content.Add(new StringContent(normalizedAcknowledgementStatement), "AcknowledgementStatement");
+        using var content = new MultipartFormDataContent();
+        content.Add(new StringContent(FormText.Required(title)), "Title");
+        var normalizedDescription = FormText.Optional(description);
+        if (normalizedDescription is not null)
+            content.Add(new StringContent(normalizedDescription), "Description");
+        content.Add(new StringContent(categoryId.ToString()), "CategoryId");
+        if (effectiveDate.HasValue)
+            content.Add(new StringContent(effectiveDate.Value.ToString("yyyy-MM-dd")), "EffectiveDate");
+        if (reviewDate.HasValue)
+            content.Add(new StringContent(reviewDate.Value.ToString("yyyy-MM-dd")), "ReviewDate");
+        content.Add(new StringContent(reviewFrequency), "ReviewFrequency");
+        if (customReviewFrequencyMonths.HasValue)
+            content.Add(new StringContent(customReviewFrequencyMonths.Value.ToString()), "CustomReviewFrequencyMonths");
+        if (reviewOwnerEmployeeId.HasValue)
+            content.Add(new StringContent(reviewOwnerEmployeeId.Value.ToString()), "ReviewOwnerEmployeeId");
+        foreach (var id in audienceDepartmentIds)
+            content.Add(new StringContent(id.ToString()), "AudienceDepartmentIds");
+        foreach (var id in audienceLocationIds)
+            content.Add(new StringContent(id.ToString()), "AudienceLocationIds");
+        foreach (var id in audiencePositionProfileIds)
+            content.Add(new StringContent(id.ToString()), "AudiencePositionProfileIds");
+        foreach (var id in audienceEmployeeIds)
+            content.Add(new StringContent(id.ToString()), "AudienceEmployeeIds");
+        content.Add(new StringContent(requiresAcknowledgement.ToString()), "RequiresAcknowledgement");
+        if (acknowledgementDueDate.HasValue)
+            content.Add(new StringContent(acknowledgementDueDate.Value.ToString("yyyy-MM-dd")), "AcknowledgementDueDate");
+        var normalizedAcknowledgementStatement = FormText.Optional(acknowledgementStatement);
+        if (normalizedAcknowledgementStatement is not null)
+            content.Add(new StringContent(normalizedAcknowledgementStatement), "AcknowledgementStatement");
 
-            await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
-            var fileContent = new StreamContent(stream);
-            fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
-            content.Add(fileContent, "File", file.Name);
+        await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
+        var fileContent = new StreamContent(stream);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+        content.Add(fileContent, "File", file.Name);
 
-            var response = await Http.PostAsync(
-                $"api/companies/{companyId}/shared-documents",
-                content, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-                return null;
-
-            try
-            {
-                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-                if (body.TryGetProperty("error", out var errorProp))
-                    return errorProp.GetString();
-            }
-            catch { }
-
-            return $"Upload failed ({(int)response.StatusCode}).";
-        }
-        catch (Exception ex)
-        {
-            return ex.Message;
-        }
+        var response = await Http.PostAsync(
+            $"api/companies/{companyId}/shared-documents",
+            content, cancellationToken);
+        var result = await ApiResponseReader.ReadNoContentAsync(response, cancellationToken);
+        return result.Success ? null : (result.DisplayMessage ?? "Upload failed.");
     }
 
     // Returns null on success, or an error message string on failure.
@@ -659,46 +472,27 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         IBrowserFile file,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            using var content = new MultipartFormDataContent();
-            content.Add(new StringContent(FormText.Required(title)), "Title");
-            var normalizedDescription = FormText.Optional(description);
-            if (normalizedDescription is not null)
-                content.Add(new StringContent(normalizedDescription), "Description");
-            content.Add(new StringContent(documentTypeId.ToString()), "DocumentTypeId");
-            if (issueDate.HasValue)
-                content.Add(new StringContent(issueDate.Value.ToString("yyyy-MM-dd")), "IssueDate");
-            if (expiryDate.HasValue)
-                content.Add(new StringContent(expiryDate.Value.ToString("yyyy-MM-dd")), "ExpiryDate");
+        using var content = new MultipartFormDataContent();
+        content.Add(new StringContent(FormText.Required(title)), "Title");
+        var normalizedDescription = FormText.Optional(description);
+        if (normalizedDescription is not null)
+            content.Add(new StringContent(normalizedDescription), "Description");
+        content.Add(new StringContent(documentTypeId.ToString()), "DocumentTypeId");
+        if (issueDate.HasValue)
+            content.Add(new StringContent(issueDate.Value.ToString("yyyy-MM-dd")), "IssueDate");
+        if (expiryDate.HasValue)
+            content.Add(new StringContent(expiryDate.Value.ToString("yyyy-MM-dd")), "ExpiryDate");
 
-            await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
-            var fileContent = new StreamContent(stream);
-            fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
-            content.Add(fileContent, "File", file.Name);
+        await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
+        var fileContent = new StreamContent(stream);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+        content.Add(fileContent, "File", file.Name);
 
-            var response = await Http.PostAsync(
-                $"api/companies/{companyId}/employees/{employeeId}/documents",
-                content, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-                return null;
-
-            // Try to surface the structured error message from the API.
-            try
-            {
-                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-                if (body.TryGetProperty("error", out var errorProp))
-                    return errorProp.GetString();
-            }
-            catch { }
-
-            return $"Upload failed ({(int)response.StatusCode}).";
-        }
-        catch (Exception ex)
-        {
-            return ex.Message;
-        }
+        var response = await Http.PostAsync(
+            $"api/companies/{companyId}/employees/{employeeId}/documents",
+            content, cancellationToken);
+        var result = await ApiResponseReader.ReadNoContentAsync(response, cancellationToken);
+        return result.Success ? null : (result.DisplayMessage ?? "Upload failed.");
     }
 
     public async Task<string?> UploadRequestedDocumentAsync(
@@ -712,58 +506,36 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         IBrowserFile file,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            using var content = new MultipartFormDataContent();
-            content.Add(new StringContent(FormText.Required(title)), "Title");
-            var normalizedDescription = FormText.Optional(description);
-            if (normalizedDescription is not null)
-                content.Add(new StringContent(normalizedDescription), "Description");
-            if (issueDate.HasValue)
-                content.Add(new StringContent(issueDate.Value.ToString("yyyy-MM-dd")), "IssueDate");
-            if (expiryDate.HasValue)
-                content.Add(new StringContent(expiryDate.Value.ToString("yyyy-MM-dd")), "ExpiryDate");
+        using var content = new MultipartFormDataContent();
+        content.Add(new StringContent(FormText.Required(title)), "Title");
+        var normalizedDescription = FormText.Optional(description);
+        if (normalizedDescription is not null)
+            content.Add(new StringContent(normalizedDescription), "Description");
+        if (issueDate.HasValue)
+            content.Add(new StringContent(issueDate.Value.ToString("yyyy-MM-dd")), "IssueDate");
+        if (expiryDate.HasValue)
+            content.Add(new StringContent(expiryDate.Value.ToString("yyyy-MM-dd")), "ExpiryDate");
 
-            await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
-            var fileContent = new StreamContent(stream);
-            fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
-            content.Add(fileContent, "File", file.Name);
+        await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
+        var fileContent = new StreamContent(stream);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+        content.Add(fileContent, "File", file.Name);
 
-            var response = await Http.PostAsync(
-                $"api/companies/{companyId}/employees/{employeeId}/document-requests/{documentRequestId}/upload",
-                content, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-                return null;
-
-            try
-            {
-                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-                if (body.TryGetProperty("error", out var errorProp))
-                    return errorProp.GetString();
-            }
-            catch { }
-
-            return $"Upload failed ({(int)response.StatusCode}).";
-        }
-        catch (Exception ex)
-        {
-            return ex.Message;
-        }
+        var response = await Http.PostAsync(
+            $"api/companies/{companyId}/employees/{employeeId}/document-requests/{documentRequestId}/upload",
+            content, cancellationToken);
+        var result = await ApiResponseReader.ReadNoContentAsync(response, cancellationToken);
+        return result.Success ? null : (result.DisplayMessage ?? "Upload failed.");
     }
 
     public async Task<bool> CancelDocumentRequestAsync(
         Guid companyId, Guid employeeId, Guid documentRequestId,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await Http.DeleteAsync(
-                $"api/companies/{companyId}/employees/{employeeId}/document-requests/{documentRequestId}",
-                cancellationToken);
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
+        var response = await Http.DeleteAsync(
+            $"api/companies/{companyId}/employees/{employeeId}/document-requests/{documentRequestId}",
+            cancellationToken);
+        return response.IsSuccessStatusCode;
     }
 
     public async Task<string?> RequestDocumentAsync(
@@ -775,44 +547,22 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         string? notes,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var body = new { documentTypeId, dueDate = dueDate?.ToString("yyyy-MM-dd"), isMandatory, notes };
-            var response = await Http.PostAsJsonAsync(
-                $"api/companies/{companyId}/employees/{employeeId}/document-requests",
-                body, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-                return null;
-
-            try
-            {
-                var json = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-                if (json.TryGetProperty("error", out var errorProp))
-                    return errorProp.GetString();
-            }
-            catch { }
-
-            return $"Request failed ({(int)response.StatusCode}).";
-        }
-        catch (Exception ex)
-        {
-            return ex.Message;
-        }
+        var body = new { documentTypeId, dueDate = dueDate?.ToString("yyyy-MM-dd"), isMandatory, notes };
+        var response = await Http.PostAsJsonAsync(
+            $"api/companies/{companyId}/employees/{employeeId}/document-requests",
+            body, cancellationToken);
+        var result = await ApiResponseReader.ReadNoContentAsync(response, cancellationToken);
+        return result.Success ? null : (result.DisplayMessage ?? "Request failed.");
     }
 
     public async Task<bool> DeleteEmployeeDocumentAsync(
         Guid companyId, Guid employeeId, Guid employeeDocumentId,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await Http.DeleteAsync(
-                $"api/companies/{companyId}/employees/{employeeId}/documents/{employeeDocumentId}",
-                cancellationToken);
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
+        var response = await Http.DeleteAsync(
+            $"api/companies/{companyId}/employees/{employeeId}/documents/{employeeDocumentId}",
+            cancellationToken);
+        return response.IsSuccessStatusCode;
     }
 
     // Relative URL for the download redirect endpoint — bind directly to an <a href> so the
@@ -831,40 +581,22 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         IBrowserFile file,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            using var content = new MultipartFormDataContent();
-            if (issueDate.HasValue)
-                content.Add(new StringContent(issueDate.Value.ToString("yyyy-MM-dd")), "IssueDate");
-            if (expiryDate.HasValue)
-                content.Add(new StringContent(expiryDate.Value.ToString("yyyy-MM-dd")), "ExpiryDate");
+        using var content = new MultipartFormDataContent();
+        if (issueDate.HasValue)
+            content.Add(new StringContent(issueDate.Value.ToString("yyyy-MM-dd")), "IssueDate");
+        if (expiryDate.HasValue)
+            content.Add(new StringContent(expiryDate.Value.ToString("yyyy-MM-dd")), "ExpiryDate");
 
-            await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
-            var fileContent = new StreamContent(stream);
-            fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
-            content.Add(fileContent, "File", file.Name);
+        await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
+        var fileContent = new StreamContent(stream);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
+        content.Add(fileContent, "File", file.Name);
 
-            var response = await Http.PostAsync(
-                $"api/companies/{companyId}/employees/{employeeId}/documents/{employeeDocumentId}/versions",
-                content, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-                return null;
-
-            try
-            {
-                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-                if (body.TryGetProperty("error", out var errorProp))
-                    return errorProp.GetString();
-            }
-            catch { }
-
-            return $"Upload failed ({(int)response.StatusCode}).";
-        }
-        catch (Exception ex)
-        {
-            return ex.Message;
-        }
+        var response = await Http.PostAsync(
+            $"api/companies/{companyId}/employees/{employeeId}/documents/{employeeDocumentId}/versions",
+            content, cancellationToken);
+        var result = await ApiResponseReader.ReadNoContentAsync(response, cancellationToken);
+        return result.Success ? null : (result.DisplayMessage ?? "Upload failed.");
     }
 
     public async Task<IReadOnlyList<EmployeeDocumentVersionHistoryItem>> GetEmployeeDocumentVersionHistoryAsync(

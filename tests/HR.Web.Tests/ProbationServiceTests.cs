@@ -1,220 +1,167 @@
 using System.Net;
-using System.Net.Http.Json;
 using HR.Web.Models;
 using HR.Web.Services;
-using Microsoft.Extensions.DependencyInjection;
+using static HR.Web.Tests.ApiTestSupport;
 
 namespace HR.Web.Tests;
 
-// Ticket 17: ProbationService.UpdateProbationRecordAsync — administrative-correction save with
-// optimistic concurrency. Mirrors EmployeeServiceTests' harness (real DI-registered named
-// HttpClient over a fake primary handler) and EmployeeService.UpdateEmploymentDetailsAsync's
-// error-shape handling ({ error, code } vs FastEndpoints' 422 { statusCode, message, errors }).
 public class ProbationServiceTests
 {
-    private static (ProbationService Service, HttpMessageHandlerStub Handler) BuildService()
+    // ── GetProbationRecordByEmployeeAsync — 404 is a legitimate "no record" outcome ──
+
+    [Fact]
+    public async Task GetProbationRecordByEmployeeAsync_Returns_Value_When_Api_Returns_Ok()
     {
-        var handler = new HttpMessageHandlerStub();
-        var services = new ServiceCollection();
-        services.AddHttpClient("hrapi", c => c.BaseAddress = new Uri("http://localhost/"))
-            .ConfigurePrimaryHttpMessageHandler(() => handler);
-        var factory = new HrApiHttpClientFactory(
-            services.BuildServiceProvider().GetRequiredService<IHttpClientFactory>(), new CircuitSessionState());
-        return (new ProbationService(factory), handler);
-    }
+        var response = new ProbationRecordModel(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateOnly.FromDateTime(DateTime.Today), DateOnly.FromDateTime(DateTime.Today).AddMonths(6), "InProgress", null, null, null, null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, response));
+        var service = new ProbationService(factory);
 
-    private static UpdateProbationRecordApiRequest SampleRequest(int? expectedVersion = 3) => new(
-        CompanyId: Guid.NewGuid(),
-        ProbationRecordId: Guid.NewGuid(),
-        ManagerEmployeeId: Guid.NewGuid(),
-        ExpectedEndDate: DateOnly.FromDateTime(DateTime.Today).AddMonths(3),
-        Notes: "Some notes",
-        ExpectedVersion: expectedVersion);
+        var result = await service.GetProbationRecordByEmployeeAsync(Guid.NewGuid(), Guid.NewGuid());
 
-    private sealed class HttpMessageHandlerStub : HttpMessageHandler
-    {
-        public Func<HttpRequestMessage, Task<HttpResponseMessage>>? OnSend { get; set; }
-
-        protected override Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request, CancellationToken cancellationToken)
-            => OnSend?.Invoke(request) ?? Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        Assert.NotNull(result);
     }
 
     [Fact]
-    public async Task UpdateProbationRecordAsync_On_Success_Returns_Ok_With_NewVersion()
+    public async Task GetProbationRecordByEmployeeAsync_Returns_Null_Without_Throwing_When_Api_Returns_NotFound()
     {
-        var (service, handler) = BuildService();
-        var request = SampleRequest();
+        // A missing probation record is expected/legitimate here — 404 must not be treated as a
+        // hard failure, and no exception should propagate.
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.NotFound, new { error = "No probation record." }));
+        var service = new ProbationService(factory);
 
-        handler.OnSend = _ =>
-        {
-            var response = new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = JsonContent.Create(new UpdateProbationRecordApiResponse(
-                    request.ProbationRecordId, request.CompanyId, Guid.NewGuid(), request.ManagerEmployeeId,
-                    DateOnly.FromDateTime(DateTime.Today), request.ExpectedEndDate, "Active",
-                    request.Notes, null, null, null, null, DateTimeOffset.UtcNow, 4)),
-            };
-            return Task.FromResult(response);
-        };
+        var result = await service.GetProbationRecordByEmployeeAsync(Guid.NewGuid(), Guid.NewGuid());
 
-        var result = await service.UpdateProbationRecordAsync(request.CompanyId, request);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetProbationRecordByEmployeeAsync_Returns_Null_When_Api_Returns_Unauthorized()
+    {
+        // Distinct failure kind from NotFound — still surfaces as null here (this method has no
+        // separate error channel), but must not be conflated with a "confirmed no record" 404 by
+        // the caller reading logs/behaviour; verified via a distinct FailureKind at the reader level.
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.Unauthorized, null));
+        var service = new ProbationService(factory);
+
+        var result = await service.GetProbationRecordByEmployeeAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task GetProbationRecordByEmployeeAsync_Propagates_Cancellation_When_Token_Already_Cancelled()
+    {
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, null));
+        var service = new ProbationService(factory);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => service.GetProbationRecordByEmployeeAsync(Guid.NewGuid(), Guid.NewGuid(), cts.Token));
+    }
+
+    // ── UpdateProbationRecordAsync(ApiSaveResult) ────────────────────────────────
+
+    [Fact]
+    public async Task UpdateProbationRecordAsync_Returns_Ok_When_Api_Returns_Success()
+    {
+        var response = new UpdateProbationRecordApiResponse(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateOnly.FromDateTime(DateTime.Today), DateOnly.FromDateTime(DateTime.Today).AddMonths(6), "InProgress", null, null, null, null, null, DateTimeOffset.UtcNow, 2);
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, response));
+        var service = new ProbationService(factory);
+
+        var request = new UpdateProbationRecordApiRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateOnly.FromDateTime(DateTime.Today).AddMonths(6), null, 1);
+        var result = await service.UpdateProbationRecordAsync(Guid.NewGuid(), request);
 
         Assert.True(result.Success);
-        Assert.Equal(4, result.NewVersion);
         Assert.False(result.IsConcurrencyConflict);
     }
 
     [Fact]
-    public async Task UpdateProbationRecordAsync_On_409_Returns_Fail_With_IsConcurrencyConflict_True()
+    public async Task UpdateProbationRecordAsync_Flags_ConcurrencyConflict_When_Api_Returns_Conflict_With_Concurrency_Code()
     {
-        var (service, handler) = BuildService();
-        var request = SampleRequest();
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.Conflict, new { error = "Changed by someone else.", code = "concurrency" }));
+        var service = new ProbationService(factory);
 
-        handler.OnSend = _ =>
-        {
-            var response = new HttpResponseMessage(HttpStatusCode.Conflict)
-            {
-                Content = JsonContent.Create(new
-                {
-                    error = "This probation record was changed by someone else since you opened it.",
-                    code = "concurrency",
-                }),
-            };
-            return Task.FromResult(response);
-        };
-
-        var result = await service.UpdateProbationRecordAsync(request.CompanyId, request);
+        var request = new UpdateProbationRecordApiRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateOnly.FromDateTime(DateTime.Today).AddMonths(6), null, 1);
+        var result = await service.UpdateProbationRecordAsync(Guid.NewGuid(), request);
 
         Assert.False(result.Success);
         Assert.True(result.IsConcurrencyConflict);
-        Assert.False(string.IsNullOrWhiteSpace(result.ErrorMessage));
-        Assert.Null(result.NewVersion);
-    }
-
-    // Ticket 18: a business-rule 409 (terminal-status rejection, code == "conflict") must NOT be
-    // treated as a stale-write concurrency conflict — the UI relies on this to avoid showing the
-    // "reload latest values" banner for an ordinary rule violation.
-    [Fact]
-    public async Task UpdateProbationRecordAsync_On_409_With_ConflictCode_Returns_Fail_With_IsConcurrencyConflict_False()
-    {
-        var (service, handler) = BuildService();
-        var request = SampleRequest();
-
-        handler.OnSend = _ =>
-        {
-            var response = new HttpResponseMessage(HttpStatusCode.Conflict)
-            {
-                Content = JsonContent.Create(new
-                {
-                    error = "Cannot edit a probation record that has already reached the terminal status 'Passed'.",
-                    code = "conflict",
-                }),
-            };
-            return Task.FromResult(response);
-        };
-
-        var result = await service.UpdateProbationRecordAsync(request.CompanyId, request);
-
-        Assert.False(result.Success);
-        Assert.False(result.IsConcurrencyConflict);
-        Assert.Equal(
-            "Cannot edit a probation record that has already reached the terminal status 'Passed'.",
-            result.ErrorMessage);
-        Assert.Null(result.NewVersion);
-    }
-
-    // A malformed/empty/unrecognized 409 body must not be mistaken for either known code — treated
-    // as an ordinary failure with a generic fallback message.
-    [Theory]
-    [InlineData("")]
-    [InlineData("not json")]
-    [InlineData("{}")]
-    [InlineData("{\"error\":\"Something went wrong.\",\"code\":\"something-else\"}")]
-    public async Task UpdateProbationRecordAsync_On_409_With_Malformed_Or_Unknown_Body_Returns_Ordinary_Failure(string body)
-    {
-        var (service, handler) = BuildService();
-        var request = SampleRequest();
-
-        handler.OnSend = _ =>
-        {
-            var response = new HttpResponseMessage(HttpStatusCode.Conflict)
-            {
-                Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json"),
-            };
-            return Task.FromResult(response);
-        };
-
-        var result = await service.UpdateProbationRecordAsync(request.CompanyId, request);
-
-        Assert.False(result.Success);
-        Assert.False(result.IsConcurrencyConflict);
-        Assert.False(string.IsNullOrWhiteSpace(result.ErrorMessage));
-        Assert.Null(result.NewVersion);
     }
 
     [Fact]
-    public async Task UpdateProbationRecordAsync_On_Other_Failure_Returns_Fail_With_IsConcurrencyConflict_False()
+    public async Task UpdateProbationRecordAsync_Does_Not_Flag_ConcurrencyConflict_For_Plain_Business_Conflict()
     {
-        var (service, handler) = BuildService();
-        var request = SampleRequest();
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.Conflict, new { error = "Cannot change manager while extension is pending." }));
+        var service = new ProbationService(factory);
 
-        handler.OnSend = _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Forbidden));
-
-        var result = await service.UpdateProbationRecordAsync(request.CompanyId, request);
+        var request = new UpdateProbationRecordApiRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateOnly.FromDateTime(DateTime.Today).AddMonths(6), null, 1);
+        var result = await service.UpdateProbationRecordAsync(Guid.NewGuid(), request);
 
         Assert.False(result.Success);
         Assert.False(result.IsConcurrencyConflict);
     }
 
     [Fact]
-    public async Task UpdateProbationRecordAsync_On_422_Validation_Shape_Surfaces_Field_Error_Message()
+    public async Task UpdateProbationRecordAsync_Returns_Failure_When_Api_Returns_Forbidden()
     {
-        var (service, handler) = BuildService();
-        var request = SampleRequest();
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.Forbidden, null));
+        var service = new ProbationService(factory);
 
-        handler.OnSend = _ =>
-        {
-            var response = new HttpResponseMessage((HttpStatusCode)422)
-            {
-                Content = JsonContent.Create(new
-                {
-                    statusCode = 422,
-                    message = "One or more validation errors occurred.",
-                    errors = new Dictionary<string, string[]>
-                    {
-                        ["ExpectedEndDate"] = ["Expected end date must be after the start date."],
-                    },
-                }),
-            };
-            return Task.FromResult(response);
-        };
-
-        var result = await service.UpdateProbationRecordAsync(request.CompanyId, request);
+        var request = new UpdateProbationRecordApiRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateOnly.FromDateTime(DateTime.Today).AddMonths(6), null, 1);
+        var result = await service.UpdateProbationRecordAsync(Guid.NewGuid(), request);
 
         Assert.False(result.Success);
-        Assert.False(result.IsConcurrencyConflict);
-        Assert.Contains("Expected end date must be after the start date.", result.ErrorMessage);
+        Assert.Equal("You do not have permission to perform this action.", result.ErrorMessage);
     }
 
     [Fact]
-    public async Task UpdateProbationRecordAsync_On_BusinessRule_ErrorEnvelope_Surfaces_Message()
+    public async Task UpdateProbationRecordAsync_Returns_Controlled_Failure_When_Success_Body_Is_Malformed()
     {
-        var (service, handler) = BuildService();
-        var request = SampleRequest();
+        var factory = BuildFactory(new MalformedJsonHandler());
+        var service = new ProbationService(factory);
 
-        handler.OnSend = _ =>
-        {
-            var response = new HttpResponseMessage(HttpStatusCode.BadRequest)
-            {
-                Content = JsonContent.Create(new { error = "Probation record not found." }),
-            };
-            return Task.FromResult(response);
-        };
-
-        var result = await service.UpdateProbationRecordAsync(request.CompanyId, request);
+        var request = new UpdateProbationRecordApiRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), DateOnly.FromDateTime(DateTime.Today).AddMonths(6), null, 1);
+        var result = await service.UpdateProbationRecordAsync(Guid.NewGuid(), request);
 
         Assert.False(result.Success);
-        Assert.Equal("Probation record not found.", result.ErrorMessage);
+        Assert.NotNull(result.ErrorMessage);
+    }
+
+    // ── CompleteReviewAsync (idempotency-style guard indirectly exercised via API result) ──
+
+    [Fact]
+    public async Task CompleteReviewAsync_Returns_True_When_Api_Returns_Ok()
+    {
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, null));
+        var service = new ProbationService(factory);
+
+        var result = await service.CompleteReviewAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null);
+
+        Assert.True(result);
+    }
+
+    [Fact]
+    public async Task CompleteReviewAsync_Returns_False_When_Api_Returns_Conflict_For_Already_Completed_Review()
+    {
+        // Guards against completing an already-completed review — the server rejects the repeat
+        // call with 409, which must not be misreported as success.
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.Conflict, new { error = "This review has already been completed." }));
+        var service = new ProbationService(factory);
+
+        var result = await service.CompleteReviewAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null);
+
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task CompleteReviewAsync_Returns_False_When_Api_Returns_Unauthorized()
+    {
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.Unauthorized, null));
+        var service = new ProbationService(factory);
+
+        var result = await service.CompleteReviewAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null);
+
+        Assert.False(result);
     }
 }

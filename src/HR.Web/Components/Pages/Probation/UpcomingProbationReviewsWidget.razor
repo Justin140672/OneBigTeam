@@ -1,4 +1,6 @@
+@using HR.Web.Components.Pages.Dashboards
 @inject ProbationService ProbationService
+@inject WidgetSourceLoader SourceLoader
 @inject NavigationManager Navigation
 @inject AppSession Session
 
@@ -49,6 +51,12 @@
                 </div>
             }
 
+            @if (_result.IsFailed)
+            {
+                <WidgetSourceWarning SourceName="Upcoming probation reviews" Retrying="_retrying" OnRetry="RetryAsync" />
+            }
+            else
+            {
             <div class="widget-body">
                 @if (_items.Count == 0)
                 {
@@ -76,6 +84,7 @@
                     }
                 }
             </div>
+            }
         </div>
     }
 }
@@ -84,6 +93,9 @@
     [Parameter] public EventCallback<Guid> OnOpenTask { get; set; }
 
     private bool _loading = true;
+    private bool _retrying;
+    private WidgetResult<IReadOnlyList<UpcomingProbationReviewItem>> _result =
+        WidgetResult<IReadOnlyList<UpcomingProbationReviewItem>>.Loading("Upcoming probation reviews");
     private IReadOnlyList<UpcomingProbationReviewItem> _items = [];
     private IReadOnlyDictionary<Guid, string> _employeeNames = new Dictionary<Guid, string>();
     private int _overdue;
@@ -100,17 +112,28 @@
 
         _today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        var reviewsTask   = ProbationService.GetUpcomingReviewsAsync(Session.CompanyId);
         var employeesTask = Session.GetEmployeeNamesAsync();
+        await LoadAsync();
+        try { _employeeNames = await employeesTask; } catch { /* names fall back to "Employee" */ }
+        _loading  = false;
+    }
 
-        await Task.WhenAll(reviewsTask, employeesTask);
+    private async Task LoadAsync()
+    {
+        _result = await SourceLoader.LoadAsync("Upcoming Probation Reviews", "Upcoming probation reviews",
+            () => ProbationService.GetUpcomingReviewsOrThrowAsync(Session.CompanyId));
 
-        _items = await reviewsTask;
-        _employeeNames = await employeesTask;
-
+        _items = _result.IsLoaded ? _result.Value ?? [] : [];
         _overdue  = _items.Count(r => r.DueDate < _today);
         _dueSoon  = _items.Count(r => r.DueDate >= _today && r.DueDate <= _today.AddDays(7));
-        _loading  = false;
+    }
+
+    private async Task RetryAsync()
+    {
+        _retrying = true;
+        StateHasChanged();
+        await LoadAsync();
+        _retrying = false;
     }
 
     // Opens the review task dialog when one exists (the normal case — GenerateDueProbationReviewsJob

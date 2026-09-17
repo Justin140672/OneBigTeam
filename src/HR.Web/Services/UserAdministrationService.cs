@@ -1,5 +1,5 @@
-using System.Net.Http.Json;
 using HR.SharedKernel;
+using HR.SharedKernel.Http;
 using HR.Web.Models;
 
 namespace HR.Web.Services;
@@ -11,18 +11,13 @@ public sealed class UserAdministrationService(HrApiHttpClientFactory httpClientF
     public async Task<ListUsersResponse?> ListUsersAsync(
         Guid companyId, int page = 1, int pageSize = 100, string? search = null)
     {
-        try
-        {
-            search = FormText.OptionalSearch(search);
-            var url = $"api/companies/{companyId}/users?page={page}&pageSize={pageSize}";
-            if (search is not null) url += $"&search={Uri.EscapeDataString(search)}";
+        search = FormText.OptionalSearch(search);
+        var url = $"api/companies/{companyId}/users?page={page}&pageSize={pageSize}";
+        if (search is not null) url += $"&search={Uri.EscapeDataString(search)}";
 
-            return await Http.GetFromJsonAsync<ListUsersResponse>(url, HrApiJsonOptions.Default);
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
+        var result = await ApiResponseReader.ExecuteAsync<ListUsersResponse>(
+            ct => Http.GetAsync(url, ct), HrApiJsonOptions.Default);
+        return result.Success ? result.Value : null;
     }
 
     /// <summary>
@@ -57,42 +52,23 @@ public sealed class UserAdministrationService(HrApiHttpClientFactory httpClientF
 
     public async Task<List<InvitableEmployeeModel>?> GetInvitableEmployeesAsync(Guid companyId)
     {
-        try
-        {
-            var result = await Http.GetFromJsonAsync<GetInvitableEmployeesResponse>(
-                $"api/companies/{companyId}/users/invitable-employees", HrApiJsonOptions.Default);
-            return result?.Items;
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
+        var result = await ApiResponseReader.ExecuteAsync<GetInvitableEmployeesResponse>(
+            ct => Http.GetAsync($"api/companies/{companyId}/users/invitable-employees", ct), HrApiJsonOptions.Default);
+        return result.Success ? result.Value?.Items : null;
     }
 
     public async Task<GetUserDetailResponse?> GetUserAsync(Guid companyId, Guid employeeId)
     {
-        try
-        {
-            return await Http.GetFromJsonAsync<GetUserDetailResponse>(
-                $"api/companies/{companyId}/users/{employeeId}", HrApiJsonOptions.Default);
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
+        var result = await ApiResponseReader.ExecuteAsync<GetUserDetailResponse>(
+            ct => Http.GetAsync($"api/companies/{companyId}/users/{employeeId}", ct), HrApiJsonOptions.Default);
+        return result.Success ? result.Value : null;
     }
 
     public async Task<GetUserAuditHistoryResponse?> GetAuditHistoryAsync(Guid companyId, Guid employeeId)
     {
-        try
-        {
-            return await Http.GetFromJsonAsync<GetUserAuditHistoryResponse>(
-                $"api/companies/{companyId}/users/{employeeId}/audit-history", HrApiJsonOptions.Default);
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
+        var result = await ApiResponseReader.ExecuteAsync<GetUserAuditHistoryResponse>(
+            ct => Http.GetAsync($"api/companies/{companyId}/users/{employeeId}/audit-history", ct), HrApiJsonOptions.Default);
+        return result.Success ? result.Value : null;
     }
 
     public async Task<(InviteEmployeeUserResponse? Result, string? Error)> InviteEmployeeUserAsync(
@@ -101,11 +77,8 @@ public sealed class UserAdministrationService(HrApiHttpClientFactory httpClientF
         var response = await Http.PostAsJsonAsync(
             $"api/companies/{companyId}/employees/{employeeId}/invite-user",
             new InviteEmployeeUserRequest(companyId, employeeId, email, roleIds));
-
-        if (response.IsSuccessStatusCode)
-            return (await response.Content.ReadFromJsonAsync<InviteEmployeeUserResponse>(HrApiJsonOptions.Default), null);
-
-        return (null, await ReadErrorAsync(response, "Failed to invite this employee."));
+        var result = await ApiResponseReader.ReadJsonAsync<InviteEmployeeUserResponse>(response, HrApiJsonOptions.Default);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to invite this employee."));
     }
 
     public async Task<(bool Success, string? Error)> UpdateUserRolesAsync(
@@ -114,60 +87,43 @@ public sealed class UserAdministrationService(HrApiHttpClientFactory httpClientF
         var response = await Http.PutAsJsonAsync(
             $"api/companies/{companyId}/users/{userId}/roles",
             new UpdateUserRolesRequest(companyId, userId, roleIds));
-
-        return response.IsSuccessStatusCode
-            ? (true, null)
-            : (false, await ReadErrorAsync(response, "Failed to update this user's roles."));
+        var result = await ApiResponseReader.ReadNoContentAsync(response);
+        return (result.Success, result.Success ? null : (result.DisplayMessage ?? "Failed to update this user's roles."));
     }
 
     public async Task<(bool Success, string? Error)> ResendInviteAsync(Guid companyId, Guid inviteId)
     {
         var response = await Http.PostAsJsonAsync($"api/companies/{companyId}/invites/{inviteId}/resend", new { });
-
-        return response.IsSuccessStatusCode
-            ? (true, null)
-            : (false, await ReadErrorAsync(response, "Failed to resend the invitation."));
+        var result = await ApiResponseReader.ReadNoContentAsync(response);
+        return (result.Success, result.Success ? null : (result.DisplayMessage ?? "Failed to resend the invitation."));
     }
 
     public async Task<(bool Success, string? Error)> CancelInviteAsync(Guid companyId, Guid inviteId)
     {
         var response = await Http.PostAsJsonAsync($"api/companies/{companyId}/invites/{inviteId}/cancel", new { });
-
-        return response.IsSuccessStatusCode
-            ? (true, null)
-            : (false, await ReadErrorAsync(response, "Failed to cancel the invitation."));
+        var result = await ApiResponseReader.ReadNoContentAsync(response);
+        return (result.Success, result.Success ? null : (result.DisplayMessage ?? "Failed to cancel the invitation."));
     }
 
     public async Task<(bool Success, string? Error)> DisableUserAsync(Guid companyId, Guid userId)
     {
         var response = await Http.PostAsJsonAsync($"api/companies/{companyId}/users/{userId}/disable", new { });
-
-        return response.IsSuccessStatusCode
-            ? (true, null)
-            : (false, await ReadErrorAsync(response, "Failed to disable this account."));
+        var result = await ApiResponseReader.ReadNoContentAsync(response);
+        return (result.Success, result.Success ? null : (result.DisplayMessage ?? "Failed to disable this account."));
     }
 
     public async Task<(bool Success, string? Error)> EnableUserAsync(Guid companyId, Guid userId)
     {
         var response = await Http.PostAsJsonAsync($"api/companies/{companyId}/users/{userId}/enable", new { });
-
-        return response.IsSuccessStatusCode
-            ? (true, null)
-            : (false, await ReadErrorAsync(response, "Failed to enable this account."));
+        var result = await ApiResponseReader.ReadNoContentAsync(response);
+        return (result.Success, result.Success ? null : (result.DisplayMessage ?? "Failed to enable this account."));
     }
 
     public async Task<List<EmployeeRoleOverrideModel>?> GetRoleOverridesAsync(Guid companyId, Guid userId)
     {
-        try
-        {
-            var result = await Http.GetFromJsonAsync<ListEmployeeRoleOverridesResponse>(
-                $"api/companies/{companyId}/users/{userId}/role-overrides", HrApiJsonOptions.Default);
-            return result?.Overrides;
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
+        var result = await ApiResponseReader.ExecuteAsync<ListEmployeeRoleOverridesResponse>(
+            ct => Http.GetAsync($"api/companies/{companyId}/users/{userId}/role-overrides", ct), HrApiJsonOptions.Default);
+        return result.Success ? result.Value?.Overrides : null;
     }
 
     public async Task<(AddEmployeeRoleOverrideResponse? Result, string? Error)> AddRoleOverrideAsync(
@@ -177,51 +133,21 @@ public sealed class UserAdministrationService(HrApiHttpClientFactory httpClientF
             $"api/companies/{companyId}/users/{userId}/role-overrides",
             new AddEmployeeRoleOverrideRequest(companyId, userId, roleId, overrideType, reason, expiresAt),
             HrApiJsonOptions.Default);
-
-        if (response.IsSuccessStatusCode)
-            return (await response.Content.ReadFromJsonAsync<AddEmployeeRoleOverrideResponse>(HrApiJsonOptions.Default), null);
-
-        return (null, await ReadErrorAsync(response, "Failed to add the permission override."));
+        var result = await ApiResponseReader.ReadJsonAsync<AddEmployeeRoleOverrideResponse>(response, HrApiJsonOptions.Default);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to add the permission override."));
     }
 
     public async Task<(bool Success, string? Error)> RemoveRoleOverrideAsync(Guid companyId, Guid userId, Guid roleId)
     {
         var response = await Http.DeleteAsync($"api/companies/{companyId}/users/{userId}/role-overrides/{roleId}");
-
-        return response.IsSuccessStatusCode
-            ? (true, null)
-            : (false, await ReadErrorAsync(response, "Failed to remove the permission override."));
+        var result = await ApiResponseReader.ReadNoContentAsync(response);
+        return (result.Success, result.Success ? null : (result.DisplayMessage ?? "Failed to remove the permission override."));
     }
 
     public async Task<(GetEffectiveAccessResponse? Result, string? Error)> GetEffectiveAccessAsync(Guid companyId, Guid employeeId)
     {
-        try
-        {
-            var response = await Http.GetAsync($"api/companies/{companyId}/users/{employeeId}/effective-access");
-
-            if (response.IsSuccessStatusCode)
-                return (await response.Content.ReadFromJsonAsync<GetEffectiveAccessResponse>(HrApiJsonOptions.Default), null);
-
-            return (null, await ReadErrorAsync(response, "Failed to load effective access for this user."));
-        }
-        catch (HttpRequestException)
-        {
-            return (null, "Failed to load effective access for this user.");
-        }
+        var result = await ApiResponseReader.ExecuteAsync<GetEffectiveAccessResponse>(
+            ct => Http.GetAsync($"api/companies/{companyId}/users/{employeeId}/effective-access", ct), HrApiJsonOptions.Default);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to load effective access for this user."));
     }
-
-    private static async Task<string?> ReadErrorAsync(HttpResponseMessage response, string fallback)
-    {
-        try
-        {
-            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-            return body?.Error ?? fallback;
-        }
-        catch
-        {
-            return fallback;
-        }
-    }
-
-    private sealed record ErrorEnvelope(string? Error);
 }

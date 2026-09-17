@@ -12,11 +12,11 @@ internal sealed class LoggingEmailSender(ILogger<LoggingEmailSender> logger) : I
 {
     public Task SendAsync(string toEmail, string subject, string htmlBody, CancellationToken ct = default)
     {
-        // Never logs htmlBody — transactional emails (invites, resets, support links) carry
-        // single-use tokens and secure action links in their body.
+        // Never logs the recipient email or htmlBody — transactional emails (invites, resets,
+        // support links) carry single-use tokens and secure action links in their body, and the
+        // recipient address is personal data that does not belong in routine operational logs.
         logger.LogInformation(
-            "EMAIL (stub) To={ToEmail} Subject={Subject}",
-            SensitiveDataScrubber.MaskEmail(toEmail),
+            "EMAIL (stub) Subject={Subject}",
             subject);
 
         return Task.CompletedTask;

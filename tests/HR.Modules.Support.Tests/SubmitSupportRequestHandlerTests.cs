@@ -58,6 +58,58 @@ public class SubmitSupportRequestHandlerTests
         Assert.Equal(result.Value.ReferenceNumber, saved.ReferenceNumber);
     }
 
+    [Theory]
+    [InlineData("<img src=x onerror=alert(1)>")]
+    [InlineData("\"><script>alert(1)</script>")]
+    [InlineData("Tom & Sons <support@example.com>")]
+    public async Task HandleAsync_HtmlEncodes_Title_In_Admin_Notification_Email(string maliciousTitle)
+    {
+        // CodeQL alert: the support request title is user-controlled free text that is interpolated
+        // into the admin notification's HTML body — it must be HTML-encoded so it cannot execute as
+        // markup/script in the recipient's mail client.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var emailSender = new FakeEmailSender();
+        var request = ValidRequest(companyId) with { Title = maliciousTitle };
+        var handler = new SubmitSupportRequestHandler(
+            db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
+            emailSender, BuildConfiguration());
+
+        var result = await handler.HandleAsync(request, Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var sent = Assert.Single(emailSender.Sent);
+        Assert.DoesNotContain("<script>", sent.HtmlBody, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<img", sent.HtmlBody, StringComparison.OrdinalIgnoreCase);
+        // The encoded form of the dangerous characters must be present instead — "onerror=" may
+        // still appear, but only as inert encoded text, never as a live tag/attribute.
+        Assert.Contains("&lt;", sent.HtmlBody);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Builds_AdminLink_Only_For_Http_Or_Https_Configured_BaseUrl()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var emailSender = new FakeEmailSender();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Support:AdminNotificationEmail"] = "support-admin@example.test",
+                ["Support:AdminBaseUrl"] = "javascript:alert(1)//",
+            })
+            .Build();
+        var handler = new SubmitSupportRequestHandler(
+            db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
+            emailSender, configuration);
+
+        var result = await handler.HandleAsync(ValidRequest(companyId), Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var sent = Assert.Single(emailSender.Sent);
+        Assert.DoesNotContain("javascript:", sent.HtmlBody, StringComparison.OrdinalIgnoreCase);
+    }
+
     [Fact]
     public async Task HandleAsync_Generates_Unique_ReferenceNumbers_Across_Multiple_Requests()
     {

@@ -1,4 +1,5 @@
 using HR.SharedKernel;
+using HR.SharedKernel.Http;
 using HR.Web.Models;
 using System.Web;
 
@@ -7,6 +8,15 @@ namespace HR.Web.Services;
 public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient();
+
+    // Maps the shared ApiResult<T> failure classification onto the pre-existing ApiSaveResult
+    // shape consumed by EditSectionBase/EditPageBase/SaveConflictBanner across ~25 call sites.
+    // IsConcurrencyConflict is driven exclusively by ApiFailureKind.Concurrency (code == "concurrency"),
+    // the same convention EditSectionBase already used.
+    private static ApiSaveResult ToSaveResult<T>(ApiResult<T> result, Func<T?, int?>? versionSelector = null)
+        => result.Success
+            ? ApiSaveResult.Ok(versionSelector is not null ? versionSelector(result.Value) : null)
+            : ApiSaveResult.Fail(result.DisplayMessage ?? "Failed to save.", result.IsConcurrencyConflict);
 
     /// <summary>
     /// The full employee administration list (EmployeeList grid). API-gated to "employee:manage"
@@ -204,26 +214,8 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
     {
         var response = await Http.PutAsJsonAsync(
             $"api/companies/{companyId}/employees/{id}/profile", request);
-
-        if (response.IsSuccessStatusCode)
-        {
-            var ok = await response.Content.ReadFromJsonAsync<UpdateEmployeeProfileResponse>(HrApiJsonOptions.Default);
-            return ApiSaveResult.Ok(ok?.Version);
-        }
-
-        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
-        {
-            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-            return ApiSaveResult.Fail(body?.Error ?? "A conflict occurred.", body?.Code == "concurrency");
-        }
-
-        if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
-        {
-            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-            return ApiSaveResult.Fail(body?.Error ?? "Validation failed.");
-        }
-
-        return ApiSaveResult.Fail("Failed to save profile.");
+        var result = await ApiResponseReader.ReadJsonAsync<UpdateEmployeeProfileResponse>(response, HrApiJsonOptions.Default);
+        return ToSaveResult(result, v => v?.Version);
     }
 
     // Item 5: atomic combined save for the Employee Edit screen (profile + employment in one
@@ -233,28 +225,8 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
     {
         var response = await Http.PutAsJsonAsync(
             $"api/companies/{companyId}/employees/{id}/profile-and-employment", request);
-
-        if (response.IsSuccessStatusCode)
-        {
-            var ok = await response.Content.ReadFromJsonAsync<UpdateEmployeeProfileAndEmploymentResponse>(HrApiJsonOptions.Default);
-            return ApiSaveResult.Ok(ok?.Version);
-        }
-
-        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
-        {
-            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-            return ApiSaveResult.Fail(body?.Error ?? "A conflict occurred.", body?.Code == "concurrency");
-        }
-
-        var raw = await response.Content.ReadAsStringAsync();
-
-        if (TryDeserialize<ErrorEnvelope>(raw)?.Error is { } businessMessage)
-            return ApiSaveResult.Fail(businessMessage);
-
-        if (TryDeserialize<ValidationErrorResponse>(raw)?.Errors is { Count: > 0 } fieldErrors)
-            return ApiSaveResult.Fail(string.Join(" ", fieldErrors.Values.SelectMany(m => m)));
-
-        return ApiSaveResult.Fail($"Failed to save employee ({(int)response.StatusCode} {response.StatusCode}).");
+        var result = await ApiResponseReader.ReadJsonAsync<UpdateEmployeeProfileAndEmploymentResponse>(response, HrApiJsonOptions.Default);
+        return ToSaveResult(result, v => v?.Version);
     }
 
     public async Task<(bool Success, string? Error)> CompleteInitialSetupAsync(
@@ -262,30 +234,18 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         CompleteInitialEmployeeSetupRequest request,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await Http.PutAsJsonAsync(
-                $"api/companies/{companyId}/employees/me/complete-initial-setup", request, cancellationToken);
+        var response = await Http.PutAsJsonAsync(
+            $"api/companies/{companyId}/employees/me/complete-initial-setup", request, cancellationToken);
 
-            if (response.IsSuccessStatusCode)
-                return (true, null);
+        // A 409 here means setup was already completed (e.g. a double-submit/race) — treat it
+        // as a soft success rather than an error so the caller just closes the dialog.
+        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            return (true, null);
 
-            // A 409 here means setup was already completed (e.g. a double-submit/race) — treat it
-            // as a soft success rather than an error so the caller just closes the dialog.
-            if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
-                return (true, null);
-
-            var raw = await response.Content.ReadAsStringAsync(cancellationToken);
-
-            if (TryDeserialize<ErrorEnvelope>(raw)?.Error is { } businessMessage)
-                return (false, businessMessage);
-
-            if (TryDeserialize<ValidationErrorResponse>(raw)?.Errors is { Count: > 0 } fieldErrors)
-                return (false, string.Join(" ", fieldErrors.Values.SelectMany(m => m)));
-
-            return (false, $"Failed to complete your profile ({(int)response.StatusCode} {response.StatusCode}).");
-        }
-        catch { return (false, "An unexpected error occurred."); }
+        var result = await ApiResponseReader.ReadNoContentAsync(response, cancellationToken);
+        return result.Success
+            ? (true, null)
+            : (false, result.DisplayMessage ?? "Failed to complete your profile.");
     }
 
     public async Task<GetMyPersonalDetailsResponse?> GetMyPersonalDetailsAsync(
@@ -340,39 +300,11 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         UpdateMyContactDetailsRequest request,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await Http.PutAsJsonAsync(
-                $"api/companies/{companyId}/employees/me/contact-details", request, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-            {
-                var ok = await response.Content.ReadFromJsonAsync<GetMyContactDetailsResponse>(HrApiJsonOptions.Default, cancellationToken);
-                return ApiSaveResult.Ok(ok?.Version);
-            }
-
-            if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
-            {
-                var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>(cancellationToken);
-                return ApiSaveResult.Fail(body?.Error ?? "A conflict occurred.", body?.Code == "concurrency");
-            }
-
-            if (response.StatusCode == System.Net.HttpStatusCode.UnprocessableEntity)
-            {
-                var body = await response.Content.ReadFromJsonAsync<ValidationErrorEnvelope>(cancellationToken);
-                var first = body?.Errors?.Values.SelectMany(v => v).FirstOrDefault();
-                return ApiSaveResult.Fail(first ?? "Validation failed.");
-            }
-
-            if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
-            {
-                var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>(cancellationToken);
-                return ApiSaveResult.Fail(body?.Error ?? "Validation failed.");
-            }
-
-            return ApiSaveResult.Fail("Failed to save contact details.");
-        }
-        catch { return ApiSaveResult.Fail("An unexpected error occurred."); }
+        var response = await Http.PutAsJsonAsync(
+            $"api/companies/{companyId}/employees/me/contact-details", request, cancellationToken);
+        var result = await ApiResponseReader.ReadJsonAsync<GetMyContactDetailsResponse>(
+            response, HrApiJsonOptions.Default, cancellationToken);
+        return ToSaveResult(result, v => v?.Version);
     }
 
     public async Task<GetEmergencyContactsResponse?> GetMyEmergencyContactsAsync(
@@ -392,33 +324,10 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         AddEmergencyContactRequest request,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await Http.PostAsJsonAsync(
-                $"api/companies/{companyId}/employees/me/emergency-contacts", request, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-            {
-                var created = await response.Content.ReadFromJsonAsync<EmergencyContactItem>(cancellationToken);
-                return (created, null);
-            }
-
-            if (response.StatusCode == System.Net.HttpStatusCode.UnprocessableEntity)
-            {
-                var body = await response.Content.ReadFromJsonAsync<ValidationErrorEnvelope>(cancellationToken);
-                var first = body?.Errors?.Values.SelectMany(v => v).FirstOrDefault();
-                return (null, first ?? "Validation failed.");
-            }
-
-            if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
-            {
-                var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>(cancellationToken);
-                return (null, body?.Error ?? "Validation failed.");
-            }
-
-            return (null, "Failed to add emergency contact.");
-        }
-        catch { return (null, "An unexpected error occurred."); }
+        var response = await Http.PostAsJsonAsync(
+            $"api/companies/{companyId}/employees/me/emergency-contacts", request, cancellationToken);
+        var result = await ApiResponseReader.ReadJsonAsync<EmergencyContactItem>(response, cancellationToken: cancellationToken);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to add emergency contact."));
     }
 
     public async Task<(bool Success, string? Error)> UpdateMyEmergencyContactAsync(
@@ -426,31 +335,11 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         UpdateEmergencyContactRequest request,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await Http.PutAsJsonAsync(
-                $"api/companies/{companyId}/employees/me/emergency-contacts/{request.ContactId}",
-                request, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-                return (true, null);
-
-            if (response.StatusCode == System.Net.HttpStatusCode.UnprocessableEntity)
-            {
-                var body = await response.Content.ReadFromJsonAsync<ValidationErrorEnvelope>(cancellationToken);
-                var first = body?.Errors?.Values.SelectMany(v => v).FirstOrDefault();
-                return (false, first ?? "Validation failed.");
-            }
-
-            if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
-            {
-                var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>(cancellationToken);
-                return (false, body?.Error ?? "Validation failed.");
-            }
-
-            return (false, "Failed to update emergency contact.");
-        }
-        catch { return (false, "An unexpected error occurred."); }
+        var response = await Http.PutAsJsonAsync(
+            $"api/companies/{companyId}/employees/me/emergency-contacts/{request.ContactId}",
+            request, cancellationToken);
+        var result = await ApiResponseReader.ReadNoContentAsync(response, cancellationToken);
+        return (result.Success, result.Success ? null : (result.DisplayMessage ?? "Failed to update emergency contact."));
     }
 
     public async Task<(bool Success, string? Error)> RemoveMyEmergencyContactAsync(
@@ -458,17 +347,11 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         Guid contactId,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await Http.DeleteAsync(
-                $"api/companies/{companyId}/employees/me/emergency-contacts/{contactId}",
-                cancellationToken);
-
-            return response.IsSuccessStatusCode
-                ? (true, null)
-                : (false, "Failed to remove emergency contact.");
-        }
-        catch { return (false, "An unexpected error occurred."); }
+        var response = await Http.DeleteAsync(
+            $"api/companies/{companyId}/employees/me/emergency-contacts/{contactId}",
+            cancellationToken);
+        var result = await ApiResponseReader.ReadNoContentAsync(response, cancellationToken);
+        return (result.Success, result.Success ? null : (result.DisplayMessage ?? "Failed to remove emergency contact."));
     }
 
     public async Task<GetEmergencyContactsResponse?> GetEmployeeEmergencyContactsAsync(
@@ -483,8 +366,6 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         }
         catch { return null; }
     }
-
-    private sealed record ValidationErrorEnvelope(Dictionary<string, string[]>? Errors);
 
     public async Task<ListNationalitiesResponse?> ListNationalitiesAsync(
         CancellationToken cancellationToken = default)
@@ -502,72 +383,19 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
     {
         var response = await Http.PutAsJsonAsync(
             $"api/companies/{companyId}/employees/{id}/employment", request);
-
-        if (response.IsSuccessStatusCode)
-        {
-            var ok = await response.Content.ReadFromJsonAsync<EmploymentDetailsSaveBody>(HrApiJsonOptions.Default);
-            return ApiSaveResult.Ok(ok?.Version);
-        }
-
-        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
-        {
-            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-            return ApiSaveResult.Fail(body?.Error ?? "A conflict occurred.", body?.Code == "concurrency");
-        }
-
-        // The endpoint sends { error: "..." } for business-rule failures (not-found, conflict, a
-        // plain validation rejection like "Cannot set employment status to Draft."). But FluentValidation
-        // failures never reach the endpoint's own HandleAsync at all — this project sets
-        // Errors.StatusCode = 422 for those (see Program.cs) and FastEndpoints short-circuits with
-        // its own { statusCode, message, errors: { field: [...] } } shape instead. Falling back to a
-        // single generic message on anything that isn't the { error } shape silently swallowed real
-        // rejections like "Employee number is required." — check both known shapes before giving up.
-        var raw = await response.Content.ReadAsStringAsync();
-
-        if (TryDeserialize<ErrorEnvelope>(raw)?.Error is { } businessMessage)
-            return ApiSaveResult.Fail(businessMessage);
-
-        if (TryDeserialize<ValidationErrorResponse>(raw)?.Errors is { Count: > 0 } fieldErrors)
-            return ApiSaveResult.Fail(string.Join(" ", fieldErrors.Values.SelectMany(m => m)));
-
-        return ApiSaveResult.Fail($"Failed to save employment details ({(int)response.StatusCode} {response.StatusCode}).");
+        var result = await ApiResponseReader.ReadJsonAsync<EmploymentDetailsSaveBody>(response, HrApiJsonOptions.Default);
+        return ToSaveResult(result, v => v?.Version);
     }
 
     private sealed record EmploymentDetailsSaveBody(int Version);
-
-    private static T? TryDeserialize<T>(string json) where T : class
-    {
-        try { return System.Text.Json.JsonSerializer.Deserialize<T>(json, HrApiJsonOptions.Default); }
-        catch (System.Text.Json.JsonException) { return null; }
-    }
-
-    private sealed record ValidationErrorResponse(Dictionary<string, List<string>>? Errors);
 
     public async Task<(CreateEmployeeResponse? Employee, string? Error)> CreateEmployeeAsync(
         Guid companyId, CreateEmployeeRequest request)
     {
         var response = await Http.PostAsJsonAsync(
             $"api/companies/{companyId}/employees", request);
-
-        if (response.IsSuccessStatusCode)
-        {
-            var created = await response.Content.ReadFromJsonAsync<CreateEmployeeResponse>();
-            return (created, null);
-        }
-
-        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
-        {
-            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-            return (null, body?.Error ?? "An employee with that email already exists.");
-        }
-
-        if (response.StatusCode == System.Net.HttpStatusCode.BadRequest)
-        {
-            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-            return (null, body?.Error ?? "Validation failed.");
-        }
-
-        return (null, "Failed to create employee.");
+        var result = await ApiResponseReader.ReadJsonAsync<CreateEmployeeResponse>(response);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to create employee."));
     }
 
     public async Task<(StartLeavingProcessResponse? Result, string? Error)> StartLeavingProcessAsync(
@@ -575,26 +403,8 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
     {
         var response = await Http.PostAsJsonAsync(
             $"api/companies/{companyId}/employees/{employeeId}/leaving-process", request);
-
-        if (response.IsSuccessStatusCode)
-        {
-            var created = await response.Content.ReadFromJsonAsync<StartLeavingProcessResponse>(HrApiJsonOptions.Default);
-            return (created, null);
-        }
-
-        // Same reasoning as UpdateEmploymentDetailsAsync above — 404 (not found)/409 (conflict —
-        // already an in-progress leaving process) send the { error } shape, but FluentValidation
-        // failures short-circuit with FastEndpoints' own 422 { statusCode, message, errors } shape
-        // instead. Check both known shapes before falling back to a generic message.
-        var raw = await response.Content.ReadAsStringAsync();
-
-        if (TryDeserialize<ErrorEnvelope>(raw)?.Error is { } businessMessage)
-            return (null, businessMessage);
-
-        if (TryDeserialize<ValidationErrorResponse>(raw)?.Errors is { Count: > 0 } fieldErrors)
-            return (null, string.Join(" ", fieldErrors.Values.SelectMany(m => m)));
-
-        return (null, $"Failed to start leaving process ({(int)response.StatusCode} {response.StatusCode}).");
+        var result = await ApiResponseReader.ReadJsonAsync<StartLeavingProcessResponse>(response, HrApiJsonOptions.Default);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to start leaving process."));
     }
 
     public async Task<LeavingProcessResponse?> GetLeavingProcessAsync(Guid companyId, Guid employeeId)
@@ -615,32 +425,17 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
     {
         var response = await Http.PutAsJsonAsync(
             $"api/companies/{companyId}/employees/{employeeId}/leaving-process", request);
+        var result = await ApiResponseReader.ReadJsonAsync<AmendLeavingProcessResponse>(response, HrApiJsonOptions.Default);
 
-        if (response.IsSuccessStatusCode)
-        {
-            var amended = await response.Content.ReadFromJsonAsync<AmendLeavingProcessResponse>(HrApiJsonOptions.Default);
-            return new(amended, null, false, amended?.Version);
-        }
+        if (result.Success)
+            return new(result.Value, null, false, result.Value?.Version);
 
-        // Same reasoning as StartLeavingProcessAsync above — 404 (no in-progress leaving process)/409
-        // (other business conflict) send the { error } shape, but FluentValidation failures short-circuit
-        // with FastEndpoints' own 422 { statusCode, message, errors } shape instead.
-        var raw = await response.Content.ReadAsStringAsync();
-        var envelope = TryDeserialize<ErrorEnvelope>(raw);
-
-        // Ticket 2: distinguish an optimistic-concurrency 409 ({ code: "concurrency" }) so the dialog
+        // Ticket 2: distinguish an optimistic-concurrency 409 (code == "concurrency") so the dialog
         // can raise the shared <SaveConflictBanner> rather than a generic error.
-        if (response.StatusCode == System.Net.HttpStatusCode.Conflict && envelope?.Code == "concurrency")
-            return new(null, envelope.Error
-                ?? "Someone else changed this leaving process while you were editing.", true);
+        if (result.IsConcurrencyConflict)
+            return new(null, result.Error ?? "Someone else changed this leaving process while you were editing.", true);
 
-        if (envelope?.Error is { } businessMessage)
-            return new(null, businessMessage);
-
-        if (TryDeserialize<ValidationErrorResponse>(raw)?.Errors is { Count: > 0 } fieldErrors)
-            return new(null, string.Join(" ", fieldErrors.Values.SelectMany(m => m)));
-
-        return new(null, $"Failed to amend leaving process ({(int)response.StatusCode} {response.StatusCode}).");
+        return new(null, result.DisplayMessage ?? "Failed to amend leaving process.");
     }
 
     public async Task<(CancelLeavingProcessResponse? Result, string? Error)> CancelLeavingProcessAsync(
@@ -648,22 +443,8 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
     {
         var response = await Http.PostAsJsonAsync(
             $"api/companies/{companyId}/employees/{employeeId}/leaving-process/cancel", request);
-
-        if (response.IsSuccessStatusCode)
-        {
-            var cancelled = await response.Content.ReadFromJsonAsync<CancelLeavingProcessResponse>(HrApiJsonOptions.Default);
-            return (cancelled, null);
-        }
-
-        var raw = await response.Content.ReadAsStringAsync();
-
-        if (TryDeserialize<ErrorEnvelope>(raw)?.Error is { } businessMessage)
-            return (null, businessMessage);
-
-        if (TryDeserialize<ValidationErrorResponse>(raw)?.Errors is { Count: > 0 } fieldErrors)
-            return (null, string.Join(" ", fieldErrors.Values.SelectMany(m => m)));
-
-        return (null, $"Failed to cancel leaving process ({(int)response.StatusCode} {response.StatusCode}).");
+        var result = await ApiResponseReader.ReadJsonAsync<CancelLeavingProcessResponse>(response, HrApiJsonOptions.Default);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to cancel leaving process."));
     }
 
     // ── EQUALITY & DIVERSITY (self-service) ───────────────────────────────────
@@ -688,26 +469,11 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         SaveMyEqualityDataRequest request,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await Http.PutAsJsonAsync(
-                $"api/companies/{companyId}/employees/{employeeId}/equality-record",
-                request, HrApiJsonOptions.Default, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-                return (true, null);
-
-            var raw = await response.Content.ReadAsStringAsync(cancellationToken);
-
-            if (TryDeserialize<ErrorEnvelope>(raw)?.Error is { } businessMessage)
-                return (false, businessMessage);
-
-            if (TryDeserialize<ValidationErrorResponse>(raw)?.Errors is { Count: > 0 } fieldErrors)
-                return (false, string.Join(" ", fieldErrors.Values.SelectMany(m => m)));
-
-            return (false, "Failed to save your equality and diversity information.");
-        }
-        catch { return (false, "An unexpected error occurred."); }
+        var response = await Http.PutAsJsonAsync(
+            $"api/companies/{companyId}/employees/{employeeId}/equality-record",
+            request, HrApiJsonOptions.Default, cancellationToken);
+        var result = await ApiResponseReader.ReadNoContentAsync(response, cancellationToken);
+        return (result.Success, result.Success ? null : (result.DisplayMessage ?? "Failed to save your equality and diversity information."));
     }
 
     public async Task<(bool Success, string? Error)> ClearMyEqualityRecordAsync(
@@ -715,20 +481,12 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         Guid employeeId,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await Http.DeleteAsync(
-                $"api/companies/{companyId}/employees/{employeeId}/equality-record",
-                cancellationToken);
-
-            return response.IsSuccessStatusCode
-                ? (true, null)
-                : (false, "Failed to clear your equality and diversity information.");
-        }
-        catch { return (false, "An unexpected error occurred."); }
+        var response = await Http.DeleteAsync(
+            $"api/companies/{companyId}/employees/{employeeId}/equality-record",
+            cancellationToken);
+        var result = await ApiResponseReader.ReadNoContentAsync(response, cancellationToken);
+        return (result.Success, result.Success ? null : (result.DisplayMessage ?? "Failed to clear your equality and diversity information."));
     }
-
-    private sealed record ErrorEnvelope(string? Error, string? Code = null);
 }
 
 // Ticket 2: unified save outcome for concurrency-aware API calls. IsConcurrencyConflict is true

@@ -17,10 +17,9 @@ internal sealed class LoggingInvitationEmailSender(ILogger<LoggingInvitationEmai
         string actionUrl,
         CancellationToken ct = default)
     {
+        // Never logs the recipient email/name or the action URL (single-use invitation token).
         logger.LogInformation(
-            "INVITATION EMAIL (stub) To={ToEmail} Name={RecipientName} ActionUrl=(redacted - contains invitation token)",
-            SensitiveDataScrubber.MaskEmail(toEmail),
-            recipientName ?? "(none)");
+            "INVITATION EMAIL (stub) ActionUrl=(redacted - contains invitation token)");
 
         return Task.FromResult(true);
     }

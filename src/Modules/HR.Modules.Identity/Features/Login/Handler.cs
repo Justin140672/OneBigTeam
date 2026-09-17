@@ -40,7 +40,10 @@ internal sealed class LoginHandler(
             // genuine bad-credentials case from an unverified gateway assumption misfiring (see
             // the several UNVERIFIED comments elsewhere in SupabaseAuthGateway). SignInWithPasswordAsync
             // now redacts tokens/links from ex.Message, and the email is masked before logging.
-            logger.LogWarning(ex, "Login failed at Supabase sign-in for {Email}", SensitiveDataScrubber.MaskEmail(request.Email));
+            // No safe identifier is available yet at this point (sign-in has not resolved a local
+            // UserProfile) — deliberately does not log the email address. ex.Message has already
+            // been reduced by SupabaseAuthGateway to redact tokens/links before it reaches here.
+            logger.LogWarning(ex, "Login failed at Supabase sign-in.");
             return Result.Failure<LoginResponse>(Error.Validation("Invalid email or password."));
         }
 
@@ -53,8 +56,8 @@ internal sealed class LoginHandler(
             // any real signup path in this app, but fail closed rather than let an orphaned
             // Supabase identity through with no local profile for downstream code to resolve.
             logger.LogWarning(
-                "Login succeeded at Supabase but found no matching UserProfile for {Email} (Supabase user id {SupabaseUserId})",
-                SensitiveDataScrubber.MaskEmail(request.Email), session.UserId);
+                "Login succeeded at Supabase but found no matching UserProfile (Supabase user id {SupabaseUserId})",
+                session.UserId);
             return Result.Failure<LoginResponse>(Error.Validation("Invalid email or password."));
         }
 
@@ -77,8 +80,8 @@ internal sealed class LoginHandler(
         if (roles.Count == 0)
         {
             logger.LogWarning(
-                "Login succeeded at Supabase and resolved a UserProfile for {Email}, but the account has no roles — rejecting as invalid",
-                SensitiveDataScrubber.MaskEmail(request.Email));
+                "Login succeeded at Supabase and resolved UserProfile {UserProfileId}, but the account has no roles — rejecting as invalid",
+                profile.Id);
             return Result.Failure<LoginResponse>(Error.Validation("Invalid email or password."));
         }
 

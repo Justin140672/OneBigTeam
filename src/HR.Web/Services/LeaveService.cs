@@ -1,4 +1,5 @@
 using System.Text.Json;
+using HR.SharedKernel.Http;
 using HR.SharedKernel.Idempotency;
 using HR.Web.Models;
 
@@ -14,17 +15,10 @@ public sealed class LeaveService(HrApiHttpClientFactory httpClientFactory)
         Guid leaveRequestId,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await Http.DeleteAsync(
-                $"api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}",
-                cancellationToken);
-            return response.IsSuccessStatusCode;
-        }
-        catch
-        {
-            return false;
-        }
+        var result = await ApiResponseReader.ExecuteNoContentAsync(
+            ct => Http.DeleteAsync($"api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}", ct),
+            cancellationToken: cancellationToken);
+        return result.Success;
     }
 
     public async Task<LeaveRequestListResponse?> ListLeaveRequestsAsync(
@@ -32,15 +26,10 @@ public sealed class LeaveService(HrApiHttpClientFactory httpClientFactory)
         Guid employeeId,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            return await Http.GetFromJsonAsync<LeaveRequestListResponse>(
-                $"api/companies/{companyId}/employees/{employeeId}/leave-requests", HrApiJsonOptions.Default, cancellationToken);
-        }
-        catch
-        {
-            return null;
-        }
+        var result = await ApiResponseReader.ExecuteAsync<LeaveRequestListResponse>(
+            ct => Http.GetAsync($"api/companies/{companyId}/employees/{employeeId}/leave-requests", ct),
+            HrApiJsonOptions.Default, cancellationToken);
+        return result.Success ? result.Value : null;
     }
 
     public async Task<GetRecentLeaveRequestsResponse?> GetRecentLeaveRequestsAsync(
@@ -48,16 +37,10 @@ public sealed class LeaveService(HrApiHttpClientFactory httpClientFactory)
         int take = 10,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            return await Http.GetFromJsonAsync<GetRecentLeaveRequestsResponse>(
-                $"api/companies/{companyId}/leave-requests/recent?take={take}",
-                HrApiJsonOptions.Default, cancellationToken);
-        }
-        catch
-        {
-            return null;
-        }
+        var result = await ApiResponseReader.ExecuteAsync<GetRecentLeaveRequestsResponse>(
+            ct => Http.GetAsync($"api/companies/{companyId}/leave-requests/recent?take={take}", ct),
+            HrApiJsonOptions.Default, cancellationToken);
+        return result.Success ? result.Value : null;
     }
 
     // DSH-03: non-swallowing sibling of GetRecentLeaveRequestsAsync.
@@ -73,16 +56,10 @@ public sealed class LeaveService(HrApiHttpClientFactory httpClientFactory)
         Guid leaveRequestId,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            return await Http.GetFromJsonAsync<GetLeaveRequestResponse>(
-                $"api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}",
-                HrApiJsonOptions.Default, cancellationToken);
-        }
-        catch
-        {
-            return null;
-        }
+        var result = await ApiResponseReader.ExecuteAsync<GetLeaveRequestResponse>(
+            ct => Http.GetAsync($"api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}", ct),
+            HrApiJsonOptions.Default, cancellationToken);
+        return result.Success ? result.Value : null;
     }
 
     public async Task<LeaveBalanceResponse?> GetEmployeeLeaveBalanceAsync(
@@ -90,16 +67,11 @@ public sealed class LeaveService(HrApiHttpClientFactory httpClientFactory)
         Guid employeeId,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var year = DateTime.UtcNow.Year;
-            return await Http.GetFromJsonAsync<LeaveBalanceResponse>(
-                $"api/companies/{companyId}/employees/{employeeId}/leave-balances?policyYear={year}", HrApiJsonOptions.Default, cancellationToken);
-        }
-        catch
-        {
-            return null;
-        }
+        var year = DateTime.UtcNow.Year;
+        var result = await ApiResponseReader.ExecuteAsync<LeaveBalanceResponse>(
+            ct => Http.GetAsync($"api/companies/{companyId}/employees/{employeeId}/leave-balances?policyYear={year}", ct),
+            HrApiJsonOptions.Default, cancellationToken);
+        return result.Success ? result.Value : null;
     }
 
     public async Task<(PreviewLeaveResponse? Response, string? Error)> PreviewLeaveRequestAsync(
@@ -108,25 +80,12 @@ public sealed class LeaveService(HrApiHttpClientFactory httpClientFactory)
         PreviewLeaveRequestModel request,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var httpResponse = await Http.PostAsJsonAsync(
+        var result = await ApiResponseReader.ExecuteAsync<PreviewLeaveResponse>(
+            ct => Http.PostAsJsonAsync(
                 $"api/companies/{companyId}/employees/{employeeId}/leave-requests/preview",
-                request, HrApiJsonOptions.Default, cancellationToken);
-
-            if (httpResponse.IsSuccessStatusCode)
-                return (await httpResponse.Content.ReadFromJsonAsync<PreviewLeaveResponse>(HrApiJsonOptions.Default, cancellationToken), null);
-
-            return (null, "Unable to calculate preview.");
-        }
-        catch (TaskCanceledException)
-        {
-            return (null, null);
-        }
-        catch
-        {
-            return (null, "Unable to calculate preview.");
-        }
+                request, HrApiJsonOptions.Default, ct),
+            HrApiJsonOptions.Default, cancellationToken);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Unable to calculate preview."));
     }
 
     public async Task<(SubmitLeaveResponse? Response, string? Error)> SubmitLeaveRequestAsync(
@@ -135,31 +94,12 @@ public sealed class LeaveService(HrApiHttpClientFactory httpClientFactory)
         SubmitLeaveRequestModel request,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var httpResponse = await Http.PostAsJsonAsync(
+        var result = await ApiResponseReader.ExecuteAsync<SubmitLeaveResponse>(
+            ct => Http.PostAsJsonAsync(
                 $"api/companies/{companyId}/employees/{employeeId}/leave-requests",
-                request, HrApiJsonOptions.Default, cancellationToken);
-
-            if (httpResponse.IsSuccessStatusCode)
-                return (await httpResponse.Content.ReadFromJsonAsync<SubmitLeaveResponse>(HrApiJsonOptions.Default, cancellationToken), null);
-
-            var body = await httpResponse.Content.ReadAsStringAsync(cancellationToken);
-            try
-            {
-                using var doc = JsonDocument.Parse(body);
-                var msg = doc.RootElement.TryGetProperty("error", out var e) ? e.GetString() : null;
-                return (null, msg ?? "Failed to submit leave request.");
-            }
-            catch
-            {
-                return (null, "Failed to submit leave request.");
-            }
-        }
-        catch
-        {
-            return (null, "Failed to submit leave request.");
-        }
+                request, HrApiJsonOptions.Default, ct),
+            HrApiJsonOptions.Default, cancellationToken);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to submit leave request."));
     }
 
     /// <summary>
@@ -253,7 +193,7 @@ public sealed class LeaveService(HrApiHttpClientFactory httpClientFactory)
         {
             try
             {
-                var validationBody = await httpResponse.Content.ReadFromJsonAsync<ValidationErrorEnvelope>(cancellationToken);
+                var validationBody = await httpResponse.Content.ReadFromJsonAsync<ApiValidationEnvelope>(cancellationToken);
                 var first = validationBody?.Errors?.Values.SelectMany(v => v).FirstOrDefault();
                 return MutationOutcome<AdjustLeaveBalanceResponse>.Rejected(first ?? "Validation failed.");
             }
@@ -284,17 +224,9 @@ public sealed class LeaveService(HrApiHttpClientFactory httpClientFactory)
         Guid leaveTypeId,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            return await Http.GetFromJsonAsync<LeaveBalanceHistoryResponse>(
-                $"api/companies/{companyId}/employees/{employeeId}/leave-types/{leaveTypeId}/balance-history",
-                HrApiJsonOptions.Default, cancellationToken);
-        }
-        catch
-        {
-            return null;
-        }
+        var result = await ApiResponseReader.ExecuteAsync<LeaveBalanceHistoryResponse>(
+            ct => Http.GetAsync($"api/companies/{companyId}/employees/{employeeId}/leave-types/{leaveTypeId}/balance-history", ct),
+            HrApiJsonOptions.Default, cancellationToken);
+        return result.Success ? result.Value : null;
     }
-
-    private sealed record ValidationErrorEnvelope(Dictionary<string, string[]>? Errors);
 }

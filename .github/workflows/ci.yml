@@ -13,6 +13,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Least-privilege default: every job in this workflow only reads code, builds and runs tests.
+# No job here creates deployments, writes packages, or needs any other GitHub API write access.
+permissions:
+  contents: read
+
 env:
   DOTNET_NOLOGO: "true"
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
@@ -62,6 +67,8 @@ jobs:
   # ------------------------------------------------------------------
   version:
     runs-on: ubuntu-latest
+    # Computes a version string from GITHUB_SHA/GITHUB_RUN_NUMBER only - no checkout, no GitHub API call.
+    permissions: {}
     outputs:
       version: ${{ steps.v.outputs.version }}
       sha: ${{ steps.v.outputs.sha }}
@@ -256,6 +263,8 @@ jobs:
   # ------------------------------------------------------------------
   ci-success:
     runs-on: ubuntu-latest
+    # Only inspects `needs` context - no checkout, no GitHub API call.
+    permissions: {}
     if: always()
     needs: [dependency-audit, build-test, integration-tests, e2e-compile, package, deploy-scripts-test]
     steps:

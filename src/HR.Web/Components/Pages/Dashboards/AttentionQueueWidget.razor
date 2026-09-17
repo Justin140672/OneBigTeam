@@ -1,107 +1,30 @@
 @* Unified "Needs your attention" queue for the HR dashboard.
 
-   DSH-06: the widget now issues ONE server-side bounded summary fetch
+   DSH-06: the widget issues ONE server-side bounded summary fetch
    (DashboardService.GetHrSummaryOrThrowAsync) instead of fanning out to 6 category endpoints plus
    an employee-name lookup. The server returns per-category authoritative counts and a pre-ordered,
    capped (25) item list. Each returned category maps to one WidgetSourceOutcome so the existing
    WidgetPanelState.Summarise / ShowAllClear / per-failed-source warning / count-badge behaviour
    (DSH-03) is preserved. If the single fetch itself fails, the whole-widget total-failure path
-   with retry-all is used. *@
-@using HR.Web.Components.Pages.Tasks
+   with retry-all is used.
+
+   This widget is a thin, HR-audience container: it owns authorization, data source selection,
+   HR ordering, and wording. Presentation (loading/failure/all-clear/item rendering/task dialog)
+   is shared with the manager dashboard via AttentionQueuePanel. *@
 @inject DashboardService DashboardService
 @inject WidgetSourceLoader SourceLoader
-@inject NavigationManager Navigation
 @inject AppSession Session
 
 @if (Session.CanManageEmployees)
 {
-    <div class="widget-card attention-queue-card">
-        <div class="widget-header">
-            <i class="fa-solid fa-bell widget-icon"></i>
-            <span class="widget-title">Needs your attention</span>
-            @if (!_loading && _visibleItems.Count > 0)
-            {
-                <span class="widget-count-badge">@_visibleItems.Count</span>
-            }
-        </div>
-
-        <div class="widget-body">
-            @if (_loading)
-            {
-                <HrLoadingIndicator Label="Loading your action queue…" />
-            }
-            else if (_summary.TotalFailure)
-            {
-                <WidgetSourceWarning SourceName="Your action queue" Retrying="_retryingAll"
-                                     OnRetry="ReloadAllAsync" />
-            }
-            else
-            {
-                @foreach (var source in _summary.FailedSources)
-                {
-                    var s = source;
-                    <WidgetSourceWarning SourceName="@s" Retrying="_retryingAll"
-                                         OnRetry="ReloadAllAsync" />
-                }
-
-                @if (_summary.ShowAllClear)
-                {
-                    <div class="attention-queue-all-clear">
-                        <i class="fa-solid fa-circle-check fa-lg"></i>
-                        <div>
-                            <p class="mb-0 fw-semibold">All clear</p>
-                            <p class="mb-0 text-muted">No overdue tasks, pending approvals or compliance exceptions right now.</p>
-                        </div>
-                    </div>
-                }
-                else
-                {
-                    @foreach (var item in _visibleItems)
-                    {
-                        var i = item;
-                        @if (i.HasTarget)
-                        {
-                            <button type="button"
-                                    class="task-widget-item attention-queue-item @(i.IsOverdue ? "attention-queue-item--overdue" : "")"
-                                    aria-label="@i.AccessibleLabel"
-                                    @onclick="() => ActivateAsync(i)">
-                                <span class="priority-pip priority-pip--@i.PriorityCss" title="@i.PriorityLabel">
-                                    <i class="@i.PriorityIcon" aria-hidden="true"></i>
-                                </span>
-                                <div class="task-widget-content">
-                                    <span class="task-widget-title" title="@i.ActionTitle">@i.ActionTitle</span>
-                                    <span class="task-widget-meta">@i.MetaText</span>
-                                </div>
-                                @if (i.DueLabel is not null)
-                                {
-                                    <span class="due-badge due-badge--@i.DueCss">@i.DueLabel</span>
-                                }
-                                <span class="attention-queue-action">@i.ActionLabel</span>
-                            </button>
-                        }
-                        else
-                        {
-                            <div class="task-widget-item attention-queue-item attention-queue-item--stale"
-                                 aria-label="@i.AccessibleLabel">
-                                <span class="priority-pip priority-pip--@i.PriorityCss" title="@i.PriorityLabel">
-                                    <i class="@i.PriorityIcon" aria-hidden="true"></i>
-                                </span>
-                                <div class="task-widget-content">
-                                    <span class="task-widget-title" title="@i.ActionTitle">@i.ActionTitle</span>
-                                    <span class="task-widget-meta text-muted">This item can no longer be opened — it may have been completed or removed.</span>
-                                </div>
-                            </div>
-                        }
-                    }
-                }
-            }
-        </div>
-    </div>
-
-    <TaskViewDialog CompanyId="Session.CompanyId"
-                    TaskId="_selectedTaskId"
-                    IsOpen="_taskDialogOpen"
-                    OnClosed="CloseTaskDialogAsync" />
+    <AttentionQueuePanel Title="Needs your attention"
+                          AllClearMessage="No overdue tasks, pending approvals or compliance exceptions right now."
+                          CompanyId="Session.CompanyId"
+                          Loading="_loading"
+                          RetryingAll="_retryingAll"
+                          Summary="_summary"
+                          Items="_items"
+                          OnReload="ReloadAllAsync" />
 }
 
 @code {
@@ -113,11 +36,7 @@
 
     private WidgetResult<DashboardSummaryModel> _res = WidgetResult<DashboardSummaryModel>.Loading(WidgetName);
     private WidgetPanelSummary _summary = WidgetPanelState.Summarise([]);
-
-    private List<AttentionItem> _visibleItems = [];
-
-    private Guid? _selectedTaskId;
-    private bool _taskDialogOpen;
+    private IReadOnlyList<AttentionQueueItem> _items = [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -145,215 +64,17 @@
 
     private void Recompute()
     {
-        var items = new List<AttentionItem>();
-        var outcomes = new List<WidgetSourceOutcome>();
-
         if (_res.IsFailed)
         {
             // Whole-widget failure — Summarise over a single failed outcome so TotalFailure is set.
             _summary = WidgetPanelState.Summarise([new WidgetSourceOutcome("Dashboard summary", true, true, 0)]);
-            _visibleItems = [];
+            _items = [];
             return;
         }
 
-        var response = _res.Value!;
-
-        foreach (var category in response.Categories)
-        {
-            outcomes.Add(new WidgetSourceOutcome(
-                category.Category, true, category.IsFailed, category.ActionableCount));
-
-            if (category.IsFailed) continue;
-
-            foreach (var it in category.Items)
-            {
-                var (dueLabel, dueCss) = DueBadge(it.DueDate);
-                items.Add(new AttentionItem(
-                    ActionTitle: string.IsNullOrWhiteSpace(it.ActionType) ? it.Category : it.ActionType,
-                    EmployeeName: it.EmployeeName,
-                    Category: it.Category,
-                    StatusLabel: string.IsNullOrWhiteSpace(it.Status) ? it.ActionType : it.Status,
-                    DueDate: it.DueDate,
-                    DueLabel: it.IsOverdue ? "Overdue" : dueLabel,
-                    DueCss: it.IsOverdue ? "overdue" : dueCss,
-                    IsOverdue: it.IsOverdue,
-                    UrgencyRank: it.IsOverdue ? 0 : it.UrgencyRank,
-                    TaskId: it.TaskId,
-                    DeepLinkUrl: it.DeepLinkUrl,
-                    OnActivate: BuildActivate(it)));
-            }
-        }
+        var (outcomes, items) = AttentionQueueSupport.Convert(_res.Value!, _today);
 
         _summary = WidgetPanelState.Summarise(outcomes);
-
-        _visibleItems = items
-            .OrderByDescending(i => i.IsOverdue)
-            .ThenBy(i => i.UrgencyRank)
-            .ThenBy(i => i.DueDate ?? DateOnly.MaxValue)
-            .ToList();
-    }
-
-    private Func<Task> BuildActivate(DashboardActionItemModel it)
-    {
-        if (it.TaskId is not null)
-            return () => OpenTaskAsync(it.TaskId.Value);
-
-        return () =>
-        {
-            // Guard: never navigate to a missing/blank target (stale item). We cannot detect a
-            // server-side 404 before navigating — this only covers absent deep links.
-            if (!string.IsNullOrWhiteSpace(it.DeepLinkUrl))
-                Navigation.NavigateTo(it.DeepLinkUrl);
-            return Task.CompletedTask;
-        };
-    }
-
-    /// <summary>
-    /// Resolves the visible action label for an attention row. One naming convention is used:
-    /// "&lt;verb&gt; &lt;destination noun&gt;" (e.g. "View employee", "View document",
-    /// "Review user account", "View acknowledgement progress"). A row backed by a task always
-    /// opens the task dialog, so it is always "Open task"; otherwise the destination is derived
-    /// from the corrected deep-link URL, falling back to the category, so the label always
-    /// describes where the row actually goes.
-    /// </summary>
-    private static string ResolveActionLabel(Guid? taskId, string? deepLinkUrl, string category)
-    {
-        if (taskId is not null)
-            return "Open task";
-
-        var url = deepLinkUrl?.ToLowerInvariant() ?? string.Empty;
-        if (url.Contains("acknowledge"))
-            return "View acknowledgement progress";
-        if (url.Contains("/documents") || url.Contains("/document/"))
-            return "View document";
-        if (url.Contains("/user-administration") || url.Contains("/users") || url.Contains("/user-accounts") || url.Contains("/accounts"))
-            return "Review user account";
-        if (url.Contains("/employees") || url.Contains("/employee/"))
-            return "View employee";
-
-        return (category ?? string.Empty).ToLowerInvariant() switch
-        {
-            var c when c.Contains("acknowledg") => "View acknowledgement progress",
-            var c when c.Contains("document") => "View document",
-            var c when c.Contains("account") || c.Contains("access") => "Review user account",
-            var c when c.Contains("employee") || c.Contains("compliance") || c.Contains("wellbeing") => "View employee",
-            _ => "View details",
-        };
-    }
-
-    private async Task ActivateAsync(AttentionItem item) => await item.OnActivate();
-
-    private Task OpenTaskAsync(Guid taskId)
-    {
-        _selectedTaskId = taskId;
-        _taskDialogOpen = true;
-        return Task.CompletedTask;
-    }
-
-    private async Task CloseTaskDialogAsync()
-    {
-        _taskDialogOpen = false;
-        await ReloadAllAsync();
-    }
-
-    private (string? Label, string Css) DueBadge(DateOnly? due)
-    {
-        if (due is null) return (null, "");
-        return DueBadge(due.Value);
-    }
-
-    private (string Label, string Css) DueBadge(DateOnly due)
-    {
-        if (due < _today) return ("Overdue", "overdue");
-        if (due == _today) return ("Today", "today");
-        if (due == _today.AddDays(1)) return ("Tomorrow", "soon");
-        if (due <= _today.AddDays(7)) return (due.ToString("d MMM"), "soon");
-        return (due.ToString("d MMM"), "normal");
-    }
-
-    private sealed record AttentionItem(
-        string ActionTitle,
-        string EmployeeName,
-        string Category,
-        string StatusLabel,
-        DateOnly? DueDate,
-        string? DueLabel,
-        string DueCss,
-        bool IsOverdue,
-        int UrgencyRank,
-        Guid? TaskId,
-        string? DeepLinkUrl,
-        Func<Task> OnActivate)
-    {
-        /// <summary>An item is actionable only if it opens a task or has a non-blank deep link.</summary>
-        public bool HasTarget => TaskId is not null || !string.IsNullOrWhiteSpace(DeepLinkUrl);
-
-        public string ActionLabel => ResolveActionLabel(TaskId, DeepLinkUrl, Category);
-
-        /// <summary>
-        /// Secondary/supporting line under the task title: employee, source category, and (when
-        /// meaningful) status — never repeating "Overdue" alongside the due-badge, and adding the
-        /// exact due date for overdue rows so same-employee/same-title items stay distinguishable.
-        /// </summary>
-        public string MetaText
-        {
-            get
-            {
-                var parts = new List<string>();
-                if (!string.IsNullOrWhiteSpace(EmployeeName)) parts.Add(EmployeeName);
-
-                // When the row is overdue, the due-badge already reads "Overdue" — drop any
-                // supporting part (category name, status) that would repeat the word rather than
-                // only guarding against an exact "Overdue" status match (e.g. category names like
-                // "Manager Tasks Overdue" would otherwise duplicate it).
-                if (!string.IsNullOrWhiteSpace(Category) &&
-                    !(IsOverdue && Category.Contains("Overdue", StringComparison.OrdinalIgnoreCase)))
-                {
-                    parts.Add(Category);
-                }
-
-                if (!string.IsNullOrWhiteSpace(StatusLabel) &&
-                    !StatusLabel.Contains("Overdue", StringComparison.OrdinalIgnoreCase))
-                {
-                    parts.Add(StatusLabel);
-                }
-
-                if (IsOverdue && DueDate is not null)
-                    parts.Add($"Due {DueDate.Value:d MMM}");
-
-                return string.Join(" · ", parts);
-            }
-        }
-
-        public string PriorityCss => IsOverdue ? "critical" : UrgencyRank switch
-        {
-            1 => "high",
-            2 => "medium",
-            _ => "low",
-        };
-
-        // DSH-07: priority must not be conveyed by colour alone — surface the word in the
-        // accessible label and give each level a distinct glyph.
-        public string PriorityLabel => PriorityCss switch
-        {
-            "critical" => "Critical priority",
-            "high" => "High priority",
-            "medium" => "Medium priority",
-            _ => "Low priority",
-        };
-
-        public string PriorityIcon => PriorityCss switch
-        {
-            "critical" => "fa-solid fa-circle-exclamation",
-            "high" => "fa-solid fa-triangle-exclamation",
-            "medium" => "fa-solid fa-circle",
-            _ => "fa-regular fa-circle",
-        };
-
-        public string AccessibleLabel =>
-            $"{PriorityLabel}. {ActionTitle}, {MetaText}{(DueLabel is null ? "" : $", due {DueLabel}")}. " +
-            (HasTarget
-                ? $"{ActionLabel}."
-                : "This item can no longer be opened — it may have been completed or removed.");
+        _items = ManagerAttentionQueueOrdering.Order(items, i => i.IsOverdue, i => i.UrgencyRank, i => i.DueDate);
     }
 }

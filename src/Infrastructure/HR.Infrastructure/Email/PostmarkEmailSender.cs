@@ -35,9 +35,9 @@ internal sealed class PostmarkEmailSender : IEmailSender
             // Drop it silently — returning normally (not throwing) so EmailDeliveryJob does not retry
             // or mark a spurious hard failure. See PostmarkRecipientGuard.
             _logger.LogWarning(
-                "Postmark send skipped: recipient domain is a reserved / undeliverable address (To={ToEmail}). " +
-                "A live Postmark token is likely configured in a non-production environment.",
-                SensitiveDataScrubber.MaskEmail(toEmail));
+                "Postmark send skipped: recipient domain is a reserved / undeliverable address. " +
+                "A live Postmark token is likely configured in a non-production environment. Subject={Subject}",
+                subject);
             return;
         }
 
@@ -59,8 +59,8 @@ internal sealed class PostmarkEmailSender : IEmailSender
             // action links.
             var (errorCode, message) = await ReadPostmarkErrorAsync(response, ct);
             _logger.LogWarning(
-                "Postmark email send failed. To={ToEmail} StatusCode={StatusCode} PostmarkErrorCode={PostmarkErrorCode} PostmarkMessage={PostmarkMessage}",
-                SensitiveDataScrubber.MaskEmail(toEmail), (int)response.StatusCode, errorCode, message);
+                "Postmark email send failed. Subject={Subject} StatusCode={StatusCode} PostmarkErrorCode={PostmarkErrorCode} PostmarkMessage={PostmarkMessage}",
+                subject, (int)response.StatusCode, errorCode, message);
             response.EnsureSuccessStatusCode();
         }
     }

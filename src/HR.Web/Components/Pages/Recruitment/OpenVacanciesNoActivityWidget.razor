@@ -1,4 +1,6 @@
+@using HR.Web.Components.Pages.Dashboards
 @inject VacancyService VacancyService
+@inject WidgetSourceLoader SourceLoader
 @inject NavigationManager Navigation
 @inject AppSession Session
 
@@ -28,6 +30,12 @@
                 }
             </div>
 
+            @if (_result.IsFailed)
+            {
+                <WidgetSourceWarning SourceName="Stale vacancies" Retrying="_retrying" OnRetry="RetryAsync" />
+            }
+            else
+            {
             <div class="widget-body">
                 @if (_items.Count == 0)
                 {
@@ -52,12 +60,15 @@
                     }
                 }
             </div>
+            }
         </div>
     }
 }
 
 @code {
     private bool _loading = true;
+    private bool _retrying;
+    private WidgetResult<GetStaleVacanciesResponse?> _result = WidgetResult<GetStaleVacanciesResponse?>.Loading("Stale vacancies");
     private IReadOnlyList<StaleVacancyItem> _items = [];
 
     protected override async Task OnInitializedAsync()
@@ -68,8 +79,23 @@
             return;
         }
 
-        var result = await VacancyService.GetStaleVacanciesAsync(Session.CompanyId);
-        _items = result?.Items ?? [];
+        await LoadAsync();
         _loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
+        _result = await SourceLoader.LoadAsync("Stale Vacancies", "Stale vacancies",
+            () => VacancyService.GetStaleVacanciesOrThrowAsync(Session.CompanyId));
+
+        _items = _result.IsLoaded ? _result.Value?.Items ?? [] : [];
+    }
+
+    private async Task RetryAsync()
+    {
+        _retrying = true;
+        StateHasChanged();
+        await LoadAsync();
+        _retrying = false;
     }
 }

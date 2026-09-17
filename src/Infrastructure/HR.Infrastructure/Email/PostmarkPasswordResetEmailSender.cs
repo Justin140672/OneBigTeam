@@ -57,9 +57,8 @@ internal sealed class PostmarkPasswordResetEmailSender : IPasswordResetEmailSend
         if (PostmarkRecipientGuard.IsUndeliverable(toEmail))
         {
             _logger.LogWarning(
-                "Postmark password-reset send skipped: recipient domain is a reserved / undeliverable address (To={ToEmail}). " +
-                "A live Postmark token is likely configured in a non-production environment.",
-                SensitiveDataScrubber.MaskEmail(toEmail));
+                "Postmark password-reset send skipped: recipient domain is a reserved / undeliverable address. " +
+                "A live Postmark token is likely configured in a non-production environment.");
             return false;
         }
 
@@ -80,11 +79,11 @@ internal sealed class PostmarkPasswordResetEmailSender : IPasswordResetEmailSend
 
             if (!response.IsSuccessStatusCode)
             {
-                // Log status code but never the action URL — it carries the single-use recovery token.
+                // Log status code but never the action URL — it carries the single-use recovery token —
+                // and never the recipient email address.
                 _logger.LogWarning(
-                    "Postmark password-reset email send failed. StatusCode={StatusCode} To={ToEmail}",
-                    (int)response.StatusCode,
-                    SensitiveDataScrubber.MaskEmail(toEmail));
+                    "Postmark password-reset email send failed. StatusCode={StatusCode}",
+                    (int)response.StatusCode);
                 return false;
             }
 
@@ -92,9 +91,9 @@ internal sealed class PostmarkPasswordResetEmailSender : IPasswordResetEmailSend
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex,
-                "Postmark password-reset email request failed. To={ToEmail}",
-                SensitiveDataScrubber.MaskEmail(toEmail));
+            _logger.LogWarning(
+                "Postmark password-reset email request failed. FailureCategory={FailureCategory}",
+                ex.GetType().Name);
             return false;
         }
     }

@@ -48,10 +48,16 @@ public class SensitiveAuthLoggingTests(IdentityDatabaseFixture fixture)
         var result = await handler.HandleAsync(
             new LoginRequest("secret.person@example.com", TokenShapedPassword), CancellationToken.None);
 
+        // CodeQL alerts #49/#48/#47: even a masked email (local-part-truncated, full domain
+        // visible) is deliberately no longer logged here — a masked email still leaks the domain
+        // and is not provably safe to a static analyser. No safe identifier exists this early in
+        // the login flow (Supabase sign-in hasn't resolved a local UserProfile yet), so nothing
+        // recipient-identifying is logged at all.
         Assert.True(result.IsFailure);
         Assert.DoesNotContain(TokenShapedPassword, logger.Text);
         Assert.DoesNotContain("secret.person@example.com", logger.Text);
-        Assert.Contains("se***@example.com", logger.Text);
+        Assert.DoesNotContain("se***@example.com", logger.Text);
+        Assert.DoesNotContain("@example.com", logger.Text);
     }
 
     [Fact]

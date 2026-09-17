@@ -124,7 +124,9 @@ public class EmployeeServiceTests
         var (created, error) = await service.CreateEmployeeAsync(Guid.NewGuid(), SampleCreateRequest());
 
         Assert.Null(created);
-        Assert.Equal("Failed to create employee.", error);
+        // Now surfaced via the shared ApiResponseReader's server-error message rather than the
+        // old bespoke "Failed to create employee." fallback.
+        Assert.Equal("The server encountered an error (500).", error);
     }
 
     // ── UpdateEmployeeProfileAsync ───────────────────────────────────────────────
@@ -178,6 +180,19 @@ public class EmployeeServiceTests
         Assert.True(result.IsConcurrencyConflict);
     }
 
+    [Fact]
+    public async Task UpdateEmployeeProfileAsync_Does_Not_Flag_ConcurrencyConflict_For_Plain_Business_Conflict()
+    {
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.Conflict, new { error = "An employee with this work email already exists." }));
+        var service = new EmployeeService(factory);
+
+        var result = await service.UpdateEmployeeProfileAsync(Guid.NewGuid(), Guid.NewGuid(), SampleUpdateRequest());
+
+        Assert.False(result.Success);
+        Assert.False(result.IsConcurrencyConflict);
+        Assert.Equal("An employee with this work email already exists.", result.ErrorMessage);
+    }
+
     // ── UpdateMyContactDetailsAsync ──────────────────────────────────────────────
 
     [Fact]
@@ -223,18 +238,21 @@ public class EmployeeServiceTests
         Assert.Equal("'12345' is not a valid mobile number.", result.ErrorMessage);
     }
 
+    // A network failure is no longer silently swallowed into a generic "An unexpected error
+    // occurred." result — per the shared response-reader migration, only ApiResponseReader's own
+    // ExecuteAsync wrapper (not used by this call site) classifies HttpRequestException as
+    // ApiFailureKind.Network. A caller that issues the HttpClient call directly (as this method
+    // does) lets a genuine transport failure propagate so it is visibly distinguishable from an
+    // API-returned error, rather than being converted into the same shape as a business failure.
     [Fact]
-    public async Task UpdateMyContactDetailsAsync_Returns_GenericError_When_Network_Fails()
+    public async Task UpdateMyContactDetailsAsync_Propagates_HttpRequestException_When_Network_Fails()
     {
         var factory = BuildFactory(new ThrowingHandler());
         var service = new EmployeeService(factory);
 
-        var result = await service.UpdateMyContactDetailsAsync(
+        await Assert.ThrowsAsync<HttpRequestException>(() => service.UpdateMyContactDetailsAsync(
             Guid.NewGuid(),
-            new UpdateMyContactDetailsRequest(Guid.NewGuid(), null, null, null, "1 Test Street", null, "London", null, "SW1A 1AA", "United Kingdom"));
-
-        Assert.False(result.Success);
-        Assert.Equal("An unexpected error occurred.", result.ErrorMessage);
+            new UpdateMyContactDetailsRequest(Guid.NewGuid(), null, null, null, "1 Test Street", null, "London", null, "SW1A 1AA", "United Kingdom")));
     }
 
     // ── AddMyEmergencyContactAsync ───────────────────────────────────────────────

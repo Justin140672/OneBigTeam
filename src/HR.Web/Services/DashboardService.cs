@@ -1,27 +1,38 @@
+using HR.SharedKernel.Http;
+
 namespace HR.Web.Services;
 
 /// <summary>
 /// Typed client for the server-side bounded dashboard summary endpoints (ticket DSH-06). Each call
 /// replaces a fan-out of 5-7 independent widget fetches with one request that returns per-category
 /// authoritative counts plus a capped (25) pre-ordered item list. Non-swallowing ("OrThrow") so
-/// <see cref="WidgetSourceLoader"/> can record the failure.
+/// <see cref="WidgetSourceLoader"/> can record the failure — reads go through the shared
+/// <see cref="ApiResponseReader"/> so 401/403/404/5xx/network failures are classified consistently
+/// with every other migrated service, then re-thrown as an exception carrying that classification
+/// (rather than a bare "no body" message) for WidgetSourceLoader to log.
 /// </summary>
 public sealed class DashboardService(HrApiHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient();
 
-    public async Task<DashboardSummaryModel> GetHrSummaryOrThrowAsync(Guid companyId, CancellationToken ct = default)
-    {
-        var response = await Http.GetFromJsonAsync<DashboardSummaryModel>(
-            $"api/companies/{companyId}/dashboards/hr/summary", HrApiJsonOptions.Default, ct);
-        return response ?? throw new InvalidOperationException("HR dashboard summary returned no body.");
-    }
+    public async Task<DashboardSummaryModel> GetHrSummaryOrThrowAsync(Guid companyId, CancellationToken ct = default) =>
+        await GetSummaryOrThrowAsync($"api/companies/{companyId}/dashboards/hr/summary", ct);
 
-    public async Task<DashboardSummaryModel> GetManagerSummaryOrThrowAsync(Guid companyId, CancellationToken ct = default)
+    public async Task<DashboardSummaryModel> GetManagerSummaryOrThrowAsync(Guid companyId, CancellationToken ct = default) =>
+        await GetSummaryOrThrowAsync($"api/companies/{companyId}/dashboards/manager/summary", ct);
+
+    private async Task<DashboardSummaryModel> GetSummaryOrThrowAsync(string requestUri, CancellationToken ct)
     {
-        var response = await Http.GetFromJsonAsync<DashboardSummaryModel>(
-            $"api/companies/{companyId}/dashboards/manager/summary", HrApiJsonOptions.Default, ct);
-        return response ?? throw new InvalidOperationException("Manager dashboard summary returned no body.");
+        var result = await ApiResponseReader.ExecuteAsync<DashboardSummaryModel>(
+            httpCt => Http.GetAsync(requestUri, httpCt), HrApiJsonOptions.Default, ct);
+
+        if (!result.Success)
+        {
+            throw new InvalidOperationException(
+                $"Dashboard summary request to '{requestUri}' failed ({result.FailureKind}): {result.Error}");
+        }
+
+        return result.Value ?? throw new InvalidOperationException("Dashboard summary returned no body.");
     }
 }
 

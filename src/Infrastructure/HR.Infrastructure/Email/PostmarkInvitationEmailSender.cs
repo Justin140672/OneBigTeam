@@ -56,9 +56,8 @@ internal sealed class PostmarkInvitationEmailSender : IInvitationEmailSender
         if (PostmarkRecipientGuard.IsUndeliverable(toEmail))
         {
             _logger.LogWarning(
-                "Postmark invitation send skipped: recipient domain is a reserved / undeliverable address (To={ToEmail}). " +
-                "A live Postmark token is likely configured in a non-production environment.",
-                SensitiveDataScrubber.MaskEmail(toEmail));
+                "Postmark invitation send skipped: recipient domain is a reserved / undeliverable address. " +
+                "A live Postmark token is likely configured in a non-production environment.");
             return false;
         }
 
@@ -89,11 +88,10 @@ internal sealed class PostmarkInvitationEmailSender : IInvitationEmailSender
 
             if (!response.IsSuccessStatusCode)
             {
-                // Log status code but not the action URL which contains the invitation token.
+                // Log status code but not the action URL (invitation token) or the recipient email.
                 _logger.LogWarning(
-                    "Postmark invitation email send failed. StatusCode={StatusCode} To={ToEmail}",
-                    (int)response.StatusCode,
-                    SensitiveDataScrubber.MaskEmail(toEmail));
+                    "Postmark invitation email send failed. StatusCode={StatusCode}",
+                    (int)response.StatusCode);
                 return false;
             }
 
@@ -101,9 +99,9 @@ internal sealed class PostmarkInvitationEmailSender : IInvitationEmailSender
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex,
-                "Postmark invitation email request failed. To={ToEmail}",
-                SensitiveDataScrubber.MaskEmail(toEmail));
+            _logger.LogWarning(
+                "Postmark invitation email request failed. FailureCategory={FailureCategory}",
+                ex.GetType().Name);
             return false;
         }
     }

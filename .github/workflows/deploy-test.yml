@@ -29,6 +29,11 @@ jobs:
 
     uses: ./.github/workflows/deploy.yml
 
+    permissions:
+      contents: read
+      actions: read
+      deployments: write
+
     with:
       environment: test
       ref: >-

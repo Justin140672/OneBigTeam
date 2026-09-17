@@ -73,4 +73,40 @@ public class SupportHtmlSanitizerTests
     {
         Assert.Equal(string.Empty, SupportHtmlSanitizer.Sanitize(input));
     }
+
+    [Theory]
+    [InlineData("<svg onload=alert(1)><circle/></svg>")]
+    [InlineData("<svg><script>alert(1)</script></svg>")]
+    [InlineData("<math><mtext><script>alert(1)</script></mtext></math>")]
+    public void Sanitize_strips_svg_and_mathml_payloads(string malicious)
+    {
+        var result = SupportHtmlSanitizer.Sanitize(malicious);
+
+        Assert.DoesNotContain("<svg", result, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<math", result, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<script", result, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("onload", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("<a href=\"data:text/html,<script>alert(1)</script>\">click</a>")]
+    [InlineData("<a href=\"JaVaScRiPt:alert(1)\">click</a>")]
+    [InlineData("<a HREF=\"javascript:alert(1)\" OnClick=\"steal()\">click</a>")]
+    public void Sanitize_strips_dangerous_schemes_and_mixed_case_attributes(string malicious)
+    {
+        var result = SupportHtmlSanitizer.Sanitize(malicious);
+
+        Assert.DoesNotContain("javascript:", result, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("data:", result, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("onclick", result, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<script", result, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Sanitize_strips_mixed_case_script_tags()
+    {
+        var result = SupportHtmlSanitizer.Sanitize("<ScRiPt>alert(1)</sCrIpT>");
+
+        Assert.DoesNotContain("<script", result, StringComparison.OrdinalIgnoreCase);
+    }
 }

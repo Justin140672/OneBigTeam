@@ -1,0 +1,136 @@
+@* Shared "needs attention" presentation, used by both AttentionQueueWidget (HR dashboard) and
+   ManagerAttentionQueueWidget (manager dashboard). Owns: card/header markup, loading and retry
+   presentation, partial-failure warnings, all-clear presentation, attention-item rendering, item
+   activation (task dialog vs deep-link navigation), and the task dialog itself. Callers own only:
+   authorization, data source selection, ordering, and audience-specific wording/counts (DSH-06/DSH-03). *@
+@using HR.Web.Components.Pages.Tasks
+@inject NavigationManager Navigation
+
+<div class="widget-card attention-queue-card">
+    <div class="widget-header">
+        <i class="fa-solid fa-bell widget-icon"></i>
+        <span class="widget-title">@Title</span>
+        @if (!Loading && Items.Count > 0)
+        {
+            <span class="widget-count-badge">@Items.Count</span>
+        }
+    </div>
+
+    <div class="widget-body">
+        @if (Loading)
+        {
+            <HrLoadingIndicator Label="Loading your action queue…" />
+        }
+        else if (Summary.TotalFailure)
+        {
+            <WidgetSourceWarning SourceName="Your action queue" Retrying="RetryingAll"
+                                 OnRetry="RaiseRetryAsync" />
+        }
+        else
+        {
+            @foreach (var source in Summary.FailedSources)
+            {
+                var s = source;
+                <WidgetSourceWarning SourceName="@s" Retrying="RetryingAll"
+                                     OnRetry="RaiseRetryAsync" />
+            }
+
+            @if (Summary.ShowAllClear)
+            {
+                <div class="attention-queue-all-clear">
+                    <i class="fa-solid fa-circle-check fa-lg"></i>
+                    <div>
+                        <p class="mb-0 fw-semibold">All clear</p>
+                        <p class="mb-0 text-muted">@AllClearMessage</p>
+                    </div>
+                </div>
+            }
+            else
+            {
+                @foreach (var item in Items)
+                {
+                    var i = item;
+                    @if (i.HasTarget)
+                    {
+                        <button type="button"
+                                class="task-widget-item attention-queue-item @(i.IsOverdue ? "attention-queue-item--overdue" : "")"
+                                aria-label="@i.AccessibleLabel"
+                                @onclick="() => ActivateAsync(i)">
+                            <span class="priority-pip priority-pip--@i.PriorityCss" title="@i.PriorityLabel">
+                                <i class="@i.PriorityIcon" aria-hidden="true"></i>
+                            </span>
+                            <div class="task-widget-content">
+                                <span class="task-widget-title" title="@i.ActionTitle">@i.ActionTitle</span>
+                                <span class="task-widget-meta">@i.MetaText</span>
+                            </div>
+                            @if (i.DueLabel is not null)
+                            {
+                                <span class="due-badge due-badge--@i.DueCss">@i.DueLabel</span>
+                            }
+                            <span class="attention-queue-action">@i.ActionLabel</span>
+                        </button>
+                    }
+                    else
+                    {
+                        <div class="task-widget-item attention-queue-item attention-queue-item--stale"
+                             aria-label="@i.AccessibleLabel">
+                            <span class="priority-pip priority-pip--@i.PriorityCss" title="@i.PriorityLabel">
+                                <i class="@i.PriorityIcon" aria-hidden="true"></i>
+                            </span>
+                            <div class="task-widget-content">
+                                <span class="task-widget-title" title="@i.ActionTitle">@i.ActionTitle</span>
+                                <span class="task-widget-meta text-muted">This item can no longer be opened — it may have been completed or removed.</span>
+                            </div>
+                        </div>
+                    }
+                }
+            }
+        }
+    </div>
+</div>
+
+<TaskViewDialog CompanyId="CompanyId"
+                TaskId="_selectedTaskId"
+                IsOpen="_taskDialogOpen"
+                OnClosed="CloseTaskDialogAsync" />
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = "";
+    [Parameter, EditorRequired] public string AllClearMessage { get; set; } = "";
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public bool Loading { get; set; }
+    [Parameter, EditorRequired] public bool RetryingAll { get; set; }
+    [Parameter, EditorRequired] public WidgetPanelSummary Summary { get; set; } = WidgetPanelState.Summarise([]);
+    [Parameter, EditorRequired] public IReadOnlyList<AttentionQueueItem> Items { get; set; } = [];
+
+    /// <summary>Raised when the caller should re-fetch (retry-all button, or after the task dialog closes).</summary>
+    [Parameter, EditorRequired] public EventCallback OnReload { get; set; }
+
+    private Guid? _selectedTaskId;
+    private bool _taskDialogOpen;
+
+    private Task RaiseRetryAsync() => OnReload.InvokeAsync();
+
+    private Task ActivateAsync(AttentionQueueItem item)
+    {
+        if (item.TaskId is not null)
+        {
+            _selectedTaskId = item.TaskId.Value;
+            _taskDialogOpen = true;
+            return Task.CompletedTask;
+        }
+
+        // Guard: never navigate to a missing/blank target (stale item). We cannot detect a
+        // server-side 404 before navigating — this only covers absent deep links.
+        if (!string.IsNullOrWhiteSpace(item.DeepLinkUrl))
+            Navigation.NavigateTo(item.DeepLinkUrl);
+
+        return Task.CompletedTask;
+    }
+
+    private async Task CloseTaskDialogAsync()
+    {
+        _taskDialogOpen = false;
+        await OnReload.InvokeAsync();
+    }
+}

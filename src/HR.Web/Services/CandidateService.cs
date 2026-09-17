@@ -1,8 +1,6 @@
 using HR.SharedKernel;
-using System.Net;
+using HR.SharedKernel.Http;
 using System.Net.Http.Headers;
-using System.Net.Http.Json;
-using System.Text.Json;
 using HR.Web.Models;
 using Microsoft.AspNetCore.Components.Forms;
 
@@ -15,89 +13,60 @@ public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
 
     public async Task<ListCandidatesResponse?> ListCandidatesAsync(Guid companyId, string? search = null, int pageNumber = 1, int pageSize = 20, bool includeInactive = false)
     {
-        try
-        {
-            search = FormText.OptionalSearch(search);
-            var url = $"api/companies/{companyId}/candidates?pageNumber={pageNumber}&pageSize={pageSize}";
-            if (search is not null) url += $"&search={Uri.EscapeDataString(search)}";
-            if (includeInactive) url += "&includeInactive=true";
+        search = FormText.OptionalSearch(search);
+        var url = $"api/companies/{companyId}/candidates?pageNumber={pageNumber}&pageSize={pageSize}";
+        if (search is not null) url += $"&search={Uri.EscapeDataString(search)}";
+        if (includeInactive) url += "&includeInactive=true";
 
-            return await Http.GetFromJsonAsync<ListCandidatesResponse>(url, HrApiJsonOptions.Default);
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
+        var result = await ApiResponseReader.ExecuteAsync<ListCandidatesResponse>(
+            ct => Http.GetAsync(url, ct), HrApiJsonOptions.Default);
+        return result.Success ? result.Value : null;
     }
 
     public async Task<GetCandidateResponse?> GetCandidateAsync(Guid companyId, Guid id)
     {
-        try
-        {
-            return await Http.GetFromJsonAsync<GetCandidateResponse>(
-                $"api/companies/{companyId}/candidates/{id}", HrApiJsonOptions.Default);
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
+        var result = await ApiResponseReader.ExecuteAsync<GetCandidateResponse>(
+            ct => Http.GetAsync($"api/companies/{companyId}/candidates/{id}", ct), HrApiJsonOptions.Default);
+        return result.Success ? result.Value : null;
     }
 
     public async Task<(CreateCandidateResponse? Result, string? Error)> CreateCandidateAsync(Guid companyId, CreateCandidateRequest request)
     {
         var response = await Http.PostAsJsonAsync($"api/companies/{companyId}/candidates", request);
-
-        if (response.IsSuccessStatusCode)
-            return (await response.Content.ReadFromJsonAsync<CreateCandidateResponse>(), null);
-
-        return (null, await ReadErrorAsync(response, "Failed to create candidate."));
+        var result = await ApiResponseReader.ReadJsonAsync<CreateCandidateResponse>(response);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to create candidate."));
     }
 
     public async Task<(UpdateCandidateResponse? Result, string? Error)> UpdateCandidateAsync(Guid companyId, Guid id, UpdateCandidateRequest request)
     {
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/candidates/{id}", request);
-
-        if (response.IsSuccessStatusCode)
-            return (await response.Content.ReadFromJsonAsync<UpdateCandidateResponse>(), null);
-
-        return (null, await ReadErrorAsync(response, "Failed to update candidate."));
+        var result = await ApiResponseReader.ReadJsonAsync<UpdateCandidateResponse>(response);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to update candidate."));
     }
 
     public async Task<(DeactivateCandidateResponse? Result, string? Error)> DeactivateCandidateAsync(Guid companyId, Guid candidateId, string reason)
     {
         var request = new DeactivateCandidateRequest(companyId, candidateId, reason);
         var response = await Http.PostAsJsonAsync($"api/companies/{companyId}/candidates/{candidateId}/deactivate", request);
-
-        if (response.IsSuccessStatusCode)
-            return (await response.Content.ReadFromJsonAsync<DeactivateCandidateResponse>(), null);
-
-        return (null, await ReadErrorAsync(response, "Failed to deactivate candidate."));
+        var result = await ApiResponseReader.ReadJsonAsync<DeactivateCandidateResponse>(response);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to deactivate candidate."));
     }
 
     public async Task<(ReactivateCandidateResponse? Result, string? Error)> ReactivateCandidateAsync(Guid companyId, Guid candidateId)
     {
         var request = new ReactivateCandidateRequest(companyId, candidateId);
         var response = await Http.PostAsJsonAsync($"api/companies/{companyId}/candidates/{candidateId}/reactivate", request);
-
-        if (response.IsSuccessStatusCode)
-            return (await response.Content.ReadFromJsonAsync<ReactivateCandidateResponse>(), null);
-
-        return (null, await ReadErrorAsync(response, "Failed to reactivate candidate."));
+        var result = await ApiResponseReader.ReadJsonAsync<ReactivateCandidateResponse>(response);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to reactivate candidate."));
     }
 
     // ── DOCUMENTS (Ticket #1) ──────────────────────────────────────────────────
 
     public async Task<ListCandidateDocumentsResponse?> ListCandidateDocumentsAsync(Guid companyId, Guid candidateId)
     {
-        try
-        {
-            return await Http.GetFromJsonAsync<ListCandidateDocumentsResponse>(
-                $"api/companies/{companyId}/candidates/{candidateId}/documents", HrApiJsonOptions.Default);
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
+        var result = await ApiResponseReader.ExecuteAsync<ListCandidateDocumentsResponse>(
+            ct => Http.GetAsync($"api/companies/{companyId}/candidates/{candidateId}/documents", ct), HrApiJsonOptions.Default);
+        return result.Success ? result.Value : null;
     }
 
     // Relative URL of the web-side authenticated proxy that streams a candidate document inline
@@ -110,38 +79,20 @@ public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, Guid candidateId, string title, string kind, IBrowserFile file,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            using var content = new MultipartFormDataContent();
-            content.Add(new StringContent(title), "Title");
-            content.Add(new StringContent(kind), "Kind");
+        using var content = new MultipartFormDataContent();
+        content.Add(new StringContent(title), "Title");
+        content.Add(new StringContent(kind), "Kind");
 
-            await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
-            var fileContent = new StreamContent(stream);
-            fileContent.Headers.ContentType = new MediaTypeHeaderValue(
-                string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType);
-            content.Add(fileContent, "File", file.Name);
+        await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
+        var fileContent = new StreamContent(stream);
+        fileContent.Headers.ContentType = new MediaTypeHeaderValue(
+            string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType);
+        content.Add(fileContent, "File", file.Name);
 
-            var response = await Http.PostAsync(
-                $"api/companies/{companyId}/candidates/{candidateId}/documents", content, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-                return null;
-
-            try
-            {
-                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-                if (body.TryGetProperty("error", out var errorProp))
-                    return errorProp.GetString();
-            }
-            catch { }
-
-            return $"Upload failed ({(int)response.StatusCode}).";
-        }
-        catch (Exception ex)
-        {
-            return ex.Message;
-        }
+        var result = await ApiResponseReader.ExecuteNoContentAsync(
+            ct => Http.PostAsync($"api/companies/{companyId}/candidates/{candidateId}/documents", content, ct),
+            cancellationToken: cancellationToken);
+        return result.Success ? null : (result.DisplayMessage ?? "Upload failed.");
     }
 
     // ── IEditService<CandidateEditModel, Guid> ──────────────────────────────────
@@ -173,20 +124,19 @@ public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
             expectedVersion);
 
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/candidates/{id}", request);
+        var result = await ApiResponseReader.ReadJsonAsync<UpdateCandidateResponse>(response);
 
-        if (response.IsSuccessStatusCode)
-        {
-            var updated = await response.Content.ReadFromJsonAsync<UpdateCandidateResponse>();
-            return ApiSaveResult.Ok(updated?.Version);
-        }
+        if (result.Success)
+            return ApiSaveResult.Ok(result.Value?.Version);
 
-        if (response.StatusCode == HttpStatusCode.Conflict)
-            return ApiSaveResult.Fail(
-                await ReadErrorAsync(response, "Someone else changed this candidate while you were editing.")
-                    ?? "Someone else changed this candidate while you were editing.",
-                isConcurrencyConflict: true);
-
-        return ApiSaveResult.Fail(await ReadErrorAsync(response, "Failed to update candidate.") ?? "Failed to update candidate.");
+        // The recruitment API returns no "code" on its 409 body, so ANY 409 (Concurrency or plain
+        // Conflict) from this endpoint is treated as a save conflict.
+        var isConflict = result.FailureKind is ApiFailureKind.Concurrency or ApiFailureKind.Conflict;
+        return ApiSaveResult.Fail(
+            result.DisplayMessage ?? (isConflict
+                ? "Someone else changed this candidate while you were editing."
+                : "Failed to update candidate."),
+            isConflict);
     }
 
     async Task<(CandidateEditModel? Result, string? Error)> IEditService<CandidateEditModel, Guid>.CreateAsync(Guid companyId, CandidateEditModel model)
@@ -210,22 +160,4 @@ public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
         var (updated, error) = await UpdateCandidateAsync(companyId, id, request);
         return (updated is null ? null : model, error);
     }
-
-    private static async Task<string?> ReadErrorAsync(HttpResponseMessage response, string fallback)
-    {
-        if (response.StatusCode is HttpStatusCode.NotFound)
-            return "Candidate not found.";
-
-        try
-        {
-            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-            return body?.Error ?? fallback;
-        }
-        catch
-        {
-            return fallback;
-        }
-    }
-
-    private sealed record ErrorEnvelope(string? Error);
 }

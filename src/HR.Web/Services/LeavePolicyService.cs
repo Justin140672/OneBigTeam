@@ -1,4 +1,5 @@
 using HR.SharedKernel;
+using HR.SharedKernel.Http;
 using HR.Web.Models;
 
 namespace HR.Web.Services;
@@ -10,30 +11,18 @@ public class LeavePolicyService(HrApiHttpClientFactory httpClientFactory)
 
     public async Task<ListLeavePoliciesResponse?> ListLeavePoliciesAsync(Guid companyId, bool activeOnly = false)
     {
-        try
-        {
-            var url = $"api/companies/{companyId}/leave-policies";
-            if (activeOnly) url += "?activeOnly=true";
-            var result = await Http.GetFromJsonAsync<ListLeavePoliciesResponse>(url, HrApiJsonOptions.Default);
-            return result;
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
+        var url = $"api/companies/{companyId}/leave-policies";
+        if (activeOnly) url += "?activeOnly=true";
+        var result = await ApiResponseReader.ExecuteAsync<ListLeavePoliciesResponse>(
+            ct => Http.GetAsync(url, ct), HrApiJsonOptions.Default);
+        return result.Success ? result.Value : null;
     }
 
     public async Task<GetLeavePolicyResponse?> GetLeavePolicyAsync(Guid companyId, Guid id)
     {
-        try
-        {
-            return await Http.GetFromJsonAsync<GetLeavePolicyResponse>(
-                $"api/companies/{companyId}/leave-policies/{id}", HrApiJsonOptions.Default);
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
+        var result = await ApiResponseReader.ExecuteAsync<GetLeavePolicyResponse>(
+            ct => Http.GetAsync($"api/companies/{companyId}/leave-policies/{id}", ct), HrApiJsonOptions.Default);
+        return result.Success ? result.Value : null;
     }
 
     async Task<LeavePolicyEditModel?> IEditService<LeavePolicyEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
@@ -60,23 +49,11 @@ public class LeavePolicyService(HrApiHttpClientFactory httpClientFactory)
             model.CarryOverDays, model.AllowNegativeBalance, model.IsDefault, expectedVersion);
 
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/leave-policies/{id}", request);
+        var result = await ApiResponseReader.ReadJsonAsync<UpdateLeavePolicyResponse>(response);
 
-        if (response.IsSuccessStatusCode)
-        {
-            var updated = await response.Content.ReadFromJsonAsync<UpdateLeavePolicyResponse>();
-            return ApiSaveResult.Ok(updated?.Version);
-        }
-
-        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-
-        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
-            return ApiSaveResult.Fail(
-                body?.Error ?? "A leave policy with that name already exists.", body?.Code == "concurrency");
-
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-            return ApiSaveResult.Fail("Leave policy not found.");
-
-        return ApiSaveResult.Fail(body?.Error ?? "Failed to update leave policy.");
+        return result.Success
+            ? ApiSaveResult.Ok(result.Value?.Version)
+            : ApiSaveResult.Fail(result.DisplayMessage ?? "Failed to update leave policy.", result.IsConcurrencyConflict);
     }
 
     async Task<(LeavePolicyEditModel? Result, string? Error)> IEditService<LeavePolicyEditModel, Guid>.CreateAsync(
@@ -105,59 +82,23 @@ public class LeavePolicyService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, CreateLeavePolicyRequest request)
     {
         var response = await Http.PostAsJsonAsync($"api/companies/{companyId}/leave-policies", request);
-
-        if (response.IsSuccessStatusCode)
-        {
-            var created = await response.Content.ReadFromJsonAsync<CreateLeavePolicyResponse>();
-            return (created, null);
-        }
-
-        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
-        {
-            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-            return (null, body?.Error ?? "A leave policy with that name already exists.");
-        }
-
-        return (null, "Failed to create leave policy.");
+        var result = await ApiResponseReader.ReadJsonAsync<CreateLeavePolicyResponse>(response);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to create leave policy."));
     }
 
     public async Task<(UpdateLeavePolicyResponse? Result, string? Error)> UpdateAsync(
         Guid companyId, Guid policyId, UpdateLeavePolicyRequest request)
     {
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/leave-policies/{policyId}", request);
-
-        if (response.IsSuccessStatusCode)
-        {
-            var updated = await response.Content.ReadFromJsonAsync<UpdateLeavePolicyResponse>();
-            return (updated, null);
-        }
-
-        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
-        {
-            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-            return (null, body?.Error ?? "A leave policy with that name already exists.");
-        }
-
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-            return (null, "Leave policy not found.");
-
-        return (null, "Failed to update leave policy.");
+        var result = await ApiResponseReader.ReadJsonAsync<UpdateLeavePolicyResponse>(response);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to update leave policy."));
     }
 
     public async Task<string?> SetDefaultLeavePolicyAsync(Guid companyId, Guid id)
     {
         var response = await Http.PostAsJsonAsync(
             $"api/companies/{companyId}/leave-policies/{id}/set-default", new { });
-
-        if (response.IsSuccessStatusCode)
-            return null;
-
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-            return "Leave policy not found.";
-
-        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-        return body?.Error ?? "Failed to set default leave policy.";
+        var result = await ApiResponseReader.ReadNoContentAsync(response);
+        return result.Success ? null : (result.DisplayMessage ?? "Failed to set default leave policy.");
     }
-
-    private sealed record ErrorEnvelope(string? Error, string? Code = null);
 }

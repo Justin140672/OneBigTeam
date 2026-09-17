@@ -2,6 +2,7 @@ using System.Net.Http.Json;
 using HR.SharedKernel.Idempotency;
 using HR.Web.Models;
 using HR.SharedKernel;
+using HR.SharedKernel.Http;
 
 namespace HR.Web.Services;
 
@@ -14,92 +15,73 @@ public sealed class AssetService(HrApiHttpClientFactory httpClientFactory)
     public async Task<List<EmployeeAssetItem>?> GetEmployeeAssignmentsAsync(
         Guid companyId, Guid employeeId, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            return await Http.GetFromJsonAsync<List<EmployeeAssetItem>>(
-                $"api/companies/{companyId}/employees/{employeeId}/assets", HrApiJsonOptions.Default, cancellationToken);
-        }
-        catch { return null; }
+        var result = await ApiResponseReader.ExecuteAsync<List<EmployeeAssetItem>>(
+            ct => Http.GetAsync($"api/companies/{companyId}/employees/{employeeId}/assets", ct),
+            HrApiJsonOptions.Default, cancellationToken);
+        return result.Success ? result.Value : null;
     }
 
     public async Task<List<AvailableAssetItem>?> ListAvailableAssetsAsync(
         Guid companyId, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var all = await Http.GetFromJsonAsync<List<AvailableAssetItem>>(
-                $"api/companies/{companyId}/assets?status=Available", HrApiJsonOptions.Default, cancellationToken);
-            return all;
-        }
-        catch { return null; }
+        var result = await ApiResponseReader.ExecuteAsync<List<AvailableAssetItem>>(
+            ct => Http.GetAsync($"api/companies/{companyId}/assets?status=Available", ct),
+            HrApiJsonOptions.Default, cancellationToken);
+        return result.Success ? result.Value : null;
     }
 
     public async Task<bool> AssignAssetAsync(
         Guid companyId, Guid assetId, Guid employeeId, Guid assignedBy, string? notes,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await Http.PostAsJsonAsync(
+        var result = await ApiResponseReader.ExecuteNoContentAsync(
+            ct => Http.PostAsJsonAsync(
                 $"api/companies/{companyId}/assets/{assetId}/assignments",
                 new { companyId, assetId, employeeId, assignedBy, notes = FormText.Optional(notes) },
-                cancellationToken);
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
+                ct),
+            cancellationToken: cancellationToken);
+        return result.Success;
     }
 
     public async Task<bool> RequestReturnAsync(
         Guid companyId, Guid assignmentId, Guid requestedBy,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await Http.PostAsJsonAsync(
+        var result = await ApiResponseReader.ExecuteNoContentAsync(
+            ct => Http.PostAsJsonAsync(
                 $"api/companies/{companyId}/asset-assignments/{assignmentId}/request-return",
                 new { companyId, id = assignmentId, requestedBy },
-                cancellationToken);
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
+                ct),
+            cancellationToken: cancellationToken);
+        return result.Success;
     }
 
     public async Task<List<AssetAssignmentItem>?> GetAssetAssignmentsAsync(
         Guid companyId, Guid assetId, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            return await Http.GetFromJsonAsync<List<AssetAssignmentItem>>(
-                $"api/companies/{companyId}/assets/{assetId}/assignments", HrApiJsonOptions.Default, cancellationToken);
-        }
-        catch { return null; }
+        var result = await ApiResponseReader.ExecuteAsync<List<AssetAssignmentItem>>(
+            ct => Http.GetAsync($"api/companies/{companyId}/assets/{assetId}/assignments", ct),
+            HrApiJsonOptions.Default, cancellationToken);
+        return result.Success ? result.Value : null;
     }
 
     public async Task<AssetDetailModel?> GetAssetAsync(
         Guid companyId, Guid assetId, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            return await Http.GetFromJsonAsync<AssetDetailModel>(
-                $"api/companies/{companyId}/assets/{assetId}", HrApiJsonOptions.Default, cancellationToken);
-        }
-        catch { return null; }
+        var result = await ApiResponseReader.ExecuteAsync<AssetDetailModel>(
+            ct => Http.GetAsync($"api/companies/{companyId}/assets/{assetId}", ct),
+            HrApiJsonOptions.Default, cancellationToken);
+        return result.Success ? result.Value : null;
     }
 
     // ── Admin asset list / CRUD ────────────────────────────────────────────
 
     public async Task<ListAssetsAdminResponse?> ListAssetsAsync(Guid companyId)
     {
-        try
-        {
-            var items = await Http.GetFromJsonAsync<List<AssetListItemModel>>(
-                $"api/companies/{companyId}/assets", HrApiJsonOptions.Default);
-            return items is null ? null : new ListAssetsAdminResponse(items);
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
+        var result = await ApiResponseReader.ExecuteAsync<List<AssetListItemModel>>(
+            ct => Http.GetAsync($"api/companies/{companyId}/assets", ct),
+            HrApiJsonOptions.Default);
+        return result.Success ? new ListAssetsAdminResponse(result.Value ?? []) : null;
     }
 
     /// <summary>
@@ -204,12 +186,12 @@ public sealed class AssetService(HrApiHttpClientFactory httpClientFactory)
         return MutationOutcome<CreateAssetResponse>.Rejected(body?.Error ?? "Failed to create asset.");
     }
 
-    private static async Task<ErrorEnvelope?> TryReadErrorEnvelopeAsync(
+    private static async Task<ApiErrorEnvelope?> TryReadErrorEnvelopeAsync(
         HttpResponseMessage response, CancellationToken cancellationToken)
     {
         try
         {
-            return await response.Content.ReadFromJsonAsync<ErrorEnvelope>(cancellationToken: cancellationToken);
+            return await response.Content.ReadFromJsonAsync<ApiErrorEnvelope>(cancellationToken: cancellationToken);
         }
         catch (Exception ex) when (ex is System.Text.Json.JsonException or IOException
             or OperationCanceledException or HttpRequestException)
@@ -222,37 +204,15 @@ public sealed class AssetService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, Guid id, UpdateAssetRequest request)
     {
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/assets/{id}", request);
-
-        if (response.IsSuccessStatusCode)
-        {
-            var updated = await response.Content.ReadFromJsonAsync<UpdateAssetResponse>();
-            return (updated, null);
-        }
-
-        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
-        {
-            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-            return (null, body?.Error ?? "An asset with that number already exists.");
-        }
-
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-            return (null, "Asset not found.");
-
-        return (null, "Failed to update asset.");
+        var result = await ApiResponseReader.ReadJsonAsync<UpdateAssetResponse>(response);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to update asset."));
     }
 
     public async Task<string?> RetireAssetAsync(Guid companyId, Guid id)
     {
         var response = await Http.DeleteAsync($"api/companies/{companyId}/assets/{id}");
-
-        if (response.IsSuccessStatusCode)
-            return null;
-
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-            return "Asset not found.";
-
-        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-        return body?.Error ?? "Failed to retire asset.";
+        var result = await ApiResponseReader.ReadNoContentAsync(response);
+        return result.Success ? null : (result.DisplayMessage ?? "Failed to retire asset.");
     }
 
     async Task<AssetEditModel?> IEditService<AssetEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
@@ -282,23 +242,11 @@ public sealed class AssetService(HrApiHttpClientFactory httpClientFactory)
             model.PurchaseDate, model.PurchasePrice, expectedVersion);
 
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/assets/{id}", request);
+        var result = await ApiResponseReader.ReadJsonAsync<UpdateAssetResponse>(response);
 
-        if (response.IsSuccessStatusCode)
-        {
-            var updated = await response.Content.ReadFromJsonAsync<UpdateAssetResponse>();
-            return ApiSaveResult.Ok(updated?.Version);
-        }
-
-        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-
-        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
-            return ApiSaveResult.Fail(
-                body?.Error ?? "An asset with that number already exists.", body?.Code == "concurrency");
-
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-            return ApiSaveResult.Fail("Asset not found.");
-
-        return ApiSaveResult.Fail(body?.Error ?? "Failed to update asset.");
+        return result.Success
+            ? ApiSaveResult.Ok(result.Value?.Version)
+            : ApiSaveResult.Fail(result.DisplayMessage ?? "Failed to update asset.", result.IsConcurrencyConflict);
     }
 
     // Callers that only know IEditService<AssetEditModel, Guid> (not idempotency-aware) get a
@@ -358,6 +306,4 @@ public sealed class AssetService(HrApiHttpClientFactory httpClientFactory)
         var (updated, error) = await UpdateAssetAsync(companyId, id, request);
         return (updated is null ? null : model, error);
     }
-
-    private sealed record ErrorEnvelope(string? Error, string? Code = null);
 }

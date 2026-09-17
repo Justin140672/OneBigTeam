@@ -1,6 +1,8 @@
+@using HR.Web.Components.Pages.Dashboards
 @inject ApplicationService ApplicationService
 @inject RecruitmentStageService RecruitmentStageService
 @inject VacancyService VacancyService
+@inject WidgetSourceLoader SourceLoader
 @inject NavigationManager Navigation
 @inject AppSession Session
 
@@ -30,6 +32,12 @@
                 }
             </div>
 
+            @if (_offersRes.IsFailed)
+            {
+                <WidgetSourceWarning SourceName="Offers awaiting response" Retrying="_retrying" OnRetry="RetryAsync" />
+            }
+            else
+            {
             <div class="widget-body">
                 <div class="task-widget-section-label">Offers Awaiting Response</div>
                 @if (_offers.Count == 0)
@@ -72,12 +80,16 @@
                     }
                 }
             </div>
+            }
         </div>
     }
 }
 
 @code {
     private bool _loading = true;
+    private bool _retrying;
+    private WidgetResult<OffersAwaitingResponseMetricResponse?> _offersRes =
+        WidgetResult<OffersAwaitingResponseMetricResponse?>.Loading("Offers awaiting response");
     private IReadOnlyList<RecruitmentMetricApplicationItem> _offers = [];
     private IReadOnlyList<ApplicationByStatusItem> _recentHires = [];
 
@@ -89,6 +101,12 @@
             return;
         }
 
+        await LoadAsync();
+        _loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
         var stagesResult = await RecruitmentStageService.ListStagesAsync(Session.CompanyId);
         var stages = stagesResult?.Items ?? [];
 
@@ -101,18 +119,26 @@
         // last-non-terminal-stage-by-DisplayOrder inference.
         var hiredStageIds = stages.Where(s => s.TerminalOutcome == RecruitmentStageTerminalOutcome.Hired).Select(s => s.Id).ToList();
 
-        var offersTask = VacancyService.GetOffersAwaitingResponseMetricAsync(Session.CompanyId);
+        var offersTask = SourceLoader.LoadAsync("Offers & Recent Hires", "Offers awaiting response",
+            () => VacancyService.GetOffersAwaitingResponseMetricOrThrowAsync(Session.CompanyId));
 
         var hireTasks = hiredStageIds.Select(id => ApplicationService.GetApplicationsByStatusAsync(Session.CompanyId, id)).ToList();
 
-        var offersResult = await offersTask;
+        _offersRes = await offersTask;
         var hireResults = await Task.WhenAll(hireTasks);
 
-        _offers = offersResult?.Items ?? [];
+        _offers = _offersRes.IsLoaded ? _offersRes.Value?.Items ?? [] : [];
         // "Recent hires" stands in for "upcoming start dates" — Recruitment doesn't own an
         // Employee start date once hired, so the most recent hire transitions are the closest
         // proxy available without crossing into the Employees module's data.
         _recentHires = hireResults.Where(r => r is not null).SelectMany(r => r!.Items).ToList();
-        _loading = false;
+    }
+
+    private async Task RetryAsync()
+    {
+        _retrying = true;
+        StateHasChanged();
+        await LoadAsync();
+        _retrying = false;
     }
 }

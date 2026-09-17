@@ -1,3 +1,4 @@
+using System.Text.Encodings.Web;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Features.CreatePlatformAdministrator;
 using HR.Modules.Identity.Persistence;
@@ -117,7 +118,8 @@ internal sealed class ResetPlatformAdministratorMfaHandler(
         // best-effort: the affected administrator's MFA is already gone, and per the acceptance
         // criteria success is returned once the provider accepts. A failed email is logged and
         // recorded in the audit outcome rather than rolling back a completed security action.
-        var notificationDelivered = await TryNotifyAffectedAdministratorAsync(administrator.Email, now, cancellationToken);
+        var notificationDelivered = await TryNotifyAffectedAdministratorAsync(
+            administrator.Id, administrator.Email, now, cancellationToken);
 
         await auditEventPublisher.PublishAsync(
             new PlatformAdministratorMfaResetAuditEvent(
@@ -134,7 +136,7 @@ internal sealed class ResetPlatformAdministratorMfaHandler(
     }
 
     private async Task<bool> TryNotifyAffectedAdministratorAsync(
-        string email, DateTimeOffset occurredAt, CancellationToken cancellationToken)
+        Guid administratorId, string email, DateTimeOffset occurredAt, CancellationToken cancellationToken)
     {
         // Approved secure channel: a direct email to the administrator's registered address. The
         // administrative alerts inbox (IAdministrativeAlertWriter) is a platform-owner ops queue and
@@ -144,8 +146,12 @@ internal sealed class ResetPlatformAdministratorMfaHandler(
         try
         {
             var subject = "Your administrator account MFA has been reset";
+            // The administrator's own email address is dynamic, user-supplied data from this
+            // handler's point of view and is inserted into an HTML text node — HTML-encode it so it
+            // cannot be used to break out of the surrounding markup (CodeQL alert #33).
+            var encodedEmail = HtmlEncoder.Default.Encode(email);
             var body =
-                $"<p>The multi-factor authentication (MFA) on your platform administrator account (<strong>{email}</strong>) " +
+                $"<p>The multi-factor authentication (MFA) on your platform administrator account (<strong>{encodedEmail}</strong>) " +
                 $"was reset by a platform owner on {occurredAt:u}.</p>" +
                 "<p>All previously enrolled MFA factors have been removed. You will be prompted to enrol MFA again the next time you sign in.</p>" +
                 "<p>If you did not expect this change, contact the platform owners immediately.</p>";
@@ -155,8 +161,10 @@ internal sealed class ResetPlatformAdministratorMfaHandler(
         }
         catch (Exception ex)
         {
+            // Logs the administrator ID (a safe correlation identifier), never the email address.
             logger.LogWarning(ex,
-                "Failed to send MFA-reset notification email to platform administrator {Email}.", email);
+                "Failed to send MFA-reset notification email to platform administrator {AdministratorId}.",
+                administratorId);
             return false;
         }
     }

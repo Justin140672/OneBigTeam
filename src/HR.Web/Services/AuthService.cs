@@ -34,7 +34,9 @@ public sealed class AuthService(HrApiHttpClientFactory httpClientFactory, ILogge
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Failed to log in {Email}", SensitiveDataScrubber.MaskEmail(email));
+            // No safe identifier is available pre-authentication — deliberately does not log the
+            // email address.
+            logger.LogWarning(ex, "Failed to log in.");
             return (null, "Something went wrong. Please try again.");
         }
     }

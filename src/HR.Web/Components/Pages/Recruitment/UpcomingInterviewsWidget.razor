@@ -1,4 +1,6 @@
+@using HR.Web.Components.Pages.Dashboards
 @inject InterviewService InterviewService
+@inject WidgetSourceLoader SourceLoader
 @inject NavigationManager Navigation
 @inject AppSession Session
 
@@ -28,6 +30,12 @@
                 }
             </div>
 
+            @if (_result.IsFailed)
+            {
+                <WidgetSourceWarning SourceName="Upcoming interviews" Retrying="_retrying" OnRetry="RetryAsync" />
+            }
+            else
+            {
             <div class="widget-body">
                 @if (_items.Count == 0)
                 {
@@ -52,12 +60,15 @@
                     }
                 }
             </div>
+            }
         </div>
     }
 }
 
 @code {
     private bool _loading = true;
+    private bool _retrying;
+    private WidgetResult<GetUpcomingInterviewsResponse?> _result = WidgetResult<GetUpcomingInterviewsResponse?>.Loading("Upcoming interviews");
     private IReadOnlyList<UpcomingInterviewItem> _items = [];
 
     protected override async Task OnInitializedAsync()
@@ -68,8 +79,23 @@
             return;
         }
 
-        var result = await InterviewService.GetUpcomingInterviewsAsync(Session.CompanyId);
-        _items = result?.Items ?? [];
+        await LoadAsync();
         _loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
+        _result = await SourceLoader.LoadAsync("Upcoming Interviews", "Upcoming interviews",
+            () => InterviewService.GetUpcomingInterviewsOrThrowAsync(Session.CompanyId));
+
+        _items = _result.IsLoaded ? _result.Value?.Items ?? [] : [];
+    }
+
+    private async Task RetryAsync()
+    {
+        _retrying = true;
+        StateHasChanged();
+        await LoadAsync();
+        _retrying = false;
     }
 }

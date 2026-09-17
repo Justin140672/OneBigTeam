@@ -231,4 +231,32 @@ public class ResetPlatformAdministratorMfaHandlerTests(IdentityDatabaseFixture f
         Assert.Equal("lost authenticator", audit.Reason);
         Assert.Equal(targetId, audit.AdministratorId);
     }
+
+    [Fact]
+    public async Task HandleAsync_HtmlEncodes_Administrator_Email_In_Notification_Body()
+    {
+        // CodeQL alert #33: the administrator's own email is interpolated into the notification
+        // HTML body — an address containing HTML-significant characters (a real, if unusual,
+        // RFC 5321 local part) must not be able to break out of the surrounding markup.
+        var ownerEmail = await SeedOwnerAsync();
+        var maliciousEmail = "\"><script>alert(1)</script>@test.com";
+        await using var db = fixture.BuildContext();
+        var target = PlatformAdministrator.Create(
+            maliciousEmail, PlatformAdministratorRole.SupportStaff, Now, createdByUserId: null,
+            supabaseAuthUserId: Guid.NewGuid());
+        db.PlatformAdministrators.Add(target);
+        await db.SaveChangesAsync();
+
+        var gateway = new FakeSupabaseAuthGateway();
+        var emailSender = new FakeEmailSender();
+        var handler = BuildHandler(gateway, emailSender, new FakeAuditEventPublisher());
+        var currentUser = new FakeCurrentUser(Guid.NewGuid(), ownerEmail);
+
+        var result = await handler.HandleAsync(Request(target.Id), currentUser, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var sentEmail = Assert.Single(emailSender.Sent);
+        Assert.DoesNotContain("<script>", sentEmail.HtmlBody, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("&lt;script&gt;", sentEmail.HtmlBody);
+    }
 }

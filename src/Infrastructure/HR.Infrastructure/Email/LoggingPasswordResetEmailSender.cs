@@ -19,10 +19,9 @@ internal sealed class LoggingPasswordResetEmailSender(ILogger<LoggingPasswordRes
     {
         var ua = UserAgentSummary.Parse(userAgent);
 
+        // Never logs the recipient email/name or the action URL (single-use recovery token).
         logger.LogInformation(
-            "PASSWORD RESET EMAIL (stub) To={ToEmail} Name={RecipientName} Browser={Browser} OS={OperatingSystem} ActionUrl=(redacted)",
-            SensitiveDataScrubber.MaskEmail(toEmail),
-            recipientName ?? "(none)",
+            "PASSWORD RESET EMAIL (stub) Browser={Browser} OS={OperatingSystem} ActionUrl=(redacted)",
             ua.BrowserName,
             ua.OperatingSystem);
 

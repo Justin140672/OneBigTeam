@@ -1,4 +1,5 @@
 using HR.SharedKernel;
+using HR.SharedKernel.Http;
 using HR.Web.Models;
 
 namespace HR.Web.Services;
@@ -10,16 +11,11 @@ public class LeaveTypeService(HrApiHttpClientFactory httpClientFactory)
 
     public async Task<ListLeaveTypesResponse?> ListLeaveTypesAsync(Guid companyId, bool includeInactive = false)
     {
-        try
-        {
-            var url = $"api/companies/{companyId}/leave-types";
-            if (!includeInactive) url += "?isActive=true";
-            return await Http.GetFromJsonAsync<ListLeaveTypesResponse>(url, HrApiJsonOptions.Default);
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
+        var url = $"api/companies/{companyId}/leave-types";
+        if (!includeInactive) url += "?isActive=true";
+        var result = await ApiResponseReader.ExecuteAsync<ListLeaveTypesResponse>(
+            ct => Http.GetAsync(url, ct), HrApiJsonOptions.Default);
+        return result.Success ? result.Value : null;
     }
 
     // No dedicated backend GetById endpoint — the list already returns full item detail.
@@ -49,23 +45,11 @@ public class LeaveTypeService(HrApiHttpClientFactory httpClientFactory)
             model.DefaultEntitlementDays, model.AccrualMethod, model.Behaviour, model.HasBalance, expectedVersion);
 
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/leave-types/{id}", request);
+        var result = await ApiResponseReader.ReadJsonAsync<UpdateLeaveTypeResponse>(response);
 
-        if (response.IsSuccessStatusCode)
-        {
-            var updated = await response.Content.ReadFromJsonAsync<UpdateLeaveTypeResponse>();
-            return ApiSaveResult.Ok(updated?.Version);
-        }
-
-        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-
-        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
-            return ApiSaveResult.Fail(
-                body?.Error ?? "A leave type with that code already exists.", body?.Code == "concurrency");
-
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-            return ApiSaveResult.Fail("Leave type not found.");
-
-        return ApiSaveResult.Fail(body?.Error ?? "Failed to update leave type.");
+        return result.Success
+            ? ApiSaveResult.Ok(result.Value?.Version)
+            : ApiSaveResult.Fail(result.DisplayMessage ?? "Failed to update leave type.", result.IsConcurrencyConflict);
     }
 
     async Task<(LeaveTypeEditModel? Result, string? Error)> IEditService<LeaveTypeEditModel, Guid>.CreateAsync(
@@ -94,58 +78,22 @@ public class LeaveTypeService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, CreateLeaveTypeRequest request)
     {
         var response = await Http.PostAsJsonAsync($"api/companies/{companyId}/leave-types", request);
-
-        if (response.IsSuccessStatusCode)
-        {
-            var created = await response.Content.ReadFromJsonAsync<CreateLeaveTypeResponse>();
-            return (created, null);
-        }
-
-        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
-        {
-            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-            return (null, body?.Error ?? "A leave type with that code already exists.");
-        }
-
-        return (null, "Failed to create leave type.");
+        var result = await ApiResponseReader.ReadJsonAsync<CreateLeaveTypeResponse>(response);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to create leave type."));
     }
 
     public async Task<(UpdateLeaveTypeResponse? Result, string? Error)> UpdateAsync(
         Guid companyId, Guid id, UpdateLeaveTypeRequest request)
     {
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/leave-types/{id}", request);
-
-        if (response.IsSuccessStatusCode)
-        {
-            var updated = await response.Content.ReadFromJsonAsync<UpdateLeaveTypeResponse>();
-            return (updated, null);
-        }
-
-        if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
-        {
-            var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-            return (null, body?.Error ?? "A leave type with that code already exists.");
-        }
-
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-            return (null, "Leave type not found.");
-
-        return (null, "Failed to update leave type.");
+        var result = await ApiResponseReader.ReadJsonAsync<UpdateLeaveTypeResponse>(response);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to update leave type."));
     }
 
     public async Task<string?> DeactivateAsync(Guid companyId, Guid id)
     {
         var response = await Http.DeleteAsync($"api/companies/{companyId}/leave-types/{id}");
-
-        if (response.IsSuccessStatusCode)
-            return null;
-
-        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
-            return "Leave type not found.";
-
-        var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-        return body?.Error ?? "Failed to deactivate leave type.";
+        var result = await ApiResponseReader.ReadNoContentAsync(response);
+        return result.Success ? null : (result.DisplayMessage ?? "Failed to deactivate leave type.");
     }
-
-    private sealed record ErrorEnvelope(string? Error, string? Code = null);
 }

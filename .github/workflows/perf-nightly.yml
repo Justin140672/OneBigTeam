@@ -19,6 +19,9 @@ concurrency:
   group: perf-nightly
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 env:
   DOTNET_NOLOGO: "true"
   DOTNET_CLI_TELEMETRY_OPTOUT: "true"
