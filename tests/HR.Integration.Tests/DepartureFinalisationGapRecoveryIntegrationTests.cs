@@ -533,6 +533,22 @@ public class DepartureFinalisationGapRecoveryIntegrationTests
             Assert.True(assignment.IsActive);
         }
 
+        // HistoricalLeaveDeactivationRepairProgress is a single global row (one-time sweep, shared
+        // across the whole Postgres testcontainer this "Integration" collection's tests all run
+        // against) — a prior test in this collection may already have driven it to IsComplete, which
+        // would make ExecuteAsync() a permanent no-op and never reach the departure just seeded
+        // above. Reset it here so this test's own sweep is guaranteed to run fresh regardless of
+        // what already ran before it.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var leaveDb = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
+            var existingProgress = await leaveDb.HistoricalLeaveDeactivationRepairProgress
+                .Where(p => p.Id == HistoricalLeaveDeactivationRepairProgress.SingletonId)
+                .ToListAsync();
+            leaveDb.HistoricalLeaveDeactivationRepairProgress.RemoveRange(existingProgress);
+            await leaveDb.SaveChangesAsync();
+        }
+
         // The historical sweep job DOES find and fix it.
         using (var scope = _factory.Services.CreateScope())
         {

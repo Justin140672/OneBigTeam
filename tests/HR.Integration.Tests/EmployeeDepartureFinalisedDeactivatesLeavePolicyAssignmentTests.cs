@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Leave.Domain;
+using HR.Modules.Leave.Jobs;
 using HR.Modules.Leave.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,7 +15,10 @@ namespace HR.Integration.Tests;
 /// employee's departure (via a backdated, confirmed leaving process — which
 /// StartLeavingProcessHandler finalises synchronously, see EmployeeDepartureFinalizer) publishes
 /// EmployeeDepartureFinalisedIntegrationEvent, which EmployeeDepartureFinalisedHandler in the Leave
-/// module consumes to deactivate the employee's EmployeeLeavePolicyAssignment.
+/// module consumes to record a durable LeavePolicyDeactivationOnDeparture request and enqueue
+/// LeavePolicyDeactivationJob to perform the actual deactivation. Real Hangfire job execution is
+/// disabled for this suite (see FakeBackgroundJobClient), so the test runs the captured job body
+/// directly, mirroring DepartureFinalisationDisablesAccountIntegrationTests.
 /// </summary>
 [Collection("Integration")]
 public class EmployeeDepartureFinalisedDeactivatesLeavePolicyAssignmentTests
@@ -83,6 +87,28 @@ public class EmployeeDepartureFinalisedDeactivatesLeavePolicyAssignmentTests
                 confirmBackdatedLeavingDate = true
             });
         Assert.Equal(HttpStatusCode.Created, leavingResponse.StatusCode);
+
+        Guid deactivationId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
+            var request = await db.LeavePolicyDeactivationsOnDeparture
+                .SingleAsync(d => d.CompanyId == companyId && d.EmployeeId == employeeId);
+            deactivationId = request.Id;
+        }
+
+        var backgroundJobClient = (FakeBackgroundJobClient)_factory.Services.GetRequiredService<Hangfire.IBackgroundJobClient>();
+        Assert.Contains(backgroundJobClient.CreatedJobs, j =>
+            j.Type == typeof(LeavePolicyDeactivationJob)
+            && (Guid?)j.Args.ElementAtOrDefault(0) == deactivationId);
+
+        // Real Hangfire job execution is disabled for this suite (see FakeBackgroundJobClient) — run
+        // the captured job body directly, mirroring DepartureFinalisationDisablesAccountIntegrationTests.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var job = ActivatorUtilities.CreateInstance<LeavePolicyDeactivationJob>(scope.ServiceProvider);
+            await job.ProcessAsync(deactivationId, companyId);
+        }
 
         using (var scope = _factory.Services.CreateScope())
         {
