@@ -259,9 +259,22 @@
 
         if (_stepFields.TryGetValue(_step, out var fields))
         {
+            // Merge EditContext's per-property (DataAnnotations attribute) messages with the
+            // model's own IValidatableObject checks run directly. Validator.TryValidateObject
+            // (which backs EditContext.Validate()) silently skips IValidatableObject.Validate
+            // whenever *any* other property on the model fails attribute validation — which is
+            // always true on an early wizard step, since later steps' [Required] fields (e.g.
+            // LastWorkingDay, LeavingReason) are still unset. That gate would otherwise make the
+            // backdating-confirmation check on step 2 never run. Calling Validate() directly
+            // sidesteps it.
+            var customMessages = _model.Validate(new ValidationContext(_model))
+                .Where(r => r.MemberNames.Any(fields.Contains))
+                .Select(r => r.ErrorMessage);
+
             var firstMessage = fields
                 .SelectMany(f => _editContext.GetValidationMessages(_editContext.Field(f)))
-                .FirstOrDefault();
+                .Concat(customMessages)
+                .FirstOrDefault(m => !string.IsNullOrWhiteSpace(m));
 
             if (firstMessage is not null)
             {
