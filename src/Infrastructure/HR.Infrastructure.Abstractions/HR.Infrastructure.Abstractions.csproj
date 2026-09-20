@@ -17,6 +17,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Only used by SupportSessionTokenConstants to derive/share the "Login as Customer"
+         support-session JWT signing key between HR.Infrastructure (issuance) and HR.Api
+         (validation), which have no reference to each other. -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Update="Newtonsoft.Json">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>

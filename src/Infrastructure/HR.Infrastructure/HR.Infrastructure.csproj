@@ -17,6 +17,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Only used by Security/SupportSessionTokenIssuer to mint the distinctly-signed, short-lived
+         "Login as Customer" support-session token (never a real Supabase-issued JWT). -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
     <PackageReference Include="ClosedXML" />
     <PackageReference Include="QuestPDF" />
     <PackageReference Include="Hangfire.AspNetCore" />

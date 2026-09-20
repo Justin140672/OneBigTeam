@@ -53,6 +53,14 @@ internal sealed class SupportSessionConfiguration : IEntityTypeConfiguration<Sup
         builder.Property(s => s.RevokedAt)
             .HasColumnName("revoked_at");
 
+        // P1 "Login as Customer": explicit, persisted optimistic-concurrency token (matches
+        // Company.Version / Ticket 2 convention) — see SupportSession.Version's remarks.
+        builder.Property(s => s.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.HasIndex(s => s.CompanyId)
             .HasDatabaseName("ix_support_sessions_company_id");
 

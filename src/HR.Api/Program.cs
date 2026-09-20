@@ -158,9 +158,36 @@ if (builder.Environment.IsDevelopment())
 // Supabase auth" plan). The dev persona switcher in HR.Web still exists, but it now performs a
 // real Supabase password-grant login (see /api/dev/persona/{userId} below) rather than flipping
 // an in-memory claims pointer.
+// P1 "Login as Customer": a support-session request authenticates with a distinctly-signed,
+// distinctly-issued token (see SupportSessionJwtBearerConfiguration / HR.Infrastructure's
+// SupportSessionTokenIssuer), never a real Supabase-issued token. A policy scheme picks the right
+// JwtBearer handler per request by cheaply peeking the token's unvalidated "iss" claim; the
+// selected handler still performs full signature/issuer/audience/lifetime validation. This keeps
+// the real Supabase validation path (ConfigureSupabaseJwtBearer) completely unchanged for every
+// other request — support-session tokens are the only thing ever routed to the second scheme.
+const string AuthenticationSelectorScheme = "BearerOrSupportSession";
+
 builder.Services
-	.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-	.AddJwtBearer(ConfigureSupabaseJwtBearer);
+	.AddAuthentication(AuthenticationSelectorScheme)
+	.AddPolicyScheme(AuthenticationSelectorScheme, "Supabase Bearer or Support Session", selectorOptions =>
+	{
+		selectorOptions.ForwardDefaultSelector = context =>
+		{
+			var header = context.Request.Headers.Authorization.ToString();
+			if (header.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+			{
+				var token = header["Bearer ".Length..].Trim();
+				if (HR.Api.Authentication.SupportSessionJwtBearerConfiguration.LooksLikeSupportSessionToken(token))
+					return HR.Api.Authentication.SupportSessionJwtBearerConfiguration.SchemeName;
+			}
+
+			return JwtBearerDefaults.AuthenticationScheme;
+		};
+	})
+	.AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, ConfigureSupabaseJwtBearer)
+	.AddJwtBearer(
+		HR.Api.Authentication.SupportSessionJwtBearerConfiguration.SchemeName,
+		options => HR.Api.Authentication.SupportSessionJwtBearerConfiguration.ConfigureValidation(options, builder.Configuration));
 
 // Ticket 6: attach the async ConfigurationManager<OpenIdConnectConfiguration> for the real Supabase
 // JWKS endpoint, wrapped in a FreshnessGatedConfigurationManager that enforces an absolute

@@ -222,4 +222,70 @@ public class PermissionAuthorizationHandlerTests
 
         Assert.Empty(alertWriter.Commands);
     }
+
+    // P1 "Login as Customer" support-session branch -----------------------------------------------
+    // A support session is never resolved through the real permission-assignment lookup — it can
+    // only ever satisfy the fixed EmployeeRead allow-list entry. These assert both the one positive
+    // case and several negative cases, and that the "would otherwise have it" service is never
+    // consulted (hasPermission: true below, yet denied) since support sessions have no user_profile.
+
+    [Fact]
+    public async Task SupportSession_Succeeds_For_EmployeeRead()
+    {
+        var handler = new PermissionAuthorizationHandler(
+            FakeCurrentUser.SupportSession(UserId, tenantId: CompanyId.ToString()),
+            new FakeAppAuthorizationService(hasPermission: true),
+            NewThrottle(),
+            new FakeAuditEventPublisher(),
+            new CapturingAdministrativeAlertWriter(),
+            NullLogger<PermissionAuthorizationHandler>.Instance,
+            new FakeClock(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
+
+        var context = await RunAsync(handler, new PermissionRequirement(HR.Modules.Identity.Domain.SystemPermissions.EmployeeRead));
+
+        Assert.True(context.HasSucceeded);
+    }
+
+    [Theory]
+    [MemberData(nameof(NonEmployeeReadPermissionIds))]
+    public async Task SupportSession_Is_Denied_For_Every_Permission_Other_Than_EmployeeRead(Guid deniedPermissionId)
+    {
+        var handler = new PermissionAuthorizationHandler(
+            FakeCurrentUser.SupportSession(UserId, tenantId: CompanyId.ToString()),
+            new FakeAppAuthorizationService(hasPermission: true),
+            NewThrottle(),
+            new FakeAuditEventPublisher(),
+            new CapturingAdministrativeAlertWriter(),
+            NullLogger<PermissionAuthorizationHandler>.Instance,
+            new FakeClock(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
+
+        var context = await RunAsync(handler, new PermissionRequirement(deniedPermissionId));
+
+        Assert.False(context.HasSucceeded);
+    }
+
+    public static IEnumerable<object[]> NonEmployeeReadPermissionIds()
+    {
+        yield return [HR.Modules.Identity.Domain.SystemPermissions.EmployeeEdit];
+        yield return [Guid.NewGuid()];
+        yield return [Guid.Empty];
+    }
+
+    [Fact]
+    public async Task SupportSession_Denial_Does_Not_Publish_An_Audit_Event()
+    {
+        var publisher = new FakeAuditEventPublisher();
+        var handler = new PermissionAuthorizationHandler(
+            FakeCurrentUser.SupportSession(UserId, tenantId: CompanyId.ToString()),
+            new FakeAppAuthorizationService(hasPermission: false),
+            NewThrottle(),
+            publisher,
+            new CapturingAdministrativeAlertWriter(),
+            NullLogger<PermissionAuthorizationHandler>.Instance,
+            new FakeClock(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
+
+        await RunAsync(handler, new PermissionRequirement(HR.Modules.Identity.Domain.SystemPermissions.EmployeeEdit));
+
+        Assert.Empty(publisher.PublishedEvents);
+    }
 }

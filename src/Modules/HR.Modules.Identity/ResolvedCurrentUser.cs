@@ -4,4 +4,6 @@ internal sealed record ResolvedCurrentUser(
     Guid? UserId,
     string? Email,
     string? TenantId,
-    bool IsAuthenticated);
+    bool IsAuthenticated,
+    bool IsSupportSession = false,
+    Guid? SupportSessionId = null);

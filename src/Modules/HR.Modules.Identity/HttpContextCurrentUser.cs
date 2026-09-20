@@ -67,6 +67,10 @@ internal sealed class HttpContextCurrentUser(IHttpContextAccessor httpContextAcc
         }
     }
 
+    public bool IsSupportSession => GetResolved()?.IsSupportSession ?? false;
+
+    public Guid? SupportSessionId => GetResolved()?.SupportSessionId;
+
     private ResolvedCurrentUser? GetResolved()
     {
         if (httpContextAccessor.HttpContext?.Items.TryGetValue(

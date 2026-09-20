@@ -44,6 +44,34 @@ public class RedeemSupportSessionEndpointTests
         return (companyId, token);
     }
 
+    private async Task<(Guid CompanyId, string Token)> SeedRevokedSupportSessionAsync(DateTimeOffset now)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+
+        var companyId = Guid.NewGuid();
+        var token = $"raw-token-{Guid.NewGuid():N}";
+        var session = SupportSession.Issue(companyId, Guid.NewGuid(), "admin@example.com", "reason", HashToken(token), now);
+        session.Revoke(now.AddMinutes(1));
+        db.SupportSessions.Add(session);
+        await db.SaveChangesAsync();
+        return (companyId, token);
+    }
+
+    /// <summary>Seeds a session whose 20-minute expiry has already passed relative to "now".</summary>
+    private async Task<(Guid CompanyId, string Token)> SeedExpiredSupportSessionAsync(DateTimeOffset issuedAt)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+
+        var companyId = Guid.NewGuid();
+        var token = $"raw-token-{Guid.NewGuid():N}";
+        var session = SupportSession.Issue(companyId, Guid.NewGuid(), "admin@example.com", "reason", HashToken(token), issuedAt);
+        db.SupportSessions.Add(session);
+        await db.SaveChangesAsync();
+        return (companyId, token);
+    }
+
     private static string HashToken(string token)
     {
         var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
@@ -83,6 +111,8 @@ public class RedeemSupportSessionEndpointTests
         Assert.NotNull(payload);
         Assert.Equal(companyId, payload!.CompanyId);
         Assert.Equal("admin@example.com", payload.IssuedByAdminEmail);
+        Assert.False(string.IsNullOrWhiteSpace(payload.Token));
+        Assert.True(payload.ExpiresAt > DateTimeOffset.UtcNow);
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
@@ -113,5 +143,95 @@ public class RedeemSupportSessionEndpointTests
         Assert.Equal(HttpStatusCode.BadRequest, secondResponse.StatusCode);
     }
 
-    private sealed record RedeemSupportSessionPayload(Guid CompanyId, Guid IssuedByAdminUserId, string IssuedByAdminEmail, DateTimeOffset RedeemedAt);
+    [Fact]
+    public async Task Post_RedeemSupportSession_Returns_BadRequest_For_A_Revoked_Session()
+    {
+        var (_, token) = await SeedRevokedSupportSessionAsync(DateTimeOffset.UtcNow);
+        using var client = _factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(Url, new { token });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_RedeemSupportSession_Returns_BadRequest_For_An_Expired_Session()
+    {
+        var (_, token) = await SeedExpiredSupportSessionAsync(DateTimeOffset.UtcNow.AddMinutes(-25));
+        using var client = _factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync(Url, new { token });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    // Downstream authorization behaviour of a minted support-session identity ---------------------
+    // These simulate the resolved identity a real support-session JWT produces via
+    // TestAuthHandler.SupportSessionHeader rather than round-tripping a real signed JWT through the
+    // separate "SupportSession" JwtBearer scheme, which this WebApplicationFactory's TestAuthHandler
+    // entirely replaces for all integration tests (see TestAuthHandler's remarks). What's under test
+    // here is the authorization-handler behaviour downstream of resolution
+    // (SupabaseCurrentUserResolutionMiddleware / PermissionAuthorizationHandler /
+    // PlatformAdminAuthorizationHandler / TenantRouteAuthorizationMiddleware), which only ever reads
+    // resolved ClaimsPrincipal claims, not which scheme produced them.
+
+    private HttpClient CreateSupportSessionClient(Guid supportSessionId, Guid companyId, string email = "admin@example.com")
+    {
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, Guid.NewGuid().ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.SupportSessionHeader, supportSessionId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.EmailHeader, email);
+        return client;
+    }
+
+    [Fact]
+    public async Task SupportSession_Identity_Can_Access_EmployeeRead_Endpoint_For_Its_Own_Company()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = CreateSupportSessionClient(Guid.NewGuid(), companyId);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/employees/gender-split");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task SupportSession_Identity_Is_Forbidden_From_An_Endpoint_Requiring_A_Different_Permission()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = CreateSupportSessionClient(Guid.NewGuid(), companyId);
+
+        var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/settings", new { });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task SupportSession_Identity_Is_Forbidden_From_A_PlatformAdmin_Endpoint_Even_When_Email_Matches_A_Real_Admin()
+    {
+        var (_, email) = await PlatformAdministratorTestHelpers.SeedAdministratorAsync(
+            _factory, HR.Modules.Identity.Domain.PlatformAdministratorRole.PlatformOwner, isEnabled: true);
+
+        using var client = CreateSupportSessionClient(Guid.NewGuid(), Guid.NewGuid(), email: email);
+
+        var response = await client.GetAsync("/api/companies/admin/platform-settings");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task SupportSession_Identity_Cannot_Access_A_Different_Companys_EmployeeRead_Endpoint()
+    {
+        var ownCompanyId = Guid.NewGuid();
+        var otherCompanyId = Guid.NewGuid();
+        using var client = CreateSupportSessionClient(Guid.NewGuid(), ownCompanyId);
+
+        var response = await client.GetAsync($"/api/companies/{otherCompanyId}/employees/gender-split");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    private sealed record RedeemSupportSessionPayload(
+        Guid CompanyId, Guid IssuedByAdminUserId, string IssuedByAdminEmail, DateTimeOffset RedeemedAt, string Token, DateTimeOffset ExpiresAt);
 }

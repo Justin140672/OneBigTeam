@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Companies.Persistence;
 using HR.SharedKernel;
 using HR.SharedKernel.Idempotency;
@@ -13,7 +14,8 @@ namespace HR.Modules.Companies.Features.RedeemSupportSession;
 internal sealed class RedeemSupportSessionHandler(
     CompaniesDbContext dbContext,
     IClock clock,
-    IAuditEventPublisher auditEventPublisher)
+    IAuditEventPublisher auditEventPublisher,
+    ISupportSessionTokenIssuer tokenIssuer)
 {
     public async Task<Result<RedeemSupportSessionResponse>> HandleAsync(
         RedeemSupportSessionRequest request,
@@ -41,6 +43,8 @@ internal sealed class RedeemSupportSessionHandler(
 
         var tokenHash = HashToken(request.Token);
 
+        // Tracked (not AsNoTracking) — SaveChangesWithConcurrencyAsync below needs EF change
+        // tracking to pin the OriginalValue of Version and detect a concurrent redeemer.
         var supportSession = await dbContext.SupportSessions
             .SingleOrDefaultAsync(s => s.TokenHash == tokenHash, cancellationToken);
 
@@ -51,17 +55,43 @@ internal sealed class RedeemSupportSessionHandler(
         }
 
         var now = clock.UtcNowOffset();
+        var expectedVersion = supportSession.Version;
+
         var redeemResult = supportSession.Redeem(now);
         if (redeemResult.IsFailure)
         {
             return Result.Failure<RedeemSupportSessionResponse>(redeemResult.Error);
         }
 
+        // P1: atomic, race-safe redemption via the shared optimistic-concurrency pattern (Ticket
+        // 2 — see SupportSession.Version's remarks). Two simultaneous redemption requests for the
+        // same token must never both succeed: whichever request's SaveChangesAsync commits first
+        // advances Version, so the loser's pinned OriginalValue no longer matches the stored row,
+        // its UPDATE affects zero rows, and EF raises DbUpdateConcurrencyException — translated
+        // here to a validation failure rather than a silent double-success.
+        var saveResult = await dbContext.SaveChangesWithConcurrencyAsync(
+            supportSession, expectedVersion, "This support session has already been redeemed.", cancellationToken);
+
+        if (saveResult.IsFailure)
+        {
+            return Result.Failure<RedeemSupportSessionResponse>(saveResult.Error);
+        }
+
+        var expiresAt = supportSession.ExpiresAt;
+        var token = tokenIssuer.IssueToken(
+            supportSession.Id,
+            supportSession.CompanyId,
+            supportSession.IssuedByAdminUserId,
+            supportSession.IssuedByAdminEmail,
+            expiresAt);
+
         var response = new RedeemSupportSessionResponse(
             supportSession.CompanyId,
             supportSession.IssuedByAdminUserId,
             supportSession.IssuedByAdminEmail,
-            supportSession.RedeemedAt!.Value);
+            now,
+            token,
+            expiresAt);
 
         if (request.IdempotencyKey is { } key)
         {

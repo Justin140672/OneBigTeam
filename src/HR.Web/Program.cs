@@ -39,6 +39,7 @@ builder.Services.AddScoped<CircuitSessionState>();
 builder.Services.AddScoped<SupabaseSessionAccessor>();
 builder.Services.AddScoped<HrApiHttpClientFactory>();
 builder.Services.AddScoped<SupportSessionState>();
+builder.Services.AddScoped<SupportSessionCookieAccessor>();
 
 var hrApiClientBuilder = builder.Services.AddHttpClient("hrapi", c =>
 {
@@ -214,6 +215,13 @@ app.Use(async (context, next) =>
 app.Use(async (context, next) =>
 {
     _ = context.RequestServices.GetRequiredService<SupabaseSessionAccessor>().AccessToken;
+
+    // P1 "Login as Customer": same forcing pattern as SupabaseSessionAccessor above — reads the
+    // support-session display-metadata cookie now, while a real HttpContext is guaranteed, and
+    // activates SupportSessionState for this circuit so SupportSessionBanner (injected directly,
+    // no separate API round-trip) renders correctly from the very first page render.
+    context.RequestServices.GetRequiredService<SupportSessionCookieAccessor>().Synchronize();
+
     await next(context);
 });
 
@@ -472,25 +480,24 @@ if (app.Environment.IsDevelopment())
 // platform:admin policy, requires a typed reason, 20-minute single-use token) and is given a link
 // to this endpoint.
 //
-// STUB — DELIBERATE, NOT AN OVERSIGHT: this endpoint validates and consumes the token (via
-// HR.Modules.Companies's RedeemSupportSession endpoint) and confirms/audits that redemption, but
-// it does NOT establish an authenticated HR.Web session as the customer's company. Doing so safely
-// requires either:
-//   (a) a genuine Supabase Admin API-driven session mint for a real customer user (true user
-//       impersonation) — a materially larger, higher-risk change to the auth surface, or
-//   (b) teaching HR.Api's authorization pipeline (SupabaseCurrentUserResolutionMiddleware,
-//       RequireTenantMiddleware, TenantRouteAuthorizationMiddleware — see HR.Modules.Identity) a
-//       new "support-scoped, company-only, not-a-real-user" identity shape, which is itself a
-//       security-sensitive change to code shared by every authenticated request in the system.
-// Both are out of scope for this pass. Building either without a focused security review of that
-// shared middleware would risk silently weakening authentication/authorization for every tenant,
-// which is a materially worse outcome than shipping "the safe half" of this feature. See
-// SupportSessionState's remarks for the same reasoning from the client-side half (the visible
-// support banner), which is built and ready to be driven by whichever mechanism above is chosen.
+// Redeems the token (atomically, single-use — HR.Modules.Companies's RedeemSupportSession) and, on
+// success, establishes a real authenticated support session: the API mints a distinctly-signed,
+// distinctly-issued support-session token (never a real Supabase token — see
+// HR.Infrastructure.Security.SupportSessionTokenIssuer / HR.Api's SupportSessionJwtBearerConfiguration)
+// scoped to exactly the redeemed session's target company and expiry. That token is set as this
+// browser's normal bearer-token cookie (obt_supabase_at) — HR.Api's authentication pipeline
+// recognises it via a second JwtBearer scheme and HR.Modules.Identity's
+// SupabaseCurrentUserResolutionMiddleware builds a support-scoped ResolvedCurrentUser from it,
+// restricted to a narrow read-only permission grant (PermissionAuthorizationHandler) and never
+// resolvable to a real employee identity. A second, small cookie carries only display metadata
+// (company id, admin email, expiry) for the visible SupportSessionBanner (see
+// SupportSessionCookieAccessor).
 app.MapGet("/support-session/redeem", async (
     HttpContext context,
     string? token,
-    HrApiHttpClientFactory httpClientFactory) =>
+    HrApiHttpClientFactory httpClientFactory,
+    IHostEnvironment environment,
+    CircuitSessionState sessionState) =>
 {
     if (string.IsNullOrWhiteSpace(token))
     {
@@ -533,24 +540,41 @@ app.MapGet("/support-session/redeem", async (
             """, "text/html");
     }
 
+    var redeemed = await response.Content.ReadFromJsonAsync<SupportSessionRedeemedPayload>(
+        HrApiJsonOptions.Default, context.RequestAborted);
+
+    if (redeemed is null || string.IsNullOrWhiteSpace(redeemed.Token))
+    {
+        return Results.Content("""
+            <!DOCTYPE html>
+            <html><head><title>Support session error</title></head>
+            <body><h1>Something went wrong</h1>
+            <p>The support-session service returned an unexpected response. Please try again.</p></body></html>
+            """, "text/html");
+    }
+
     // Token was valid and is now consumed (single-use — RedeemSupportSession marks it redeemed
-    // server-side and this call cannot succeed a second time). The redemption itself is fully
-    // real, audited, and functional; only the "establish an authenticated HR.Web session as this
-    // customer" half is intentionally not implemented — see the remarks above this endpoint.
-    return Results.Content($"""
-        <!DOCTYPE html>
-        <html><head><title>Support session validated</title></head>
-        <body>
-        <h1>Support session validated</h1>
-        <p>The support session token was valid and has now been consumed. This confirms the
-        platform administrator's access grant was genuine and has been recorded in the audit log.</p>
-        <p><strong>Full automatic sign-in into the customer's environment is not implemented in
-        this build.</strong> Establishing a real authenticated session safely requires a dedicated
-        follow-up change to HR.Api's shared authentication/authorization middleware, which was
-        deliberately deferred rather than rushed — see Program.cs's remarks on this endpoint for the
-        full reasoning.</p>
-        </body></html>
-        """, "text/html");
+    // server-side with a race-safe conditional update, so this call cannot succeed a second time).
+    var expiresInSeconds = Math.Max(1, (int)(redeemed.ExpiresAt - DateTimeOffset.UtcNow).TotalSeconds);
+    SupabaseSessionAccessor.SetSessionCookie(context, redeemed.Token, expiresInSeconds, environment, sessionState);
+    SupportSessionCookieAccessor.SetCookie(context, redeemed.CompanyId, redeemed.IssuedByAdminEmail, redeemed.ExpiresAt, environment);
+
+    // Lands on the employee list, not the company-settings edit page: a support session is
+    // restricted to the read-only "employee:read" grant (PermissionAuthorizationHandler) and does
+    // NOT hold "company:manage", so /companies/{id}/edit would immediately 403 for it.
+    return Results.Redirect($"/companies/{redeemed.CompanyId}/employees");
+}).AllowAnonymous();
+
+// Ends the current support session (visible "End support session" action on SupportSessionBanner).
+// Clears both cookies set above and returns to the platform admin's own login page — this
+// deliberately does NOT call any revoke/refresh-token endpoint: the underlying SupportSession row
+// was already single-use-consumed at redemption time, so there is nothing further to invalidate
+// server-side; ending the session is purely "stop presenting this browser's support-scoped token".
+app.MapPost("/support-session/end", (HttpContext context, IHostEnvironment environment, CircuitSessionState sessionState) =>
+{
+    SupabaseSessionAccessor.ClearSessionCookie(context, environment, sessionState);
+    SupportSessionCookieAccessor.ClearCookie(context, environment);
+    return Results.Redirect("/login");
 }).AllowAnonymous();
 
 // Authenticated proxy for downloading the employee import template (used by the Getting Started
@@ -629,3 +653,11 @@ app.MapRazorComponents<App>()
 app.MapDefaultEndpoints();
 
 app.Run();
+
+internal sealed record SupportSessionRedeemedPayload(
+    Guid CompanyId,
+    Guid IssuedByAdminUserId,
+    string IssuedByAdminEmail,
+    DateTimeOffset RedeemedAt,
+    string Token,
+    DateTimeOffset ExpiresAt);

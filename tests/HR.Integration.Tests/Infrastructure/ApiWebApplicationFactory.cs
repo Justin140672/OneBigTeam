@@ -55,7 +55,11 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["Infrastructure:SensitiveDataProtection:ActiveKeyId"] = "test",
-                ["Infrastructure:SensitiveDataProtection:Keys:test"] = TestSensitiveDataKey
+                ["Infrastructure:SensitiveDataProtection:Keys:test"] = TestSensitiveDataKey,
+                // P1 "Login as Customer": a fixed, throwaway key so ISupportSessionTokenIssuer /
+                // SupportSessionJwtBearerConfiguration are resolvable in integration tests — never
+                // a real secret, mirrors TestSensitiveDataKey's own convention above.
+                ["SupportSession:SigningKey"] = "test-support-session-signing-key-not-a-real-secret",
             });
         });
 

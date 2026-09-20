@@ -4,4 +4,6 @@ internal sealed record RedeemSupportSessionResponse(
     Guid CompanyId,
     Guid IssuedByAdminUserId,
     string IssuedByAdminEmail,
-    DateTimeOffset RedeemedAt);
+    DateTimeOffset RedeemedAt,
+    string Token,
+    DateTimeOffset ExpiresAt);

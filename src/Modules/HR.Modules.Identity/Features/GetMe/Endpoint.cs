@@ -33,6 +33,30 @@ internal sealed class Endpoint(
             return;
         }
 
+        // P1 "Login as Customer": a support session has no identity.user_profiles /
+        // identity.users / role-assignment rows to query (and must never be given any — see
+        // SupabaseCurrentUserResolutionMiddleware's remarks), so it short-circuits here with its
+        // own fixed, narrow, read-only permission grant instead of going through the normal
+        // DB-driven role/permission lookups below (which would simply return "no permissions" and
+        // leave every capability flag false, breaking the app shell for no security benefit — the
+        // actual enforcement point is PermissionAuthorizationHandler's identical allow-list, not
+        // this response).
+        if (currentUser.IsSupportSession)
+        {
+            await Send.ResultAsync(TypedResults.Ok(new GetMeResponse(
+                userId.Value,
+                companyId,
+                currentUser.Email,
+                [HR.Modules.Identity.Domain.SystemPermissions.EmployeeRead],
+                [],
+                CanManageCompany: false,
+                IsHrAdministrator: false,
+                IsManager: false,
+                IsRecruiter: false,
+                IsEmailConfirmed: true)));
+            return;
+        }
+
         var permissions = await authorizationService.GetEffectivePermissionsAsync(userId.Value, ct);
 
         // Mirrors the "company:manage" policy roles exactly (HR.Modules.Identity.IdentityModule.AddRolePolicies)

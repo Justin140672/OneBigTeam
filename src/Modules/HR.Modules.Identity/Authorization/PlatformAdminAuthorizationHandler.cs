@@ -31,6 +31,14 @@ internal sealed class PlatformAdminAuthorizationHandler(
         AuthorizationHandlerContext context,
         PlatformAdminRequirement requirement)
     {
+        // P1 "Login as Customer": a support session's token carries the acting admin's own email
+        // (for display/audit) and would otherwise satisfy this policy's email-fallback match below
+        // — but a support session must be restricted to tenant-scoped operations for its one named
+        // company only, never platform:admin endpoints (which are cross-tenant). Fail closed here
+        // explicitly rather than relying on the caller never presenting this token to such a route.
+        if (currentUser.IsSupportSession)
+            return;
+
         var userId = currentUser.UserId;
         var email = currentUser.Email;
 

@@ -12,7 +12,7 @@ namespace HR.Modules.Companies.Domain;
 /// environment for support purposes; no customer user's own identity, session, or audit trail is
 /// ever touched.
 /// </summary>
-internal sealed class SupportSession
+internal sealed class SupportSession : IVersionedAggregate
 {
     private SupportSession() { }
 
@@ -26,6 +26,18 @@ internal sealed class SupportSession
     public DateTimeOffset ExpiresAt { get; private set; }
     public DateTimeOffset? RedeemedAt { get; private set; }
     public DateTimeOffset? RevokedAt { get; private set; }
+
+    // Explicit, persisted optimistic-concurrency token (matches Company.Version / Ticket 2
+    // convention). P1 "Login as Customer": redemption is the one operation on this aggregate that
+    // absolutely must be race-safe — two simultaneous redemption requests for the same token must
+    // never both succeed. RedeemSupportSessionHandler saves via
+    // DbContextConcurrencyExtensions.SaveChangesWithConcurrencyAsync, which pins this Version as
+    // the EF OriginalValue before saving, so a concurrent redeemer's UPDATE affects zero rows and
+    // raises DbUpdateConcurrencyException (translated to a 409/validation failure) rather than both
+    // requests silently succeeding.
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
 
     public static SupportSession Issue(
         Guid companyId,
@@ -45,6 +57,7 @@ internal sealed class SupportSession
             TokenHash = tokenHash,
             CreatedAt = now,
             ExpiresAt = now.AddMinutes(20),
+            Version = 1,
         };
     }
 

@@ -16,6 +16,16 @@ internal sealed class TestAuthHandler : AuthenticationHandler<AuthenticationSche
     public const string TenantHeader = "X-Test-Tenant";
     public const string EmailHeader = "X-Test-Email";
 
+    // P1 "Login as Customer" support-session integration tests: setting this header simulates the
+    // resolved identity a real support-session JWT would produce (see
+    // SupabaseCurrentUserResolutionMiddleware's support_session_id branch), without needing this
+    // test harness to mint/validate a real signed JWT for the separate "SupportSession" auth scheme
+    // — TestAuthHandler entirely replaces the app's authentication schemes for these tests, and
+    // SupabaseCurrentUserResolutionMiddleware only ever inspects ClaimsPrincipal claims, not which
+    // scheme produced them. The claim type value ("support_session_id") is duplicated here rather
+    // than referencing HR.Modules.Identity.CurrentUserClaims.SupportSessionId, which is internal.
+    public const string SupportSessionHeader = "X-Test-SupportSessionId";
+
     public TestAuthHandler(
         IOptionsMonitor<AuthenticationSchemeOptions> options,
         ILoggerFactory logger,
@@ -40,6 +50,11 @@ internal sealed class TestAuthHandler : AuthenticationHandler<AuthenticationSche
         if (Request.Headers.TryGetValue(EmailHeader, out var emailValues) && !string.IsNullOrWhiteSpace(emailValues))
         {
             claims.Add(new Claim("email", emailValues.ToString()));
+        }
+
+        if (Request.Headers.TryGetValue(SupportSessionHeader, out var supportSessionIdValues) && !string.IsNullOrWhiteSpace(supportSessionIdValues))
+        {
+            claims.Add(new Claim("support_session_id", supportSessionIdValues.ToString()));
         }
 
         if (Request.Headers.TryGetValue(TenantHeader, out var tenantIdValues) && !string.IsNullOrWhiteSpace(tenantIdValues))

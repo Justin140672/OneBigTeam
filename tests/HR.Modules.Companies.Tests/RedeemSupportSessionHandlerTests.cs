@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Features.RedeemSupportSession;
 using HR.Modules.Companies.Persistence;
@@ -14,12 +15,18 @@ public class RedeemSupportSessionHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 6, 30, 10, 0, 0, TimeSpan.Zero);
 
+    private sealed class FakeSupportSessionTokenIssuer : ISupportSessionTokenIssuer
+    {
+        public string IssueToken(Guid supportSessionId, Guid companyId, Guid adminUserId, string adminEmail, DateTimeOffset expiresAt)
+            => $"fake-token:{supportSessionId}";
+    }
+
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Token_Does_Not_Match_Any_Session()
     {
         await using var context = BuildContext();
         var publisher = new CapturingAuditEventPublisher();
-        var handler = new RedeemSupportSessionHandler(context, new FakeClock(Now.UtcDateTime), publisher);
+        var handler = new RedeemSupportSessionHandler(context, new FakeClock(Now.UtcDateTime), publisher, new FakeSupportSessionTokenIssuer());
 
         var result = await handler.HandleAsync(
             new RedeemSupportSessionRequest("garbage-token-that-does-not-exist"),
@@ -42,7 +49,7 @@ public class RedeemSupportSessionHandlerTests
         await context.SaveChangesAsync();
 
         var publisher = new CapturingAuditEventPublisher();
-        var handler = new RedeemSupportSessionHandler(context, new FakeClock(Now.AddMinutes(1).UtcDateTime), publisher);
+        var handler = new RedeemSupportSessionHandler(context, new FakeClock(Now.AddMinutes(1).UtcDateTime), publisher, new FakeSupportSessionTokenIssuer());
 
         var result = await handler.HandleAsync(new RedeemSupportSessionRequest(token), CancellationToken.None);
 
@@ -72,11 +79,11 @@ public class RedeemSupportSessionHandlerTests
         await context.SaveChangesAsync();
 
         var publisher = new CapturingAuditEventPublisher();
-        var firstHandler = new RedeemSupportSessionHandler(context, new FakeClock(Now.AddMinutes(1).UtcDateTime), publisher);
+        var firstHandler = new RedeemSupportSessionHandler(context, new FakeClock(Now.AddMinutes(1).UtcDateTime), publisher, new FakeSupportSessionTokenIssuer());
         var firstResult = await firstHandler.HandleAsync(new RedeemSupportSessionRequest(token), CancellationToken.None);
         Assert.True(firstResult.IsSuccess);
 
-        var secondHandler = new RedeemSupportSessionHandler(context, new FakeClock(Now.AddMinutes(2).UtcDateTime), publisher);
+        var secondHandler = new RedeemSupportSessionHandler(context, new FakeClock(Now.AddMinutes(2).UtcDateTime), publisher, new FakeSupportSessionTokenIssuer());
         var secondResult = await secondHandler.HandleAsync(new RedeemSupportSessionRequest(token), CancellationToken.None);
 
         Assert.True(secondResult.IsFailure);
@@ -95,7 +102,7 @@ public class RedeemSupportSessionHandlerTests
         await context.SaveChangesAsync();
 
         var publisher = new CapturingAuditEventPublisher();
-        var handler = new RedeemSupportSessionHandler(context, new FakeClock(Now.AddMinutes(2).UtcDateTime), publisher);
+        var handler = new RedeemSupportSessionHandler(context, new FakeClock(Now.AddMinutes(2).UtcDateTime), publisher, new FakeSupportSessionTokenIssuer());
 
         var result = await handler.HandleAsync(new RedeemSupportSessionRequest(token), CancellationToken.None);
 
@@ -114,7 +121,7 @@ public class RedeemSupportSessionHandlerTests
         await context.SaveChangesAsync();
 
         var publisher = new CapturingAuditEventPublisher();
-        var handler = new RedeemSupportSessionHandler(context, new FakeClock(Now.AddMinutes(21).UtcDateTime), publisher);
+        var handler = new RedeemSupportSessionHandler(context, new FakeClock(Now.AddMinutes(21).UtcDateTime), publisher, new FakeSupportSessionTokenIssuer());
 
         var result = await handler.HandleAsync(new RedeemSupportSessionRequest(token), CancellationToken.None);
 
@@ -123,16 +130,77 @@ public class RedeemSupportSessionHandlerTests
         Assert.Empty(publisher.Published);
     }
 
+    /// <summary>
+    /// P1 "Login as Customer": genuine concurrent-redemption regression test for the optimistic
+    /// concurrency guard added to RedeemSupportSessionHandler (SaveChangesWithConcurrencyAsync /
+    /// SupportSession.Version, see their remarks). Two separate DbContext instances (pointed at the
+    /// same named in-memory database, matching how two separate concurrent HTTP requests would each
+    /// get their own scoped DbContext) each load their own tracked copy of the session while it is
+    /// still unredeemed — simulating true simultaneity, not just "redeem twice in sequence" (which
+    /// the domain guard alone, Redeem()'s RedeemedAt-not-null check, already covers without needing
+    /// the concurrency token at all; see HandleAsync_Returns_Validation_Failure_On_Second_Redeem_Attempt).
+    /// Only the first writer's SaveChangesAsync should succeed; the second's pinned OriginalValue no
+    /// longer matches the row (the first writer already advanced Version), so its UPDATE affects zero
+    /// rows and EF raises DbUpdateConcurrencyException, translated to a concurrency failure.
+    /// </summary>
+    [Fact]
+    public async Task HandleAsync_Only_One_Of_Two_Concurrent_Redemption_Attempts_Succeeds()
+    {
+        var dbName = Guid.NewGuid().ToString("N");
+        const string token = "known-raw-token-value";
+
+        await using (var seedContext = BuildContext(dbName))
+        {
+            var session = SupportSession.Issue(Guid.NewGuid(), Guid.NewGuid(), "admin@example.com", "reason", HashToken(token), Now);
+            seedContext.SupportSessions.Add(session);
+            await seedContext.SaveChangesAsync();
+        }
+
+        await using var context1 = BuildContext(dbName);
+        await using var context2 = BuildContext(dbName);
+
+        // Force each context to independently load (and track) the still-unredeemed session before
+        // either handler writes anything — this is what makes the two attempts genuinely concurrent
+        // rather than sequential. Each handler's own internal query below returns this same tracked
+        // instance (EF's identity-map behaviour), not a fresh, already-redeemed read.
+        await context1.SupportSessions.SingleAsync(s => s.TokenHash == HashToken(token));
+        await context2.SupportSessions.SingleAsync(s => s.TokenHash == HashToken(token));
+
+        var publisher1 = new CapturingAuditEventPublisher();
+        var publisher2 = new CapturingAuditEventPublisher();
+        var handler1 = new RedeemSupportSessionHandler(context1, new FakeClock(Now.AddMinutes(1).UtcDateTime), publisher1, new FakeSupportSessionTokenIssuer());
+        var handler2 = new RedeemSupportSessionHandler(context2, new FakeClock(Now.AddMinutes(2).UtcDateTime), publisher2, new FakeSupportSessionTokenIssuer());
+
+        var result1 = await handler1.HandleAsync(new RedeemSupportSessionRequest(token), CancellationToken.None);
+        var result2 = await handler2.HandleAsync(new RedeemSupportSessionRequest(token), CancellationToken.None);
+
+        // Exactly one of the two concurrent writers must win.
+        Assert.True(result1.IsSuccess);
+        Assert.True(result2.IsFailure);
+        Assert.Equal("concurrency", result2.Error.Code);
+
+        // Exactly one audit event / one RedeemedAt value is persisted for this session.
+        Assert.Single(publisher1.Published);
+        Assert.Empty(publisher2.Published);
+
+        await using var verifyContext = BuildContext(dbName);
+        var persisted = await verifyContext.SupportSessions.SingleAsync(s => s.TokenHash == HashToken(token));
+        Assert.Equal(Now.AddMinutes(1), persisted.RedeemedAt);
+        Assert.Equal(2, persisted.Version);
+    }
+
     private static string HashToken(string token)
     {
         var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
         return Convert.ToHexString(hashBytes).ToLowerInvariant();
     }
 
-    private static CompaniesDbContext BuildContext()
+    private static CompaniesDbContext BuildContext() => BuildContext(Guid.NewGuid().ToString("N"));
+
+    private static CompaniesDbContext BuildContext(string dbName)
     {
         var options = new DbContextOptionsBuilder<CompaniesDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .UseInMemoryDatabase(dbName)
             .Options;
 
         return new CompaniesDbContext(options);

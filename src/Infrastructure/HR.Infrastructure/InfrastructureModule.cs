@@ -31,6 +31,7 @@ public static class InfrastructureModule
         AddEmailSender(services, configuration);
         services.AddSingleton<IInviteLinkBuilder, ConfiguredInviteLinkBuilder>();
         services.AddScoped<IAuditEventPublisher, DbAuditEventPublisher>();
+        services.AddSingleton<ISupportSessionTokenIssuer, Security.SupportSessionTokenIssuer>();
         services.AddScoped<IAuditHistoryReader, AuditHistoryReader>();
         services.AddScoped<IAuditEventExistenceReader, AuditEventExistenceReader>();
         services.AddScoped<IAuditDataExportSource, Persistence.AuditDataExportSource>();
