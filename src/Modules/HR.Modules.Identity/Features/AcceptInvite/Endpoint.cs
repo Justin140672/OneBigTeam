@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Builder;
 using FastEndpoints;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
@@ -27,6 +28,8 @@ internal sealed class Endpoint(
     {
         Post("/api/invites/accept");
         AllowAnonymous();
+        // See HR.Modules.Identity.Features.Login.Endpoint's remarks on why this is a literal.
+        Options(b => b.RequireRateLimiting("identity-accept-invite"));
     }
 
     public override async Task HandleAsync(AcceptInviteRequest req, CancellationToken ct)

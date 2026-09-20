@@ -60,6 +60,18 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
                 // SupportSessionJwtBearerConfiguration are resolvable in integration tests — never
                 // a real secret, mirrors TestSensitiveDataKey's own convention above.
                 ["SupportSession:SigningKey"] = "test-support-session-signing-key-not-a-real-secret",
+                // P1 identity rate limiting: this shared factory's tests call Login/SignUp/
+                // forgot-password/etc. far more often per class run than the production defaults
+                // allow (many cases exercising the SAME email/IP combination in one run). Widened
+                // here — mirrors the identical convention already used for the marketing
+                // contact-form limiter (Marketing:ContactForm:RateLimit:*) — rather than disabling
+                // the policies outright, so the policies themselves are still genuinely exercised.
+                ["Identity:RateLimits:identity-login:PermitLimit"] = "1000",
+                ["Identity:RateLimits:identity-signup:PermitLimit"] = "1000",
+                ["Identity:RateLimits:identity-forgot-password:PermitLimit"] = "1000",
+                ["Identity:RateLimits:identity-resend-verification:PermitLimit"] = "1000",
+                ["Identity:RateLimits:identity-accept-invite:PermitLimit"] = "1000",
+                ["Identity:RateLimits:identity-reset-password:PermitLimit"] = "1000",
             });
         });
 

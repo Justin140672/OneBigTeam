@@ -2,6 +2,7 @@ using System.Net;
 using System.Threading.RateLimiting;
 using FastEndpoints;
 using HR.Api.Authentication;
+using HR.Api.RateLimiting;
 using HR.Api.Startup;
 using HR.Infrastructure;
 using HR.Infrastructure.Logging;
@@ -127,7 +128,15 @@ builder.Services.AddRateLimiter(options =>
 				PermitLimit = contactFormRateLimitPermitLimit,
 				QueueLimit = 0,
 			}));
+
+	// P1: abuse protection for the anonymous identity endpoints (Login, Sign-up, Forgot password,
+	// Resend verification, Accept invitation, Reset password) — see
+	// HR.Api.RateLimiting.IdentityRateLimiting for the full design (layered per-IP + per-identity
+	// limiters, keyed-hash partition keys, configurable windows/limits).
+	options.AddIdentityRateLimiting(builder.Configuration);
 });
+
+builder.Services.ConfigureTrustedProxies(builder.Configuration);
 
 // Supabase-backed JWT Bearer validation. This Supabase project uses asymmetric JWT signing
 // (ES256/RS256 via a bare JWKS document) — Ticket 6 replaced the hand-rolled synchronous JWKS
@@ -533,7 +542,15 @@ app.UseCompaniesRecurringJobs();
 app.UseCompanyOnboardingRecurringJobs();
 app.UseDataImportRecurringJobs();
 app.UseLoggingMiddleware();
+// Trusted-proxy-only forwarded-header resolution (see IdentityRateLimiting.ConfigureTrustedProxies)
+// must run before routing/rate limiting so RemoteIpAddress is already the real client IP by the
+// time the identity rate-limit policies partition on it.
+app.UseForwardedHeaders();
 app.UseRouting();
+// Buffers+parses the (small, already-to-be-validated) request body for exactly the six identity
+// POST routes to extract a normalized email/token for the keyed rate-limit partition — must run
+// before UseRateLimiter, which reads HttpContext.Items[IdentityRateLimiting.SecondaryKeyItemKey].
+app.Use(IdentityRateLimiting.ExtractSecondaryRateLimitKeyAsync);
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseIdentityModule();

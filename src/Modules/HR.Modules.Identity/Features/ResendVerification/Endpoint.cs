@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Builder;
 using FastEndpoints;
 using Microsoft.AspNetCore.Http;
 
@@ -10,6 +11,8 @@ internal sealed class Endpoint(
     {
         Post("/api/resend-verification");
         AllowAnonymous();
+        // See HR.Modules.Identity.Features.Login.Endpoint's remarks on why this is a literal.
+        Options(b => b.RequireRateLimiting("identity-resend-verification"));
     }
 
     public override async Task HandleAsync(ResendVerificationRequest request, CancellationToken cancellationToken)
