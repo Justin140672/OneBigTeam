@@ -4,6 +4,7 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Companies.Contracts;
 using HR.Web.Models;
 using HR.Web.Services;
+using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Web.Tests;
@@ -26,8 +27,28 @@ public class AppSessionTests
         return new HrApiHttpClientFactory(services.BuildServiceProvider().GetRequiredService<IHttpClientFactory>(), sessionState ?? new CircuitSessionState());
     }
 
-    private static AppSession BuildSession(HrApiHttpClientFactory factory, CircuitSessionState? sessionState = null) =>
-        new(factory, new EmployeeService(factory), new SicknessCategoryService(factory), new CompanyOnboardingService(factory), new SubscriptionService(factory), sessionState ?? new CircuitSessionState());
+    private static AppSession BuildSession(HrApiHttpClientFactory factory, CircuitSessionState? sessionState = null)
+    {
+        var circuitSessionState = sessionState ?? new CircuitSessionState();
+        return new(
+            factory,
+            new EmployeeService(factory),
+            new SicknessCategoryService(factory),
+            new CompanyOnboardingService(factory),
+            new SubscriptionService(factory),
+            circuitSessionState,
+            new AppSessionAuthStateProvider(factory, circuitSessionState),
+            new TestNavigationManager());
+    }
+
+    private sealed class TestNavigationManager : NavigationManager
+    {
+        public TestNavigationManager() => Initialize("http://localhost/", "http://localhost/");
+
+        protected override void NavigateToCore(string uri, NavigationOptions options)
+        {
+        }
+    }
 
     private static RoutingHandler BuildHappyPathHandler(
         Guid userId, Guid companyId, Guid employeeId,
