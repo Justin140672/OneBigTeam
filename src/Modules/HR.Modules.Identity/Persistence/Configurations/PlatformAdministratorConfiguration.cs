@@ -24,6 +24,37 @@ internal sealed class PlatformAdministratorConfiguration : IEntityTypeConfigurat
         builder.Property(a => a.DisabledAt).HasColumnName("disabled_at");
         builder.Property(a => a.DisabledByUserId).HasColumnName("disabled_by_user_id");
 
+        // P1: durable provisioning-workflow state — see PlatformAdministratorProvisioningStatus.
+        builder.Property(a => a.ProvisioningStatus)
+            .HasColumnName("provisioning_status")
+            .HasMaxLength(32)
+            .IsRequired()
+            .HasDefaultValue(Domain.PlatformAdministratorProvisioningStatus.Active);
+
+        builder.Property(a => a.ProvisioningCorrelationId).HasColumnName("provisioning_correlation_id");
+        builder.Property(a => a.IsNewIdentityProviderAccount)
+            .HasColumnName("is_new_identity_provider_account")
+            .IsRequired()
+            .HasDefaultValue(false);
+        builder.Property(a => a.ProvisioningFailureReason).HasColumnName("provisioning_failure_reason").HasMaxLength(500);
+        builder.Property(a => a.ProvisioningStartedAt).HasColumnName("provisioning_started_at");
+        builder.Property(a => a.ProvisioningCompletedAt).HasColumnName("provisioning_completed_at");
+
+        builder.Property(a => a.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .IsConcurrencyToken()
+            .HasDefaultValue(1);
+
         builder.HasIndex(a => a.Email).IsUnique();
+
+        // P1: DB-level guarantee that two local rows can never point at the same identity-provider
+        // account — the application-level checks in CreatePlatformAdministratorHandler /
+        // ActivatePlatformAdministratorHandler are defence-in-depth on top of this, not a
+        // substitute for it. Filtered so multiple NULLs (not-yet-linked rows) are allowed.
+        builder.HasIndex(a => a.SupabaseAuthUserId)
+            .IsUnique()
+            .HasFilter("supabase_auth_user_id IS NOT NULL")
+            .HasDatabaseName("ix_platform_administrators_supabase_auth_user_id_unique");
     }
 }

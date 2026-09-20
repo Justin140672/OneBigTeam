@@ -95,6 +95,15 @@ internal sealed class FakeSupabaseAuthGateway(IHttpClientFactory httpClientFacto
         return Task.FromResult<(Guid, IReadOnlyDictionary<string, string>)?>((DeriveFakeUserId(email), metadata));
     }
 
+    // P1 platform-administrator provisioning: same deterministic-id / metadata-recording behaviour
+    // as CreateConfirmedUserAsync above.
+    public Task<Guid> CreatePendingUserWithMetadataAsync(
+        string email, string redirectTo, IReadOnlyDictionary<string, string> metadata, CancellationToken cancellationToken)
+    {
+        Metadata[email.Trim().ToLowerInvariant()] = metadata;
+        return Task.FromResult(DeriveFakeUserId(email));
+    }
+
     public Task<SupabaseSession> SignInWithPasswordAsync(string email, string password, CancellationToken cancellationToken)
     {
         // Every dev-persona/E2E login uses the same fixed seeded password (see

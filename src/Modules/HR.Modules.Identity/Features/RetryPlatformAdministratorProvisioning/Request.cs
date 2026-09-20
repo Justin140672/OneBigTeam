@@ -1,0 +1,3 @@
+namespace HR.Modules.Identity.Features.RetryPlatformAdministratorProvisioning;
+
+internal sealed record RetryPlatformAdministratorProvisioningRequest(Guid Id);

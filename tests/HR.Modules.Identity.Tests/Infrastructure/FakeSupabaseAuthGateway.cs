@@ -106,8 +106,18 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
 
     public Dictionary<string, Guid> UserIdsByEmail { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-    public Task<Guid?> GetUserIdByEmailAsync(string email, CancellationToken cancellationToken) =>
-        Task.FromResult(UserIdsByEmail.TryGetValue(email.Trim(), out var id) ? id : (Guid?)null);
+    /// <summary>Simulates the identity-provider lookup itself failing (e.g. a transient outage)
+    /// before any local record would be persisted — see CreatePlatformAdministratorHandler's
+    /// "nothing persisted on lookup failure" behavior.</summary>
+    public bool ShouldThrowOnGetUserIdByEmail { get; set; }
+
+    public Task<Guid?> GetUserIdByEmailAsync(string email, CancellationToken cancellationToken)
+    {
+        if (ShouldThrowOnGetUserIdByEmail)
+            throw new InvalidOperationException("Simulated Supabase lookup failure.");
+
+        return Task.FromResult(UserIdsByEmail.TryGetValue(email.Trim(), out var id) ? id : (Guid?)null);
+    }
 
     public Task<SupabaseSession> ExchangeCodeForSessionAsync(string code, CancellationToken cancellationToken)
     {
@@ -167,6 +177,25 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
             : new Dictionary<string, string>();
 
         return Task.FromResult<(Guid, IReadOnlyDictionary<string, string>)?>((userId, metadata));
+    }
+
+    public List<(string Email, string RedirectTo, IReadOnlyDictionary<string, string> Metadata)> PendingUsersCreatedWithMetadata { get; } = [];
+
+    public Task<Guid> CreatePendingUserWithMetadataAsync(
+        string email, string redirectTo, IReadOnlyDictionary<string, string> metadata, CancellationToken cancellationToken)
+    {
+        if (ShouldThrowEmailAlreadyRegistered)
+            throw new EmailAlreadyRegisteredException(email);
+
+        if (ShouldThrowOnCreate)
+            throw new InvalidOperationException("Simulated Supabase failure.");
+
+        PendingUsersCreatedWithMetadata.Add((email, redirectTo, metadata));
+        MetadataByEmail[email.Trim()] = metadata;
+
+        var userId = UserIdToReturn ?? Guid.NewGuid();
+        UserIdsByEmail[email.Trim()] = userId;
+        return Task.FromResult(userId);
     }
 
     public Task<SupabaseSession> SignInWithPasswordAsync(string email, string password, CancellationToken cancellationToken)

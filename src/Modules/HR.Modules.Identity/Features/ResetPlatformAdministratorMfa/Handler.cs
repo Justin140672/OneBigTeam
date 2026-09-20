@@ -87,7 +87,8 @@ internal sealed class ResetPlatformAdministratorMfaHandler(
                 cancellationToken);
 
             return Result.Failure<ResetPlatformAdministratorMfaResponse>(Error.Conflict(
-                "This administrator has no linked identity-provider account, so MFA cannot be reset."));
+                $"This administrator has no linked identity-provider account (provisioning status: " +
+                $"{administrator.ProvisioningStatus}), so MFA cannot be reset. Complete or retry activation first."));
         }
 
         int factorsRemoved;

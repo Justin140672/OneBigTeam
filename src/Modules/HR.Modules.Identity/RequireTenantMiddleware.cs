@@ -31,7 +31,7 @@ internal sealed class RequireTenantMiddleware(RequestDelegate next)
         // introducing a new mechanism.
         var isPlatformAdminPolicy = context.GetEndpoint()?.Metadata
             .GetOrderedMetadata<IAuthorizeData>()
-            .Any(a => a.Policy == "platform:admin") == true;
+            .Any(a => a.Policy is "platform:admin" or "identity:self-provisioning") == true;
 
         if (!allowsAnonymous && !isPlatformAdminPolicy && context.User.Identity?.IsAuthenticated == true)
         {

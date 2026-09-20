@@ -319,5 +319,9 @@ public sealed class SessionRevocationEnforcementTests : IAsyncLifetime
 
         public Task<Guid?> GetUserIdByEmailAsync(string email, CancellationToken cancellationToken)
             => throw new NotSupportedException();
+
+        public Task<Guid> CreatePendingUserWithMetadataAsync(
+            string email, string redirectTo, IReadOnlyDictionary<string, string> metadata, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
     }
 }

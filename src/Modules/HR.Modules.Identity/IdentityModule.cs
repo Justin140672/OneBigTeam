@@ -187,6 +187,9 @@ public static class IdentityModule
         services.AddScoped<ResetPlatformAdministratorPasswordHandler>();
         services.AddScoped<IValidator<ResetPlatformAdministratorPasswordRequest>, ResetPlatformAdministratorPasswordValidator>();
         services.AddScoped<ResetPlatformAdministratorMfaHandler>();
+        // P1: platform-administrator provisioning workflow.
+        services.AddScoped<HR.Modules.Identity.Features.ActivatePlatformAdministrator.ActivatePlatformAdministratorHandler>();
+        services.AddScoped<HR.Modules.Identity.Features.RetryPlatformAdministratorProvisioning.RetryPlatformAdministratorProvisioningHandler>();
         services.AddScoped<IValidator<ResetPlatformAdministratorMfaRequest>, ResetPlatformAdministratorMfaValidator>();
 
         // P1 fix: departure-triggered account disablement is now driven exclusively by
@@ -303,6 +306,14 @@ public static class IdentityModule
         // additional handler-level check, unlike the ~23 other handlers that separately check the
         // PlatformAdmin:AllowedEmails config allow-list (left in place for now as defense-in-depth
         // — see PlatformAdminAuthorizationHandler remarks).
+        // P1: used exclusively by ActivatePlatformAdministrator. Deliberately just "authenticated"
+        // — no role/permission/tenant requirement — because the whole point of that endpoint is to
+        // grant the platform:admin-equivalent status for the first time; requiring it up front would
+        // be circular. Company-agnostic in the same way platform:admin is (see its own remarks
+        // immediately below), so it gets the identical RequireTenantMiddleware exemption.
+        builder.AddPolicy("identity:self-provisioning", policy => policy
+            .RequireAuthenticatedUser());
+
         builder.AddPolicy("platform:admin", policy => policy
             .RequireAuthenticatedUser()
             .AddRequirements(new PlatformAdminRequirement()));

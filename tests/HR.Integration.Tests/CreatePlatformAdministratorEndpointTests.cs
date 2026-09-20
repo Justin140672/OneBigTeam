@@ -25,6 +25,7 @@ public class CreatePlatformAdministratorEndpointTests
     public CreatePlatformAdministratorEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
+        _factory.SupabaseAuthGateway.Reset();
     }
 
     [Fact]
@@ -119,5 +120,55 @@ public class CreatePlatformAdministratorEndpointTests
         Assert.Equal(newEmail.ToLowerInvariant(), reloaded.Email);
     }
 
-    private sealed record PlatformAdministratorPayload(Guid Id, string Email, string Role, bool IsEnabled, DateTimeOffset CreatedAt);
+    /// <summary>P1: a brand-new provider account — the handler mints a pending Supabase user and
+    /// stamps a correlation id, landing the new row in PendingProvisioning.</summary>
+    [Fact]
+    public async Task Post_PlatformAdministrators_Returns_PendingProvisioning_For_New_Provider_Account()
+    {
+        var (_, ownerEmail) = await PlatformAdministratorTestHelpers.SeedAdministratorAsync(
+            _factory, PlatformAdministratorRole.PlatformOwner);
+        using var client = PlatformAdministratorTestHelpers.ClientFor(_factory, Guid.NewGuid(), ownerEmail);
+
+        var newEmail = $"new-provider-{Guid.NewGuid():N}@test.example";
+
+        var response = await client.PostAsJsonAsync(
+            "/api/platform-administrators", new { email = newEmail, role = "SupportStaff" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<PlatformAdministratorPayload>();
+        Assert.NotNull(payload);
+        Assert.Equal("pending_provisioning", payload!.ProvisioningStatus);
+
+        Assert.Contains(_factory.SupabaseAuthGateway.PendingUsersCreatedWithMetadata, u => u.Email == newEmail.ToLowerInvariant());
+    }
+
+    /// <summary>P1: an identity-provider account already exists for this email — the handler must
+    /// NOT create a duplicate account, instead requesting a password reset as the link-verification
+    /// mechanism, landing the row in PendingLinkVerification.</summary>
+    [Fact]
+    public async Task Post_PlatformAdministrators_Returns_PendingLinkVerification_For_Existing_Provider_Account()
+    {
+        var (_, ownerEmail) = await PlatformAdministratorTestHelpers.SeedAdministratorAsync(
+            _factory, PlatformAdministratorRole.PlatformOwner);
+        using var client = PlatformAdministratorTestHelpers.ClientFor(_factory, Guid.NewGuid(), ownerEmail);
+
+        var newEmail = $"existing-provider-{Guid.NewGuid():N}@test.example";
+        _factory.SupabaseAuthGateway.UserIdsByEmail[newEmail.ToLowerInvariant()] = Guid.NewGuid();
+
+        var response = await client.PostAsJsonAsync(
+            "/api/platform-administrators", new { email = newEmail, role = "SupportStaff" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var payload = await response.Content.ReadFromJsonAsync<PlatformAdministratorPayload>();
+        Assert.NotNull(payload);
+        Assert.Equal("pending_link_verification", payload!.ProvisioningStatus);
+
+        Assert.Contains(_factory.SupabaseAuthGateway.PasswordResetRequests, r => r.Email == newEmail.ToLowerInvariant());
+        Assert.DoesNotContain(_factory.SupabaseAuthGateway.PendingUsersCreatedWithMetadata, u => u.Email == newEmail.ToLowerInvariant());
+    }
+
+    private sealed record PlatformAdministratorPayload(
+        Guid Id, string Email, string Role, bool IsEnabled, DateTimeOffset CreatedAt, string ProvisioningStatus);
 }

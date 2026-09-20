@@ -118,8 +118,17 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
     /// <summary>Populate to have <see cref="GetUserIdByEmailAsync"/> resolve an id for that email.</summary>
     public Dictionary<string, Guid> UserIdsByEmail { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-    public Task<Guid?> GetUserIdByEmailAsync(string email, CancellationToken cancellationToken) =>
-        Task.FromResult(UserIdsByEmail.TryGetValue(email.Trim(), out var id) ? id : (Guid?)null);
+    /// <summary>Simulates the identity-provider lookup itself failing before any local record
+    /// would be persisted (see CreatePlatformAdministratorHandler).</summary>
+    public bool ShouldThrowOnGetUserIdByEmail { get; set; }
+
+    public Task<Guid?> GetUserIdByEmailAsync(string email, CancellationToken cancellationToken)
+    {
+        if (ShouldThrowOnGetUserIdByEmail)
+            throw new InvalidOperationException("Simulated Supabase lookup failure.");
+
+        return Task.FromResult(UserIdsByEmail.TryGetValue(email.Trim(), out var id) ? id : (Guid?)null);
+    }
 
     public Task<SupabaseSession> ExchangeCodeForSessionAsync(string code, CancellationToken cancellationToken)
     {
@@ -190,6 +199,25 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         return Task.FromResult(new SupabaseSession("access-token", "refresh-token", UserIdToReturn ?? Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(1)));
     }
 
+    public List<(string Email, string RedirectTo, IReadOnlyDictionary<string, string> Metadata)> PendingUsersCreatedWithMetadata { get; } = [];
+
+    public Task<Guid> CreatePendingUserWithMetadataAsync(
+        string email, string redirectTo, IReadOnlyDictionary<string, string> metadata, CancellationToken cancellationToken)
+    {
+        if (string.Equals(EmailAlreadyRegisteredFor, email, StringComparison.OrdinalIgnoreCase))
+            throw new EmailAlreadyRegisteredException(email);
+
+        if (ShouldThrowOnCreate)
+            throw new InvalidOperationException("Simulated Supabase failure.");
+
+        PendingUsersCreatedWithMetadata.Add((email, redirectTo, metadata));
+        MetadataByEmail[email.Trim()] = metadata;
+
+        var userId = UserIdToReturn ?? Guid.NewGuid();
+        UserIdsByEmail[email.Trim()] = userId;
+        return Task.FromResult(userId);
+    }
+
     public void Reset()
     {
         CreatedUsers.Clear();
@@ -212,5 +240,8 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         ConfirmedUsersCreated.Clear();
         EmailAlreadyRegisteredFor = null;
         UserIdsByEmail.Clear();
+        PendingUsersCreatedWithMetadata.Clear();
+        MetadataByEmail.Clear();
+        ShouldThrowOnGetUserIdByEmail = false;
     }
 }

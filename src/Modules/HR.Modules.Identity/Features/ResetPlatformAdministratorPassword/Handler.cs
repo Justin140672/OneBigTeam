@@ -34,6 +34,14 @@ internal sealed class ResetPlatformAdministratorPasswordHandler(
         if (administrator is null)
             return Result.Failure<ResetPlatformAdministratorPasswordResponse>(Error.NotFound("Platform administrator was not found."));
 
+        // P1: a not-yet-activated administrator has no confirmed, usable identity-provider account
+        // to send a password-recovery link for — a clear, specific provisioning-state error instead
+        // of a confusing recovery email for an account the recipient has never signed into.
+        if (administrator.ProvisioningStatus != Domain.PlatformAdministratorProvisioningStatus.Active)
+            return Result.Failure<ResetPlatformAdministratorPasswordResponse>(Error.Conflict(
+                $"This administrator has not completed activation yet (status: {administrator.ProvisioningStatus}). " +
+                "Resend or retry the activation invitation instead of resetting a password."));
+
         var webBaseUrl =
             configuration["WebApp:BaseUrl"]?.TrimEnd('/') ??
             configuration["services:web:https:0"] ??

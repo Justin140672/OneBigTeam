@@ -502,6 +502,58 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         return (userId, metadata);
     }
 
+    public async Task<Guid> CreatePendingUserWithMetadataAsync(
+        string email, string redirectTo, IReadOnlyDictionary<string, string> metadata, CancellationToken cancellationToken)
+    {
+        var http = CreateClient(options.Value.SecretKey);
+
+        // Random password this app never persists or returns — the recipient authenticates for the
+        // first time via Supabase's own confirmation-email link + a subsequent password set/reset,
+        // never via a password this process ever knew. Same admin CREATE endpoint as CreateUserAsync
+        // (see its remarks for why /auth/v1/invite is deliberately not used).
+        var randomPassword = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24));
+
+        var requestBody = new
+        {
+            email,
+            password = randomPassword,
+            email_confirm = false,
+            user_metadata = metadata,
+        };
+
+        using var response = await http.PostAsJsonAsync("/auth/v1/admin/users", requestBody, JsonOptions, cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            var isAlreadyExists =
+                body.Contains("already", StringComparison.OrdinalIgnoreCase)
+                && body.Contains("regist", StringComparison.OrdinalIgnoreCase)
+                || body.Contains("email_exists", StringComparison.OrdinalIgnoreCase)
+                || body.Contains("user_already_exists", StringComparison.OrdinalIgnoreCase);
+
+            if (isAlreadyExists)
+                throw new EmailAlreadyRegisteredException(email);
+
+            throw new InvalidOperationException(
+                $"Supabase admin create-user request failed with status {(int)response.StatusCode} ({response.StatusCode}). {Describe(body)}");
+        }
+
+        var payload = await response.Content.ReadFromJsonAsync<SupabaseInviteResponse>(JsonOptions, cancellationToken);
+        if (payload is null || !Guid.TryParse(payload.Id, out var userId))
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Supabase admin create-user response did not contain a parseable user id. {Describe(body)}");
+        }
+
+        // Same as CreateUserAsync: the admin create call above never sends an email itself.
+        await ResendVerificationEmailAsync(email, redirectTo, cancellationToken);
+
+        return userId;
+    }
+
     private sealed record SupabaseAdminUsersResponse(List<SupabaseAdminUser>? Users);
 
     private sealed record SupabaseAdminUser(

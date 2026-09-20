@@ -308,6 +308,71 @@ app.MapPost("/verify-email-complete", async (
     return Results.Redirect("/login?verified=true");
 }).AllowAnonymous();
 
+// P1 platform-administrator provisioning: lands here after EITHER Supabase provisioning path
+// (see HR.Modules.Identity's CreatePlatformAdministratorHandler):
+//   - PendingProvisioning (brand-new account): Supabase's own signup-confirmation redirect.
+//   - PendingLinkVerification (pre-existing account): Supabase's recovery redirect (reused here
+//     specifically because it also doubles as a strong, existing "prove you control this account"
+//     mechanism — see CreatePlatformAdministratorHandler's remarks on why silent email-match
+//     linking is never acceptable).
+// Same implicit/fragment hand-off pattern as /verify-email above — see that endpoint's remarks.
+app.MapGet("/platform-admin/activate", () => Results.Content("""
+    <!DOCTYPE html>
+    <html>
+    <head><title>Activating your administrator account…</title></head>
+    <body>
+    <form id="f" method="post" action="/platform-admin/activate-complete">
+        <input type="hidden" name="access_token" id="access_token" />
+    </form>
+    <script>
+        var params = new URLSearchParams(window.location.hash.slice(1));
+        var accessToken = params.get('access_token');
+        if (accessToken) {
+            document.getElementById('access_token').value = accessToken;
+            history.replaceState(null, '', '/platform-admin/activate');
+            document.getElementById('f').submit();
+        } else {
+            window.location.replace('/login?error=activation');
+        }
+    </script>
+    </body>
+    </html>
+    """, "text/html")).AllowAnonymous();
+
+// Calls HR.Api's /api/identity/platform-administrators/activate with the access token as a Bearer
+// token — HR.Api's own JWT Bearer validation is what actually verifies this token is a genuine,
+// current Supabase session; this endpoint never trusts it itself. Deliberately does NOT establish
+// an HR.Web session here (same reasoning as /verify-email-complete above) — the administrator signs
+// in normally afterward via /login with their own (or newly set) credentials.
+app.MapPost("/platform-admin/activate-complete", async (
+    HttpContext context,
+    IHttpClientFactory httpClientFactory) =>
+{
+    var form = await context.Request.ReadFormAsync();
+    var accessToken = form["access_token"].ToString();
+
+    if (string.IsNullOrWhiteSpace(accessToken))
+        return Results.Redirect("/login?error=activation");
+
+    var http = httpClientFactory.CreateClient("hrapi");
+    http.DefaultRequestHeaders.Authorization = new("Bearer", accessToken);
+
+    HttpResponseMessage response;
+    try
+    {
+        response = await http.PostAsync("api/identity/platform-administrators/activate", content: null);
+    }
+    catch (HttpRequestException)
+    {
+        return Results.Redirect("/login?error=activation");
+    }
+
+    if (!response.IsSuccessStatusCode)
+        return Results.Redirect("/login?error=activation");
+
+    return Results.Redirect("/login?activated=true");
+}).AllowAnonymous();
+
 // Handles Supabase's password-recovery redirect — same implicit/fragment flow as /verify-email
 // above (Supabase uses the identical redirect mechanism for both — see that endpoint's remarks).
 // Unlike /verify-email-complete, the next hop here (/reset-password-complete) needs to render an

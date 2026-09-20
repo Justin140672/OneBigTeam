@@ -130,6 +130,18 @@ internal interface ISupabaseAuthGateway
     /// </summary>
     Task<(Guid UserId, IReadOnlyDictionary<string, string> Metadata)?> GetUserMetadataByEmailAsync(
         string email, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// P1 platform-administrator provisioning: creates a pending (unverified) Supabase Auth user
+    /// with a random, never-returned/never-stored password, stamps <paramref name="metadata"/> onto
+    /// its <c>user_metadata</c> (the same anti-duplicate-account correlation pattern as
+    /// <see cref="CreateConfirmedUserAsync"/>/Ticket 12), and sends the account-confirmation email
+    /// whose link redirects to <paramref name="redirectTo"/>. Throws
+    /// <see cref="EmailAlreadyRegisteredException"/> if Supabase reports the email as already
+    /// registered (mirrors <see cref="CreateUserAsync"/>).
+    /// </summary>
+    Task<Guid> CreatePendingUserWithMetadataAsync(
+        string email, string redirectTo, IReadOnlyDictionary<string, string> metadata, CancellationToken cancellationToken);
 }
 
 internal sealed record SupabaseSession(string AccessToken, string RefreshToken, Guid UserId, DateTimeOffset ExpiresAt);

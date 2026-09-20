@@ -7,4 +7,5 @@ internal sealed record CreatePlatformAdministratorResponse(
     string Email,
     PlatformAdministratorRole Role,
     bool IsEnabled,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string ProvisioningStatus);

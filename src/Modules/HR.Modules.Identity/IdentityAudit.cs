@@ -606,3 +606,69 @@ internal sealed record PlatformAdministratorMfaResetAuditEvent(
     object? IAuditEvent.After          => null;
     object? IAuditEvent.Metadata       => new { Succeeded, FactorsRemoved, NotificationDelivered, FailureReason };
 }
+
+// P1: published when the identity-provider side of platform-administrator provisioning
+// (account creation, or link-verification email delivery for an already-existing provider
+// account) fails durably. The local record remains visible and retryable — never a silent
+// dead end.
+internal sealed record PlatformAdministratorProvisioningFailedAuditEvent(
+    Guid AdministratorId,
+    string Email,
+    string FailureReason,
+    Guid? ActorUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    Guid    IAuditEvent.CompanyId      => Guid.Empty;
+    string  IAuditEvent.EventType      => "platform-administrator.provisioning-failed";
+    string  IAuditEvent.EntityType     => "PlatformAdministrator";
+    Guid    IAuditEvent.EntityId       => AdministratorId;
+    Guid?   IAuditEvent.ActorUserId    => ActorUserId;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId  => null;
+    string? IAuditEvent.Summary        => $"Provisioning failed for platform administrator {Email}: {FailureReason}";
+    object? IAuditEvent.Before         => null;
+    object? IAuditEvent.After          => new { FailureReason };
+    object? IAuditEvent.Metadata       => null;
+}
+
+// P1: published when a platform administrator successfully activates — proving control of the
+// identity-provider account by authenticating as it (see ActivatePlatformAdministratorHandler).
+internal sealed record PlatformAdministratorActivatedAuditEvent(
+    Guid AdministratorId,
+    string Email,
+    Guid SupabaseAuthUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    Guid    IAuditEvent.CompanyId      => Guid.Empty;
+    string  IAuditEvent.EventType      => "platform-administrator.activated";
+    string  IAuditEvent.EntityType     => "PlatformAdministrator";
+    Guid    IAuditEvent.EntityId       => AdministratorId;
+    Guid?   IAuditEvent.ActorUserId    => SupabaseAuthUserId;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId  => null;
+    string? IAuditEvent.Summary        => $"Platform administrator {Email} activated their account";
+    object? IAuditEvent.Before         => null;
+    object? IAuditEvent.After          => null;
+    object? IAuditEvent.Metadata       => null;
+}
+
+// P1: published when a platform owner retries a failed/pending provisioning attempt
+// (Features/RetryPlatformAdministratorProvisioning).
+internal sealed record PlatformAdministratorProvisioningRetriedAuditEvent(
+    Guid AdministratorId,
+    string Email,
+    Guid? ActorUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    Guid    IAuditEvent.CompanyId      => Guid.Empty;
+    string  IAuditEvent.EventType      => "platform-administrator.provisioning-retried";
+    string  IAuditEvent.EntityType     => "PlatformAdministrator";
+    Guid    IAuditEvent.EntityId       => AdministratorId;
+    Guid?   IAuditEvent.ActorUserId    => ActorUserId;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId  => null;
+    string? IAuditEvent.Summary        => $"Retried provisioning for platform administrator {Email}";
+    object? IAuditEvent.Before         => null;
+    object? IAuditEvent.After          => null;
+    object? IAuditEvent.Metadata       => null;
+}
