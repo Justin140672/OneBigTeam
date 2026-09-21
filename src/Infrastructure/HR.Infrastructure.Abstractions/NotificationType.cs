@@ -66,4 +66,10 @@ public enum NotificationType
     // building and is available to download (see OrganisationDataExportCompletedIntegrationEvent /
     // NotifyOnOrganisationDataExportCompletedHandler). In-app only.
     OrganisationDataExportReady                    = 45,
+
+    // Customer Release Notifications: a manual, platform-admin-authored product/release
+    // announcement sent to every active customer's Company Administrator users (see
+    // HR.Modules.Notifications.Features.SendProductUpdate). In-app only — never auto-generated on
+    // deploy, always a deliberate admin action.
+    ProductUpdate                                  = 46,
 }

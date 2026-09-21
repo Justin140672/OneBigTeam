@@ -590,6 +590,7 @@
           "FastEndpoints": "[8.3.0, )",
           "FluentValidation": "[12.1.1, )",
           "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
+          "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
           "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
           "Hangfire.Core": "[1.8.24, )",

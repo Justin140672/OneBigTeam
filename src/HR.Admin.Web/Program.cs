@@ -76,6 +76,7 @@ builder.Services.AddScoped<AdminUsersService>();
 builder.Services.AddScoped<PlatformSettingsService>();
 builder.Services.AddScoped<SubscriptionPricingService>();
 builder.Services.AddScoped<MarketingContentAdminService>();
+builder.Services.AddScoped<ProductUpdateService>();
 builder.Services.AddScoped<DevAuthService>();
 builder.Services.AddAuthentication("NoOp")
     .AddScheme<AuthenticationSchemeOptions, NoOpAuthenticationHandler>("NoOp", _ => { });

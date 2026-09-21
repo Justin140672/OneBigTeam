@@ -21,7 +21,8 @@ internal sealed class FaultInjectingNotificationWriter(FakeNotificationWriter in
         Guid sourceEntityId, NotificationType type,
         NotificationPriority priority,
         DateTimeOffset createdAt,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? actionUrl = null)
     {
         WriteAttempts++;
         if (FailNextWrites > 0)
@@ -30,7 +31,7 @@ internal sealed class FaultInjectingNotificationWriter(FakeNotificationWriter in
             throw new InvalidOperationException("Simulated notification store failure.");
         }
 
-        return inner.WriteAsync(id, companyId, employeeId, title, body, sourceEntityId, type, priority, createdAt, cancellationToken);
+        return inner.WriteAsync(id, companyId, employeeId, title, body, sourceEntityId, type, priority, createdAt, cancellationToken, actionUrl);
     }
 
     public Task<Result> WriteTemplatedAsync(

@@ -21,7 +21,8 @@ internal sealed class FakeNotificationWriter : INotificationWriter
         NotificationType type,
         NotificationPriority priority,
         DateTimeOffset createdAt,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? actionUrl = null)
     {
         Written.Add(new WrittenNotification(id, companyId, employeeId, title, body, sourceEntityId, type, priority, createdAt));
         return Task.CompletedTask;

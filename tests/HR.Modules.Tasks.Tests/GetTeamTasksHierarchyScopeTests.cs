@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Tasks.Contracts;
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Features.GetTeamTasks;
@@ -99,7 +100,7 @@ public class GetTeamTasksHierarchyScopeTests
             context, reader, new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService(), new FakeCurrentUser(manager));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(manager), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(manager), WorkloadScope.Manager, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal(indirectReport, action.EmployeeId);
@@ -122,7 +123,7 @@ public class GetTeamTasksHierarchyScopeTests
             context, FakeDirectReportsReader.WithHierarchy(), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(caller));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(caller), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(caller), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
     }
@@ -141,7 +142,7 @@ public class GetTeamTasksHierarchyScopeTests
             context, FakeDirectReportsReader.WithHierarchy(), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService(), new FakeCurrentUser(caller));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(caller), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(caller), WorkloadScope.Manager, CancellationToken.None);
 
         Assert.Empty(result);
     }

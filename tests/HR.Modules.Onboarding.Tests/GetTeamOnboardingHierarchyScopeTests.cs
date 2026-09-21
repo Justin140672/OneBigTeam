@@ -94,7 +94,7 @@ public class GetTeamOnboardingHierarchyScopeTests
             reportReader, reader, new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-onboarding"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(manager));
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(manager), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(manager), WorkloadScope.Manager, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal(indirectReport, action.EmployeeId);
@@ -116,7 +116,7 @@ public class GetTeamOnboardingHierarchyScopeTests
             reportReader, FakeDirectReportsReader.WithHierarchy(), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-hr"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(caller));
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(caller), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(caller), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
     }
@@ -135,7 +135,7 @@ public class GetTeamOnboardingHierarchyScopeTests
             reportReader, FakeDirectReportsReader.WithHierarchy(), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService(), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(caller));
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(caller), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(caller), WorkloadScope.Manager, CancellationToken.None);
 
         Assert.Empty(result);
     }

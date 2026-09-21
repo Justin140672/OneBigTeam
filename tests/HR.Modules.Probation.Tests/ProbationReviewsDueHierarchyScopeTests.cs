@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Persistence;
 using HR.Modules.Probation.Services;
@@ -64,7 +65,7 @@ public class ProbationReviewsDueHierarchyScopeTests
             db, reader, new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-probation"), new FakeCurrentUser(manager), new FakeOpenTaskBySourceEntityReader(), ClockAt(Today));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(manager), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(manager), WorkloadScope.Manager, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal(indirectReport, action.EmployeeId);
@@ -94,7 +95,7 @@ public class ProbationReviewsDueHierarchyScopeTests
             db, reader, new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-probation"), new FakeCurrentUser(manager), new FakeOpenTaskBySourceEntityReader(), ClockAt(Today));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(manager), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(manager), WorkloadScope.Manager, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal(indirectReport, action.EmployeeId);
@@ -115,7 +116,7 @@ public class ProbationReviewsDueHierarchyScopeTests
             db, FakeDirectReportsReader.WithHierarchy(), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(caller), new FakeOpenTaskBySourceEntityReader(), ClockAt(Today));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(caller), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(caller), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
     }
@@ -134,7 +135,7 @@ public class ProbationReviewsDueHierarchyScopeTests
             db, FakeDirectReportsReader.WithHierarchy(), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-probation"), new FakeCurrentUser(caller), new FakeOpenTaskBySourceEntityReader(), ClockAt(Today));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(caller), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(caller), WorkloadScope.Manager, CancellationToken.None);
 
         Assert.Empty(result);
     }

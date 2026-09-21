@@ -24,6 +24,16 @@ public interface INotificationWriter
         DateTimeOffset createdAt,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// <paramref name="actionUrl"/> is an optional explicit override for the notification's
+    /// click-navigation target. When null (the default, and the behaviour of every pre-existing call
+    /// site), the target is computed from <paramref name="type"/>/<paramref name="companyId"/>/
+    /// <paramref name="employeeId"/>/<paramref name="sourceEntityId"/> via
+    /// NotificationActionRouteBuilder, unchanged. Supplying a value bypasses that computation
+    /// entirely — used by admin-authored notification types (e.g. ProductUpdate) whose destination
+    /// is chosen by a human at write time rather than derived from a fixed per-type route. Still
+    /// subject to the same "application-relative only" invariant as every other ActionUrl.
+    /// </summary>
     Task WriteAsync(
         Guid id,
         Guid companyId,
@@ -34,7 +44,8 @@ public interface INotificationWriter
         NotificationType type,
         NotificationPriority priority,
         DateTimeOffset createdAt,
-        CancellationToken cancellationToken = default);
+        CancellationToken cancellationToken = default,
+        string? actionUrl = null);
 
     Task<bool> ExistsAsync(
         Guid employeeId,

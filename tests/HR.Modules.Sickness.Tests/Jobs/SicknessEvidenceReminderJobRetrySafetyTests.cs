@@ -43,14 +43,14 @@ public class SicknessEvidenceReminderJobRetrySafetyTests
 
         public Task WriteAsync(Guid id, Guid companyId, Guid employeeId, string title, string? body,
             Guid sourceEntityId, NotificationType type, NotificationPriority priority,
-            DateTimeOffset createdAt, CancellationToken cancellationToken = default)
+            DateTimeOffset createdAt, CancellationToken cancellationToken = default, string? actionUrl = null)
         {
             if (failForEmployee(employeeId) && _failures < failTimes)
             {
                 _failures++;
                 throw new InvalidOperationException("notification store unavailable");
             }
-            return inner.WriteAsync(id, companyId, employeeId, title, body, sourceEntityId, type, priority, createdAt, cancellationToken);
+            return inner.WriteAsync(id, companyId, employeeId, title, body, sourceEntityId, type, priority, createdAt, cancellationToken, actionUrl);
         }
 
         public Task<Result> WriteTemplatedAsync(Guid id, Guid companyId, Guid employeeId, NotificationType type,

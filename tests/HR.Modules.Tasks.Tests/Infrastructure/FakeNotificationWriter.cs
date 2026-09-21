@@ -26,7 +26,8 @@ internal sealed class FakeNotificationWriter : INotificationWriter
         Guid sourceEntityId, NotificationType type,
         NotificationPriority priority,
         DateTimeOffset createdAt,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? actionUrl = null)
     {
         if (ThrowOnWrite)
             throw new InvalidOperationException("Simulated notification write failure.");

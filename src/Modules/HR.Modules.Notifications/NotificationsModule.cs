@@ -1,4 +1,5 @@
 using HR.Modules.Employees.Contracts;
+using HR.Modules.Companies.Contracts;
 using HR.Modules.Tasks.Contracts;
 using HR.Modules.Notifications.Domain;
 using HR.Infrastructure.Abstractions;
@@ -6,7 +7,9 @@ using HR.SharedKernel;
 using HR.Modules.Notifications.Features.GetMyNotifications;
 using HR.Modules.Notifications.Features.GetOperationalAlert;
 using HR.Modules.Notifications.Features.ListOperationalAlerts;
+using HR.Modules.Notifications.Features.PreviewProductUpdateRecipients;
 using HR.Modules.Notifications.Features.ResolveOperationalAlert;
+using HR.Modules.Notifications.Features.SendProductUpdate;
 using HR.Modules.Notifications.Features.GetUnreadNotificationCount;
 using HR.Modules.Notifications.Features.MarkAllNotificationsRead;
 using HR.Modules.Notifications.Features.MarkNotificationRead;
@@ -55,6 +58,11 @@ public static class NotificationsModule
         services.AddScoped<ListOperationalAlertsValidator>();
         services.AddScoped<GetOperationalAlertValidator>();
         services.AddScoped<ResolveOperationalAlertValidator>();
+
+        // Customer Release Notifications: platform-admin manual product/release announcement send.
+        services.AddScoped<PreviewProductUpdateRecipientsHandler>();
+        services.AddScoped<SendProductUpdateHandler>();
+        services.AddScoped<SendProductUpdateValidator>();
 
         // Follow-up C: one-off internal-operations notification email when a new missing-file
         // organisation-data-export alert opens.

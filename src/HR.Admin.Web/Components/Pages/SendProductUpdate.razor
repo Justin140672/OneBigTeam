@@ -1,0 +1,194 @@
+@page "/product-updates"
+@using HR.SharedKernel
+@inject ProductUpdateService ProductUpdateService
+
+<PageTitle>Send Product Update — Admin Portal</PageTitle>
+
+<h1>Send Product Update</h1>
+<p class="admin-actions-intro">
+    Send a manual product/release announcement to every active customer's Company Administrator
+    users. This uses the same in-app notification bell, unread count and click-through navigation
+    every other notification uses — it is never triggered automatically by a deploy.
+</p>
+
+<section class="details-panel admin-actions-panel">
+    <div class="admin-action-field">
+        <label for="product-update-title">Title <span class="text-danger">*</span></label>
+        <SfTextBox @bind-Value="_title" Placeholder="e.g. New recruitment pipeline report"
+                   HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "product-update-title" })" />
+    </div>
+
+    <div class="admin-action-field">
+        <label for="product-update-message">Message <span class="text-danger">*</span></label>
+        <SfTextBox @bind-Value="_message" Multiline="true"
+                   Placeholder="Describe what's new and why it matters."
+                   HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "product-update-message" })" />
+    </div>
+
+    <div class="admin-action-field">
+        <label for="product-update-url">Link (optional)</label>
+        <SfTextBox @bind-Value="_url" Placeholder="/reports/recruitment-pipeline"
+                   HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "product-update-url" })" />
+        <p class="admin-field-hint">
+            A relative path into the customer app, e.g. <code>/reports/recruitment-pipeline</code>.
+            Leave blank for a purely informational announcement.
+        </p>
+    </div>
+
+    @if (_validationError is not null)
+    {
+        <p class="admin-action-error">@_validationError</p>
+    }
+
+    @if (_sendErrors is { Count: > 0 })
+    {
+        <ul class="admin-action-error">
+            @foreach (var error in _sendErrors)
+            {
+                <li>@error</li>
+            }
+        </ul>
+    }
+
+    @if (_sendResult is not null)
+    {
+        <p class="admin-action-success">
+            Sent to @_sendResult.RecipientCount Company Administrator(s) across @_sendResult.CompanyCount compan@(_sendResult.CompanyCount == 1 ? "y" : "ies").
+        </p>
+    }
+
+    <div class="admin-actions-buttons">
+        <SfButton IsPrimary="true" Disabled="_previewLoading" OnClick="OpenConfirmDialogAsync">
+            Send to Customer Admins
+        </SfButton>
+    </div>
+</section>
+
+@if (_dialogVisible)
+{
+    <SfDialog Visible="_dialogVisible" IsModal="true" Width="480px" ShowCloseIcon="false">
+        <DialogTemplates>
+            <Header>Send product update</Header>
+            <Content>
+                @if (_previewLoading)
+                {
+                    <p>Calculating recipients…</p>
+                }
+                else if (_preview is null)
+                {
+                    <p class="admin-action-error">
+                        Could not calculate recipients. You may not be authorised to perform this action.
+                    </p>
+                }
+                else
+                {
+                    <p>
+                        Send this product update to <strong>@_preview.RecipientCount</strong> Company Admin
+                        user(s) across <strong>@_preview.CompanyCount</strong> active customer compan@(_preview.CompanyCount == 1 ? "y" : "ies")?
+                    </p>
+                    @if (_preview.RecipientCount == 0)
+                    {
+                        <p class="admin-action-error">There are no eligible recipients right now.</p>
+                    }
+                }
+            </Content>
+            <FooterTemplate>
+                <SfButton IsPrimary="true" Disabled="@(_sending || _previewLoading || _preview is null || _preview.RecipientCount == 0)"
+                          OnClick="ConfirmSendAsync">
+                    @if (_sending)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Send
+                </SfButton>
+                <SfButton Disabled="_sending" OnClick="CloseDialog">Cancel</SfButton>
+            </FooterTemplate>
+        </DialogTemplates>
+    </SfDialog>
+}
+
+@code {
+    private string _title = string.Empty;
+    private string _message = string.Empty;
+    private string? _url;
+
+    private string? _validationError;
+    private List<string>? _sendErrors;
+    private SendProductUpdateResultModel? _sendResult;
+
+    private bool _dialogVisible;
+    private bool _previewLoading;
+    private bool _sending;
+    private ProductUpdateRecipientPreviewModel? _preview;
+
+    private async Task OpenConfirmDialogAsync()
+    {
+        _sendErrors = null;
+        _sendResult = null;
+
+        if (string.IsNullOrWhiteSpace(_title))
+        {
+            _validationError = "Title is required.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(_message))
+        {
+            _validationError = "Message is required.";
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_url) && (!_url.StartsWith('/') || _url.StartsWith("//")))
+        {
+            _validationError = "Url must be a relative path starting with '/' (e.g. /reports/recruitment-pipeline).";
+            return;
+        }
+
+        _validationError = null;
+        _dialogVisible = true;
+        _previewLoading = true;
+        _preview = null;
+        StateHasChanged();
+
+        _preview = await ProductUpdateService.GetRecipientPreviewOrNullAsync();
+        _previewLoading = false;
+    }
+
+    private void CloseDialog()
+    {
+        _dialogVisible = false;
+    }
+
+    private async Task ConfirmSendAsync()
+    {
+        _sending = true;
+        try
+        {
+            var request = new SendProductUpdateRequest(
+                FormText.Required(_title),
+                FormText.Required(_message),
+                FormText.Optional(_url));
+
+            var outcome = await ProductUpdateService.SendAsync(request);
+
+            if (outcome.Result is not null)
+            {
+                _sendResult = outcome.Result;
+                _sendErrors = null;
+                _title = string.Empty;
+                _message = string.Empty;
+                _url = null;
+            }
+            else
+            {
+                _sendResult = null;
+                _sendErrors = outcome.Errors?.ToList() ?? ["Could not send the product update."];
+            }
+        }
+        finally
+        {
+            _sending = false;
+            _dialogVisible = false;
+        }
+    }
+}

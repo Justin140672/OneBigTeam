@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Features.GetRecentLeaveRequests;
 using HR.Modules.Leave.Persistence;
@@ -128,7 +129,7 @@ public class GetRecentLeaveRequestsHierarchyScopeTests
             db, reader, new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService(), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(manager));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(manager), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(manager), WorkloadScope.Manager, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal(indirectReport, action.EmployeeId);
@@ -151,7 +152,7 @@ public class GetRecentLeaveRequestsHierarchyScopeTests
             db, FakeDirectReportsReader.WithHierarchy(), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-hr"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(caller));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(caller), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(caller), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
     }
@@ -171,7 +172,7 @@ public class GetRecentLeaveRequestsHierarchyScopeTests
             db, FakeDirectReportsReader.WithHierarchy(), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService(), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(caller));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(caller), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(caller), WorkloadScope.Manager, CancellationToken.None);
 
         Assert.Empty(result);
     }

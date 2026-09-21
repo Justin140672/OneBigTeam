@@ -10,7 +10,7 @@ internal sealed class FakeNotificationWriter : INotificationWriter
     public Task WriteAsync(
         Guid id, Guid companyId, Guid employeeId, string title, string? body, Guid sourceEntityId,
         NotificationType type, NotificationPriority priority, DateTimeOffset createdAt,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, string? actionUrl = null)
     {
         WrittenNotifications.Add((companyId, employeeId, type, sourceEntityId));
         return Task.CompletedTask;

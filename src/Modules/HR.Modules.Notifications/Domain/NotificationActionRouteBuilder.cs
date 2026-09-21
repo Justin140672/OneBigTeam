@@ -152,7 +152,13 @@ internal static class NotificationActionRouteBuilder
     /// should never trigger given every branch above is a hard-coded relative template, but it is
     /// the single choke point every computed URL passes through before reaching persistence.
     /// </summary>
-    private static string? EnforceRelative(string? url)
+    /// <summary>
+    /// Exposed (not just used internally by <see cref="BuildActionUrl"/>) so callers supplying an
+    /// explicit ActionUrl override — e.g. NotificationWriter.WriteAsync's admin-authored-URL
+    /// parameter — apply the exact same "application-relative only" guard rather than a
+    /// second, potentially-drifting implementation.
+    /// </summary>
+    public static string? EnforceRelative(string? url)
     {
         if (string.IsNullOrEmpty(url))
             return null;

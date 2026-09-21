@@ -106,7 +106,8 @@ internal sealed class NotificationWriter(
         NotificationType type,
         NotificationPriority priority,
         DateTimeOffset createdAt,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? actionUrl = null)
     {
         // SET-06: a scheduled-reminder type is suppressed entirely (no in-app notification, no
         // email) while the company has ScheduledRemindersEnabled off — this is a deliberate no-op.
@@ -114,7 +115,9 @@ internal sealed class NotificationWriter(
         if (NotificationChannelDefaults.IsScheduledReminder(type) && !notificationSettings.ScheduledRemindersEnabled)
             return;
 
-        var actionUrl = NotificationActionRouteBuilder.BuildActionUrl(type, companyId, employeeId, sourceEntityId);
+        actionUrl = actionUrl is not null
+            ? NotificationActionRouteBuilder.EnforceRelative(actionUrl)
+            : NotificationActionRouteBuilder.BuildActionUrl(type, companyId, employeeId, sourceEntityId);
         var notification = Notification.Create(id, companyId, employeeId, title, body, sourceEntityId, createdAt, type, priority, actionUrl);
         dbContext.Notifications.Add(notification);
 
