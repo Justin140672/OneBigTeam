@@ -43,6 +43,7 @@ public class TaskCompletionActionReplaySafetyConformanceTests
         "HR.Modules.Probation.Features.CompleteProbationReviewFromTask.CompleteProbationReviewFromTaskAction",
         "HR.Modules.Sickness.Features.FulfilEvidenceRequest.SicknessEvidenceUploadCompletionAction",
         "HR.Modules.Sickness.Features.CompleteReturnToWorkReviewFromTask.CompleteReturnToWorkReviewFromTaskAction",
+        "HR.Modules.Documents.Features.CompleteProfilePhotoReviewFromTask.CompleteProfilePhotoReviewFromTaskAction",
     ];
 
     /// <summary>
@@ -57,6 +58,7 @@ public class TaskCompletionActionReplaySafetyConformanceTests
         typeof(HR.Modules.Offboarding.OffboardingModule),
         typeof(HR.Modules.Probation.ProbationModule),
         typeof(HR.Modules.Sickness.SicknessModule),
+        typeof(HR.Modules.Documents.DocumentsModule),
     ];
 
     [Fact]

@@ -185,11 +185,13 @@ public class LeavingProcessLifecycleEndToEndTests
         Assert.Equal("Active", employeeAfterCancel.Status);
 
         // OffboardingPlanCoordinator.CancelOutstandingTasksAsync moves the plan itself to
-        // Cancelled and skips every outstanding task — both observable via the overview endpoint.
+        // Cancelled and cancels every outstanding task (OffboardingTask.CancelBecauseLeavingProcessCancelled,
+        // reported as a distinct "Cancelled" status, separate from "Skipped") — both observable via
+        // the overview endpoint.
         var overviewAfterCancel = await GetOffboardingOverviewAsync(client, companyId, employeeId);
         Assert.Equal("Cancelled", overviewAfterCancel.PlanStatus);
         Assert.NotEmpty(overviewAfterCancel.Tasks);
-        Assert.All(overviewAfterCancel.Tasks, t => Assert.Equal("Skipped", t.Status));
+        Assert.All(overviewAfterCancel.Tasks, t => Assert.Equal("Cancelled", t.Status));
     }
 
     [Fact]

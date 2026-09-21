@@ -111,7 +111,10 @@ public class OffboardingTaskSynchronisationOnLeavingProcessCancelledTests
 
         var documentReviewTaskAfter = Assert.Single(
             overviewAfter.Tasks, t => t.Id == documentReviewTask.Id);
-        Assert.Equal("Skipped", documentReviewTaskAfter.Status);
+        // OffboardingTask.CancelBecauseLeavingProcessCancelled (see "Unify Leaving and Offboarding
+        // into one employee workspace") reports a distinct "Cancelled" status for tasks resolved by
+        // a withdrawn leaving process, separate from "Skipped".
+        Assert.Equal("Cancelled", documentReviewTaskAfter.Status);
 
         // The core regression check: the Tasks-module TaskItem must no longer be Open — it must
         // have actually been cancelled, not just left dangling while the local plan/task rows

@@ -1,6 +1,8 @@
 using HR.Modules.Sickness.Domain;
 using HR.Modules.Sickness.Features.GetMissingFitNotes;
 using HR.Modules.Sickness.Persistence;
+using HR.Modules.Sickness.Tests.Infrastructure;
+using HR.Modules.Tasks.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Tests;
@@ -41,7 +43,7 @@ public class GetMissingFitNotesHandlerTests
         db.SicknessEvidenceRequests.Add(request);
         await db.SaveChangesAsync();
 
-        var handler = new GetMissingFitNotesHandler(db);
+        var handler = new GetMissingFitNotesHandler(db, new FakeOpenTaskBySourceEntityReader());
         var result = await handler.HandleAsync(new GetMissingFitNotesRequest(companyId), null, CancellationToken.None);
 
         var item = Assert.Single(result.Items);
@@ -64,7 +66,7 @@ public class GetMissingFitNotesHandlerTests
         db.SicknessEvidenceRequests.Add(request);
         await db.SaveChangesAsync();
 
-        var handler = new GetMissingFitNotesHandler(db);
+        var handler = new GetMissingFitNotesHandler(db, new FakeOpenTaskBySourceEntityReader());
         var result = await handler.HandleAsync(new GetMissingFitNotesRequest(companyId), null, CancellationToken.None);
 
         var item = Assert.Single(result.Items);
@@ -86,7 +88,7 @@ public class GetMissingFitNotesHandlerTests
         db.SicknessEvidenceRequests.AddRange(fulfilled, cancelled);
         await db.SaveChangesAsync();
 
-        var handler = new GetMissingFitNotesHandler(db);
+        var handler = new GetMissingFitNotesHandler(db, new FakeOpenTaskBySourceEntityReader());
         var result = await handler.HandleAsync(new GetMissingFitNotesRequest(companyId), null, CancellationToken.None);
 
         Assert.Empty(result.Items);
@@ -104,9 +106,50 @@ public class GetMissingFitNotesHandlerTests
         db.SicknessEvidenceRequests.Add(request);
         await db.SaveChangesAsync();
 
-        var handler = new GetMissingFitNotesHandler(db);
+        var handler = new GetMissingFitNotesHandler(db, new FakeOpenTaskBySourceEntityReader());
         var result = await handler.HandleAsync(new GetMissingFitNotesRequest(companyId), null, CancellationToken.None);
 
         Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Resolves_TaskId_When_A_Matching_Open_Upload_Task_Exists()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var (recordId, _) = await SeedRecordAsync(db, companyId);
+
+        var request = SicknessEvidenceRequest.Create(Guid.NewGuid(), companyId, recordId, Guid.Empty, DueDate, null, Now);
+        db.SicknessEvidenceRequests.Add(request);
+        await db.SaveChangesAsync();
+
+        var linkedTaskId = Guid.NewGuid();
+        var reader = new FakeOpenTaskBySourceEntityReader(new Dictionary<Guid, Guid> { [request.Id] = linkedTaskId });
+
+        var handler = new GetMissingFitNotesHandler(db, reader);
+        var result = await handler.HandleAsync(new GetMissingFitNotesRequest(companyId), null, CancellationToken.None);
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal(linkedTaskId, item.TaskId);
+        Assert.Equal(TaskActionType.Upload, reader.LastActionType);
+    }
+
+    [Fact]
+    public async Task HandleAsync_TaskId_Is_Null_When_No_Matching_Open_Task_Exists()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var (recordId, _) = await SeedRecordAsync(db, companyId);
+
+        var request = SicknessEvidenceRequest.Create(Guid.NewGuid(), companyId, recordId, Guid.Empty, DueDate, null, Now);
+        db.SicknessEvidenceRequests.Add(request);
+        await db.SaveChangesAsync();
+
+        // Reader returns an empty map — no open Upload task resolved for this request.
+        var handler = new GetMissingFitNotesHandler(db, new FakeOpenTaskBySourceEntityReader());
+        var result = await handler.HandleAsync(new GetMissingFitNotesRequest(companyId), null, CancellationToken.None);
+
+        var item = Assert.Single(result.Items);
+        Assert.Null(item.TaskId);
     }
 }

@@ -92,7 +92,7 @@ public class GetTeamOnboardingHierarchyScopeTests
 
         var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
             reportReader, reader, new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-onboarding"), new FakeCurrentUser(manager));
+            new FakeAuthorizationService("reporting:view-onboarding"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(manager));
 
         var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(manager), CancellationToken.None);
 
@@ -114,7 +114,7 @@ public class GetTeamOnboardingHierarchyScopeTests
 
         var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
             reportReader, FakeDirectReportsReader.WithHierarchy(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(caller));
+            new FakeAuthorizationService("reporting:view-hr"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(caller));
 
         var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(caller), CancellationToken.None);
 
@@ -133,7 +133,7 @@ public class GetTeamOnboardingHierarchyScopeTests
 
         var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
             reportReader, FakeDirectReportsReader.WithHierarchy(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService(), new FakeCurrentUser(caller));
+            new FakeAuthorizationService(), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(caller));
 
         var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(caller), CancellationToken.None);
 

@@ -29,7 +29,7 @@ internal sealed class FakeTaskCreator : ITaskCreator
         var id = Guid.NewGuid();
         _created.Add(new CreatedTask(
             id, companyId, createdBy, title, description, priority, source, actionType,
-            dueDate, assignedEmployeeId, assignedUserId, sourceEntityId, notifyAssignee));
+            dueDate, assignedEmployeeId, assignedUserId, sourceEntityId, notifyAssignee, idempotencyKey));
         return Task.FromResult(id);
     }
 
@@ -46,5 +46,6 @@ internal sealed class FakeTaskCreator : ITaskCreator
         Guid? AssignedEmployeeId,
         Guid? AssignedUserId,
         Guid? SourceEntityId,
-        bool NotifyAssignee = true);
+        bool NotifyAssignee = true,
+        string? IdempotencyKey = null);
 }

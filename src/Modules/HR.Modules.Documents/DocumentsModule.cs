@@ -60,6 +60,8 @@ using HR.Modules.Documents.Features.GetPendingProfilePhoto;
 using HR.Modules.Documents.Features.GetPendingProfilePhotoById;
 using HR.Modules.Documents.Features.ApproveProfilePhoto;
 using HR.Modules.Documents.Features.RejectProfilePhoto;
+using HR.Modules.Documents.Features.CompleteProfilePhotoReviewFromTask;
+using HR.Modules.Tasks.Contracts;
 using HR.Modules.Documents.Services;
 using HR.Modules.Documents.Services.OnboardingTasks;
 using HR.Modules.Documents.Features.ListDocumentTypes;
@@ -242,11 +244,23 @@ public static class DocumentsModule
         services.AddScoped<GetEmployeeProfilePhotoHandler>();
         services.AddScoped<IValidator<GetEmployeeProfilePhotoRequest>, GetEmployeeProfilePhotoValidator>();
 
+        services.AddScoped<Services.ProfilePhotoReviewer>();
+
         services.AddScoped<ApproveProfilePhotoHandler>();
         services.AddScoped<IValidator<ApproveProfilePhotoRequest>, ApproveProfilePhotoValidator>();
 
         services.AddScoped<RejectProfilePhotoHandler>();
         services.AddScoped<IValidator<RejectProfilePhotoRequest>, RejectProfilePhotoValidator>();
+
+        // Wires the generic Tasks "Complete task" endpoint into the real approve/reject decision
+        // for a profile-photo review task, and prevents that endpoint from completing the task
+        // without one (see CompleteProfilePhotoReviewFromTaskAction for details).
+        services.AddScoped<ITaskCompletionAction, CompleteProfilePhotoReviewFromTaskAction>();
+
+        // Recovers pending profile-photo submissions left without an active HR review task (a
+        // missing/lost task creation, or a submission that predates the idempotency-keyed task
+        // creation fix).
+        services.AddScoped<ReconcileMissingProfilePhotoReviewTasksJob>();
 
         services.AddScoped<GetEmployeeDocumentHandler>();
         services.AddScoped<IValidator<GetEmployeeDocumentRequest>, GetEmployeeDocumentValidator>();
@@ -348,6 +362,10 @@ public static class DocumentsModule
             "documents-idempotency-maintenance",
             job => job.ExecuteAsync(),
             "*/5 * * * *");
+        jobManager.AddOrUpdate<ReconcileMissingProfilePhotoReviewTasksJob>(
+            "reconcile-missing-profile-photo-review-tasks",
+            job => job.ExecuteAsync(),
+            Cron.Hourly());
         return app;
     }
 

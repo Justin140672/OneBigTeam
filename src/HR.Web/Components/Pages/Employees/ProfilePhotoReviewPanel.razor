@@ -31,9 +31,9 @@
 
                 @if (_showRejectReason)
                 {
-                    <HrTextBox @bind-Value="_rejectReason" Placeholder="Reason for rejection (optional)" CssClass="mb-2 w-100" />
+                    <HrTextBox @bind-Value="_rejectReason" Placeholder="Reason for rejection (required)" CssClass="mb-2 w-100" />
                     <div class="d-flex gap-2">
-                        <SfButton CssClass="e-small" IsPrimary="true" Disabled="@_reviewing" OnClick="ConfirmRejectAsync">Confirm Reject</SfButton>
+                        <SfButton CssClass="e-small" IsPrimary="true" Disabled="@(_reviewing || string.IsNullOrWhiteSpace(_rejectReason))" OnClick="ConfirmRejectAsync">Confirm Reject</SfButton>
                         <SfButton CssClass="e-small e-flat" Disabled="@_reviewing" OnClick="@(() => _showRejectReason = false)">Back</SfButton>
                     </div>
                 }
@@ -120,6 +120,11 @@
     private async Task ConfirmRejectAsync()
     {
         if (_pending is null) return;
+        if (string.IsNullOrWhiteSpace(_rejectReason))
+        {
+            _error = "A rejection reason is required.";
+            return;
+        }
 
         _reviewing = true;
         _error = null;

@@ -1,7 +1,7 @@
 @using HR.Web.Components.Pages.Dashboards
+@using HR.Web.Components.Pages.Tasks
 @inject SicknessService SicknessService
 @inject WidgetSourceLoader SourceLoader
-@inject NavigationManager Navigation
 @inject AppSession Session
 
 @if (Session.CanManageEmployees || Session.IsManager)
@@ -71,15 +71,31 @@
                         {
                             var i = item;
                             var (dueLabel, dueCss) = DueBadge(i.DueDate, i.Status);
-                            var url = $"/companies/{Session.CompanyId}/employees/{i.EmployeeId}";
-                            <div @key="i.RequestId" class="task-widget-item" @onclick="() => Navigation.NavigateTo(url)">
-                                <span class="priority-pip priority-pip--@(i.Status == "Overdue" ? "critical" : "medium")"></span>
-                                <div class="task-widget-content">
-                                    <span class="task-widget-title">@EmployeeName(i.EmployeeId)</span>
-                                    <span class="task-widget-meta">Fit note evidence</span>
+                            @if (i.TaskId is not null)
+                            {
+                                <button type="button" @key="i.RequestId" class="task-widget-item"
+                                        aria-label="@($"View evidence request for {EmployeeName(i.EmployeeId)}")"
+                                        @onclick="() => OpenTask(i.TaskId!.Value)">
+                                    <span class="priority-pip priority-pip--@(i.Status == "Overdue" ? "critical" : "medium")"></span>
+                                    <div class="task-widget-content">
+                                        <span class="task-widget-title">@EmployeeName(i.EmployeeId)</span>
+                                        <span class="task-widget-meta">Fit note evidence</span>
+                                    </div>
+                                    <span class="due-badge due-badge--@dueCss">@dueLabel</span>
+                                    <span class="attention-queue-action">View evidence request</span>
+                                </button>
+                            }
+                            else
+                            {
+                                <div @key="i.RequestId" class="task-widget-item attention-queue-item--stale"
+                                     aria-label="@($"Evidence request for {EmployeeName(i.EmployeeId)} can no longer be opened")">
+                                    <span class="priority-pip priority-pip--@(i.Status == "Overdue" ? "critical" : "medium")"></span>
+                                    <div class="task-widget-content">
+                                        <span class="task-widget-title">@EmployeeName(i.EmployeeId)</span>
+                                        <span class="task-widget-meta text-muted">This item can no longer be opened — it may have been completed or removed.</span>
+                                    </div>
                                 </div>
-                                <span class="due-badge due-badge--@dueCss">@dueLabel</span>
-                            </div>
+                            }
                         }
                     }
                 </div>
@@ -87,6 +103,11 @@
         </div>
     }
 }
+
+<TaskViewDialog CompanyId="Session.CompanyId"
+                TaskId="_selectedTaskId"
+                IsOpen="_taskDialogOpen"
+                OnClosed="CloseTaskDialogAsync" />
 
 @code {
     private bool _loading = true;
@@ -96,6 +117,20 @@
     private IReadOnlyDictionary<Guid, string> _employeeNames = new Dictionary<Guid, string>();
     private int _overdue;
     private int _pending;
+    private Guid? _selectedTaskId;
+    private bool _taskDialogOpen;
+
+    private void OpenTask(Guid taskId)
+    {
+        _selectedTaskId = taskId;
+        _taskDialogOpen = true;
+    }
+
+    private async Task CloseTaskDialogAsync()
+    {
+        _taskDialogOpen = false;
+        await LoadAsync();
+    }
 
     protected override async Task OnInitializedAsync()
     {

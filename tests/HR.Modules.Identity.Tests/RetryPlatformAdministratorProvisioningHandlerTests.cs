@@ -130,22 +130,6 @@ public class RetryPlatformAdministratorProvisioningHandlerTests(IdentityDatabase
         Assert.Equal("conflict", result.Error.Code);
     }
 
-    /// <summary>
-    /// A row that predates the provisioning workflow (null ProvisioningCorrelationId) — reachable
-    /// via PlatformAdministrator.Create alone (never calling BeginProvisioning), which leaves
-    /// ProvisioningStatus defaulted to Active per the domain's own remarks. To exercise this branch
-    /// (a Pending*/Failed status but a null correlation id) would require a state combination the
-    /// public domain API cannot produce — BeginProvisioning always sets the correlation id together
-    /// with the Pending* status, and there is no way to reach Failed without going through
-    /// BeginProvisioning first. This scenario is therefore not reachable through the real domain API
-    /// and is intentionally skipped rather than forced via reflection.
-    /// </summary>
-    [Fact(Skip = "Not reachable via the public PlatformAdministrator API: BeginProvisioning always sets ProvisioningCorrelationId together with a Pending* status, and Failed can only be reached via BeginProvisioning first — so a Pending/Failed row with a null correlation id cannot be constructed without reflection.")]
-    public Task HandleAsync_Returns_Conflict_When_Correlation_Id_Is_Null()
-    {
-        return Task.CompletedTask;
-    }
-
     [Fact]
     public async Task HandleAsync_Failed_New_Account_Path_Retries_CreatePendingUserWithMetadata_And_Moves_To_PendingProvisioning()
     {

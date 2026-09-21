@@ -1,10 +1,11 @@
 using HR.Modules.Sickness.Domain;
 using HR.Modules.Sickness.Persistence;
+using HR.Modules.Tasks.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Features.GetMissingFitNotes;
 
-internal sealed class GetMissingFitNotesHandler(SicknessDbContext dbContext)
+internal sealed class GetMissingFitNotesHandler(SicknessDbContext dbContext, IOpenTaskBySourceEntityReader taskReader)
 {
     public async Task<GetMissingFitNotesResponse> HandleAsync(
         GetMissingFitNotesRequest request,
@@ -34,6 +35,16 @@ internal sealed class GetMissingFitNotesHandler(SicknessDbContext dbContext)
             .AsNoTracking()
             .ToListAsync(cancellationToken);
 
-        return new GetMissingFitNotesResponse(items);
+        if (items.Count == 0)
+            return new GetMissingFitNotesResponse(items);
+
+        var taskIds = await taskReader.GetOpenTaskIdsAsync(
+            request.CompanyId, items.Select(i => i.RequestId), cancellationToken, TaskActionType.Upload);
+
+        var withTasks = items
+            .Select(i => i with { TaskId = taskIds.TryGetValue(i.RequestId, out var tid) ? tid : null })
+            .ToList();
+
+        return new GetMissingFitNotesResponse(withTasks);
     }
 }

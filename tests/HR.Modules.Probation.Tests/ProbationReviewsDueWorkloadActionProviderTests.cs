@@ -150,7 +150,8 @@ public class ProbationReviewsDueWorkloadActionProviderTests
         var action = Assert.Single(result);
         Assert.Equal("Complete ManagerCheckIn Probation Review", action.ActionType);
         Assert.Equal(dueDate, action.DueDate);
-        Assert.Equal($"/companies/{companyId}/employees/{employeeId}/view", action.DeepLinkUrl);
+        // No employee-profile fallback: this category is entirely task-backed.
+        Assert.Equal("", action.DeepLinkUrl);
     }
 
     // ── OverdueProbationReviewsWorkloadActionProvider ───────────────────────────

@@ -150,9 +150,9 @@ internal static class ProbationReviewWorkloadActions
         var departments = await employeeDepartmentReader.GetDepartmentsAsync(companyId, reviewEmployeeIds, cancellationToken);
 
         // A pending probation review is actioned via its Task (TaskActionType.Review, keyed by the
-        // review id as SourceEntityId). Surface that task id so the dashboard row opens the task
-        // dialog in place rather than deep-linking to the employee page — falls back to the
-        // employee deep link only when no open task exists.
+        // review id as SourceEntityId). This category is entirely task-backed: no employee-profile
+        // deep link is offered as a fallback — when the task cannot be resolved, DeepLinkUrl stays
+        // blank so the dashboard shows an explicit "no longer available" state instead.
         var taskIdsByReview = await taskReader.GetOpenTaskIdsAsync(
             companyId, reviews.Select(r => r.Id), cancellationToken, TaskActionType.Review);
 
@@ -171,7 +171,7 @@ internal static class ProbationReviewWorkloadActions
                 DueDate: r.DueDate,
                 AssignedTo: null,
                 Status: overdueOnly ? "Overdue" : "Due",
-                DeepLinkUrl: $"/companies/{companyId}/employees/{employeeId}/view",
+                DeepLinkUrl: "",
                 TaskId: taskId);
         }).ToList();
     }

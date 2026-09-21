@@ -61,11 +61,12 @@ internal sealed class OffboardingReportReader(OffboardingDbContext dbContext) : 
                     or OffboardingTaskStatus.Waived)
                 .Select(t => t.Title)
                 .ToList();
-            var outstanding = planTasks
+            var outstandingTasks = planTasks
                 .Where(t => t.Status is not (OffboardingTaskStatus.Completed or OffboardingTaskStatus.Skipped
                     or OffboardingTaskStatus.Waived or OffboardingTaskStatus.Cancelled))
-                .Select(t => t.Title)
                 .ToList();
+            var outstanding = outstandingTasks.Select(t => t.Title).ToList();
+            var outstandingIds = outstandingTasks.Select(t => t.Id).ToList();
 
             var documentReviewTask = planTasks.FirstOrDefault(t => t.Title == DocumentReviewTaskTitle);
             var documentsReturned = documentReviewTask is null
@@ -80,7 +81,8 @@ internal sealed class OffboardingReportReader(OffboardingDbContext dbContext) : 
                 progress.ResolvedTasks,
                 outstanding,
                 resolvedTitles,
-                documentsReturned));
+                documentsReturned,
+                outstandingIds));
         }
 
         return results;

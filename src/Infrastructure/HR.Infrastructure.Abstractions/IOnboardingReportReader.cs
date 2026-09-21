@@ -29,4 +29,8 @@ public sealed record OnboardingReportTaskItem(
     string Title,
     DateOnly? DueDate,
     string Owner,
-    bool IsOverdue);
+    bool IsOverdue,
+    // The OnboardingTask's own id (its Tasks-module CompleteOnboardingTaskFromTask source entity
+    // id), added so consumers such as OutstandingOnboardingTasksWorkloadActionProvider can resolve
+    // the exact linked Task via IOpenTaskBySourceEntityReader without matching on title/employee.
+    Guid TaskId = default);

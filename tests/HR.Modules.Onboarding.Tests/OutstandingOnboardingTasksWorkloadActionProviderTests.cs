@@ -3,6 +3,7 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Onboarding.Services;
 using HR.Modules.Onboarding.Tests.Infrastructure;
 using HR.Modules.Employees.Contracts;
+using HR.Modules.Tasks.Contracts;
 using HR.SharedKernel;
 
 namespace HR.Modules.Onboarding.Tests;
@@ -35,7 +36,7 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
 
         var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
             reader, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(callerId));
+            new FakeAuthorizationService("reporting:view-hr"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
 
         var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), CancellationToken.None);
 
@@ -56,7 +57,7 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
 
         var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
             reader, new FakeDirectReportsReader([directReportId]), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-onboarding"), new FakeCurrentUser(callerId));
+            new FakeAuthorizationService("reporting:view-onboarding"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
 
         var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), CancellationToken.None);
 
@@ -75,7 +76,7 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
 
         var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
             reader, new FakeDirectReportsReader([]), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-onboarding"), new FakeCurrentUser(callerId));
+            new FakeAuthorizationService("reporting:view-onboarding"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
 
         var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), CancellationToken.None);
 
@@ -94,7 +95,7 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
 
         var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
             reader, new FakeDirectReportsReader([Guid.NewGuid()]), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-onboarding"), new FakeCurrentUser(null));
+            new FakeAuthorizationService("reporting:view-onboarding"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(null));
 
         var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(Guid.NewGuid()), CancellationToken.None);
 
@@ -112,7 +113,7 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
 
         var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
             reader, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService(), new FakeCurrentUser(callerId));
+            new FakeAuthorizationService(), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
 
         var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), CancellationToken.None);
 
@@ -120,20 +121,24 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
     }
 
     [Fact]
-    public async Task Maps_ActionType_Status_DueDate_And_DeepLink()
+    public async Task Maps_ActionType_Status_DueDate_And_ResolvedTaskId()
     {
         var employeeId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         var callerId = Guid.NewGuid();
         var dueDate = new DateOnly(2026, 8, 5);
+        var onboardingTaskId = Guid.NewGuid();
+        var linkedTaskId = Guid.NewGuid();
         var reader = new FakeOnboardingReportReader(
         [
-            BuildItem(employeeId, new OnboardingReportTaskItem("Set up laptop", dueDate, "HR", false)),
+            BuildItem(employeeId, new OnboardingReportTaskItem("Set up laptop", dueDate, "HR", false, onboardingTaskId)),
         ]);
 
         var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
             reader, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(callerId));
+            new FakeAuthorizationService("reporting:view-hr"),
+            new FakeOpenTaskBySourceEntityReader(new Dictionary<Guid, Guid> { [onboardingTaskId] = linkedTaskId }),
+            new FakeCurrentUser(callerId));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
 
@@ -142,7 +147,70 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
         Assert.Equal("Outstanding Onboarding Tasks", action.ActionCategory);
         Assert.Equal("Outstanding", action.Status);
         Assert.Equal(dueDate, action.DueDate);
-        Assert.Equal($"/companies/{companyId}/employees/{employeeId}/view", action.DeepLinkUrl);
+        Assert.Equal(linkedTaskId, action.TaskId);
+        // No employee-profile fallback: this category is entirely task-backed.
+        Assert.Equal("", action.DeepLinkUrl);
+    }
+
+    [Fact]
+    public async Task Task_Without_Resolved_TaskId_Has_No_DeepLink_Fallback()
+    {
+        var employeeId = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
+        var reader = new FakeOnboardingReportReader(
+        [
+            BuildItem(employeeId, new OnboardingReportTaskItem("Set up laptop", null, "HR", false, Guid.NewGuid())),
+        ]);
+
+        var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
+            reader, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
+            new FakeAuthorizationService("reporting:view-hr"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
+
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), CancellationToken.None);
+
+        var action = Assert.Single(result);
+        Assert.Null(action.TaskId);
+        Assert.Equal("", action.DeepLinkUrl);
+    }
+
+    [Fact]
+    public async Task Multiple_Outstanding_Tasks_With_The_Same_Title_Each_Resolve_Their_Own_Distinct_TaskId()
+    {
+        // Two onboarding tasks with the same title (e.g. two employees each have "Set up laptop")
+        // must have their linked task resolved by the OnboardingTask id, never by title/employee
+        // matching — each source task id must be keyed independently.
+        var employeeA = Guid.NewGuid();
+        var employeeB = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
+        var onboardingTaskId1 = Guid.NewGuid();
+        var onboardingTaskId2 = Guid.NewGuid();
+        var linkedTaskId1 = Guid.NewGuid();
+        var linkedTaskId2 = Guid.NewGuid();
+
+        var reader = new FakeOnboardingReportReader(
+        [
+            BuildItem(employeeA, new OnboardingReportTaskItem("Set up laptop", null, "HR", false, onboardingTaskId1)),
+            BuildItem(employeeB, new OnboardingReportTaskItem("Set up laptop", null, "HR", false, onboardingTaskId2)),
+        ]);
+
+        var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
+            reader, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
+            new FakeAuthorizationService("reporting:view-hr"),
+            new FakeOpenTaskBySourceEntityReader(new Dictionary<Guid, Guid>
+            {
+                [onboardingTaskId1] = linkedTaskId1,
+                [onboardingTaskId2] = linkedTaskId2,
+            }),
+            new FakeCurrentUser(callerId));
+
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), CancellationToken.None);
+
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, a => a.EmployeeId == employeeA && a.TaskId == linkedTaskId1);
+        Assert.Contains(result, a => a.EmployeeId == employeeB && a.TaskId == linkedTaskId2);
+        Assert.NotEqual(
+            result.Single(a => a.EmployeeId == employeeA).TaskId,
+            result.Single(a => a.EmployeeId == employeeB).TaskId);
     }
 
     [Fact]
@@ -157,7 +225,7 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
 
         var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
             reader, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
-            new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(callerId));
+            new FakeAuthorizationService("reporting:view-hr"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
 
         var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), CancellationToken.None);
 

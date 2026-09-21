@@ -5,6 +5,9 @@ using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Persistence;
 using HR.Modules.Identity.Domain;
+using HR.Modules.Tasks.Contracts;
+using HR.Modules.Tasks.Domain;
+using HR.Modules.Tasks.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -214,6 +217,49 @@ public class UploadMyProfilePhotoEndpointTests
 
         var pendingPhoto = await db2.PendingProfilePhotos.SingleAsync(p => p.EmployeeId == employeeId);
         Assert.Equal("new-pending.png", pendingPhoto.FileName);
+    }
+
+    [Fact]
+    public async Task Post_ReUpload_While_Pending_Does_Not_Create_A_Second_Open_Review_Task()
+    {
+        // Defect fix: re-uploading a replacement photo while the first submission is still pending
+        // review previously created a SECOND open review task pointing at the same submission,
+        // because ITaskCreator.CreateAsync had no way to know the "new" task was really the same
+        // review being refreshed. UploadMyProfilePhotoHandler now passes a deterministic
+        // idempotency key derived from the pending photo's (stable) Id, so a re-upload while
+        // pending must be a no-op for task creation.
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        using var client = await SelfClient(companyId, employeeId);
+
+        var first = await client.PostAsync(
+            $"/api/companies/{companyId}/employees/me/profile-photo",
+            BuildUpload(BuildPngBytes(400, 300), "image/png", "first.png"));
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        var firstPayload = await first.Content.ReadFromJsonAsync<ProfilePhotoPayload>();
+
+        var second = await client.PostAsync(
+            $"/api/companies/{companyId}/employees/me/profile-photo",
+            BuildUpload(BuildPngBytes(500, 500), "image/png", "second.png"));
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        var secondPayload = await second.Content.ReadFromJsonAsync<ProfilePhotoPayload>();
+
+        // Same logical pending submission across both uploads.
+        Assert.Equal(firstPayload!.Id, secondPayload!.Id);
+
+        using var scope = _factory.Services.CreateScope();
+        var tasksDb = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
+
+        var reviewTasks = await tasksDb.TaskItems
+            .Where(t =>
+                t.CompanyId == companyId &&
+                t.Source == TaskSource.Document &&
+                t.ActionType == TaskActionType.Review &&
+                t.SourceEntityId == secondPayload.Id)
+            .ToListAsync();
+
+        Assert.Single(reviewTasks);
+        Assert.Equal(TaskItemStatus.Open, reviewTasks[0].Status);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────────

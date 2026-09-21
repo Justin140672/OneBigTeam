@@ -14,16 +14,38 @@ public class RejectProfilePhotoValidatorTests
     }
 
     [Fact]
-    public void Validate_ValidRequest_With_Null_RejectionReason_Passes()
+    public void Validate_Null_RejectionReason_Fails()
     {
         var result = Validator.Validate(new RejectProfilePhotoRequest(Guid.NewGuid(), Guid.NewGuid(), null));
-        Assert.True(result.IsValid);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(RejectProfilePhotoRequest.RejectionReason));
+    }
+
+    [Fact]
+    public void Validate_Empty_RejectionReason_Fails()
+    {
+        var result = Validator.Validate(new RejectProfilePhotoRequest(Guid.NewGuid(), Guid.NewGuid(), ""));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(RejectProfilePhotoRequest.RejectionReason));
+    }
+
+    [Fact]
+    public void Validate_WhitespaceOnly_RejectionReason_Fails()
+    {
+        // FluentValidation's NotEmpty() also rejects whitespace-only strings, distinct from a bare
+        // length check — pin that behaviour explicitly rather than relying on the null/empty cases.
+        var result = Validator.Validate(new RejectProfilePhotoRequest(Guid.NewGuid(), Guid.NewGuid(), "   "));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(RejectProfilePhotoRequest.RejectionReason));
     }
 
     [Fact]
     public void Validate_EmptyCompanyId_Fails()
     {
-        var result = Validator.Validate(new RejectProfilePhotoRequest(Guid.Empty, Guid.NewGuid(), null));
+        var result = Validator.Validate(new RejectProfilePhotoRequest(Guid.Empty, Guid.NewGuid(), "Blurry"));
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(RejectProfilePhotoRequest.CompanyId));
@@ -32,7 +54,7 @@ public class RejectProfilePhotoValidatorTests
     [Fact]
     public void Validate_EmptyEmployeeId_Fails()
     {
-        var result = Validator.Validate(new RejectProfilePhotoRequest(Guid.NewGuid(), Guid.Empty, null));
+        var result = Validator.Validate(new RejectProfilePhotoRequest(Guid.NewGuid(), Guid.Empty, "Blurry"));
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(RejectProfilePhotoRequest.EmployeeId));
@@ -41,7 +63,7 @@ public class RejectProfilePhotoValidatorTests
     [Fact]
     public void Validate_EmptyCompanyId_And_EmployeeId_Reports_Both_Errors()
     {
-        var result = Validator.Validate(new RejectProfilePhotoRequest(Guid.Empty, Guid.Empty, null));
+        var result = Validator.Validate(new RejectProfilePhotoRequest(Guid.Empty, Guid.Empty, "Blurry"));
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(RejectProfilePhotoRequest.CompanyId));

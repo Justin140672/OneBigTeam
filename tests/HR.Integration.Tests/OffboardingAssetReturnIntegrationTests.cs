@@ -235,7 +235,10 @@ public class OffboardingAssetReturnIntegrationTests
         var overviewAfter = await GetOverviewAsync(client, companyId, employeeId);
         Assert.Equal("Cancelled", overviewAfter.PlanStatus);
         var assetReturnTaskAfter = Assert.Single(overviewAfter.Tasks, t => t.Id == assetReturnTask.Id);
-        Assert.Equal("Skipped", assetReturnTaskAfter.Status);
+        // OffboardingTask.CancelBecauseLeavingProcessCancelled (see "Unify Leaving and Offboarding
+        // into one employee workspace") reports a distinct "Cancelled" status for tasks resolved by
+        // a withdrawn leaving process, separate from "Skipped".
+        Assert.Equal("Cancelled", assetReturnTaskAfter.Status);
 
         // The core assertion: the underlying Assets-module assignment must be completely untouched —
         // still assigned/active, not silently returned as a side effect of cancellation.

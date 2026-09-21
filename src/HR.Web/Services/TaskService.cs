@@ -41,14 +41,36 @@ public sealed class TaskService(HrApiHttpClientFactory httpClientFactory)
 
     public async Task<TaskDetailModel?> GetTaskAsync(Guid companyId, Guid taskId, CancellationToken cancellationToken = default)
     {
+        var result = await GetTaskResultAsync(companyId, taskId, cancellationToken);
+        return result.Task;
+    }
+
+    /// <summary>
+    /// Loads a single task, distinguishing "the task genuinely does not exist / caller cannot
+    /// access it" (404/403 — <see cref="TaskFetchResult.NotFound"/>) from a recoverable/transient
+    /// failure (network error, timeout, 5xx — <see cref="TaskFetchResult.Failed"/>), so TaskViewDialog
+    /// can offer a retry for the latter instead of treating every failure as "task not found".
+    /// </summary>
+    public async Task<TaskFetchResult> GetTaskResultAsync(Guid companyId, Guid taskId, CancellationToken cancellationToken = default)
+    {
         try
         {
-            return await Http.GetFromJsonAsync<TaskDetailModel>(
-                $"api/companies/{companyId}/tasks/{taskId}", HrApiJsonOptions.Default, cancellationToken);
+            var response = await Http.GetAsync($"api/companies/{companyId}/tasks/{taskId}", cancellationToken);
+
+            if (response.StatusCode is System.Net.HttpStatusCode.NotFound or System.Net.HttpStatusCode.Forbidden)
+                return TaskFetchResult.NotFound;
+
+            if (!response.IsSuccessStatusCode)
+                return TaskFetchResult.Failed;
+
+            var task = await response.Content.ReadFromJsonAsync<TaskDetailModel>(HrApiJsonOptions.Default, cancellationToken);
+            return task is null ? TaskFetchResult.NotFound : TaskFetchResult.Loaded(task);
         }
         catch
         {
-            return null;
+            // Network failure, timeout, deserialization error, etc. — recoverable, not evidence the
+            // task itself is missing.
+            return TaskFetchResult.Failed;
         }
     }
 

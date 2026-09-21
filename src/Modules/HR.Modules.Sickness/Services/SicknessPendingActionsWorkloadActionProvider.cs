@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using HR.Modules.Employees.Contracts;
+using HR.Modules.Tasks.Contracts;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Sickness.Domain;
 using HR.Modules.Sickness.Persistence;
@@ -19,7 +20,8 @@ namespace HR.Modules.Sickness.Services;
 internal sealed class SicknessPendingActionsWorkloadActionProvider(
     SicknessDbContext dbContext,
     IEmployeeDepartmentReader employeeDepartmentReader,
-    IAuthorizationService authorizationService) : IWorkloadActionProvider
+    IAuthorizationService authorizationService,
+    IOpenTaskBySourceEntityReader taskReader) : IWorkloadActionProvider
 {
     public string ActionCategory => "Pending Sickness Actions";
 
@@ -56,11 +58,21 @@ internal sealed class SicknessPendingActionsWorkloadActionProvider(
 
         var departments = await employeeDepartmentReader.GetDepartmentsAsync(companyId, employeeIds, cancellationToken);
 
+        // Reviews are actioned via their own Task (TaskActionType.Review, keyed by the review id as
+        // SourceEntityId — see CompleteReturnToWorkReviewFromTaskAction). Evidence requests are
+        // actioned via TaskActionType.Upload, keyed by the evidence request id (see
+        // SicknessEvidenceUploadCompletionAction / FitNoteEvidenceRequestService).
+        var reviewTaskIds = await taskReader.GetOpenTaskIdsAsync(
+            companyId, reviews.Select(r => r.Id), cancellationToken, TaskActionType.Review);
+        var evidenceTaskIds = await taskReader.GetOpenTaskIdsAsync(
+            companyId, evidenceRequests.Select(e => e.Id), cancellationToken, TaskActionType.Upload);
+
         var actions = new List<WorkloadAction>();
 
         foreach (var r in reviews)
         {
             departments.TryGetValue(r.EmployeeId, out var dept);
+            var taskId = reviewTaskIds.TryGetValue(r.Id, out var tid) ? tid : (Guid?)null;
             actions.Add(new WorkloadAction(
                 EmployeeId: r.EmployeeId,
                 EmployeeName: dept?.EmployeeName ?? r.EmployeeId.ToString(),
@@ -70,12 +82,15 @@ internal sealed class SicknessPendingActionsWorkloadActionProvider(
                 DueDate: r.DueDate,
                 AssignedTo: null,
                 Status: r.Status.ToString(),
-                DeepLinkUrl: $"/companies/{companyId}/employees/{r.EmployeeId}/view"));
+                // No employee-profile fallback: entirely task-backed category.
+                DeepLinkUrl: "",
+                TaskId: taskId));
         }
 
         foreach (var e in evidenceRequests)
         {
             departments.TryGetValue(e.EmployeeId, out var dept);
+            var taskId = evidenceTaskIds.TryGetValue(e.Id, out var tid) ? tid : (Guid?)null;
             actions.Add(new WorkloadAction(
                 EmployeeId: e.EmployeeId,
                 EmployeeName: dept?.EmployeeName ?? e.EmployeeId.ToString(),
@@ -85,7 +100,8 @@ internal sealed class SicknessPendingActionsWorkloadActionProvider(
                 DueDate: e.DueDate,
                 AssignedTo: null,
                 Status: e.Status.ToString(),
-                DeepLinkUrl: $"/companies/{companyId}/employees/{e.EmployeeId}/view"));
+                DeepLinkUrl: "",
+                TaskId: taskId));
         }
 
         return actions;

@@ -1,14 +1,18 @@
 using System.Net;
 using System.Net.Http.Json;
+using HR.Infrastructure.Abstractions;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Persistence;
+using HR.Modules.Onboarding.Domain;
+using HR.Modules.Onboarding.Persistence;
 using HR.Modules.Tasks.Contracts;
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Persistence;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
@@ -154,6 +158,73 @@ public class GetHrDashboardSummaryEndpointTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => client.GetAsync(Url(companyId), cts.Token));
     }
 
+    [Fact]
+    public async Task Get_HrDashboardSummary_Outstanding_Onboarding_Task_Resolves_Linked_TaskId_When_Open_Task_Exists()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = await SeedEmployeeAsync(companyId, "Nadia", "Newstarter");
+        var onboardingTaskId = await SeedOutstandingOnboardingTaskAsync(companyId, employeeId);
+        var linkedTaskId = await SeedOpenTaskLinkedToSourceAsync(
+            companyId, onboardingTaskId, TaskSource.Onboarding, TaskActionType.Complete, employeeId);
+
+        using var client = await ClientFor(companyId, Guid.NewGuid(), SystemRoles.HrAdministrator);
+        var payload = await client.GetFromJsonAsync<SummaryPayload>(Url(companyId));
+
+        Assert.NotNull(payload);
+        var category = payload!.Categories.Single(c => c.Category == "Outstanding Onboarding Tasks");
+        var item = Assert.Single(category.Items);
+        Assert.Equal(linkedTaskId, item.TaskId);
+        Assert.Equal("", item.DeepLinkUrl);
+    }
+
+    [Fact]
+    public async Task Get_HrDashboardSummary_Outstanding_Onboarding_Task_Has_Null_TaskId_When_No_Open_Task_Exists()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = await SeedEmployeeAsync(companyId, "Nadia", "Newstarter");
+        await SeedOutstandingOnboardingTaskAsync(companyId, employeeId);
+        // No Tasks-module TaskItem seeded — the onboarding task has no linked open task.
+
+        using var client = await ClientFor(companyId, Guid.NewGuid(), SystemRoles.HrAdministrator);
+        var payload = await client.GetFromJsonAsync<SummaryPayload>(Url(companyId));
+
+        Assert.NotNull(payload);
+        var category = payload!.Categories.Single(c => c.Category == "Outstanding Onboarding Tasks");
+        var item = Assert.Single(category.Items);
+        Assert.Null(item.TaskId);
+        Assert.Equal("", item.DeepLinkUrl);
+    }
+
+    [Fact]
+    public async Task Get_HrDashboardSummary_Multiple_Outstanding_Onboarding_Tasks_With_Same_Title_Resolve_Distinct_TaskIds()
+    {
+        // Two different employees each have an onboarding task with the identical title — proves
+        // resolution is keyed by the onboarding task's own id, not by title/employee matching.
+        var companyId = Guid.NewGuid();
+        var employeeA = await SeedEmployeeAsync(companyId, "Anna", "Alpha");
+        var employeeB = await SeedEmployeeAsync(companyId, "Bruno", "Beta");
+
+        var onboardingTaskIdA = await SeedOutstandingOnboardingTaskAsync(companyId, employeeA, "Set up laptop");
+        var onboardingTaskIdB = await SeedOutstandingOnboardingTaskAsync(companyId, employeeB, "Set up laptop");
+
+        var linkedTaskIdA = await SeedOpenTaskLinkedToSourceAsync(
+            companyId, onboardingTaskIdA, TaskSource.Onboarding, TaskActionType.Complete, employeeA);
+        var linkedTaskIdB = await SeedOpenTaskLinkedToSourceAsync(
+            companyId, onboardingTaskIdB, TaskSource.Onboarding, TaskActionType.Complete, employeeB);
+
+        using var client = await ClientFor(companyId, Guid.NewGuid(), SystemRoles.HrAdministrator);
+        var payload = await client.GetFromJsonAsync<SummaryPayload>(Url(companyId));
+
+        Assert.NotNull(payload);
+        var category = payload!.Categories.Single(c => c.Category == "Outstanding Onboarding Tasks");
+        Assert.Equal(2, category.Items.Count);
+        Assert.Contains(category.Items, i => i.EmployeeId == employeeA && i.TaskId == linkedTaskIdA);
+        Assert.Contains(category.Items, i => i.EmployeeId == employeeB && i.TaskId == linkedTaskIdB);
+        Assert.NotEqual(
+            category.Items.Single(i => i.EmployeeId == employeeA).TaskId,
+            category.Items.Single(i => i.EmployeeId == employeeB).TaskId);
+    }
+
     // ── Seeding helpers (mirrors GetWorkloadActionsEndpointTests) ─────────────
 
     private async Task<Guid> SeedEmployeeAsync(Guid companyId, string firstName, string lastName)
@@ -204,6 +275,35 @@ public class GetHrDashboardSummaryEndpointTests
             TaskPriority.Medium, TaskSource.Workflow, TaskActionType.Complete, dueDate,
             assignedEmployeeId, null, Now));
         await db.SaveChangesAsync();
+    }
+
+    private async Task<Guid> SeedOutstandingOnboardingTaskAsync(Guid companyId, Guid employeeId, string title = "Set up laptop")
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<OnboardingDbContext>();
+        var plan = OnboardingPlan.Create(Guid.NewGuid(), companyId, employeeId, Today, null, Now);
+        db.OnboardingPlans.Add(plan);
+        var task = OnboardingTask.Create(
+            Guid.NewGuid(), companyId, plan.Id, title, null,
+            OnboardingTemplateTaskAssignTo.Manager, Today.AddDays(5), Now);
+        db.OnboardingTasks.Add(task);
+        await db.SaveChangesAsync();
+        return task.Id;
+    }
+
+    /// <summary>Seeds a real open Tasks-module TaskItem whose SourceEntityId links back to a source-module task/record id.</summary>
+    private async Task<Guid> SeedOpenTaskLinkedToSourceAsync(
+        Guid companyId, Guid sourceEntityId, TaskSource source, TaskActionType actionType, Guid assignedEmployeeId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(), "Linked task", null,
+            TaskPriority.Medium, source, actionType, Today.AddDays(5),
+            assignedEmployeeId, null, Now, sourceEntityId: sourceEntityId);
+        db.TaskItems.Add(task);
+        await db.SaveChangesAsync();
+        return task.Id;
     }
 
     private sealed record SummaryPayload(

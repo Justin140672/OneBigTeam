@@ -47,9 +47,9 @@ public class RejectProfilePhotoEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ManagerUser.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString()); // different company
 
-        var response = await client.PostAsync(
+        var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo/pending/reject",
-            EmptyJson());
+            new { companyId, employeeId, rejectionReason = "Blurry" });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -65,7 +65,7 @@ public class RejectProfilePhotoEndpointTests
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo/pending/reject",
-            EmptyJson());
+            ValidReasonJson());
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -84,7 +84,7 @@ public class RejectProfilePhotoEndpointTests
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo/pending/reject",
-            EmptyJson());
+            ValidReasonJson());
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -98,7 +98,7 @@ public class RejectProfilePhotoEndpointTests
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo/pending/reject",
-            EmptyJson());
+            ValidReasonJson());
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -126,7 +126,7 @@ public class RejectProfilePhotoEndpointTests
 
         var response = await clientA.PostAsync(
             $"/api/companies/{companyA}/employees/{employeeId}/profile-photo/pending/reject",
-            EmptyJson());
+            ValidReasonJson());
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 
@@ -177,8 +177,10 @@ public class RejectProfilePhotoEndpointTests
     }
 
     [Fact]
-    public async Task Post_Reject_Without_Reason_Succeeds_With_Null_RejectionReason()
+    public async Task Post_Reject_Without_Reason_Fails_Validation()
     {
+        // Ticket requirement: "Rejection must require a clear reason" — a rejection with no reason
+        // must not be accepted, so the employee always knows what to fix before resubmitting.
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
@@ -196,11 +198,48 @@ public class RejectProfilePhotoEndpointTests
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo/pending/reject",
             EmptyJson());
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        // FastEndpoints/FluentValidation validation failures surface as 422 UnprocessableEntity in
+        // this codebase, not 400.
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
 
-        var payload = await response.Content.ReadFromJsonAsync<RejectedProfilePhotoPayload>();
-        Assert.NotNull(payload);
-        Assert.Null(payload!.RejectionReason);
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DocumentsDbContext>();
+
+        // The pending submission must remain intact — a failed/rejected rejection request must not
+        // silently clear it.
+        var pendingRows = await db.PendingProfilePhotos.Where(p => p.EmployeeId == employeeId).ToListAsync();
+        Assert.Single(pendingRows);
+    }
+
+    [Fact]
+    public async Task Post_Reject_With_Whitespace_Only_Reason_Fails_Validation()
+    {
+        // FluentValidation's NotEmpty() also rejects whitespace-only strings — verify that holds
+        // end-to-end through the endpoint, not just at the validator-unit level.
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        using (var selfClient = await SelfClient(companyId, employeeId))
+        {
+            var upload = await selfClient.PostAsync(
+                $"/api/companies/{companyId}/employees/me/profile-photo",
+                BuildPngUpload("submitted.png"));
+            Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
+        }
+
+        using var client = await ManagerClient(companyId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/profile-photo/pending/reject",
+            new { companyId, employeeId, rejectionReason = "   " });
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DocumentsDbContext>();
+
+        var pendingRows = await db.PendingProfilePhotos.Where(p => p.EmployeeId == employeeId).ToListAsync();
+        Assert.Single(pendingRows);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -226,6 +265,12 @@ public class RejectProfilePhotoEndpointTests
 
     private static StringContent EmptyJson() =>
         new("{}", Encoding.UTF8, "application/json");
+
+    // A validation-passing body used for tests targeting authorization/not-found behaviour, so
+    // those checks (which run after validation in the FastEndpoints pipeline) are actually
+    // reached rather than short-circuited by the now-required RejectionReason.
+    private static StringContent ValidReasonJson() =>
+        new("""{"rejectionReason":"Blurry"}""", Encoding.UTF8, "application/json");
 
     private static MultipartFormDataContent BuildPngUpload(string fileName = "avatar.png") =>
         BuildUpload(BuildPngBytes(400, 300), "image/png", fileName);

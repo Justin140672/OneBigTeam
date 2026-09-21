@@ -26,7 +26,7 @@ public sealed record AttentionQueueItem(
     /// <summary>An item is actionable only if it opens a task or has a non-blank deep link.</summary>
     public bool HasTarget => TaskId is not null || !string.IsNullOrWhiteSpace(DeepLinkUrl);
 
-    public string ActionLabel => AttentionQueueSupport.ResolveActionLabel(TaskId, DeepLinkUrl, Category);
+    public string ActionLabel => AttentionQueueSupport.ResolveActionLabel(TaskId, DeepLinkUrl, Category, ActionTitle);
 
     /// <summary>
     /// Secondary/supporting line under the task title: employee, source category, and (when
@@ -126,10 +126,30 @@ public static class AttentionQueueSupport
     /// from the corrected deep-link URL, falling back to the category, so the label always
     /// describes where the row actually goes.
     /// </summary>
-    public static string ResolveActionLabel(Guid? taskId, string? deepLinkUrl, string category)
+    public static string ResolveActionLabel(Guid? taskId, string? deepLinkUrl, string category, string? actionTitle = null)
     {
         if (taskId is not null)
+        {
+            // Category/title-specific wording so the visible label/accessible name describes the
+            // actual destination opened (the matching TaskViewDialog action panel), not just a
+            // generic "Open task" — DSH ticket requirement that labels match their destination
+            // exactly. ActionTitle disambiguates categories that cover more than one destination
+            // (e.g. "Pending Sickness Actions" covers both return-to-work reviews and evidence
+            // requests).
+            var c = (category ?? string.Empty).ToLowerInvariant();
+            var t = (actionTitle ?? string.Empty).ToLowerInvariant();
+
+            if (c.Contains("leave"))
+                return "Review leave request";
+            if (c.Contains("probation"))
+                return "Review probation";
+            if (t.Contains("return to work"))
+                return "Complete return-to-work review";
+            if (t.Contains("evidence"))
+                return "View evidence request";
+
             return "Open task";
+        }
 
         var url = deepLinkUrl?.ToLowerInvariant() ?? string.Empty;
         if (url.Contains("acknowledge"))

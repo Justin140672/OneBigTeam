@@ -103,6 +103,13 @@ internal sealed class UploadMyProfilePhotoHandler(
         var names = await employeeNameReader.GetNamesAsync(request.CompanyId, [employeeId], cancellationToken);
         var employeeName = names.TryGetValue(employeeId, out var name) ? name : "an employee";
 
+        // The pending submission keeps a stable Id across re-uploads (see PendingProfilePhoto.Replace
+        // above) — without a deterministic idempotency key, re-uploading while a review is already
+        // outstanding would create a second open task pointing at the same submission, since
+        // ITaskCreator.CreateAsync has no other way to know this "new" task is really the same
+        // review being refreshed. Keying on the pending photo's Id guarantees exactly one active
+        // task per submission (req #2/#6/#12), and ITaskCompleter.CompleteBySourceEntityAsync only
+        // ever needs to resolve a single open task for that sourceEntityId as a result.
         await taskCreator.CreateAsync(
             request.CompanyId,
             createdBy:          employeeId,
@@ -115,7 +122,8 @@ internal sealed class UploadMyProfilePhotoHandler(
             assignedEmployeeId: null,
             assignedUserId:     null,
             sourceEntityId:     pendingPhoto.Id,
-            cancellationToken);
+            cancellationToken,
+            idempotencyKey:     $"ProfilePhotoReview:{pendingPhoto.Id}");
 
         await auditPublisher.PublishAsync(new ProfilePhotoSubmittedAuditEvent(
             pendingPhoto.CompanyId,

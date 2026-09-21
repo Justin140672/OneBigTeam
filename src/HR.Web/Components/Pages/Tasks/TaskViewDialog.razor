@@ -11,16 +11,28 @@
             {
                 <HrLoadingIndicator Label="Loading task…" />
             }
+            else if (_loadFailed)
+            {
+                @* A recoverable/transient failure (network error, timeout, 5xx) — distinct from a
+                   task that genuinely no longer exists. Offer a retry rather than telling the user
+                   the task is gone, and never redirect to an employee profile. *@
+                <div class="alert alert-danger mb-3" data-testid="task-load-failed">
+                    <p class="mb-2">This task could not be loaded right now. This may be a temporary
+                        problem — refresh the dashboard to check whether the action is still outstanding.</p>
+                    <SfButton CssClass="e-outline" OnClick="RetryAsync" Disabled="_loading">Retry</SfButton>
+                </div>
+            }
             else if (_task is null)
             {
-                @* DSH-01: GetTask returns 404/403 (and TaskService maps both to null) when the
+                @* DSH-01: GetTask returns 404/403 (and TaskService maps both to NotFound) when the
                    task no longer exists or the caller is not authorized for it — e.g. it was
                    completed, cancelled or reassigned away since the list was loaded. Surface a
                    single neutral message that does not confirm whether the task exists, and let
                    closing the dialog refresh the underlying list. *@
                 <div class="alert alert-warning mb-0" data-testid="task-unavailable">
-                    This task is no longer available. It may have been completed, cancelled or
-                    reassigned. Close this dialog to refresh your list.
+                    This task could not be found. It may have been completed, cancelled or removed,
+                    or you may no longer have permission to view it. Refresh the dashboard to check
+                    whether the action is still outstanding.
                 </div>
             }
             else
@@ -118,6 +130,7 @@
 
     private bool Visible;
     private bool _loading;
+    private bool _loadFailed;
     private TaskDetailModel? _task;
     private Guid? _loadedTaskId;
 
@@ -135,9 +148,14 @@
     private async Task LoadAsync()
     {
         _loading = true;
-        _task = await TaskService.GetTaskAsync(CompanyId, TaskId!.Value);
+        _loadFailed = false;
+        var result = await TaskService.GetTaskResultAsync(CompanyId, TaskId!.Value);
+        _task = result.Task;
+        _loadFailed = result.Status == TaskLoadStatus.Failed;
         _loading = false;
     }
+
+    private Task RetryAsync() => LoadAsync();
 
     // Every panel above (LeaveTaskPanel, ProbationReviewPanel, DocumentUploadTaskPanel,
     // CompleteTaskPanel, etc.) only ever invokes OnCompleted once its task's terminal action has

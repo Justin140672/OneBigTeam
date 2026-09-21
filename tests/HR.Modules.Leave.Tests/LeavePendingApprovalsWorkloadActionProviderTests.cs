@@ -142,7 +142,8 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
         Assert.Equal("Approve Leave Request", action.ActionType);
         Assert.Equal("Pending Leave Approvals", action.ActionCategory);
         Assert.Equal(startDate, action.DueDate);
-        Assert.Equal($"/companies/{companyId}/employees/{employeeId}/view", action.DeepLinkUrl);
+        // No employee-profile fallback: this category is entirely task-backed.
+        Assert.Equal("", action.DeepLinkUrl);
         Assert.Equal("Pending", action.Status);
     }
 }

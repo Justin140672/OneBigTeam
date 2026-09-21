@@ -72,6 +72,7 @@ public sealed record MissingFitNoteItem(
     Guid EmployeeId,
     Guid SicknessRecordId,
     DateOnly DueDate,
-    string Status);
+    string Status,
+    Guid? TaskId);
 
 public sealed record GetMissingFitNotesResponseModel(List<MissingFitNoteItem> Items);

@@ -84,6 +84,57 @@ public class AttentionQueueSupportTests
         Assert.Equal("Open task", label);
     }
 
+    // ---------- ResolveActionLabel: task-backed category/title-specific wording ----------
+
+    [Fact]
+    public void ResolveActionLabel_TaskId_LeaveCategory_ReturnsReviewLeaveRequest()
+    {
+        var label = AttentionQueueSupport.ResolveActionLabel(Guid.NewGuid(), null, "Leave", actionTitle: "Annual leave request");
+        Assert.Equal("Review leave request", label);
+    }
+
+    [Fact]
+    public void ResolveActionLabel_TaskId_ProbationCategory_ReturnsReviewProbation()
+    {
+        var label = AttentionQueueSupport.ResolveActionLabel(Guid.NewGuid(), null, "Probation Reviews Due", actionTitle: "Probation review");
+        Assert.Equal("Review probation", label);
+    }
+
+    [Fact]
+    public void ResolveActionLabel_TaskId_SicknessCategory_TitleContainsReturnToWork_ReturnsCompleteReturnToWorkReview()
+    {
+        var label = AttentionQueueSupport.ResolveActionLabel(Guid.NewGuid(), null, "Pending Sickness Actions", actionTitle: "Complete Return to Work review");
+        Assert.Equal("Complete return-to-work review", label);
+    }
+
+    [Fact]
+    public void ResolveActionLabel_TaskId_SicknessCategory_TitleContainsEvidence_ReturnsViewEvidenceRequest()
+    {
+        var label = AttentionQueueSupport.ResolveActionLabel(Guid.NewGuid(), null, "Pending Sickness Actions", actionTitle: "Provide Evidence for absence");
+        Assert.Equal("View evidence request", label);
+    }
+
+    [Fact]
+    public void ResolveActionLabel_TaskId_OnboardingCategory_NoSpecialTitle_ReturnsOpenTask()
+    {
+        var label = AttentionQueueSupport.ResolveActionLabel(Guid.NewGuid(), null, "Outstanding Onboarding Tasks", actionTitle: "Collect right-to-work documents");
+        Assert.Equal("Open task", label);
+    }
+
+    [Fact]
+    public void ResolveActionLabel_TaskId_OffboardingCategory_NoSpecialTitle_ReturnsOpenTask()
+    {
+        var label = AttentionQueueSupport.ResolveActionLabel(Guid.NewGuid(), null, "Outstanding Offboarding Tasks", actionTitle: "Return company equipment");
+        Assert.Equal("Open task", label);
+    }
+
+    [Fact]
+    public void ResolveActionLabel_TaskId_NullActionTitle_DoesNotThrow_ReturnsOpenTask()
+    {
+        var label = AttentionQueueSupport.ResolveActionLabel(Guid.NewGuid(), null, "Pending Sickness Actions", actionTitle: null);
+        Assert.Equal("Open task", label);
+    }
+
     [Theory]
     [InlineData("/policies/1/acknowledge", "View acknowledgement progress")]
     [InlineData("/documents/1", "View document")]

@@ -2,6 +2,26 @@ namespace HR.Web.Models;
 
 public sealed record GetOutstandingTaskCountResponse(int Count);
 
+/// <summary>
+/// Outcome of loading a single task for <c>TaskViewDialog</c>. Distinguishes a task that genuinely
+/// does not exist (or that the caller can no longer access — 404/403) from a recoverable/transient
+/// load failure (network error, timeout, 5xx), so the dialog can offer a retry for the latter
+/// rather than presenting every failure as "task not found".
+/// </summary>
+public enum TaskLoadStatus
+{
+    Loaded,
+    NotFound,
+    Failed
+}
+
+public sealed record TaskFetchResult(TaskLoadStatus Status, TaskDetailModel? Task)
+{
+    public static TaskFetchResult Loaded(TaskDetailModel task) => new(TaskLoadStatus.Loaded, task);
+    public static readonly TaskFetchResult NotFound = new(TaskLoadStatus.NotFound, null);
+    public static readonly TaskFetchResult Failed = new(TaskLoadStatus.Failed, null);
+}
+
 public sealed record TaskListResponse(
     IReadOnlyList<TaskListItem> Items,
     int TotalCount = 0,

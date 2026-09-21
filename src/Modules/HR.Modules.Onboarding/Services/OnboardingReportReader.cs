@@ -59,7 +59,8 @@ internal sealed class OnboardingReportReader(OnboardingDbContext dbContext) : IO
                     t.Title,
                     t.DueDate,
                     t.AssignTo.ToString(),
-                    t.DueDate is not null && t.DueDate < today))
+                    t.DueDate is not null && t.DueDate < today,
+                    t.Id))
                 .ToList();
 
             results.Add(new OnboardingReportItem(

@@ -3,6 +3,7 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Features.ApproveProfilePhoto;
 using HR.Modules.Documents.Persistence;
+using HR.Modules.Documents.Services;
 using HR.Modules.Documents.Tests.Infrastructure;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -26,8 +27,8 @@ public class ApproveProfilePhotoHandlerTests
         var taskCompleter = new FakeTaskCompleter();
         var notifications = new FakeNotificationWriter();
         var audit         = new FakeAuditPublisher();
-        var handler = new ApproveProfilePhotoHandler(
-            db, storage, taskCompleter, notifications, new FakeClock(FixedUtcNow), audit);
+        var reviewer = new ProfilePhotoReviewer(db, storage, new FakeClock(FixedUtcNow), audit, notifications);
+        var handler = new ApproveProfilePhotoHandler(reviewer, taskCompleter);
         return (handler, storage, taskCompleter, notifications, audit);
     }
 

@@ -77,12 +77,12 @@ internal sealed class LeavePendingApprovalsWorkloadActionProvider(
         var taskIdsByRequest = await taskReader.GetOpenTaskIdsAsync(
             companyId, pending.Select(p => p.Id), cancellationToken, TaskActionType.Approve);
 
-        // No dedicated leave-approval screen exists yet in HR.Web, so the deep link routes to the
-        // employee's profile page, which is where a Manager/HR user actions leave requests today —
-        // documented interpretation, see OBT-721 ticket note on providers without a clean existing
-        // "real screen" to link to. DueDate is the leave's own StartDate: an approval is only truly
-        // useful before the leave period begins, so that is the meaningful "due by" date for this
-        // action, not the request's submission date.
+        // This category is entirely task-backed: a pending leave request is actioned via its
+        // approval Task, opened in the Task View dialog (LeaveTaskPanel). No employee-profile deep
+        // link is offered as a fallback — when the task cannot be resolved, DeepLinkUrl stays blank
+        // so the dashboard shows an explicit "no longer available" state instead. DueDate is the
+        // leave's own StartDate: an approval is only truly useful before the leave period begins,
+        // so that is the meaningful "due by" date for this action, not the request's submission date.
         return pending.Select(p =>
         {
             departments.TryGetValue(p.EmployeeId, out var dept);
@@ -97,7 +97,7 @@ internal sealed class LeavePendingApprovalsWorkloadActionProvider(
                 DueDate: p.StartDate,
                 AssignedTo: null,
                 Status: "Pending",
-                DeepLinkUrl: $"/companies/{companyId}/employees/{p.EmployeeId}/view",
+                DeepLinkUrl: "",
                 TaskId: taskId);
         }).ToList();
     }

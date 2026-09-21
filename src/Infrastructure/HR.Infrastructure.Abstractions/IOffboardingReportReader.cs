@@ -24,4 +24,10 @@ public sealed record OffboardingReportItem(
     // for this plan, OR that task's Status is Completed. This is the closest existing signal to
     // "documents returned" — Offboarding has no dedicated document-return domain concept; the
     // auto-generated HR review task is what StartOffboarding creates for this purpose.
-    bool DocumentsReturned);
+    bool DocumentsReturned,
+    // The OffboardingTask's own id, parallel to OutstandingTaskTitles (same order/length), so
+    // consumers such as OutstandingOffboardingTasksWorkloadActionProvider can resolve the exact
+    // linked Task via IOpenTaskBySourceEntityReader without matching on title/employee. Nullable
+    // (rather than defaulting to an empty list) so existing named-argument test construction
+    // sites that predate this field remain source-compatible; treat null as "no ids supplied".
+    IReadOnlyList<Guid>? OutstandingTaskIds = null);

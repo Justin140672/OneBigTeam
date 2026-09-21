@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using HR.Modules.Employees.Contracts;
+using HR.Modules.Tasks.Contracts;
 using HR.Infrastructure.Abstractions;
 using Microsoft.AspNetCore.Authorization;
 
@@ -18,6 +19,7 @@ internal sealed class OutstandingOnboardingTasksWorkloadActionProvider(
     IDirectReportsReader directReportsReader,
     IEmployeeDepartmentReader employeeDepartmentReader,
     IAuthorizationService authorizationService,
+    IOpenTaskBySourceEntityReader taskReader,
     HR.SharedKernel.ICurrentUser currentUser) : IWorkloadActionProvider
 {
     public string ActionCategory => "Outstanding Onboarding Tasks";
@@ -60,6 +62,15 @@ internal sealed class OutstandingOnboardingTasksWorkloadActionProvider(
         var allEmployeeIds = items.Select(i => i.EmployeeId).ToHashSet();
         var departments = await employeeDepartmentReader.GetDepartmentsAsync(companyId, allEmployeeIds, cancellationToken);
 
+        // Each outstanding onboarding task is actioned via its own Task
+        // (TaskActionType.Complete, keyed by the OnboardingTask id as SourceEntityId — see
+        // CompleteOnboardingTaskFromTaskAction/OnboardingModule.cs). Resolve the exact linked task
+        // id per onboarding task rather than matching by title/employee, so a dashboard row opens
+        // the correct Task View entry even when an employee has multiple tasks with the same title.
+        var allTaskIds = items.SelectMany(i => i.OutstandingTasks.Select(t => t.TaskId)).ToList();
+        var openTaskIds = await taskReader.GetOpenTaskIdsAsync(
+            companyId, allTaskIds, cancellationToken, TaskActionType.Complete);
+
         var actions = new List<WorkloadAction>();
         foreach (var item in items)
         {
@@ -67,6 +78,8 @@ internal sealed class OutstandingOnboardingTasksWorkloadActionProvider(
 
             foreach (var task in item.OutstandingTasks)
             {
+                var linkedTaskId = openTaskIds.TryGetValue(task.TaskId, out var tid) ? tid : (Guid?)null;
+
                 actions.Add(new WorkloadAction(
                     EmployeeId: item.EmployeeId,
                     EmployeeName: dept?.EmployeeName ?? item.EmployeeId.ToString(),
@@ -76,7 +89,12 @@ internal sealed class OutstandingOnboardingTasksWorkloadActionProvider(
                     DueDate: task.DueDate,
                     AssignedTo: task.Owner,
                     Status: task.IsOverdue ? "Overdue" : "Outstanding",
-                    DeepLinkUrl: $"/companies/{companyId}/employees/{item.EmployeeId}/view"));
+                    // No employee-profile fallback: this category is entirely task-backed. When
+                    // TaskId resolves, AttentionQueuePanel opens the Task View dialog; when it
+                    // cannot be resolved, DeepLinkUrl stays blank so the dashboard shows an
+                    // explicit "no longer available" state instead of opening the employee profile.
+                    DeepLinkUrl: "",
+                    TaskId: linkedTaskId));
             }
         }
 

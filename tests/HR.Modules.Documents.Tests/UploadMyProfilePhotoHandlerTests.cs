@@ -309,6 +309,57 @@ public class UploadMyProfilePhotoHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Creates_Task_With_Deterministic_IdempotencyKey_Derived_From_Pending_Photo_Id()
+    {
+        // Defect fix: re-uploading a replacement photo while a review is still pending (same
+        // PendingProfilePhoto.Id via PendingProfilePhoto.Replace) must not create a second open
+        // review task — CreateAsync is passed a deterministic idempotency key keyed on the pending
+        // photo's Id so the second upload is a no-op for task creation.
+        await using var db      = BuildContext();
+        var companyId           = Guid.NewGuid();
+        var employeeId          = Guid.NewGuid();
+        var taskCreator         = new FakeTaskCreator();
+        var handler             = BuildHandler(db, taskCreator: taskCreator);
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId),
+            employeeId,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var task = Assert.Single(taskCreator.Created);
+        Assert.NotNull(task.IdempotencyKey);
+        Assert.Equal($"ProfilePhotoReview:{result.Value!.Id}", task.IdempotencyKey);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ReUpload_While_Pending_Uses_Same_IdempotencyKey_As_First_Upload()
+    {
+        await using var db      = BuildContext();
+        var companyId           = Guid.NewGuid();
+        var employeeId          = Guid.NewGuid();
+        var taskCreator         = new FakeTaskCreator();
+        var handler             = BuildHandler(db, taskCreator: taskCreator);
+
+        var firstResult = await handler.HandleAsync(
+            BuildRequest(companyId, FakePngFile("first.png")),
+            employeeId,
+            CancellationToken.None);
+        Assert.True(firstResult.IsSuccess);
+
+        var secondResult = await handler.HandleAsync(
+            BuildRequest(companyId, FakePngFile("second.png")),
+            employeeId,
+            CancellationToken.None);
+        Assert.True(secondResult.IsSuccess);
+
+        Assert.Equal(2, taskCreator.Created.Count);
+        Assert.Equal(taskCreator.Created[0].IdempotencyKey, taskCreator.Created[1].IdempotencyKey);
+        Assert.Equal($"ProfilePhotoReview:{firstResult.Value!.Id}", taskCreator.Created[0].IdempotencyKey);
+    }
+
+    [Fact]
     public async Task HandleAsync_Does_Not_Create_Task_When_Validation_Fails()
     {
         await using var db  = BuildContext();

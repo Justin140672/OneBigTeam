@@ -41,6 +41,10 @@ internal sealed class RetryPlatformAdministratorProvisioningHandler(
             return Result.Failure<RetryPlatformAdministratorProvisioningResponse>(
                 Error.Conflict("This administrator invitation has been cancelled. Re-enable the account before retrying."));
 
+        // Defensive only — unreachable via the public PlatformAdministrator domain API (Create()
+        // only ever produces Active rows with a null correlation id; BeginProvisioning() always
+        // sets the correlation id together with a Pending* status), so this branch has no
+        // corresponding unit test.
         if (administrator.ProvisioningCorrelationId is not { } correlationId)
             return Result.Failure<RetryPlatformAdministratorProvisioningResponse>(
                 Error.Conflict("This administrator record predates the provisioning workflow and cannot be retried automatically."));

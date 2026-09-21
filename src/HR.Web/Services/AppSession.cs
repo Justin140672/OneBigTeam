@@ -3,10 +3,12 @@ using HR.Modules.Companies.Contracts;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using HR.Web.Models;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
 
 namespace HR.Web.Services;
 
-public sealed class AppSession(HrApiHttpClientFactory httpClientFactory, EmployeeService employeeService, SicknessCategoryService sicknessCategoryService, CompanyOnboardingService companyOnboardingService, SubscriptionService subscriptionService, CircuitSessionState sessionState)
+public sealed class AppSession(HrApiHttpClientFactory httpClientFactory, EmployeeService employeeService, SicknessCategoryService sicknessCategoryService, CompanyOnboardingService companyOnboardingService, SubscriptionService subscriptionService, CircuitSessionState sessionState, AuthenticationStateProvider authStateProvider, NavigationManager navigationManager)
 {
     private HttpClient Http => httpClientFactory.CreateClient();
 
@@ -190,8 +192,70 @@ public sealed class AppSession(HrApiHttpClientFactory httpClientFactory, Employe
     // cache was built for is no longer the circuit's current (or has been invalidated).
     private string? _loadedForToken;
 
+    // AppSessionAuthStateProvider.ApplyState is authoritative for the circuit's CURRENT auth state
+    // and correctly clears CircuitSessionState (see that type) on a reconnect that arrives without a
+    // valid session cookie — but MainLayout.OnInitializedAsync (the only caller of InitialiseAsync)
+    // runs exactly once per circuit, not on every reconnect, so nothing was ever re-checking this
+    // cache's staleness against CircuitSessionState after that first load. The result: MainLayout
+    // kept rendering the previous user's cached DisplayName/DisplayName-derived UI (top bar, sidebar)
+    // even though the underlying bearer token had already been cleared — a stale-identity display bug
+    // (see CircuitReconnectAfterCookieRemovalTests), and the inevitable follow-on "Your session has
+    // expired" failures once a page tried to actually use the now-tokenless circuit. Subscribing
+    // directly to AuthenticationStateProvider.AuthenticationStateChanged (raised by ApplyState's own
+    // NotifyAuthenticationStateChanged call) means this cache hears about a reconnect-to-anonymous
+    // transition immediately, regardless of whether any component's lifecycle method runs again.
+    private bool _authChangeSubscribed;
+
+    private void EnsureSubscribedToAuthChanges()
+    {
+        if (_authChangeSubscribed) return;
+        _authChangeSubscribed = true;
+        authStateProvider.AuthenticationStateChanged += OnAuthenticationStateChanged;
+    }
+
+    private void OnAuthenticationStateChanged(Task<AuthenticationState> task) => _ = HandleAuthenticationStateChangedAsync(task);
+
+    private async Task HandleAuthenticationStateChangedAsync(Task<AuthenticationState> task)
+    {
+        AuthenticationState state;
+        try
+        {
+            state = await task;
+        }
+        catch
+        {
+            return;
+        }
+
+        // Only react to a transition INTO anonymous on a circuit that was previously loaded — an
+        // anonymous notification before this session ever loaded (e.g. the initial seed on a fresh
+        // circuit) is not a stale-identity condition and must not trigger a redirect loop on /login
+        // itself (which uses a different layout and never calls InitialiseAsync in the first place,
+        // but defend here too since this subscription is intentionally circuit-lifetime-long).
+        if (state.User.Identity?.IsAuthenticated == true) return;
+        if (!IsLoaded) return;
+
+        IsLoaded = false;
+        _inFlight = null;
+        UserId = default;
+        CompanyId = default;
+        Email = null;
+        PermissionIds = [];
+        EmployeeId = null;
+        FirstName = null;
+        LastName = null;
+        JobTitle = null;
+        ProfileImageUrl = null;
+        RequiresInitialEmployeeSetup = false;
+
+        Changed?.Invoke();
+        navigationManager.NavigateTo("/login", forceLoad: true);
+    }
+
     public async Task InitialiseAsync()
     {
+        EnsureSubscribedToAuthChanges();
+
         if (IsLoaded)
         {
             if (sessionState.Status == CircuitAuthStatus.Invalidated || sessionState.AccessToken != _loadedForToken)

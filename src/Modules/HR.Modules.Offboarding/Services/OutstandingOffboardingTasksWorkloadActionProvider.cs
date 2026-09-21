@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using HR.Modules.Employees.Contracts;
+using HR.Modules.Tasks.Contracts;
 using HR.Infrastructure.Abstractions;
 using Microsoft.AspNetCore.Authorization;
 
@@ -14,7 +15,8 @@ namespace HR.Modules.Offboarding.Services;
 internal sealed class OutstandingOffboardingTasksWorkloadActionProvider(
     IOffboardingReportReader offboardingReportReader,
     IEmployeeDepartmentReader employeeDepartmentReader,
-    IAuthorizationService authorizationService) : IWorkloadActionProvider
+    IAuthorizationService authorizationService,
+    IOpenTaskBySourceEntityReader taskReader) : IWorkloadActionProvider
 {
     public string ActionCategory => "Outstanding Offboarding Tasks";
 
@@ -36,6 +38,14 @@ internal sealed class OutstandingOffboardingTasksWorkloadActionProvider(
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
 
+        // Each outstanding offboarding task is actioned via its own Task (TaskActionType.Complete,
+        // keyed by the OffboardingTask id as SourceEntityId — see
+        // CompleteOffboardingTaskFromTaskAction/OffboardingTaskSynchronizer.cs). Resolve the exact
+        // linked task per offboarding task rather than matching by title/employee.
+        var allTaskIds = items.SelectMany(i => i.OutstandingTaskIds ?? []).ToList();
+        var openTaskIds = await taskReader.GetOpenTaskIdsAsync(
+            companyId, allTaskIds, cancellationToken, TaskActionType.Complete);
+
         var actions = new List<WorkloadAction>();
         foreach (var item in items)
         {
@@ -44,8 +54,14 @@ internal sealed class OutstandingOffboardingTasksWorkloadActionProvider(
 
             departments.TryGetValue(item.EmployeeId, out var dept);
 
-            foreach (var title in item.OutstandingTaskTitles)
+            for (var i = 0; i < item.OutstandingTaskTitles.Count; i++)
             {
+                var title = item.OutstandingTaskTitles[i];
+                var sourceTaskId = item.OutstandingTaskIds is { } ids && i < ids.Count ? ids[i] : (Guid?)null;
+                var linkedTaskId = sourceTaskId is not null && openTaskIds.TryGetValue(sourceTaskId.Value, out var tid)
+                    ? tid
+                    : (Guid?)null;
+
                 actions.Add(new WorkloadAction(
                     EmployeeId: item.EmployeeId,
                     EmployeeName: dept?.EmployeeName ?? item.EmployeeId.ToString(),
@@ -55,7 +71,10 @@ internal sealed class OutstandingOffboardingTasksWorkloadActionProvider(
                     DueDate: item.LastWorkingDay,
                     AssignedTo: null,
                     Status: item.LastWorkingDay < today ? "Overdue" : "Outstanding",
-                    DeepLinkUrl: $"/companies/{companyId}/employees/{item.EmployeeId}/view"));
+                    // No employee-profile fallback: this category is entirely task-backed. See
+                    // OutstandingOnboardingTasksWorkloadActionProvider for the same pattern.
+                    DeepLinkUrl: "",
+                    TaskId: linkedTaskId));
             }
         }
 
