@@ -50,7 +50,7 @@ public class EmployeeAccountsAwaitingDisablementWorkloadActionProviderTests
         var provider = new EmployeeAccountsAwaitingDisablementWorkloadActionProvider(
             context, offboardingReader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(companyId, AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal(employeeId, action.EmployeeId);
@@ -73,7 +73,7 @@ public class EmployeeAccountsAwaitingDisablementWorkloadActionProviderTests
         var provider = new EmployeeAccountsAwaitingDisablementWorkloadActionProvider(
             context, offboardingReader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService());
 
-        var result = await provider.GetActionsAsync(companyId, AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -97,7 +97,7 @@ public class EmployeeAccountsAwaitingDisablementWorkloadActionProviderTests
         var provider = new EmployeeAccountsAwaitingDisablementWorkloadActionProvider(
             context, offboardingReader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(companyId, AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -121,7 +121,7 @@ public class EmployeeAccountsAwaitingDisablementWorkloadActionProviderTests
         var provider = new EmployeeAccountsAwaitingDisablementWorkloadActionProvider(
             context, offboardingReader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(companyId, AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -144,7 +144,7 @@ public class EmployeeAccountsAwaitingDisablementWorkloadActionProviderTests
         var provider = new EmployeeAccountsAwaitingDisablementWorkloadActionProvider(
             context, offboardingReader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(companyId, AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Disable Account", action.ActionType);
@@ -152,5 +152,27 @@ public class EmployeeAccountsAwaitingDisablementWorkloadActionProviderTests
         Assert.Equal("Access Not Yet Disabled", action.Status);
         Assert.Equal(lastWorkingDay, action.DueDate);
         Assert.Equal($"/companies/{companyId}/user-administration/{employeeId}", action.DeepLinkUrl);
+    }
+
+    [Fact]
+    public async Task HrCaller_Requesting_ManagerScope_Returns_Empty_HrOnly_Category_Never_Leaks_Into_Manager_Workspace()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        context.Users.Add(CreateActiveUser(employeeId));
+        await context.SaveChangesAsync();
+
+        var offboardingReader = new FakeOffboardingReportReader(
+        [
+            BuildOffboardingItem(employeeId, Today.AddDays(-1), "InProgress"),
+        ]);
+
+        var provider = new EmployeeAccountsAwaitingDisablementWorkloadActionProvider(
+            context, offboardingReader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
+
+        var result = await provider.GetActionsAsync(companyId, AnyCaller(), WorkloadScope.Manager, CancellationToken.None);
+
+        Assert.Empty(result);
     }
 }

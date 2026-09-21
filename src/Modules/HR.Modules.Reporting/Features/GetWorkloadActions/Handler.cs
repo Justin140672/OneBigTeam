@@ -2,6 +2,7 @@ using System.Security.Claims;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Reporting.ReportRegistry;
 using HR.SharedKernel;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Modules.Reporting.Features.GetWorkloadActions;
@@ -20,6 +21,7 @@ internal sealed class GetWorkloadActionsHandler(
     IServiceScopeFactory scopeFactory,
     IEmployeeDirectoryReader employeeDirectoryReader,
     IEmployeeRecruiterReader employeeRecruiterReader,
+    Microsoft.AspNetCore.Authorization.IAuthorizationService authorizationService,
     IClock clock)
 {
     public async Task<Result<GetWorkloadActionsResponse>> HandleAsync(
@@ -28,6 +30,14 @@ internal sealed class GetWorkloadActionsHandler(
         CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(clock.UtcNow);
+
+        // This report is a single, non-workspace-tabbed view (unlike the Manager/HR dashboard
+        // summaries), so the requested scope is derived once here from the caller's own HR access
+        // rather than being an explicit caller-chosen workspace — this preserves this endpoint's
+        // pre-existing "HR sees company-wide, Manager sees their team" behaviour while still routing
+        // through the same explicit WorkloadScope contract every provider now honours.
+        var callerIsHr = (await authorizationService.AuthorizeAsync(caller, "reporting:view-hr")).Succeeded;
+        var requestedScope = callerIsHr ? WorkloadScope.Hr : WorkloadScope.Manager;
 
         // Invoked in parallel (OBT-720 perf pass) since this is the highest fan-out endpoint (17
         // providers today, one per outstanding-action category across modules) and each provider is
@@ -49,7 +59,7 @@ internal sealed class GetWorkloadActionsHandler(
         {
             using var scope = scopeFactory.CreateScope();
             var provider = scope.ServiceProvider.GetServices<IWorkloadActionProvider>().ElementAt(index);
-            return await provider.GetActionsAsync(request.CompanyId, caller, cancellationToken);
+            return await provider.GetActionsAsync(request.CompanyId, caller, requestedScope, cancellationToken);
         }));
 
         var allActions = resultsPerProvider.SelectMany(actions => actions).ToList();

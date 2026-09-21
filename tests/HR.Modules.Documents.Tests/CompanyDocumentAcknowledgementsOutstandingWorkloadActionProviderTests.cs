@@ -30,7 +30,7 @@ public class CompanyDocumentAcknowledgementsOutstandingWorkloadActionProviderTes
         var provider = new CompanyDocumentAcknowledgementsOutstandingWorkloadActionProvider(
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Single(result);
     }
@@ -46,7 +46,7 @@ public class CompanyDocumentAcknowledgementsOutstandingWorkloadActionProviderTes
         var provider = new CompanyDocumentAcknowledgementsOutstandingWorkloadActionProvider(
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService());
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -65,7 +65,7 @@ public class CompanyDocumentAcknowledgementsOutstandingWorkloadActionProviderTes
         var provider = new CompanyDocumentAcknowledgementsOutstandingWorkloadActionProvider(
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(companyId, AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Acknowledge \"Code of Conduct\"", action.ActionType);
@@ -73,5 +73,21 @@ public class CompanyDocumentAcknowledgementsOutstandingWorkloadActionProviderTes
         Assert.Equal("Not Acknowledged", action.Status);
         Assert.Null(action.DueDate);
         Assert.Equal($"/companies/{companyId}/shared-documents/{docId}/acknowledgement-progress", action.DeepLinkUrl);
+    }
+
+    [Fact]
+    public async Task HrCaller_Requesting_ManagerScope_Returns_Empty_HrOnly_Category_Never_Leaks_Into_Manager_Workspace()
+    {
+        var reader = new FakeCompanyDocumentAcknowledgementReportReader(
+        [
+            BuildItem(Guid.NewGuid(), "Code of Conduct", Guid.NewGuid(), acknowledged: false),
+        ]);
+
+        var provider = new CompanyDocumentAcknowledgementsOutstandingWorkloadActionProvider(
+            reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
+
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), WorkloadScope.Manager, CancellationToken.None);
+
+        Assert.Empty(result);
     }
 }

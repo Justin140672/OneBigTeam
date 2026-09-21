@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Probation.Domain;
 using HR.Modules.Probation.Persistence;
 using HR.Modules.Probation.Services;
@@ -60,7 +61,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
             new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(callerId),
             new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Hr, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Due", action.Status);
@@ -85,7 +86,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
             new FakeAuthorizationService("reporting:view-probation"), new FakeCurrentUser(callerId),
             new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Manager, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal(directReportId, action.EmployeeId);
@@ -105,7 +106,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
             new FakeAuthorizationService("reporting:view-probation"), new FakeCurrentUser(callerId),
             new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Manager, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -124,7 +125,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
             new FakeAuthorizationService(), new FakeCurrentUser(callerId),
             new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Manager, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -145,7 +146,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
             new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(callerId),
             new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Hr, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Complete ManagerCheckIn Probation Review", action.ActionType);
@@ -171,7 +172,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
             new FakeAuthorizationService("reporting:view-hr"), new FakeCurrentUser(callerId),
             new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Hr, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Overdue", action.Status);
@@ -193,7 +194,7 @@ public class ProbationReviewsDueWorkloadActionProviderTests
             new FakeAuthorizationService("reporting:view-probation"), new FakeCurrentUser(callerId),
             new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Manager, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -212,7 +213,142 @@ public class ProbationReviewsDueWorkloadActionProviderTests
             new FakeAuthorizationService(), new FakeCurrentUser(callerId),
             new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Manager, CancellationToken.None);
+
+        Assert.Empty(result);
+    }
+
+    // ── Dual HR+Manager role regression coverage ────────────────────────────────
+
+    [Fact]
+    public async Task DueProvider_DualHrAndManagerCaller_Requesting_ManagerScope_Sees_Only_TeamScoped_Results()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var directReportId = Guid.NewGuid();
+        var otherEmployeeId = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
+
+        SeedReview(context, companyId, directReportId, Today.AddDays(5));
+        SeedReview(context, companyId, otherEmployeeId, Today.AddDays(5));
+        await context.SaveChangesAsync();
+
+        var provider = new ProbationReviewsDueWorkloadActionProvider(
+            context, new FakeDirectReportsReader([directReportId]), new FakeEmployeeDepartmentReader(),
+            new FakeAuthorizationService("reporting:view-hr", "reporting:view-probation"), new FakeCurrentUser(callerId),
+            new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
+
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Manager, CancellationToken.None);
+
+        var action = Assert.Single(result);
+        Assert.Equal(directReportId, action.EmployeeId);
+    }
+
+    [Fact]
+    public async Task DueProvider_DualHrAndManagerCaller_Requesting_HrScope_Sees_CompanyWide_Results()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var directReportId = Guid.NewGuid();
+        var otherEmployeeId = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
+
+        SeedReview(context, companyId, directReportId, Today.AddDays(5));
+        SeedReview(context, companyId, otherEmployeeId, Today.AddDays(5));
+        await context.SaveChangesAsync();
+
+        var provider = new ProbationReviewsDueWorkloadActionProvider(
+            context, new FakeDirectReportsReader([directReportId]), new FakeEmployeeDepartmentReader(),
+            new FakeAuthorizationService("reporting:view-hr", "reporting:view-probation"), new FakeCurrentUser(callerId),
+            new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
+
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Hr, CancellationToken.None);
+
+        Assert.Equal(2, result.Count);
+    }
+
+    [Fact]
+    public async Task DueProvider_CallerWithoutViewHr_Requesting_HrScope_Returns_Empty()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
+        SeedReview(context, companyId, Guid.NewGuid(), Today.AddDays(5));
+        await context.SaveChangesAsync();
+
+        // Caller only holds the manager-tier policy, not reporting:view-hr.
+        var provider = new ProbationReviewsDueWorkloadActionProvider(
+            context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
+            new FakeAuthorizationService("reporting:view-probation"), new FakeCurrentUser(callerId),
+            new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
+
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Hr, CancellationToken.None);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task OverdueProvider_DualHrAndManagerCaller_Requesting_ManagerScope_Sees_Only_TeamScoped_Results()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var directReportId = Guid.NewGuid();
+        var otherEmployeeId = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
+
+        SeedReview(context, companyId, directReportId, Today.AddDays(-3));
+        SeedReview(context, companyId, otherEmployeeId, Today.AddDays(-3));
+        await context.SaveChangesAsync();
+
+        var provider = new OverdueProbationReviewsWorkloadActionProvider(
+            context, new FakeDirectReportsReader([directReportId]), new FakeEmployeeDepartmentReader(),
+            new FakeAuthorizationService("reporting:view-hr", "reporting:view-probation"), new FakeCurrentUser(callerId),
+            new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
+
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Manager, CancellationToken.None);
+
+        var action = Assert.Single(result);
+        Assert.Equal(directReportId, action.EmployeeId);
+    }
+
+    [Fact]
+    public async Task OverdueProvider_DualHrAndManagerCaller_Requesting_HrScope_Sees_CompanyWide_Results()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var directReportId = Guid.NewGuid();
+        var otherEmployeeId = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
+
+        SeedReview(context, companyId, directReportId, Today.AddDays(-3));
+        SeedReview(context, companyId, otherEmployeeId, Today.AddDays(-3));
+        await context.SaveChangesAsync();
+
+        var provider = new OverdueProbationReviewsWorkloadActionProvider(
+            context, new FakeDirectReportsReader([directReportId]), new FakeEmployeeDepartmentReader(),
+            new FakeAuthorizationService("reporting:view-hr", "reporting:view-probation"), new FakeCurrentUser(callerId),
+            new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
+
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Hr, CancellationToken.None);
+
+        Assert.Equal(2, result.Count);
+    }
+
+    [Fact]
+    public async Task OverdueProvider_CallerWithoutViewHr_Requesting_HrScope_Returns_Empty()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
+        SeedReview(context, companyId, Guid.NewGuid(), Today.AddDays(-3));
+        await context.SaveChangesAsync();
+
+        var provider = new OverdueProbationReviewsWorkloadActionProvider(
+            context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
+            new FakeAuthorizationService("reporting:view-probation"), new FakeCurrentUser(callerId),
+            new FakeOpenTaskBySourceEntityReader(), new FakeClock(Today.ToDateTime(TimeOnly.MinValue)));
+
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Empty(result);
     }

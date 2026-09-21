@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
 using HR.Modules.Identity.Services;
@@ -40,7 +41,7 @@ public class EmployeeAccountsAwaitingInvitationWorkloadActionProviderTests
         var provider = new EmployeeAccountsAwaitingInvitationWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(companyId, AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
         Assert.All(result, a => Assert.Equal("Pending Invitation", a.Status));
@@ -57,7 +58,7 @@ public class EmployeeAccountsAwaitingInvitationWorkloadActionProviderTests
         var provider = new EmployeeAccountsAwaitingInvitationWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService());
 
-        var result = await provider.GetActionsAsync(companyId, AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -80,7 +81,7 @@ public class EmployeeAccountsAwaitingInvitationWorkloadActionProviderTests
         var provider = new EmployeeAccountsAwaitingInvitationWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(companyId, AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -105,7 +106,7 @@ public class EmployeeAccountsAwaitingInvitationWorkloadActionProviderTests
         var provider = new EmployeeAccountsAwaitingInvitationWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(companyId, AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
         var expiredAction = Assert.Single(result, a => a.EmployeeId == expiredEmployeeId);
@@ -129,10 +130,26 @@ public class EmployeeAccountsAwaitingInvitationWorkloadActionProviderTests
         var provider = new EmployeeAccountsAwaitingInvitationWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(companyId, AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Employee Accounts Awaiting Invitation", action.ActionCategory);
         Assert.Equal($"/companies/{companyId}/user-administration/{employeeId}", action.DeepLinkUrl);
+    }
+
+    [Fact]
+    public async Task HrCaller_Requesting_ManagerScope_Returns_Empty_HrOnly_Category_Never_Leaks_Into_Manager_Workspace()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        context.UserInvites.Add(UserInvite.Create(Guid.NewGuid(), companyId, "a@example.com", DateTimeOffset.UtcNow));
+        await context.SaveChangesAsync();
+
+        var provider = new EmployeeAccountsAwaitingInvitationWorkloadActionProvider(
+            context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
+
+        var result = await provider.GetActionsAsync(companyId, AnyCaller(), WorkloadScope.Manager, CancellationToken.None);
+
+        Assert.Empty(result);
     }
 }

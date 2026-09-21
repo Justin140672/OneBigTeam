@@ -19,6 +19,33 @@ namespace HR.Infrastructure.Abstractions;
 /// returns company-wide data to a non-HR caller is a direct tenant-isolation/authorization bug in
 /// that provider, not something the aggregator can catch after the fact.
 /// </summary>
+/// <summary>
+/// Explicit workspace the caller is currently viewing. Introduced to fix a role-bleed bug where a
+/// user holding BOTH the HR and Manager roles saw HR-only, company-wide data on their Manager
+/// dashboard/attention queue: providers used to re-derive "am I HR" from the caller alone, so an
+/// HR+Manager caller always got the HR (company-wide) branch, even when the request came in through
+/// the Manager-scoped route. The caller of <see cref="IWorkloadActionProvider.GetActionsAsync"/> now
+/// states which workspace it is composing for; providers must honour that explicitly rather than
+/// re-inferring it, and must still re-verify the caller is actually authorized for that workspace
+/// (a requested workspace must never grant access the caller doesn't otherwise have).
+/// </summary>
+public enum WorkloadScope
+{
+    /// <summary>
+    /// The caller's Manager workspace: only items assigned via manager responsibility or visible
+    /// under the caller's own reporting sub-tree (direct/indirect reports). Never company-wide, even
+    /// when the caller also holds an HR role.
+    /// </summary>
+    Manager,
+
+    /// <summary>
+    /// The caller's HR workspace: HR queue items and company-wide data visible under HR rules.
+    /// Requires the caller to hold HR access; providers must return an empty list rather than
+    /// company-wide data for a caller who lacks it, regardless of this requested scope.
+    /// </summary>
+    Hr
+}
+
 public interface IWorkloadActionProvider
 {
     /// <summary>
@@ -30,19 +57,27 @@ public interface IWorkloadActionProvider
 
     /// <summary>
     /// Returns the outstanding actions in this category that <paramref name="caller"/> is allowed
-    /// to see for <paramref name="companyId"/>. Implementations must:
+    /// to see for <paramref name="companyId"/> within the explicitly requested
+    /// <paramref name="requestedScope"/> workspace. Implementations must:
     /// 1. Resolve the caller's roles/employee id from <paramref name="caller"/> (via
     ///    IAuthorizationService policy checks and the "sub" claim, same pattern used by
     ///    GetProbationReport/Endpoint.cs) — never trust anything client-supplied.
-    /// 2. Apply their own row-level scoping (HR-only, manager-scoped to direct reports,
-    ///    recruitment-scoped, or self-scoped) before returning anything.
-    /// 3. Return an empty list rather than throwing when the caller has no matching role/scope —
+    /// 2. Apply <paramref name="requestedScope"/>'s inclusion rules (HR-only/company-wide items only
+    ///    for <see cref="WorkloadScope.Hr"/>; manager-assignment/reporting-sub-tree items only for
+    ///    <see cref="WorkloadScope.Manager"/>) — never widen scope based on the caller ALSO holding a
+    ///    different role. A caller with both HR and Manager roles requesting
+    ///    <see cref="WorkloadScope.Manager"/> must still only see their own team's items.
+    /// 3. Re-verify the caller is actually authorized for the requested scope (e.g. HR scope
+    ///    requires the caller to hold reporting:view-hr) — a requested scope is a display-routing
+    ///    signal only, never an authorization escalation path.
+    /// 4. Return an empty list rather than throwing when the caller has no matching role/scope —
     ///    a 403 for the whole report is the aggregation endpoint's job (baseline reporting:view
     ///    policy), not an individual provider's.
     /// </summary>
     Task<IReadOnlyList<WorkloadAction>> GetActionsAsync(
         Guid companyId,
         ClaimsPrincipal caller,
+        WorkloadScope requestedScope,
         CancellationToken cancellationToken);
 }
 

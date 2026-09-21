@@ -4,6 +4,7 @@ using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Identity.Domain;
+using HR.Modules.Identity.Persistence;
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Persistence;
 using HR.Modules.Tasks.Contracts;
@@ -151,6 +152,57 @@ public class GetManagerDashboardSummaryEndpointTests
         Assert.Equal(2, leave.ActionableCount);
     }
 
+    [Fact]
+    public async Task Get_ManagerDashboardSummary_DualRole_Caller_Sees_Only_TeamScoped_Items_Not_HrOnly_Or_OutOfHierarchy_Items()
+    {
+        // Regression test for the reported bug: a user holding BOTH HR and Manager roles must see
+        // only their own reporting sub-tree on the Manager dashboard — never HR's company-wide data,
+        // and never another employee's overdue task outside their hierarchy.
+        var companyId = Guid.NewGuid();
+
+        var dualRoleUserId = await SeedEmployeeAsync(companyId, "Dana", "DualRole");
+        var directReportId = await SeedEmployeeAsync(companyId, "Devon", "Report");
+        var outOfHierarchyEmployeeId = await SeedEmployeeAsync(companyId, "Ola", "Outside");
+        var awaitingInvitationEmployeeId = await SeedEmployeeAsync(companyId, "Ines", "Invitee");
+
+        using var hrBootstrapClient = await ClientFor(companyId, Guid.NewGuid(), SystemRoles.HrAdministrator);
+        await AssignManagerAsync(hrBootstrapClient, companyId, directReportId, dualRoleUserId);
+        // outOfHierarchyEmployeeId is deliberately left unassigned — outside the caller's reporting sub-tree.
+
+        await SeedOverdueTaskAsync(companyId, directReportId, Today.AddDays(-1));
+        await SeedOverdueTaskAsync(companyId, outOfHierarchyEmployeeId, Today.AddDays(-1));
+        await SeedPendingInvitationAsync(companyId, awaitingInvitationEmployeeId);
+
+        using var dualRoleClient = await ClientFor(
+            companyId, dualRoleUserId, SystemRoles.Manager, SystemRoles.HrAdministrator);
+
+        var managerPayload = await dualRoleClient.GetFromJsonAsync<SummaryPayload>(Url(companyId));
+
+        Assert.NotNull(managerPayload);
+        var managerTasks = managerPayload!.Categories.Single(c => c.Category == "Manager Tasks Overdue");
+        var managerTaskEmployeeIds = managerTasks.Items.Select(i => i.EmployeeId).ToList();
+        Assert.Contains(directReportId, managerTaskEmployeeIds);
+        Assert.DoesNotContain(outOfHierarchyEmployeeId, managerTaskEmployeeIds);
+        Assert.Equal(1, managerTasks.ActionableCount);
+
+        var hrOnlyCategory = managerPayload.Categories.SingleOrDefault(c => c.Category == "Employee Accounts Awaiting Invitation");
+        Assert.True(hrOnlyCategory is null || hrOnlyCategory.ActionableCount == 0);
+
+        var hrPayload = await dualRoleClient.GetFromJsonAsync<SummaryPayload>(
+            $"/api/companies/{companyId}/dashboards/hr/summary");
+
+        Assert.NotNull(hrPayload);
+        var hrManagerTasks = hrPayload!.Categories.Single(c => c.Category == "Manager Tasks Overdue");
+        var hrManagerTaskEmployeeIds = hrManagerTasks.Items.Select(i => i.EmployeeId).ToList();
+        Assert.Contains(directReportId, hrManagerTaskEmployeeIds);
+        Assert.Contains(outOfHierarchyEmployeeId, hrManagerTaskEmployeeIds);
+        Assert.Equal(2, hrManagerTasks.ActionableCount);
+
+        var hrInvitations = hrPayload.Categories.Single(c => c.Category == "Employee Accounts Awaiting Invitation");
+        Assert.Contains(hrInvitations.Items, i => i.EmployeeId == awaitingInvitationEmployeeId);
+        Assert.Equal(1, hrInvitations.ActionableCount);
+    }
+
     // ── Seeding helpers ──────────────────────────────────────────────────────
 
     private async Task<Guid> SeedEmployeeAsync(Guid companyId, string firstName, string lastName)
@@ -185,6 +237,25 @@ public class GetManagerDashboardSummaryEndpointTests
             Guid.NewGuid(), companyId, employeeId, Guid.NewGuid(), Guid.NewGuid(),
             startDate, LeaveDayPart.FullDay, startDate.AddDays(3), LeaveDayPart.FullDay,
             3m, "Trip", Now));
+        await db.SaveChangesAsync();
+    }
+
+    private async Task SeedOverdueTaskAsync(Guid companyId, Guid assignedEmployeeId, DateOnly dueDate)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
+        db.TaskItems.Add(TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(), "Complete document check", null,
+            TaskPriority.Medium, TaskSource.Workflow, TaskActionType.Complete, dueDate,
+            assignedEmployeeId, null, Now));
+        await db.SaveChangesAsync();
+    }
+
+    private async Task SeedPendingInvitationAsync(Guid companyId, Guid employeeId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        db.UserInvites.Add(UserInvite.Create(employeeId, companyId, $"{employeeId:N}@example.com", Now));
         await db.SaveChangesAsync();
     }
 

@@ -47,7 +47,7 @@ public class UpcomingEmployeeLeavingDatesWorkloadActionProviderTests
         var provider = new UpcomingEmployeeLeavingDatesWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(companyId, new(new ClaimsIdentity()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, new(new ClaimsIdentity()), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
     }
@@ -63,7 +63,7 @@ public class UpcomingEmployeeLeavingDatesWorkloadActionProviderTests
         var provider = new UpcomingEmployeeLeavingDatesWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService());
 
-        var result = await provider.GetActionsAsync(companyId, new(new ClaimsIdentity()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, new(new ClaimsIdentity()), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -85,7 +85,7 @@ public class UpcomingEmployeeLeavingDatesWorkloadActionProviderTests
         var provider = new UpcomingEmployeeLeavingDatesWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(companyId, new(new ClaimsIdentity()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, new(new ClaimsIdentity()), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -103,7 +103,7 @@ public class UpcomingEmployeeLeavingDatesWorkloadActionProviderTests
         var provider = new UpcomingEmployeeLeavingDatesWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(companyId, new(new ClaimsIdentity()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, new(new ClaimsIdentity()), WorkloadScope.Hr, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Prepare for Employee Departure", action.ActionType);
@@ -111,5 +111,21 @@ public class UpcomingEmployeeLeavingDatesWorkloadActionProviderTests
         Assert.Equal("Upcoming", action.Status);
         Assert.Equal(lastWorkingDay, action.DueDate);
         Assert.Equal($"/companies/{companyId}/employees/{employeeId}/view", action.DeepLinkUrl);
+    }
+
+    [Fact]
+    public async Task HrCaller_Requesting_ManagerScope_Returns_Empty_HrOnly_Category_Never_Leaks_Into_Manager_Workspace()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        context.EmployeeLeavingProcesses.Add(CreateLeavingProcess(companyId, Guid.NewGuid(), Today.AddDays(5)));
+        await context.SaveChangesAsync();
+
+        var provider = new UpcomingEmployeeLeavingDatesWorkloadActionProvider(
+            context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
+
+        var result = await provider.GetActionsAsync(companyId, new(new ClaimsIdentity()), WorkloadScope.Manager, CancellationToken.None);
+
+        Assert.Empty(result);
     }
 }

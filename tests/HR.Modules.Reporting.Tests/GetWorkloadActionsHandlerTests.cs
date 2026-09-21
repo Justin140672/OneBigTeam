@@ -32,11 +32,13 @@ public class GetWorkloadActionsHandlerTests
     // results so the handler's default (no manager/location/recruiter filter applied) behaviour is
     // unaffected.
     private static GetWorkloadActionsHandler MakeHandler(
-        IEnumerable<IWorkloadActionProvider> providers, HR.SharedKernel.IClock clock) =>
+        IEnumerable<IWorkloadActionProvider> providers, HR.SharedKernel.IClock clock,
+        Microsoft.AspNetCore.Authorization.IAuthorizationService? authorizationService = null) =>
         new(
             new FakeServiceScopeFactory([.. providers]),
             new FakeEmployeeDirectoryReader([]),
             new FakeEmployeeRecruiterReader(),
+            authorizationService ?? new FakeAuthorizationService("reporting:view-hr"),
             clock);
 
     [Fact]
@@ -229,7 +231,7 @@ public class GetWorkloadActionsHandlerTests
 
         var directoryReader = new FakeEmployeeDirectoryReader([DirectoryItem(matchingEmployeeId)]);
         var handler = new GetWorkloadActionsHandler(
-            new FakeServiceScopeFactory([provider]), directoryReader, new FakeEmployeeRecruiterReader(), new FakeClock(FixedUtcNow));
+            new FakeServiceScopeFactory([provider]), directoryReader, new FakeEmployeeRecruiterReader(), new FakeAuthorizationService("reporting:view-hr"), new FakeClock(FixedUtcNow));
 
         var managerId = Guid.NewGuid();
         var result = await handler.HandleAsync(
@@ -251,7 +253,7 @@ public class GetWorkloadActionsHandlerTests
 
         var directoryReader = new FakeEmployeeDirectoryReader([DirectoryItem(matchingEmployeeId)]);
         var handler = new GetWorkloadActionsHandler(
-            new FakeServiceScopeFactory([provider]), directoryReader, new FakeEmployeeRecruiterReader(), new FakeClock(FixedUtcNow));
+            new FakeServiceScopeFactory([provider]), directoryReader, new FakeEmployeeRecruiterReader(), new FakeAuthorizationService("reporting:view-hr"), new FakeClock(FixedUtcNow));
 
         var locationId = Guid.NewGuid();
         var result = await handler.HandleAsync(
@@ -280,7 +282,7 @@ public class GetWorkloadActionsHandlerTests
             },
         };
         var handler = new GetWorkloadActionsHandler(
-            new FakeServiceScopeFactory([provider]), new FakeEmployeeDirectoryReader([]), recruiterReader, new FakeClock(FixedUtcNow));
+            new FakeServiceScopeFactory([provider]), new FakeEmployeeDirectoryReader([]), recruiterReader, new FakeAuthorizationService("reporting:view-hr"), new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(
             new GetWorkloadActionsRequest(Guid.NewGuid(), RecruitmentUser: "jamie"), AnyCaller(), CancellationToken.None);
@@ -308,7 +310,7 @@ public class GetWorkloadActionsHandlerTests
             },
         };
         var handler = new GetWorkloadActionsHandler(
-            new FakeServiceScopeFactory([provider]), directoryReader, recruiterReader, new FakeClock(FixedUtcNow));
+            new FakeServiceScopeFactory([provider]), directoryReader, recruiterReader, new FakeAuthorizationService("reporting:view-hr"), new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(
             new GetWorkloadActionsRequest(Guid.NewGuid(), ManagerId: Guid.NewGuid(), RecruitmentUser: "jamie"),
@@ -388,5 +390,48 @@ public class GetWorkloadActionsHandlerTests
         Assert.Equal(totalActions, summary.TotalOutstanding);
         Assert.Equal(totalActions, summary.Overdue);
         Assert.Equal(ReportLimits.DisplayRowLimit, result.Value.Items.Count);
+    }
+
+    // ── Requested scope derivation (this endpoint is single/non-tabbed, so scope is derived once
+    // from the caller's own HR access rather than being caller-chosen, unlike the Manager/HR
+    // dashboard summary endpoints) ──────────────────────────────────────────────
+
+    [Fact]
+    public async Task HandleAsync_HrCaller_Passes_HrScope_To_Providers()
+    {
+        var recorder = new ScopeRecordingWorkloadActionProvider("Cat");
+        var handler = MakeHandler([recorder], new FakeClock(FixedUtcNow), new FakeAuthorizationService("reporting:view-hr"));
+
+        await handler.HandleAsync(new GetWorkloadActionsRequest(Guid.NewGuid()), AnyCaller(), CancellationToken.None);
+
+        Assert.Equal(WorkloadScope.Hr, recorder.LastRequestedScope);
+    }
+
+    [Fact]
+    public async Task HandleAsync_NonHrCaller_Passes_ManagerScope_To_Providers()
+    {
+        var recorder = new ScopeRecordingWorkloadActionProvider("Cat");
+        var handler = MakeHandler([recorder], new FakeClock(FixedUtcNow), new FakeAuthorizationService());
+
+        await handler.HandleAsync(new GetWorkloadActionsRequest(Guid.NewGuid()), AnyCaller(), CancellationToken.None);
+
+        Assert.Equal(WorkloadScope.Manager, recorder.LastRequestedScope);
+    }
+
+    private sealed class ScopeRecordingWorkloadActionProvider(string actionCategory) : IWorkloadActionProvider
+    {
+        public WorkloadScope? LastRequestedScope { get; private set; }
+
+        public string ActionCategory => actionCategory;
+
+        public Task<IReadOnlyList<WorkloadAction>> GetActionsAsync(
+            Guid companyId,
+            ClaimsPrincipal caller,
+            WorkloadScope requestedScope,
+            CancellationToken cancellationToken)
+        {
+            LastRequestedScope = requestedScope;
+            return Task.FromResult<IReadOnlyList<WorkloadAction>>(Array.Empty<WorkloadAction>());
+        }
     }
 }

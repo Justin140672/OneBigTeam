@@ -29,7 +29,7 @@ public class MissingRequiredEmployeeDocumentsWorkloadActionProviderTests
         var provider = new MissingRequiredEmployeeDocumentsWorkloadActionProvider(
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
         Assert.Contains(result, a => a.ActionType == "Provide Passport");
@@ -47,7 +47,7 @@ public class MissingRequiredEmployeeDocumentsWorkloadActionProviderTests
         var provider = new MissingRequiredEmployeeDocumentsWorkloadActionProvider(
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService());
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -63,7 +63,7 @@ public class MissingRequiredEmployeeDocumentsWorkloadActionProviderTests
         var provider = new MissingRequiredEmployeeDocumentsWorkloadActionProvider(
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -81,12 +81,28 @@ public class MissingRequiredEmployeeDocumentsWorkloadActionProviderTests
         var provider = new MissingRequiredEmployeeDocumentsWorkloadActionProvider(
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(companyId, AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Missing Required Employee Documents", action.ActionCategory);
         Assert.Equal("Missing", action.Status);
         Assert.Null(action.DueDate);
         Assert.Equal($"/companies/{companyId}/employees/{employeeId}?tab=documents", action.DeepLinkUrl);
+    }
+
+    [Fact]
+    public async Task HrCaller_Requesting_ManagerScope_Returns_Empty_HrOnly_Category_Never_Leaks_Into_Manager_Workspace()
+    {
+        var reader = new FakeDocumentComplianceReportReader(
+        [
+            BuildItem(Guid.NewGuid(), 1, "Passport"),
+        ]);
+
+        var provider = new MissingRequiredEmployeeDocumentsWorkloadActionProvider(
+            reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
+
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), WorkloadScope.Manager, CancellationToken.None);
+
+        Assert.Empty(result);
     }
 }

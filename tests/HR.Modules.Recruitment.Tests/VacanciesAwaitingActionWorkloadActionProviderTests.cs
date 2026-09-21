@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Services;
@@ -50,7 +51,7 @@ public class VacanciesAwaitingActionWorkloadActionProviderTests
         var provider = new VacanciesAwaitingActionWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-recruitment"));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), WorkloadScope.Manager, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Awaiting Assignment", action.Status);
@@ -70,7 +71,7 @@ public class VacanciesAwaitingActionWorkloadActionProviderTests
         var provider = new VacanciesAwaitingActionWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), WorkloadScope.Manager, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -90,7 +91,7 @@ public class VacanciesAwaitingActionWorkloadActionProviderTests
         var provider = new VacanciesAwaitingActionWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-recruitment"));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), WorkloadScope.Manager, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Open 30+ Days", action.Status);
@@ -111,11 +112,33 @@ public class VacanciesAwaitingActionWorkloadActionProviderTests
         var provider = new VacanciesAwaitingActionWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-recruitment"));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), WorkloadScope.Manager, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Null(action.DueDate);
         Assert.Equal($"/companies/{companyId}/vacancies/{vacancy.Id}/view", action.DeepLinkUrl);
         Assert.Equal(hiringManagerId, action.EmployeeId);
+    }
+
+    [Fact]
+    public async Task GetActionsAsync_RecruiterCaller_Sees_Same_Results_Regardless_Of_RequestedScope()
+    {
+        // Recruitment scoping is independent of the Manager/HR workspace split — a Recruiter's
+        // items appear identically whichever dashboard requests them.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var hiringManagerId = Guid.NewGuid();
+
+        context.Vacancies.Add(CreateOpenVacancy(companyId, hiringManagerId, DateOnly.FromDateTime(Now.Date)));
+        await context.SaveChangesAsync();
+
+        var provider = new VacanciesAwaitingActionWorkloadActionProvider(
+            context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-recruitment"));
+
+        var managerScopeResult = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), WorkloadScope.Manager, CancellationToken.None);
+        var hrScopeResult = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), WorkloadScope.Hr, CancellationToken.None);
+
+        Assert.Single(managerScopeResult);
+        Assert.Single(hrScopeResult);
     }
 }

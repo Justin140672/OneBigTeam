@@ -16,6 +16,7 @@ internal sealed class FakeWorkloadActionProvider(string actionCategory, params W
     public Task<IReadOnlyList<WorkloadAction>> GetActionsAsync(
         Guid companyId,
         ClaimsPrincipal caller,
+        WorkloadScope requestedScope,
         CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<WorkloadAction>>(actions);
 }

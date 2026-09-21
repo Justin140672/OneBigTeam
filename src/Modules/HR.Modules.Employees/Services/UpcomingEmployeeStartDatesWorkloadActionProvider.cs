@@ -23,8 +23,12 @@ internal sealed class UpcomingEmployeeStartDatesWorkloadActionProvider(
     public async Task<IReadOnlyList<WorkloadAction>> GetActionsAsync(
         Guid companyId,
         ClaimsPrincipal caller,
+        WorkloadScope requestedScope,
         CancellationToken cancellationToken)
     {
+        if (requestedScope != WorkloadScope.Hr)
+            return [];
+
         var callerIsHr = (await authorizationService.AuthorizeAsync(caller, "reporting:view-hr")).Succeeded;
         if (!callerIsHr)
             return [];

@@ -1,5 +1,6 @@
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Services;
 using HR.Modules.Employees.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
@@ -42,7 +43,7 @@ public class UpcomingEmployeeStartDatesWorkloadActionProviderTests
         var provider = new UpcomingEmployeeStartDatesWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(companyId, new(new System.Security.Claims.ClaimsIdentity()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, new(new System.Security.Claims.ClaimsIdentity()), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
     }
@@ -58,7 +59,7 @@ public class UpcomingEmployeeStartDatesWorkloadActionProviderTests
         var provider = new UpcomingEmployeeStartDatesWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService());
 
-        var result = await provider.GetActionsAsync(companyId, new(new System.Security.Claims.ClaimsIdentity()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, new(new System.Security.Claims.ClaimsIdentity()), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -76,7 +77,7 @@ public class UpcomingEmployeeStartDatesWorkloadActionProviderTests
         var provider = new UpcomingEmployeeStartDatesWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(companyId, new(new System.Security.Claims.ClaimsIdentity()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, new(new System.Security.Claims.ClaimsIdentity()), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -94,7 +95,7 @@ public class UpcomingEmployeeStartDatesWorkloadActionProviderTests
         var provider = new UpcomingEmployeeStartDatesWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(companyId, new(new System.Security.Claims.ClaimsIdentity()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, new(new System.Security.Claims.ClaimsIdentity()), WorkloadScope.Hr, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Prepare for New Starter", action.ActionType);
@@ -102,5 +103,21 @@ public class UpcomingEmployeeStartDatesWorkloadActionProviderTests
         Assert.Equal("Upcoming", action.Status);
         Assert.Equal(startDate, action.DueDate);
         Assert.Equal($"/companies/{companyId}/employees/{employee.Id}/view", action.DeepLinkUrl);
+    }
+
+    [Fact]
+    public async Task HrCaller_Requesting_ManagerScope_Returns_Empty_HrOnly_Category_Never_Leaks_Into_Manager_Workspace()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        context.Employees.Add(CreateEmployee(companyId, Today.AddDays(5)));
+        await context.SaveChangesAsync();
+
+        var provider = new UpcomingEmployeeStartDatesWorkloadActionProvider(
+            context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
+
+        var result = await provider.GetActionsAsync(companyId, new(new System.Security.Claims.ClaimsIdentity()), WorkloadScope.Manager, CancellationToken.None);
+
+        Assert.Empty(result);
     }
 }

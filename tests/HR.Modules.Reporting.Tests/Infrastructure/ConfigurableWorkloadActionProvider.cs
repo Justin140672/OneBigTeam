@@ -25,6 +25,7 @@ internal sealed class ConfigurableWorkloadActionProvider : IWorkloadActionProvid
     public Task<IReadOnlyList<WorkloadAction>> GetActionsAsync(
         Guid companyId,
         ClaimsPrincipal caller,
+        WorkloadScope requestedScope,
         CancellationToken cancellationToken) => _behaviour(cancellationToken);
 
     public static ConfigurableWorkloadActionProvider Returning(

@@ -30,7 +30,7 @@ public class AssetsAwaitingReturnWorkloadActionProviderTests
         var provider = new AssetsAwaitingReturnWorkloadActionProvider(
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Return Laptop", action.ActionType);
@@ -47,7 +47,7 @@ public class AssetsAwaitingReturnWorkloadActionProviderTests
         var provider = new AssetsAwaitingReturnWorkloadActionProvider(
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService());
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -66,12 +66,28 @@ public class AssetsAwaitingReturnWorkloadActionProviderTests
         var provider = new AssetsAwaitingReturnWorkloadActionProvider(
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(companyId, AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Assets Awaiting Return", action.ActionCategory);
         Assert.Equal("Assigned - Not Yet Returned", action.Status);
         Assert.Null(action.DueDate);
         Assert.Equal($"/companies/{companyId}/employees/{employeeId}?tab=assets", action.DeepLinkUrl);
+    }
+
+    [Fact]
+    public async Task HrCaller_Requesting_ManagerScope_Returns_Empty_HrOnly_Category_Never_Leaks_Into_Manager_Workspace()
+    {
+        var reader = new FakeAssetAssignmentReportReader(
+        [
+            BuildItem(Guid.NewGuid(), "Laptop", "Assigned"),
+        ]);
+
+        var provider = new AssetsAwaitingReturnWorkloadActionProvider(
+            reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
+
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), WorkloadScope.Manager, CancellationToken.None);
+
+        Assert.Empty(result);
     }
 }

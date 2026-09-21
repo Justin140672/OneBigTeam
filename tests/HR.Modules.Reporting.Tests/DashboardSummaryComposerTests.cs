@@ -53,7 +53,7 @@ public class DashboardSummaryComposerTests
 
     private static Task<DashboardSummaryResponse> Compose(
         DashboardSummaryComposer composer, CancellationToken ct = default) =>
-        composer.ComposeAsync(Guid.NewGuid(), AnyCaller(), ct);
+        composer.ComposeAsync(Guid.NewGuid(), AnyCaller(), WorkloadScope.Manager, ct);
 
     [Fact]
     public async Task ComposeAsync_Merges_Multiple_Providers_Into_Per_Category_Results()
@@ -243,5 +243,42 @@ public class DashboardSummaryComposerTests
         var item = (await Compose(composer)).Categories.Single().Items.Single();
 
         Assert.Equal(taskId, item.TaskId);
+    }
+
+    [Theory]
+    [InlineData(WorkloadScope.Manager)]
+    [InlineData(WorkloadScope.Hr)]
+    public async Task ComposeAsync_Passes_The_Requested_Scope_Through_To_Every_Provider(WorkloadScope requestedScope)
+    {
+        // Regression coverage for the role-bleed fix: the composer must forward whichever scope its
+        // caller (GetManagerDashboardSummaryHandler / GetHrDashboardSummaryHandler) explicitly
+        // requested, never re-derive or default it.
+        var recorder = new ScopeRecordingWorkloadActionProvider(LeaveCategory);
+        var composer = Composer([recorder]);
+
+        await composer.ComposeAsync(Guid.NewGuid(), AnyCaller(), requestedScope, CancellationToken.None);
+
+        Assert.Equal(requestedScope, recorder.LastRequestedScope);
+    }
+
+    /// <summary>
+    /// Minimal fake that records the <see cref="WorkloadScope"/> it was invoked with, so a test can
+    /// assert the composer forwarded the caller-supplied scope unchanged rather than re-deriving it.
+    /// </summary>
+    private sealed class ScopeRecordingWorkloadActionProvider(string actionCategory) : IWorkloadActionProvider
+    {
+        public WorkloadScope? LastRequestedScope { get; private set; }
+
+        public string ActionCategory => actionCategory;
+
+        public Task<IReadOnlyList<WorkloadAction>> GetActionsAsync(
+            Guid companyId,
+            ClaimsPrincipal caller,
+            WorkloadScope requestedScope,
+            CancellationToken cancellationToken)
+        {
+            LastRequestedScope = requestedScope;
+            return Task.FromResult<IReadOnlyList<WorkloadAction>>(Array.Empty<WorkloadAction>());
+        }
     }
 }

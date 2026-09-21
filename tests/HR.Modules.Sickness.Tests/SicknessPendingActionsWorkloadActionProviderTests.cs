@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Sickness.Domain;
 using HR.Modules.Sickness.Persistence;
 using HR.Modules.Sickness.Services;
@@ -55,7 +56,7 @@ public class SicknessPendingActionsWorkloadActionProviderTests
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"),
             new FakeOpenTaskBySourceEntityReader());
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
         Assert.All(result, a => Assert.Equal("Complete Return to Work Review", a.ActionType));
@@ -80,7 +81,7 @@ public class SicknessPendingActionsWorkloadActionProviderTests
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService(),
             new FakeOpenTaskBySourceEntityReader());
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -99,7 +100,29 @@ public class SicknessPendingActionsWorkloadActionProviderTests
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService(),
             new FakeOpenTaskBySourceEntityReader());
 
-        var result = await provider.GetActionsAsync(companyId, new ClaimsPrincipal(new ClaimsIdentity()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, new ClaimsPrincipal(new ClaimsIdentity()), WorkloadScope.Hr, CancellationToken.None);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetActionsAsync_HrCaller_Requesting_ManagerScope_Returns_Empty_HrOnly_Category_Never_Leaks_Into_Manager_Workspace()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var record = CreateRecord(companyId, employeeId, new DateOnly(2026, 7, 1));
+        context.SicknessRecords.Add(record);
+        context.ReturnToWorkReviews.Add(
+            ReturnToWorkReview.Create(Guid.NewGuid(), companyId, record.Id, employeeId, new DateOnly(2026, 7, 10), DateTimeOffset.UtcNow));
+        await context.SaveChangesAsync();
+
+        var provider = new SicknessPendingActionsWorkloadActionProvider(
+            context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"),
+            new FakeOpenTaskBySourceEntityReader());
+
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), WorkloadScope.Manager, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -123,7 +146,7 @@ public class SicknessPendingActionsWorkloadActionProviderTests
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"),
             new FakeOpenTaskBySourceEntityReader());
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), WorkloadScope.Hr, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Follow Up Sickness Evidence Request", action.ActionType);
@@ -163,7 +186,7 @@ public class SicknessPendingActionsWorkloadActionProviderTests
                 [evidenceRequestId] = evidenceTaskId,
             }));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
         Assert.Contains(result, a => a.ActionType == "Complete Return to Work Review" && a.TaskId == reviewTaskId);
@@ -202,7 +225,7 @@ public class SicknessPendingActionsWorkloadActionProviderTests
                 [reviewB.Id] = taskIdB,
             }));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
         Assert.Contains(result, a => a.EmployeeId == employeeA && a.TaskId == taskIdA);

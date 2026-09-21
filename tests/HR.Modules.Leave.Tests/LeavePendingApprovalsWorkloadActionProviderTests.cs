@@ -53,7 +53,7 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
             context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-hr"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
     }
@@ -76,7 +76,7 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
             context, new FakeDirectReportsReader([directReportId]), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService(), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerEmployeeId));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerEmployeeId), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerEmployeeId), WorkloadScope.Manager, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal(directReportId, action.EmployeeId);
@@ -96,7 +96,7 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
             context, new FakeDirectReportsReader([]), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService(), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Manager, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -115,7 +115,7 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
             new FakeAuthorizationService(), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(null));
 
         // No resolved current-user id at all — the caller can't even be resolved to an employee id.
-        var result = await provider.GetActionsAsync(companyId, new ClaimsPrincipal(new ClaimsIdentity()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, new ClaimsPrincipal(new ClaimsIdentity()), WorkloadScope.Manager, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -136,7 +136,7 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
             context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-hr"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Hr, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Approve Leave Request", action.ActionType);
@@ -145,5 +145,71 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
         // No employee-profile fallback: this category is entirely task-backed.
         Assert.Equal("", action.DeepLinkUrl);
         Assert.Equal("Pending", action.Status);
+    }
+
+    [Fact]
+    public async Task GetActionsAsync_DualHrAndManagerCaller_Requesting_ManagerScope_Sees_Only_TeamScoped_Results()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var directReportId = Guid.NewGuid();
+        var otherEmployeeId = Guid.NewGuid();
+        var callerEmployeeId = Guid.NewGuid();
+
+        context.LeaveRequests.AddRange(
+            CreatePendingRequest(companyId, directReportId, new DateOnly(2026, 8, 3)),
+            CreatePendingRequest(companyId, otherEmployeeId, new DateOnly(2026, 8, 10)));
+        await context.SaveChangesAsync();
+
+        var provider = new LeavePendingApprovalsWorkloadActionProvider(
+            context, new FakeDirectReportsReader([directReportId]), new FakeEmployeeDepartmentReader(),
+            new FakeAuthorizationService("reporting:view-hr"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerEmployeeId));
+
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerEmployeeId), WorkloadScope.Manager, CancellationToken.None);
+
+        var action = Assert.Single(result);
+        Assert.Equal(directReportId, action.EmployeeId);
+    }
+
+    [Fact]
+    public async Task GetActionsAsync_DualHrAndManagerCaller_Requesting_HrScope_Sees_CompanyWide_Results()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var directReportId = Guid.NewGuid();
+        var otherEmployeeId = Guid.NewGuid();
+        var callerEmployeeId = Guid.NewGuid();
+
+        context.LeaveRequests.AddRange(
+            CreatePendingRequest(companyId, directReportId, new DateOnly(2026, 8, 3)),
+            CreatePendingRequest(companyId, otherEmployeeId, new DateOnly(2026, 8, 10)));
+        await context.SaveChangesAsync();
+
+        var provider = new LeavePendingApprovalsWorkloadActionProvider(
+            context, new FakeDirectReportsReader([directReportId]), new FakeEmployeeDepartmentReader(),
+            new FakeAuthorizationService("reporting:view-hr"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerEmployeeId));
+
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerEmployeeId), WorkloadScope.Hr, CancellationToken.None);
+
+        Assert.Equal(2, result.Count);
+    }
+
+    [Fact]
+    public async Task GetActionsAsync_CallerWithoutViewHr_Requesting_HrScope_Returns_Empty()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
+        context.LeaveRequests.Add(CreatePendingRequest(companyId, Guid.NewGuid(), new DateOnly(2026, 8, 3)));
+        await context.SaveChangesAsync();
+
+        // Caller lacks reporting:view-hr entirely (only resolvable as a manager, if that).
+        var provider = new LeavePendingApprovalsWorkloadActionProvider(
+            context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
+            new FakeAuthorizationService(), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
+
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Hr, CancellationToken.None);
+
+        Assert.Empty(result);
     }
 }

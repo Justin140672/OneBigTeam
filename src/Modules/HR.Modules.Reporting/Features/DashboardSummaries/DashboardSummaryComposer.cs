@@ -36,6 +36,7 @@ internal sealed class DashboardSummaryComposer(
     public async Task<DashboardSummaryResponse> ComposeAsync(
         Guid companyId,
         ClaimsPrincipal caller,
+        WorkloadScope requestedScope,
         CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(clock.UtcNow);
@@ -70,7 +71,7 @@ internal sealed class DashboardSummaryComposer(
             {
                 using var scope = scopeFactory.CreateScope();
                 var provider = scope.ServiceProvider.GetServices<IWorkloadActionProvider>().ElementAt(index);
-                var actions = await provider.GetActionsAsync(companyId, caller, linked.Token);
+                var actions = await provider.GetActionsAsync(companyId, caller, requestedScope, linked.Token);
                 return new ProviderOutcome(category, Failed: false, actions);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)

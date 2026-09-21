@@ -33,10 +33,11 @@ internal sealed class ProbationReviewsDueWorkloadActionProvider(
     public async Task<IReadOnlyList<WorkloadAction>> GetActionsAsync(
         Guid companyId,
         ClaimsPrincipal caller,
+        WorkloadScope requestedScope,
         CancellationToken cancellationToken)
         => await ProbationReviewWorkloadActions.GetAsync(
             dbContext, directReportsReader, employeeDepartmentReader, authorizationService, currentUser, taskReader, clock,
-            companyId, caller, ActionCategory, overdueOnly: false, cancellationToken);
+            companyId, caller, requestedScope, ActionCategory, overdueOnly: false, cancellationToken);
 }
 
 /// <summary>
@@ -57,10 +58,11 @@ internal sealed class OverdueProbationReviewsWorkloadActionProvider(
     public async Task<IReadOnlyList<WorkloadAction>> GetActionsAsync(
         Guid companyId,
         ClaimsPrincipal caller,
+        WorkloadScope requestedScope,
         CancellationToken cancellationToken)
         => await ProbationReviewWorkloadActions.GetAsync(
             dbContext, directReportsReader, employeeDepartmentReader, authorizationService, currentUser, taskReader, clock,
-            companyId, caller, ActionCategory, overdueOnly: true, cancellationToken);
+            companyId, caller, requestedScope, ActionCategory, overdueOnly: true, cancellationToken);
 }
 
 /// <summary>
@@ -80,14 +82,24 @@ internal static class ProbationReviewWorkloadActions
         IClock clock,
         Guid companyId,
         ClaimsPrincipal caller,
+        WorkloadScope requestedScope,
         string actionCategory,
         bool overdueOnly,
         CancellationToken cancellationToken)
     {
-        var callerIsHr = (await authorizationService.AuthorizeAsync(caller, "reporting:view-hr")).Succeeded;
-
+        // Scope is driven by the EXPLICITLY requested workspace, never re-inferred from the
+        // caller's full role set — a caller holding both HR and Manager roles must still only see
+        // their own reporting sub-tree when the Manager workspace is requested.
         IReadOnlyCollection<Guid>? employeeIds = null;
-        if (!callerIsHr)
+        if (requestedScope == WorkloadScope.Hr)
+        {
+            // A requested workspace is a display-routing signal only: re-verify the caller actually
+            // holds HR access before honouring it, never trust it as authorization.
+            var callerIsHr = (await authorizationService.AuthorizeAsync(caller, "reporting:view-hr")).Succeeded;
+            if (!callerIsHr)
+                return [];
+        }
+        else
         {
             var callerIsManager = (await authorizationService.AuthorizeAsync(caller, "reporting:view-probation")).Succeeded;
             if (!callerIsManager)

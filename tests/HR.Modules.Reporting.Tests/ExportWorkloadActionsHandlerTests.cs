@@ -31,6 +31,7 @@ public class ExportWorkloadActionsHandlerTests
                 new FakeServiceScopeFactory([.. providers]),
                 new FakeEmployeeDirectoryReader([]),
                 new FakeEmployeeRecruiterReader(),
+                new FakeAuthorizationService("reporting:view-hr"),
                 new FakeClock(FixedUtcNow)),
             exporter,
             new FakeAuthorizationService(),

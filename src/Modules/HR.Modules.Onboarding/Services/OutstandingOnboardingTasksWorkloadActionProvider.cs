@@ -27,12 +27,22 @@ internal sealed class OutstandingOnboardingTasksWorkloadActionProvider(
     public async Task<IReadOnlyList<WorkloadAction>> GetActionsAsync(
         Guid companyId,
         ClaimsPrincipal caller,
+        WorkloadScope requestedScope,
         CancellationToken cancellationToken)
     {
-        var callerIsHr = (await authorizationService.AuthorizeAsync(caller, "reporting:view-hr")).Succeeded;
-
+        // Scope is driven by the EXPLICITLY requested workspace, never re-inferred from the
+        // caller's full role set — a caller holding both HR and Manager roles must still only see
+        // their own reporting sub-tree when the Manager workspace is requested.
         IReadOnlyCollection<Guid>? employeeIds = null;
-        if (!callerIsHr)
+        if (requestedScope == WorkloadScope.Hr)
+        {
+            // A requested workspace is a display-routing signal only: re-verify the caller actually
+            // holds HR access before honouring it, never trust it as authorization.
+            var callerIsHr = (await authorizationService.AuthorizeAsync(caller, "reporting:view-hr")).Succeeded;
+            if (!callerIsHr)
+                return [];
+        }
+        else
         {
             var callerIsManager = (await authorizationService.AuthorizeAsync(caller, "reporting:view-onboarding")).Succeeded;
             if (!callerIsManager)

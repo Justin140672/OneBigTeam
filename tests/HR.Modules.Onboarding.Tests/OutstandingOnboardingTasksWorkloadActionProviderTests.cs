@@ -38,7 +38,7 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
             reader, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-hr"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
     }
@@ -59,7 +59,7 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
             reader, new FakeDirectReportsReader([directReportId]), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-onboarding"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), WorkloadScope.Manager, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal(directReportId, action.EmployeeId);
@@ -78,7 +78,7 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
             reader, new FakeDirectReportsReader([]), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-onboarding"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), WorkloadScope.Manager, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -97,7 +97,7 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
             reader, new FakeDirectReportsReader([Guid.NewGuid()]), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-onboarding"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(null));
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(Guid.NewGuid()), WorkloadScope.Manager, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -115,7 +115,7 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
             reader, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService(), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), WorkloadScope.Manager, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -140,7 +140,7 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
             new FakeOpenTaskBySourceEntityReader(new Dictionary<Guid, Guid> { [onboardingTaskId] = linkedTaskId }),
             new FakeCurrentUser(callerId));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Hr, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Set up laptop", action.ActionType);
@@ -166,7 +166,7 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
             reader, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-hr"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), WorkloadScope.Hr, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Null(action.TaskId);
@@ -203,7 +203,7 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
             }),
             new FakeCurrentUser(callerId));
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
         Assert.Contains(result, a => a.EmployeeId == employeeA && a.TaskId == linkedTaskId1);
@@ -227,9 +227,76 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
             reader, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-hr"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), WorkloadScope.Hr, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Overdue", action.Status);
+    }
+
+    [Fact]
+    public async Task DualHrAndManagerCaller_Requesting_ManagerScope_Sees_Only_TeamScoped_Results_Not_CompanyWide()
+    {
+        // Regression test for the role-bleed bug: a caller holding BOTH reporting:view-hr and
+        // reporting:view-onboarding must still only see their own reporting sub-tree when the
+        // Manager workspace is explicitly requested — HR access must never widen the Manager view.
+        var directReportId = Guid.NewGuid();
+        var otherEmployeeId = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
+        var reader = new FakeOnboardingReportReader(
+        [
+            BuildItem(directReportId, new OnboardingReportTaskItem("Task A", null, "Manager", false)),
+            BuildItem(otherEmployeeId, new OnboardingReportTaskItem("Task B", null, "Manager", false)),
+        ]);
+
+        var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
+            reader, new FakeDirectReportsReader([directReportId]), new FakeEmployeeDepartmentReader(),
+            new FakeAuthorizationService("reporting:view-hr", "reporting:view-onboarding"),
+            new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
+
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), WorkloadScope.Manager, CancellationToken.None);
+
+        var action = Assert.Single(result);
+        Assert.Equal(directReportId, action.EmployeeId);
+    }
+
+    [Fact]
+    public async Task DualHrAndManagerCaller_Requesting_HrScope_Sees_CompanyWide_Results()
+    {
+        var directReportId = Guid.NewGuid();
+        var otherEmployeeId = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
+        var reader = new FakeOnboardingReportReader(
+        [
+            BuildItem(directReportId, new OnboardingReportTaskItem("Task A", null, "Manager", false)),
+            BuildItem(otherEmployeeId, new OnboardingReportTaskItem("Task B", null, "Manager", false)),
+        ]);
+
+        var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
+            reader, new FakeDirectReportsReader([directReportId]), new FakeEmployeeDepartmentReader(),
+            new FakeAuthorizationService("reporting:view-hr", "reporting:view-onboarding"),
+            new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
+
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), WorkloadScope.Hr, CancellationToken.None);
+
+        Assert.Equal(2, result.Count);
+    }
+
+    [Fact]
+    public async Task Caller_Without_ViewHr_Requesting_HrScope_Returns_Empty_Workspace_Param_Cannot_Grant_Access()
+    {
+        var callerId = Guid.NewGuid();
+        var reader = new FakeOnboardingReportReader(
+        [
+            BuildItem(Guid.NewGuid(), new OnboardingReportTaskItem("Task A", null, "Manager", false)),
+        ]);
+
+        // Caller only holds the Manager-tier policy, not reporting:view-hr.
+        var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
+            reader, new FakeDirectReportsReader([Guid.NewGuid()]), new FakeEmployeeDepartmentReader(),
+            new FakeAuthorizationService("reporting:view-onboarding"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
+
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), WorkloadScope.Hr, CancellationToken.None);
+
+        Assert.Empty(result);
     }
 }

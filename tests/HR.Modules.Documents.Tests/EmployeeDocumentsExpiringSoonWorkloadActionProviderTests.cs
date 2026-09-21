@@ -31,7 +31,7 @@ public class EmployeeDocumentsExpiringSoonWorkloadActionProviderTests
         var provider = new EmployeeDocumentsExpiringSoonWorkloadActionProvider(
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
     }
@@ -47,7 +47,7 @@ public class EmployeeDocumentsExpiringSoonWorkloadActionProviderTests
         var provider = new EmployeeDocumentsExpiringSoonWorkloadActionProvider(
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService());
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -63,7 +63,7 @@ public class EmployeeDocumentsExpiringSoonWorkloadActionProviderTests
         var provider = new EmployeeDocumentsExpiringSoonWorkloadActionProvider(
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -83,12 +83,28 @@ public class EmployeeDocumentsExpiringSoonWorkloadActionProviderTests
         var provider = new EmployeeDocumentsExpiringSoonWorkloadActionProvider(
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
 
-        var result = await provider.GetActionsAsync(companyId, AnyCaller(), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, AnyCaller(), WorkloadScope.Hr, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal(expectedActionType, action.ActionType);
         Assert.Equal("Employee Documents Expiring Soon", action.ActionCategory);
         Assert.Equal("Expiring Soon", action.Status);
         Assert.Equal($"/companies/{companyId}/employees/{employeeId}?tab=documents", action.DeepLinkUrl);
+    }
+
+    [Fact]
+    public async Task HrCaller_Requesting_ManagerScope_Returns_Empty_HrOnly_Category_Never_Leaks_Into_Manager_Workspace()
+    {
+        var reader = new FakeDocumentComplianceReportReader(
+        [
+            BuildItem(Guid.NewGuid(), 2),
+        ]);
+
+        var provider = new EmployeeDocumentsExpiringSoonWorkloadActionProvider(
+            reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"));
+
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), AnyCaller(), WorkloadScope.Manager, CancellationToken.None);
+
+        Assert.Empty(result);
     }
 }

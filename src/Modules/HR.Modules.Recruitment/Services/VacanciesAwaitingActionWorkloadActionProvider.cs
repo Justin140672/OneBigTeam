@@ -32,8 +32,12 @@ internal sealed class VacanciesAwaitingActionWorkloadActionProvider(
     public async Task<IReadOnlyList<WorkloadAction>> GetActionsAsync(
         Guid companyId,
         ClaimsPrincipal caller,
+        WorkloadScope requestedScope,
         CancellationToken cancellationToken)
     {
+        // Recruitment scoping is independent of the Manager/HR workspace split (a Recruiter is
+        // neither Manager nor HR necessarily) — unaffected by this fix, unchanged from prior
+        // behaviour: visible to any caller holding recruitment access regardless of requestedScope.
         var callerIsRecruiter = (await authorizationService.AuthorizeAsync(caller, "reporting:view-recruitment")).Succeeded;
         if (!callerIsRecruiter)
             return [];

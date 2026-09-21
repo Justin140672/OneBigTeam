@@ -39,7 +39,7 @@ public class OutstandingOffboardingTasksWorkloadActionProviderTests
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"),
             new FakeOpenTaskBySourceEntityReader());
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(Guid.NewGuid()), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
     }
@@ -57,7 +57,7 @@ public class OutstandingOffboardingTasksWorkloadActionProviderTests
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-onboarding"),
             new FakeOpenTaskBySourceEntityReader());
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(Guid.NewGuid()), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -74,7 +74,7 @@ public class OutstandingOffboardingTasksWorkloadActionProviderTests
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService(),
             new FakeOpenTaskBySourceEntityReader());
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(Guid.NewGuid()), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -91,7 +91,7 @@ public class OutstandingOffboardingTasksWorkloadActionProviderTests
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"),
             new FakeOpenTaskBySourceEntityReader());
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(Guid.NewGuid()), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Empty(result);
     }
@@ -114,7 +114,7 @@ public class OutstandingOffboardingTasksWorkloadActionProviderTests
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"),
             new FakeOpenTaskBySourceEntityReader());
 
-        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(Guid.NewGuid()), WorkloadScope.Hr, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Outstanding", action.Status);
@@ -135,7 +135,7 @@ public class OutstandingOffboardingTasksWorkloadActionProviderTests
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"),
             new FakeOpenTaskBySourceEntityReader());
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), WorkloadScope.Hr, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal("Return laptop", action.ActionType);
@@ -165,7 +165,7 @@ public class OutstandingOffboardingTasksWorkloadActionProviderTests
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"),
             new FakeOpenTaskBySourceEntityReader(new Dictionary<Guid, Guid> { [offboardingTaskId] = linkedTaskId }));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), WorkloadScope.Hr, CancellationToken.None);
 
         var action = Assert.Single(result);
         Assert.Equal(linkedTaskId, action.TaskId);
@@ -200,12 +200,29 @@ public class OutstandingOffboardingTasksWorkloadActionProviderTests
                 [offboardingTaskId2] = linkedTaskId2,
             }));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
         Assert.Contains(result, a => a.TaskId == linkedTaskId1);
         Assert.Contains(result, a => a.TaskId == linkedTaskId2);
         // Both rows resolved distinctly, not the same task id for both.
         Assert.NotEqual(result[0].TaskId, result[1].TaskId);
+    }
+
+    [Fact]
+    public async Task HrCaller_Requesting_ManagerScope_Returns_Empty_HrOnly_Category_Never_Leaks_Into_Manager_Workspace()
+    {
+        var reader = new FakeOffboardingReportReader(
+        [
+            BuildItem(Guid.NewGuid(), Today.AddDays(5), "Return laptop"),
+        ]);
+
+        var provider = new OutstandingOffboardingTasksWorkloadActionProvider(
+            reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"),
+            new FakeOpenTaskBySourceEntityReader());
+
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(Guid.NewGuid()), WorkloadScope.Manager, CancellationToken.None);
+
+        Assert.Empty(result);
     }
 }

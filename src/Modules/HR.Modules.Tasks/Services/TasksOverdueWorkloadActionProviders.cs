@@ -29,8 +29,13 @@ internal sealed class EmployeeTasksOverdueWorkloadActionProvider(
     public async Task<IReadOnlyList<WorkloadAction>> GetActionsAsync(
         Guid companyId,
         ClaimsPrincipal caller,
+        WorkloadScope requestedScope,
         CancellationToken cancellationToken)
     {
+        // Self-scoped regardless of requested workspace: every caller's own overdue tasks
+        // legitimately belong on both their Manager and HR dashboards (this is the "personal task"
+        // case, not an HR-vs-Manager distinction), matching requirement that a task may validly
+        // appear in multiple workspaces when it independently qualifies for each.
         // NOT caller.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's
         // resolved Employee/UserId. ICurrentUser.UserId reads off the ambient HttpContext, safe
         // even from this provider's own DI scope.
@@ -86,12 +91,25 @@ internal sealed class ManagerTasksOverdueWorkloadActionProvider(
     public async Task<IReadOnlyList<WorkloadAction>> GetActionsAsync(
         Guid companyId,
         ClaimsPrincipal caller,
+        WorkloadScope requestedScope,
         CancellationToken cancellationToken)
     {
-        var callerIsHr = (await authorizationService.AuthorizeAsync(caller, "reporting:view-hr")).Succeeded;
-
+        // Scope is driven by the EXPLICITLY requested workspace, never re-inferred from the
+        // caller's full role set. This is the fix for the reported bug: a caller holding BOTH HR
+        // and Manager roles must still only see their own reporting sub-tree's overdue tasks when
+        // the Manager workspace is requested — HR access must never widen the Manager view to
+        // company-wide, even though the same caller legitimately sees company-wide data when the
+        // HR workspace is explicitly requested instead.
         IReadOnlyCollection<Guid>? employeeIds = null;
-        if (!callerIsHr)
+        if (requestedScope == WorkloadScope.Hr)
+        {
+            // A requested workspace is a display-routing signal only: re-verify the caller actually
+            // holds HR access before honouring it, never trust it as authorization.
+            var callerIsHr = (await authorizationService.AuthorizeAsync(caller, "reporting:view-hr")).Succeeded;
+            if (!callerIsHr)
+                return [];
+        }
+        else
         {
             // NOT caller.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's
             // resolved Employee/UserId. ICurrentUser.UserId reads off the ambient HttpContext, safe
