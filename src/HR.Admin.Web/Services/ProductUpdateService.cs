@@ -1,15 +1,13 @@
-using System.Net.Http.Json;
-
 using HR.Admin.Web.Models;
+using HR.SharedKernel.Http;
 
 namespace HR.Admin.Web.Services;
 
 /// <summary>
 /// Wraps the Customer Release Notifications endpoints (SendProductUpdate /
-/// PreviewProductUpdateRecipients, both on HR.Modules.Notifications). Modeled on
-/// PlatformSettingsService/SubscriptionPricingService: "hrapi" HttpClientFactory client, null/empty
-/// result on any read/send failure rather than throwing, so the page can show a plain "couldn't be
-/// loaded" / "couldn't be sent" message.
+/// PreviewProductUpdateRecipients, both on HR.Modules.Notifications). Uses the shared
+/// ApiResult&lt;T&gt;/ApiResponseReader contracts (HR.SharedKernel.Http) rather than a bespoke local
+/// envelope, per this repo's shared web-response-handling convention.
 /// </summary>
 public sealed class ProductUpdateService(HrApiHttpClientFactory httpClientFactory)
 {
@@ -18,57 +16,30 @@ public sealed class ProductUpdateService(HrApiHttpClientFactory httpClientFactor
     public async Task<ProductUpdateRecipientPreviewModel?> GetRecipientPreviewOrNullAsync(
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await Http.GetAsync(
-                "api/notifications/admin/product-updates/recipient-preview", cancellationToken);
-            if (!response.IsSuccessStatusCode)
-                return null;
+        var result = await ApiResponseReader.ExecuteAsync<ProductUpdateRecipientPreviewModel>(
+            ct => Http.GetAsync("api/notifications/admin/product-updates/recipient-preview", ct),
+            cancellationToken: cancellationToken);
 
-            return await response.Content.ReadFromJsonAsync<ProductUpdateRecipientPreviewModel>(
-                cancellationToken: cancellationToken);
-        }
-        catch (HttpRequestException)
-        {
-            return null;
-        }
+        return result.Value;
     }
 
     public async Task<SendProductUpdateOutcome> SendAsync(
         SendProductUpdateRequest request, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await Http.PostAsJsonAsync(
-                "api/notifications/admin/product-updates", request, cancellationToken);
+        var result = await ApiResponseReader.ExecuteAsync<SendProductUpdateResultModel>(
+            ct => Http.PostAsJsonAsync("api/notifications/admin/product-updates", request, ct),
+            cancellationToken: cancellationToken);
 
-            if (response.IsSuccessStatusCode)
-            {
-                var result = await response.Content.ReadFromJsonAsync<SendProductUpdateResultModel>(
-                    cancellationToken: cancellationToken);
-                return new SendProductUpdateOutcome(result, null);
-            }
+        if (result.Success)
+            return new SendProductUpdateOutcome(result.Value, null);
 
-            if ((int)response.StatusCode == 422)
-            {
-                var body = await response.Content.ReadFromJsonAsync<ValidationErrorEnvelope>(
-                    cancellationToken: cancellationToken);
-                var errors = body?.Errors?.Values.SelectMany(v => v).ToList();
-                if (errors is { Count: > 0 })
-                    return new SendProductUpdateOutcome(null, errors);
-            }
+        if (result.ValidationErrors is { Count: > 0 } errors)
+            return new SendProductUpdateOutcome(null, errors.Values.SelectMany(v => v).ToList());
 
-            return new SendProductUpdateOutcome(
-                null, ["Could not send the product update. You may not be authorised to perform this action."]);
-        }
-        catch (HttpRequestException)
-        {
-            return new SendProductUpdateOutcome(
-                null, ["A network error occurred while sending the product update. Please try again."]);
-        }
+        return new SendProductUpdateOutcome(
+            null,
+            [result.Error ?? "Could not send the product update. You may not be authorised to perform this action."]);
     }
-
-    private sealed record ValidationErrorEnvelope(Dictionary<string, string[]>? Errors);
 }
 
 public sealed record SendProductUpdateOutcome(

@@ -64,6 +64,12 @@ public class NotificationEventMappingContractTests
         NotificationType.InterviewScheduled,
         NotificationType.InterviewFeedbackOverdue,
         NotificationType.InterviewReminder,
+
+        // Customer Release Notifications: ProductUpdate's ActionUrl is an admin-supplied explicit
+        // override passed to INotificationWriter.WriteAsync at send time (see SendProductUpdateHandler),
+        // not something NotificationActionRouteBuilder can derive from type/company/employee/source
+        // ids alone — so BuildActionUrl deliberately returns null for this type.
+        NotificationType.ProductUpdate,
     ];
 
     public static IEnumerable<object[]> AllNotificationTypes() =>
