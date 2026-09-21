@@ -9,9 +9,9 @@ using Microsoft.Extensions.DependencyInjection;
 namespace HR.Integration.Tests;
 
 /// <summary>
-/// SICK-02: reporting-hierarchy / HR-administrator resource-level authorization for the three
+/// SICK-02: reporting-hierarchy / HR-administrator resource-level authorization for the
 /// Sickness endpoints guarded by <c>HR.Modules.Sickness.Services.SicknessResourceAuthorizer</c> —
-/// GetMissingFitNotes, GetOverdueReturnToWorkReviews, and GetReturnToWorkReview. The
+/// GetMissingFitNotes and GetReturnToWorkReview. The
 /// "sickness:review" policy those endpoints carry only proves Manager/HrAdministrator role
 /// membership; it never proves the caller has a reporting relationship to the specific
 /// employee(s) whose data is being requested, so these tests exercise that resource-ownership
@@ -171,148 +171,6 @@ public class SicknessResourceAuthorizationTests
 
         using var employeeClient = await ClientFor(companyId, employee);
         var response = await employeeClient.GetAsync($"/api/companies/{companyId}/sickness-evidence-requests/missing");
-
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // GetOverdueReturnToWorkReviews
-    // ─────────────────────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task GetOverdueReturnToWorkReviews_Visible_To_Direct_Manager()
-    {
-        var companyId = Guid.NewGuid();
-        using var hrClient = await HrAdminClientAsync(companyId);
-        var reference = await EmployeeReferenceDataSeeder.SeedViaApiAsync(hrClient, companyId);
-
-        var manager = await CreateEmployeeAsync(hrClient, companyId, reference);
-        await AssignRoleAsync(manager, companyId, SystemRoles.Manager);
-        var report = await CreateEmployeeAsync(hrClient, companyId, reference);
-        await AssignManagerAsync(hrClient, companyId, report, manager);
-
-        await CreateOverdueReturnToWorkReviewAsync(hrClient, companyId, report);
-
-        using var managerClient = await ClientFor(companyId, manager);
-        var response = await managerClient.GetAsync($"/api/companies/{companyId}/return-to-work-reviews/overdue");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var payload = await response.Content.ReadFromJsonAsync<OverdueReviewsPayload>();
-        Assert.NotNull(payload);
-        Assert.Contains(payload!.Items, i => i.EmployeeId == report);
-    }
-
-    [Fact]
-    public async Task GetOverdueReturnToWorkReviews_Visible_To_Indirect_Manager_Via_Skip_Level_Hierarchy()
-    {
-        var companyId = Guid.NewGuid();
-        using var hrClient = await HrAdminClientAsync(companyId);
-        var reference = await EmployeeReferenceDataSeeder.SeedViaApiAsync(hrClient, companyId);
-
-        var seniorManager = await CreateEmployeeAsync(hrClient, companyId, reference);
-        await AssignRoleAsync(seniorManager, companyId, SystemRoles.Manager);
-        var manager = await CreateEmployeeAsync(hrClient, companyId, reference);
-        await AssignManagerAsync(hrClient, companyId, manager, seniorManager);
-        var report = await CreateEmployeeAsync(hrClient, companyId, reference);
-        await AssignManagerAsync(hrClient, companyId, report, manager);
-
-        await CreateOverdueReturnToWorkReviewAsync(hrClient, companyId, report);
-
-        using var seniorManagerClient = await ClientFor(companyId, seniorManager);
-        var response = await seniorManagerClient.GetAsync($"/api/companies/{companyId}/return-to-work-reviews/overdue");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var payload = await response.Content.ReadFromJsonAsync<OverdueReviewsPayload>();
-        Assert.NotNull(payload);
-        Assert.Contains(payload!.Items, i => i.EmployeeId == report);
-    }
-
-    [Fact]
-    public async Task GetOverdueReturnToWorkReviews_Hidden_From_Peer_Manager()
-    {
-        var companyId = Guid.NewGuid();
-        using var hrClient = await HrAdminClientAsync(companyId);
-        var reference = await EmployeeReferenceDataSeeder.SeedViaApiAsync(hrClient, companyId);
-
-        var manager = await CreateEmployeeAsync(hrClient, companyId, reference);
-        await AssignRoleAsync(manager, companyId, SystemRoles.Manager);
-        var report = await CreateEmployeeAsync(hrClient, companyId, reference);
-        await AssignManagerAsync(hrClient, companyId, report, manager);
-
-        var peerManager = await CreateEmployeeAsync(hrClient, companyId, reference);
-        await AssignRoleAsync(peerManager, companyId, SystemRoles.Manager);
-
-        await CreateOverdueReturnToWorkReviewAsync(hrClient, companyId, report);
-
-        using var peerClient = await ClientFor(companyId, peerManager);
-        var response = await peerClient.GetAsync($"/api/companies/{companyId}/return-to-work-reviews/overdue");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var payload = await response.Content.ReadFromJsonAsync<OverdueReviewsPayload>();
-        Assert.NotNull(payload);
-        Assert.DoesNotContain(payload!.Items, i => i.EmployeeId == report);
-    }
-
-    [Fact]
-    public async Task GetOverdueReturnToWorkReviews_Hidden_From_Unrelated_Employees_Manager()
-    {
-        var companyId = Guid.NewGuid();
-        using var hrClient = await HrAdminClientAsync(companyId);
-        var reference = await EmployeeReferenceDataSeeder.SeedViaApiAsync(hrClient, companyId);
-
-        var manager = await CreateEmployeeAsync(hrClient, companyId, reference);
-        await AssignRoleAsync(manager, companyId, SystemRoles.Manager);
-        var report = await CreateEmployeeAsync(hrClient, companyId, reference);
-        await AssignManagerAsync(hrClient, companyId, report, manager);
-
-        var unrelatedManager = await CreateEmployeeAsync(hrClient, companyId, reference);
-        await AssignRoleAsync(unrelatedManager, companyId, SystemRoles.Manager);
-        var unrelatedReport = await CreateEmployeeAsync(hrClient, companyId, reference);
-        await AssignManagerAsync(hrClient, companyId, unrelatedReport, unrelatedManager);
-
-        await CreateOverdueReturnToWorkReviewAsync(hrClient, companyId, report);
-
-        using var unrelatedManagerClient = await ClientFor(companyId, unrelatedManager);
-        var response = await unrelatedManagerClient.GetAsync($"/api/companies/{companyId}/return-to-work-reviews/overdue");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var payload = await response.Content.ReadFromJsonAsync<OverdueReviewsPayload>();
-        Assert.NotNull(payload);
-        Assert.DoesNotContain(payload!.Items, i => i.EmployeeId == report);
-    }
-
-    [Fact]
-    public async Task GetOverdueReturnToWorkReviews_HrAdministrator_Sees_Company_Wide()
-    {
-        var companyId = Guid.NewGuid();
-        using var hrClient = await HrAdminClientAsync(companyId);
-        var reference = await EmployeeReferenceDataSeeder.SeedViaApiAsync(hrClient, companyId);
-
-        var manager = await CreateEmployeeAsync(hrClient, companyId, reference);
-        await AssignRoleAsync(manager, companyId, SystemRoles.Manager);
-        var report = await CreateEmployeeAsync(hrClient, companyId, reference);
-        await AssignManagerAsync(hrClient, companyId, report, manager);
-
-        await CreateOverdueReturnToWorkReviewAsync(hrClient, companyId, report);
-
-        var response = await hrClient.GetAsync($"/api/companies/{companyId}/return-to-work-reviews/overdue");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var payload = await response.Content.ReadFromJsonAsync<OverdueReviewsPayload>();
-        Assert.NotNull(payload);
-        Assert.Contains(payload!.Items, i => i.EmployeeId == report);
-    }
-
-    [Fact]
-    public async Task GetOverdueReturnToWorkReviews_PlainEmployee_Gets_Forbidden()
-    {
-        var companyId = Guid.NewGuid();
-        using var hrClient = await HrAdminClientAsync(companyId);
-        var reference = await EmployeeReferenceDataSeeder.SeedViaApiAsync(hrClient, companyId);
-        var employee = await CreateEmployeeAsync(hrClient, companyId, reference);
-
-        using var employeeClient = await ClientFor(companyId, employee);
-        var response = await employeeClient.GetAsync($"/api/companies/{companyId}/return-to-work-reviews/overdue");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
@@ -580,47 +438,6 @@ public class SicknessResourceAuthorizationTests
     }
 
     /// <summary>
-    /// Creates and closes a sickness record whose return-to-work review due date is well in the
-    /// past, then runs ReturnToWorkReminderJob so the review transitions Pending -> Overdue —
-    /// mirroring FitNoteRequestCreatesTaskTests' job-driven state promotion pattern.
-    /// ReturnToWorkRequiredAfterDays defaults to 1, so any closed record with >=1 total day
-    /// produces a review with no HR-settings setup required.
-    /// </summary>
-    private async Task CreateOverdueReturnToWorkReviewAsync(HttpClient hrClient, Guid companyId, Guid employeeId)
-    {
-        var categoryId = await CreateCategoryAsync(hrClient, companyId);
-        var startDate = new DateOnly(2026, 6, 1);
-        var endDate = new DateOnly(2026, 6, 3);
-
-        var createResponse = await hrClient.PostAsJsonAsync(
-            $"/api/companies/{companyId}/employees/{employeeId}/sickness-records",
-            new
-            {
-                companyId,
-                employeeId,
-                categoryId,
-                startDate = startDate.ToString("yyyy-MM-dd"),
-                startDayPart = "FullDay"
-            });
-        createResponse.EnsureSuccessStatusCode();
-        var recordId = (await createResponse.Content.ReadFromJsonAsync<SicknessRecordPayload>())!.Id;
-
-        var closeResponse = await hrClient.PostAsJsonAsync(
-            $"/api/companies/{companyId}/employees/{employeeId}/sickness-records/{recordId}/close",
-            new
-            {
-                companyId,
-                employeeId,
-                id = recordId,
-                endDate = endDate.ToString("yyyy-MM-dd"),
-                endDayPart = "FullDay"
-            });
-        closeResponse.EnsureSuccessStatusCode();
-
-        await RunReturnToWorkReminderJobAsync();
-    }
-
-    /// <summary>
     /// Creates and closes a sickness record, then directly writes Notes onto the resulting
     /// (Pending) return-to-work review via the DbContext — the domain has no public API for
     /// setting review notes outside CompleteReturnToWorkReview, which this test deliberately
@@ -676,22 +493,12 @@ public class SicknessResourceAuthorizationTests
         await job.ExecuteAsync();
     }
 
-    private async Task RunReturnToWorkReminderJobAsync()
-    {
-        using var scope = _factory.Services.CreateScope();
-        var job = scope.ServiceProvider.GetRequiredService<ReturnToWorkReminderJob>();
-        await job.ExecuteAsync();
-    }
-
     private sealed record EmployeePayload(Guid Id);
     private sealed record CategoryPayload(Guid Id);
     private sealed record SicknessRecordPayload(Guid Id);
 
     private sealed record MissingFitNotesPayload(IReadOnlyList<MissingFitNoteItemPayload> Items);
     private sealed record MissingFitNoteItemPayload(Guid RequestId, Guid EmployeeId, Guid SicknessRecordId, string DueDate, string Status);
-
-    private sealed record OverdueReviewsPayload(IReadOnlyList<OverdueReviewItemPayload> Items);
-    private sealed record OverdueReviewItemPayload(Guid ReviewId, Guid EmployeeId, Guid SicknessRecordId, string DueDate, Guid? TaskId);
 
     private sealed record ReviewPayload(
         Guid Id,

@@ -58,15 +58,6 @@ public sealed record TeamSicknessTodayItem(
 
 public sealed record GetTeamSicknessTodayResponseModel(List<TeamSicknessTodayItem> Items);
 
-public sealed record OverdueReturnToWorkReviewItem(
-    Guid ReviewId,
-    Guid EmployeeId,
-    Guid SicknessRecordId,
-    DateOnly DueDate,
-    Guid? TaskId);
-
-public sealed record GetOverdueReturnToWorkReviewsResponseModel(List<OverdueReturnToWorkReviewItem> Items);
-
 public sealed record MissingFitNoteItem(
     Guid RequestId,
     Guid EmployeeId,

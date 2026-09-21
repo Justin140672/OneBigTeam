@@ -16,8 +16,18 @@ namespace HR.Web.E2E.Tests.Tests;
 /// parallel with no ordering guarantee, assigning employees to "Senior Software Engineer" here
 /// would permanently hide it from those unrelated tests for the rest of the run once any test in
 /// this class executes.
+///
+/// Only 2 of this class's methods (the CompanyModeIsManual/CompanyModeIsAutomatic pair) actually
+/// mutate the shared Acme CompanySettings row (its employee-numbering mode) — the other 15 just
+/// create/view employees against already-seeded, per-test-uniquely-named data and never touch that
+/// row. This class therefore runs as an ordinary parallel-eligible class (not class-level
+/// HrSettingsSerialTestBase) so those 15 aren't forced to queue behind the whole "HrSettingsSerial"
+/// group (HrSettingsPageTests, DataImportWizardTests, etc.) for no reason; the 2 mutating methods
+/// acquire HrSettingsSerialTestBase.GateInstance directly around just their mutating/asserting
+/// section instead, matching the narrow method-level pattern already used by
+/// PositionRoleDefaultsSerialTestBase/SharedProbationGate — see GroupSerializedTestBases.cs.
 /// </summary>
-public sealed class CreateEmployeeTests(HrSettingsSerialFixture fixture) : HrSettingsSerialTestBase(fixture)
+public sealed class CreateEmployeeTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId        = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid JamesOkaforId = Guid.Parse("30000000-0000-0000-0000-000000000002");
@@ -536,24 +546,37 @@ public sealed class CreateEmployeeTests(HrSettingsSerialFixture fixture) : HrSet
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Set the mode explicitly rather than assuming Acme's seeded default is Manual — this is
-        // a shared company-wide setting, and another test in this suite (e.g. the Automatic-mode
-        // sibling below) can leave it changed if its own restore-in-finally didn't complete. Confirm
-        // the plain text input renders and is required (see EmployeeEdit.razor's Employee Number
-        // field). Employee Numbering lives on the standalone HR Settings page (HrSettingsPage.razor).
-        await hrSettings.GoToAsync(AcmeId);
-        await hrSettings.SelectEmployeeNumberModeAsync("Manual");
-        await hrSettings.SaveAsync();
-        Assert.False(await hrSettings.HasErrorAsync(),
-            "Expected no error after switching the company's numbering mode to Manual");
-        Assert.Equal("Manual", await hrSettings.GetEmployeeNumberModeAsync());
+        // This mutates the single shared Acme CompanySettings row (employee-numbering mode), which
+        // HrSettingsSerialTestBase's group (HrSettingsPageTests etc.) also reads/writes — serialize
+        // against that group for just this section rather than pulling this whole class into it (see
+        // this class's remarks and PositionRoleDefaultsSerialTestBase/SharedProbationGate for the
+        // same narrow pattern).
+        await HrSettingsSerialTestBase.GateInstance.WaitAsync();
+        try
+        {
+            // Set the mode explicitly rather than assuming Acme's seeded default is Manual — this is
+            // a shared company-wide setting, and another test in this suite (e.g. the Automatic-mode
+            // sibling below) can leave it changed if its own restore-in-finally didn't complete. Confirm
+            // the plain text input renders and is required (see EmployeeEdit.razor's Employee Number
+            // field). Employee Numbering lives on the standalone HR Settings page (HrSettingsPage.razor).
+            await hrSettings.GoToAsync(AcmeId);
+            await hrSettings.SelectEmployeeNumberModeAsync("Manual");
+            await hrSettings.SaveAsync();
+            Assert.False(await hrSettings.HasErrorAsync(),
+                "Expected no error after switching the company's numbering mode to Manual");
+            Assert.Equal("Manual", await hrSettings.GetEmployeeNumberModeAsync());
 
-        await empEdit.GoToNewAsync(AcmeId);
+            await empEdit.GoToNewAsync(AcmeId);
 
-        Assert.True(await empEdit.IsEmployeeNumberInputVisibleAsync(),
-            "Expected the Employee Number text input to be visible when the company's numbering mode is Manual");
-        Assert.False(await empEdit.HasEmployeeNumberAutoAssignedMessageAsync(),
-            "Did not expect the auto-assigned informational message while in Manual mode");
+            Assert.True(await empEdit.IsEmployeeNumberInputVisibleAsync(),
+                "Expected the Employee Number text input to be visible when the company's numbering mode is Manual");
+            Assert.False(await empEdit.HasEmployeeNumberAutoAssignedMessageAsync(),
+                "Did not expect the auto-assigned informational message while in Manual mode");
+        }
+        finally
+        {
+            HrSettingsSerialTestBase.GateInstance.Release();
+        }
     }
 
     [Fact]
@@ -571,48 +594,59 @@ public sealed class CreateEmployeeTests(HrSettingsSerialFixture fixture) : HrSet
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Switch Acme's numbering mode to Automatic for the duration of this test. Employee
-        // Numbering lives on the standalone HR Settings page (HrSettingsPage.razor), gated on
-        // Session.IsHrAdministrator — Laura (HrAdministrator) can both change this setting and
-        // create employees, so no persona switch is needed here.
-        await hrSettings.GoToAsync(AcmeId);
-        var initialMode = await hrSettings.GetEmployeeNumberModeAsync();
-        await hrSettings.SelectEmployeeNumberModeAsync("Automatic");
-        await hrSettings.SaveAsync();
-        Assert.False(await hrSettings.HasErrorAsync(),
-            "Expected no error after switching the company's numbering mode to Automatic");
-
+        // This mutates the single shared Acme CompanySettings row (employee-numbering mode) for the
+        // duration of the test — serialize against HrSettingsSerialTestBase's group for just this
+        // section rather than pulling this whole class into it; see this class's remarks.
+        await HrSettingsSerialTestBase.GateInstance.WaitAsync();
         try
         {
-            await empEdit.GoToNewAsync(AcmeId);
+            // Switch Acme's numbering mode to Automatic for the duration of this test. Employee
+            // Numbering lives on the standalone HR Settings page (HrSettingsPage.razor), gated on
+            // Session.IsHrAdministrator — Laura (HrAdministrator) can both change this setting and
+            // create employees, so no persona switch is needed here.
+            await hrSettings.GoToAsync(AcmeId);
+            var initialMode = await hrSettings.GetEmployeeNumberModeAsync();
+            await hrSettings.SelectEmployeeNumberModeAsync("Automatic");
+            await hrSettings.SaveAsync();
+            Assert.False(await hrSettings.HasErrorAsync(),
+                "Expected no error after switching the company's numbering mode to Automatic");
 
-            Assert.False(await empEdit.IsEmployeeNumberInputVisibleAsync(),
-                "Did not expect the Employee Number text input to be visible when the company's numbering mode is Automatic");
-            Assert.True(await empEdit.HasEmployeeNumberAutoAssignedMessageAsync(),
-                "Expected the auto-assigned informational message while in Automatic mode");
+            try
+            {
+                await empEdit.GoToNewAsync(AcmeId);
 
-            await empEdit.FillFirstNameAsync("E2E");
-            await empEdit.FillLastNameAsync(lastName);
-            await empEdit.FillWorkEmailAsync(workEmail);
-            await empEdit.SelectDropdownAsync("Gender", "Male");
-            await empEdit.SelectDropdownAsync("Nationality", "British");
-            await empEdit.FillDateOfBirthAsync("15/06/1990");
-            await empEdit.FillStartDateAsync("01/03/2026");
-            await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-            await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
+                Assert.False(await empEdit.IsEmployeeNumberInputVisibleAsync(),
+                    "Did not expect the Employee Number text input to be visible when the company's numbering mode is Automatic");
+                Assert.True(await empEdit.HasEmployeeNumberAutoAssignedMessageAsync(),
+                    "Expected the auto-assigned informational message while in Automatic mode");
 
-            await empEdit.SaveNewEmployeeAsync();
+                await empEdit.FillFirstNameAsync("E2E");
+                await empEdit.FillLastNameAsync(lastName);
+                await empEdit.FillWorkEmailAsync(workEmail);
+                await empEdit.SelectDropdownAsync("Gender", "Male");
+                await empEdit.SelectDropdownAsync("Nationality", "British");
+                await empEdit.FillDateOfBirthAsync("15/06/1990");
+                await empEdit.FillStartDateAsync("01/03/2026");
+                await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
+                await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
 
-            Assert.True(await empList.HasEmployeeAsync(lastName),
-                $"Expected the new employee '{lastName}' to appear in the employee list after creation");
+                await empEdit.SaveNewEmployeeAsync();
+
+                Assert.True(await empList.HasEmployeeAsync(lastName),
+                    $"Expected the new employee '{lastName}' to appear in the employee list after creation");
+            }
+            finally
+            {
+                // Restore the original numbering mode so this test doesn't leak state into other
+                // tests/fixtures that rely on Acme's seeded default.
+                await hrSettings.GoToAsync(AcmeId);
+                await hrSettings.SelectEmployeeNumberModeAsync(initialMode);
+                await hrSettings.SaveAsync();
+            }
         }
         finally
         {
-            // Restore the original numbering mode so this test doesn't leak state into other
-            // tests/fixtures that rely on Acme's seeded default.
-            await hrSettings.GoToAsync(AcmeId);
-            await hrSettings.SelectEmployeeNumberModeAsync(initialMode);
-            await hrSettings.SaveAsync();
+            HrSettingsSerialTestBase.GateInstance.Release();
         }
     }
 
@@ -645,34 +679,45 @@ public sealed class CreateEmployeeTests(HrSettingsSerialFixture fixture) : HrSet
         // read back the already-stuck "Manual" value as its baseline and "restore" straight back to
         // it, leaving Acme stuck on Manual forever and breaking every other test that assumes
         // Automatic. Hardcoding the known-correct baseline makes this self-healing instead.
-        await hrSettings.GoToAsync(AcmeId);
-        await hrSettings.SelectEmployeeNumberModeAsync("Manual");
-        await hrSettings.SaveAsync();
-
+        // This mutates the single shared Acme CompanySettings row (employee-numbering mode) for the
+        // duration of the test — serialize against HrSettingsSerialTestBase's group for just this
+        // section rather than pulling this whole class into it; see this class's remarks.
+        await HrSettingsSerialTestBase.GateInstance.WaitAsync();
         try
         {
-            // James Okafor is a pre-seeded employee — edit his Employment tab's Employee Number.
-            await empEdit.GoToAsync(AcmeId, JamesOkaforId);
-            await empEdit.OpenEmploymentTabAsync();
+            await hrSettings.GoToAsync(AcmeId);
+            await hrSettings.SelectEmployeeNumberModeAsync("Manual");
+            await hrSettings.SaveAsync();
 
-            Assert.True(await empEdit.IsEmployeeNumberInputVisibleAsync(),
-                "Expected the Employee Number field to be editable while Numbering Mode is Manual");
+            try
+            {
+                // James Okafor is a pre-seeded employee — edit his Employment tab's Employee Number.
+                await empEdit.GoToAsync(AcmeId, JamesOkaforId);
+                await empEdit.OpenEmploymentTabAsync();
 
-            await empEdit.FillEmployeeNumberAsync(newEmployeeNumber);
-            await empEdit.ClickSaveChangesAsync();
+                Assert.True(await empEdit.IsEmployeeNumberInputVisibleAsync(),
+                    "Expected the Employee Number field to be editable while Numbering Mode is Manual");
 
-            // Re-navigate to confirm the new value persisted and shows in the header badge.
-            await empEdit.GoToAsync(AcmeId, JamesOkaforId);
-            Assert.Equal($"#{newEmployeeNumber}", await empEdit.GetEmployeeNumberHeaderTextAsync());
+                await empEdit.FillEmployeeNumberAsync(newEmployeeNumber);
+                await empEdit.ClickSaveChangesAsync();
+
+                // Re-navigate to confirm the new value persisted and shows in the header badge.
+                await empEdit.GoToAsync(AcmeId, JamesOkaforId);
+                Assert.Equal($"#{newEmployeeNumber}", await empEdit.GetEmployeeNumberHeaderTextAsync());
+            }
+            finally
+            {
+                // Restore to Acme's known seed default so this test doesn't leak state into other
+                // tests/fixtures — see the comment above for why this is hardcoded rather than
+                // capture-and-restore.
+                await hrSettings.GoToAsync(AcmeId);
+                await hrSettings.SelectEmployeeNumberModeAsync("Automatic");
+                await hrSettings.SaveAsync();
+            }
         }
         finally
         {
-            // Restore to Acme's known seed default so this test doesn't leak state into other
-            // tests/fixtures — see the comment above for why this is hardcoded rather than
-            // capture-and-restore.
-            await hrSettings.GoToAsync(AcmeId);
-            await hrSettings.SelectEmployeeNumberModeAsync("Automatic");
-            await hrSettings.SaveAsync();
+            HrSettingsSerialTestBase.GateInstance.Release();
         }
     }
 }

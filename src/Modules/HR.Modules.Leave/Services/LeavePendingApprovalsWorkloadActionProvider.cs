@@ -93,6 +93,15 @@ internal sealed class LeavePendingApprovalsWorkloadActionProvider(
         // so the dashboard shows an explicit "no longer available" state instead. DueDate is the
         // leave's own StartDate: an approval is only truly useful before the leave period begins,
         // so that is the meaningful "due by" date for this action, not the request's submission date.
+        // A pending leave request's approval task is always assigned to the EMPLOYEE'S MANAGER
+        // (see LeaveRequestedHandler) — never to HR. When this provider is composing the HR
+        // workspace, HR is only being shown these rows for company-wide oversight; the item must
+        // not be presented as something HR can click into and action from that list, even though
+        // an HR Administrator's server-side override would separately allow it via GetTask/
+        // CompleteTask. Actionability here always matches the true owner (the manager), regardless
+        // of which workspace requested the data.
+        var isHrOversightOnly = requestedScope == WorkloadScope.Hr;
+
         return pending.Select(p =>
         {
             departments.TryGetValue(p.EmployeeId, out var dept);
@@ -108,7 +117,9 @@ internal sealed class LeavePendingApprovalsWorkloadActionProvider(
                 AssignedTo: null,
                 Status: "Pending",
                 DeepLinkUrl: "",
-                TaskId: taskId);
+                TaskId: taskId,
+                IsOwnerActionable: !isHrOversightOnly,
+                OwnerLabel: isHrOversightOnly ? "Owned by the employee's manager" : null);
         }).ToList();
     }
 }

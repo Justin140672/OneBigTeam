@@ -210,8 +210,10 @@ public sealed class WorkloadActionsReportTests(HrAdminPersonaFixture fixture) : 
         // Whether the "Go" deep link navigates to an employee profile, a task, a leave request,
         // etc. depends entirely on which IWorkloadActionProvider produced the first row in the
         // seeded E2E environment, so this only asserts that at least one exists and that clicking
-        // it performs a real client-side navigation away from the report page — not the exact
-        // destination URL.
+        // it performs a real action — not the exact destination. WorkloadActionsReportPage.razor's
+        // GoToAction shows task-type deep links (/companies/{companyId}/tasks/{taskId}) in-place
+        // via TaskViewDialog rather than navigating away from the report, so a Go click can
+        // legitimately open that dialog instead of changing the URL.
         if (!await report.IsEmptyStateVisibleAsync())
         {
             Assert.True(await report.GetGoButtonCountAsync() > 0,
@@ -220,8 +222,30 @@ public sealed class WorkloadActionsReportTests(HrAdminPersonaFixture fixture) : 
             var startingUrl = _page.Url;
             await report.ClickFirstRowGoButtonAsync();
 
-            Assert.NotEqual(startingUrl, _page.Url);
-            Assert.DoesNotContain("/reporting/workload-actions", _page.Url);
+            // Whichever action this row's Go button triggers (an in-place TaskViewDialog for a
+            // task-type action, or a real navigation for anything else) takes a moment — a Blazor
+            // NavigateTo redirect or the dialog's own open animation aren't guaranteed to have
+            // landed the instant ClickFirstRowGoButtonAsync returns. Poll for either signal instead
+            // of reading _page.Url/IsVisibleAsync as a single instant snapshot, which raced ahead of
+            // a genuine (non-task) navigation and saw neither condition true yet.
+            var taskDialog = _page.GetByRole(AriaRole.Dialog).Filter(new() { Has = _page.Locator("[data-testid='task-title']") });
+            var deadline = DateTime.UtcNow.AddSeconds(10);
+            while (!await taskDialog.IsVisibleAsync() && _page.Url == startingUrl && DateTime.UtcNow < deadline)
+            {
+                await _page.WaitForTimeoutAsync(200);
+            }
+
+            if (await taskDialog.IsVisibleAsync())
+            {
+                // Task-type action: the report stays on the same URL and instead opens the task
+                // in-place — that in itself proves the click performed a real action.
+                await Assertions.Expect(taskDialog).ToBeVisibleAsync();
+            }
+            else
+            {
+                Assert.NotEqual(startingUrl, _page.Url);
+                Assert.DoesNotContain("/reporting/workload-actions", _page.Url);
+            }
         }
     }
 

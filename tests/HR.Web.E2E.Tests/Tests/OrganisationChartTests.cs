@@ -100,9 +100,11 @@ public sealed class OrganisationChartTests(HrAdminPersonaFixture fixture) : Role
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
 
         // "View Org Chart" moved into the "More actions" overflow menu and was renamed
-        // "View Organisation Chart" — see EmployeeEdit.razor's BuildMoreActionsItems.
+        // "View Organisation Chart" — see EmployeeEdit.razor's BuildMoreActionsItems. Id-based
+        // ("#org-chart"), not role+name — see SharedDocumentDetailPage.ClickMoreActionsItemAsync's
+        // remarks for why.
         await _page.GetByRole(AriaRole.Button, new() { Name = "More actions" }).ClickAsync();
-        await _page.GetByRole(AriaRole.Menuitem, new() { Name = "View Organisation Chart" }).ClickAsync();
+        await _page.Locator("#org-chart").ClickAsync();
         await _page.WaitForURLAsync(
             new Regex(@"/organisation-chart\?employeeId="), new() { Timeout = 15_000 });
 

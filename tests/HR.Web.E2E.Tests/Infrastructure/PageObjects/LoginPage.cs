@@ -101,12 +101,15 @@ public sealed class LoginPage(IPage page, string baseUrl)
     /// </summary>
     private async Task<bool> TryCachedLoginAsync(IBrowser browser, string email)
     {
-        var options = await PersonaLoginCache.GetOrLoginAsync(browser, baseUrl, email);
+        var (options, entry) = await PersonaLoginCache.GetOrLoginWithEntryForCallerAsync(browser, baseUrl, email);
         if (options.StorageState is string json && await PersonaLoginCache.TryApplyStorageStateAsync(page, baseUrl, json))
             return true;
 
-        PersonaLoginCache.Invalidate(email);
-        var refreshed = await PersonaLoginCache.GetOrLoginAsync(browser, baseUrl, email);
+        // Route through the coalescing refresh gate instead of a blind Invalidate + relogin — under
+        // load, many racing callers for the SAME persona (overwhelmingly laura.bennett) can hit this
+        // same false-negative app-shell wait at once; only the first should pay for a fresh real
+        // login, the rest should just await and reuse it. See PersonaLoginCache.InvalidateAndRefreshAsync.
+        var refreshed = await PersonaLoginCache.InvalidateAndRefreshAsync(browser, baseUrl, email, entry);
         return refreshed.StorageState is string refreshedJson &&
             await PersonaLoginCache.TryApplyStorageStateAsync(page, baseUrl, refreshedJson);
     }

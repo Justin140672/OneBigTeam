@@ -171,7 +171,10 @@ internal sealed class GetWorkloadActionsHandler(
         a.AssignedTo,
         a.Status,
         a.Urgency.ToString(),
-        a.DeepLinkUrl);
+        a.DeepLinkUrl,
+        a.TaskId,
+        a.IsOwnerActionable,
+        a.OwnerLabel);
 
     private static List<WorkloadActionGroup> GroupRows(
         IReadOnlyList<WorkloadActionRow> rows, Func<WorkloadActionRow, string> keySelector) =>

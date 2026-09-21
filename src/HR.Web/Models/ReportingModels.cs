@@ -412,7 +412,10 @@ public record WorkloadActionRowModel(
     string? AssignedTo,
     string Status,
     string Urgency,
-    string DeepLinkUrl);
+    string DeepLinkUrl,
+    Guid? TaskId = null,
+    bool IsOwnerActionable = true,
+    string? OwnerLabel = null);
 
 public record WorkloadActionGroupModel(
     string Key,

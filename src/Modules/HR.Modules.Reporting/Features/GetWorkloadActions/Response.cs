@@ -19,7 +19,10 @@ internal sealed record WorkloadActionRow(
     string? AssignedTo,
     string Status,
     string Urgency,
-    string DeepLinkUrl);
+    string DeepLinkUrl,
+    Guid? TaskId = null,
+    bool IsOwnerActionable = true,
+    string? OwnerLabel = null);
 
 internal sealed record WorkloadActionGroup(
     string Key,

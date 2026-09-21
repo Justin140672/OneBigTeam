@@ -43,7 +43,10 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #9ca3af;
+    /* #9ca3af (Tailwind gray-400) previously used here only reaches ~2.55:1 contrast against the
+       white card background, failing WCAG AA's 4.5:1 requirement for small/bold text. #6b7280
+       (gray-500, already used elsewhere in this file for .cd-readonly text) reaches ~4.8:1. */
+    color: #6b7280;
     padding-bottom: 4px;
     border-bottom: 1px solid #f3f4f6;
 }
@@ -88,7 +91,9 @@
 
 .cd-hint {
     font-size: 0.75rem;
-    color: #9ca3af;
+    /* Same WCAG AA contrast fix as .cd-section-label above — #9ca3af only reaches ~2.55:1 on the
+       white card background. */
+    color: #6b7280;
 }
 
 .cd-readonly {

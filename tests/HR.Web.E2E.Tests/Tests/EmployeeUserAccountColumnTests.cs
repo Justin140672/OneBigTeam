@@ -160,7 +160,9 @@ public sealed class EmployeeUserAccountColumnTests(HrAdminPersonaFixture fixture
         Assert.False(await moreButton.IsDisabledAsync());
 
         await moreButton.ClickAsync();
-        var exportToExcelItem = _page.GetByRole(AriaRole.Menuitem, new() { Name = "Export to Excel" });
+        // Id-based ("#hr-excel", OverflowActionsMenu.razor's static _items list), not role+name —
+        // see SharedDocumentDetailPage.ClickMoreActionsItemAsync's remarks for why.
+        var exportToExcelItem = _page.Locator("#hr-excel");
         await exportToExcelItem.WaitForAsync(new() { Timeout = 10_000 });
         Assert.True(await exportToExcelItem.IsVisibleAsync());
 

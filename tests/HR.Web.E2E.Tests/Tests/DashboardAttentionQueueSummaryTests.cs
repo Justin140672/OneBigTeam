@@ -40,6 +40,20 @@ public static class DashboardAttentionQueueSummaryTests
     public static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     /// <summary>
+    /// Every possible <see cref="AttentionQueueSupport.ResolveActionLabel"/> value for a
+    /// task-backed row (TaskId is not null) — see that method's switch. A deep-link row (no
+    /// TaskId) never produces the bare word "View": it's always "View &lt;noun&gt;" (e.g. "View
+    /// employee", "View document") or "Review user account"/"View details". So identifying a
+    /// deep-link row means excluding these exact task-backed labels, not looking for an exact
+    /// "View" match.
+    /// </summary>
+    public static readonly string[] TaskBackedActionLabels =
+    [
+        "Open task", "Review leave request", "Review probation",
+        "Complete return-to-work review", "View evidence request",
+    ];
+
+    /// <summary>
     /// Best-effort wait for the single bounded summary request. The dashboards issue this
     /// server-side, so it may never surface as a browser request — a timeout here is not a
     /// failure, it just means the journey couldn't be observed at the network layer.
@@ -186,14 +200,16 @@ public sealed class HrDashboardAttentionQueueSummaryTests(HrAdminPersonaFixture 
         var dashboard = await LoginAndOpenAsync();
         await dashboard.WaitForAttentionQueueLoadedAsync();
 
-        // A row whose primary action reads "View" (rather than "Open task") has no linked TaskId
-        // and navigates its DeepLinkUrl on activation.
+        // A row whose action label isn't one of the task-backed labels (AttentionQueuePanel's
+        // ActivateAsync only opens the task dialog when TaskId is set — see
+        // AttentionQueueSupport.ResolveActionLabel) has no linked TaskId and navigates its
+        // DeepLinkUrl on activation instead.
         var rows = _page.Locator(".attention-queue-card .attention-queue-item");
         var count = await rows.CountAsync();
         for (var i = 0; i < count; i++)
         {
             var action = (await rows.Nth(i).Locator(".attention-queue-action").TextContentAsync())?.Trim();
-            if (!string.Equals(action, "View", StringComparison.OrdinalIgnoreCase))
+            if (action is null || DashboardAttentionQueueSummaryTests.TaskBackedActionLabels.Contains(action, StringComparer.OrdinalIgnoreCase))
                 continue;
 
             await rows.Nth(i).ClickAsync();
@@ -424,7 +440,7 @@ public sealed class ManagerDashboardAttentionQueueSummaryTests(ManagerPersonaFix
         for (var i = 0; i < count; i++)
         {
             var action = (await rows.Nth(i).Locator(".attention-queue-action").TextContentAsync())?.Trim();
-            if (!string.Equals(action, "View", StringComparison.OrdinalIgnoreCase))
+            if (action is null || DashboardAttentionQueueSummaryTests.TaskBackedActionLabels.Contains(action, StringComparer.OrdinalIgnoreCase))
                 continue;
 
             await rows.Nth(i).ClickAsync();

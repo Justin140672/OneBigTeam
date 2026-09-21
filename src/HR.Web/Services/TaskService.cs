@@ -74,21 +74,6 @@ public sealed class TaskService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    public async Task<TaskListResponse?> GetTeamTasksAsync(Guid companyId, Guid managerId, int pageNumber = 1, int pageSize = 20, string? status = null, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var qs = $"pageNumber={pageNumber}&pageSize={pageSize}";
-            if (!string.IsNullOrWhiteSpace(status)) qs += $"&status={Uri.EscapeDataString(status)}";
-            return await Http.GetFromJsonAsync<TaskListResponse>(
-                $"api/companies/{companyId}/employees/{managerId}/team-tasks?{qs}", HrApiJsonOptions.Default, cancellationToken);
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
     public async Task<UnassignedTaskListResponse?> GetUnassignedTasksAsync(Guid companyId, CancellationToken cancellationToken = default)
     {
         try
@@ -121,15 +106,6 @@ public sealed class TaskService(HrApiHttpClientFactory httpClientFactory)
     // ── DSH-03 non-swallowing siblings ──────────────────────────────────────
     // Duplicate the URL/GET of the matching method above but let exceptions propagate so
     // WidgetSourceLoader can observe (and log) a genuine source failure. Do not add try/catch.
-
-    public Task<TaskListResponse?> GetTeamTasksOrThrowAsync(
-        Guid companyId, Guid managerId, int pageNumber = 1, int pageSize = 20, string? status = null, CancellationToken cancellationToken = default)
-    {
-        var qs = $"pageNumber={pageNumber}&pageSize={pageSize}";
-        if (!string.IsNullOrWhiteSpace(status)) qs += $"&status={Uri.EscapeDataString(status)}";
-        return Http.GetFromJsonAsync<TaskListResponse>(
-            $"api/companies/{companyId}/employees/{managerId}/team-tasks?{qs}", HrApiJsonOptions.Default, cancellationToken);
-    }
 
     public Task<UnassignedTaskListResponse?> GetUnassignedTasksOrThrowAsync(Guid companyId, CancellationToken cancellationToken = default) =>
         Http.GetFromJsonAsync<UnassignedTaskListResponse>(

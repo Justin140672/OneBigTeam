@@ -117,7 +117,19 @@ internal sealed class FakeSupabaseAuthGateway(IHttpClientFactory httpClientFacto
         }
 
         var userId = DeriveFakeUserId(email);
-        var expiresAt = DateTimeOffset.UtcNow.AddHours(1);
+        // 12h, not the usual real-Supabase-mirroring 1h: PersonaLoginCache performs each persona's
+        // real login exactly ONCE for the whole E2E run and never proactively refreshes it — every
+        // later test's browser context reuses that same cached storageState/JWT for however long the
+        // run takes. A 1h expiry meant every context built after the run's 1-hour mark carried an
+        // already-expired token, causing a mass "session looks fine but every API call 401s" failure
+        // for every still-running test (worst for laura.bennett, used by ~110 of ~170 classes) — an
+        // entirely separate stampede from the run-start one, indistinguishable from it in symptoms
+        // (bounces to /login, PersonaLoginCache.InvalidateAndRefreshAsync fires, real relogin queues
+        // behind _realLoginGate) but caused by wall-clock elapsed time rather than concurrency. This
+        // token is E2E-only and not a real secret (see E2eFakeSupabaseJwt's remarks), so there's no
+        // reason to mirror production's real 1h Supabase access-token lifetime here — 12h comfortably
+        // outlasts any realistic full-suite run.
+        var expiresAt = DateTimeOffset.UtcNow.AddHours(12);
         var accessToken = E2eFakeSupabaseJwt.CreateAccessToken(
             options.Value.ProjectUrl, userId, email, expiresAt - DateTimeOffset.UtcNow);
 

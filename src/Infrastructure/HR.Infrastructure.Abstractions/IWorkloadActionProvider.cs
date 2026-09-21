@@ -113,6 +113,22 @@ public enum WorkloadActionUrgency
 /// exists — consumers fall back to <paramref name="DeepLinkUrl"/> navigation. Never populated via a
 /// cross-module join. Additive/optional (DSH-06).
 /// </param>
+/// <param name="IsOwnerActionable">
+/// Whether this action is actionable by the caller in the <see cref="WorkloadScope"/> workspace it
+/// was requested for — distinct from mere visibility. A provider may legitimately surface an item
+/// for oversight (e.g. HR viewing a pending leave approval that is actually assigned to the
+/// employee's manager) without it being something the current viewer should be able to click into
+/// and act on from that list. Defaults to true (actionable) so existing providers are unaffected;
+/// a provider must explicitly set this to false when the true task owner differs from the
+/// workspace being composed for. Consumers must never infer actionability from visibility alone,
+/// and must never grant it purely because the caller holds a role (e.g. HR) that a server-side
+/// override would separately allow — this flag governs presentation only, never authorization.
+/// </param>
+/// <param name="OwnerLabel">
+/// Human-readable owner/responsibility label shown when <see cref="IsOwnerActionable"/> is false,
+/// e.g. "Owned by the employee's manager" — lets a read-only row explain who this action actually
+/// belongs to rather than implying it is stale/missing.
+/// </param>
 public sealed record WorkloadAction(
     Guid EmployeeId,
     string EmployeeName,
@@ -124,7 +140,9 @@ public sealed record WorkloadAction(
     string Status,
     string DeepLinkUrl,
     WorkloadActionUrgency Urgency = WorkloadActionUrgency.Upcoming,
-    Guid? TaskId = null)
+    Guid? TaskId = null,
+    bool IsOwnerActionable = true,
+    string? OwnerLabel = null)
 {
     public static WorkloadActionUrgency ComputeUrgency(DateOnly? dueDate, DateOnly today)
     {

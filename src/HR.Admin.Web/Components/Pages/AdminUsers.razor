@@ -321,6 +321,16 @@ else
 
             if (succeeded)
             {
+                // Render the success/failure message NOW, before paying for a full administrator-list
+                // reload. Without this, Blazor doesn't re-render between the two awaits above and the
+                // one inside LoadAsync() below — the success banner and the reloaded list only appear
+                // together once LoadAsync() itself finishes, so under load (more seeded/created
+                // administrators accumulating across a long E2E run, each GetAdministratorsOrNullAsync
+                // call getting slower) the banner's apparent appearance time was actually bounded by an
+                // unrelated list-reload query, not by the action that had already completed. The action
+                // itself (reset password / disable / etc.) is already done by this point; showing its
+                // result doesn't need to wait on a subsequent, logically separate list refresh.
+                StateHasChanged();
                 await LoadAsync();
             }
         }

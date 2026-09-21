@@ -646,16 +646,36 @@
 
     private void GoToAction(WorkloadActionRowModel row)
     {
+        // Actionability is scoped to the workspace this report is being viewed under (HR vs
+        // Manager, resolved server-side) — a row can be visible for oversight (e.g. HR seeing a
+        // manager-owned leave approval, or a manager seeing an employee's own sickness evidence
+        // follow-up) without being something the current viewer should open/act on from here, even
+        // though a server-side HR-administrator override would separately allow it.
+        if (!row.IsOwnerActionable)
+            return;
+
+        // Task-backed rows (e.g. Leave/Sickness — see LeavePendingApprovalsWorkloadActionProvider,
+        // SicknessPendingActionsWorkloadActionProvider) carry TaskId directly rather than a deep
+        // link into /companies/{companyId}/tasks/{taskId}; open those via the standard
+        // TaskViewDialog in place rather than requiring a synthetic deep link URL.
+        if (row.TaskId is { } taskId)
+        {
+            _selectedTaskId = taskId;
+            _taskDialogOpen = true;
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(row.DeepLinkUrl))
             return;
 
-        // Manager task actions link to /companies/{companyId}/tasks/{taskId} — show the task
-        // in-place via the existing TaskViewDialog rather than navigating away from the report.
+        // Some providers (e.g. the Tasks module's own overdue-task providers) still construct a
+        // /companies/{companyId}/tasks/{taskId} deep link directly — keep that in-place-open
+        // behaviour too, alongside genuine external deep links.
         var taskLinkPrefix = $"/companies/{CompanyId}/tasks/";
         if (row.DeepLinkUrl.StartsWith(taskLinkPrefix, StringComparison.OrdinalIgnoreCase)
-            && Guid.TryParse(row.DeepLinkUrl[taskLinkPrefix.Length..], out var taskId))
+            && Guid.TryParse(row.DeepLinkUrl[taskLinkPrefix.Length..], out var legacyTaskId))
         {
-            _selectedTaskId = taskId;
+            _selectedTaskId = legacyTaskId;
             _taskDialogOpen = true;
             return;
         }
@@ -709,7 +729,14 @@
                     @{
                         var item = (WorkloadActionRowModel)context;
                     }
-                    <a href="javascript:void(0)" @onclick="@(() => GoToAction(item))">@item.EmployeeName</a>
+                    @if (item.IsOwnerActionable)
+                    {
+                        <a href="javascript:void(0)" @onclick="@(() => GoToAction(item))">@item.EmployeeName</a>
+                    }
+                    else
+                    {
+                        <span>@item.EmployeeName</span>
+                    }
                 </Template>
             </GridColumn>
             <GridColumn Field="@nameof(WorkloadActionRowModel.Department)" HeaderText="Department" Width="140" />
@@ -726,12 +753,19 @@
                     <span class="@UrgencyBadgeClass(item.Urgency)">@item.Urgency</span>
                 </Template>
             </GridColumn>
-            <GridColumn HeaderText="Action" Width="90">
+            <GridColumn HeaderText="Action" Width="130">
                 <Template>
                     @{
                         var item = (WorkloadActionRowModel)context;
                     }
-                    <SfButton OnClick="@(() => GoToAction(item))">Go</SfButton>
+                    @if (item.IsOwnerActionable)
+                    {
+                        <SfButton OnClick="@(() => GoToAction(item))">Go</SfButton>
+                    }
+                    else
+                    {
+                        <span class="text-muted small" title="@item.OwnerLabel">@item.OwnerLabel</span>
+                    }
                 </Template>
             </GridColumn>
         </GridColumns>

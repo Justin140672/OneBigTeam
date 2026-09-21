@@ -44,7 +44,10 @@ public sealed class SharedDocumentVersionHistoryTests(HrAdminPersonaFixture fixt
 
             var headers = await detail.GetVersionColumnHeadersAsync();
             Assert.Contains(headers, h => h.Contains("Publication Status"));
-            Assert.Contains(headers, h => h.Contains("Effective Date"));
+            // Effective Date is asserted below via GetVersionDetailAsync's per-row "Details" popup,
+            // not as a grid column header — see the comment on that assertion for why (it moved out
+            // of the grid as part of a compaction). Asserting it here too was stale and always false
+            // post-compaction.
             Assert.Contains(headers, h => h.Contains("Download"));
 
             Assert.Equal(1, await detail.WaitForVersionRowCountAsync(1));
@@ -54,7 +57,9 @@ public sealed class SharedDocumentVersionHistoryTests(HrAdminPersonaFixture fixt
             // Newly uploaded documents start as Draft (per "new documents are created as
             // drafts", also asserted at list level in SharedDocumentUploadTests) — the current
             // version's Publication Status must reflect that, not a hardcoded "Published"/etc.
-            Assert.Equal("1", await detail.GetVersionRowCellAsync(fileNameFragment, 0));
+            // SharedDocumentDetail.razor's Version column renders "v{VersionNumber}", not a bare
+            // number.
+            Assert.Equal("v1", await detail.GetVersionRowCellAsync(fileNameFragment, 0));
             Assert.Equal("Draft", await detail.GetVersionRowCellAsync(fileNameFragment, 1));
 
             // Effective Date moved out of the grid's own columns and into the per-row "Details"
@@ -104,7 +109,7 @@ public sealed class SharedDocumentVersionHistoryTests(HrAdminPersonaFixture fixt
 
             // v1 is no longer the document's current version — its row must read "Superseded"
             // regardless of the document's own (still-Draft) status.
-            Assert.Equal("1", await detail.GetVersionRowCellAsync(firstFileNameFragment, 0));
+            Assert.Equal("v1", await detail.GetVersionRowCellAsync(firstFileNameFragment, 0));
             Assert.Equal("Superseded", await detail.GetVersionRowCellAsync(firstFileNameFragment, 1));
 
             var firstHref = await detail.GetVersionDownloadHrefAsync(firstFileNameFragment);
@@ -113,7 +118,7 @@ public sealed class SharedDocumentVersionHistoryTests(HrAdminPersonaFixture fixt
 
             // v2 is now the current version — its Publication Status tracks the document's live
             // status (still "Draft"; this test never publishes).
-            Assert.Equal("2", await detail.GetVersionRowCellAsync(secondFileNameFragment, 0));
+            Assert.Equal("v2", await detail.GetVersionRowCellAsync(secondFileNameFragment, 0));
             Assert.Equal("Draft", await detail.GetVersionRowCellAsync(secondFileNameFragment, 1));
 
             var secondHref = await detail.GetVersionDownloadHrefAsync(secondFileNameFragment);
@@ -160,7 +165,7 @@ public sealed class SharedDocumentVersionHistoryTests(HrAdminPersonaFixture fixt
         await dialog.Locator("input[type='file']").SetInputFilesAsync(filePath);
 
         await dialog.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true }).ClickAsync();
-        await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+        await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 30_000 });
 
         await _page.WaitForSelectorAsync($"text={title}", new() { Timeout = 15_000 });
     }

@@ -38,8 +38,11 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
     public async Task SaveAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
-        // Navigates back to the position-profiles list on success.
-        await page.WaitForURLAsync("**/position-profiles", new() { Timeout = 30_000 });
+        // Navigates back to the position-profiles list on success. WaitUntil=Commit, not the
+        // default Load: a Blazor interactive navigation may never re-fire the target document's
+        // "load" event (same fix as PositionProfileListPage.ClickNewPositionProfileAsync).
+        await page.WaitForURLAsync("**/position-profiles",
+            new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
         // With prerender:false the circuit connects after navigation, wait for the grid.
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
@@ -83,12 +86,15 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
     }
 
     /// <summary>
-    /// Selects a value ("Annual", "Hourly", "Daily", …) from the "Salary Type" dropdown in the
-    /// Defaults card. Scoped to that field's own <c>.hr-field</c> wrapper by label, same pattern as
-    /// <see cref="SelectDefaultLeavePolicyAsync"/> (the card has three sibling comboboxes).
+    /// Selects a value ("Annual", "Hourly", "Daily", …) from the salary type dropdown in the
+    /// Defaults card. The Defaults card's redesign folded the Min/Max/Type salary inputs into a
+    /// single "Salary Range" group (<c>#pp-salary-range-label</c>) rather than three separate
+    /// <c>.hr-field</c>-wrapped fields, so there is no ".hr-field" containing the text "Salary
+    /// Type" any more — the combobox is only identified by its own aria-label ("Salary type").
+    /// Scope directly to that group instead of a (now-nonexistent) label-text filter.
     /// </summary>
     public Task SelectSalaryTypeAsync(string salaryType) =>
-        DropDownSelector.SelectAsync(page, page.Locator(".hr-field", new PageLocatorOptions { HasText = "Salary Type" }), salaryType);
+        DropDownSelector.SelectAsync(page, page.Locator("[aria-labelledby='pp-salary-range-label']"), salaryType);
 
     /// <summary>Selects a value from the Department dropdown on the position profile create/edit form.</summary>
     public Task SelectDepartmentAsync(string nameFragment) =>
@@ -213,14 +219,17 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
     public async Task ConfirmDiscardChangesAsync()
     {
         await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Discard Changes" }).ClickAsync();
-        await page.WaitForURLAsync("**/position-profiles", new() { Timeout = 30_000 });
+        // WaitUntil=Commit, not the default Load — see SaveAsync's comment above.
+        await page.WaitForURLAsync("**/position-profiles",
+            new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
     public async Task ConfirmSaveFromUnsavedChangesDialogAsync()
     {
         await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
-        await page.WaitForURLAsync("**/position-profiles", new() { Timeout = 30_000 });
+        await page.WaitForURLAsync("**/position-profiles",
+            new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
@@ -230,7 +239,8 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
     public async Task CloseAndWaitForListAsync()
     {
         await ClickCloseAsync();
-        await page.WaitForURLAsync("**/position-profiles", new() { Timeout = 30_000 });
+        await page.WaitForURLAsync("**/position-profiles",
+            new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 

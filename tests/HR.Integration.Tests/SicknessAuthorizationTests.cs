@@ -268,30 +268,8 @@ public class SicknessAuthorizationTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // --- sickness:review — GetOverdueReturnToWorkReviews / GetMissingFitNotes now include
-    // Manager (dashboard widening; was previously "sickness:manage", HrAdministrator only) ---
-
-    [Fact]
-    public async Task Manager_Gets_Ok_Getting_Overdue_ReturnToWork_Reviews()
-    {
-        var companyId = Guid.NewGuid();
-        using var client = await ClientFor(companyId, ManagerUser);
-
-        var response = await client.GetAsync($"/api/companies/{companyId}/return-to-work-reviews/overdue");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task PlainEmployee_Gets_Forbidden_Getting_Overdue_ReturnToWork_Reviews()
-    {
-        var companyId = Guid.NewGuid();
-        using var client = await ClientFor(companyId, PlainEmployeeUser);
-
-        var response = await client.GetAsync($"/api/companies/{companyId}/return-to-work-reviews/overdue");
-
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-    }
+    // --- sickness:review — GetMissingFitNotes now includes Manager (dashboard widening; was
+    // previously "sickness:manage", HrAdministrator only) ---
 
     [Fact]
     public async Task Manager_Gets_Ok_Getting_Missing_Fit_Notes()

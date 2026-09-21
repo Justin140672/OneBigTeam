@@ -6,7 +6,6 @@ using HR.Modules.Tasks.Features.CompleteTask;
 using HR.Modules.Tasks.Features.CompleteTask.Actions;
 using HR.Modules.Tasks.Features.GetEmployeeTasks;
 using HR.Modules.Tasks.Features.GetMyTasks;
-using HR.Modules.Tasks.Features.GetTeamTasks;
 using HR.Modules.Tasks.Features.GetTask;
 using HR.Modules.Tasks.Features.GetOutstandingTaskCount;
 using HR.Modules.Tasks.Features.GetUnassignedTasks;
@@ -73,7 +72,6 @@ public static class TasksModule
         services.AddScoped<GetUnassignedTasksHandler>();
         services.AddScoped<GetOutstandingTaskCountHandler>();
         services.AddScoped<GetMyTasksHandler>();
-        services.AddScoped<GetTeamTasksHandler>();
         services.AddScoped<GetEmployeeTasksHandler>();
         services.AddScoped<ReassignTaskHandler>();
         services.AddScoped<CompleteTaskHandler>();

@@ -130,7 +130,9 @@ internal sealed class DashboardSummaryComposer(
                         IsOverdue: a.Urgency == WorkloadActionUrgency.Overdue,
                         Status: a.Status,
                         DeepLinkUrl: a.DeepLinkUrl,
-                        TaskId: a.TaskId))
+                        TaskId: a.TaskId,
+                        IsOwnerActionable: a.IsOwnerActionable,
+                        OwnerLabel: a.OwnerLabel))
                     .ToList();
 
                 return new DashboardCategoryResult(

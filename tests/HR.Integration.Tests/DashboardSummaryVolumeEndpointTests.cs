@@ -64,10 +64,13 @@ public class DashboardSummaryVolumeEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         // HrAdministrator -> company-wide provider scoping for a single summary request.
+        // Uses the HR summary endpoint (WorkloadScope.Hr): the Manager summary endpoint always
+        // applies manager-team scoping regardless of caller roles (see GetManagerDashboardSummaryHandler),
+        // so it would never see company-wide volume for a caller with no reporting sub-tree.
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator, companyId);
 
         var stopwatch = Stopwatch.StartNew();
-        var response = await client.GetAsync($"/api/companies/{companyId}/dashboards/manager/summary");
+        var response = await client.GetAsync($"/api/companies/{companyId}/dashboards/hr/summary");
         stopwatch.Stop();
 
         _output.WriteLine(

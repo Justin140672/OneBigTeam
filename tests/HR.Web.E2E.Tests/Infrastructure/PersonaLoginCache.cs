@@ -44,6 +44,25 @@ internal static class PersonaLoginCache
     // without re-introducing the app-shell timeouts this cap was added to prevent.
     private static readonly SemaphoreSlim _realLoginGate = new(6, 6);
 
+    // Per-persona coalescing gate for the invalidate-then-relogin path (see
+    // <see cref="InvalidateAndRefreshAsync"/>). Under 15-thread concurrency, a cached session can
+    // fail its 10s app-shell wait (TryApplyStorageStateAsync) purely because the shared app is
+    // momentarily slow to render — not because the session is actually stale. Before this gate,
+    // every racing caller that hit that false negative independently called Invalidate + a fresh
+    // real login, and because Invalidate blindly removed whatever was currently cached (no
+    // identity check against the entry a given caller had actually observed as stale), a burst of
+    // N racing callers for the same persona (overwhelmingly laura.bennett, used by ~110 of ~170
+    // classes) could each in turn evict the freshly-published GOOD session another caller had just
+    // finished logging in, ratcheting up to N redundant real logins in a row. Each real login can
+    // itself cost up to 5 attempts x 45s app-shell waits, so a small stampede here is exactly what
+    // produced the 4-5 MINUTE class durations and "failed after 5 attempts" errors observed for
+    // laura-heavy classes — the very app load this coalescing exists to relieve. Routing every
+    // invalidate+relogin for a given persona through one gate means only the FIRST racing caller
+    // actually performs a fresh real login; every other racing caller for that same persona simply
+    // waits for it and reuses its result instead of independently repeating the same expensive,
+    // load-adding work.
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> _refreshGates = new();
+
     public static Task<BrowserNewContextOptions> GetOrLoginAsync(AppFixture app, string personaEmail) =>
         GetOrLoginAsync(app.Browser, app.WebBaseUrl, personaEmail);
 
@@ -56,6 +75,28 @@ internal static class PersonaLoginCache
     /// </summary>
     public static async Task<BrowserNewContextOptions> GetOrLoginAsync(IBrowser browser, string baseUrl, string personaEmail)
     {
+        var (options, _) = await GetOrLoginWithEntryAsync(browser, baseUrl, personaEmail);
+        return options;
+    }
+
+    /// <summary>
+    /// Same as <see cref="GetOrLoginAsync(IBrowser,string,string)"/>, but also hands back the exact
+    /// <see cref="Lazy{T}"/> cache entry the caller observed, so a later caller that finds this
+    /// entry's storageState doesn't actually work can atomically evict THIS SPECIFIC entry (via
+    /// <see cref="InvalidateAndRefreshAsync"/>) rather than blindly clearing whatever happens to be
+    /// cached at that later moment — which could by then be a different, already-good entry another
+    /// racing caller just published.
+    /// </summary>
+    public static async Task<(BrowserNewContextOptions Options, object Entry)> GetOrLoginWithEntryForCallerAsync(
+        IBrowser browser, string baseUrl, string personaEmail)
+    {
+        var (options, entry) = await GetOrLoginWithEntryAsync(browser, baseUrl, personaEmail);
+        return (options, entry);
+    }
+
+    private static async Task<(BrowserNewContextOptions Options, Lazy<Task<BrowserNewContextOptions>> Entry)> GetOrLoginWithEntryAsync(
+        IBrowser browser, string baseUrl, string personaEmail)
+    {
         var entry = _cache.GetOrAdd(
             personaEmail,
             email => new Lazy<Task<BrowserNewContextOptions>>(
@@ -64,7 +105,7 @@ internal static class PersonaLoginCache
 
         try
         {
-            return await entry.Value;
+            return (await entry.Value, entry);
         }
         catch
         {
@@ -83,12 +124,39 @@ internal static class PersonaLoginCache
     }
 
     /// <summary>
-    /// Drops a persona's cached storageState, e.g. because applying it to a page failed to reach the
-    /// authenticated shell (likely a stale/expired Supabase session). The next
-    /// <see cref="GetOrLoginAsync(IBrowser,string,string)"/> call for that persona performs a fresh
-    /// real login instead of handing out the (apparently no-longer-valid) cached one.
+    /// Coalescing replacement for the old "blind Invalidate + GetOrLoginAsync" sequence
+    /// (<see cref="PageObjects.LoginPage.TryCachedLoginAsync"/>'s fallback when a cached session's
+    /// app-shell wait fails). Routes every caller for the same persona through a per-persona gate so
+    /// only the FIRST racing caller performs a fresh real login; every other caller who hit the same
+    /// false-negative app-shell wait (a symptom of general app load under 15-thread concurrency, not
+    /// necessarily a genuinely stale session) waits for that one relogin and reuses its result instead
+    /// of independently repeating the same expensive real-login work — which is exactly what was
+    /// stacking multiple redundant 45s-per-attempt real logins for laura.bennett and producing the
+    /// 4-5 minute class durations and "failed after 5 attempts" errors. Only evicts
+    /// <paramref name="staleEntry"/> itself (not "whatever is cached now") so a caller that raced
+    /// behind an already-completed refresh doesn't evict that fresh good entry.
     /// </summary>
-    public static void Invalidate(string personaEmail) => _cache.TryRemove(personaEmail, out _);
+    public static async Task<BrowserNewContextOptions> InvalidateAndRefreshAsync(
+        IBrowser browser, string baseUrl, string personaEmail, object staleEntry)
+    {
+        var gate = _refreshGates.GetOrAdd(personaEmail, _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync();
+        try
+        {
+            if (staleEntry is Lazy<Task<BrowserNewContextOptions>> typedStaleEntry)
+            {
+                ((ICollection<KeyValuePair<string, Lazy<Task<BrowserNewContextOptions>>>>)_cache)
+                    .Remove(new KeyValuePair<string, Lazy<Task<BrowserNewContextOptions>>>(personaEmail, typedStaleEntry));
+            }
+
+            var (options, _) = await GetOrLoginWithEntryAsync(browser, baseUrl, personaEmail);
+            return options;
+        }
+        finally
+        {
+            gate.Release();
+        }
+    }
 
     /// <summary>
     /// Publishes an already-authenticated page's current storageState as the cache entry for

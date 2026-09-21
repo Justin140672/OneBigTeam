@@ -25,8 +25,16 @@ namespace HR.Web.E2E.Tests.Tests;
 /// (shared-document:manage) — the "Default Acknowledgement Statement" field used to live on
 /// Company Settings (CompanyAdministrator-only) but has since moved to the standalone HR Settings
 /// page, which only an HrAdministrator can reach.
+///
+/// Only 3 of this class's 7 methods actually mutate the shared Acme CompanySettings row (they call
+/// HrSettingsPage.SetDefaultAcknowledgementStatementAsync + SaveAsync) — the other 4 just
+/// upload/publish/edit documents with unique GUID-suffixed titles and never touch that row. This
+/// class therefore runs as an ordinary parallel-eligible class (not class-level
+/// HrSettingsSerialTestBase) so those 4 aren't forced to queue behind the whole "HrSettingsSerial"
+/// group for no reason; the 3 mutating methods acquire HrSettingsSerialTestBase.GateInstance
+/// directly instead — see CreateEmployeeTests' remarks for the same pattern applied there first.
 /// </summary>
-public sealed class SharedCompanyDocumentAcknowledgementSettingsTests(HrSettingsSerialFixture fixture) : HrSettingsSerialTestBase(fixture)
+public sealed class SharedCompanyDocumentAcknowledgementSettingsTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
@@ -41,20 +49,30 @@ public sealed class SharedCompanyDocumentAcknowledgementSettingsTests(HrSettings
         await login.GoToAsync();
         await login.LoginAsync(HrEmail);
 
-        await hrSettings.GoToAsync(AcmeId);
+        // Mutates the single shared Acme CompanySettings row — serialize against
+        // HrSettingsSerialTestBase's group for just this section; see this class's remarks.
+        await HrSettingsSerialTestBase.GateInstance.WaitAsync();
+        try
+        {
+            await hrSettings.GoToAsync(AcmeId);
 
-        var statement = $"Default acknowledgement statement {Guid.NewGuid():N}";
-        await hrSettings.SetDefaultAcknowledgementStatementAsync(statement);
+            var statement = $"Default acknowledgement statement {Guid.NewGuid():N}";
+            await hrSettings.SetDefaultAcknowledgementStatementAsync(statement);
 
-        await hrSettings.SaveAsync();
-        Assert.False(await hrSettings.HasErrorAsync(),
-            "Expected no error after saving the default acknowledgement statement");
+            await hrSettings.SaveAsync();
+            Assert.False(await hrSettings.HasErrorAsync(),
+                "Expected no error after saving the default acknowledgement statement");
 
-        // Reload the page for real (re-navigate) to exercise the settings-hydration path, not
-        // just in-memory Blazor state — same pattern as HrSettingsPageTests.
-        await hrSettings.GoToAsync(AcmeId);
+            // Reload the page for real (re-navigate) to exercise the settings-hydration path, not
+            // just in-memory Blazor state — same pattern as HrSettingsPageTests.
+            await hrSettings.GoToAsync(AcmeId);
 
-        Assert.Equal(statement, await hrSettings.GetDefaultAcknowledgementStatementAsync());
+            Assert.Equal(statement, await hrSettings.GetDefaultAcknowledgementStatementAsync());
+        }
+        finally
+        {
+            HrSettingsSerialTestBase.GateInstance.Release();
+        }
     }
 
     [Fact]
@@ -67,22 +85,34 @@ public sealed class SharedCompanyDocumentAcknowledgementSettingsTests(HrSettings
         await login.GoToAsync();
         await login.LoginAsync(HrEmail);
 
-        var defaultStatement = $"Default statement {Guid.NewGuid():N}";
-        await hrSettings.GoToAsync(AcmeId);
-        await hrSettings.SetDefaultAcknowledgementStatementAsync(defaultStatement);
-        await hrSettings.SaveAsync();
-        Assert.False(await hrSettings.HasErrorAsync());
+        // Mutates the single shared Acme CompanySettings row, then reads that same default back via
+        // the upload dialog's auto-populate — held for the whole test (not just the save) so another
+        // concurrent mutator in this group can't change the default in between; see this class's
+        // remarks.
+        await HrSettingsSerialTestBase.GateInstance.WaitAsync();
+        try
+        {
+            var defaultStatement = $"Default statement {Guid.NewGuid():N}";
+            await hrSettings.GoToAsync(AcmeId);
+            await hrSettings.SetDefaultAcknowledgementStatementAsync(defaultStatement);
+            await hrSettings.SaveAsync();
+            Assert.False(await hrSettings.HasErrorAsync());
 
-        await upload.GoToListAsync(AcmeId);
-        await upload.OpenAsync();
+            await upload.GoToListAsync(AcmeId);
+            await upload.OpenAsync();
 
-        await upload.FillTitleAsync($"Test Policy {Guid.NewGuid():N}");
-        await upload.SelectCategoryAsync("Policy");
+            await upload.FillTitleAsync($"Test Policy {Guid.NewGuid():N}");
+            await upload.SelectCategoryAsync("Policy");
 
-        await upload.CheckRequiresAcknowledgementAsync();
+            await upload.CheckRequiresAcknowledgementAsync();
 
-        Assert.Equal(defaultStatement, await upload.GetAcknowledgementStatementValueAsync());
-        Assert.Equal(defaultStatement, await upload.GetAcknowledgementPreviewTextAsync());
+            Assert.Equal(defaultStatement, await upload.GetAcknowledgementStatementValueAsync());
+            Assert.Equal(defaultStatement, await upload.GetAcknowledgementPreviewTextAsync());
+        }
+        finally
+        {
+            HrSettingsSerialTestBase.GateInstance.Release();
+        }
     }
 
     [Fact]
@@ -191,27 +221,38 @@ public sealed class SharedCompanyDocumentAcknowledgementSettingsTests(HrSettings
         await login.GoToAsync();
         await login.LoginAsync(HrEmail);
 
-        var defaultStatement = $"Default statement {Guid.NewGuid():N}";
-        await hrSettings.GoToAsync(AcmeId);
-        await hrSettings.SetDefaultAcknowledgementStatementAsync(defaultStatement);
-        await hrSettings.SaveAsync();
-        Assert.False(await hrSettings.HasErrorAsync());
+        // Mutates the single shared Acme CompanySettings row, then reads that same default back via
+        // "Reset to Default" — held for the whole test (not just the save) so another concurrent
+        // mutator in this group can't change the default in between; see this class's remarks.
+        await HrSettingsSerialTestBase.GateInstance.WaitAsync();
+        try
+        {
+            var defaultStatement = $"Default statement {Guid.NewGuid():N}";
+            await hrSettings.GoToAsync(AcmeId);
+            await hrSettings.SetDefaultAcknowledgementStatementAsync(defaultStatement);
+            await hrSettings.SaveAsync();
+            Assert.False(await hrSettings.HasErrorAsync());
 
-        var documentId = await UploadDraftDocumentAsync();
+            var documentId = await UploadDraftDocumentAsync();
 
-        await detail.GoToAsync(AcmeId, documentId);
-        await detail.RequireAcknowledgementAsync(DateOnly.FromDateTime(DateTime.UtcNow.AddDays(14)));
+            await detail.GoToAsync(AcmeId, documentId);
+            await detail.RequireAcknowledgementAsync(DateOnly.FromDateTime(DateTime.UtcNow.AddDays(14)));
 
-        // Set the statement to something other than the default first, so the reset is a
-        // meaningful assertion rather than a no-op.
-        await detail.OpenEditAcknowledgementDialogAsync();
-        await detail.FillAcknowledgementStatementAsync($"Custom statement {Guid.NewGuid():N}");
-        await detail.SaveEditAcknowledgementDialogAsync();
+            // Set the statement to something other than the default first, so the reset is a
+            // meaningful assertion rather than a no-op.
+            await detail.OpenEditAcknowledgementDialogAsync();
+            await detail.FillAcknowledgementStatementAsync($"Custom statement {Guid.NewGuid():N}");
+            await detail.SaveEditAcknowledgementDialogAsync();
 
-        await detail.OpenEditAcknowledgementDialogAsync();
-        await detail.ClickResetAcknowledgementStatementToDefaultAsync();
+            await detail.OpenEditAcknowledgementDialogAsync();
+            await detail.ClickResetAcknowledgementStatementToDefaultAsync();
 
-        Assert.Equal(defaultStatement, await detail.GetAcknowledgementStatementValueAsync());
+            Assert.Equal(defaultStatement, await detail.GetAcknowledgementStatementValueAsync());
+        }
+        finally
+        {
+            HrSettingsSerialTestBase.GateInstance.Release();
+        }
     }
 
     [Fact]

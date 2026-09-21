@@ -160,9 +160,20 @@ public sealed class CandidateOfferDetailsAndResponseTests(CrossUserFixture fixtu
     /// <summary>
     /// Logs in as Laura to create a fresh, uniquely-titled Position Profile with a salary range
     /// (Engineering / London Office / Standard leave policy — mandatory fields), switches to Marcus
-    /// to create + publish a vacancy against it, then adds <paramref name="candidateLast"/> as an
-    /// application. No interview is scheduled — "Offer" only requires an active, non-terminal,
-    /// no-pending-interview application. Returns (candidateLast, vacancyTitle).
+    /// ONCE to create the candidate and publish a vacancy against it, then adds
+    /// <paramref name="candidateLast"/> as an application. No interview is scheduled — "Offer" only
+    /// requires an active, non-terminal, no-pending-interview application. Returns (candidateLast,
+    /// vacancyTitle).
+    ///
+    /// Deliberately does the Laura (HR Administrator) work FIRST and switches to Marcus (Recruiter)
+    /// exactly once, rather than Marcus → Laura → Marcus: each <see cref="LoginPage.SwitchAccountAsync"/>
+    /// call re-enters the same real-Supabase-login/persona-cache machinery
+    /// <see cref="LoginPage.LoginAsync"/> uses (see PersonaLoginCache), which under 15-thread E2E
+    /// concurrency can itself cost a full "invalidate + up to 5 attempts x 45s real login" cascade on
+    /// a cache miss. A needless switch back to the SAME persona (Marcus → Laura → Marcus) triples this
+    /// test's exposure to that worst case for no product-behavior reason — Candidate creation has no
+    /// dependency on the Position Profile, so it can simply happen after switching to Marcus, in the
+    /// same single Marcus session that also creates/publishes the Vacancy and adds the application.
     /// </summary>
     private async Task<(string Candidate, string Vacancy)> ArrangePreOfferApplicationAsync(
         LoginPage login,
@@ -180,18 +191,9 @@ public sealed class CandidateOfferDetailsAndResponseTests(CrossUserFixture fixtu
         var profileTitle = $"E2E Offer Profile {unique}";
 
         await login.GoToAsync();
-        await login.LoginAsync(MarcusEmail);
-
-        // Candidate (candidate:view is Recruiter-only — create as Marcus).
-        await candidateList.GoToAsync(AcmeId);
-        await candidateList.ClickNewCandidateAsync();
-        await candidateEdit.FillFirstNameAsync("E2E");
-        await candidateEdit.FillLastNameAsync(candidateLast);
-        await candidateEdit.FillEmailAsync($"e2e.{candidateLast.ToLowerInvariant()}@example.com");
-        await candidateEdit.SaveNewCandidateAsync();
+        await login.LoginAsync(LauraEmail);
 
         // Position Profile with a salary range (needs HR Administrator).
-        await login.SwitchAccountAsync(LauraEmail);
         await ppList.GoToAsync(AcmeId);
         await ppList.ClickNewPositionProfileAsync();
         await ppEdit.FillTitleAsync(profileTitle);
@@ -202,8 +204,17 @@ public sealed class CandidateOfferDetailsAndResponseTests(CrossUserFixture fixtu
         await ppEdit.SelectSalaryTypeAsync("Annual");
         await ppEdit.SaveAsync();
 
-        // Vacancy (recruitment:manage — back to Marcus).
+        // Candidate + Vacancy (candidate:view and recruitment:manage are both Recruiter-only —
+        // switch to Marcus exactly once for the rest of this arrangement).
         await login.SwitchAccountAsync(MarcusEmail);
+
+        await candidateList.GoToAsync(AcmeId);
+        await candidateList.ClickNewCandidateAsync();
+        await candidateEdit.FillFirstNameAsync("E2E");
+        await candidateEdit.FillLastNameAsync(candidateLast);
+        await candidateEdit.FillEmailAsync($"e2e.{candidateLast.ToLowerInvariant()}@example.com");
+        await candidateEdit.SaveNewCandidateAsync();
+
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickNewVacancyAsync();
         await vacancyDetail.FillTitleAsync(vacancyTitle);

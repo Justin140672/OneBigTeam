@@ -157,21 +157,6 @@ public sealed class SicknessService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    public async Task<GetOverdueReturnToWorkReviewsResponseModel?> GetOverdueReturnToWorkReviewsAsync(
-        Guid companyId,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            return await Http.GetFromJsonAsync<GetOverdueReturnToWorkReviewsResponseModel>(
-                $"api/companies/{companyId}/return-to-work-reviews/overdue", HrApiJsonOptions.Default, cancellationToken);
-        }
-        catch
-        {
-            return null;
-        }
-    }
-
     public async Task<GetMissingFitNotesResponseModel?> GetMissingFitNotesAsync(
         Guid companyId,
         CancellationToken cancellationToken = default)
@@ -188,11 +173,6 @@ public sealed class SicknessService(HrApiHttpClientFactory httpClientFactory)
     }
 
     // DSH-03: non-swallowing siblings.
-    public Task<GetOverdueReturnToWorkReviewsResponseModel?> GetOverdueReturnToWorkReviewsOrThrowAsync(
-        Guid companyId, CancellationToken cancellationToken = default) =>
-        Http.GetFromJsonAsync<GetOverdueReturnToWorkReviewsResponseModel>(
-            $"api/companies/{companyId}/return-to-work-reviews/overdue", HrApiJsonOptions.Default, cancellationToken);
-
     public Task<GetMissingFitNotesResponseModel?> GetMissingFitNotesOrThrowAsync(
         Guid companyId, CancellationToken cancellationToken = default) =>
         Http.GetFromJsonAsync<GetMissingFitNotesResponseModel>(

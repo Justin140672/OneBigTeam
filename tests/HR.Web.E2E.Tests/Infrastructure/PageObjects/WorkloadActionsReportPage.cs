@@ -163,14 +163,11 @@ public sealed class WorkloadActionsReportPage(IPage page, string baseUrl)
     public async Task<int> GetGoButtonCountAsync() => await GoButtons.CountAsync();
 
     /// <summary>
-    /// Clicks the "Go" action button on the first grid row and waits for the resulting
-    /// client-side navigation (via <c>Navigation.NavigateTo</c> in the page's code-behind) to
-    /// leave the workload-actions report URL.
+    /// Clicks the "Go" action button on the first grid row. For most action types this triggers a
+    /// client-side navigation away from the report (via <c>Navigation.NavigateTo</c> in the page's
+    /// code-behind); task-type actions instead open the task in-place via TaskViewDialog without
+    /// changing the URL (see WorkloadActionsReportPage.razor's GoToAction) — callers must check for
+    /// either outcome rather than assuming navigation always happens.
     /// </summary>
-    public async Task ClickFirstRowGoButtonAsync()
-    {
-        await GoButtons.First.ClickAsync();
-        await page.WaitForURLAsync(url => !url.Contains("/reporting/workload-actions"),
-            new() { Timeout = 15_000 });
-    }
+    public Task ClickFirstRowGoButtonAsync() => GoButtons.First.ClickAsync();
 }

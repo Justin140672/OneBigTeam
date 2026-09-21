@@ -38,4 +38,6 @@ internal sealed record DashboardActionItem(
     bool IsOverdue,
     string Status,
     string DeepLinkUrl,
-    Guid? TaskId);
+    Guid? TaskId,
+    bool IsOwnerActionable = true,
+    string? OwnerLabel = null);

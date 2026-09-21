@@ -218,6 +218,43 @@ public class AttentionQueueSupportTests
         Assert.False(Item(taskId: null, deepLinkUrl: deepLink).HasTarget);
     }
 
+    // ---------- IsOwnerActionable / IsReadOnlyByDesign ----------
+
+    [Fact]
+    public void HasTarget_TaskIdSet_But_NotOwnerActionable_IsFalse()
+    {
+        var item = Item(taskId: Guid.NewGuid(), deepLinkUrl: null) with { IsOwnerActionable = false };
+        Assert.False(item.HasTarget);
+    }
+
+    [Fact]
+    public void HasTarget_DeepLinkSet_But_NotOwnerActionable_IsFalse()
+    {
+        var item = Item(taskId: null, deepLinkUrl: "/employees/1") with { IsOwnerActionable = false };
+        Assert.False(item.HasTarget);
+    }
+
+    [Fact]
+    public void HasTarget_TaskIdSet_And_OwnerActionable_IsTrue()
+    {
+        var item = Item(taskId: Guid.NewGuid(), deepLinkUrl: null) with { IsOwnerActionable = true };
+        Assert.True(item.HasTarget);
+    }
+
+    [Fact]
+    public void IsReadOnlyByDesign_True_When_NotOwnerActionable()
+    {
+        var item = Item() with { IsOwnerActionable = false };
+        Assert.True(item.IsReadOnlyByDesign);
+    }
+
+    [Fact]
+    public void IsReadOnlyByDesign_False_When_OwnerActionable()
+    {
+        var item = Item() with { IsOwnerActionable = true };
+        Assert.False(item.IsReadOnlyByDesign);
+    }
+
     [Fact]
     public void PriorityCss_Overdue_IsCritical_RegardlessOfUrgencyRank()
     {
@@ -342,6 +379,74 @@ public class AttentionQueueSupportTests
             item.AccessibleLabel);
     }
 
+    [Fact]
+    public void AccessibleLabel_ReadOnlyByDesign_IncludesOwnerLabel_NotStaleFallback()
+    {
+        var item = Item(
+            actionTitle: "Approve leave request",
+            employeeName: "Jane Doe",
+            category: "Pending Leave Approvals",
+            statusLabel: "Pending",
+            isOverdue: false,
+            urgencyRank: 2,
+            taskId: Guid.NewGuid(),
+            dueLabel: null) with
+        {
+            IsOwnerActionable = false,
+            OwnerLabel = "Owned by the employee's manager",
+        };
+
+        Assert.Equal(
+            "Medium priority. Approve leave request, Jane Doe · Pending Leave Approvals · Pending. " +
+            "Owned by the employee's manager. Shown for visibility only — not actionable from this list.",
+            item.AccessibleLabel);
+    }
+
+    [Fact]
+    public void AccessibleLabel_ReadOnlyByDesign_NullOwnerLabel_FallsBackToOwnedBySomeoneElse()
+    {
+        var item = Item(
+            actionTitle: "Approve leave request",
+            employeeName: "Jane Doe",
+            category: "Pending Leave Approvals",
+            statusLabel: "Pending",
+            isOverdue: false,
+            urgencyRank: 3,
+            taskId: Guid.NewGuid(),
+            dueLabel: null) with
+        {
+            IsOwnerActionable = false,
+            OwnerLabel = null,
+        };
+
+        Assert.Equal(
+            "Low priority. Approve leave request, Jane Doe · Pending Leave Approvals · Pending. " +
+            "Owned by someone else. Shown for visibility only — not actionable from this list.",
+            item.AccessibleLabel);
+    }
+
+    [Fact]
+    public void AccessibleLabel_GenuinelyStale_NoTaskId_NoDeepLink_OwnerActionableTrue_UsesStaleFallback()
+    {
+        var item = Item(
+            actionTitle: "Review policy",
+            employeeName: "Jane Doe",
+            category: "Task",
+            statusLabel: "Pending",
+            isOverdue: false,
+            urgencyRank: 3,
+            taskId: null,
+            deepLinkUrl: null,
+            dueLabel: null) with
+        {
+            IsOwnerActionable = true,
+        };
+
+        Assert.Equal(
+            "Low priority. Review policy, Jane Doe · Task · Pending. This item can no longer be opened — it may have been completed or removed.",
+            item.AccessibleLabel);
+    }
+
     // ---------- Convert ----------
 
     private static DashboardActionItemModel RawItem(
@@ -354,9 +459,11 @@ public class AttentionQueueSupportTests
         bool isOverdue = false,
         string status = "Pending",
         string deepLinkUrl = "/tasks/1",
-        Guid? taskId = null) =>
+        Guid? taskId = null,
+        bool isOwnerActionable = true,
+        string? ownerLabel = null) =>
         new(employeeId, employeeName, Department: null, actionType, category, dueDate, urgency,
-            isOverdue, status, deepLinkUrl, taskId);
+            isOverdue, status, deepLinkUrl, taskId, isOwnerActionable, ownerLabel);
 
     private static DashboardCategoryModel Category(
         string name,
@@ -478,6 +585,44 @@ public class AttentionQueueSupportTests
         Assert.Equal("Leave requests", item.ActionTitle);
         // StatusLabel falls back to ActionType (also blank here, so ends up empty).
         Assert.Equal("", item.StatusLabel);
+    }
+
+    [Fact]
+    public void ToAttentionItem_Copies_IsOwnerActionable_And_OwnerLabel_From_RawItem_When_NotOwnerActionable()
+    {
+        var response = new DashboardSummaryModel(
+            Categories:
+            [
+                Category("Pending Leave Approvals", required: true, failed: false, actionableCount: 1,
+                    items: [RawItem(isOwnerActionable: false, ownerLabel: "Owned by the employee's manager")]),
+            ],
+            TotalActionableCount: 1, AllRequiredLoaded: true, HasPartialFailure: false, AsOfDate: Today);
+
+        var (_, items) = AttentionQueueSupport.Convert(response, Today);
+        var item = Assert.Single(items);
+
+        Assert.False(item.IsOwnerActionable);
+        Assert.Equal("Owned by the employee's manager", item.OwnerLabel);
+        Assert.True(item.IsReadOnlyByDesign);
+    }
+
+    [Fact]
+    public void ToAttentionItem_Copies_IsOwnerActionable_And_OwnerLabel_From_RawItem_When_OwnerActionable()
+    {
+        var response = new DashboardSummaryModel(
+            Categories:
+            [
+                Category("Pending Leave Approvals", required: true, failed: false, actionableCount: 1,
+                    items: [RawItem(isOwnerActionable: true, ownerLabel: null)]),
+            ],
+            TotalActionableCount: 1, AllRequiredLoaded: true, HasPartialFailure: false, AsOfDate: Today);
+
+        var (_, items) = AttentionQueueSupport.Convert(response, Today);
+        var item = Assert.Single(items);
+
+        Assert.True(item.IsOwnerActionable);
+        Assert.Null(item.OwnerLabel);
+        Assert.False(item.IsReadOnlyByDesign);
     }
 
     // ---------- Manager per-employee alert-count dictionary construction ----------

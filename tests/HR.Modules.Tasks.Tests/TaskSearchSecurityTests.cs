@@ -3,7 +3,6 @@
 using HR.Modules.Tasks.Contracts;
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Features.GetMyTasks;
-using HR.Modules.Tasks.Features.GetTeamTasks;
 using HR.Modules.Tasks.Features.GetEmployeeTasks;
 using HR.Modules.Tasks.Persistence;
 using HR.Modules.Tasks.Tests.Infrastructure;
@@ -58,30 +57,6 @@ public class TaskSearchSecurityTests
         Assert.Empty(result.Items);
     }
 
-    // ── Cross-company isolation — GetTeamTasks ────────────────────────────
-
-    [Fact]
-    public async Task GetTeamTasks_TotalCount_Excludes_Other_Company_Tasks()
-    {
-        await using var ctx = BuildContext();
-        var companyA = Guid.NewGuid();
-        var companyB = Guid.NewGuid();
-        var reportId = Guid.NewGuid();
-
-        ctx.TaskItems.AddRange(
-            MakeTask(companyA, reportId),
-            MakeTask(companyA, reportId),
-            MakeTask(companyB, reportId));   // same report employee, different company
-        await ctx.SaveChangesAsync();
-
-        var result = await new GetTeamTasksHandler(
-            ctx, new FakeDirectReportsReader(reportId), new FakeEmployeeNameReader()).HandleAsync(
-            new GetTeamTasksRequest { CompanyId = companyA, ManagerId = Guid.NewGuid() },
-            CancellationToken.None);
-
-        Assert.Equal(2, result.TotalCount);
-    }
-
     // ── Cross-company isolation — GetEmployeeTasks ────────────────────────
 
     [Fact]
@@ -120,14 +95,6 @@ public class TaskSearchSecurityTests
     {
         var result = new GetMyTasksValidator().Validate(
             new GetMyTasksRequest { CompanyId = Guid.NewGuid(), PageSize = 201 });
-        Assert.False(result.IsValid);
-    }
-
-    [Fact]
-    public void GetTeamTasksValidator_Rejects_Zero_PageNumber()
-    {
-        var result = new GetTeamTasksValidator().Validate(
-            new GetTeamTasksRequest { CompanyId = Guid.NewGuid(), ManagerId = Guid.NewGuid(), PageNumber = 0 });
         Assert.False(result.IsValid);
     }
 

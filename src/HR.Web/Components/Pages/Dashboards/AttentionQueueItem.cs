@@ -21,10 +21,24 @@ public sealed record AttentionQueueItem(
     bool IsOverdue,
     int UrgencyRank,
     Guid? TaskId,
-    string? DeepLinkUrl)
+    string? DeepLinkUrl,
+    bool IsOwnerActionable = true,
+    string? OwnerLabel = null)
 {
-    /// <summary>An item is actionable only if it opens a task or has a non-blank deep link.</summary>
-    public bool HasTarget => TaskId is not null || !string.IsNullOrWhiteSpace(DeepLinkUrl);
+    /// <summary>
+    /// An item is actionable only if it is owned by the viewer in the workspace being displayed
+    /// AND it opens a task or has a non-blank deep link. Actionability is never inferred from mere
+    /// visibility — a row can be shown for oversight (<see cref="IsOwnerActionable"/> false) without
+    /// being clickable, e.g. a manager-owned leave approval shown to HR for company-wide visibility.
+    /// </summary>
+    public bool HasTarget => IsOwnerActionable && (TaskId is not null || !string.IsNullOrWhiteSpace(DeepLinkUrl));
+
+    /// <summary>
+    /// True when this row genuinely exists but is intentionally not actionable from the current
+    /// list (owned by someone else) — distinct from a stale row whose underlying task/target is
+    /// simply gone. Governs which "why can't I click this" message is shown.
+    /// </summary>
+    public bool IsReadOnlyByDesign => !IsOwnerActionable;
 
     public string ActionLabel => AttentionQueueSupport.ResolveActionLabel(TaskId, DeepLinkUrl, Category, ActionTitle);
 
@@ -92,7 +106,9 @@ public sealed record AttentionQueueItem(
         $"{PriorityLabel}. {ActionTitle}, {MetaText}{(DueLabel is null ? "" : $", due {DueLabel}")}. " +
         (HasTarget
             ? $"{ActionLabel}."
-            : "This item can no longer be opened — it may have been completed or removed.");
+            : IsReadOnlyByDesign
+                ? $"{OwnerLabel ?? "Owned by someone else"}. Shown for visibility only — not actionable from this list."
+                : "This item can no longer be opened — it may have been completed or removed.");
 }
 
 /// <summary>
@@ -187,7 +203,9 @@ public static class AttentionQueueSupport
             IsOverdue: it.IsOverdue,
             UrgencyRank: it.IsOverdue ? 0 : it.UrgencyRank,
             TaskId: it.TaskId,
-            DeepLinkUrl: it.DeepLinkUrl);
+            DeepLinkUrl: it.DeepLinkUrl,
+            IsOwnerActionable: it.IsOwnerActionable,
+            OwnerLabel: it.OwnerLabel);
     }
 
     /// <summary>

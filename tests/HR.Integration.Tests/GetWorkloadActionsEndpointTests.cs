@@ -356,6 +356,57 @@ public class GetWorkloadActionsEndpointTests
         Assert.DoesNotContain(payload!.Items, i => i.ActionCategory == "Employee Accounts Awaiting Invitation");
     }
 
+    [Fact]
+    public async Task Get_WorkloadActions_HrAdministrator_Sees_PendingLeaveApproval_As_Not_OwnerActionable_With_TaskId()
+    {
+        var companyId = Guid.NewGuid();
+        var hrAdminId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrAdminId, SystemRoles.HrAdministrator);
+        using var client = await ClientFor(companyId, hrAdminId);
+
+        var employeeId = await SeedEmployeeAsync(companyId, "Layla", "Leaver");
+        var leaveRequestId = await SeedLeaveRequestAsync(companyId, employeeId, Today.AddDays(5));
+        var linkedTaskId = await SeedOpenTaskLinkedToSourceAsync(
+            companyId, leaveRequestId, TaskSource.Leave, TaskActionType.Approve, Guid.NewGuid());
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/reporting/workload-actions");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<WorkloadActionsPayload>();
+        Assert.NotNull(payload);
+
+        var item = Assert.Single(payload!.Items, i => i.ActionCategory == "Pending Leave Approvals");
+        Assert.False(item.IsOwnerActionable);
+        Assert.Equal(linkedTaskId, item.TaskId);
+    }
+
+    [Fact]
+    public async Task Get_WorkloadActions_Manager_Sees_Own_Reports_PendingLeaveApproval_As_OwnerActionable()
+    {
+        var companyId = Guid.NewGuid();
+        var managerId = await SeedEmployeeAsync(companyId, "Meera", "Manager");
+        var directReportId = await SeedEmployeeAsync(companyId, "Devon", "Report");
+        await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
+
+        var hrBootstrapUserId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrBootstrapUserId, SystemRoles.HrAdministrator);
+        using var hrBootstrapClient = await ClientFor(companyId, hrBootstrapUserId);
+        await AssignManagerAsync(hrBootstrapClient, companyId, directReportId, managerId);
+
+        await SeedLeaveRequestAsync(companyId, directReportId, Today.AddDays(5));
+
+        using var client = await ClientFor(companyId, managerId);
+        var response = await client.GetAsync($"/api/companies/{companyId}/reporting/workload-actions");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<WorkloadActionsPayload>();
+        Assert.NotNull(payload);
+
+        var item = Assert.Single(payload!.Items, i => i.ActionCategory == "Pending Leave Approvals");
+        Assert.Equal(directReportId, item.EmployeeId);
+        Assert.True(item.IsOwnerActionable);
+    }
+
     // ── Seeding helpers ──────────────────────────────────────────────────────
 
     private async Task<Guid> SeedEmployeeAsync(Guid companyId, string firstName, string lastName)
@@ -458,6 +509,21 @@ public class GetWorkloadActionsEndpointTests
         await db.SaveChangesAsync();
     }
 
+    /// <summary>Seeds a real open Tasks-module TaskItem whose SourceEntityId links back to a source-module task/record id.</summary>
+    private async Task<Guid> SeedOpenTaskLinkedToSourceAsync(
+        Guid companyId, Guid sourceEntityId, TaskSource source, TaskActionType actionType, Guid assignedEmployeeId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
+        var task = TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(), "Linked task", null,
+            TaskPriority.Medium, source, actionType, Today.AddDays(5),
+            assignedEmployeeId, null, Now, sourceEntityId: sourceEntityId);
+        db.TaskItems.Add(task);
+        await db.SaveChangesAsync();
+        return task.Id;
+    }
+
     private async Task SeedUserInviteAsync(Guid companyId, Guid employeeId)
     {
         using var scope = _factory.Services.CreateScope();
@@ -481,7 +547,10 @@ public class GetWorkloadActionsEndpointTests
         string? AssignedTo,
         string Status,
         string Urgency,
-        string DeepLinkUrl);
+        string DeepLinkUrl,
+        Guid? TaskId = null,
+        bool IsOwnerActionable = true,
+        string? OwnerLabel = null);
 
     private sealed record WorkloadActionSummaryPayload(int TotalOutstanding, int Overdue, int DueToday, int DueThisWeek);
 

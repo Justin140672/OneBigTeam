@@ -7,6 +7,8 @@ using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
 using HR.Modules.Leave.Domain;
 using HR.Modules.Leave.Persistence;
+using HR.Modules.Sickness.Domain;
+using HR.Modules.Sickness.Persistence;
 using HR.Modules.Tasks.Contracts;
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Persistence;
@@ -203,6 +205,62 @@ public class GetManagerDashboardSummaryEndpointTests
         Assert.Equal(1, hrInvitations.ActionableCount);
     }
 
+    [Fact]
+    public async Task Get_ManagerDashboardSummary_Pending_Leave_For_DirectReport_Is_OwnerActionable()
+    {
+        var companyId = Guid.NewGuid();
+        var managerId = await SeedEmployeeAsync(companyId, "Meera", "Manager");
+        var directReportId = await SeedEmployeeAsync(companyId, "Devon", "Report");
+
+        using var hrBootstrapClient = await ClientFor(companyId, Guid.NewGuid(), SystemRoles.HrAdministrator);
+        await AssignManagerAsync(hrBootstrapClient, companyId, directReportId, managerId);
+
+        await SeedLeaveRequestAsync(companyId, directReportId, Today.AddDays(5));
+
+        using var managerClient = await ClientFor(companyId, managerId, SystemRoles.Manager);
+        var payload = await managerClient.GetFromJsonAsync<SummaryPayload>(Url(companyId));
+
+        Assert.NotNull(payload);
+        var leave = payload!.Categories.Single(c => c.Category == "Pending Leave Approvals");
+        var item = Assert.Single(leave.Items);
+        Assert.Equal(directReportId, item.EmployeeId);
+        Assert.True(item.IsOwnerActionable);
+    }
+
+    [Fact]
+    public async Task Get_ManagerDashboardSummary_ReturnToWorkReview_For_DirectReport_Now_Appears_As_OwnerActionable()
+    {
+        // Regression coverage: previously the Sickness provider returned [] unconditionally for
+        // Manager scope, so a manager's own Return to Work review task never appeared at all.
+        var companyId = Guid.NewGuid();
+        var managerId = await SeedEmployeeAsync(companyId, "Meera", "Manager");
+        var directReportId = await SeedEmployeeAsync(companyId, "Devon", "Report");
+        var outOfHierarchyEmployeeId = await SeedEmployeeAsync(companyId, "Ola", "Outside");
+
+        using var hrBootstrapClient = await ClientFor(companyId, Guid.NewGuid(), SystemRoles.HrAdministrator);
+        await AssignManagerAsync(hrBootstrapClient, companyId, directReportId, managerId);
+        // outOfHierarchyEmployeeId is deliberately left unassigned.
+
+        await SeedReturnToWorkReviewAsync(companyId, directReportId, Today.AddDays(3));
+        await SeedReturnToWorkReviewAsync(companyId, outOfHierarchyEmployeeId, Today.AddDays(3));
+
+        using var managerClient = await ClientFor(companyId, managerId, SystemRoles.Manager);
+        var payload = await managerClient.GetFromJsonAsync<SummaryPayload>(Url(companyId));
+
+        Assert.NotNull(payload);
+        var sickness = payload!.Categories.Single(c => c.Category == "Pending Sickness Actions");
+        var employeeIds = sickness.Items.Select(i => i.EmployeeId).ToList();
+
+        // Present and owner-actionable for the manager's own report.
+        Assert.Contains(directReportId, employeeIds);
+        var ownItem = sickness.Items.Single(i => i.EmployeeId == directReportId);
+        Assert.True(ownItem.IsOwnerActionable);
+
+        // Absent entirely for an employee outside the caller's reporting sub-tree (row-level
+        // tenant/hierarchy isolation) — not merely marked non-actionable.
+        Assert.DoesNotContain(outOfHierarchyEmployeeId, employeeIds);
+    }
+
     // ── Seeding helpers ──────────────────────────────────────────────────────
 
     private async Task<Guid> SeedEmployeeAsync(Guid companyId, string firstName, string lastName)
@@ -251,6 +309,22 @@ public class GetManagerDashboardSummaryEndpointTests
         await db.SaveChangesAsync();
     }
 
+    private async Task SeedReturnToWorkReviewAsync(Guid companyId, Guid employeeId, DateOnly dueDate)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SicknessDbContext>();
+        var categoryId = Guid.NewGuid();
+        db.SicknessCategories.Add(SicknessCategory.Create(categoryId, companyId, $"Illness-{categoryId:N}", 1, Now));
+        var record = SicknessRecord.Create(
+            Guid.NewGuid(), companyId, employeeId, categoryId,
+            new DateOnly(2026, 7, 1), SicknessDayPart.FullDay, null, null, null, null,
+            SicknessEvidenceStatus.NotRequired, Now);
+        db.SicknessRecords.Add(record);
+        db.ReturnToWorkReviews.Add(ReturnToWorkReview.Create(
+            Guid.NewGuid(), companyId, record.Id, employeeId, dueDate, Now));
+        await db.SaveChangesAsync();
+    }
+
     private async Task SeedPendingInvitationAsync(Guid companyId, Guid employeeId)
     {
         using var scope = _factory.Services.CreateScope();
@@ -285,5 +359,7 @@ public class GetManagerDashboardSummaryEndpointTests
         bool IsOverdue,
         string Status,
         string DeepLinkUrl,
-        Guid? TaskId);
+        Guid? TaskId,
+        bool IsOwnerActionable = true,
+        string? OwnerLabel = null);
 }

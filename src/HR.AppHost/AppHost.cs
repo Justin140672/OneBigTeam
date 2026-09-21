@@ -70,6 +70,25 @@ api
     .WithEnvironment("Documents__ClamAv__Port", clamAv.GetEndpoint("clamd").Property(EndpointProperty.Port))
     .WaitFor(clamAv);
 
+if (isE2ETesting)
+{
+	// The identity-login rate limit (default 8 requests/minute, partitioned by client IP + email —
+	// see IdentityRateLimiting) is P1 abuse protection sized for real anonymous traffic. Under E2E
+	// every Playwright circuit shares the same machine's IP, and PersonaLoginCache's cache-invalidate
+	// path (a cached session's app-shell wait can still legitimately time out under 15-thread
+	// contention, not just on a genuinely stale session) can fire more than one real POST /api/login
+	// for the SAME persona email within the same 1-minute window — especially laura.bennett
+	// (HrAdminPersonaFixture), used by ~110 of the ~170 E2E test classes vs. single digits/dozens for
+	// the other three personas, so her IP+email partition is the one most likely to exhaust an 8/min
+	// budget. Once exhausted, every further login attempt gets an instant 429 instead of a real
+	// response, which RealFormLoginAsync doesn't distinguish from "still rendering" — it just times
+	// out waiting for the app shell or a login error, misdiagnosed as load/timing rather than what it
+	// actually is. Raised well above anything a single E2E run's login traffic (real logins are capped
+	// at 6 concurrent via PersonaLoginCache's own gate, plus its retry backoff) could plausibly hit;
+	// production's default 8/min is untouched since this only applies to the E2E-launched api process.
+	api.WithEnvironment("Identity__RateLimits__identity-login__PermitLimit", "100");
+}
+
 var web = isE2ETesting
 	? builder.AddProject<Projects.HR_Web>("web", launchProfileName: "http")
 	: builder.AddProject<Projects.HR_Web>("web");

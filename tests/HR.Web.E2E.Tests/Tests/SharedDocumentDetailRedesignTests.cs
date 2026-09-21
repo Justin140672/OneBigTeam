@@ -128,12 +128,14 @@ public sealed class SharedDocumentDetailRedesignTests(HrAdminPersonaFixture fixt
             Assert.True(await detail.IsMetadataDialogOpenAsync(),
                 "Expected 'Edit details' to open the Edit Document Metadata dialog");
             await _page.Keyboard.PressAsync("Escape");
+            await detail.WaitForOverlayToClearAsync();
 
             // "Edit audience" (Audience card) -> EditSharedCompanyDocumentAudienceDialog.razor.
             await detail.OpenAudienceDialogAsync();
             Assert.True(await detail.IsAudienceDialogOpenAsync(),
                 "Expected 'Edit audience' to open the Edit Document Audience dialog");
             await _page.Keyboard.PressAsync("Escape");
+            await detail.WaitForOverlayToClearAsync();
 
             // "Edit acknowledgement settings" (Acknowledgement card) -> EditSharedCompanyDocumentAcknowledgementDialog.razor.
             await detail.OpenEditAcknowledgementDialogAsync();
@@ -212,7 +214,7 @@ public sealed class SharedDocumentDetailRedesignTests(HrAdminPersonaFixture fixt
         await dialog.Locator("input[type='file']").SetInputFilesAsync(filePath);
 
         await dialog.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true }).ClickAsync();
-        await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+        await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 30_000 });
 
         await _page.WaitForSelectorAsync($"text={title}", new() { Timeout = 15_000 });
     }

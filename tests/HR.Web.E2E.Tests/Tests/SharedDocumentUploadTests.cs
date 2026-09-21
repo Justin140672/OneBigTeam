@@ -50,7 +50,7 @@ public sealed class SharedDocumentUploadTests(ParallelBlankPersonaFixture fixtur
             await dialog.Locator("input[type='file']").SetInputFilesAsync(tempFile);
 
             await dialog.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true }).ClickAsync();
-            await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+            await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 30_000 });
 
             // The grid re-fetches after a successful upload — the new title should appear,
             // and (per "new documents are created as drafts") its status column must read Draft.

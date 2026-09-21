@@ -69,7 +69,9 @@ public sealed record DashboardActionItemModel(
     bool IsOverdue,
     string Status,
     string DeepLinkUrl,
-    Guid? TaskId)
+    Guid? TaskId,
+    bool IsOwnerActionable = true,
+    string? OwnerLabel = null)
 {
     public int UrgencyRank => Urgency switch
     {

@@ -147,6 +147,25 @@ public class GetHrDashboardSummaryEndpointTests
     }
 
     [Fact]
+    public async Task Get_HrDashboardSummary_Pending_Leave_Approval_Is_Not_OwnerActionable_For_Hr()
+    {
+        // A pending leave request's approval task is always owned by the employee's manager —
+        // HR sees the row for company-wide oversight only, never as directly actionable.
+        var companyId = Guid.NewGuid();
+        var employeeId = await SeedEmployeeAsync(companyId, "Layla", "Leaver");
+        await SeedLeaveRequestAsync(companyId, employeeId, Today.AddDays(5));
+
+        using var client = await ClientFor(companyId, Guid.NewGuid(), SystemRoles.HrAdministrator);
+        var payload = await client.GetFromJsonAsync<SummaryPayload>(Url(companyId));
+
+        Assert.NotNull(payload);
+        var leave = payload!.Categories.Single(c => c.Category == "Pending Leave Approvals");
+        var item = Assert.Single(leave.Items);
+        Assert.False(item.IsOwnerActionable);
+        Assert.NotNull(item.OwnerLabel);
+    }
+
+    [Fact]
     public async Task Get_HrDashboardSummary_Client_Cancellation_Is_Observed_As_Cancellation()
     {
         var companyId = Guid.NewGuid();
@@ -332,5 +351,7 @@ public class GetHrDashboardSummaryEndpointTests
         bool IsOverdue,
         string Status,
         string DeepLinkUrl,
-        Guid? TaskId);
+        Guid? TaskId,
+        bool IsOwnerActionable = true,
+        string? OwnerLabel = null);
 }

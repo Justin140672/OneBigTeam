@@ -140,7 +140,25 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
+        // The unfiltered page is capped at 100 rows sorted by last name (same reasoning as
+        // HasEmployeeAsync/GetUserAccountStatusTextAsync above) — a just-created employee (e.g.
+        // BulkEmployeeInvitationTests' freshly-created candidates) can easily fall outside that cap
+        // on this shared, long-lived E2E database, leaving the row locator below waiting forever
+        // for a row that's never going to render (surfacing downstream as an unrelated-looking
+        // timeout/retry cascade). Unlike the other helpers below, this one is also used to check
+        // MULTIPLE distinct rows in sequence after the caller already ran its own SearchAsync (e.g.
+        // MultiRowSelection_ShowsCorrectCountOnUpdateSelectedButton, which searches once for a
+        // shared name prefix then checks two different rows within that result set) — always
+        // re-searching by this call's own single nameFragment would narrow the grid down to just
+        // that one row and drop the previously-checked row(s) out of the (reloaded, selection-
+        // resetting) result set entirely. So only fall back to searching when the row genuinely
+        // isn't present in whatever's currently rendered.
         var row = page.Locator(".e-grid .e-row").Filter(new() { HasTextRegex = NameMatcher(nameFragment) }).First;
+        if (await row.CountAsync() == 0)
+        {
+            await SearchAsync(nameFragment);
+            row = page.Locator(".e-grid .e-row").Filter(new() { HasTextRegex = NameMatcher(nameFragment) }).First;
+        }
         var checkbox = row.Locator(".e-checkbox-wrapper").First;
         var input = checkbox.Locator("input[type='checkbox']").First;
         var wasChecked = await input.IsCheckedAsync();
@@ -175,7 +193,10 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         // count, e.g. "Update selected (2)" — see BulkUpdateMenu.ButtonText). Playwright's Name
         // matching is substring by default, so this still matches with or without the count.
         await page.GetByRole(AriaRole.Button, new() { Name = "Update selected" }).ClickAsync();
-        var item = page.GetByRole(AriaRole.Menuitem, new() { Name = "Selected Employees" });
+        // Id-based, not role+name — matches ClickBulkUpdateAsync's own "#hr-bulk-selected" lookup
+        // just below, for the same reason (see that method's remarks: a just-rebuilt Items list can
+        // render a transient stale/empty popup that a role+name query can miss).
+        var item = page.Locator("#hr-bulk-selected");
         await item.WaitForAsync(new() { Timeout = 10_000 });
 
         // BulkUpdateMenu's HasSelection is wired from a separate async computation off the grid's

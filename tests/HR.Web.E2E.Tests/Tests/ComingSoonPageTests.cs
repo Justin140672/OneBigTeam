@@ -64,6 +64,13 @@ public sealed class ComingSoonPageTests(ParallelBlankPersonaFixture fixture)
             .ToHaveTextAsync("Product Roadmap");
     }
 
+    // The roadmap page was simplified to a single "Coming soon" group (see ComingSoon.razor's
+    // OnInitializedAsync — every non-"Available" item is grouped under one "Coming soon" label; there
+    // is no longer a separate "Planned" section) and the underlying catalog's item titles were
+    // updated (see HR.SharedKernel.PhaseTwoRoadmapCatalog: "AI-powered position profiles" ->
+    // "AI-generated Live Job Descriptions", "Employee webhooks" -> "Webhooks & Integrations",
+    // "AI help assistant" -> "AI Help Assistant"). This test now reflects the current single-section
+    // structure and card titles instead of the earlier multi-section roadmap.
     [Fact]
     public async Task ComingSoonSection_RendersExpectedCards()
     {
@@ -74,43 +81,26 @@ public sealed class ComingSoonPageTests(ParallelBlankPersonaFixture fixture)
             new() { Has = _page.Locator(".section-heading h2", new() { HasText = "Coming soon" }) });
         await Assertions.Expect(comingSoonSection).ToBeVisibleAsync();
 
-        var positionProfilesCard = comingSoonSection.Locator(".card", new() { HasText = "AI-powered position profiles" });
-        await Assertions.Expect(positionProfilesCard.Locator("h3")).ToHaveTextAsync("AI-powered position profiles");
+        var jobDescriptionsCard = comingSoonSection.Locator(".card", new() { HasText = "AI-generated Live Job Descriptions" });
+        await Assertions.Expect(jobDescriptionsCard.Locator("h3")).ToHaveTextAsync("AI-generated Live Job Descriptions");
 
-        var webhooksCard = comingSoonSection.Locator(".card", new() { HasText = "Employee webhooks" });
-        await Assertions.Expect(webhooksCard.Locator("h3")).ToHaveTextAsync("Employee webhooks");
+        var webhooksCard = comingSoonSection.Locator(".card", new() { HasText = "Webhooks & Integrations" });
+        await Assertions.Expect(webhooksCard.Locator("h3")).ToHaveTextAsync("Webhooks & Integrations");
+
+        var aiAssistantCard = comingSoonSection.Locator(".card", new() { HasText = "AI Help Assistant" });
+        await Assertions.Expect(aiAssistantCard.Locator("h3")).ToHaveTextAsync("AI Help Assistant");
     }
 
     [Fact]
-    public async Task PlannedSection_RendersExpectedCard()
-    {
-        await _page.GotoAsync($"{_fixture.MarketingBaseUrl}/roadmap");
-
-        var plannedSection = _page.Locator(
-            "section.section",
-            new() { Has = _page.Locator(".section-heading h2", new() { HasText = "Planned" }) });
-        await Assertions.Expect(plannedSection).ToBeVisibleAsync();
-
-        var aiAssistantCard = plannedSection.Locator(".card", new() { HasText = "AI help assistant" });
-        await Assertions.Expect(aiAssistantCard.Locator("h3")).ToHaveTextAsync("AI help assistant");
-    }
-
-    [Fact]
-    public async Task StatusSections_AreGrouped_WithComingSoonAboveThePlannedSection()
+    public async Task RoadmapPage_HasExactlyOneComingSoonSection_AndNoPlannedSection()
     {
         await _page.GotoAsync($"{_fixture.MarketingBaseUrl}/roadmap");
 
         var comingSoonHeading = _page.Locator(".section-heading h2", new() { HasText = "Coming soon" });
-        var plannedHeading = _page.Locator(".section-heading h2", new() { HasText = "Planned" });
-
         await Assertions.Expect(comingSoonHeading).ToBeVisibleAsync();
-        await Assertions.Expect(plannedHeading).ToBeVisibleAsync();
+        await Assertions.Expect(comingSoonHeading).ToHaveCountAsync(1);
 
-        var comingSoonBox = await comingSoonHeading.BoundingBoxAsync();
-        var plannedBox = await plannedHeading.BoundingBoxAsync();
-
-        Assert.NotNull(comingSoonBox);
-        Assert.NotNull(plannedBox);
-        Assert.True(plannedBox!.Y > comingSoonBox!.Y);
+        var plannedHeading = _page.Locator(".section-heading h2", new() { HasText = "Planned" });
+        await Assertions.Expect(plannedHeading).ToHaveCountAsync(0);
     }
 }

@@ -28,7 +28,11 @@ public sealed class StartLeavingProcessDialog(IPage page)
     public async Task OpenAsync()
     {
         var moreActionsButton = page.GetByRole(AriaRole.Button, new() { Name = "More actions" });
-        var menuItem = page.GetByRole(AriaRole.Menuitem, new() { Name = "Start offboarding" });
+        // Id-based ("#start-offboarding", EmployeeEdit.razor's BuildMoreActionsItems), not
+        // role+name — see SharedDocumentDetailPage.ClickMoreActionsItemAsync's remarks for why: an
+        // id resolves against whichever render eventually wins instead of racing a role+name query
+        // against the popup's item set mid-rebuild.
+        var menuItem = page.Locator("#start-offboarding");
 
         // The SfDropDownButton's popup (".e-dropdown-popup") is rendered asynchronously after the
         // click event dispatches — a bare click-then-click race can fire the menu item click before

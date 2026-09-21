@@ -5,6 +5,7 @@ using HR.Modules.Sickness.Persistence;
 using HR.Modules.Sickness.Services;
 using HR.Modules.Sickness.Tests.Infrastructure;
 using HR.Modules.Tasks.Contracts;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Tests;
@@ -54,12 +55,15 @@ public class SicknessPendingActionsWorkloadActionProviderTests
 
         var provider = new SicknessPendingActionsWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"),
-            new FakeOpenTaskBySourceEntityReader());
+            new FakeOpenTaskBySourceEntityReader(), new FakeDirectReportsReader(), new FakeCurrentUser(Guid.NewGuid()));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
         Assert.All(result, a => Assert.Equal("Complete Return to Work Review", a.ActionType));
+        // Reviews are always owned by the employee's manager — HR sees them for oversight only.
+        Assert.All(result, a => Assert.False(a.IsOwnerActionable));
+        Assert.All(result, a => Assert.Equal("Owned by the employee's manager", a.OwnerLabel));
     }
 
     [Fact]
@@ -75,11 +79,12 @@ public class SicknessPendingActionsWorkloadActionProviderTests
             ReturnToWorkReview.Create(Guid.NewGuid(), companyId, record.Id, employeeId, new DateOnly(2026, 7, 10), DateTimeOffset.UtcNow));
         await context.SaveChangesAsync();
 
-        // Manager but not HR — this category is HR-only, so even a Manager with direct reports
-        // must get nothing back.
+        // Manager but not HR, and requesting the Hr scope explicitly — the authorization check for
+        // the Hr scope requires reporting:view-hr, which this caller lacks, so they get nothing back
+        // regardless of direct reports.
         var provider = new SicknessPendingActionsWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService(),
-            new FakeOpenTaskBySourceEntityReader());
+            new FakeOpenTaskBySourceEntityReader(), new FakeDirectReportsReader([employeeId]), new FakeCurrentUser(Guid.NewGuid()));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), WorkloadScope.Hr, CancellationToken.None);
 
@@ -98,7 +103,7 @@ public class SicknessPendingActionsWorkloadActionProviderTests
 
         var provider = new SicknessPendingActionsWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService(),
-            new FakeOpenTaskBySourceEntityReader());
+            new FakeOpenTaskBySourceEntityReader(), new FakeDirectReportsReader(), new FakeCurrentUser(Guid.NewGuid()));
 
         var result = await provider.GetActionsAsync(companyId, new ClaimsPrincipal(new ClaimsIdentity()), WorkloadScope.Hr, CancellationToken.None);
 
@@ -106,7 +111,32 @@ public class SicknessPendingActionsWorkloadActionProviderTests
     }
 
     [Fact]
-    public async Task GetActionsAsync_HrCaller_Requesting_ManagerScope_Returns_Empty_HrOnly_Category_Never_Leaks_Into_Manager_Workspace()
+    public async Task GetActionsAsync_HrCaller_Requesting_ManagerScope_With_No_Team_Returns_Empty()
+    {
+        // Manager scope is now self-scoped to the caller's own reporting sub-tree regardless of
+        // any Hr role the caller also holds — a caller with an empty team sees nothing.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
+
+        var record = CreateRecord(companyId, employeeId, new DateOnly(2026, 7, 1));
+        context.SicknessRecords.Add(record);
+        context.ReturnToWorkReviews.Add(
+            ReturnToWorkReview.Create(Guid.NewGuid(), companyId, record.Id, employeeId, new DateOnly(2026, 7, 10), DateTimeOffset.UtcNow));
+        await context.SaveChangesAsync();
+
+        var provider = new SicknessPendingActionsWorkloadActionProvider(
+            context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"),
+            new FakeOpenTaskBySourceEntityReader(), new FakeDirectReportsReader([]), new FakeCurrentUser(callerId));
+
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Manager, CancellationToken.None);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetActionsAsync_ManagerScope_CallerWithNoResolvedEmployeeId_Returns_Empty()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
@@ -119,12 +149,50 @@ public class SicknessPendingActionsWorkloadActionProviderTests
         await context.SaveChangesAsync();
 
         var provider = new SicknessPendingActionsWorkloadActionProvider(
-            context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"),
-            new FakeOpenTaskBySourceEntityReader());
+            context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService(),
+            new FakeOpenTaskBySourceEntityReader(), new FakeDirectReportsReader([employeeId]), new FakeCurrentUser(null));
 
-        var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), WorkloadScope.Manager, CancellationToken.None);
+        var result = await provider.GetActionsAsync(companyId, new ClaimsPrincipal(new ClaimsIdentity()), WorkloadScope.Manager, CancellationToken.None);
 
         Assert.Empty(result);
+    }
+
+    [Fact]
+    public async Task GetActionsAsync_ManagerScope_Sees_Only_ReturnToWorkReviews_For_Own_ReportingSubtree_As_OwnerActionable()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+        var directReportId = Guid.NewGuid();
+        var outsideEmployeeId = Guid.NewGuid();
+
+        var recordIn = CreateRecord(companyId, directReportId, new DateOnly(2026, 7, 1));
+        var recordOut = CreateRecord(companyId, outsideEmployeeId, new DateOnly(2026, 7, 1));
+        context.SicknessRecords.AddRange(recordIn, recordOut);
+
+        var reviewIn = ReturnToWorkReview.Create(
+            Guid.NewGuid(), companyId, recordIn.Id, directReportId, new DateOnly(2026, 7, 10), DateTimeOffset.UtcNow);
+        var reviewOut = ReturnToWorkReview.Create(
+            Guid.NewGuid(), companyId, recordOut.Id, outsideEmployeeId, new DateOnly(2026, 7, 10), DateTimeOffset.UtcNow);
+        context.ReturnToWorkReviews.AddRange(reviewIn, reviewOut);
+
+        // Evidence requests must never be surfaced to the Manager workspace at all.
+        context.SicknessEvidenceRequests.Add(
+            SicknessEvidenceRequest.Create(Guid.NewGuid(), companyId, recordIn.Id, Guid.NewGuid(),
+                new DateOnly(2026, 7, 20), null, DateTimeOffset.UtcNow));
+        await context.SaveChangesAsync();
+
+        var provider = new SicknessPendingActionsWorkloadActionProvider(
+            context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService(),
+            new FakeOpenTaskBySourceEntityReader(), new FakeDirectReportsReader([directReportId]), new FakeCurrentUser(managerId));
+
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(managerId), WorkloadScope.Manager, CancellationToken.None);
+
+        var action = Assert.Single(result);
+        Assert.Equal(directReportId, action.EmployeeId);
+        Assert.Equal("Complete Return to Work Review", action.ActionType);
+        Assert.True(action.IsOwnerActionable);
+        Assert.Null(action.OwnerLabel);
     }
 
     [Fact]
@@ -144,7 +212,7 @@ public class SicknessPendingActionsWorkloadActionProviderTests
 
         var provider = new SicknessPendingActionsWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-hr"),
-            new FakeOpenTaskBySourceEntityReader());
+            new FakeOpenTaskBySourceEntityReader(), new FakeDirectReportsReader(), new FakeCurrentUser(Guid.NewGuid()));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), WorkloadScope.Hr, CancellationToken.None);
 
@@ -154,6 +222,9 @@ public class SicknessPendingActionsWorkloadActionProviderTests
         Assert.Equal(dueDate, action.DueDate);
         // No employee-profile fallback: entirely task-backed category.
         Assert.Equal("", action.DeepLinkUrl);
+        // Evidence requests are actioned by the employee themselves — never owner-actionable from HR.
+        Assert.False(action.IsOwnerActionable);
+        Assert.Equal("Owned by the employee", action.OwnerLabel);
     }
 
     [Fact]
@@ -184,7 +255,7 @@ public class SicknessPendingActionsWorkloadActionProviderTests
             {
                 [review.Id] = reviewTaskId,
                 [evidenceRequestId] = evidenceTaskId,
-            }));
+            }), new FakeDirectReportsReader(), new FakeCurrentUser(Guid.NewGuid()));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), WorkloadScope.Hr, CancellationToken.None);
 
@@ -223,7 +294,7 @@ public class SicknessPendingActionsWorkloadActionProviderTests
             {
                 [reviewA.Id] = taskIdA,
                 [reviewB.Id] = taskIdB,
-            }));
+            }), new FakeDirectReportsReader(), new FakeCurrentUser(Guid.NewGuid()));
 
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(Guid.NewGuid()), WorkloadScope.Hr, CancellationToken.None);
 

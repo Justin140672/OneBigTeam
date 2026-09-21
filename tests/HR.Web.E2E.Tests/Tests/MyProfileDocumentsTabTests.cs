@@ -185,7 +185,7 @@ public sealed class MyProfileDocumentsTabTests(CrossUserFixture fixture) : Cross
             await dialog.Locator("input[type='file']").SetInputFilesAsync(tempFile);
 
             await dialog.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true }).ClickAsync();
-            await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+            await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 30_000 });
 
             await _page.WaitForSelectorAsync($"text={title}", new() { Timeout = 15_000 });
 

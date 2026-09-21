@@ -443,7 +443,11 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task ClickViewOrganisationChartMenuItemAsync()
     {
         await OpenMoreActionsMenuAsync();
-        await page.GetByRole(AriaRole.Menuitem, new() { Name = "View Organisation Chart" }).ClickAsync();
+        // Id-based ("#org-chart", EmployeeEdit.razor's BuildMoreActionsItems), not role+name — same
+        // defensive choice as SharedDocumentDetailPage.ClickMoreActionsItemAsync's remarks, even
+        // though this dropdown's items are a stable field here rather than recomputed on every
+        // render, so the same rebuild race is less likely but not impossible.
+        await page.Locator("#org-chart").ClickAsync();
         await page.WaitForURLAsync(new System.Text.RegularExpressions.Regex(@"/organisation-chart\?employeeId="), new() { Timeout = 15_000 });
     }
 
@@ -464,7 +468,8 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         bool visible;
         try
         {
-            await page.GetByRole(AriaRole.Menuitem, new() { Name = "Start offboarding" })
+            // Id-based — see ClickViewOrganisationChartMenuItemAsync's remarks.
+            await page.Locator("#start-offboarding")
                 .WaitForAsync(new() { Timeout = 3_000 });
             visible = true;
         }
@@ -480,7 +485,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task ClickStartOffboardingMenuItemAsync()
     {
         await OpenMoreActionsMenuAsync();
-        await page.GetByRole(AriaRole.Menuitem, new() { Name = "Start offboarding" }).ClickAsync();
+        await page.Locator("#start-offboarding").ClickAsync();
     }
 
     // ── Details tab field access (view-mode read-only checks / accessible labels) ─

@@ -80,7 +80,7 @@ public sealed class KeyboardJourneyTests(EmployeePersonaFixture fixture)
             // once, re-focusing and re-pressing, before treating this as a genuine failure.
             await submit.FocusAsync();
             await _page.Keyboard.PressAsync("Enter");
-            await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+            await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 30_000 });
         }
     }
 

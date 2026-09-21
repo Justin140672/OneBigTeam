@@ -56,6 +56,10 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
+        // A pending leave request's approval task is always owned by the employee's manager — HR
+        // only ever sees these rows for oversight, never as something to click into and action.
+        Assert.All(result, a => Assert.False(a.IsOwnerActionable));
+        Assert.All(result, a => Assert.Equal("Owned by the employee's manager", a.OwnerLabel));
     }
 
     [Fact]
@@ -80,6 +84,9 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
 
         var action = Assert.Single(result);
         Assert.Equal(directReportId, action.EmployeeId);
+        // The manager is the true owner of the approval task in the Manager workspace.
+        Assert.True(action.IsOwnerActionable);
+        Assert.Null(action.OwnerLabel);
     }
 
     [Fact]
@@ -192,6 +199,60 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerEmployeeId), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
+    }
+
+    [Fact]
+    public async Task GetActionsAsync_Resolves_Linked_TaskId_In_HrScope_And_Marks_Not_OwnerActionable()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var callerId = Guid.NewGuid();
+
+        var request = CreatePendingRequest(companyId, employeeId, new DateOnly(2026, 8, 3));
+        context.LeaveRequests.Add(request);
+        await context.SaveChangesAsync();
+
+        var linkedTaskId = Guid.NewGuid();
+        var provider = new LeavePendingApprovalsWorkloadActionProvider(
+            context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
+            new FakeAuthorizationService("reporting:view-hr"),
+            new FakeOpenTaskBySourceEntityReader(new Dictionary<Guid, Guid> { [request.Id] = linkedTaskId }),
+            new FakeCurrentUser(callerId));
+
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Hr, CancellationToken.None);
+
+        var action = Assert.Single(result);
+        Assert.Equal(linkedTaskId, action.TaskId);
+        Assert.False(action.IsOwnerActionable);
+        Assert.Equal("Owned by the employee's manager", action.OwnerLabel);
+    }
+
+    [Fact]
+    public async Task GetActionsAsync_Resolves_Linked_TaskId_In_ManagerScope_And_Marks_OwnerActionable()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var directReportId = Guid.NewGuid();
+        var callerEmployeeId = Guid.NewGuid();
+
+        var request = CreatePendingRequest(companyId, directReportId, new DateOnly(2026, 8, 3));
+        context.LeaveRequests.Add(request);
+        await context.SaveChangesAsync();
+
+        var linkedTaskId = Guid.NewGuid();
+        var provider = new LeavePendingApprovalsWorkloadActionProvider(
+            context, new FakeDirectReportsReader([directReportId]), new FakeEmployeeDepartmentReader(),
+            new FakeAuthorizationService(),
+            new FakeOpenTaskBySourceEntityReader(new Dictionary<Guid, Guid> { [request.Id] = linkedTaskId }),
+            new FakeCurrentUser(callerEmployeeId));
+
+        var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerEmployeeId), WorkloadScope.Manager, CancellationToken.None);
+
+        var action = Assert.Single(result);
+        Assert.Equal(linkedTaskId, action.TaskId);
+        Assert.True(action.IsOwnerActionable);
+        Assert.Null(action.OwnerLabel);
     }
 
     [Fact]

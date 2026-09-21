@@ -218,7 +218,11 @@ public sealed class AdminUsersManagementTests(ParallelBlankPersonaFixture fixtur
         await adminUsers.FillDialogReasonAsync(adminUsers.ResetPasswordDialog, "E2E: resetting password for administrator");
         await adminUsers.ClickDialogConfirmAsync(adminUsers.ResetPasswordDialog, "Reset password");
 
-        await _page.WaitForSelectorAsync(".admin-action-success", new() { Timeout = 15_000 });
+        // Matches the 20s timeout other admin-action-success waits use elsewhere in the suite
+        // (e.g. AdminSupportRequestDetailPage.SaveAsync, OperationalAlertDetailsPage) — this
+        // flow chains create-administrator + reset-password + a full admin-list reload before the
+        // success message renders, and 15s was tight for that under load.
+        await _page.WaitForSelectorAsync(".admin-action-success", new() { Timeout = 20_000 });
         Assert.True(await adminUsers.IsActionSuccessVisibleAsync(),
             "Expected a success message after resetting the administrator's password");
     }

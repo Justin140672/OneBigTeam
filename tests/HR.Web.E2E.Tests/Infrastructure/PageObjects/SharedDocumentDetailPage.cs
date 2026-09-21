@@ -62,14 +62,40 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     private ILocator MoreActionsButton => page.GetByRole(AriaRole.Button, new() { Name = "More actions" });
 
     /// <summary>
+    /// Maps a "More actions" item's display name to its stable DropDownMenuItem.Id from
+    /// BuildMoreActionsItems (SharedDocumentDetail.razor) — "archive"/"expire"/"audit" become the
+    /// rendered &lt;li&gt;'s literal id attribute, same as BulkUpdateMenu.razor's "hr-bulk-selected"
+    /// (see EmployeeListPage.ClickBulkUpdateAsync's remarks for that established pattern).
+    /// </summary>
+    private static string MoreActionsItemId(string itemName) => itemName switch
+    {
+        "Archive" => "archive",
+        "Mark Expired" => "expire",
+        "Audit History" => "audit",
+        _ => throw new ArgumentOutOfRangeException(nameof(itemName), itemName, "Unknown 'More actions' item name."),
+    };
+
+    /// <summary>
     /// Opens the "More actions" overflow menu and clicks the named item (e.g. "Archive",
     /// "Mark Expired", "Audit History"), retrying the open if the popup doesn't mount in time —
     /// same "freshly mounted SfDropDownButton can silently swallow a same-tick click" race
     /// documented on StartLeavingProcessDialog.OpenAsync.
+    ///
+    /// Located by the item's stable id (see <see cref="MoreActionsItemId"/>), NOT by
+    /// role+accessible-name: BuildMoreActionsItems() is an inline method call re-evaluated on
+    /// EVERY component re-render (Blazor doesn't memoize it), so this dropdown's Items list can
+    /// rebuild more than once in quick succession right after the page's data load completes.
+    /// Each rebuild briefly re-renders the popup, and a role+name query issued mid-rebuild can
+    /// observe a transient state with no matching item at all — not just "swallowed click" (the
+    /// button click itself lands fine; the popup opens; it's the item set inside it that's
+    /// mid-flux) — which the original retry loop's 3×5s + 10s budget could still exhaust if the
+    /// rebuilds keep recurring. An id-based locator auto-waits through that churn and resolves
+    /// against whichever render eventually wins, same fix already proven for
+    /// EmployeeListPage.ClickBulkUpdateAsync's "hr-bulk-selected" item.
     /// </summary>
     private async Task ClickMoreActionsItemAsync(string itemName)
     {
-        var menuItem = page.GetByRole(AriaRole.Menuitem, new() { Name = itemName, Exact = true });
+        var menuItem = page.Locator($"#{MoreActionsItemId(itemName)}");
 
         for (var attempt = 1; attempt <= 3; attempt++)
         {
@@ -88,9 +114,25 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
             return;
         }
 
-        // Final attempt without swallowing the exception, so a genuine failure still surfaces.
+        // Final attempt without swallowing the exception, so a genuine failure still surfaces —
+        // but with the popup's actual current contents attached, so a failure here says WHAT was
+        // rendered instead of just "item not found" (distinguishes "popup never opened"/"still
+        // empty" from "opened with a different item set than expected").
         await MoreActionsButton.ClickAsync();
-        await menuItem.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        try
+        {
+            await menuItem.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        }
+        catch (TimeoutException)
+        {
+            var popupText = await page.Locator(".e-dropdown-popup").IsVisibleAsync()
+                ? await page.Locator(".e-dropdown-popup").InnerTextAsync()
+                : "(popup not visible)";
+            throw new TimeoutException(
+                $"'More actions' item '{itemName}' (#{MoreActionsItemId(itemName)}) never appeared after 3 retries. " +
+                $"Popup contents at final failure: {popupText}");
+        }
+
         await menuItem.ClickAsync();
     }
 
@@ -106,7 +148,9 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
         bool visible;
         try
         {
-            await page.GetByRole(AriaRole.Menuitem, new() { Name = itemName, Exact = true })
+            // Id-based, not role+name — see ClickMoreActionsItemAsync's remarks on why role+name
+            // can miss a mid-rebuild popup.
+            await page.Locator($"#{MoreActionsItemId(itemName)}")
                 .WaitForAsync(new() { Timeout = 3_000 });
             visible = true;
         }
@@ -122,10 +166,16 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     public async Task GoToAsync(Guid companyId, Guid documentId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/shared-documents/{documentId}");
-        await page.WaitForSelectorAsync(".e-grid, .alert-danger", new() { Timeout = 20_000 });
-        await page.WaitForFunctionAsync(
-            "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
-            null, new PageWaitForFunctionOptions { Timeout = 15_000 });
+        // SharedDocumentDetail.razor has no grid at all (".e-grid" — the previous wait condition
+        // here — never appears on this page), so that wait provided no real readiness signal: it
+        // either matched nothing until a 20s timeout, or matched by coincidence, without confirming
+        // _detail had actually finished loading. The page's own three render states are: loading
+        // (HrLoadingIndicator), not-found (".alert-danger"), or loaded (h1.doc-detail-title plus the
+        // "More actions" SfDropDownButton, whose Items are computed from _detail). Waiting for
+        // either of the latter two is what actually confirms the document data — and therefore the
+        // "More actions" menu's real item list (Archive/Mark Expired only while Draft/Published) —
+        // has loaded, instead of racing a freshly-navigated page whose data fetch is still in flight.
+        await page.WaitForSelectorAsync("h1.doc-detail-title, .alert-danger", new() { Timeout = 20_000 });
     }
 
     /// <summary>
@@ -459,6 +509,14 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
         await PublishDialog.GetByRole(AriaRole.Button, new() { Name = "Publish", Exact = true }).ClickAsync();
         await PublishDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
 
+        // Same stale-overlay race documented on WaitForOverlayToClearAsync above (RequireAcknowledgementAsync
+        // already applies it after its own Save) — a caller that immediately drives another click
+        // right after Publish (e.g. AuditHistoryDialog_OpensFromDetailPage_AndShowsEntry_AfterPublish's
+        // OpenAuditHistoryDialogAsync -> "More actions" button) can otherwise have that click silently
+        // eat Playwright's full default action timeout waiting for the fading ".e-dlg-overlay" to stop
+        // intercepting pointer events, rather than failing fast or proceeding immediately.
+        await WaitForOverlayToClearAsync();
+
         await page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
@@ -599,7 +657,7 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// can otherwise hit "subtree intercepts pointer events" on the stale overlay. Best-effort: if
     /// no overlay is present at all, this is a no-op.
     /// </summary>
-    private async Task WaitForOverlayToClearAsync()
+    public async Task WaitForOverlayToClearAsync()
     {
         try
         {
@@ -829,6 +887,14 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     {
         await ExpireDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
         await ExpireDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+
+        // Same stale-overlay race documented on WaitForOverlayToClearAsync above: the dialog role
+        // element reporting "Hidden" doesn't guarantee its ".e-dlg-overlay" fade-out has finished
+        // intercepting pointer events yet. A caller that immediately clicks "More actions" right
+        // after Cancel (e.g. MarkExpired_OnPublishedDocument_OpensDialogWithWording_CancelLeavesUnchanged's
+        // IsExpireButtonVisibleAsync check) can otherwise silently eat Playwright's full default
+        // action timeout waiting for that stale overlay to stop intercepting the click.
+        await WaitForOverlayToClearAsync();
     }
 
     /// <summary>The inline error text shown inside the Expire dialog when the server rejects the request (e.g. already Expired/Archived), or null if none is shown.</summary>

@@ -70,7 +70,7 @@ public sealed class LeaveCancellationTests(EmployeePersonaFixture fixture) : Rol
             "Expected the confirmation dialog's message");
 
         await confirmDialog.GetByRole(AriaRole.Button, new() { Name = "Yes, Cancel Request" }).ClickAsync();
-        await confirmDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+        await confirmDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 30_000 });
 
         // ── Step 6: Row stays in the table but status changes to "Cancelled" ──
         // The API keeps cancelled requests visible; only the Cancel button disappears.

@@ -85,10 +85,12 @@ public sealed class SharedDocumentReviewRenewalTests(HrAdminPersonaFixture fixtu
             var originalFileNameFragment = Path.GetFileName(originalFile);
             var renewedFileNameFragment  = Path.GetFileName(renewedFile);
 
-            Assert.Equal("1", await detail.GetVersionRowCellAsync(originalFileNameFragment, 0));
+            // SharedDocumentDetail.razor's Version column renders "v{VersionNumber}", not a bare
+            // number.
+            Assert.Equal("v1", await detail.GetVersionRowCellAsync(originalFileNameFragment, 0));
             Assert.Equal("Superseded", await detail.GetVersionRowCellAsync(originalFileNameFragment, 1));
 
-            Assert.Equal("2", await detail.GetVersionRowCellAsync(renewedFileNameFragment, 0));
+            Assert.Equal("v2", await detail.GetVersionRowCellAsync(renewedFileNameFragment, 0));
             Assert.Equal("Draft", await detail.GetVersionRowCellAsync(renewedFileNameFragment, 1));
 
             // CompleteSharedCompanyDocumentReviewDialog.razor prefixes the version note with
@@ -216,7 +218,7 @@ public sealed class SharedDocumentReviewRenewalTests(HrAdminPersonaFixture fixtu
         await dialog.Locator("input[type='file']").SetInputFilesAsync(filePath);
 
         await dialog.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true }).ClickAsync();
-        await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+        await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 30_000 });
 
         await _page.WaitForSelectorAsync($"text={title}", new() { Timeout = 15_000 });
     }

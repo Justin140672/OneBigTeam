@@ -1,6 +1,5 @@
 using HR.Modules.Tasks.Features.GetEmployeeTasks;
 using HR.Modules.Tasks.Features.GetMyTasks;
-using HR.Modules.Tasks.Features.GetTeamTasks;
 
 namespace HR.Modules.Tasks.Tests;
 
@@ -69,24 +68,6 @@ public class TaskListFilterValidationTests
         => AssertPriority(
             Validate(new GetEmployeeTasksValidator(),
                 new GetEmployeeTasksRequest { CompanyId = Company, EmployeeId = Subject, Priority = priority }),
-            expectValid);
-
-    // ── GetTeamTasks ──────────────────────────────────────────────────────
-
-    [Theory]
-    [MemberData(nameof(StatusCases))]
-    public void GetTeamTasks_status(string? status, bool expectValid)
-        => AssertStatus(
-            Validate(new GetTeamTasksValidator(),
-                new GetTeamTasksRequest { CompanyId = Company, ManagerId = Subject, Status = status }),
-            expectValid);
-
-    [Theory]
-    [MemberData(nameof(PriorityCases))]
-    public void GetTeamTasks_priority(string? priority, bool expectValid)
-        => AssertPriority(
-            Validate(new GetTeamTasksValidator(),
-                new GetTeamTasksRequest { CompanyId = Company, ManagerId = Subject, Priority = priority }),
             expectValid);
 
     // ── data ──────────────────────────────────────────────────────────────

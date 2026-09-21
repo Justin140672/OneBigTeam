@@ -1240,6 +1240,19 @@ html[data-theme="dark"] .card-header {
     background: rgba(220, 38, 38, 0.04);
 }
 
+/* Rows shown for oversight only (owned by someone else in this list's context, e.g. a
+   manager-owned leave approval visible to HR) — plain, non-interactive, no cursor/hover state,
+   never focusable (a div, no tabindex, no click handler — see AttentionQueuePanel.razor). */
+.attention-queue-item--readonly {
+    cursor: default;
+}
+
+.attention-queue-owner-label {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
 .attention-queue-action {
     flex-shrink: 0;
     font-size: 0.75rem;
