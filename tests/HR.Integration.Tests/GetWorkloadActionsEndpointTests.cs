@@ -136,10 +136,6 @@ public class GetWorkloadActionsEndpointTests
         var companyId = Guid.NewGuid();
         var hrAdminId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, hrAdminId, SystemRoles.HrAdministrator);
-        // VacanciesAwaitingActionWorkloadActionProvider is Recruiter-scoped only (see its xmldoc),
-        // so this persona also needs the Recruiter role to exercise that category alongside the
-        // HR-only/Manager-or-HR categories below.
-        await TestRoleSeeder.AssignRoleAsync(_factory, hrAdminId, SystemRoles.Recruiter);
         using var hrClient = await ClientFor(companyId, hrAdminId);
 
         var employeeId = await SeedEmployeeAsync(companyId, "Priya", "Patel");
@@ -153,9 +149,6 @@ public class GetWorkloadActionsEndpointTests
         // Overdue task assigned to the same employee.
         await SeedOverdueTaskAsync(companyId, employeeId, Today.AddDays(-2));
 
-        // Open vacancy with no recruiter assigned.
-        await SeedOpenVacancyAsync(companyId, hiringManagerId: employeeId, assignedRecruiterId: null);
-
         var response = await hrClient.GetAsync($"/api/companies/{companyId}/reporting/workload-actions");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -166,8 +159,11 @@ public class GetWorkloadActionsEndpointTests
         Assert.Contains("Pending Leave Approvals", categories);
         Assert.Contains("Probation Reviews Due", categories);
         Assert.Contains("Manager Tasks Overdue", categories);
-        Assert.Contains("Vacancies Awaiting Action", categories);
-        Assert.True(payload.Summary.TotalOutstanding >= 4);
+        // Recruitment vacancy actions were removed from the shared Manager/HR workload aggregation —
+        // see VacanciesAwaitingActionWorkloadActionProvider removal; recruitment needs its own scoped
+        // surface in a future ticket.
+        Assert.DoesNotContain("Vacancies Awaiting Action", categories);
+        Assert.True(payload.Summary.TotalOutstanding >= 3);
     }
 
     [Fact]
@@ -212,7 +208,7 @@ public class GetWorkloadActionsEndpointTests
 
         // Sickness is HR-only — a Manager, regardless of direct reports, must never see it.
         Assert.DoesNotContain(payload.Items, i => i.ActionCategory == "Pending Sickness Actions");
-        // Recruitment is Recruiter-only — a plain Manager must never see it either.
+        // Recruitment vacancy actions were removed from the shared Manager/HR workload aggregation entirely.
         Assert.DoesNotContain(payload.Items, i => i.ActionCategory == "Vacancies Awaiting Action");
     }
 

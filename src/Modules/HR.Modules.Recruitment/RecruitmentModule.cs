@@ -84,7 +84,6 @@ public static class RecruitmentModule
         AddFeatureServices(services);
         AddCandidateDocumentStorage(services, configuration);
         services.AddScoped<IInterviewFeedbackService, InterviewFeedbackService>();
-        services.AddScoped<IWorkloadActionProvider, VacanciesAwaitingActionWorkloadActionProvider>();
 
         services.AddDbContext<RecruitmentDbContext>(options =>
             options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
