@@ -27,6 +27,8 @@ internal sealed class IdentityDbContext : DbContext
     public DbSet<SessionRevocation> SessionRevocations => Set<SessionRevocation>();
     public DbSet<AccountDisablement> AccountDisablements => Set<AccountDisablement>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
+    public DbSet<InvitationBatch> InvitationBatches => Set<InvitationBatch>();
+    public DbSet<InvitationBatchRecipient> InvitationBatchRecipients => Set<InvitationBatchRecipient>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

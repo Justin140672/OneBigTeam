@@ -19,6 +19,7 @@ internal sealed class UserInviteConfiguration : IEntityTypeConfiguration<UserInv
         builder.Property(i => i.ExpiresAt).HasColumnName("expires_at").IsRequired();
         builder.Property(i => i.ClaimedAt).HasColumnName("claimed_at");
         builder.Property(i => i.CancelledAt).HasColumnName("cancelled_at");
+        builder.Property(i => i.EmailSentAt).HasColumnName("email_sent_at");
         builder.Property(i => i.CreatedByUserId).HasColumnName("created_by_user_id");
         builder.Property(i => i.CreatedAt).HasColumnName("created_at").IsRequired();
 

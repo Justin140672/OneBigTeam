@@ -1,0 +1,218 @@
+@using HR.Web.Models
+@using HR.Web.Services
+@inject UserAdministrationService UserAdministrationService
+
+<div class="invite-mode-candidate-grid">
+    @if (_loading)
+    {
+        <HrLoadingIndicator Label="Loading invitable employees…" />
+    }
+    else if (_error is not null)
+    {
+        <div class="alert alert-danger">@_error</div>
+    }
+    else
+    {
+        <div class="d-flex align-items-center gap-2 mb-2">
+            <SfButton CssClass="e-small" OnClick="SelectAllEligibleAsync">Select all eligible</SfButton>
+            <SfButton CssClass="e-small" OnClick="ClearSelectionAsync">Clear selection</SfButton>
+            <span class="text-muted">@_selectedCount selected</span>
+            <span class="ms-auto">
+                <SfButton IsPrimary="true" Disabled="@(_selectedCount == 0)" OnClick="InviteSelectedClickedAsync">
+                    Invite selected (@_selectedCount)
+                </SfButton>
+            </span>
+        </div>
+
+        <HrGrid @ref="_grid"
+                TValue="InvitableEmployeeModel"
+                DataSource="@_candidates"
+                class="invite-mode-grid"
+                AllowPaging="true"
+                AllowSorting="true"
+                AllowFiltering="true">
+            <GridEvents TValue="InvitableEmployeeModel" RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
+            <GridSelectionSettings Type="Syncfusion.Blazor.Grids.SelectionType.Multiple"
+                                   Mode="Syncfusion.Blazor.Grids.SelectionMode.Row"
+                                   PersistSelection="true"></GridSelectionSettings>
+            <GridPageSettings PageSize="20" />
+            <GridColumns>
+                <GridColumn Type="Syncfusion.Blazor.Grids.ColumnType.CheckBox" Width="50"></GridColumn>
+                <GridColumn Field="@nameof(InvitableEmployeeModel.Name)" HeaderText="Employee" Width="220">
+                    <Template>
+                        @{
+                            var row = (context as InvitableEmployeeModel)!;
+                            <a href="/companies/@CompanyId/employees/@row.EmployeeId">@row.Name</a>
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(InvitableEmployeeModel.WorkEmail)" HeaderText="Work Email" Width="220">
+                    <Template>
+                        @{
+                            var row = (context as InvitableEmployeeModel)!;
+                        }
+                        @if (string.IsNullOrWhiteSpace(row.WorkEmail))
+                        {
+                            <span class="text-danger">
+                                No work email —
+                                <a href="/companies/@CompanyId/employees/@row.EmployeeId">correct this employee's record</a>
+                            </span>
+                        }
+                        else
+                        {
+                            @row.WorkEmail
+                        }
+                    </Template>
+                </GridColumn>
+                <GridColumn Field="@nameof(InvitableEmployeeModel.PositionTitle)" HeaderText="Position" Width="180" />
+            </GridColumns>
+        </HrGrid>
+
+        <div class="invite-mode-grid-summary mb-2">@_candidates.Count candidate(s)</div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter] public bool CanManageUsers { get; set; }
+    [Parameter] public EventCallback<(List<InvitationRecipientCandidate> Recipients, List<InvitationExclusionCandidate> Excluded)> OnInviteSelectedRequested { get; set; }
+
+    private HrGrid<InvitableEmployeeModel>? _grid;
+    private bool _loading = true;
+    private string? _error;
+    private List<InvitableEmployeeModel> _candidates = [];
+    private int _selectedCount;
+
+    // Employees the admin has explicitly unchecked during this page visit — never re-auto-selected
+    // for the lifetime of this component instance (no persistence needed beyond that).
+    private readonly HashSet<Guid> _userDeselected = [];
+    private bool _autoSelected;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_candidates.Count == 0 && !_loading)
+            return;
+
+        await LoadCandidatesAsync();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCandidatesAsync();
+    }
+
+    private async Task LoadCandidatesAsync()
+    {
+        _loading = true;
+        _error = null;
+        StateHasChanged();
+
+        var result = await UserAdministrationService.GetInvitableEmployeesAsync(CompanyId);
+        if (result is null)
+        {
+            _error = "Failed to load invitable employees.";
+            _loading = false;
+            return;
+        }
+
+        _candidates = result;
+        _loading = false;
+        _autoSelected = false;
+    }
+
+    public async Task ReloadAsync()
+    {
+        await LoadCandidatesAsync();
+        StateHasChanged();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_autoSelected && !_loading && _error is null && _grid is not null && _candidates.Count > 0)
+        {
+            _autoSelected = true;
+            await SelectEligibleIndexesAsync(EligibleIndexes());
+            await RefreshSelectedCountAsync();
+        }
+    }
+
+    private IEnumerable<int> EligibleIndexes() =>
+        _candidates
+            .Select((c, i) => (c, i))
+            .Where(x => !string.IsNullOrWhiteSpace(x.c.WorkEmail) && !_userDeselected.Contains(x.c.EmployeeId))
+            .Select(x => x.i);
+
+    private async Task SelectEligibleIndexesAsync(IEnumerable<int> indexes)
+    {
+        if (_grid is null) return;
+        var list = indexes.ToArray();
+        if (list.Length == 0) return;
+        await _grid.SelectRowsAsync(list);
+    }
+
+    private async Task SelectAllEligibleAsync()
+    {
+        _userDeselected.Clear();
+        if (_grid is null) return;
+        await _grid.ClearSelectionAsync();
+        await SelectEligibleIndexesAsync(EligibleIndexes());
+        _selectedCount = (await _grid.GetSelectedRecordsAsync()).Count;
+        StateHasChanged();
+    }
+
+    public async Task ClearSelectionAsync()
+    {
+        _userDeselected.Clear();
+        foreach (var candidate in _candidates)
+            _userDeselected.Add(candidate.EmployeeId);
+
+        if (_grid is not null)
+            await _grid.ClearSelectionAsync();
+        _selectedCount = 0;
+        StateHasChanged();
+    }
+
+    private async Task OnRowSelected(Syncfusion.Blazor.Grids.RowSelectEventArgs<InvitableEmployeeModel> args)
+    {
+        if (args.Data is not null)
+            _userDeselected.Remove(args.Data.EmployeeId);
+        await RefreshSelectedCountAsync();
+    }
+
+    private async Task OnRowDeselected(Syncfusion.Blazor.Grids.RowDeselectEventArgs<InvitableEmployeeModel> args)
+    {
+        if (args.Data is not null)
+            _userDeselected.Add(args.Data.EmployeeId);
+        await RefreshSelectedCountAsync();
+    }
+
+    private async Task RefreshSelectedCountAsync()
+    {
+        if (_grid is null) return;
+        _selectedCount = (await _grid.GetSelectedRecordsAsync()).Count;
+        StateHasChanged();
+    }
+
+    private async Task InviteSelectedClickedAsync()
+    {
+        if (_grid is null) return;
+
+        var selected = await _grid.GetSelectedRecordsAsync();
+        if (selected.Count == 0) return;
+
+        var recipients = new List<InvitationRecipientCandidate>();
+        var excluded = new List<InvitationExclusionCandidate>();
+
+        foreach (var row in selected)
+        {
+            if (string.IsNullOrWhiteSpace(row.WorkEmail))
+            {
+                excluded.Add(new(row.Name, null, "MissingEmail"));
+                continue;
+            }
+            recipients.Add(new(row.EmployeeId, row.Name, row.WorkEmail));
+        }
+
+        await OnInviteSelectedRequested.InvokeAsync((recipients, excluded));
+    }
+}

@@ -104,6 +104,16 @@ internal sealed class InviteEmployeeUserHandler(
             actionUrl: inviteLink,
             ct: cancellationToken);
 
+        if (emailSent)
+        {
+            // Drives CompanyOnboarding's "Invite your team" completion rule (spec section 7) —
+            // completion no longer waits for the invitee to accept. The idempotent-save branch
+            // above already committed the invite row itself; this is an additional save for the
+            // EmailSentAt flag, set only once the sender has actually accepted the email.
+            invite.MarkEmailSent(now);
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
         await auditEventPublisher.PublishAsync(
             new UserInvitedAuditEvent(
                 request.CompanyId,

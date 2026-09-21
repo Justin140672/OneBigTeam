@@ -1,0 +1,141 @@
+@using HR.Web.Models
+@inject InvitationBatchService InvitationBatchService
+
+<SfDialog @bind-Visible="Visible" IsModal="true" Width="640px" ShowCloseIcon="true" CssClass="bulk-invite-confirm-dialog">
+    <DialogEvents Closed="HandleDialogClosed" />
+    <DialogTemplates>
+        <Header>Invite Selected Employees</Header>
+        <Content>
+            <p class="text-muted">
+                @Recipients.Count employee(s) will be invited. Access granted is the standard
+                <strong>Employee</strong> role.
+            </p>
+
+            @if (Recipients.Count > 0)
+            {
+                <table class="table table-sm">
+                    <thead>
+                        <tr><th>Name</th><th>Email</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var recipient in Recipients)
+                        {
+                            <tr>
+                                <td>@recipient.Name</td>
+                                <td>@recipient.Email</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            @if (Excluded.Count > 0)
+            {
+                <p class="fw-medium mb-1">Excluded from this selection</p>
+                <table class="table table-sm">
+                    <thead>
+                        <tr><th>Name</th><th>Email</th><th>Reason</th></tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var excluded in Excluded)
+                        {
+                            <tr>
+                                <td>@excluded.Name</td>
+                                <td>@(excluded.Email ?? "—")</td>
+                                <td>@ExclusionReasonLabel(excluded.Reason)</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="alert alert-danger py-2">@_error</div>
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton IsPrimary="true" Disabled="@(_submitting || Recipients.Count == 0)" OnClick="ConfirmAsync">
+                @if (_submitting)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Send @Recipients.Count Invitation(s)
+            </SfButton>
+            <SfButton Disabled="@_submitting" OnClick="CancelAsync">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter] public bool IsOpen { get; set; }
+    [Parameter] public List<InvitationRecipientCandidate> Recipients { get; set; } = [];
+    [Parameter] public List<InvitationExclusionCandidate> Excluded { get; set; } = [];
+    [Parameter] public EventCallback OnClosed { get; set; }
+    [Parameter] public EventCallback<QueueInvitationBatchResponse> OnQueued { get; set; }
+
+    private bool Visible { get; set; }
+    private bool _wasOpen;
+    private bool _submitting;
+    private string? _error;
+
+    // Generated once per confirmation "session" (i.e. once per dialog open) so a double-click, or a
+    // retry after an ambiguous failure within the same open dialog, reuses the same key rather than
+    // risking a duplicate batch.
+    private Guid _idempotencyKey;
+
+    protected override void OnParametersSet()
+    {
+        Visible = IsOpen;
+
+        if (IsOpen && !_wasOpen)
+        {
+            _submitting = false;
+            _error = null;
+            _idempotencyKey = Guid.NewGuid();
+        }
+
+        _wasOpen = IsOpen;
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (Recipients.Count == 0) return;
+
+        _submitting = true;
+        _error = null;
+
+        var (result, error) = await InvitationBatchService.QueueBatchAsync(
+            CompanyId, Recipients.Select(r => r.EmployeeId).ToList(), _idempotencyKey);
+
+        _submitting = false;
+
+        if (result is null)
+        {
+            _error = error ?? "Failed to queue invitations.";
+            return;
+        }
+
+        Visible = false;
+        await OnQueued.InvokeAsync(result);
+    }
+
+    private async Task CancelAsync()
+    {
+        Visible = false;
+        await OnClosed.InvokeAsync();
+    }
+
+    private Task HandleDialogClosed() => CancelAsync();
+
+    private static string ExclusionReasonLabel(string reason) => reason switch
+    {
+        "NotEligible"       => "Not eligible",
+        "MissingEmail"      => "No work email on file",
+        "AlreadyInvited"    => "Already invited",
+        "AlreadyHasAccount" => "Already has an account",
+        "DuplicateEmail"    => "Duplicate email address",
+        _                   => reason,
+    };
+}

@@ -340,4 +340,54 @@ public class InviteEmployeeUserHandlerTests(IdentityDatabaseFixture fixture)
         var invite = await db.UserInvites.FirstOrDefaultAsync(i => i.EmployeeId == employeeId);
         Assert.NotNull(invite);
     }
+
+    [Fact]
+    public async Task HandleAsync_Marks_EmailSentAt_When_Sender_Succeeds()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var emailSender = new FakeInvitationEmailSender(succeeds: true);
+        var nameReader = new FakeEmployeeNameReader(new Dictionary<Guid, string> { [employeeId] = "Test User" });
+        var handler = BuildHandler(nameReader, new FakeAuditEventPublisher(), emailSender);
+
+        var request = new InviteEmployeeUserRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            Email = "sent@test.com",
+            RoleIds = [Guid.NewGuid()],
+        };
+
+        var result = await handler.HandleAsync(request, actorUserId: null, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        await using var db = fixture.BuildContext();
+        var invite = await db.UserInvites.SingleAsync(i => i.EmployeeId == employeeId);
+        Assert.NotNull(invite.EmailSentAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Leaves_EmailSentAt_Null_When_Sender_Fails()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var emailSender = new FakeInvitationEmailSender(succeeds: false);
+        var nameReader = new FakeEmployeeNameReader(new Dictionary<Guid, string> { [employeeId] = "Test User" });
+        var handler = BuildHandler(nameReader, new FakeAuditEventPublisher(), emailSender);
+
+        var request = new InviteEmployeeUserRequest
+        {
+            CompanyId = companyId,
+            EmployeeId = employeeId,
+            Email = "notsent@test.com",
+            RoleIds = [Guid.NewGuid()],
+        };
+
+        var result = await handler.HandleAsync(request, actorUserId: null, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        await using var db = fixture.BuildContext();
+        var invite = await db.UserInvites.SingleAsync(i => i.EmployeeId == employeeId);
+        Assert.Null(invite.EmailSentAt);
+    }
 }

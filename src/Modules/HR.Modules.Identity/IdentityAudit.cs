@@ -26,6 +26,29 @@ internal sealed record UserInvitedAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
+// Published when an administrator queues a bulk invitation batch (Features/QueueInvitationBatch).
+// No raw email list here (see 05-database-standards.md, sensitive/PII payload minimisation) —
+// only the recipient count and their employee ids, matching UserInvitedAuditEvent's own per-invite
+// email publication once each recipient is actually processed by ProcessInvitationBatchJob.
+internal sealed record InvitationBatchQueuedAuditEvent(
+    Guid CompanyId,
+    Guid BatchId,
+    IReadOnlyList<Guid> RecipientEmployeeIds,
+    Guid? ActorUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType       => "invitation-batch.queued";
+    string IAuditEvent.EntityType      => "InvitationBatch";
+    Guid   IAuditEvent.EntityId        => BatchId;
+    Guid?  IAuditEvent.ActorUserId     => ActorUserId;
+    Guid?  IAuditEvent.ActorEmployeeId => null;
+    Guid?  IAuditEvent.CorrelationId   => null;
+    string? IAuditEvent.Summary        => $"Queued a bulk invitation batch for {RecipientEmployeeIds.Count} employee(s)";
+    object? IAuditEvent.Before         => null;
+    object? IAuditEvent.After          => new { RecipientCount = RecipientEmployeeIds.Count, RecipientEmployeeIds };
+    object? IAuditEvent.Metadata       => null;
+}
+
 // Published when a pending invite is resent (Features/ResendInvite) — token/expiry regenerated.
 internal sealed record UserInviteResentAuditEvent(
     Guid CompanyId,

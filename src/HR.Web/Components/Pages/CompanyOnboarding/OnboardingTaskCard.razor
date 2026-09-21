@@ -29,11 +29,24 @@
 
     // Task.LinkUrl contains a "{companyId}" placeholder since HR.Web's routes are company-scoped
     // (e.g. "/companies/{CompanyId:guid}/employees") — substitute the current company id here.
-    // "returnUrl" tells the target edit page (EditPageBase.TargetListUrl) to send the user back
-    // here on Save/Close instead of its own list page, so completing a task from the checklist
-    // returns to the checklist rather than stranding the user on an unrelated list screen.
-    private string ResolvedLinkUrl =>
-        Task.LinkUrl.Replace("{companyId}", CompanyId.ToString()) + "?returnUrl=%2Fgetting-started";
+    // "returnUrl" tells the target edit/list page (EditPageBase.TargetListUrl, or the employee
+    // list's own "Back to employees" link in invitation mode) to send the user back here instead
+    // of its own list page, so completing a task from the checklist returns to the checklist
+    // rather than stranding the user on an unrelated list screen.
+    //
+    // Some task links (e.g. invite-additional-users -> "/companies/{companyId}/employees?mode=invite")
+    // already carry their own query string, so a naive "+ \"?returnUrl=...\"" would produce a
+    // malformed URL such as "...?mode=invite?returnUrl=...". Join with "&" when a query string is
+    // already present, "?" otherwise.
+    private string ResolvedLinkUrl
+    {
+        get
+        {
+            var url = Task.LinkUrl.Replace("{companyId}", CompanyId.ToString());
+            var separator = url.Contains('?') ? "&" : "?";
+            return $"{url}{separator}returnUrl=%2Fgetting-started";
+        }
+    }
 
     // The import template task streams a file download rather than navigating to a page (see
     // DownloadEmployeeImportTemplateTask.GetLinkUrlAsync), so "Go to task" reads wrong there.

@@ -10,6 +10,8 @@
 @inject UserService UserService
 @inject AppSession Session
 @inject CompensationService CompensationService
+@inject InvitationBatchService InvitationBatchService
+@inject UserAdministrationService UserAdministrationService
 @inject IJSRuntime JS
 
 <PageTitle>Employees</PageTitle>
@@ -18,7 +20,26 @@
     <h1 class="mb-1">Employees</h1>
     <p class="text-muted mb-3">View and manage everyone employed at your company.</p>
 
-    <div class="employee-list-controls mb-2">
+    @if (_isInviteMode)
+    {
+        <div class="alert alert-info d-flex justify-content-between align-items-center invite-mode-banner">
+            <span>Invitation mode — reviewing who to invite.</span>
+            <a href="@BackToListUrl">Back to employee list</a>
+        </div>
+    }
+
+    <InvitationBatchProgressPanel @ref="_progressPanel" CompanyId="CompanyId" OnRecipientsUpdated="HandleInvitationRecipientsUpdatedAsync" />
+
+    @if (_isInviteMode)
+    {
+        <InviteModeCandidateGrid @ref="_inviteModeGrid"
+                                  CompanyId="CompanyId"
+                                  CanManageUsers="_canManageUserAccounts"
+                                  OnInviteSelectedRequested="HandleInviteSelectedRequestedAsync" />
+    }
+    else
+    {
+        <div class="employee-list-controls mb-2">
         <div class="employee-search-wrap">
             <HrTextBox Value="@SearchTerm"
                        ValueChanged="@OnSearchChanged"
@@ -236,6 +257,14 @@
                          OnConfirmed="ConfirmDisableAsync"
                          OnCancelled="@(() => { _showDisableConfirm = false; _disableRow = null; })" />
     }
+    }
+
+    <BulkInviteConfirmDialog CompanyId="CompanyId"
+                             IsOpen="_showInviteConfirmDialog"
+                             Recipients="_inviteConfirmRecipients"
+                             Excluded="_inviteConfirmExcluded"
+                             OnClosed="HandleInviteConfirmDialogClosed"
+                             OnQueued="HandleInviteBatchQueuedAsync" />
 </div>
 
 @code {
@@ -263,6 +292,25 @@
     private string _filterStatus = string.Empty;
     private int _totalCount;
     private int _currentPage = 1;
+
+    // ── Bulk invitations ────────────────────────────────────────────────────
+    [SupplyParameterFromQuery(Name = "mode")]
+    public string? Mode { get; set; }
+
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
+
+    private bool _isInviteMode => string.Equals(Mode, "invite", StringComparison.OrdinalIgnoreCase);
+
+    private string BackToListUrl =>
+        string.IsNullOrWhiteSpace(ReturnUrl) ? $"/companies/{CompanyId}/employees" : ReturnUrl;
+
+    private InvitationBatchProgressPanel? _progressPanel;
+    private InviteModeCandidateGrid? _inviteModeGrid;
+
+    private bool _showInviteConfirmDialog;
+    private List<InvitationRecipientCandidate> _inviteConfirmRecipients = [];
+    private List<InvitationExclusionCandidate> _inviteConfirmExcluded = [];
 
     private Guid? FilterDepartmentId =>
         Guid.TryParse(_filterDepartmentIdText, out var id) ? id : null;
@@ -324,6 +372,110 @@
             // BulkUpdateMenuTemplate/HandleBulkUpdateMenuItemSelected below, which itself
             // re-validates that a selection exists for that specific action).
             selectionDependent: false);
+
+        // Bulk invitations: works on manually selected rows from the normal (non-invite-mode)
+        // grid too, not just the dedicated invitation-mode grid below. Session.CanManageUsers is
+        // available synchronously here (unlike _canManageUserAccounts, which OnBeforeLoadAsync
+        // hasn't set yet at ConfigureToolbar time).
+        if (Session.CanManageUsers)
+        {
+            AddToolbarAction(
+                id:      "hr-invite-selected",
+                text:    "Invite selected",
+                icon:    "fa-solid fa-paper-plane",
+                onClick: OnInviteSelectedClicked,
+                tooltip: "Send account invitations to selected employees",
+                textWithSelectionCount: n => n > 0 ? $"Invite selected ({n})" : "Invite selected");
+        }
+    }
+
+    // Classifies a normal-grid selection (which can include already-invited/already-has-account
+    // employees, unlike the invitation-mode candidate list) into eligible recipients vs. excluded,
+    // mirroring the server-side exclusion reasons (NotEligible/MissingEmail/AlreadyInvited/
+    // AlreadyHasAccount/DuplicateEmail) closely enough for a client-side preview.
+    private async Task OnInviteSelectedClicked(EmployeeListItemModel _)
+    {
+        if (Grid is null) return;
+
+        var selected = await Grid.GetSelectedRecordsAsync();
+        if (selected.Count == 0) return;
+
+        var recipients = new List<InvitationRecipientCandidate>();
+        var excluded = new List<InvitationExclusionCandidate>();
+        var seenEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var row in selected)
+        {
+            if (string.IsNullOrWhiteSpace(row.WorkEmail))
+            {
+                excluded.Add(new(row.FullName, null, "MissingEmail"));
+                continue;
+            }
+
+            var category = AccountStateCategory(row.UserAccountStatus);
+            if (category is "invited" or "expired")
+            {
+                excluded.Add(new(row.FullName, row.WorkEmail, "AlreadyInvited"));
+                continue;
+            }
+            if (category is "active" or "disabled")
+            {
+                excluded.Add(new(row.FullName, row.WorkEmail, "AlreadyHasAccount"));
+                continue;
+            }
+            if (!seenEmails.Add(row.WorkEmail))
+            {
+                excluded.Add(new(row.FullName, row.WorkEmail, "DuplicateEmail"));
+                continue;
+            }
+
+            recipients.Add(new(row.Id, row.FullName, row.WorkEmail));
+        }
+
+        _actionError = null;
+        _actionSuccess = null;
+        _inviteConfirmRecipients = recipients;
+        _inviteConfirmExcluded = excluded;
+        _showInviteConfirmDialog = true;
+    }
+
+    private async Task HandleInviteSelectedRequestedAsync((List<InvitationRecipientCandidate> Recipients, List<InvitationExclusionCandidate> Excluded) selection)
+    {
+        _actionError = null;
+        _actionSuccess = null;
+        _inviteConfirmRecipients = selection.Recipients;
+        _inviteConfirmExcluded = selection.Excluded;
+        _showInviteConfirmDialog = true;
+        await Task.CompletedTask;
+    }
+
+    private void HandleInviteConfirmDialogClosed()
+    {
+        _showInviteConfirmDialog = false;
+    }
+
+    private async Task HandleInviteBatchQueuedAsync(QueueInvitationBatchResponse result)
+    {
+        _showInviteConfirmDialog = false;
+        _actionSuccess = "Invitations queued — you can navigate away, processing will continue.";
+
+        if (Grid is not null)
+            await Grid.ClearSelectionAsync();
+        if (_inviteModeGrid is not null)
+            await _inviteModeGrid.ClearSelectionAsync();
+
+        if (_progressPanel is not null)
+            await _progressPanel.ShowBatchAsync(result.BatchId);
+    }
+
+    // Fired by InvitationBatchProgressPanel when a poll observes newly-sent recipients or a
+    // transition to Completed, so the "User Account" column (and invitation-mode candidate grid)
+    // reflect the outcome without a full page reload.
+    private async Task HandleInvitationRecipientsUpdatedAsync()
+    {
+        await LoadAsync();
+        if (_inviteModeGrid is not null)
+            await _inviteModeGrid.ReloadAsync();
     }
 
     private async Task OnBulkUpdateClicked(EmployeeListItemModel _)

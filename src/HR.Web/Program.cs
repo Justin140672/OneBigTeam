@@ -139,6 +139,7 @@ builder.Services.AddScoped<RecruitmentKanbanService>();
 builder.Services.AddScoped<ExternalRecruiterService>();
 builder.Services.AddScoped<RecruitmentStageService>();
 builder.Services.AddScoped<UserAdministrationService>();
+builder.Services.AddScoped<InvitationBatchService>();
 builder.Services.AddScoped<DataImportService>();
 builder.Services.AddScoped<ReportingService>();
 builder.Services.AddScoped<CompanyOnboardingService>();

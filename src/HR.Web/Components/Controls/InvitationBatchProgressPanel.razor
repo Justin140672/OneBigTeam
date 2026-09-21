@@ -1,0 +1,201 @@
+@using HR.Web.Models
+@implements IAsyncDisposable
+@inject InvitationBatchService InvitationBatchService
+
+@if (_batch is not null)
+{
+    <div class="invitation-batch-progress-panel mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div>
+                <strong>Invitation batch</strong>
+                <span class="text-muted ms-2">@StatusLabel(_batch.Status)</span>
+            </div>
+            @if (_batch.Counts.Failed > 0)
+            {
+                <SfButton CssClass="e-small" Disabled="@_retrying" OnClick="RetryFailedAsync">
+                    @if (_retrying)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Retry failed invitations
+                </SfButton>
+            }
+        </div>
+
+        @if (_batch.Status is "Queued" or "Processing")
+        {
+            <p class="text-muted small mb-2">Processing continues even if you navigate away — check back here for the latest status.</p>
+        }
+
+        <div class="invitation-batch-counts mb-2">
+            <span class="badge bg-secondary-subtle text-secondary-emphasis me-1">Waiting @_batch.Counts.Waiting</span>
+            <span class="badge bg-info-subtle text-info-emphasis me-1">Processing @_batch.Counts.Processing</span>
+            <span class="badge bg-success-subtle text-success-emphasis me-1">Sent @_batch.Counts.Sent</span>
+            <span class="badge bg-warning-subtle text-warning-emphasis me-1">Skipped @_batch.Counts.Skipped</span>
+            <span class="badge bg-danger-subtle text-danger-emphasis">Failed @_batch.Counts.Failed</span>
+        </div>
+
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger py-2">@_error</div>
+        }
+
+        @if (_batch.Recipients.Count > 0)
+        {
+            <table class="table table-sm">
+                <thead>
+                    <tr><th>Email</th><th>Status</th><th>Detail</th></tr>
+                </thead>
+                <tbody>
+                    @foreach (var recipient in _batch.Recipients)
+                    {
+                        <tr>
+                            <td>@recipient.Email</td>
+                            <td>@recipient.Status</td>
+                            <td>@(recipient.FailureReason ?? "—")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+}
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter] public EventCallback OnRecipientsUpdated { get; set; }
+
+    private InvitationBatchStatusResponse? _batch;
+    private string? _error;
+    private bool _retrying;
+    private bool _loadedInitially;
+
+    private CancellationTokenSource? _pollCts;
+    private Task? _pollTask;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (_loadedInitially) return;
+        _loadedInitially = true;
+
+        var (result, error) = await InvitationBatchService.GetLatestAsync(CompanyId);
+        _error = error;
+        if (result is not null)
+        {
+            _batch = result;
+            if (result.Status is "Queued" or "Processing")
+                StartPolling(result.BatchId);
+        }
+    }
+
+    // Called by the parent page immediately after a batch is successfully queued, so progress
+    // starts showing without waiting for a page refresh.
+    public async Task ShowBatchAsync(Guid batchId)
+    {
+        var (result, error) = await InvitationBatchService.GetStatusAsync(CompanyId, batchId);
+        _error = error;
+        if (result is not null)
+        {
+            _batch = result;
+            if (result.Status is "Queued" or "Processing")
+                StartPolling(batchId);
+        }
+        StateHasChanged();
+    }
+
+    private async Task RetryFailedAsync()
+    {
+        if (_batch is null) return;
+
+        _retrying = true;
+        StateHasChanged();
+
+        var (result, error) = await InvitationBatchService.RetryBatchAsync(CompanyId, _batch.BatchId);
+        _retrying = false;
+        _error = error;
+
+        if (result is not null)
+        {
+            ApplyUpdatedStatus(result);
+            if (result.Status is "Queued" or "Processing")
+                StartPolling(result.BatchId);
+        }
+
+        StateHasChanged();
+    }
+
+    private void StartPolling(Guid batchId)
+    {
+        StopPolling();
+        _pollCts = new CancellationTokenSource();
+        _pollTask = PollLoopAsync(batchId, _pollCts.Token);
+    }
+
+    private void StopPolling()
+    {
+        _pollCts?.Cancel();
+        _pollCts?.Dispose();
+        _pollCts = null;
+    }
+
+    private async Task PollLoopAsync(Guid batchId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                var (result, error) = await InvitationBatchService.GetStatusAsync(CompanyId, batchId);
+                if (cancellationToken.IsCancellationRequested) return;
+
+                if (result is null)
+                {
+                    _error = error;
+                    continue;
+                }
+
+                await InvokeAsync(() =>
+                {
+                    ApplyUpdatedStatus(result);
+                    StateHasChanged();
+                });
+
+                if (result.Status == "Completed")
+                    return;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected on dispose/navigation — nothing to do.
+        }
+    }
+
+    private void ApplyUpdatedStatus(InvitationBatchStatusResponse updated)
+    {
+        var sentIncreased = updated.Counts.Sent > (_batch?.Counts.Sent ?? -1);
+        var justCompleted = updated.Status == "Completed" && _batch?.Status != "Completed";
+        _batch = updated;
+        _error = null;
+
+        if (sentIncreased || justCompleted)
+            _ = OnRecipientsUpdated.InvokeAsync();
+    }
+
+    private static string StatusLabel(string status) => status switch
+    {
+        "Queued"     => "Queued",
+        "Processing" => "Processing…",
+        "Completed"  => "Completed",
+        _            => status,
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        StopPolling();
+        if (_pollTask is not null)
+        {
+            try { await _pollTask; }
+            catch { /* swallow — disposal path */ }
+        }
+    }
+}

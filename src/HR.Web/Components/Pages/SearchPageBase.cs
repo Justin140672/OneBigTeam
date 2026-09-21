@@ -38,7 +38,7 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
     // "Add employee" so the primary action reads unambiguously rather than a bare "Add".
     protected virtual string AddButtonText => "Add";
 
-    private record ToolbarAction(string Id, string Text, string Icon, Func<TItem, Task> OnClick, string? Tooltip = null, bool SelectionDependent = true);
+    private record ToolbarAction(string Id, string Text, string Icon, Func<TItem, Task> OnClick, string? Tooltip = null, bool SelectionDependent = true, Func<int, string>? TextWithSelectionCount = null);
     private readonly List<ToolbarAction> _customActions = new();
 
     /// <param name="selectionDependent">
@@ -48,8 +48,13 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
     /// where only some of them are selection-dependent (see EmployeeList's "Bulk Update" menu,
     /// which also offers "Import"/"Download Template" alongside "Selected Employees").
     /// </param>
-    protected void AddToolbarAction(string id, string text, string icon, Func<TItem, Task> onClick, string? tooltip = null, bool selectionDependent = true)
-        => _customActions.Add(new(id, text, icon, onClick, tooltip, selectionDependent));
+    /// <param name="textWithSelectionCount">
+    /// Optional override producing the button's label from the current SelectedCount (e.g.
+    /// "Invite selected (3)") — recomputed every render alongside Disabled, unlike the fixed
+    /// <paramref name="text"/>. Leave null to keep a static label.
+    /// </param>
+    protected void AddToolbarAction(string id, string text, string icon, Func<TItem, Task> onClick, string? tooltip = null, bool selectionDependent = true, Func<int, string>? textWithSelectionCount = null)
+        => _customActions.Add(new(id, text, icon, onClick, tooltip, selectionDependent, textWithSelectionCount));
 
     // Override to register custom toolbar actions via AddToolbarAction.
     protected virtual void ConfigureToolbar() { }
@@ -76,7 +81,7 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
                 items.Add(new ItemModel
                 {
                     Id          = action.Id,
-                    Text        = action.Text,
+                    Text        = action.TextWithSelectionCount?.Invoke(SelectedCount) ?? action.Text,
                     PrefixIcon  = action.Icon,
                     TooltipText = action.Tooltip ?? action.Text,
                     Disabled    = action.SelectionDependent && !_hasSelection,

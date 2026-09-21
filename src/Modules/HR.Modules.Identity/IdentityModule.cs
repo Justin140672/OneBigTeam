@@ -106,6 +106,7 @@ public static class IdentityModule
 
         services.AddScoped<IEmployeeUserAccountStatusReader, EmployeeUserAccountStatusReader>();
         services.AddScoped<IHrAdministratorDirectory, HrAdministratorDirectory>();
+        services.AddScoped<ICompanyAdministratorDirectory, CompanyAdministratorDirectory>();
         services.AddScoped<IUserEmailReader, UserEmailReader>();
         services.AddScoped<ICompanyUserEmailSearchReader, CompanyUserEmailSearchReader>();
         services.AddScoped<ICompanyUserCountReader, CompanyUserCountReader>();
@@ -143,6 +144,21 @@ public static class IdentityModule
         services.AddScoped<HR.Modules.Identity.Features.ListInvitableEmployees.ListInvitableEmployeesHandler>();
         services.AddScoped<IValidator<HR.Modules.Identity.Features.ListInvitableEmployees.ListInvitableEmployeesRequest>,
             HR.Modules.Identity.Features.ListInvitableEmployees.ListInvitableEmployeesValidator>();
+
+        // Bulk employee invitations.
+        services.AddScoped<HR.Modules.Identity.Features.QueueInvitationBatch.QueueInvitationBatchHandler>();
+        services.AddScoped<IValidator<HR.Modules.Identity.Features.QueueInvitationBatch.QueueInvitationBatchRequest>,
+            HR.Modules.Identity.Features.QueueInvitationBatch.QueueInvitationBatchValidator>();
+        services.AddScoped<HR.Modules.Identity.Features.GetInvitationBatchStatus.GetInvitationBatchStatusHandler>();
+        services.AddScoped<IValidator<HR.Modules.Identity.Features.GetInvitationBatchStatus.GetInvitationBatchStatusRequest>,
+            HR.Modules.Identity.Features.GetInvitationBatchStatus.GetInvitationBatchStatusValidator>();
+        services.AddScoped<HR.Modules.Identity.Features.GetLatestInvitationBatch.GetLatestInvitationBatchHandler>();
+        services.AddScoped<IValidator<HR.Modules.Identity.Features.GetLatestInvitationBatch.GetLatestInvitationBatchRequest>,
+            HR.Modules.Identity.Features.GetLatestInvitationBatch.GetLatestInvitationBatchValidator>();
+        services.AddScoped<HR.Modules.Identity.Features.RetryInvitationBatch.RetryInvitationBatchHandler>();
+        services.AddScoped<IValidator<HR.Modules.Identity.Features.RetryInvitationBatch.RetryInvitationBatchRequest>,
+            HR.Modules.Identity.Features.RetryInvitationBatch.RetryInvitationBatchValidator>();
+        services.AddScoped<Jobs.ProcessInvitationBatchJob>();
         services.AddScoped<UpdateUserRolesHandler>();
         services.AddScoped<IValidator<UpdateUserRolesRequest>, UpdateUserRolesValidator>();
         services.AddScoped<ResendInviteHandler>();

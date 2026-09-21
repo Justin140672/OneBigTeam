@@ -797,4 +797,45 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
 
     /// <summary>Unchecks a previously-checked row's checkbox (same click target as CheckEmployeeRowAsync).</summary>
     public async Task UncheckEmployeeRowAsync(string nameFragment) => await CheckEmployeeRowAsync(nameFragment);
+
+    // ── Bulk invitations ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Navigates directly to the employee list in invitation mode (<c>?mode=invite</c>), optionally
+    /// with a <c>returnUrl</c> (e.g. from the Getting Started checklist's "Invite your team" task
+    /// card — see OnboardingTaskCard.ResolvedLinkUrl). Waits for either the invite-mode candidate
+    /// grid or its empty state to render (EmployeeList.razor renders InviteModeCandidateGrid in
+    /// place of the normal HrGrid while <c>_isInviteMode</c> is true).
+    /// </summary>
+    public async Task GoToInviteModeAsync(Guid companyId, string? returnUrl = null)
+    {
+        var url = $"{baseUrl}/companies/{companyId}/employees?mode=invite";
+        if (returnUrl is not null)
+            url += $"&returnUrl={Uri.EscapeDataString(returnUrl)}";
+        await page.GotoAsync(url);
+        await page.WaitForSelectorAsync(
+            ".invite-mode-grid .e-row, .invite-mode-grid .e-emptyrow",
+            new() { Timeout = 20_000 });
+    }
+
+    /// <summary>The invitation-mode banner ("Invitation mode — reviewing who to invite.") shown only while <c>_isInviteMode</c> is true.</summary>
+    public ILocator InviteModeBanner => page.Locator(".invite-mode-banner");
+
+    public Task<bool> IsInviteModeBannerVisibleAsync() => InviteModeBanner.IsVisibleAsync();
+
+    /// <summary>The banner's "Back to employee list" link — honours ReturnUrl when supplied.</summary>
+    public async Task<string?> GetBackToListLinkHrefAsync() =>
+        await InviteModeBanner.GetByRole(AriaRole.Link, new() { Name = "Back to employee list" }).GetAttributeAsync("href");
+
+    /// <summary>
+    /// The normal (non-invite-mode) grid's own "Invite selected (N)" toolbar action — works on a
+    /// manual multi-row selection, distinct from the dedicated invitation-mode grid's own button
+    /// of the same name (see InviteModeCandidateGridPage.InviteSelectedButton).
+    /// </summary>
+    public ILocator InviteSelectedToolbarButton =>
+        page.GetByRole(AriaRole.Button, new() { Name = "Invite selected" });
+
+    public Task<bool> IsInviteSelectedToolbarButtonDisabledAsync() => InviteSelectedToolbarButton.IsDisabledAsync();
+
+    public Task ClickInviteSelectedToolbarButtonAsync() => InviteSelectedToolbarButton.ClickAsync();
 }

@@ -21,6 +21,8 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
 
     public FakeEmailSender EmailSender { get; } = new FakeEmailSender();
 
+    public FakeInvitationEmailSender InvitationEmailSender { get; private set; } = null!;
+
     internal FakeStripeGateway StripeGateway { get; } = new FakeStripeGateway();
 
     internal FakeSupabaseAuthGateway SupabaseAuthGateway { get; } = new FakeSupabaseAuthGateway();
@@ -95,7 +97,8 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
 
             // The invitation path uses the branded-template IInvitationEmailSender rather than the
             // raw IEmailSender — capture those sends into the same FakeEmailSender.Sent surface.
-            services.AddSingleton<IInvitationEmailSender>(new FakeInvitationEmailSender(EmailSender));
+            InvitationEmailSender = new FakeInvitationEmailSender(EmailSender);
+            services.AddSingleton<IInvitationEmailSender>(InvitationEmailSender);
 
             // Replace the real Stripe gateway so no test ever calls out to Stripe's network API.
             services.AddScoped<IStripeGateway>(_ => StripeGateway);

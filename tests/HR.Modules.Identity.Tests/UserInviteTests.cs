@@ -144,4 +144,22 @@ public class UserInviteTests
         Assert.False(invite.IsCancelled);
         Assert.Null(invite.CancelledAt);
     }
+
+    [Fact]
+    public void EmailSentAt_Is_Null_Immediately_After_Create()
+    {
+        var invite = UserInvite.Create(Guid.NewGuid(), Guid.NewGuid(), "test@example.com", Now);
+
+        Assert.Null(invite.EmailSentAt);
+    }
+
+    [Fact]
+    public void MarkEmailSent_Sets_EmailSentAt()
+    {
+        var invite = UserInvite.Create(Guid.NewGuid(), Guid.NewGuid(), "test@example.com", Now);
+
+        invite.MarkEmailSent(Now.AddMinutes(1));
+
+        Assert.Equal(Now.AddMinutes(1), invite.EmailSentAt);
+    }
 }
