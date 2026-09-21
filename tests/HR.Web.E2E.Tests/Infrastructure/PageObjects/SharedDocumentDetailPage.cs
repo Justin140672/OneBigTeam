@@ -17,30 +17,28 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// </summary>
 public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
 {
-    // The header's Publish and Archive buttons carry an icon that the same-named dialog footer
-    // button does not, so filtering by icon (rather than GetByRole(Button, Name: "Publish"/
-    // "Archive")) avoids a strict-mode "resolved to N elements" failure once the corresponding
-    // dialog is open and both the header button and the dialog's footer button are on screen.
-    private ILocator PublishHeaderButton => page.GetByRole(AriaRole.Button).Filter(new() { Has = page.Locator(".fa-paper-plane") });
-    private ILocator ArchiveHeaderButton => page.GetByRole(AriaRole.Button).Filter(new() { Has = page.Locator(".fa-box-archive") });
+    // The redesign moved Publish and "Record review" (formerly "Review Document") into the header
+    // action group, and Archive / Mark Expired / Audit History into a Syncfusion SfDropDownButton
+    // ("More actions" — see BuildMoreActionsItems/HandleMoreActionSelectedAsync in
+    // SharedDocumentDetail.razor). Publish/Record review are scoped to the header's own
+    // ".doc-detail-actions-group" rather than a bare icon filter: the "Review History" tab pane
+    // now also renders its own "Record review" button (same fa-clipboard-check icon/text, gated on
+    // Session.CanManageSharedDocuments) once that tab is selected, which an unscoped icon/text
+    // filter would collide with.
+    private ILocator HeaderActionsGroup => page.Locator(".doc-detail-actions-group");
+    private ILocator PublishHeaderButton => HeaderActionsGroup.GetByRole(AriaRole.Button).Filter(new() { Has = page.Locator(".fa-paper-plane") });
 
-    // Same icon-filter disambiguation reasoning as ArchiveHeaderButton above — fa-calendar-xmark
-    // is unique to this header button (it isn't reused by the dialog's own footer button, which
-    // carries no icon).
-    private ILocator ExpireHeaderButton => page.GetByRole(AriaRole.Button).Filter(new() { Has = page.Locator(".fa-calendar-xmark") });
-
-    // The "Review Document" header button also carries the fa-clipboard-check icon that the
+    // The "Record review" header button also carries the fa-clipboard-check icon that the
     // Acknowledgement overview-card's header uses, but that header icon lives on a plain <span>
-    // (not a button), so filtering GetByRole(Button) by this icon still resolves to just the one
-    // header button — same reasoning as Publish/Archive above.
-    private ILocator ReviewHeaderButton => page.GetByRole(AriaRole.Button).Filter(new() { Has = page.Locator(".fa-clipboard-check") });
+    // (not a button) — scoping to the header actions group is still needed on top of that for the
+    // Review History tab's own "Record review" button, see the remarks above.
+    private ILocator ReviewHeaderButton => HeaderActionsGroup.GetByRole(AriaRole.Button).Filter(new() { Has = page.Locator(".fa-clipboard-check") });
 
-    // Unlike Publish/Archive, the page header's "Edit" button shares its icon (fa-pen) and text
-    // with the Audience and Acknowledgement cards' own "Edit" buttons, so icon/text filtering
-    // can't disambiguate it — it's the only one of the three that isn't inside an .overview-card,
-    // and it comes first in DOM order (the header renders before the cards row), so .First is the
-    // reliable way to target it specifically.
-    private ILocator EditMetadataHeaderButton => page.GetByRole(AriaRole.Button, new() { Name = "Edit" }).First;
+    // "Edit details" is a unique button name on the page now (Audience/Acknowledgement cards use
+    // their own distinct "Edit audience"/"Edit acknowledgement settings" names — see the renamed
+    // locators below), so this no longer needs the old .First-based disambiguation against a
+    // shared generic "Edit" name.
+    private ILocator EditMetadataHeaderButton => page.GetByRole(AriaRole.Button, new() { Name = "Edit details", Exact = true });
     private ILocator EditMetadataDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Edit Document Metadata" });
 
     private ILocator PublishDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Publish Document" });
@@ -48,14 +46,78 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     private ILocator ExpireDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Mark Document as Expired" });
     private ILocator ReviewDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Complete Review" });
 
-    // Scoped to the "Acknowledgement" overview-card so its "Edit" button doesn't collide with the
-    // page header's metadata "Edit" button or the "Audience" card's own "Edit" button.
+    // Scoped to the "Acknowledgement" overview-card, though "Edit acknowledgement settings" is
+    // itself now a unique name on the page.
     private ILocator AcknowledgementCard => page.Locator(".overview-card").Filter(new() { HasText = "Acknowledgement" }).First;
     private ILocator EditAcknowledgementDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Edit Acknowledgement Settings" });
 
-    // Scoped to the "Audience" overview-card so its "Edit" button doesn't collide with the page
-    // header's metadata "Edit" button or the "Acknowledgement" card's own "Edit" button.
+    // Scoped to the "Audience" overview-card, though "Edit audience" is itself now a unique name
+    // on the page.
     private ILocator AudienceCard => page.Locator(".overview-card").Filter(new() { HasText = "Audience" }).First;
+
+    // ── "More actions" overflow menu (Archive / Mark Expired / Audit History) ──────────────────
+    // Follows the same open-menu/wait-for-item/click-item pattern already established for the
+    // Employee page's own "More actions" menu — see StartLeavingProcessDialog.OpenAsync and
+    // EmployeeEditPage.OpenMoreActionsMenuAsync/ClickViewOrganisationChartMenuItemAsync.
+    private ILocator MoreActionsButton => page.GetByRole(AriaRole.Button, new() { Name = "More actions" });
+
+    /// <summary>
+    /// Opens the "More actions" overflow menu and clicks the named item (e.g. "Archive",
+    /// "Mark Expired", "Audit History"), retrying the open if the popup doesn't mount in time —
+    /// same "freshly mounted SfDropDownButton can silently swallow a same-tick click" race
+    /// documented on StartLeavingProcessDialog.OpenAsync.
+    /// </summary>
+    private async Task ClickMoreActionsItemAsync(string itemName)
+    {
+        var menuItem = page.GetByRole(AriaRole.Menuitem, new() { Name = itemName, Exact = true });
+
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            await MoreActionsButton.ClickAsync();
+            try
+            {
+                await menuItem.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+            }
+            catch (TimeoutException)
+            {
+                await page.Keyboard.PressAsync("Escape");
+                continue;
+            }
+
+            await menuItem.ClickAsync();
+            return;
+        }
+
+        // Final attempt without swallowing the exception, so a genuine failure still surfaces.
+        await MoreActionsButton.ClickAsync();
+        await menuItem.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await menuItem.ClickAsync();
+    }
+
+    /// <summary>
+    /// True if the named item (e.g. "Archive", "Mark Expired") is present in the (currently
+    /// closed) "More actions" menu — BuildMoreActionsItems only includes Archive/Mark Expired
+    /// while Status is Draft or Published, and always includes "Audit History". Opens the menu to
+    /// check, then closes it again via Escape so callers aren't left with an open popup.
+    /// </summary>
+    private async Task<bool> HasMoreActionsItemAsync(string itemName)
+    {
+        await MoreActionsButton.ClickAsync();
+        bool visible;
+        try
+        {
+            await page.GetByRole(AriaRole.Menuitem, new() { Name = itemName, Exact = true })
+                .WaitForAsync(new() { Timeout = 3_000 });
+            visible = true;
+        }
+        catch (TimeoutException)
+        {
+            visible = false;
+        }
+
+        await page.Keyboard.PressAsync("Escape");
+        return visible;
+    }
 
     public async Task GoToAsync(Guid companyId, Guid documentId)
     {
@@ -88,6 +150,33 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// <summary>Page header's document title (the &lt;h1&gt; — SharedDocumentDetail.razor renders @_detail.Title there).</summary>
     public async Task<string> GetTitleAsync() =>
         (await page.Locator("h1").First.InnerTextAsync()).Trim();
+
+    // ── "Current document" card (filename/type/size/version, Open/Download/Upload New Version) ──
+
+    /// <summary>The current file's name shown in the "Current document" card.</summary>
+    public async Task<string> GetCurrentDocumentFileNameAsync() =>
+        (await page.Locator(".doc-current-file-name").InnerTextAsync()).Trim();
+
+    /// <summary>
+    /// The current file's meta line (content type · size, plus "Uploaded … by …" once the
+    /// current version's own upload metadata is resolvable — see SharedDocumentDetail.razor's
+    /// CurrentVersionEntry) shown in the "Current document" card.
+    /// </summary>
+    public async Task<string> GetCurrentDocumentMetaTextAsync() =>
+        (await page.Locator(".doc-current-file-meta").InnerTextAsync()).Trim();
+
+    /// <summary>The "Open" link in the "Current document" card (opens the current version in a new tab).</summary>
+    public ILocator CurrentDocumentOpenLink => page.Locator(".doc-current-file-actions a").Filter(new() { HasText = "Open" });
+
+    /// <summary>The "Download" link in the "Current document" card.</summary>
+    public ILocator CurrentDocumentDownloadLink => page.Locator(".doc-current-file-actions a").Filter(new() { HasText = "Download" });
+
+    /// <summary>
+    /// True if the "Upload New Version" button is present on the "Current document" card —
+    /// SharedDocumentDetail.razor only renders it while the document's Status isn't "Archived".
+    /// </summary>
+    public Task<bool> IsUploadNewVersionButtonVisibleAsync() =>
+        page.GetByRole(AriaRole.Button, new() { Name = "Upload New Version" }).IsVisibleAsync();
 
     /// <summary>Text of the "Category" row in the Document Metadata card.</summary>
     public async Task<string> GetCategoryAsync() =>
@@ -157,9 +246,11 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
             .ToHaveTextAsync(title, new() { Timeout = 15_000 });
     }
 
-    public Task<bool> IsArchiveButtonVisibleAsync() => ArchiveHeaderButton.IsVisibleAsync();
+    /// <summary>True if "Archive" is present in the "More actions" overflow menu.</summary>
+    public Task<bool> IsArchiveButtonVisibleAsync() => HasMoreActionsItemAsync("Archive");
 
-    public Task<bool> IsExpireButtonVisibleAsync() => ExpireHeaderButton.IsVisibleAsync();
+    /// <summary>True if "Mark Expired" is present in the "More actions" overflow menu.</summary>
+    public Task<bool> IsExpireButtonVisibleAsync() => HasMoreActionsItemAsync("Mark Expired");
 
     public Task<bool> IsPublishButtonVisibleAsync() => PublishHeaderButton.IsVisibleAsync();
 
@@ -374,7 +465,7 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     }
 
     /// <summary>
-    /// Drives the "Acknowledgement" card's "Edit" button and
+    /// Drives the "Acknowledgement" card's "Edit acknowledgement settings" button and
     /// EditSharedCompanyDocumentAcknowledgementDialog.razor to turn on "Requires employee
     /// acknowledgement" with the given due date, then waits for the page to reload its detail
     /// data. A due date is required — PublishSharedCompanyDocumentHandler rejects publishing a
@@ -383,7 +474,7 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// </summary>
     public async Task RequireAcknowledgementAsync(DateOnly dueDate)
     {
-        await AcknowledgementCard.GetByRole(AriaRole.Button, new() { Name = "Edit" }).ClickAsync();
+        await AcknowledgementCard.GetByRole(AriaRole.Button, new() { Name = "Edit acknowledgement settings", Exact = true }).ClickAsync();
         await EditAcknowledgementDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
         var checkboxWrapper = EditAcknowledgementDialog.Locator(".e-checkbox-wrapper")
@@ -416,18 +507,15 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
     }
 
-    // The header's "Audit History" button carries the fa-clock-rotate-left icon, which is also
-    // used by the "Review History" card's own header — but that header icon lives on a plain
-    // <span> (not a button), same disambiguation reasoning as ReviewHeaderButton above, so
-    // filtering GetByRole(Button) by this icon still resolves to just the one header button.
-    private ILocator AuditHistoryHeaderButton => page.GetByRole(AriaRole.Button).Filter(new() { Has = page.Locator(".fa-clock-rotate-left") });
+    // "Audit History" now lives in the "More actions" overflow menu (BuildMoreActionsItems in
+    // SharedDocumentDetail.razor) rather than being its own header button.
     private ILocator AuditHistoryDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Audit History" });
     private ILocator AuditDetailDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Audit Event Detail" });
 
-    /// <summary>Opens the Audit History dialog (SharedCompanyDocumentAuditHistoryDialog.razor) via the header "Audit History" button.</summary>
+    /// <summary>Opens the Audit History dialog (SharedCompanyDocumentAuditHistoryDialog.razor) via the "More actions" &gt; "Audit History" menu item.</summary>
     public async Task OpenAuditHistoryDialogAsync()
     {
-        await AuditHistoryHeaderButton.ClickAsync();
+        await ClickMoreActionsItemAsync("Audit History");
         await AuditHistoryDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
         // The dialog container mounting doesn't prove its grid has populated yet — Syncfusion
@@ -489,14 +577,15 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     // ── Edit Acknowledgement Settings dialog (statement field, Reset to Default, publish-lock) ──
 
     /// <summary>
-    /// Opens the "Acknowledgement" card's Edit dialog without changing/saving anything — unlike
-    /// <see cref="RequireAcknowledgementAsync"/>, which drives the whole toggle-and-save flow, this
-    /// is for tests that need to inspect or interact with the dialog's fields directly (e.g. the
-    /// statement field's locked/editable state, or the "Reset to Default" button).
+    /// Opens the "Acknowledgement" card's "Edit acknowledgement settings" dialog without
+    /// changing/saving anything — unlike <see cref="RequireAcknowledgementAsync"/>, which drives
+    /// the whole toggle-and-save flow, this is for tests that need to inspect or interact with the
+    /// dialog's fields directly (e.g. the statement field's locked/editable state, or the "Reset
+    /// to Default" button).
     /// </summary>
     public async Task OpenEditAcknowledgementDialogAsync()
     {
-        await AcknowledgementCard.GetByRole(AriaRole.Button, new() { Name = "Edit" }).ClickAsync();
+        await AcknowledgementCard.GetByRole(AriaRole.Button, new() { Name = "Edit acknowledgement settings", Exact = true }).ClickAsync();
         await EditAcknowledgementDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
 
@@ -649,10 +738,10 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
         await PublishDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
     }
 
-    /// <summary>Opens the Archive confirmation dialog via the header "Archive" button.</summary>
+    /// <summary>Opens the Archive confirmation dialog via "More actions" &gt; "Archive".</summary>
     public async Task OpenArchiveDialogAsync()
     {
-        await ArchiveHeaderButton.ClickAsync();
+        await ClickMoreActionsItemAsync("Archive");
         await ArchiveDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
 
@@ -719,10 +808,10 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
     }
 
-    /// <summary>Opens the "Mark Document as Expired" confirmation dialog via the header "Mark Expired" button.</summary>
+    /// <summary>Opens the "Mark Document as Expired" confirmation dialog via "More actions" &gt; "Mark Expired".</summary>
     public async Task OpenExpireDialogAsync()
     {
-        await ExpireHeaderButton.ClickAsync();
+        await ClickMoreActionsItemAsync("Mark Expired");
         await ExpireDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
 
@@ -931,17 +1020,29 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
         await WaitForReviewDialogToCloseAsync();
     }
 
-    /// <summary>Opens the Audience-edit dialog (EditSharedCompanyDocumentAudienceDialog.razor) via the "Audience" overview-card's "Edit" button.</summary>
+    /// <summary>Opens the Audience-edit dialog (EditSharedCompanyDocumentAudienceDialog.razor) via the "Audience" overview-card's "Edit audience" button.</summary>
     public async Task OpenEditAudienceDialogAsync()
     {
-        await AudienceCard.GetByRole(AriaRole.Button, new() { Name = "Edit" }).ClickAsync();
+        await AudienceCard.GetByRole(AriaRole.Button, new() { Name = "Edit audience", Exact = true }).ClickAsync();
         await page.GetByRole(AriaRole.Dialog, new() { Name = "Edit Document Audience" })
             .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
 
-    /// <summary>Text of the "Audience" overview-card's summary line (e.g. "All Employees" or "Departments: Engineering").</summary>
+    /// <summary>
+    /// Text of the "Audience" overview-card's summary paragraph (e.g. "All Employees" or
+    /// "Departments: Engineering") — a plain &lt;p class="doc-detail-audience-summary"&gt; now,
+    /// not a dt/dd pair.
+    /// </summary>
     public async Task<string> GetAudienceSummaryAsync() =>
-        (await page.Locator("dt:has-text('Audience') + dd").InnerTextAsync()).Trim();
+        (await page.Locator(".doc-detail-audience-summary").InnerTextAsync()).Trim();
+
+    /// <summary>
+    /// Whether the "Not yet published — employees can't see this document" warning badge is shown
+    /// on the "Audience" overview-card — SharedDocumentDetail.razor only renders it while the
+    /// document's Status is "Draft".
+    /// </summary>
+    public Task<bool> IsDraftAudienceWarningVisibleAsync() =>
+        page.Locator(".doc-detail-note-badge").IsVisibleAsync();
 
     /// <summary>The "Created by / Last updated by / Published by / Archived by" summary line at the bottom of the page.</summary>
     public ILocator FooterSummary => page.Locator("p.text-muted.small.mb-0");
@@ -949,20 +1050,41 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     public async Task<string> GetFooterSummaryTextAsync() =>
         (await FooterSummary.InnerTextAsync()).Trim();
 
-    /// <summary>
-    /// The Version History card's own container — same ".overview-card" scoping pattern as
-    /// <see cref="ReviewHistoryCard"/>. The page now has TWO grids that both render ".e-row"/
-    /// ".e-grid .e-headercell" markup (Version History and, since the "Display Review Information"
-    /// story, Review History) — an unscoped page-wide ".e-grid .e-row"/".e-row" locator silently
-    /// counts both grids' rows combined, which is exactly the kind of bug that made
-    /// WaitForVersionRowCountAsync(2) actually observe 3 (2 versions + 1 review history row) once
-    /// a test's flow both uploads a version *and* completes a review. Every version-row locator
-    /// below is scoped to this card specifically to avoid that collision.
-    /// </summary>
-    private ILocator VersionHistoryCard => page.Locator(".overview-card").Filter(new() { HasText = "Version History" }).First;
+    // The Version History and Review History grids now share a single SfTab
+    // (".doc-detail-history-card") rather than each having its own ".overview-card" — the old
+    // "Filter(HasText: 'Version History')" scoping doesn't distinguish them any more, since both
+    // tab headers' text lives inside that one shared card. Syncfusion's SfTab keeps both content
+    // panes (".e-content > .e-item") in the DOM and toggles their visibility rather than
+    // mounting/unmounting them, so every grid locator below is instead scoped to whichever pane is
+    // currently *visible* (Playwright's ":visible" pseudo-class, already used elsewhere in this
+    // file for the save-conflict banner) after explicitly selecting the relevant tab — this avoids
+    // the exact "grids silently share rows" collision the old scoping was written to prevent (see
+    // git history) via a different mechanism.
+    private ILocator VersionHistoryTab => page.GetByRole(AriaRole.Tab, new() { Name = "Version History" });
+    private ILocator ReviewHistoryTab => page.GetByRole(AriaRole.Tab, new() { Name = "Review History" });
+    private ILocator ActiveHistoryTabPane => page.Locator(".doc-detail-history-card .e-content > .e-item:visible").First;
 
-    public async Task<int> GetVersionRowCountAsync() =>
-        await VersionHistoryCard.Locator(".e-row").CountAsync();
+    /// <summary>Selects the "Version History" tab (a no-op click if it's already active, since it's the default) and returns its content pane.</summary>
+    private async Task<ILocator> SelectVersionHistoryTabAsync()
+    {
+        await VersionHistoryTab.ClickAsync();
+        await Assertions.Expect(VersionHistoryTab).ToHaveAttributeAsync("aria-selected", "true", new() { Timeout = 10_000 });
+        return ActiveHistoryTabPane;
+    }
+
+    /// <summary>Selects the "Review History" tab and returns its content pane.</summary>
+    private async Task<ILocator> SelectReviewHistoryTabAsync()
+    {
+        await ReviewHistoryTab.ClickAsync();
+        await Assertions.Expect(ReviewHistoryTab).ToHaveAttributeAsync("aria-selected", "true", new() { Timeout = 10_000 });
+        return ActiveHistoryTabPane;
+    }
+
+    public async Task<int> GetVersionRowCountAsync()
+    {
+        var pane = await SelectVersionHistoryTabAsync();
+        return await pane.Locator(".e-row").CountAsync();
+    }
 
     /// <summary>
     /// Waits for the Version History grid to show exactly <paramref name="expectedCount"/> rows,
@@ -976,7 +1098,8 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// </summary>
     public async Task<int> WaitForVersionRowCountAsync(int expectedCount)
     {
-        var rows = VersionHistoryCard.Locator(".e-row");
+        var pane = await SelectVersionHistoryTabAsync();
+        var rows = pane.Locator(".e-row");
         await Assertions.Expect(rows).ToHaveCountAsync(expectedCount, new() { Timeout = 15_000 });
         return await rows.CountAsync();
     }
@@ -984,22 +1107,55 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// <summary>Header text of every column currently rendered on the Version History grid.</summary>
     public async Task<IReadOnlyList<string>> GetVersionColumnHeadersAsync()
     {
-        var headers = await VersionHistoryCard.Locator(".e-grid .e-headercell").AllInnerTextsAsync();
+        var pane = await SelectVersionHistoryTabAsync();
+        var headers = await pane.Locator(".e-grid .e-headercell").AllInnerTextsAsync();
         return headers.Select(h => h.Trim()).ToList();
     }
 
     /// <summary>
     /// Returns the text of the given 0-based column index for the Version History grid row whose
     /// text contains <paramref name="rowTextFragment"/> (e.g. the version's uploaded file name,
-    /// which is unique per version in these tests). Column order matches
-    /// SharedDocumentDetail.razor's Version History GridColumns: 0=Version,
-    /// 1=Publication Status, 2=File Name, 3=Note, 4=Required Ack, 5=Effective Date,
-    /// 6=Uploaded By, 7=Uploaded At, 8=Download.
+    /// which is unique per version in these tests). Column order matches the compact set rendered
+    /// by SharedDocumentDetail.razor's Version History GridColumns: 0=Version, 1=Publication
+    /// Status, 2=File Name, 3=Uploaded, 4=Uploaded By, 5=Details (icon button — see
+    /// <see cref="GetVersionDetailAsync"/> for Note/Required Ack/Effective Date, which moved into
+    /// a per-row popup), 6=Download.
     /// </summary>
     public async Task<string> GetVersionRowCellAsync(string rowTextFragment, int columnIndex)
     {
-        var row = VersionHistoryCard.Locator(".e-row").Filter(new() { HasText = rowTextFragment }).First;
+        var pane = await SelectVersionHistoryTabAsync();
+        var row = pane.Locator(".e-row").Filter(new() { HasText = rowTextFragment }).First;
         return (await row.Locator(".e-rowcell").Nth(columnIndex).InnerTextAsync()).Trim();
+    }
+
+    /// <summary>
+    /// Opens the per-row "Details" popup (fa-circle-info icon button, aria-label "Show details for
+    /// version N") for the Version History row whose text contains <paramref name="rowTextFragment"/>,
+    /// reads its Note / Required Ack / Effective Date values, then closes the popup again. These
+    /// three fields moved out of the grid's own columns and into this popup as part of the grid's
+    /// compaction — see SharedDocumentDetail.razor's OpenVersionDetail/_versionDetailOpen.
+    /// </summary>
+    public async Task<(string Note, string RequiredAck, string EffectiveDate)> GetVersionDetailAsync(string rowTextFragment)
+    {
+        var pane = await SelectVersionHistoryTabAsync();
+        var row = pane.Locator(".e-row").Filter(new() { HasText = rowTextFragment }).First;
+        await row.Locator("button[aria-label^='Show details for version']").ClickAsync();
+
+        var dialog = page.GetByRole(AriaRole.Dialog, new() { NameRegex = new Regex("details", RegexOptions.IgnoreCase) });
+        await dialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+
+        var note = (await dialog.Locator("dt:has-text('Note') + dd").InnerTextAsync()).Trim();
+        var requiredAck = (await dialog.Locator("dt:has-text('Required Ack') + dd").InnerTextAsync()).Trim();
+        var effectiveDate = (await dialog.Locator("dt:has-text('Effective Date') + dd").InnerTextAsync()).Trim();
+
+        // ShowCloseIcon="true" on this dialog means its header close ("X") button also carries an
+        // accessible name of "Close", colliding with the footer's own "Close" button under a bare
+        // role/name match — scope to the footer specifically, same fix already applied to
+        // CloseAuditDetailDialogAsync/CloseAuditHistoryDialogAsync above.
+        await dialog.Locator(".e-footer-content button:has-text('Close')").ClickAsync();
+        await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+
+        return (note, requiredAck, effectiveDate);
     }
 
     /// <summary>
@@ -1011,7 +1167,8 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// </summary>
     public async Task<string?> GetVersionDownloadHrefAsync(string rowTextFragment)
     {
-        var row = VersionHistoryCard.Locator(".e-row").Filter(new() { HasText = rowTextFragment }).First;
+        var pane = await SelectVersionHistoryTabAsync();
+        var row = pane.Locator(".e-row").Filter(new() { HasText = rowTextFragment }).First;
         return await row.Locator("a[title='Download this version']").GetAttributeAsync("href");
     }
 
@@ -1039,28 +1196,26 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
     }
 
-    // Scoped to the "Review History" overview-card so its read-only grid (populated by
-    // CompleteSharedCompanyDocumentReviewDialog.razor — see SharedDocumentCompleteReviewTests)
-    // isn't confused with the "Version History" card's own grid immediately above it — both use
-    // the shared HrGrid component and so share ".e-grid"/".e-row"/".e-headercell" class names, but
-    // "Review History" doesn't appear as a substring of "Version History" (or any other card title
-    // on this page), so filtering by it alone is safe without needing icon-based disambiguation.
-    private ILocator ReviewHistoryCard => page.Locator(".overview-card").Filter(new() { HasText = "Review History" }).First;
-
-    public Task<bool> IsReviewHistoryCardVisibleAsync() => ReviewHistoryCard.IsVisibleAsync();
+    /// <summary>
+    /// True once the "Review History" tab is selectable/present — the tab itself (unlike the old
+    /// standalone card) is always rendered regardless of whether the document has ever been
+    /// reviewed, so this is really just a presence check on the tab header.
+    /// </summary>
+    public Task<bool> IsReviewHistoryCardVisibleAsync() => ReviewHistoryTab.IsVisibleAsync();
 
     /// <summary>
-    /// Waits for the Review History grid to finish its own JS render tick (a data row or its
-    /// ".e-emptyrow" empty-state sibling present — same "'.e-grid' alone doesn't prove rows are
-    /// queryable" reasoning as e.g. CandidateListPage.RowsRenderedSelector), then returns the
-    /// number of actual data rows (0 for the empty-state case, since ".e-emptyrow" itself is
-    /// excluded from this count).
+    /// Selects the "Review History" tab and waits for its grid to finish its own JS render tick (a
+    /// data row or its ".e-emptyrow" empty-state sibling present — same "'.e-grid' alone doesn't
+    /// prove rows are queryable" reasoning as e.g. CandidateListPage.RowsRenderedSelector), then
+    /// returns the number of actual data rows (0 for the empty-state case, since ".e-emptyrow"
+    /// itself is excluded from this count).
     /// </summary>
     public async Task<int> GetReviewHistoryRowCountAsync()
     {
-        await ReviewHistoryCard.Locator(".e-row, .e-emptyrow").First
+        var pane = await SelectReviewHistoryTabAsync();
+        await pane.Locator(".e-row, .e-emptyrow").First
             .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
-        return await ReviewHistoryCard.Locator(".e-row").CountAsync();
+        return await pane.Locator(".e-row").CountAsync();
     }
 
     /// <summary>
@@ -1074,7 +1229,8 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// </summary>
     public async Task<int> WaitForReviewHistoryRowCountAsync(int expectedCount)
     {
-        var rows = ReviewHistoryCard.Locator(".e-row");
+        var pane = await SelectReviewHistoryTabAsync();
+        var rows = pane.Locator(".e-row");
         await Assertions.Expect(rows).ToHaveCountAsync(expectedCount, new() { Timeout = 15_000 });
         return await rows.CountAsync();
     }
@@ -1082,7 +1238,8 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// <summary>Header text of every column currently rendered on the Review History grid.</summary>
     public async Task<IReadOnlyList<string>> GetReviewHistoryColumnHeadersAsync()
     {
-        var headers = await ReviewHistoryCard.Locator(".e-headercell").AllInnerTextsAsync();
+        var pane = await SelectReviewHistoryTabAsync();
+        var headers = await pane.Locator(".e-headercell").AllInnerTextsAsync();
         return headers.Select(h => h.Trim()).ToList();
     }
 
@@ -1095,18 +1252,23 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// </summary>
     public async Task<string> GetReviewHistoryRowCellAsync(int rowIndex, int columnIndex)
     {
-        var row = ReviewHistoryCard.Locator(".e-row").Nth(rowIndex);
+        var pane = await SelectReviewHistoryTabAsync();
+        var row = pane.Locator(".e-row").Nth(rowIndex);
         return (await row.Locator(".e-rowcell").Nth(columnIndex).InnerTextAsync()).Trim();
     }
 
     /// <summary>
     /// Count of interactive controls (buttons, links, or icon glyphs) rendered anywhere inside the
     /// Review History grid's rows — expected to always be 0, since the grid is strictly read-only
-    /// (no edit/delete/action column), unlike the Version History grid immediately above it (which
-    /// has a per-row Download link) or other editable grids on this page.
+    /// (no edit/delete/action column), unlike the Version History grid (which has per-row Download
+    /// and Details controls). Deliberately scoped to just the grid's own rows (".e-row" inside the
+    /// active pane), not the pane's "Record review" button that sits above the grid.
     /// </summary>
-    public Task<int> GetReviewHistoryRowActionControlCountAsync() =>
-        ReviewHistoryCard.Locator(".e-row button, .e-row a, .e-row i").CountAsync();
+    public async Task<int> GetReviewHistoryRowActionControlCountAsync()
+    {
+        var pane = await SelectReviewHistoryTabAsync();
+        return await pane.Locator(".e-row button, .e-row a, .e-row i").CountAsync();
+    }
 
     // ── Ticket 2: optimistic-concurrency conflict on the metadata / audience / acknowledgement edit dialogs ──
     // Each of the three edit dialogs (EditSharedCompanyDocument{Metadata,Audience,Acknowledgement}Dialog.razor)

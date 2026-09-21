@@ -1,6 +1,7 @@
 @page "/companies/{CompanyId:guid}/shared-documents/{DocumentId:guid}"
 @rendermode InteractiveServer
 @using System.ComponentModel.DataAnnotations
+@using Syncfusion.Blazor.SplitButtons
 @inject DocumentService DocumentService
 @inject AppSession Session
 @inject NavigationManager Navigation
@@ -38,50 +39,38 @@
                 <div class="doc-detail-actions-group">
                     @if (_detail.Status == "Draft")
                     {
-                        <SfButton CssClass="e-primary" OnClick="@(() => _publishConfirmOpen = true)">
+                        <SfButton CssClass="e-primary" OnClick="@(() => _publishConfirmOpen = true)"
+                                  aria-label="@($"Publish {_detail.Title}")">
                             <i class="fa-solid fa-paper-plane me-1"></i> Publish
                         </SfButton>
-                        <SfButton CssClass="e-outline" OnClick="@(() => _editOpen = true)">
-                            <i class="fa-solid fa-pen me-1"></i> Edit
-                        </SfButton>
                     }
-                    else
-                    {
-                        <SfButton CssClass="e-primary" OnClick="@(() => _editOpen = true)">
-                            <i class="fa-solid fa-pen me-1"></i> Edit
-                        </SfButton>
-                    }
-                    <a class="e-btn e-outline" href="@DocumentService.GetSharedCompanyDocumentDownloadUrl(CompanyId, DocumentId)" target="_blank">
+                    <SfButton CssClass="e-outline" OnClick="@(() => _editOpen = true)"
+                              aria-label="@($"Edit details for {_detail.Title}")">
+                        <i class="fa-solid fa-pen me-1"></i> Edit details
+                    </SfButton>
+                    <a class="e-btn e-outline" href="@DocumentService.GetSharedCompanyDocumentDownloadUrl(CompanyId, DocumentId)" target="_blank"
+                       aria-label="@($"Download {_detail.Title}, version {_detail.VersionNumber}")">
                         <i class="fa-solid fa-download me-1"></i> Download
                     </a>
-                    <SfButton CssClass="e-outline" OnClick="@(() => _reviewOpen = true)">
-                        <i class="fa-solid fa-clipboard-check me-1"></i> Review Document
+                    <SfButton CssClass="e-outline" OnClick="@(() => _reviewOpen = true)"
+                              aria-label="@($"Record review for {_detail.Title}")">
+                        <i class="fa-solid fa-clipboard-check me-1"></i> Record review
                     </SfButton>
-                    <SfButton CssClass="e-outline" OnClick="@(() => _auditHistoryOpen = true)">
-                        <i class="fa-solid fa-clock-rotate-left me-1"></i> Audit History
-                    </SfButton>
+                    <SfDropDownButton Content="More actions" IconCss="fa-solid fa-ellipsis-vertical" CssClass="e-outline"
+                                       Items="@BuildMoreActionsItems()" aria-label="@($"More actions for {_detail.Title}")">
+                        <DropDownButtonEvents ItemSelected="HandleMoreActionSelectedAsync" />
+                    </SfDropDownButton>
                 </div>
-                @if (_detail.Status is "Draft" or "Published")
-                {
-                    <div class="doc-detail-actions-group doc-detail-actions-danger">
-                        <SfButton CssClass="e-outline e-danger" OnClick="@(() => _archiveConfirmOpen = true)">
-                            <i class="fa-solid fa-box-archive me-1"></i> Archive
-                        </SfButton>
-                        <SfButton CssClass="e-outline e-danger" OnClick="@(() => _expireConfirmOpen = true)">
-                            <i class="fa-solid fa-calendar-xmark me-1"></i> Mark Expired
-                        </SfButton>
-                    </div>
-                }
             </div>
         </div>
 
         <div class="row g-3 mt-1">
-            <div class="col-xl-4 col-md-6">
+            <div class="col-12">
                 <div class="overview-card doc-detail-card">
-                    <div class="overview-card-header d-flex justify-content-between align-items-center">
+                    <div class="overview-card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <span>
-                            <i class="fa-solid fa-file-lines overview-card-icon"></i>
-                            <span class="overview-card-title">Document Metadata</span>
+                            <i class="fa-solid fa-file-circle-check overview-card-icon"></i>
+                            <span class="overview-card-title">Current document</span>
                         </span>
                         @if (_detail.Status != "Archived")
                         {
@@ -90,15 +79,46 @@
                             </SfButton>
                         }
                     </div>
+                    <div class="doc-current-file">
+                        <div class="doc-current-file-icon">
+                            <i class="fa-solid @FileIconClass(_detail.ContentType, _detail.FileName)"></i>
+                        </div>
+                        <div class="doc-current-file-info">
+                            <div class="doc-current-file-name" title="@_detail.FileName">@_detail.FileName</div>
+                            <div class="doc-current-file-meta text-muted small">
+                                <span class="badge bg-primary-subtle text-primary-emphasis me-1">v@(_detail.VersionNumber)</span>
+                                @_detail.ContentType · @FormatBytes(_detail.FileSize)
+                                @if (CurrentVersionEntry is { } current)
+                                {
+                                    <text> · Uploaded @current.UploadedAt.ToString("d MMM yyyy, HH:mm") by @current.UploadedByName</text>
+                                }
+                            </div>
+                        </div>
+                        <div class="doc-current-file-actions">
+                            <a class="e-btn e-primary e-small" href="@DocumentService.GetSharedCompanyDocumentDownloadUrl(CompanyId, DocumentId)" target="_blank"
+                               aria-label="@($"Open {_detail.FileName}")">
+                                <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> Open
+                            </a>
+                            <a class="e-btn e-outline e-small" href="@DocumentService.GetSharedCompanyDocumentDownloadUrl(CompanyId, DocumentId)" target="_blank"
+                               aria-label="@($"Download {_detail.FileName}")">
+                                <i class="fa-solid fa-download me-1"></i> Download
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-xl-4 col-md-6">
+                <div class="overview-card doc-detail-card">
+                    <div class="overview-card-header">
+                        <i class="fa-solid fa-file-lines overview-card-icon"></i>
+                        <span class="overview-card-title">Document details</span>
+                    </div>
                     <dl class="overview-dl">
                         <dt>Category</dt>
                         <dd>@_detail.CategoryName</dd>
                         <dt>Status</dt>
                         <dd><span class="badge @StatusBadgeClass(_detail.Status)">@_detail.Status</span></dd>
-                        <dt>Current Version</dt>
-                        <dd>v@(_detail.VersionNumber)</dd>
-                        <dt>File</dt>
-                        <dd>@_detail.FileName (@FormatBytes(_detail.FileSize))</dd>
                         @if (_detail.EffectiveDate.HasValue)
                         {
                             <dt>Effective Date</dt>
@@ -142,13 +162,16 @@
                             <span class="overview-card-title">Audience</span>
                         </span>
                         <SfButton CssClass="e-small e-outline" OnClick="@(() => _editAudienceOpen = true)">
-                            <i class="fa-solid fa-pen me-1"></i> Edit
+                            <i class="fa-solid fa-pen me-1"></i> Edit audience
                         </SfButton>
                     </div>
-                    <dl class="overview-dl">
-                        <dt>Audience</dt>
-                        <dd>@_detail.AudienceDescription</dd>
-                    </dl>
+                    <p class="doc-detail-audience-summary mb-2">@_detail.AudienceDescription</p>
+                    @if (_detail.Status == "Draft")
+                    {
+                        <span class="badge bg-warning text-dark doc-detail-note-badge">
+                            <i class="fa-solid fa-circle-info me-1"></i> Not yet published — employees can't see this document
+                        </span>
+                    }
                 </div>
             </div>
 
@@ -173,13 +196,13 @@
                                 }
                             }
                             <SfButton CssClass="e-small e-outline" OnClick="@(() => _editAcknowledgementOpen = true)">
-                                <i class="fa-solid fa-pen me-1"></i> Edit
+                                <i class="fa-solid fa-pen me-1"></i> Edit acknowledgement settings
                             </SfButton>
                         </div>
                     </div>
                     <dl class="overview-dl">
-                        <dt>Requires Acknowledgement</dt>
-                        <dd>@(_detail.RequiresAcknowledgement ? "Yes" : "No")</dd>
+                        <dt>Acknowledgement</dt>
+                        <dd>@(_detail.RequiresAcknowledgement ? "Employees must acknowledge this document" : "Employees do not need to acknowledge this document")</dd>
                         @if (_detail.RequiresAcknowledgement)
                         {
                             <dt>Due Date</dt>
@@ -215,75 +238,104 @@
             </div>
 
             <div class="col-12">
-                <div class="overview-card doc-detail-card">
-                    <div class="overview-card-header">
-                        <i class="fa-solid fa-clock-rotate-left overview-card-icon"></i>
-                        <span class="overview-card-title">Version History</span>
-                    </div>
-                    @if (_detail.VersionHistory.Count == 0)
-                    {
-                        <div class="doc-detail-empty-state">No versions yet.</div>
-                    }
-                    else
-                    {
-                        <HrGrid TValue="SharedCompanyDocumentVersionModel" DataSource="@_detail.VersionHistory" AllowPaging="false" AllowTextWrap="true">
-                            <GridColumns>
-                                <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.VersionNumber)" HeaderText="Version" Width="90" />
-                                <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.PublicationStatus)" HeaderText="Publication Status" Width="140">
-                                    <Template>
-                                        @{
-                                            var row = (context as SharedCompanyDocumentVersionModel)!;
+                <div class="overview-card doc-detail-card doc-detail-history-card">
+                    <SfTab @bind-SelectedItem="_historyTabIndex" CssClass="hr-tabs">
+                        <TabItems>
+                            <TabItem>
+                                <ChildContent><TabHeader Text="Version History" IconCss="fa-solid fa-clock-rotate-left" /></ChildContent>
+                                <ContentTemplate>
+                                    <div class="mt-3">
+                                        @if (_detail.VersionHistory.Count == 0)
+                                        {
+                                            <div class="doc-detail-empty-state">No versions yet.</div>
                                         }
-                                        <span class="badge @StatusBadgeClass(row.PublicationStatus)">@row.PublicationStatus</span>
-                                    </Template>
-                                </GridColumn>
-                                <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.FileName)" HeaderText="File Name" Width="240" />
-                                <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.VersionNote)" HeaderText="Note" Width="260" />
-                                <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.RequiresAcknowledgement)" HeaderText="Required Ack" Width="120">
-                                    <Template>
-                                        @{
-                                            var row = (context as SharedCompanyDocumentVersionModel)!;
+                                        else
+                                        {
+                                            <HrGrid TValue="SharedCompanyDocumentVersionModel" DataSource="@_detail.VersionHistory" AllowPaging="false" AllowTextWrap="true">
+                                                <GridColumns>
+                                                    <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.VersionNumber)" HeaderText="Version" Width="100">
+                                                        <Template>
+                                                            @{
+                                                                var row = (context as SharedCompanyDocumentVersionModel)!;
+                                                                var isCurrent = row.VersionNumber == _detail.VersionNumber;
+                                                            }
+                                                            <span>v@(row.VersionNumber)</span>
+                                                            @if (isCurrent)
+                                                            {
+                                                                <span class="badge bg-primary-subtle text-primary-emphasis ms-1">Current</span>
+                                                            }
+                                                        </Template>
+                                                    </GridColumn>
+                                                    <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.PublicationStatus)" HeaderText="Publication Status" Width="150">
+                                                        <Template>
+                                                            @{
+                                                                var row = (context as SharedCompanyDocumentVersionModel)!;
+                                                            }
+                                                            <span class="badge @StatusBadgeClass(row.PublicationStatus)">@row.PublicationStatus</span>
+                                                        </Template>
+                                                    </GridColumn>
+                                                    <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.FileName)" HeaderText="File Name" Width="220" />
+                                                    <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.UploadedAt)" HeaderText="Uploaded" Width="150" Format="g" />
+                                                    <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.UploadedByName)" HeaderText="Uploaded By" Width="160" />
+                                                    <GridColumn HeaderText="Details" Width="80">
+                                                        <Template>
+                                                            @{
+                                                                var row = (context as SharedCompanyDocumentVersionModel)!;
+                                                            }
+                                                            <button type="button" class="btn btn-link btn-sm p-0"
+                                                                    title="@($"Show note, acknowledgement and effective date for version {row.VersionNumber}")"
+                                                                    aria-label="@($"Show details for version {row.VersionNumber}")"
+                                                                    @onclick="@(() => OpenVersionDetail(row))">
+                                                                <i class="fa-solid fa-circle-info"></i>
+                                                            </button>
+                                                        </Template>
+                                                    </GridColumn>
+                                                    <GridColumn HeaderText="Download" Width="100">
+                                                        <Template>
+                                                            @{
+                                                                var row = (context as SharedCompanyDocumentVersionModel)!;
+                                                            }
+                                                            <a href="@DocumentService.GetSharedCompanyDocumentVersionDownloadUrl(CompanyId, DocumentId, row.VersionNumber)" target="_blank"
+                                                               title="Download this version" aria-label="@($"Download version {row.VersionNumber}")">
+                                                                <i class="fa-solid fa-download"></i>
+                                                            </a>
+                                                        </Template>
+                                                    </GridColumn>
+                                                </GridColumns>
+                                            </HrGrid>
                                         }
-                                        @(row.RequiresAcknowledgement ? "Yes" : "No")
-                                    </Template>
-                                </GridColumn>
-                                <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.EffectiveDate)" HeaderText="Effective Date" Width="130" Format="d" />
-                                <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.UploadedByName)" HeaderText="Uploaded By" Width="160" />
-                                <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.UploadedAt)" HeaderText="Uploaded At" Width="170" Format="g" />
-                                <GridColumn HeaderText="Download" Width="100">
-                                    <Template>
-                                        @{
-                                            var row = (context as SharedCompanyDocumentVersionModel)!;
+                                    </div>
+                                </ContentTemplate>
+                            </TabItem>
+                            <TabItem>
+                                <ChildContent><TabHeader Text="Review History" IconCss="fa-solid fa-magnifying-glass-chart" /></ChildContent>
+                                <ContentTemplate>
+                                    <div class="mt-3">
+                                        @if (Session.CanManageSharedDocuments)
+                                        {
+                                            <div class="mb-2">
+                                                <SfButton CssClass="e-small e-outline" OnClick="@(() => _reviewOpen = true)">
+                                                    <i class="fa-solid fa-clipboard-check me-1"></i> Record review
+                                                </SfButton>
+                                            </div>
                                         }
-                                        <a href="@DocumentService.GetSharedCompanyDocumentVersionDownloadUrl(CompanyId, DocumentId, row.VersionNumber)" target="_blank" title="Download this version">
-                                            <i class="fa-solid fa-download"></i>
-                                        </a>
-                                    </Template>
-                                </GridColumn>
-                            </GridColumns>
-                        </HrGrid>
-                    }
-                </div>
-            </div>
-
-            <div class="col-12">
-                <div class="overview-card doc-detail-card">
-                    <div class="overview-card-header">
-                        <i class="fa-solid fa-magnifying-glass-chart overview-card-icon"></i>
-                        <span class="overview-card-title">Review History</span>
-                    </div>
-                    @* Always render the grid, even with zero rows — Syncfusion's own empty-row state
-                       (".e-emptyrow") covers the no-reviews-yet case, and the E2E suite
-                       (SharedDocumentReviewHistoryTests) expects the grid — with its headers — to
-                       be present for a never-reviewed document, not a substitute empty-state div. *@
-                    <HrGrid TValue="SharedCompanyDocumentReviewHistoryModel" DataSource="@_detail.ReviewHistory" AllowPaging="false" AllowTextWrap="true">
-                        <GridColumns>
-                            <GridColumn Field="@nameof(SharedCompanyDocumentReviewHistoryModel.ReviewDate)" HeaderText="Review Date" Width="130" Format="d" />
-                            <GridColumn Field="@nameof(SharedCompanyDocumentReviewHistoryModel.ReviewedByName)" HeaderText="Reviewer" Width="180" />
-                            <GridColumn Field="@nameof(SharedCompanyDocumentReviewHistoryModel.ReviewNotes)" HeaderText="Notes" Width="280" />
-                            <GridColumn Field="@nameof(SharedCompanyDocumentReviewHistoryModel.PreviousReviewDate)" HeaderText="Previous Review Date" Width="170" Format="d" />
-                        </GridColumns>
-                    </HrGrid>
+                                        @* Always render the grid, even with zero rows — Syncfusion's own empty-row state
+                                           (".e-emptyrow") covers the no-reviews-yet case, and the E2E suite
+                                           (SharedDocumentReviewHistoryTests) expects the grid — with its headers — to
+                                           be present for a never-reviewed document, not a substitute empty-state div. *@
+                                        <HrGrid TValue="SharedCompanyDocumentReviewHistoryModel" DataSource="@_detail.ReviewHistory" AllowPaging="false" AllowTextWrap="true">
+                                            <GridColumns>
+                                                <GridColumn Field="@nameof(SharedCompanyDocumentReviewHistoryModel.ReviewDate)" HeaderText="Review Date" Width="130" Format="d" />
+                                                <GridColumn Field="@nameof(SharedCompanyDocumentReviewHistoryModel.ReviewedByName)" HeaderText="Reviewer" Width="180" />
+                                                <GridColumn Field="@nameof(SharedCompanyDocumentReviewHistoryModel.ReviewNotes)" HeaderText="Notes" Width="280" />
+                                                <GridColumn Field="@nameof(SharedCompanyDocumentReviewHistoryModel.PreviousReviewDate)" HeaderText="Previous Review Date" Width="170" Format="d" />
+                                            </GridColumns>
+                                        </HrGrid>
+                                    </div>
+                                </ContentTemplate>
+                            </TabItem>
+                        </TabItems>
+                    </SfTab>
                 </div>
             </div>
 
@@ -438,6 +490,29 @@
     </DialogTemplates>
 </SfDialog>
 
+<SfDialog Visible="_versionDetailOpen" IsModal="true" Width="380px" ShowCloseIcon="true"
+          Closed="@(() => _versionDetailOpen = false)">
+    <DialogTemplates>
+        <Header>Version @(_versionDetailRow?.VersionNumber) details</Header>
+        <Content>
+            @if (_versionDetailRow is { } row)
+            {
+                <dl class="overview-dl doc-version-detail-dl">
+                    <dt>Note</dt>
+                    <dd>@(string.IsNullOrWhiteSpace(row.VersionNote) ? "—" : row.VersionNote)</dd>
+                    <dt>Required Ack</dt>
+                    <dd>@(row.RequiresAcknowledgement ? "Yes" : "No")</dd>
+                    <dt>Effective Date</dt>
+                    <dd>@(row.EffectiveDate?.ToString("d MMMM yyyy") ?? "Not set")</dd>
+                </dl>
+            }
+        </Content>
+        <FooterTemplate>
+            <SfButton OnClick="@(() => _versionDetailOpen = false)">Close</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
 @code {
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid DocumentId { get; set; }
@@ -464,6 +539,15 @@
     private bool _expireConfirmOpen;
     private bool _expiring;
     private string? _expireError;
+    private int _historyTabIndex;
+    private bool _versionDetailOpen;
+    private SharedCompanyDocumentVersionModel? _versionDetailRow;
+
+    // The current version's own upload metadata (uploader/uploaded-at) isn't duplicated on the
+    // top-level detail response — it's derived by matching the current VersionNumber against the
+    // VersionHistory list the API already returns, rather than requiring a new backend field.
+    private SharedCompanyDocumentVersionModel? CurrentVersionEntry =>
+        _detail?.VersionHistory.FirstOrDefault(v => v.VersionNumber == _detail.VersionNumber);
 
     protected override void OnInitialized()
     {
@@ -480,6 +564,47 @@
 
         _detail = await DocumentService.GetSharedCompanyDocumentAsync(CompanyId, DocumentId);
         _loading = false;
+    }
+
+    private void OpenVersionDetail(SharedCompanyDocumentVersionModel row)
+    {
+        _versionDetailRow = row;
+        _versionDetailOpen = true;
+    }
+
+    private List<DropDownMenuItem> BuildMoreActionsItems()
+    {
+        var items = new List<DropDownMenuItem>();
+
+        if (_detail is null) return items;
+
+        if (_detail.Status is "Draft" or "Published")
+        {
+            items.Add(new DropDownMenuItem { Id = "archive", Text = "Archive", IconCss = "fa-solid fa-box-archive" });
+            items.Add(new DropDownMenuItem { Id = "expire", Text = "Mark Expired", IconCss = "fa-solid fa-calendar-xmark" });
+        }
+
+        items.Add(new DropDownMenuItem { Id = "audit", Text = "Audit History", IconCss = "fa-solid fa-clock-rotate-left" });
+
+        return items;
+    }
+
+    private Task HandleMoreActionSelectedAsync(MenuEventArgs args)
+    {
+        switch (args.Item?.Id)
+        {
+            case "archive":
+                _archiveConfirmOpen = true;
+                break;
+            case "expire":
+                _expireConfirmOpen = true;
+                break;
+            case "audit":
+                _auditHistoryOpen = true;
+                break;
+        }
+
+        return Task.CompletedTask;
     }
 
     private async Task OnMetadataSavedAsync()
@@ -639,4 +764,30 @@
         bytes < 1024 * 1024
             ? $"{bytes / 1024.0:0.#} KB"
             : $"{bytes / (1024.0 * 1024.0):0.#} MB";
+
+    // No secure inline preview (PDF/image viewer) capability exists elsewhere in this codebase for
+    // arbitrary shared-document file types, so "Current document" presents a file-summary card
+    // (icon by type, filename, size, type, version) with Open/Download actions rather than an
+    // inline preview pane. Both Open and Download currently resolve to the same
+    // GetSharedCompanyDocumentDownloadUrl — there's no separate inline-view endpoint; see report.
+    private static string FileIconClass(string contentType, string fileName)
+    {
+        var lowerType = contentType.ToLowerInvariant();
+        var lowerName = fileName.ToLowerInvariant();
+
+        if (lowerType.Contains("pdf") || lowerName.EndsWith(".pdf"))
+            return "fa-file-pdf";
+        if (lowerType.StartsWith("image/"))
+            return "fa-file-image";
+        if (lowerType.Contains("word") || lowerName.EndsWith(".doc") || lowerName.EndsWith(".docx"))
+            return "fa-file-word";
+        if (lowerType.Contains("excel") || lowerType.Contains("spreadsheet") || lowerName.EndsWith(".xls") || lowerName.EndsWith(".xlsx"))
+            return "fa-file-excel";
+        if (lowerType.Contains("csv") || lowerName.EndsWith(".csv"))
+            return "fa-file-csv";
+        if (lowerType.Contains("zip") || lowerName.EndsWith(".zip"))
+            return "fa-file-zipper";
+
+        return "fa-file-lines";
+    }
 }

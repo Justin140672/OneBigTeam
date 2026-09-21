@@ -92,8 +92,10 @@ public sealed class SharedDocumentReviewRenewalTests(HrAdminPersonaFixture fixtu
             Assert.Equal("Draft", await detail.GetVersionRowCellAsync(renewedFileNameFragment, 1));
 
             // CompleteSharedCompanyDocumentReviewDialog.razor prefixes the version note with
-            // "Renewed via document review. " ahead of the operator's own review notes.
-            var renewedVersionNote = await detail.GetVersionRowCellAsync(renewedFileNameFragment, 3);
+            // "Renewed via document review. " ahead of the operator's own review notes. Note moved
+            // out of the grid's own columns and into the per-row "Details" popup as part of the
+            // grid's compaction — see SharedDocumentDetailPage.GetVersionDetailAsync.
+            var (renewedVersionNote, _, _) = await detail.GetVersionDetailAsync(renewedFileNameFragment);
             Assert.Contains("Renewed via document review.", renewedVersionNote);
             Assert.Contains(reviewNotes, renewedVersionNote);
         }

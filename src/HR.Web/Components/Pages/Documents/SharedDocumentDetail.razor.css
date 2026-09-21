@@ -63,11 +63,74 @@
 
 /* ── Cards ────────────────────────────────────────────── */
 
-/* Keeps the label column width consistent across the Document Metadata, Audience, and
+/* Keeps the label column width consistent across the Document Details, Audience, and
    Acknowledgement cards instead of each dl's "auto" label column reflowing independently
    to its own longest label. */
 .doc-detail-card ::deep .overview-dl {
     grid-template-columns: 140px 1fr;
+}
+
+/* Narrower label column for the compact version-detail popup dialog. */
+.doc-version-detail-dl {
+    grid-template-columns: 110px 1fr;
+}
+
+/* ── Current document card ───────────────────────────────── */
+
+.doc-current-file {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.doc-current-file-icon {
+    flex: 0 0 auto;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: #f3f4f6;
+    color: var(--hr-color-primary);
+    font-size: 1.35rem;
+}
+
+.doc-current-file-info {
+    flex: 1 1 240px;
+    min-width: 0;
+}
+
+/* Wraps/truncates long filenames instead of forcing horizontal page overflow. */
+.doc-current-file-name {
+    font-weight: 600;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.doc-current-file-actions {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.doc-detail-audience-summary {
+    color: #374151;
+}
+
+.doc-detail-note-badge {
+    font-weight: 500;
+    white-space: normal;
+    text-align: left;
+}
+
+/* ── History tabs ─────────────────────────────────────── */
+
+.doc-detail-history-card ::deep .hr-tabs {
+    background: transparent;
+    box-shadow: none;
 }
 
 /* ── History grids ────────────────────────────────────── */
@@ -90,4 +153,12 @@ html[data-theme="dark"] .doc-detail-actions-danger {
 
 html[data-theme="dark"] .doc-detail-empty-state {
     color: var(--hr-gray-400);
+}
+
+html[data-theme="dark"] .doc-current-file-icon {
+    background: var(--hr-gray-800);
+}
+
+html[data-theme="dark"] .doc-detail-audience-summary {
+    color: var(--hr-gray-300);
 }

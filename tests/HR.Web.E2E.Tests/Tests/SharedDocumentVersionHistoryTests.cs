@@ -57,9 +57,11 @@ public sealed class SharedDocumentVersionHistoryTests(HrAdminPersonaFixture fixt
             Assert.Equal("1", await detail.GetVersionRowCellAsync(fileNameFragment, 0));
             Assert.Equal("Draft", await detail.GetVersionRowCellAsync(fileNameFragment, 1));
 
-            // Format ("d") is culture-dependent, so only assert the year we set is present
-            // rather than asserting an exact dd/MM vs MM/dd rendering.
-            var effectiveDateCell = await detail.GetVersionRowCellAsync(fileNameFragment, 5);
+            // Effective Date moved out of the grid's own columns and into the per-row "Details"
+            // popup as part of the grid's compaction — see SharedDocumentDetailPage.GetVersionDetailAsync.
+            // Format is culture-dependent, so only assert the year we set is present rather than
+            // asserting an exact dd/MM vs MM/dd rendering.
+            var (_, _, effectiveDateCell) = await detail.GetVersionDetailAsync(fileNameFragment);
             Assert.Contains("2026", effectiveDateCell);
 
             var href = await detail.GetVersionDownloadHrefAsync(fileNameFragment);
