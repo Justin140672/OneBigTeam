@@ -77,7 +77,7 @@ connectionString += isE2ETestingRun
 
 builder.Services.AddCompaniesModule(connectionString, builder.Configuration);
 builder.Services.AddCompanyOnboardingModule(connectionString);
-builder.Services.AddDataImportModule(connectionString, builder.Configuration);
+builder.Services.AddDataImportModule(connectionString, builder.Configuration, builder.Environment);
 builder.Services.AddDocumentsModule(connectionString, builder.Configuration, builder.Environment);
 builder.Services.AddEmployeesModule(connectionString, builder.Configuration);
 builder.Services.AddIdentityModule(connectionString, builder.Configuration);
@@ -88,7 +88,7 @@ builder.Services.AddOnboardingModule(connectionString);
 builder.Services.AddOffboardingModule(connectionString);
 builder.Services.AddTasksModule(connectionString);
 builder.Services.AddProbationModule(connectionString);
-builder.Services.AddRecruitmentModule(connectionString, builder.Configuration);
+builder.Services.AddRecruitmentModule(connectionString, builder.Configuration, builder.Environment);
 builder.Services.AddAssetsModule(connectionString);
 builder.Services.AddSicknessModule(connectionString);
 builder.Services.AddSupportModule(connectionString);

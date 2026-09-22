@@ -71,6 +71,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace HR.Modules.Recruitment;
 
@@ -79,10 +80,11 @@ public static class RecruitmentModule
     public static IServiceCollection AddRecruitmentModule(
         this IServiceCollection services,
         string connectionString,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         AddFeatureServices(services);
-        AddCandidateDocumentStorage(services, configuration);
+        AddCandidateDocumentStorage(services, configuration, environment);
         services.AddScoped<IInterviewFeedbackService, InterviewFeedbackService>();
 
         services.AddDbContext<RecruitmentDbContext>(options =>
@@ -92,11 +94,46 @@ public static class RecruitmentModule
         return services;
     }
 
-    private static void AddCandidateDocumentStorage(IServiceCollection services, IConfiguration configuration)
+    /// <summary>
+    /// Reliability review issue 2 (P1): candidate document storage must be durable (Supabase-backed)
+    /// in every environment except Development or an explicit automated-test environment, matching
+    /// the rule already applied to profile photos, support attachments, organisation exports, and
+    /// documents (see HR.Infrastructure.InfrastructureModule.IsLocalStorageAllowedEnvironment /
+    /// HR.Modules.Documents.DocumentsModule.AddStorageService). The local temp-directory fallback
+    /// loses every file on restart/redeploy and serves downloads through a dev-only route.
+    /// </summary>
+    private static void AddCandidateDocumentStorage(
+        IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
         services.Configure<CandidateDocumentUploadOptions>(configuration.GetSection("Recruitment:CandidateDocuments"));
-        services.AddScoped<ICandidateDocumentStorageService, LocalCandidateDocumentStorageService>();
+
+        var supabaseSection = configuration.GetSection("Recruitment:Supabase:CandidateDocuments");
+
+        if (supabaseSection.Exists() && !string.IsNullOrWhiteSpace(supabaseSection["SupabaseUrl"]))
+        {
+            services.Configure<SupabaseCandidateDocumentStorageOptions>(supabaseSection);
+            services.AddHttpClient<ICandidateDocumentStorageService, SupabaseCandidateDocumentStorageService>();
+            services.AddHealthChecks().AddCheck<SupabaseCandidateDocumentStorageHealthCheck>(
+                "candidate-document-storage", tags: ["degraded"]);
+        }
+        else if (IsLocalStorageAllowedEnvironment(environment))
+        {
+            services.AddScoped<ICandidateDocumentStorageService, LocalCandidateDocumentStorageService>();
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                "Candidate document storage is not configured for this environment. "
+                + "'Recruitment:Supabase:CandidateDocuments:SupabaseUrl' (and ServiceRoleKey/BucketName) "
+                + "must be set in Staging/Production — the local temp-directory fallback is only "
+                + "permitted in Development or an explicit automated-test environment.");
+        }
     }
+
+    private static bool IsLocalStorageAllowedEnvironment(IHostEnvironment environment) =>
+        environment.IsDevelopment()
+        || environment.IsEnvironment("Test")
+        || string.Equals(Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
 
     private static void AddFeatureServices(IServiceCollection services)
     {

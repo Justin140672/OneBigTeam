@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace HR.Modules.DataImport;
 
@@ -25,11 +26,12 @@ public static class DataImportModule
     public static IServiceCollection AddDataImportModule(
         this IServiceCollection services,
         string connectionString,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         services.Configure<ImportFileUploadOptions>(configuration.GetSection("DataImport:FileUpload"));
         services.AddScoped<IImportFileValidator, ImportFileValidator>();
-        services.AddScoped<IImportFileStorageService, LocalImportFileStorageService>();
+        AddImportFileStorage(services, configuration, environment);
 
         services.AddScoped<UploadImportFileHandler>();
         services.AddScoped<IValidator<UploadImportFileRequest>, UploadImportFileValidator>();
@@ -68,6 +70,46 @@ public static class DataImportModule
 
         return services;
     }
+
+    /// <summary>
+    /// Reliability review issue 2 (P1): import files must be durable (Supabase-backed) in every
+    /// environment except Development or an explicit automated-test environment, matching the rule
+    /// already applied to documents/profile photos/support attachments/organisation exports/candidate
+    /// documents. This matters more here than for most other categories: import validation and
+    /// confirmation both happen in requests after the initial upload, so a process restart between
+    /// stages on local temp storage would orphan an otherwise-valid import — Supabase-backed storage
+    /// keeps the file available from any service instance across the whole import lifecycle.
+    /// </summary>
+    private static void AddImportFileStorage(
+        IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
+    {
+        var supabaseSection = configuration.GetSection("DataImport:Supabase:ImportFiles");
+
+        if (supabaseSection.Exists() && !string.IsNullOrWhiteSpace(supabaseSection["SupabaseUrl"]))
+        {
+            services.Configure<Services.SupabaseImportFileStorageOptions>(supabaseSection);
+            services.AddHttpClient<IImportFileStorageService, Services.SupabaseImportFileStorageService>();
+            services.AddHealthChecks().AddCheck<Services.SupabaseImportFileStorageHealthCheck>(
+                "import-file-storage", tags: ["degraded"]);
+        }
+        else if (IsLocalStorageAllowedEnvironment(environment))
+        {
+            services.AddScoped<IImportFileStorageService, LocalImportFileStorageService>();
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                "Import file storage is not configured for this environment. "
+                + "'DataImport:Supabase:ImportFiles:SupabaseUrl' (and ServiceRoleKey/BucketName) must "
+                + "be set in Staging/Production — the local temp-directory fallback is only permitted "
+                + "in Development or an explicit automated-test environment.");
+        }
+    }
+
+    private static bool IsLocalStorageAllowedEnvironment(IHostEnvironment environment) =>
+        environment.IsDevelopment()
+        || environment.IsEnvironment("Test")
+        || string.Equals(Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
 
     public static WebApplication UseDataImportRecurringJobs(this WebApplication app)
     {

@@ -14,6 +14,7 @@ using HR.Modules.Probation;
 using HR.Modules.Recruitment;
 using HR.Modules.Reporting;
 using HR.Modules.Sickness;
+using HR.Modules.Support;
 using HR.Modules.Tasks;
 using HR.SharedKernel;
 using Microsoft.Extensions.Configuration;
@@ -64,11 +65,11 @@ public class ServiceContainerCompositionTests
         services.AddAuthorizationCore();
 
         services.AddCompaniesModule(connectionString, configuration);
-        services.AddDataImportModule(connectionString, configuration);
         // Development environment: this test validates DI graph composition only, not the
         // staging/production fail-fast behaviour for missing ClamAv/Supabase config (see
         // DocumentsModuleArchitectureTests / DocumentsModuleTests for that).
         var environment = new HostingEnvironment { EnvironmentName = Environments.Development };
+        services.AddDataImportModule(connectionString, configuration, environment);
         services.AddDocumentsModule(connectionString, configuration, environment);
         services.AddEmployeesModule(connectionString);
         services.AddIdentityModule(connectionString, configuration);
@@ -78,10 +79,14 @@ public class ServiceContainerCompositionTests
         services.AddOffboardingModule(connectionString);
         services.AddTasksModule(connectionString);
         services.AddProbationModule(connectionString);
-        services.AddRecruitmentModule(connectionString, configuration);
+        services.AddRecruitmentModule(connectionString, configuration, environment);
         services.AddAssetsModule(connectionString);
         services.AddSicknessModule(connectionString);
         services.AddReportingModule(connectionString);
+        // Security review ticket 4 (P1): Support's attachment handlers now depend on
+        // IUploadedFileScanner, registered by AddDocumentsModule above — included here so this
+        // test actually proves that cross-module DI wiring resolves.
+        services.AddSupportModule(connectionString);
         services.AddInfrastructure(connectionString, configuration, environment);
         services.AddHangfireBackgroundJobs(connectionString);
 
