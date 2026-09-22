@@ -93,7 +93,7 @@ builder.Services.AddAssetsModule(connectionString);
 builder.Services.AddSicknessModule(connectionString);
 builder.Services.AddSupportModule(connectionString);
 builder.Services.AddReportingModule(connectionString);
-builder.Services.AddInfrastructure(connectionString, builder.Configuration);
+builder.Services.AddInfrastructure(connectionString, builder.Configuration, builder.Environment);
 builder.Services.AddHangfireBackgroundJobs(connectionString);
 builder.Services.AddFastEndpoints(o => o.IncludeAbstractValidators = true);
 builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>

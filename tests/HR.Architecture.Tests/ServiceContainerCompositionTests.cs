@@ -82,7 +82,7 @@ public class ServiceContainerCompositionTests
         services.AddAssetsModule(connectionString);
         services.AddSicknessModule(connectionString);
         services.AddReportingModule(connectionString);
-        services.AddInfrastructure(connectionString, configuration);
+        services.AddInfrastructure(connectionString, configuration, environment);
         services.AddHangfireBackgroundJobs(connectionString);
 
         services.AddSingleton<IClock, SystemClock>();

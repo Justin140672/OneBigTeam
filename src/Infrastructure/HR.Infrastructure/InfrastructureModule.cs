@@ -26,8 +26,15 @@ public static class InfrastructureModule
     public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
         string connectionString,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
+        // Ticket 23 (P2): ambient execution-context accessor (correlation/causation/message ids) -
+        // stateless wrapper over a static AsyncLocal, so singleton lifetime is correct and it is
+        // visible to both DI-constructed classes and static extension methods (e.g. outbox helpers).
+        services.AddSingleton<HR.SharedKernel.ExecutionContext.IExecutionContextAccessor,
+            HR.SharedKernel.ExecutionContext.ExecutionContextAccessor>();
+
         AddEmailSender(services, configuration);
         services.AddSingleton<IInviteLinkBuilder, ConfiguredInviteLinkBuilder>();
         services.AddScoped<IAuditEventPublisher, DbAuditEventPublisher>();
@@ -47,9 +54,9 @@ public static class InfrastructureModule
         services.AddHttpContextAccessor();
         services.AddHttpClient();
         AddSensitiveDataProtection(services, configuration);
-        AddProfilePhotoStorageService(services, configuration);
-        AddSupportAttachmentStorageService(services, configuration);
-        AddOrganisationDataExportStorage(services, configuration);
+        AddProfilePhotoStorageService(services, configuration, environment);
+        AddSupportAttachmentStorageService(services, configuration, environment);
+        AddOrganisationDataExportStorage(services, configuration, environment);
 
         QuestPDF.Settings.License = LicenseType.Community;
         services.AddScoped<IReportExporter, ReportExporter>();
@@ -111,7 +118,20 @@ public static class InfrastructureModule
                 "Sensitive-data encryption self-test failed during startup: encrypt/decrypt round-trip mismatch.");
     }
 
-    private static void AddProfilePhotoStorageService(IServiceCollection services, IConfiguration configuration)
+    /// <summary>
+    /// Security review ticket 3 (P1): a missing Supabase storage config category must never silently
+    /// activate an ephemeral local (temp-dir) fallback outside Development/an explicit test
+    /// environment — that data disappears on restart/redeploy, and the local download route is
+    /// dev-only. Shared by all three <c>Local*StorageService</c> categories below (Documents' own
+    /// Supabase-vs-local switch in DocumentsModule follows the same rule for the same reason).
+    /// </summary>
+    private static bool IsLocalStorageAllowedEnvironment(IHostEnvironment environment) =>
+        environment.IsDevelopment()
+        || environment.IsEnvironment("Test")
+        || string.Equals(Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
+
+    private static void AddProfilePhotoStorageService(
+        IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
         var supabaseSection = configuration.GetSection("Infrastructure:Supabase:ProfilePhotos");
 
@@ -120,13 +140,22 @@ public static class InfrastructureModule
             services.Configure<SupabaseProfilePhotoStorageOptions>(supabaseSection);
             services.AddHttpClient<IProfilePhotoStorageService, SupabaseProfilePhotoStorageService>();
         }
-        else
+        else if (IsLocalStorageAllowedEnvironment(environment))
         {
             services.AddScoped<IProfilePhotoStorageService, LocalProfilePhotoStorageService>();
         }
+        else
+        {
+            throw new InvalidOperationException(
+                "Profile photo storage is not configured for this environment. "
+                + "'Infrastructure:Supabase:ProfilePhotos:SupabaseUrl' (and ServiceRoleKey/BucketName) "
+                + "must be set in Staging/Production — the local temp-directory fallback is only "
+                + "permitted in Development or an explicit automated-test environment.");
+        }
     }
 
-    private static void AddSupportAttachmentStorageService(IServiceCollection services, IConfiguration configuration)
+    private static void AddSupportAttachmentStorageService(
+        IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
         var supabaseSection = configuration.GetSection("Infrastructure:Supabase:SupportAttachments");
 
@@ -134,14 +163,25 @@ public static class InfrastructureModule
         {
             services.Configure<SupabaseSupportAttachmentStorageOptions>(supabaseSection);
             services.AddHttpClient<ISupportAttachmentStorageService, SupabaseSupportAttachmentStorageService>();
+            services.AddHealthChecks().AddCheck<SupabaseSupportAttachmentStorageHealthCheck>(
+                "support-attachment-storage", tags: ["degraded"]);
         }
-        else
+        else if (IsLocalStorageAllowedEnvironment(environment))
         {
             services.AddScoped<ISupportAttachmentStorageService, LocalSupportAttachmentStorageService>();
         }
+        else
+        {
+            throw new InvalidOperationException(
+                "Support attachment storage is not configured for this environment. "
+                + "'Infrastructure:Supabase:SupportAttachments:SupabaseUrl' (and ServiceRoleKey/BucketName) "
+                + "must be set in Staging/Production — the local temp-directory fallback is only "
+                + "permitted in Development or an explicit automated-test environment.");
+        }
     }
 
-    private static void AddOrganisationDataExportStorage(IServiceCollection services, IConfiguration configuration)
+    private static void AddOrganisationDataExportStorage(
+        IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
         var supabaseSection = configuration.GetSection("Infrastructure:Supabase:OrganisationExports");
 
@@ -149,10 +189,20 @@ public static class InfrastructureModule
         {
             services.Configure<SupabaseOrganisationDataExportStorageOptions>(supabaseSection);
             services.AddHttpClient<IOrganisationDataExportStorage, SupabaseOrganisationDataExportStorage>();
+            services.AddHealthChecks().AddCheck<SupabaseOrganisationDataExportStorageHealthCheck>(
+                "organisation-export-storage", tags: ["degraded"]);
+        }
+        else if (IsLocalStorageAllowedEnvironment(environment))
+        {
+            services.AddScoped<IOrganisationDataExportStorage, LocalOrganisationDataExportStorage>();
         }
         else
         {
-            services.AddScoped<IOrganisationDataExportStorage, LocalOrganisationDataExportStorage>();
+            throw new InvalidOperationException(
+                "Organisation data export storage is not configured for this environment. "
+                + "'Infrastructure:Supabase:OrganisationExports:SupabaseUrl' (and ServiceRoleKey/BucketName) "
+                + "must be set in Staging/Production — the local temp-directory fallback is only "
+                + "permitted in Development or an explicit automated-test environment.");
         }
     }
 

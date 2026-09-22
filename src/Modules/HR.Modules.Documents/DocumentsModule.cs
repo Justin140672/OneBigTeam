@@ -160,10 +160,23 @@ public static class DocumentsModule
         {
             services.Configure<SupabaseStorageOptions>(supabaseSection);
             services.AddHttpClient<IDocumentStorageService, SupabaseDocumentStorageService>();
+            services.AddHealthChecks().AddCheck<DocumentStorageHealthCheck>(
+                "document-storage", tags: ["degraded"]);
+        }
+        else if (isNoOpAllowedEnvironment)
+        {
+            // Security review ticket 3 (P1): the local (temp-dir) storage fallback loses every file on
+            // restart/redeploy and serves downloads through a dev-only route — only acceptable in the
+            // same Development/explicit-test environments as the no-op virus scanner above.
+            services.AddScoped<IDocumentStorageService, LocalDocumentStorageService>();
         }
         else
         {
-            services.AddScoped<IDocumentStorageService, LocalDocumentStorageService>();
+            throw new InvalidOperationException(
+                "Document storage is not configured for this environment. "
+                + "'Documents:Supabase:SupabaseUrl' (and ServiceRoleKey/BucketName) must be set in "
+                + "Staging/Production — the local temp-directory fallback is only permitted in "
+                + "Development or an explicit automated-test environment.");
         }
     }
 
