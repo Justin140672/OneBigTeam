@@ -283,6 +283,149 @@ public class IntegrationEventPublisherTests
         Assert.Null(accessor.Current);
     }
 
+    // ── Ticket 7 (P2): cancellation semantics ───────────────────────────────────────
+
+    [Fact]
+    public async Task PublishAsync_WithAlreadyCancelledToken_ThrowsWithoutInvokingAnyHandler()
+    {
+        var recording = new RecordingHandler();
+        var logger = new SpyLogger<IntegrationEventPublisher>();
+        var provider = BuildProvider(logger, recording);
+        var publisher = new IntegrationEventPublisher(provider, logger, new ExecutionContextAccessor());
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            publisher.PublishAsync(new TestIntegrationEvent(), cts.Token));
+
+        Assert.False(recording.Invoked);
+    }
+
+    [Fact]
+    public async Task PublishAsync_CancelledMidDispatch_StopsRunningLaterHandlers()
+    {
+        // The cancelling handler cancels the token itself mid-handler (simulating an external
+        // cancellation observed partway through dispatch) rather than the test cancelling up
+        // front, so the handler registered BEFORE it still runs normally and only the handler
+        // registered AFTER it must be skipped.
+        var recordingBefore = new RecordingHandler();
+        var logger = new SpyLogger<IntegrationEventPublisher>();
+        using var cts = new CancellationTokenSource();
+        var cancellingWrapper = new CancelOnInvokeHandler(cts);
+        var recordingAfter = new RecordingHandler();
+        var provider = BuildProvider(logger, recordingBefore, cancellingWrapper, recordingAfter);
+        var publisher = new IntegrationEventPublisher(provider, logger, new ExecutionContextAccessor());
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            publisher.PublishAsync(new TestIntegrationEvent(), cts.Token));
+
+        Assert.True(recordingBefore.Invoked);
+        Assert.True(cancellingWrapper.Invoked);
+        Assert.False(recordingAfter.Invoked);
+    }
+
+    private sealed class CancelOnInvokeHandler(CancellationTokenSource cts) : IIntegrationEventHandler<TestIntegrationEvent>
+    {
+        public bool Invoked { get; private set; }
+
+        public Task HandleAsync(TestIntegrationEvent integrationEvent, CancellationToken cancellationToken)
+        {
+            Invoked = true;
+            cts.Cancel();
+            return Task.CompletedTask;
+        }
+    }
+
+    [Fact]
+    public async Task PublishAsync_NonCancellationHandlerFailure_IsStillIsolatedAndDoesNotThrow()
+    {
+        // Ordinary handler exceptions must keep being caught/logged/continued exactly as before —
+        // only genuine cancellation of the supplied token gets the new stop-and-rethrow behaviour.
+        var throwing = new ThrowingHandler();
+        var recording = new RecordingHandler();
+        var logger = new SpyLogger<IntegrationEventPublisher>();
+        var provider = BuildProvider(logger, throwing, recording);
+        var publisher = new IntegrationEventPublisher(provider, logger, new ExecutionContextAccessor());
+
+        var exception = await Record.ExceptionAsync(() =>
+            publisher.PublishAsync(new TestIntegrationEvent(), CancellationToken.None));
+
+        Assert.Null(exception);
+        Assert.True(throwing.Invoked);
+        Assert.True(recording.Invoked);
+    }
+
+    [Fact]
+    public async Task PublishAndConfirmAsync_WithAlreadyCancelledToken_ThrowsRatherThanReportingSuccess()
+    {
+        var recordingRequired = new RecordingRequiredHandler();
+        var logger = new SpyLogger<IntegrationEventPublisher>();
+        var provider = BuildProvider(logger, recordingRequired);
+        var publisher = new IntegrationEventPublisher(provider, logger, new ExecutionContextAccessor());
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            publisher.PublishAndConfirmAsync(new TestIntegrationEvent(), cts.Token));
+
+        Assert.False(recordingRequired.Invoked);
+    }
+
+    [Fact]
+    public async Task PublishAndConfirmAsync_CancelledMidDispatch_ThrowsRatherThanReturningTrue()
+    {
+        var logger = new SpyLogger<IntegrationEventPublisher>();
+        using var cts = new CancellationTokenSource();
+        var cancellingWrapper = new CancelOnInvokeHandler(cts);
+        var recordingRequiredAfter = new RecordingRequiredHandler();
+        var provider = BuildProvider(logger, cancellingWrapper, recordingRequiredAfter);
+        var publisher = new IntegrationEventPublisher(provider, logger, new ExecutionContextAccessor());
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            publisher.PublishAndConfirmAsync(new TestIntegrationEvent(), cts.Token));
+
+        Assert.True(cancellingWrapper.Invoked);
+        Assert.False(recordingRequiredAfter.Invoked);
+    }
+
+    [Fact]
+    public async Task PublishAsync_HandlerThrowsOperationCanceledException_ForAReasonUnrelatedToTheSuppliedToken_IsStillIsolated()
+    {
+        // A handler's own internal cancellation (e.g. an unrelated, already-expired timeout token
+        // it created itself) must not be mistaken for cancellation of THIS dispatch's token — the
+        // guard is `when (cancellationToken.IsCancellationRequested)`, so with an uncancelled
+        // caller-supplied token this falls through to ordinary isolation, same as any other
+        // exception.
+        var unrelatedlyCancelling = new UnrelatedOperationCanceledHandler();
+        var recording = new RecordingHandler();
+        var logger = new SpyLogger<IntegrationEventPublisher>();
+        var provider = BuildProvider(logger, unrelatedlyCancelling, recording);
+        var publisher = new IntegrationEventPublisher(provider, logger, new ExecutionContextAccessor());
+
+        var exception = await Record.ExceptionAsync(() =>
+            publisher.PublishAsync(new TestIntegrationEvent(), CancellationToken.None));
+
+        Assert.Null(exception);
+        Assert.True(unrelatedlyCancelling.Invoked);
+        Assert.True(recording.Invoked);
+    }
+
+    private sealed class UnrelatedOperationCanceledHandler : IIntegrationEventHandler<TestIntegrationEvent>
+    {
+        public bool Invoked { get; private set; }
+
+        public Task HandleAsync(TestIntegrationEvent integrationEvent, CancellationToken cancellationToken)
+        {
+            Invoked = true;
+            using var unrelatedCts = new CancellationTokenSource();
+            unrelatedCts.Cancel();
+            unrelatedCts.Token.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
+        }
+    }
+
     // Captures whatever execution context is ambient (via the same IExecutionContextAccessor
     // instance the publisher under test was constructed with) at the moment it handles an event —
     // this is how a test proves what correlation/causation identity the publisher assigned.

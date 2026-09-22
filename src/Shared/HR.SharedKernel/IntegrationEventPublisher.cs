@@ -64,6 +64,16 @@ public sealed class IntegrationEventPublisher(
                 ? ExecutionContextInfo.CausedBy(parentOrAmbient, ExecutionOrigin.IntegrationEvent)
                 : ExecutionContextInfo.NewRoot(ExecutionOrigin.IntegrationEvent);
 
+        // Security review ticket 7 (P2): cancellation is NOT an ordinary handler failure. Before
+        // this fix, OperationCanceledException was caught by the same catch (Exception) block as
+        // every other handler exception below, so a cancelled dispatch would: keep running the
+        // remaining handlers for the event (each seeing a token that is already cancelled — most
+        // will throw immediately anyway, but not all do), and PublishAndConfirmAsync could still
+        // report "success" (true) despite the caller's cancellation. A cancellation observed here
+        // must stop dispatch immediately and propagate to the caller, exactly like any other
+        // cancellable async operation.
+        cancellationToken.ThrowIfCancellationRequested();
+
         var handlers = serviceProvider.GetServices<IIntegrationEventHandler<TEvent>>();
         var allRequiredSucceeded = true;
 
@@ -77,9 +87,25 @@ public sealed class IntegrationEventPublisher(
         {
             foreach (var handler in handlers)
             {
+                // Checked before EVERY handler (not just once up front) — a token can be cancelled
+                // partway through a multi-handler dispatch, and once that happens no further
+                // handler for this event should run.
+                cancellationToken.ThrowIfCancellationRequested();
+
                 try
                 {
                     await handler.HandleAsync(integrationEvent, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    // Genuine cancellation of the token this dispatch was given — not an ordinary
+                    // handler failure. Re-throw so it propagates to the caller and stops dispatch to
+                    // any remaining handlers, rather than being isolated/logged/continued like a
+                    // normal exception. A handler that throws OperationCanceledException for a
+                    // reason UNRELATED to this token (e.g. its own internal, already-disposed token)
+                    // would not match this guard and falls through to the ordinary isolation path
+                    // below, preserving existing behaviour for that edge case.
+                    throw;
                 }
                 catch (Exception ex)
                 {
