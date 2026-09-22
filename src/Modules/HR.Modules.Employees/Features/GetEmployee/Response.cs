@@ -64,6 +64,43 @@ internal sealed record GetEmployeeResponse(
     // Ticket 2: optimistic-concurrency token to echo back on the next employee edit save.
     int Version);
 
+/// <summary>
+/// GetEmployee field-level access matrix (see 30-administrative-role-separation-matrix.md): what a manager (viewing a direct or indirect report — not
+/// HR, not self) is approved to see. Operational/organisational information only — no personal
+/// contact details, demographic data, home address, leaving-process detail, notice period,
+/// system-access state, or HR notes. Returned instead of GetEmployeeResponse for that caller
+/// scope by GetEmployeeHandler; never fetch the full record and hide fields client-side (see
+/// 30-administrative-role-separation-matrix.md, reconciled against 26-permissions-access-ux.md
+/// to this one field list).
+/// </summary>
+internal sealed record GetEmployeeManagerResponse(
+    Guid Id,
+    Guid CompanyId,
+    Guid? DepartmentId,
+    string? DepartmentName,
+    Guid? LocationId,
+    string? LocationName,
+    Guid? PositionProfileId,
+    string? PositionTitle,
+    Guid? ManagerId,
+    string? ManagerFullName,
+    int DirectReportsCount,
+    IReadOnlyList<ReportingChainItem> ReportingChain,
+    string FirstName,
+    string LastName,
+    string? PreferredName,
+    string WorkEmail,
+    DateOnly StartDate,
+    EmploymentStatus Status,
+    string? EmployeeNumber,
+    Guid? EmploymentTypeId,
+    string? EmploymentTypeName,
+    bool ShowOnboardingTab,
+    bool ShowProbationTab,
+    bool ShowOffboardingTab,
+    bool ShowLeavingTab,
+    bool CanStartLeavingProcess);
+
 // Ordered from the top of the org (no manager) down to the employee's immediate manager;
 // does not include the employee themselves.
 internal sealed record ReportingChainItem(Guid EmployeeId, string Name, string? JobTitle);

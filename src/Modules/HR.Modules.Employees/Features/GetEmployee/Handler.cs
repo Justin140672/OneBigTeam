@@ -32,19 +32,28 @@ internal sealed class GetEmployeeHandler
         _resourceAuthorizer = resourceAuthorizer;
     }
 
-    public async Task<Result<GetEmployeeResponse>> HandleAsync(
+    public async Task<Result<object>> HandleAsync(
         GetEmployeeRequest request,
         CancellationToken cancellationToken)
     {
         // IAM-07: only the employee themself, a manager anywhere in their reporting hierarchy, or
-        // an HR Administrator may view this employee's full HR record. This must be checked
-        // before any of that record's fields are read, not left to the UI to hide — see the
-        // GetEmployee security ticket this closes.
+        // an HR Administrator may view this employee's record. This must be checked before any
+        // of that record's fields are read, not left to the UI to hide — see the GetEmployee
+        // security ticket this closes.
         var isAuthorized = await _resourceAuthorizer.CanViewAsync(
             request.CompanyId, request.CallerEmployeeId, request.Id, cancellationToken);
         if (!isAuthorized)
-            return Result.Failure<GetEmployeeResponse>(
+            return Result.Failure<object>(
                 Error.Forbidden("You are not authorized to view this employee's record."));
+
+        // Field-level access matrix: a manager (the only remaining authorized path besides self/HR-admin) is
+        // restricted to the operational-only field subset — GetEmployeeManagerResponse — rather
+        // than the full HR record. See EmployeeViewScope/ResolveViewScopeAsync's remarks and
+        // 30-administrative-role-separation-matrix.md (reconciled with 26-permissions-access-ux.md
+        // to this one field list). The projection happens here, before the response leaves the
+        // handler — never fetch the full record and hide fields client-side.
+        var viewScope = await _resourceAuthorizer.ResolveViewScopeAsync(
+            request.CallerEmployeeId, request.Id, cancellationToken);
 
         var result = await _dbContext.Employees
             .AsNoTracking()
@@ -125,7 +134,7 @@ internal sealed class GetEmployeeHandler
 
         if (result is null)
         {
-            return Result.Failure<GetEmployeeResponse>(
+            return Result.Failure<object>(
                 Error.NotFound($"Employee with id '{request.Id}' was not found."));
         }
 
@@ -189,7 +198,38 @@ internal sealed class GetEmployeeHandler
         var showLeavingTab = hasAnyLeavingProcess;
         var canStartLeavingProcess = !hasInProgressLeavingProcess;
 
-        return Result.Success(new GetEmployeeResponse(
+        if (viewScope == EmployeeViewScope.ManagerRestricted)
+        {
+            return Result.Success<object>(new GetEmployeeManagerResponse(
+                result.Id,
+                result.CompanyId,
+                result.DepartmentId,
+                result.DepartmentName,
+                result.LocationId,
+                result.LocationName,
+                result.PositionProfileId,
+                result.PositionTitle,
+                result.ManagerId,
+                result.ManagerFullName,
+                result.DirectReportsCount,
+                reportingChain,
+                result.FirstName,
+                result.LastName,
+                result.PreferredName,
+                result.WorkEmail,
+                result.StartDate,
+                result.Status,
+                result.EmployeeNumber,
+                result.EmploymentTypeId,
+                result.EmploymentTypeName,
+                showOnboardingTab,
+                showProbationTab,
+                showOffboardingTab,
+                showLeavingTab,
+                canStartLeavingProcess));
+        }
+
+        return Result.Success<object>(new GetEmployeeResponse(
             result.Id,
             result.CompanyId,
             result.DepartmentId,

@@ -55,15 +55,16 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id },
             CancellationToken.None);
+        var value = (GetEmployeeResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(employee.Id, result.Value!.Id);
-        Assert.Equal(companyId, result.Value.CompanyId);
-        Assert.Equal("Alice", result.Value.FirstName);
-        Assert.Equal("Smith", result.Value.LastName);
-        Assert.Equal("alice@example.com", result.Value.WorkEmail);
-        Assert.Equal(StartDate, result.Value.StartDate);
-        Assert.Equal(EmploymentStatus.Draft, result.Value.Status);
+        Assert.Equal(employee.Id, value.Id);
+        Assert.Equal(companyId, value.CompanyId);
+        Assert.Equal("Alice", value.FirstName);
+        Assert.Equal("Smith", value.LastName);
+        Assert.Equal("alice@example.com", value.WorkEmail);
+        Assert.Equal(StartDate, value.StartDate);
+        Assert.Equal(EmploymentStatus.Draft, value.Status);
     }
 
     // ── Resource authorization ───────────────────────────────────────────────────
@@ -117,9 +118,89 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id, CallerEmployeeId = managerId },
             CancellationToken.None);
+        var value = (GetEmployeeManagerResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(employee.Id, result.Value!.Id);
+        Assert.Equal(employee.Id, value.Id);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Manager_Response_Contains_Only_Operational_Fields()
+    {
+        // GetEmployee field-level access matrix (see 30-administrative-role-separation-matrix.md): a manager (hierarchy access, not self, not HR) must
+        // receive GetEmployeeManagerResponse — a distinct, narrower contract that structurally
+        // cannot carry personal email, date of birth, nationality/gender, home phone, home
+        // address, leaving-process detail, notice period or HR notes, rather than the full
+        // GetEmployeeResponse with those fields merely left unpopulated.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var managerId = Guid.NewGuid();
+        var resourceAuthorizer = new EmployeesResourceAuthorizer(
+            new FakeRoleAuthorizationService(), new FakeDirectReportsReader(employee.Id));
+
+        var handler = BuildHandler(context, resourceAuthorizer: resourceAuthorizer);
+
+        var result = await handler.HandleAsync(
+            new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id, CallerEmployeeId = managerId },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        // Type-level guarantee, not a field-by-field null check: GetEmployeeManagerResponse's
+        // constructor has no parameter for any sensitive field at all, so this assertion fails to
+        // compile (not just fails at runtime) the moment a sensitive field is ever added to it.
+        var value = Assert.IsType<GetEmployeeManagerResponse>(result.Value);
+
+        Assert.Equal(employee.Id, value.Id);
+        Assert.Equal("Alice", value.FirstName);
+        Assert.Equal("Smith", value.LastName);
+        Assert.Equal("alice@example.com", value.WorkEmail);
+        Assert.Equal(StartDate, value.StartDate);
+        Assert.Equal(EmploymentStatus.Draft, value.Status);
+        Assert.Equal("EMP-0001", value.EmployeeNumber);
+
+        var managerResponseFieldNames = typeof(GetEmployeeManagerResponse)
+            .GetProperties()
+            .Select(p => p.Name)
+            .ToHashSet(StringComparer.Ordinal);
+
+        string[] sensitiveFieldNames =
+        [
+            nameof(GetEmployeeResponse.PersonalEmail),
+            nameof(GetEmployeeResponse.DateOfBirth),
+            nameof(GetEmployeeResponse.Nationality),
+            nameof(GetEmployeeResponse.Gender),
+            nameof(GetEmployeeResponse.GenderOther),
+            nameof(GetEmployeeResponse.PhoneNumber),
+            nameof(GetEmployeeResponse.HomePhone),
+            nameof(GetEmployeeResponse.AddressLine1),
+            nameof(GetEmployeeResponse.AddressLine2),
+            nameof(GetEmployeeResponse.City),
+            nameof(GetEmployeeResponse.County),
+            nameof(GetEmployeeResponse.PostCode),
+            nameof(GetEmployeeResponse.Country),
+            nameof(GetEmployeeResponse.HasSystemAccess),
+            nameof(GetEmployeeResponse.WorkingDaysOverride),
+            nameof(GetEmployeeResponse.HoursPerDayOverride),
+            nameof(GetEmployeeResponse.ContinuousServiceDate),
+            nameof(GetEmployeeResponse.ProbationEndDate),
+            nameof(GetEmployeeResponse.LeavingDate),
+            nameof(GetEmployeeResponse.NoticePeriodUnitOverride),
+            nameof(GetEmployeeResponse.NoticePeriodLengthOverride),
+            nameof(GetEmployeeResponse.Notes),
+            nameof(GetEmployeeResponse.EffectiveNoticePeriodUnit),
+            nameof(GetEmployeeResponse.EffectiveNoticePeriodLength),
+            nameof(GetEmployeeResponse.EffectiveNoticePeriodSource),
+        ];
+
+        foreach (var sensitiveFieldName in sensitiveFieldNames)
+            Assert.DoesNotContain(sensitiveFieldName, managerResponseFieldNames);
     }
 
     [Fact]
@@ -142,9 +223,10 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id, CallerEmployeeId = employee.Id },
             CancellationToken.None);
+        var value = (GetEmployeeResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(employee.Id, result.Value!.Id);
+        Assert.Equal(employee.Id, value.Id);
     }
 
     [Fact]
@@ -198,9 +280,10 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id },
             CancellationToken.None);
+        var value = (GetEmployeeResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.False(result.Value!.HasSystemAccess);
+        Assert.False(value.HasSystemAccess);
     }
 
     [Fact]
@@ -218,12 +301,13 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id },
             CancellationToken.None);
+        var value = (GetEmployeeResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.Null(result.Value!.DepartmentName);
-        Assert.Null(result.Value.LocationName);
-        Assert.Null(result.Value.PositionTitle);
-        Assert.Null(result.Value.ManagerFullName);
+        Assert.Null(value.DepartmentName);
+        Assert.Null(value.LocationName);
+        Assert.Null(value.PositionTitle);
+        Assert.Null(value.ManagerFullName);
     }
 
     [Fact]
@@ -254,13 +338,14 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id },
             CancellationToken.None);
+        var value = (GetEmployeeResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("Engineering", result.Value!.DepartmentName);
-        Assert.Equal("Head Office", result.Value.LocationName);
-        Assert.Equal(location.Id, result.Value.LocationId);
-        Assert.Equal("Senior Developer", result.Value.PositionTitle);
-        Assert.Equal("Jane Manager", result.Value.ManagerFullName);
+        Assert.Equal("Engineering", value.DepartmentName);
+        Assert.Equal("Head Office", value.LocationName);
+        Assert.Equal(location.Id, value.LocationId);
+        Assert.Equal("Senior Developer", value.PositionTitle);
+        Assert.Equal("Jane Manager", value.ManagerFullName);
     }
 
     [Fact]
@@ -278,9 +363,10 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id },
             CancellationToken.None);
+        var value = (GetEmployeeResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(0, result.Value!.DirectReportsCount);
+        Assert.Equal(0, value.DirectReportsCount);
     }
 
     [Fact]
@@ -311,9 +397,10 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = companyId, Id = manager.Id },
             CancellationToken.None);
+        var value = (GetEmployeeResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(2, result.Value!.DirectReportsCount);
+        Assert.Equal(2, value.DirectReportsCount);
     }
 
     [Fact]
@@ -331,9 +418,10 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id },
             CancellationToken.None);
+        var value = (GetEmployeeResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.Empty(result.Value!.ReportingChain);
+        Assert.Empty(value.ReportingChain);
     }
 
     [Fact]
@@ -378,13 +466,14 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id },
             CancellationToken.None);
+        var value = (GetEmployeeResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(3, result.Value!.ReportingChain.Count);
-        Assert.Equal("Carla Ceo", result.Value.ReportingChain[0].Name);
-        Assert.Equal("CEO", result.Value.ReportingChain[0].JobTitle);
-        Assert.Equal("Dan Director", result.Value.ReportingChain[1].Name);
-        Assert.Equal("Mona Manager", result.Value.ReportingChain[2].Name);
+        Assert.Equal(3, value.ReportingChain.Count);
+        Assert.Equal("Carla Ceo", value.ReportingChain[0].Name);
+        Assert.Equal("CEO", value.ReportingChain[0].JobTitle);
+        Assert.Equal("Dan Director", value.ReportingChain[1].Name);
+        Assert.Equal("Mona Manager", value.ReportingChain[2].Name);
     }
 
     [Fact]
@@ -413,11 +502,12 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id },
             CancellationToken.None);
+        var value = (GetEmployeeResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(2, result.Value!.ReportingChain.Count);
-        Assert.Equal("Ben B", result.Value.ReportingChain[0].Name);
-        Assert.Equal("Amy A", result.Value.ReportingChain[1].Name);
+        Assert.Equal(2, value.ReportingChain.Count);
+        Assert.Equal("Ben B", value.ReportingChain[0].Name);
+        Assert.Equal("Amy A", value.ReportingChain[1].Name);
     }
 
     // ── Lifecycle tab visibility ─────────────────────────────────────────────────
@@ -436,11 +526,12 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = employee.CompanyId, Id = employee.Id },
             CancellationToken.None);
+        var value = (GetEmployeeResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.False(result.Value!.ShowOnboardingTab);
-        Assert.False(result.Value.ShowProbationTab);
-        Assert.False(result.Value.ShowOffboardingTab);
+        Assert.False(value.ShowOnboardingTab);
+        Assert.False(value.ShowProbationTab);
+        Assert.False(value.ShowOffboardingTab);
     }
 
     [Theory]
@@ -456,11 +547,12 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = employee.CompanyId, Id = employee.Id },
             CancellationToken.None);
+        var value = (GetEmployeeResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(expected, result.Value!.ShowOnboardingTab);
-        Assert.False(result.Value.ShowProbationTab);
-        Assert.False(result.Value.ShowOffboardingTab);
+        Assert.Equal(expected, value.ShowOnboardingTab);
+        Assert.False(value.ShowProbationTab);
+        Assert.False(value.ShowOffboardingTab);
     }
 
     [Theory]
@@ -478,11 +570,12 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = employee.CompanyId, Id = employee.Id },
             CancellationToken.None);
+        var value = (GetEmployeeResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.False(result.Value!.ShowOnboardingTab);
-        Assert.Equal(expected, result.Value.ShowProbationTab);
-        Assert.False(result.Value.ShowOffboardingTab);
+        Assert.False(value.ShowOnboardingTab);
+        Assert.Equal(expected, value.ShowProbationTab);
+        Assert.False(value.ShowOffboardingTab);
     }
 
     [Theory]
@@ -499,11 +592,12 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = employee.CompanyId, Id = employee.Id },
             CancellationToken.None);
+        var value = (GetEmployeeResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.False(result.Value!.ShowOnboardingTab);
-        Assert.False(result.Value.ShowProbationTab);
-        Assert.Equal(expected, result.Value.ShowOffboardingTab);
+        Assert.False(value.ShowOnboardingTab);
+        Assert.False(value.ShowProbationTab);
+        Assert.Equal(expected, value.ShowOffboardingTab);
     }
 
     [Fact]
@@ -521,11 +615,12 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = employee.CompanyId, Id = employee.Id },
             CancellationToken.None);
+        var value = (GetEmployeeResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.True(result.Value!.ShowOnboardingTab);
-        Assert.True(result.Value.ShowProbationTab);
-        Assert.True(result.Value.ShowOffboardingTab);
+        Assert.True(value.ShowOnboardingTab);
+        Assert.True(value.ShowProbationTab);
+        Assert.True(value.ShowOffboardingTab);
     }
 
     [Fact]
@@ -543,11 +638,12 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = employee.CompanyId, Id = employee.Id },
             CancellationToken.None);
+        var value = (GetEmployeeResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.False(result.Value!.ShowOnboardingTab);
-        Assert.False(result.Value.ShowProbationTab);
-        Assert.False(result.Value.ShowOffboardingTab);
+        Assert.False(value.ShowOnboardingTab);
+        Assert.False(value.ShowProbationTab);
+        Assert.False(value.ShowOffboardingTab);
     }
 
     // ── ShowLeavingTab ────────────────────────────────────────────────────────
@@ -565,9 +661,10 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = employee.CompanyId, Id = employee.Id },
             CancellationToken.None);
+        var value = (GetEmployeeResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.False(result.Value!.ShowLeavingTab);
+        Assert.False(value.ShowLeavingTab);
     }
 
     [Fact]
@@ -589,9 +686,10 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = employee.CompanyId, Id = employee.Id },
             CancellationToken.None);
+        var value = (GetEmployeeResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.True(result.Value!.ShowLeavingTab);
+        Assert.True(value.ShowLeavingTab);
     }
 
     [Fact]
@@ -614,9 +712,10 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = employee.CompanyId, Id = employee.Id },
             CancellationToken.None);
+        var value = (GetEmployeeResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.False(result.Value!.ShowLeavingTab);
+        Assert.False(value.ShowLeavingTab);
     }
 
     // ── effective notice period ──────────────────────────────────────────────
@@ -636,11 +735,12 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = employee.CompanyId, Id = employee.Id },
             CancellationToken.None);
+        var value = (GetEmployeeResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(NoticePeriodUnit.Weeks, result.Value!.EffectiveNoticePeriodUnit);
-        Assert.Equal(6, result.Value.EffectiveNoticePeriodLength);
-        Assert.Equal(NoticePeriodSource.PositionProfile, result.Value.EffectiveNoticePeriodSource);
+        Assert.Equal(NoticePeriodUnit.Weeks, value.EffectiveNoticePeriodUnit);
+        Assert.Equal(6, value.EffectiveNoticePeriodLength);
+        Assert.Equal(NoticePeriodSource.PositionProfile, value.EffectiveNoticePeriodSource);
     }
 
     [Fact]
@@ -664,13 +764,14 @@ public class GetEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id },
             CancellationToken.None);
+        var value = (GetEmployeeResponse)result.Value!;
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(NoticePeriodUnit.Months, result.Value!.NoticePeriodUnitOverride);
-        Assert.Equal(2, result.Value.NoticePeriodLengthOverride);
-        Assert.Equal(NoticePeriodUnit.Months, result.Value.EffectiveNoticePeriodUnit);
-        Assert.Equal(2, result.Value.EffectiveNoticePeriodLength);
-        Assert.Equal(NoticePeriodSource.Employee, result.Value.EffectiveNoticePeriodSource);
+        Assert.Equal(NoticePeriodUnit.Months, value.NoticePeriodUnitOverride);
+        Assert.Equal(2, value.NoticePeriodLengthOverride);
+        Assert.Equal(NoticePeriodUnit.Months, value.EffectiveNoticePeriodUnit);
+        Assert.Equal(2, value.EffectiveNoticePeriodLength);
+        Assert.Equal(NoticePeriodSource.Employee, value.EffectiveNoticePeriodSource);
     }
 
     private static Employee SeedEmployee(EmployeesDbContext context, Guid companyId)

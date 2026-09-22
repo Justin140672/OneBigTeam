@@ -46,4 +46,29 @@ internal sealed class EmployeesResourceAuthorizer
         Guid companyId, Guid callerEmployeeId, Guid targetEmployeeId, CancellationToken cancellationToken)
         => _resourceAuthorizer.CanAccessAsync(
             companyId, companyId, callerEmployeeId, targetEmployeeId, cancellationToken);
+
+    /// <summary>
+    /// Resolves the field-level scope CanViewAsync's caller is entitled to for a target employee's
+    /// record. Does not itself check whether the caller is authorized at all — call CanViewAsync
+    /// (or note that only its three paths — self, hierarchy, HR-admin — ever lead here) first.
+    /// </summary>
+    public async Task<EmployeeViewScope> ResolveViewScopeAsync(
+        Guid callerEmployeeId, Guid targetEmployeeId, CancellationToken cancellationToken)
+    {
+        if (await IsHrAdministratorAsync(callerEmployeeId, cancellationToken))
+            return EmployeeViewScope.Full;
+
+        if (callerEmployeeId == targetEmployeeId)
+            return EmployeeViewScope.Full;
+
+        // The only remaining authorized path is manager hierarchy (see CanViewAsync) — the
+        // operational-only field subset (IAM-08 access matrix).
+        return EmployeeViewScope.ManagerRestricted;
+    }
+}
+
+internal enum EmployeeViewScope
+{
+    Full,
+    ManagerRestricted,
 }

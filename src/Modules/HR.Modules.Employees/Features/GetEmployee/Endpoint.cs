@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Http;
 namespace HR.Modules.Employees.Features.GetEmployee;
 
 internal sealed class Endpoint(
-    GetEmployeeHandler handler, ICurrentUser currentUser) : Endpoint<GetEmployeeRequest, GetEmployeeResponse>
+    GetEmployeeHandler handler, ICurrentUser currentUser) : Endpoint<GetEmployeeRequest, object>
 {
     public override void Configure()
     {

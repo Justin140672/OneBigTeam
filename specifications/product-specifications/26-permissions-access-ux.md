@@ -179,15 +179,44 @@ Permissions apply only to employees beneath the manager in the complete hierarch
 
 | Caller | Detailed employee record | Salary/compensation |
 |---|---|---|
-| Employee | Own record only | Own salary only when `DisplaySalaryOnEmployeeProfile` is enabled |
-| Manager | Employees beneath them in the complete hierarchy | Same hierarchy, only when `DisplaySalaryOnEmployeeProfile` is enabled |
-| HR Administrator | Company-wide | Company-wide regardless of the display setting |
+| Employee | Own record only, full field set | Own salary only when `DisplaySalaryOnEmployeeProfile` is enabled |
+| Manager | Employees beneath them in the complete hierarchy — **operational fields only** (see field-level access matrix below); never their own record via this scope — self-access, not hierarchy, covers that | Same hierarchy, only when `DisplaySalaryOnEmployeeProfile` is enabled |
+| HR Administrator | Company-wide, full field set | Company-wide regardless of the display setting |
 | Recruiter only | No general detailed employee access | No access |
 | Company Administrator only | No general detailed employee access | No access |
 
 Company Administrator is a company-settings role, not an HR role. The initial company creator also receives HR Administrator as a separately assigned, explicit exception.
 
 Directory-style lists may expose a deliberately reduced set of work fields to a wider audience, but must not reuse a detailed employee response containing personal or sensitive fields.
+
+## Field-level access matrix (GetEmployee)
+
+A manager's hierarchy access to "the detailed employee record" above is **not** the same
+response shape HR receives — reconciles the ambiguity previously between this document and
+`30-administrative-role-separation-matrix.md` (which listed manager access as "Self", meaning
+"no more than self-service" rather than describing hierarchy scope at all). GetEmployee returns
+one of two contracts depending on the caller's resolved scope:
+
+| Field group | Employee (self) | Manager (hierarchy) | HR Administrator |
+|---|---|---|---|
+| Identity, name, work email | Y | Y | Y |
+| Department / location / position / employment type | Y | Y | Y |
+| Manager / reports / reporting chain | Y | Y | Y |
+| Start date, employment status, employee number | Y | Y | Y |
+| Lifecycle tab flags (onboarding/probation/offboarding/leaving) | Y | Y | Y |
+| Personal email, phone numbers, home address | Y | — | Y |
+| Date of birth, nationality, gender | Y | — | Y |
+| System-access state, working-pattern overrides | Y | — | Y |
+| Leaving-process dates, notice period (raw + effective) | Y | — | Y |
+| HR notes | Y | — | Y |
+| Optimistic-concurrency version token | Y | — | Y |
+
+Implemented by `HR.Modules.Employees.Features.GetEmployee.GetEmployeeHandler`: the manager path
+returns `GetEmployeeManagerResponse`, a distinct, narrower response contract with no property for
+any row marked "—" above — the full record is never fetched-and-hidden client-side. Covered by
+`GetEmployeeHandlerTests.HandleAsync_Manager_Response_Contains_Only_Operational_Fields` (unit) and
+`GetEmployeeResourceAuthorizationTests.Manager_Response_Contains_Only_Operational_Fields_Over_The_Wire`
+(integration, asserts the actual JSON payload).
 
 UI visibility never substitutes for API authorization.
 

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
 
@@ -109,6 +110,68 @@ public class GetEmployeeResourceAuthorizationTests(ApiWebApplicationFactory fact
         var response = await reportClient.GetAsync($"/api/companies/{SeededCompanyId}/employees/{manager}");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Manager_Response_Contains_Only_Operational_Fields_Over_The_Wire()
+    {
+        // GetEmployee field-level access matrix (see 30-administrative-role-separation-matrix.md): assert on the actual JSON payload a manager receives,
+        // not just the HTTP status code — permitted operational fields must be present, and every
+        // sensitive field the ticket calls out (personal email, DOB, nationality/gender, home
+        // phone, home address, leaving-process detail, notice period, HR notes, system-access
+        // state) must be structurally absent from the response, not merely null.
+        var employee = await CreateEmployeeAsync();
+        var manager = await CreateEmployeeAsync();
+
+        using (var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true))
+            await AssignManagerAsync(setupClient, employee, manager);
+
+        using var managerClient = await AuthenticatedClient(manager);
+        var response = await managerClient.GetAsync($"/api/companies/{SeededCompanyId}/employees/{employee}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        string[] permittedFields =
+        [
+            "id", "companyId", "firstName", "lastName", "workEmail", "startDate", "status",
+            "employeeNumber", "employmentTypeId", "showOnboardingTab", "showProbationTab",
+            "showOffboardingTab", "showLeavingTab", "canStartLeavingProcess",
+        ];
+        foreach (var field in permittedFields)
+            Assert.True(json.TryGetProperty(field, out _), $"Expected permitted field '{field}' to be present.");
+
+        string[] restrictedFields =
+        [
+            "personalEmail", "dateOfBirth", "nationality", "gender", "genderOther",
+            "phoneNumber", "homePhone", "addressLine1", "addressLine2", "city", "county",
+            "postCode", "country", "hasSystemAccess", "workingDaysOverride", "hoursPerDayOverride",
+            "continuousServiceDate", "probationEndDate", "leavingDate", "noticePeriodUnitOverride",
+            "noticePeriodLengthOverride", "notes", "effectiveNoticePeriodUnit",
+            "effectiveNoticePeriodLength", "effectiveNoticePeriodSource", "version",
+        ];
+        foreach (var field in restrictedFields)
+            Assert.False(json.TryGetProperty(field, out _), $"Expected restricted field '{field}' to be absent.");
+    }
+
+    [Fact]
+    public async Task Hr_Response_Contains_Sensitive_Fields()
+    {
+        // The counterpart to the manager test above: HR Administrator access must still return
+        // the full administrative record, proving the restriction is scoped to manager access
+        // only, not applied globally.
+        var employee = await CreateEmployeeAsync();
+
+        using var hrClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true);
+        var response = await hrClient.GetAsync($"/api/companies/{SeededCompanyId}/employees/{employee}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        Assert.True(json.TryGetProperty("dateOfBirth", out _));
+        Assert.True(json.TryGetProperty("nationality", out _));
+        Assert.True(json.TryGetProperty("hasSystemAccess", out _));
+        Assert.True(json.TryGetProperty("notes", out _));
     }
 
     [Fact]

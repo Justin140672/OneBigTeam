@@ -52,7 +52,7 @@ Legend: Y = full access · S = scoped (hierarchy / self / function) · — = den
 | Employee directory — list | `employee:manage` | — | — | — | Y | **—** |
 | Employee analytics / scoped workflow summaries | `employee:read` | — | S | — | Y | **—** |
 | Employee administration — create / edit / promote / manager assignment / notes / leaving process | `employee:manage` (`employee.edit`) | — | — | — | Y | **—** |
-| Employee detail record (single) | `role:employee` + handler scope | Self | Self | Self | Y | Self only |
+| Employee detail record (single) | `role:employee` + `EmployeesResourceAuthorizer` (self / hierarchy / HR-admin) + field-level response contract | Self (full self-service fields) | Hierarchy — direct + indirect reports, **operational fields only** (see IAM-08 field matrix below; no personal contact/address/DOB/demographic data, leaving-process detail, notice period or HR notes) | Self only | Y (full record) | Self only |
 | Salary / compensation (view + edit + bulk + import) | `employee:manage` | — | — | — | Y | **—** |
 | Data import (org structure + employees) | `employee:manage` | — | — | — | Y | **—** |
 | User & role administration (invite, roles, overrides, position defaults, access review) | `users:view` / `users:manage` | — | — | — | Y | **—** |
