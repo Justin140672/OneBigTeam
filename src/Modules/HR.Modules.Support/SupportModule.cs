@@ -48,6 +48,9 @@ public static class SupportModule
         services.AddScoped<IValidator<AddSupportResponseRequest>, AddSupportResponseValidator>();
         services.AddScoped<GetSupportDashboardHandler>();
         services.AddScoped<SupportNotificationRetryJob>();
+        // Reliability review issue 4 (P1): durable retry for attachment blobs that failed
+        // best-effort delete during cleanup-on-failure.
+        services.AddScoped<Jobs.SupportAttachmentPendingDeletionRetryJob>();
         services.AddScoped<Jobs.IdempotencyMaintenanceJob>();
     }
 
@@ -56,6 +59,12 @@ public static class SupportModule
         var jobManager = app.Services.GetRequiredService<IRecurringJobManager>();
         jobManager.AddOrUpdate<SupportNotificationRetryJob>(
             "support-notification-retries",
+            job => job.ExecuteAsync(),
+            Cron.Hourly());
+        // Reliability review issue 4 (P1): sweep for orphaned attachment blobs that failed
+        // immediate best-effort deletion.
+        jobManager.AddOrUpdate<Jobs.SupportAttachmentPendingDeletionRetryJob>(
+            "support-attachment-pending-deletion-retries",
             job => job.ExecuteAsync(),
             Cron.Hourly());
         // Ticket 3 (P1) follow-up item 4: clean up expired idempotency records.

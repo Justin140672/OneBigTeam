@@ -36,4 +36,47 @@ internal static class TestFile
         collection.AddRange(files);
         return collection;
     }
+
+    /// <summary>Reliability review issue 4 (P1): a form file whose stream throws partway through
+    /// <c>CopyToAsync</c>, simulating a client disconnect / truncated upload mid-copy.</summary>
+    public static IFormFile CreateWithThrowingStream(
+        string fileName = "broken.png", string contentType = "image/png") =>
+        new ThrowingStreamFormFile(fileName, contentType);
+
+    private sealed class ThrowingStreamFormFile(string fileName, string contentType) : IFormFile
+    {
+        public string ContentType { get; set; } = contentType;
+        public string ContentDisposition { get; set; } = string.Empty;
+        public IHeaderDictionary Headers { get; set; } = new HeaderDictionary();
+        public long Length => 128;
+        public string Name => "Files";
+        public string FileName => fileName;
+
+        public Stream OpenReadStream() => new ThrowingStream();
+
+        public void CopyTo(Stream target) => throw new IOException("Simulated stream-copy failure.");
+
+        public Task CopyToAsync(Stream target, CancellationToken cancellationToken = default) =>
+            throw new IOException("Simulated stream-copy failure.");
+
+        private sealed class ThrowingStream : Stream
+        {
+            public override bool CanRead => true;
+            public override bool CanSeek => false;
+            public override bool CanWrite => false;
+            public override long Length => 128;
+            public override long Position { get; set; }
+
+            public override int Read(byte[] buffer, int offset, int count) =>
+                throw new IOException("Simulated stream-copy failure.");
+
+            public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) =>
+                throw new IOException("Simulated stream-copy failure.");
+
+            public override void Flush() { }
+            public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+            public override void SetLength(long value) => throw new NotSupportedException();
+            public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        }
+    }
 }

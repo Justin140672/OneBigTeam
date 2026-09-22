@@ -16,6 +16,7 @@ internal sealed class SupportDbContext : DbContext
     public DbSet<SupportResponse> SupportResponses => Set<SupportResponse>();
     public DbSet<SupportResponseAttachment> SupportResponseAttachments => Set<SupportResponseAttachment>();
     public DbSet<SupportNotificationAttempt> SupportNotificationAttempts => Set<SupportNotificationAttempt>();
+    public DbSet<SupportAttachmentPendingDeletion> SupportAttachmentPendingDeletions => Set<SupportAttachmentPendingDeletion>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

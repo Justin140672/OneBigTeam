@@ -6,8 +6,10 @@ using HR.Modules.Support.Domain;
 using HR.Modules.Support.Persistence;
 using HR.Modules.Support.Services;
 using HR.SharedKernel;
+using HR.SharedKernel.ExecutionContext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Support.Features.SubmitSupportRequest;
 
@@ -18,7 +20,9 @@ internal sealed class SubmitSupportRequestHandler(
     ISupportAttachmentValidator attachmentValidator,
     IUploadedFileScanner fileScanner,
     IEmailSender emailSender,
-    IConfiguration configuration)
+    IConfiguration configuration,
+    IExecutionContextAccessor executionContextAccessor,
+    ILogger<SubmitSupportRequestHandler> logger)
 {
     public async Task<Result<SubmitSupportRequestResponse>> HandleAsync(
         SubmitSupportRequestRequest request,
@@ -81,17 +85,21 @@ internal sealed class SubmitSupportRequestHandler(
 
         db.SupportRequests.Add(entity);
 
-        var uploadedKeys = new List<string>();
+        // Reliability review issue 4 (P1): every storage key acquired below is tracked in this
+        // ownership scope. Commit() is only called after persistence genuinely succeeds — any
+        // other exit (an early Result.Failure return, or an exception thrown from the copy/scan/
+        // upload/persist sequence, including a second file's upload failing) reaches
+        // DisposeAsync without a commit, guaranteeing cleanup regardless of which step failed.
+        await using var cleanupScope = new UploadedAttachmentCleanupScope(
+            attachmentStorage, db, clock, executionContextAccessor, logger);
+
         if (files.Count > 0)
         {
             var uploadResult = await UploadValidatedAttachmentsAsync(
-                files, request.CompanyId, entity.Id, uploadedKeys, cancellationToken);
+                files, request.CompanyId, entity.Id, cleanupScope, cancellationToken);
 
             if (!uploadResult.IsSuccess)
-            {
-                await CleanUpUploadedAsync(uploadedKeys, cancellationToken);
                 return Result.Failure<SubmitSupportRequestResponse>(uploadResult.Error);
-            }
 
             foreach (var (file, storageKey) in uploadResult.Value)
             {
@@ -101,17 +109,8 @@ internal sealed class SubmitSupportRequestHandler(
             }
         }
 
-        try
-        {
-            await db.SaveChangesAsync(cancellationToken);
-        }
-        catch
-        {
-            // Security review ticket 4 (P1): never leave orphaned attachment blobs behind when
-            // persistence fails after a successful upload.
-            await CleanUpUploadedAsync(uploadedKeys, cancellationToken);
-            throw;
-        }
+        await db.SaveChangesAsync(cancellationToken);
+        cleanupScope.Commit();
 
         await SendAdminNotificationAsync(entity, now, cancellationToken);
 
@@ -155,13 +154,17 @@ internal sealed class SubmitSupportRequestHandler(
     /// <summary>
     /// Security review ticket 4 (P1): signature-checks and virus-scans each file in memory before
     /// it is ever written to storage, then uploads it under a random (never filename-derived)
-    /// storage key. Aborts and returns the already-uploaded keys (for cleanup by the caller) the
-    /// moment any file fails signature verification, scanning, or upload — an infected/unscannable
-    /// file in a multi-file request means nothing from that request is exposed.
+    /// storage key. Aborts the moment any file fails signature verification, scanning, or upload —
+    /// an infected/unscannable file in a multi-file request means nothing from that request is
+    /// exposed. Reliability review issue 4 (P1): every uploaded key is tracked in
+    /// <paramref name="cleanupScope"/> immediately after upload, so a later file in the same batch
+    /// throwing (stream-copy error, upload transport error) or failing validation/scan still
+    /// results in the earlier files being cleaned up — the caller never needs its own try/catch for
+    /// this.
     /// </summary>
     private async Task<Result<List<(IFormFile File, string StorageKey)>>> UploadValidatedAttachmentsAsync(
         IReadOnlyList<IFormFile> files, Guid companyId, Guid supportRequestId,
-        List<string> uploadedKeys, CancellationToken cancellationToken)
+        UploadedAttachmentCleanupScope cleanupScope, CancellationToken cancellationToken)
     {
         var uploaded = new List<(IFormFile File, string StorageKey)>();
 
@@ -183,6 +186,14 @@ internal sealed class SubmitSupportRequestHandler(
             {
                 scanResult = await fileScanner.ScanAsync(buffer, file.FileName, cancellationToken);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // Reliability review issue 4 (P1): the caller's own cancellation must propagate as
+                // OperationCanceledException, not be swallowed into a generic "scan failed" Result
+                // — callers (and ASP.NET Core's request pipeline) rely on that type to distinguish
+                // "client went away" from a genuine business failure.
+                throw;
+            }
             catch
             {
                 // Fail closed: an unreachable/errored scanner must never let a file through
@@ -202,27 +213,11 @@ internal sealed class SubmitSupportRequestHandler(
                 buffer, file.FileName, file.ContentType,
                 $"support/{companyId}/{supportRequestId}", cancellationToken);
 
-            uploadedKeys.Add(storageKey);
+            cleanupScope.Track(storageKey);
             uploaded.Add((file, storageKey));
         }
 
         return Result.Success(uploaded);
-    }
-
-    private async Task CleanUpUploadedAsync(List<string> uploadedKeys, CancellationToken cancellationToken)
-    {
-        foreach (var key in uploadedKeys)
-        {
-            try
-            {
-                await attachmentStorage.DeleteAsync(key, cancellationToken);
-            }
-            catch
-            {
-                // Best-effort cleanup — the primary failure (validation/scan/persistence) is what
-                // gets returned to the caller; a cleanup failure here must not mask or replace it.
-            }
-        }
     }
 
     private async Task<string> GenerateUniqueReferenceNumberAsync(DateTimeOffset now, CancellationToken cancellationToken)

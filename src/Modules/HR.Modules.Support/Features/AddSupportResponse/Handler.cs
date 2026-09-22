@@ -3,8 +3,10 @@ using HR.Modules.Support.Domain;
 using HR.Modules.Support.Persistence;
 using HR.Modules.Support.Services;
 using HR.SharedKernel;
+using HR.SharedKernel.ExecutionContext;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Support.Features.AddSupportResponse;
 
@@ -15,7 +17,9 @@ internal sealed class AddSupportResponseHandler(
     ISupportAttachmentValidator attachmentValidator,
     IUploadedFileScanner fileScanner,
     IEmailSender emailSender,
-    IUserEmailReader userEmailReader)
+    IUserEmailReader userEmailReader,
+    IExecutionContextAccessor executionContextAccessor,
+    ILogger<AddSupportResponseHandler> logger)
 {
     public async Task<Result<AddSupportResponseResponse>> HandleAsync(
         AddSupportResponseRequest request,
@@ -51,17 +55,19 @@ internal sealed class AddSupportResponseHandler(
             Guid.NewGuid(), supportRequest.Id, request.CompanyId, authorUserId, isStaffResponse, request.BodyHtml, now);
         db.SupportResponses.Add(response);
 
-        var uploadedKeys = new List<string>();
+        // Reliability review issue 4 (P1): same ownership-scope guarantee as
+        // SubmitSupportRequestHandler — see its remarks for why this replaces the previous
+        // list-plus-manual-try/catch approach.
+        await using var cleanupScope = new UploadedAttachmentCleanupScope(
+            attachmentStorage, db, clock, executionContextAccessor, logger);
+
         if (files.Count > 0)
         {
             var uploadResult = await UploadValidatedAttachmentsAsync(
-                files, request.CompanyId, supportRequest.Id, response.Id, uploadedKeys, cancellationToken);
+                files, request.CompanyId, supportRequest.Id, response.Id, cleanupScope, cancellationToken);
 
             if (!uploadResult.IsSuccess)
-            {
-                await CleanUpUploadedAsync(uploadedKeys, cancellationToken);
                 return Result.Failure<AddSupportResponseResponse>(uploadResult.Error);
-            }
 
             foreach (var (file, storageKey) in uploadResult.Value)
             {
@@ -73,15 +79,8 @@ internal sealed class AddSupportResponseHandler(
 
         supportRequest.Touch(now);
 
-        try
-        {
-            await db.SaveChangesAsync(cancellationToken);
-        }
-        catch
-        {
-            await CleanUpUploadedAsync(uploadedKeys, cancellationToken);
-            throw;
-        }
+        await db.SaveChangesAsync(cancellationToken);
+        cleanupScope.Commit();
 
         if (isStaffResponse)
             await SendCustomerNotificationAsync(supportRequest, now, cancellationToken);
@@ -91,7 +90,7 @@ internal sealed class AddSupportResponseHandler(
 
     private async Task<Result<List<(IFormFile File, string StorageKey)>>> UploadValidatedAttachmentsAsync(
         IReadOnlyList<IFormFile> files, Guid companyId, Guid supportRequestId, Guid responseId,
-        List<string> uploadedKeys, CancellationToken cancellationToken)
+        UploadedAttachmentCleanupScope cleanupScope, CancellationToken cancellationToken)
     {
         var uploaded = new List<(IFormFile File, string StorageKey)>();
 
@@ -113,6 +112,12 @@ internal sealed class AddSupportResponseHandler(
             {
                 scanResult = await fileScanner.ScanAsync(buffer, file.FileName, cancellationToken);
             }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // Reliability review issue 4 (P1): see SubmitSupportRequestHandler's identical
+                // rationale — the caller's cancellation must propagate, not be swallowed.
+                throw;
+            }
             catch
             {
                 return Result.Failure<List<(IFormFile, string)>>(
@@ -130,26 +135,11 @@ internal sealed class AddSupportResponseHandler(
                 buffer, file.FileName, file.ContentType,
                 $"support/{companyId}/{supportRequestId}/responses/{responseId}", cancellationToken);
 
-            uploadedKeys.Add(storageKey);
+            cleanupScope.Track(storageKey);
             uploaded.Add((file, storageKey));
         }
 
         return Result.Success(uploaded);
-    }
-
-    private async Task CleanUpUploadedAsync(List<string> uploadedKeys, CancellationToken cancellationToken)
-    {
-        foreach (var key in uploadedKeys)
-        {
-            try
-            {
-                await attachmentStorage.DeleteAsync(key, cancellationToken);
-            }
-            catch
-            {
-                // Best-effort cleanup — see SubmitSupportRequestHandler's identical rationale.
-            }
-        }
     }
 
     private async Task SendCustomerNotificationAsync(SupportRequest supportRequest, DateTimeOffset now, CancellationToken cancellationToken)

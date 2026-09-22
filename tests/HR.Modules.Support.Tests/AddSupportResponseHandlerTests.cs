@@ -4,6 +4,7 @@ using HR.Modules.Support.Persistence;
 using HR.Modules.Support.Services;
 using HR.Modules.Support.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Support.Tests;
 
@@ -31,7 +32,8 @@ public class AddSupportResponseHandlerTests
         FakeUploadedFileScanner? fileScanner = null) =>
         new(db, new FakeClock(FixedUtcNow), storage ?? new FakeSupportAttachmentStorageService(),
             new SupportAttachmentValidator(), fileScanner ?? new FakeUploadedFileScanner(),
-            emailSender ?? new FakeEmailSender(), userEmailReader ?? new FakeUserEmailReader());
+            emailSender ?? new FakeEmailSender(), userEmailReader ?? new FakeUserEmailReader(),
+            Infrastructure.TestExecutionContext.Accessor, NullLogger<AddSupportResponseHandler>.Instance);
 
     [Fact]
     public async Task HandleAsync_Flags_Customer_Response_As_Not_Staff()
