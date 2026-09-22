@@ -1,0 +1,37 @@
+# gitleaks exact-fingerprint suppressions.
+#
+# Each entry below is a `commit:file:rule:line` fingerprint, never a secret value.
+# The gitleaks CLI matches on the fingerprint only, so this file suppresses exactly
+# the historical occurrence it names — the same value appearing in a new commit, a
+# new file, or a different line gets a different fingerprint and is NOT suppressed.
+#
+# Do not add a suppression here for a value that is still live. Every entry must be
+# either (a) a revoked/rotated credential with the incident it belongs to noted, or
+# (b) a synthetic test fixture value that was never a real credential.
+
+# --- PM-TOKEN-2026-09-INC1 (docs/incidents/2026-09-postmark-token-exposure.md) ---
+# Postmark ServerToken committed 28 Aug 2026, revoked 22 Sep 2026 (owner-confirmed
+# in the Postmark dashboard). These two fingerprints are the only places the raw
+# value ever appears in history; both are pinned to the exact commit + line so a
+# reintroduction anywhere else still fails the scan.
+4d6ea3c11bb59a5e07b8ac2920e4beefe1462915:docs/incidents/2026-09-postmark-token-exposure.md:generic-api-key:25
+e0b77ef83204d2f9a262a09018ff1d6139756bed:src/HR.Api/appsettings.json:generic-api-key:45
+# .gitleaks-baseline.json itself was committed at 98971d59 (removed from the tree in
+# this change, but full-history scans still walk that historical commit). It held
+# the same already-revoked PM-TOKEN-2026-09-INC1 value 3 times (Match/Secret fields
+# on two entries); covered by the same no-history-rewrite decision as the two
+# fingerprints above, since the value is inert post-revocation either way.
+98971d59a2f1758b61c7c7654109a0cb6727d372:.gitleaks-baseline.json:generic-api-key:9
+98971d59a2f1758b61c7c7654109a0cb6727d372:.gitleaks-baseline.json:generic-api-key:10
+98971d59a2f1758b61c7c7654109a0cb6727d372:.gitleaks-baseline.json:generic-api-key:31
+
+# --- Synthetic test fixtures (never real credentials) ---
+# xUnit constants deliberately shaped like a JWT / opaque token / idempotency key so
+# the tests they live in can assert that scrubbing/logging code never leaks the
+# real thing. None of these decode to real claims or point at a real Supabase
+# project; they exist only to look credential-shaped to a regex.
+c6d8938533ddd59124507385382a3f735feee822:tests/HR.Modules.Recruitment.Tests/ApplicationConcurrencyHandlerTests.cs:generic-api-key:521
+cbf81426121505c9886ac52705db25837a46b11c:tests/HR.Modules.Identity.Tests/SupabaseAuthGatewayEdgeCaseTests.cs:generic-api-key:225
+be45b672ee7aa27a937ae1d9327579663c1c9501:tests/HR.Modules.Identity.Tests/Infrastructure/FakeSupabaseAuthGateway.cs:generic-api-key:68
+be45b672ee7aa27a937ae1d9327579663c1c9501:tests/HR.Modules.Identity.Tests/SensitiveAuthLoggingTests.cs:jwt:25
+be45b672ee7aa27a937ae1d9327579663c1c9501:tests/HR.Modules.Identity.Tests/SupabaseAuthGatewayTests.cs:generic-api-key:180

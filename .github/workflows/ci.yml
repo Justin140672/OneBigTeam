@@ -38,16 +38,15 @@ jobs:
           fetch-depth: 0
 
       - name: gitleaks
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Baseline suppresses ONLY the two known, revoked fingerprints for
-          # PM-TOKEN-2026-09-INC1 (docs/incidents/2026-09-postmark-token-exposure.md
-          # and src/HR.Api/appsettings.json, both at commit-pinned locations from before
-          # the token was rotated on 2026-09-22). Any other finding — including the same
-          # value appearing in a new commit, or an unrelated secret anywhere in history —
-          # is NOT covered by this baseline and still fails the job.
-          GITLEAKS_BASELINE_PATH: .gitleaks-baseline.json
+          # No GITLEAKS_BASELINE_PATH here on purpose: a baseline file has to hold the
+          # raw secret's Match/Secret fields to be useful, which is exactly what
+          # committed .gitleaks-baseline.json (removed in this change). Suppressions
+          # instead live in .gitleaksignore at the repo root, which the gitleaks CLI
+          # reads automatically and which stores only fingerprints, never secret
+          # values. See .gitleaksignore for the exact, reviewed exceptions.
 
   # ------------------------------------------------------------------
   # Reproducible restore + dependency vulnerability gate (NFR-09).
