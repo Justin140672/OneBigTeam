@@ -137,7 +137,8 @@ public static class InfrastructureModule
 
         if (supabaseSection.Exists() && !string.IsNullOrWhiteSpace(supabaseSection["SupabaseUrl"]))
         {
-            services.Configure<SupabaseProfilePhotoStorageOptions>(supabaseSection);
+            services.AddOptions<SupabaseProfilePhotoStorageOptions>().Bind(supabaseSection).ValidateOnStart();
+            services.AddSingleton<IValidateOptions<SupabaseProfilePhotoStorageOptions>, SupabaseProfilePhotoStorageOptionsValidator>();
             services.AddHttpClient<IProfilePhotoStorageService, SupabaseProfilePhotoStorageService>();
         }
         else if (IsLocalStorageAllowedEnvironment(environment))
@@ -161,7 +162,8 @@ public static class InfrastructureModule
 
         if (supabaseSection.Exists() && !string.IsNullOrWhiteSpace(supabaseSection["SupabaseUrl"]))
         {
-            services.Configure<SupabaseSupportAttachmentStorageOptions>(supabaseSection);
+            services.AddOptions<SupabaseSupportAttachmentStorageOptions>().Bind(supabaseSection).ValidateOnStart();
+            services.AddSingleton<IValidateOptions<SupabaseSupportAttachmentStorageOptions>, SupabaseSupportAttachmentStorageOptionsValidator>();
             services.AddHttpClient<ISupportAttachmentStorageService, SupabaseSupportAttachmentStorageService>();
             services.AddHealthChecks().AddCheck<SupabaseSupportAttachmentStorageHealthCheck>(
                 "support-attachment-storage", tags: ["degraded"]);
@@ -187,7 +189,8 @@ public static class InfrastructureModule
 
         if (supabaseSection.Exists() && !string.IsNullOrWhiteSpace(supabaseSection["SupabaseUrl"]))
         {
-            services.Configure<SupabaseOrganisationDataExportStorageOptions>(supabaseSection);
+            services.AddOptions<SupabaseOrganisationDataExportStorageOptions>().Bind(supabaseSection).ValidateOnStart();
+            services.AddSingleton<IValidateOptions<SupabaseOrganisationDataExportStorageOptions>, SupabaseOrganisationDataExportStorageOptionsValidator>();
             services.AddHttpClient<IOrganisationDataExportStorage, SupabaseOrganisationDataExportStorage>();
             services.AddHealthChecks().AddCheck<SupabaseOrganisationDataExportStorageHealthCheck>(
                 "organisation-export-storage", tags: ["degraded"]);

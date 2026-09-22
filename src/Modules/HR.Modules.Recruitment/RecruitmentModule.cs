@@ -111,7 +111,8 @@ public static class RecruitmentModule
 
         if (supabaseSection.Exists() && !string.IsNullOrWhiteSpace(supabaseSection["SupabaseUrl"]))
         {
-            services.Configure<SupabaseCandidateDocumentStorageOptions>(supabaseSection);
+            services.AddOptions<SupabaseCandidateDocumentStorageOptions>().Bind(supabaseSection).ValidateOnStart();
+            services.AddSingleton<Microsoft.Extensions.Options.IValidateOptions<SupabaseCandidateDocumentStorageOptions>, SupabaseCandidateDocumentStorageOptionsValidator>();
             services.AddHttpClient<ICandidateDocumentStorageService, SupabaseCandidateDocumentStorageService>();
             services.AddHealthChecks().AddCheck<SupabaseCandidateDocumentStorageHealthCheck>(
                 "candidate-document-storage", tags: ["degraded"]);

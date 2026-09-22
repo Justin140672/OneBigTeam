@@ -132,7 +132,8 @@ public static class DocumentsModule
 
         if (hasClamAvConfig)
         {
-            services.Configure<ClamAvOptions>(clamAvSection);
+            services.AddOptions<ClamAvOptions>().Bind(clamAvSection).ValidateOnStart();
+            services.AddSingleton<Microsoft.Extensions.Options.IValidateOptions<ClamAvOptions>, ClamAvOptionsValidator>();
             services.AddScoped<IVirusScanService, ClamAvVirusScanService>();
             // Tags match the "ready"/"critical" convention used by every other dependency check
             // registered across the app (see HR.ServiceDefaults.HealthCheckEndpoints) — a module
@@ -162,7 +163,8 @@ public static class DocumentsModule
 
         if (supabaseSection.Exists() && !string.IsNullOrWhiteSpace(supabaseSection["SupabaseUrl"]))
         {
-            services.Configure<SupabaseStorageOptions>(supabaseSection);
+            services.AddOptions<SupabaseStorageOptions>().Bind(supabaseSection).ValidateOnStart();
+            services.AddSingleton<Microsoft.Extensions.Options.IValidateOptions<SupabaseStorageOptions>, SupabaseStorageOptionsValidator>();
             services.AddHttpClient<IDocumentStorageService, SupabaseDocumentStorageService>();
             services.AddHealthChecks().AddCheck<DocumentStorageHealthCheck>(
                 "document-storage", tags: ["degraded"]);

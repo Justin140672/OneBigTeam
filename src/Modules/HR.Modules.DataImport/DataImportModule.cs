@@ -87,7 +87,8 @@ public static class DataImportModule
 
         if (supabaseSection.Exists() && !string.IsNullOrWhiteSpace(supabaseSection["SupabaseUrl"]))
         {
-            services.Configure<Services.SupabaseImportFileStorageOptions>(supabaseSection);
+            services.AddOptions<Services.SupabaseImportFileStorageOptions>().Bind(supabaseSection).ValidateOnStart();
+            services.AddSingleton<Microsoft.Extensions.Options.IValidateOptions<Services.SupabaseImportFileStorageOptions>, Services.SupabaseImportFileStorageOptionsValidator>();
             services.AddHttpClient<IImportFileStorageService, Services.SupabaseImportFileStorageService>();
             services.AddHealthChecks().AddCheck<Services.SupabaseImportFileStorageHealthCheck>(
                 "import-file-storage", tags: ["degraded"]);
