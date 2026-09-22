@@ -1,4 +1,5 @@
 using HR.SharedKernel;
+using HR.SharedKernel.ExecutionContext;
 
 namespace HR.Modules.Identity.Domain;
 
@@ -77,6 +78,12 @@ internal sealed class AccountDisablement : IVersionedAggregate
     public string? LastRetryReason { get; private set; }
     public DateTimeOffset? LastRetriedAt { get; private set; }
 
+    // Ticket 23 (P2): durable correlation metadata, stamped from the ambient execution context at
+    // creation time - nullable so rows written before this migration remain fully usable.
+    public Guid? CorrelationId { get; private set; }
+    public Guid? CausationId { get; private set; }
+    public Guid? MessageId { get; private set; }
+
     public void IncrementVersion() => Version++;
 
     public static AccountDisablement CreatePending(
@@ -84,7 +91,8 @@ internal sealed class AccountDisablement : IVersionedAggregate
         Guid companyId,
         Guid applicationUserId,
         Guid employeeId,
-        DateTimeOffset requestedAt)
+        DateTimeOffset requestedAt,
+        IExecutionContext? executionContext = null)
     {
         return new AccountDisablement
         {
@@ -96,6 +104,9 @@ internal sealed class AccountDisablement : IVersionedAggregate
             AttemptCount = 0,
             RequestedAt = requestedAt,
             Version = 1,
+            CorrelationId = executionContext is null ? null : CorrelationIdGuid.Derive(executionContext.CorrelationId),
+            CausationId = executionContext?.MessageId,
+            MessageId = Guid.NewGuid(),
         };
     }
 

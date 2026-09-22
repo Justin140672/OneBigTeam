@@ -4,6 +4,7 @@ using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
 using HR.Modules.Identity.Services;
 using HR.SharedKernel;
+using HR.SharedKernel.ExecutionContext;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
@@ -22,7 +23,11 @@ namespace HR.Modules.Identity.Features.AcceptInvite;
 internal sealed class Endpoint(
     IdentityDbContext db,
     ISupabaseAuthGateway supabaseAuthGateway,
-    IClock clock) : Endpoint<AcceptInviteRequest, AcceptInviteResponse>
+    IClock clock,
+    // Ticket 23 (P2): reference wiring for Identity's invite-acceptance durable operation -
+    // optional so any direct/unit construction of this endpoint is unaffected; production DI
+    // (FastEndpoints) always supplies the real singleton.
+    IExecutionContextAccessor? executionContextAccessor = null) : Endpoint<AcceptInviteRequest, AcceptInviteResponse>
 {
     public override void Configure()
     {
@@ -83,7 +88,8 @@ internal sealed class Endpoint(
             if (operation is null)
             {
                 var candidate = InviteAcceptanceOperation.CreatePending(
-                    Guid.NewGuid(), invite.Id, invite.CompanyId, invite.EmployeeId, invite.Email, now);
+                    Guid.NewGuid(), invite.Id, invite.CompanyId, invite.EmployeeId, invite.Email, now,
+                    executionContextAccessor?.Current);
                 db.InviteAcceptanceOperations.Add(candidate);
 
                 try

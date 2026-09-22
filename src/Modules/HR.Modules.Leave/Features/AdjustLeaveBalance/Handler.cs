@@ -3,6 +3,7 @@ using HR.Modules.Leave.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.ExecutionContext;
 using HR.SharedKernel.Idempotency;
 using HR.SharedKernel.Outbox;
 using Microsoft.AspNetCore.Http;
@@ -24,7 +25,9 @@ internal sealed class AdjustLeaveBalanceHandler(
     // the event stays queued for the background IdempotencyMaintenanceJob.
     IAuditEventPublisher? auditPublisher = null,
     ILogger<AdjustLeaveBalanceHandler>? logger = null,
-    IPostCommitFaultInjector? postCommitFaultInjector = null)
+    IPostCommitFaultInjector? postCommitFaultInjector = null,
+    // Ticket 23 (P2): reference wiring for the Leave module - same optional-for-tests convention.
+    IExecutionContextAccessor? executionContextAccessor = null)
 {
     // Optional so the many existing handler-level unit tests that construct this handler directly
     // (with no interest in Ticket 3's fault-injection seam) don't all need updating for an unrelated
@@ -187,7 +190,7 @@ internal sealed class AdjustLeaveBalanceHandler(
             request.AdjustedByEmployeeId,
             now,
             AdjustmentHours: adjustmentHoursForRecord,
-            Reason: request.Reason.ToString()), request.CompanyId, now);
+            Reason: request.Reason.ToString()), request.CompanyId, now, executionContextAccessor);
 
         // Explicit transaction per ticket requirement, even though both writes share one DbContext/SaveChangesAsync.
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);

@@ -28,5 +28,10 @@ internal sealed class InviteAcceptanceOperationConfiguration : IEntityTypeConfig
         builder.Property(o => o.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(o => o.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(o => o.CompletedAt).HasColumnName("completed_at");
+
+        // Ticket 23 (P2): nullable so existing rows remain usable without a backfill.
+        builder.Property(o => o.CorrelationId).HasColumnName("correlation_id");
+        builder.Property(o => o.CausationId).HasColumnName("causation_id");
+        builder.Property(o => o.MessageId).HasColumnName("message_id");
     }
 }

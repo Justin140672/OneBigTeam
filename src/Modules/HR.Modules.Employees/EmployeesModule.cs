@@ -508,6 +508,9 @@ public static class EmployeesModule
             (49, "SeedConcurrencyAdmin", false), (50, "SeedConcurrencySelf", false),
             (51, "SeedContactSaveA", false), (52, "SeedContactSaveB", false),
             (53, "SeedContactSaveC", false), (54, "SeedContactSaveD", false),
+            (55, "SeedInviteA", false), (56, "SeedInviteB", false), (57, "SeedInviteC", false),
+            (58, "SeedInviteD", false), (59, "SeedInviteE", false), (60, "SeedInviteF", false),
+            (61, "SeedInviteG", false), (62, "SeedInviteH", false),
         };
 
         return Array.ConvertAll(defs, d => (

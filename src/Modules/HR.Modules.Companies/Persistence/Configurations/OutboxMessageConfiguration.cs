@@ -57,6 +57,11 @@ internal sealed class OutboxMessageConfiguration : IEntityTypeConfiguration<Outb
         builder.Property(message => message.FailedAt)
             .HasColumnName("failed_at");
 
+        // Ticket 23 (P2): nullable so existing rows remain usable without a backfill.
+        builder.Property(message => message.CorrelationId).HasColumnName("correlation_id");
+        builder.Property(message => message.CausationId).HasColumnName("causation_id");
+        builder.Property(message => message.MessageId).HasColumnName("message_id");
+
         builder.HasIndex(message => message.CompanyId);
 
         builder.HasIndex(message => new { message.Status, message.CreatedAt });

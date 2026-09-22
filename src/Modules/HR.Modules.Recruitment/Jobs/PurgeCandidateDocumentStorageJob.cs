@@ -4,6 +4,7 @@ using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Services;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
+using HR.SharedKernel.ExecutionContext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -46,7 +47,8 @@ internal sealed class PurgeCandidateDocumentStorageJob(
     ILegalHoldStatusReader legalHoldStatusReader,
     IAuditEventPublisher auditPublisher,
     IClock clock,
-    ILogger<PurgeCandidateDocumentStorageJob> logger)
+    ILogger<PurgeCandidateDocumentStorageJob> logger,
+    IExecutionContextAccessor? executionContextAccessor = null)
 {
     public const int MaxAttempts = 5;
 
@@ -77,6 +79,18 @@ internal sealed class PurgeCandidateDocumentStorageJob(
             return;
 
         var now = clock.UtcNowOffset();
+
+        // Ticket 23 (P2): restore the persisted correlation/causation/message ids for the duration
+        // of this resumed background work (Origin = ReconciliationJob), so the resulting suspend/
+        // completion audit events carry the SAME correlation id as the original purge request even
+        // after a process restart. Rows written before this migration (all-null metadata) fall back
+        // to a fresh root context.
+        var restoredContext = operation.CorrelationId is { } correlationId
+            ? ExecutionContextInfo.Restore(
+                correlationId.ToString("D"), operation.MessageId ?? Guid.NewGuid(), operation.CausationId,
+                ExecutionOrigin.ReconciliationJob)
+            : ExecutionContextInfo.NewRoot(ExecutionOrigin.ReconciliationJob);
+        using var _ = executionContextAccessor?.Push(restoredContext);
 
         // Ticket 18 (P1): checked immediately before the actual destructive delete, on every
         // attempt — not only at enqueue time. Ticket 19 (P2): deliberately checked BEFORE

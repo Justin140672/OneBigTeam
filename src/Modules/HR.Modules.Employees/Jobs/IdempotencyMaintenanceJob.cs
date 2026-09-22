@@ -1,6 +1,7 @@
 using Hangfire;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.ExecutionContext;
 using HR.SharedKernel.Idempotency;
 using HR.SharedKernel.Outbox;
 using Microsoft.Extensions.Logging;
@@ -18,16 +19,21 @@ internal sealed class IdempotencyMaintenanceJob(
     EmployeesDbContext dbContext,
     IAuditEventPublisher auditPublisher,
     IIntegrationEventPublisher integrationPublisher,
-    ILogger<IdempotencyMaintenanceJob> logger)
+    ILogger<IdempotencyMaintenanceJob> logger,
+    IExecutionContextAccessor executionContextAccessor)
 {
     [DisableConcurrentExecution(timeoutInSeconds: 300)]
     public async Task ExecuteAsync()
     {
         var now = DateTimeOffset.UtcNow;
 
+        // Ticket 23 (P2): this is the durable-redelivery / reconciliation path — DispatchPendingAsync
+        // restores each entry's persisted correlation/causation/message ids as the ambient execution
+        // context before invoking the publisher (Origin = ReconciliationJob), so a delayed retry after
+        // a process restart carries the same identity as when it was originally staged.
         await dbContext.DispatchPendingAsync(
             dbContext.AuditOutboxEntries, auditPublisher, now, IdempotencyCleanupExtensions.DefaultBatchSize,
-            logger, CancellationToken.None, integrationPublisher);
+            logger, CancellationToken.None, integrationPublisher, executionContextAccessor);
 
         await dbContext.IdempotencyRecords.CleanupExpiredIdempotencyRecordsWithLoggingAsync(
             now, logger, "Employees", CancellationToken.None);

@@ -5,6 +5,7 @@ using HR.Modules.Tasks.Jobs;
 using HR.Modules.Tasks.Persistence;
 using HR.Modules.Tasks.Services;
 using HR.SharedKernel;
+using HR.SharedKernel.ExecutionContext;
 using HR.SharedKernel.Idempotency;
 using HR.Infrastructure.Abstractions;
 using Microsoft.AspNetCore.Http;
@@ -21,7 +22,10 @@ internal sealed class CompleteTaskHandler(
     TaskCompletionDispatcher dispatcher,
     TasksResourceAuthorizer resourceAuthorizer,
     IBackgroundJobClient backgroundJobClient,
-    ILogger<CompleteTaskHandler> logger)
+    ILogger<CompleteTaskHandler> logger,
+    // Ticket 23 (P2): reference wiring for the Tasks module - optional so existing direct
+    // constructions in unit tests are unaffected; production DI always supplies the real singleton.
+    IExecutionContextAccessor? executionContextAccessor = null)
 {
     public async Task<Result<CompleteTaskResponse>> HandleAsync(
         CompleteTaskRequest request,
@@ -139,7 +143,8 @@ internal sealed class CompleteTaskHandler(
             {
                 operation = TaskCompletionOperation.CreatePending(
                     Guid.NewGuid(), task.CompanyId, task.Id, request.CompletedBy,
-                    request.OutcomeDecision, request.OutcomeReason, now);
+                    request.OutcomeDecision, request.OutcomeReason, now,
+                    executionContextAccessor?.Current);
                 dbContext.TaskCompletionOperations.Add(operation);
 
                 try

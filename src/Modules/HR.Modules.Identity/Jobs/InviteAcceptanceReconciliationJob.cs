@@ -3,6 +3,7 @@ using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
 using HR.Modules.Identity.Services;
 using HR.SharedKernel;
+using HR.SharedKernel.ExecutionContext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -44,7 +45,8 @@ internal sealed class InviteAcceptanceReconciliationJob(
     ISupabaseAuthGateway supabaseAuthGateway,
     IClock clock,
     IAuditEventPublisher auditEventPublisher,
-    ILogger<InviteAcceptanceReconciliationJob> logger)
+    ILogger<InviteAcceptanceReconciliationJob> logger,
+    IExecutionContextAccessor? executionContextAccessor = null)
 {
     /// <summary>
     /// An operation younger than this is assumed to still be a normal in-flight AcceptInvite call
@@ -65,6 +67,7 @@ internal sealed class InviteAcceptanceReconciliationJob(
 
         foreach (var operation in staleConfirmed)
         {
+            using var _ = executionContextAccessor?.Push(RestoreContextFor(operation));
             await ReconcileSupabaseConfirmedAsync(operation, now);
         }
 
@@ -74,9 +77,22 @@ internal sealed class InviteAcceptanceReconciliationJob(
 
         foreach (var operation in stalePending)
         {
+            using var _ = executionContextAccessor?.Push(RestoreContextFor(operation));
             await ReconcilePendingAsync(operation, now);
         }
     }
+
+    // Ticket 23 (P2): restores the persisted correlation/causation/message ids for the duration of
+    // reconciling ONE operation (Origin = ReconciliationJob), so the resulting
+    // Orphaned/Cancelled/Completed audit event carries the SAME correlation id as the original
+    // AcceptInvite request even after a process restart. Rows written before this migration
+    // (all-null metadata) fall back to a fresh root context rather than throwing.
+    private static IExecutionContext RestoreContextFor(InviteAcceptanceOperation operation) =>
+        operation.CorrelationId is { } correlationId
+            ? ExecutionContextInfo.Restore(
+                correlationId.ToString("D"), operation.MessageId ?? Guid.NewGuid(), operation.CausationId,
+                ExecutionOrigin.ReconciliationJob)
+            : ExecutionContextInfo.NewRoot(ExecutionOrigin.ReconciliationJob);
 
     private async Task ReconcileSupabaseConfirmedAsync(InviteAcceptanceOperation operation, DateTimeOffset now)
     {

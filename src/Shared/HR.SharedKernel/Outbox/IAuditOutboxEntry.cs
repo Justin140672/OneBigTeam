@@ -45,4 +45,21 @@ public interface IAuditOutboxEntry
 
     /// <summary>Set once <see cref="AttemptCount"/> exceeds the dispatcher's retry ceiling.</summary>
     bool IsTerminallyFailed { get; set; }
+
+    /// <summary>
+    /// Ticket 23 (P2): the workflow correlation id in effect when this entry was staged, captured
+    /// from the ambient execution context. Nullable so rows written before this column existed
+    /// remain dispatchable — see <see cref="DbSetAuditOutboxExtensions.DispatchPendingAsync{TEntry}"/>.
+    /// </summary>
+    Guid? CorrelationId { get; set; }
+
+    /// <summary>Ticket 23 (P2): the message id of the command/event that directly caused this one
+    /// to be staged, or null if this entry is a workflow root (e.g. staged directly from an HTTP
+    /// command handler with nothing ambient).</summary>
+    Guid? CausationId { get; set; }
+
+    /// <summary>Ticket 23 (P2): this entry's own stable message id — distinct from the deterministic
+    /// event id some events already carry for retry-deduplication (<c>IAuditEvent.EventId</c>,
+    /// left completely unchanged by this ticket).</summary>
+    Guid? MessageId { get; set; }
 }

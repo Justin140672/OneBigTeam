@@ -19,4 +19,7 @@ internal sealed class AuditOutboxEntry : IAuditOutboxEntry
     public DateTimeOffset? NextAttemptAt { get; set; }
     public string? LastError { get; set; }
     public bool IsTerminallyFailed { get; set; }
+    public Guid? CorrelationId { get; set; }
+    public Guid? CausationId { get; set; }
+    public Guid? MessageId { get; set; }
 }

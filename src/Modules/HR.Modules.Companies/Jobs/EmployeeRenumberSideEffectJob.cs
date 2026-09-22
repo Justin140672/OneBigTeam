@@ -2,6 +2,7 @@ using Hangfire;
 using HR.Modules.Companies.Persistence;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.ExecutionContext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -24,7 +25,8 @@ internal sealed class EmployeeRenumberSideEffectJob(
     CompaniesDbContext db,
     IEmployeeRenumberingService employeeRenumberingService,
     IClock clock,
-    ILogger<EmployeeRenumberSideEffectJob> logger)
+    ILogger<EmployeeRenumberSideEffectJob> logger,
+    IExecutionContextAccessor? executionContextAccessor = null)
 {
     public const int MaxAttempts = 4;
 
@@ -59,6 +61,18 @@ internal sealed class EmployeeRenumberSideEffectJob(
         var now = clock.UtcNowOffset();
         message.MarkProcessing(now);
         await db.SaveChangesAsync();
+
+        // Ticket 23 (P2): restore the persisted correlation/causation/message ids for the duration
+        // of this resumed background work (Origin = ReconciliationJob), so anything the renumbering
+        // service logs/audits downstream carries the SAME correlation id as the original settings
+        // change even after a process restart. Rows written before this migration (all-null
+        // metadata) fall back to a fresh root context.
+        var restoredContext = message.CorrelationId is { } correlationId
+            ? ExecutionContextInfo.Restore(
+                correlationId.ToString("D"), message.MessageId ?? Guid.NewGuid(), message.CausationId,
+                ExecutionOrigin.ReconciliationJob)
+            : ExecutionContextInfo.NewRoot(ExecutionOrigin.ReconciliationJob);
+        using var _ = executionContextAccessor?.Push(restoredContext);
 
         try
         {

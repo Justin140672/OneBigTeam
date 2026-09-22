@@ -1,3 +1,5 @@
+using HR.SharedKernel.ExecutionContext;
+
 namespace HR.Modules.Companies.Domain;
 
 /// <summary>
@@ -35,12 +37,19 @@ internal sealed class OutboxMessage
     public DateTimeOffset? ProcessedAt { get; private set; }
     public DateTimeOffset? FailedAt { get; private set; }
 
+    // Ticket 23 (P2): durable correlation metadata, stamped from the ambient execution context at
+    // creation time - nullable so rows written before this migration remain fully usable.
+    public Guid? CorrelationId { get; private set; }
+    public Guid? CausationId { get; private set; }
+    public Guid? MessageId { get; private set; }
+
     public static OutboxMessage CreatePending(
         Guid id,
         Guid companyId,
         string eventType,
         string payload,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        IExecutionContext? executionContext = null)
     {
         return new OutboxMessage
         {
@@ -51,6 +60,9 @@ internal sealed class OutboxMessage
             Status = StatusPending,
             AttemptCount = 0,
             CreatedAt = createdAt,
+            CorrelationId = executionContext is null ? null : CorrelationIdGuid.Derive(executionContext.CorrelationId),
+            CausationId = executionContext?.MessageId,
+            MessageId = Guid.NewGuid(),
         };
     }
 

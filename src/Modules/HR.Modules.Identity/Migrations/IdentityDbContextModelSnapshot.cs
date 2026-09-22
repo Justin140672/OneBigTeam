@@ -39,6 +39,10 @@ namespace HR.Modules.Identity.Migrations
                         .HasDefaultValue(0)
                         .HasColumnName("attempt_count");
 
+                    b.Property<Guid?>("CausationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("causation_id");
+
                     b.Property<Guid?>("ClaimedBy")
                         .HasColumnType("uuid")
                         .HasColumnName("claimed_by");
@@ -46,6 +50,10 @@ namespace HR.Modules.Identity.Migrations
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid")
                         .HasColumnName("company_id");
+
+                    b.Property<Guid?>("CorrelationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("correlation_id");
 
                     b.Property<Guid>("EmployeeId")
                         .HasColumnType("uuid")
@@ -82,6 +90,10 @@ namespace HR.Modules.Identity.Migrations
                     b.Property<DateTimeOffset?>("LeaseExpiresAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("lease_expires_at");
+
+                    b.Property<Guid?>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
 
                     b.Property<DateTimeOffset?>("ProcessedAt")
                         .HasColumnType("timestamp with time zone")
@@ -339,6 +351,10 @@ namespace HR.Modules.Identity.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid?>("CausationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("causation_id");
+
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid")
                         .HasColumnName("company_id");
@@ -346,6 +362,10 @@ namespace HR.Modules.Identity.Migrations
                     b.Property<DateTimeOffset?>("CompletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("completed_at");
+
+                    b.Property<Guid?>("CorrelationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("correlation_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -364,6 +384,10 @@ namespace HR.Modules.Identity.Migrations
                     b.Property<Guid>("InviteId")
                         .HasColumnType("uuid")
                         .HasColumnName("invite_id");
+
+                    b.Property<Guid?>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
 
                     b.Property<string>("Status")
                         .IsRequired()

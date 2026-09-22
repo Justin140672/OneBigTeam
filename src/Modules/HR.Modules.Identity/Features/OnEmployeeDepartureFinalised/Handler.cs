@@ -4,6 +4,7 @@ using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Jobs;
 using HR.Modules.Identity.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.ExecutionContext;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Features.OnEmployeeDepartureFinalised;
@@ -28,7 +29,13 @@ namespace HR.Modules.Identity.Features.OnEmployeeDepartureFinalised;
 internal sealed class Handler(
     IdentityDbContext db,
     IClock clock,
-    IBackgroundJobClient backgroundJobClient) : IIntegrationEventHandler<EmployeeDepartureFinalisedIntegrationEvent>
+    IBackgroundJobClient backgroundJobClient,
+    // Ticket 23 (P2): reference wiring for Identity - since this handler runs inside
+    // IntegrationEventPublisher's dispatch loop, executionContextAccessor.Current is already the
+    // CausedBy(...) context chained from EmployeeDepartureFinalisedIntegrationEvent's own envelope
+    // (same correlation id, causation id = that event's message id) with no extra plumbing needed.
+    IExecutionContextAccessor? executionContextAccessor = null)
+    : IIntegrationEventHandler<EmployeeDepartureFinalisedIntegrationEvent>
 {
     public async Task HandleAsync(
         EmployeeDepartureFinalisedIntegrationEvent integrationEvent,
@@ -67,7 +74,8 @@ internal sealed class Handler(
 
         var now = clock.UtcNow;
         var request = AccountDisablement.CreatePending(
-            Guid.NewGuid(), integrationEvent.CompanyId, accountId, integrationEvent.EmployeeId, now);
+            Guid.NewGuid(), integrationEvent.CompanyId, accountId, integrationEvent.EmployeeId, now,
+            executionContextAccessor?.Current);
 
         db.AccountDisablements.Add(request);
         await db.SaveChangesAsync(cancellationToken);

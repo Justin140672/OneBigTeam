@@ -4,6 +4,7 @@ using HR.Modules.Recruitment.Jobs;
 using HR.Modules.Recruitment.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
+using HR.SharedKernel.ExecutionContext;
 using HR.SharedKernel.Idempotency;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -27,7 +28,10 @@ internal sealed class PurgeEligibleCandidatesHandler(
     IAuditEventPublisher auditPublisher,
     ICompanyRecruitmentSettingsReader recruitmentSettingsReader,
     ILegalHoldStatusReader legalHoldStatusReader,
-    IBackgroundJobClient backgroundJobClient)
+    IBackgroundJobClient backgroundJobClient,
+    // Ticket 23 (P2): reference wiring for Recruitment - optional so existing direct unit-test
+    // constructions are unaffected; production DI always supplies the real singleton.
+    IExecutionContextAccessor? executionContextAccessor = null)
 {
     public async Task<Result<PurgeEligibleCandidatesResponse>> HandleAsync(
         PurgeEligibleCandidatesRequest request,
@@ -120,7 +124,8 @@ internal sealed class PurgeEligibleCandidatesHandler(
         // Jobs/PurgeCandidateDocumentStorageReconciliationJob.cs for the recovery sweep.
         var deletionOperations = documentsToPurge
             .Select(d => CandidateDocumentDeletionOperation.CreatePending(
-                Guid.NewGuid(), request.CompanyId, d.CandidateId, d.StorageKey, now))
+                Guid.NewGuid(), request.CompanyId, d.CandidateId, d.StorageKey, now,
+                executionContextAccessor?.Current))
             .ToList();
         db.CandidateDocumentDeletionOperations.AddRange(deletionOperations);
 

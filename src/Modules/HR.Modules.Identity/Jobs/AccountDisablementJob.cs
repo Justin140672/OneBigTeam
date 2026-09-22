@@ -1,6 +1,7 @@
 using Hangfire;
 using HR.Modules.Identity.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.ExecutionContext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -38,7 +39,8 @@ internal sealed class AccountDisablementJob(
     IdentityDbContext db,
     IClock clock,
     IAuditEventPublisher auditEventPublisher,
-    ILogger<AccountDisablementJob> logger)
+    ILogger<AccountDisablementJob> logger,
+    IExecutionContextAccessor? executionContextAccessor = null)
 {
     public const int MaxAttempts = 4;
 
@@ -118,6 +120,18 @@ internal sealed class AccountDisablementJob(
                 return;
             }
         }
+
+        // Ticket 23 (P2): restore the persisted correlation/causation/message ids for the duration
+        // of this resumed background work (Origin = ReconciliationJob) - a delayed retry or
+        // reconciliation-driven resumption after a process restart therefore publishes its audit
+        // events under the SAME correlation id the originating departure event carried. Rows
+        // written before this migration (all-null metadata) fall back to a fresh root context.
+        var restoredContext = request.CorrelationId is { } correlationId
+            ? ExecutionContextInfo.Restore(
+                correlationId.ToString("D"), request.MessageId ?? Guid.NewGuid(), request.CausationId,
+                ExecutionOrigin.ReconciliationJob)
+            : ExecutionContextInfo.NewRoot(ExecutionOrigin.ReconciliationJob);
+        using var _ = executionContextAccessor?.Push(restoredContext);
 
         try
         {

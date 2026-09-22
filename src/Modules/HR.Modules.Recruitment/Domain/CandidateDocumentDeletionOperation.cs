@@ -1,4 +1,5 @@
 using HR.SharedKernel;
+using HR.SharedKernel.ExecutionContext;
 
 namespace HR.Modules.Recruitment.Domain;
 
@@ -69,10 +70,17 @@ internal sealed class CandidateDocumentDeletionOperation : IVersionedAggregate
     public string? LastRetryReason { get; private set; }
     public DateTimeOffset? LastRetriedAt { get; private set; }
 
+    // Ticket 23 (P2): durable correlation metadata, stamped from the ambient execution context at
+    // creation time - nullable so rows written before this migration remain fully usable.
+    public Guid? CorrelationId { get; private set; }
+    public Guid? CausationId { get; private set; }
+    public Guid? MessageId { get; private set; }
+
     public void IncrementVersion() => Version++;
 
     public static CandidateDocumentDeletionOperation CreatePending(
-        Guid id, Guid companyId, Guid candidateId, string storageKey, DateTimeOffset now)
+        Guid id, Guid companyId, Guid candidateId, string storageKey, DateTimeOffset now,
+        IExecutionContext? executionContext = null)
     {
         return new CandidateDocumentDeletionOperation
         {
@@ -84,6 +92,9 @@ internal sealed class CandidateDocumentDeletionOperation : IVersionedAggregate
             AttemptCount = 0,
             CreatedAt = now,
             Version = 1,
+            CorrelationId = executionContext is null ? null : CorrelationIdGuid.Derive(executionContext.CorrelationId),
+            CausationId = executionContext?.MessageId,
+            MessageId = Guid.NewGuid(),
         };
     }
 

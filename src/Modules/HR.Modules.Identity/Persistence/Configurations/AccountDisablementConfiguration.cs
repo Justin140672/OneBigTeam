@@ -79,6 +79,11 @@ internal sealed class AccountDisablementConfiguration : IEntityTypeConfiguration
         builder.Property(d => d.LastRetriedAt)
             .HasColumnName("last_retried_at");
 
+        // Ticket 23 (P2): nullable so existing rows remain usable without a backfill.
+        builder.Property(d => d.CorrelationId).HasColumnName("correlation_id");
+        builder.Property(d => d.CausationId).HasColumnName("causation_id");
+        builder.Property(d => d.MessageId).HasColumnName("message_id");
+
         builder.HasIndex(d => d.CompanyId);
         builder.HasIndex(d => new { d.Status, d.RequestedAt });
 

@@ -18,7 +18,7 @@ namespace HR.Modules.Tasks.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("tasks")
-                .HasAnnotation("ProductVersion", "10.0.11")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -33,6 +33,10 @@ namespace HR.Modules.Tasks.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("attempt_count");
 
+                    b.Property<Guid?>("CausationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("causation_id");
+
                     b.Property<Guid?>("ClaimedBy")
                         .HasColumnType("uuid")
                         .HasColumnName("claimed_by");
@@ -44,6 +48,10 @@ namespace HR.Modules.Tasks.Persistence.Migrations
                     b.Property<Guid>("CompletedBy")
                         .HasColumnType("uuid")
                         .HasColumnName("completed_by");
+
+                    b.Property<Guid?>("CorrelationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("correlation_id");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -61,6 +69,10 @@ namespace HR.Modules.Tasks.Persistence.Migrations
                     b.Property<DateTimeOffset?>("LeaseExpiresAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("lease_expires_at");
+
+                    b.Property<Guid?>("MessageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("message_id");
 
                     b.Property<string>("OutcomeDecision")
                         .HasMaxLength(200)

@@ -1,4 +1,5 @@
 using HR.SharedKernel;
+using HR.SharedKernel.ExecutionContext;
 
 namespace HR.Modules.Tasks.Domain;
 
@@ -63,6 +64,12 @@ internal sealed class TaskCompletionOperation : IVersionedAggregate
     public Guid? ClaimedBy { get; private set; }
     public DateTimeOffset? LeaseExpiresAt { get; private set; }
 
+    // Ticket 23 (P2): durable correlation metadata, stamped from the ambient execution context at
+    // creation time - nullable so rows written before this migration remain fully usable.
+    public Guid? CorrelationId { get; private set; }
+    public Guid? CausationId { get; private set; }
+    public Guid? MessageId { get; private set; }
+
     public void IncrementVersion() => Version++;
 
     public static TaskCompletionOperation CreatePending(
@@ -72,7 +79,8 @@ internal sealed class TaskCompletionOperation : IVersionedAggregate
         Guid completedBy,
         string? outcomeDecision,
         string? outcomeReason,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        IExecutionContext? executionContext = null)
     {
         return new TaskCompletionOperation
         {
@@ -86,6 +94,9 @@ internal sealed class TaskCompletionOperation : IVersionedAggregate
             AttemptCount = 0,
             CreatedAt = now,
             Version = 1,
+            CorrelationId = executionContext is null ? null : CorrelationIdGuid.Derive(executionContext.CorrelationId),
+            CausationId = executionContext?.MessageId,
+            MessageId = Guid.NewGuid(),
         };
     }
 

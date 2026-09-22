@@ -4,6 +4,7 @@ using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
+using HR.SharedKernel.ExecutionContext;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Companies.Features.UpdateCompanySettings;
@@ -14,17 +15,22 @@ internal sealed class UpdateCompanySettingsHandler
 	private readonly IClock _clock;
 	private readonly IAuditEventPublisher _auditEventPublisher;
 	private readonly ICurrentUser _currentUser;
+	private readonly IExecutionContextAccessor? _executionContextAccessor;
 
 	public UpdateCompanySettingsHandler(
 		CompaniesDbContext dbContext,
 		IClock clock,
 		IAuditEventPublisher auditEventPublisher,
-		ICurrentUser currentUser)
+		ICurrentUser currentUser,
+		// Ticket 23 (P2): reference wiring for Companies - optional so existing direct unit-test
+		// constructions are unaffected; production DI always supplies the real singleton.
+		IExecutionContextAccessor? executionContextAccessor = null)
 	{
 		_dbContext = dbContext;
 		_clock = clock;
 		_auditEventPublisher = auditEventPublisher;
 		_currentUser = currentUser;
+		_executionContextAccessor = executionContextAccessor;
 	}
 
 	public async Task<Result<UpdateCompanySettingsResponse>> HandleAsync(
@@ -87,7 +93,8 @@ internal sealed class UpdateCompanySettingsHandler
 			company.Id,
 			"companies.company-settings.updated",
 			payload,
-			now);
+			now,
+			_executionContextAccessor?.Current);
 
 		_dbContext.OutboxMessages.Add(outboxMessage);
 

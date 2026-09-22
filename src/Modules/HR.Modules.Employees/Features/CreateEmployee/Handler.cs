@@ -6,6 +6,7 @@ using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.ExecutionContext;
 using HR.SharedKernel.Idempotency;
 using HR.SharedKernel.Outbox;
 using Microsoft.AspNetCore.Http;
@@ -25,6 +26,7 @@ internal sealed class CreateEmployeeHandler
     private readonly IAuditEventPublisher? _auditPublisher;
     private readonly IIntegrationEventPublisher? _integrationPublisher;
     private readonly ILogger<CreateEmployeeHandler>? _logger;
+    private readonly IExecutionContextAccessor? _executionContextAccessor;
 
     public CreateEmployeeHandler(
         EmployeesDbContext dbContext,
@@ -40,7 +42,12 @@ internal sealed class CreateEmployeeHandler
         // simply skipped and the event stays queued for the background IdempotencyMaintenanceJob.
         IAuditEventPublisher? auditPublisher = null,
         IIntegrationEventPublisher? integrationPublisher = null,
-        ILogger<CreateEmployeeHandler>? logger = null)
+        ILogger<CreateEmployeeHandler>? logger = null,
+        // Ticket 23 (P2): reference-implementation module for correlation/causation propagation.
+        // Optional for the same reason as the publishers above — when absent, EnqueueIntegrationOutbox
+        // simply stamps no metadata (existing behaviour), rather than requiring every unit test to
+        // supply one.
+        IExecutionContextAccessor? executionContextAccessor = null)
     {
         _dbContext = dbContext;
         _clock = clock;
@@ -51,6 +58,7 @@ internal sealed class CreateEmployeeHandler
         _auditPublisher = auditPublisher;
         _integrationPublisher = integrationPublisher;
         _logger = logger;
+        _executionContextAccessor = executionContextAccessor;
     }
 
     public async Task<Result<CreateEmployeeResponse>> HandleAsync(
@@ -363,7 +371,7 @@ internal sealed class CreateEmployeeHandler
             new EmployeeCreatedIntegrationEvent(
                 employee.CompanyId, employee.Id, employee.StartDate, employee.ManagerId, probationEndDate,
                 employee.PositionProfileId, positionProfile?.DefaultLeavePolicyId),
-            request.CompanyId, now);
+            request.CompanyId, now, _executionContextAccessor);
 
         try
         {
@@ -430,7 +438,7 @@ internal sealed class CreateEmployeeHandler
             {
                 await _dbContext.DispatchPendingAsync(
                     _dbContext.AuditOutboxEntries, _auditPublisher, now, IdempotencyCleanupExtensions.DefaultBatchSize,
-                    _logger, cancellationToken, _integrationPublisher);
+                    _logger, cancellationToken, _integrationPublisher, _executionContextAccessor);
             }
             catch (Exception exception)
             {

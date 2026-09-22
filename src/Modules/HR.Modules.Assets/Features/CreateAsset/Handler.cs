@@ -2,6 +2,7 @@ using HR.Modules.Assets.Domain;
 using HR.Modules.Assets.Persistence;
 using HR.Modules.Companies.Contracts;
 using HR.SharedKernel;
+using HR.SharedKernel.ExecutionContext;
 using HR.SharedKernel.Idempotency;
 using HR.SharedKernel.Outbox;
 using Microsoft.AspNetCore.Http;
@@ -22,7 +23,10 @@ internal sealed class CreateAssetHandler(
     // the event stays queued for the background IdempotencyMaintenanceJob.
     IAuditEventPublisher? auditPublisher = null,
     ILogger<CreateAssetHandler>? logger = null,
-    IPostCommitFaultInjector? postCommitFaultInjector = null)
+    IPostCommitFaultInjector? postCommitFaultInjector = null,
+    // Ticket 23 (P2): reference wiring for the Assets module - same optional-for-tests convention
+    // as the publishers above.
+    IExecutionContextAccessor? executionContextAccessor = null)
 {
     // Optional so the many existing handler-level unit tests that construct this handler directly
     // (with no interest in Ticket 3's fault-injection seam) don't all need updating for an unrelated
@@ -148,7 +152,7 @@ internal sealed class CreateAssetHandler(
             entity.AssetNumber,
             entity.Name,
             request.ActorId,
-            now), request.CompanyId, now);
+            now), request.CompanyId, now, executionContextAccessor);
 
         // Ticket 3 (P1) final gap item 6: no-op in production. Lets an integration test simulate a
         // failure BEFORE this save commits (so nothing is persisted, including no asset number

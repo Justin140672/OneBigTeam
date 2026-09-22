@@ -29,6 +29,12 @@ public sealed class AuditOutboxEntryConfiguration<TEntry> : IEntityTypeConfigura
         builder.Property(e => e.LastError).HasColumnName("last_error").HasMaxLength(2000);
         builder.Property(e => e.IsTerminallyFailed).HasColumnName("is_terminally_failed");
 
+        // Ticket 23 (P2): nullable so existing rows (written before this migration) remain
+        // dispatchable without a backfill - see DbSetAuditOutboxExtensions.
+        builder.Property(e => e.CorrelationId).HasColumnName("correlation_id");
+        builder.Property(e => e.CausationId).HasColumnName("causation_id");
+        builder.Property(e => e.MessageId).HasColumnName("message_id");
+
         // The dispatcher scans for undelivered, due entries - an index starting with the highly
         // selective primary key would not help that query.
         builder.HasIndex(e => new { e.DispatchedAt, e.NextAttemptAt })

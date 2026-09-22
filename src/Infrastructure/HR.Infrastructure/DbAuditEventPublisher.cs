@@ -1,5 +1,6 @@
 using HR.Infrastructure.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.ExecutionContext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -20,7 +21,8 @@ namespace HR.Infrastructure;
 /// </summary>
 internal sealed class DbAuditEventPublisher(
     AuditDbContext context,
-    ILogger<DbAuditEventPublisher> logger) : IAuditEventPublisher
+    ILogger<DbAuditEventPublisher> logger,
+    IExecutionContextAccessor executionContextAccessor) : IAuditEventPublisher
 {
     public async Task PublishAsync<TAuditEvent>(TAuditEvent auditEvent, CancellationToken cancellationToken)
     {
@@ -29,6 +31,25 @@ internal sealed class DbAuditEventPublisher(
 
         try
         {
+            // Ticket 23 (P2) follow-up: a central "default the ambient correlation id onto every
+            // audit event" was tried here and REVERTED — HR.Modules.Employees.Features.
+            // GetEmployeeAuditHistory.Handler.MergeCorrelatedItems already repurposes
+            // IAuditEvent.CorrelationId as a narrow, explicit merge key shared deliberately between
+            // exactly two coordinated requests (the combined Employee+Employment tab save). Defaulting
+            // every audit event published within the same HTTP request to the SAME ambient
+            // correlation id made every unrelated audit row from that request (task creation,
+            // notifications, offboarding-plan start, ...) look like part of that same merge group,
+            // silently collapsing them into one displayed item — a real, reproduced regression
+            // (LeavingProcessLifecycleEndToEndTests). Technical per-request correlation still flows
+            // through request logs (Serilog), integration-event causation chaining
+            // (ExecutionContext/MessageEnvelope), and the durable outbox/operation tables' dedicated
+            // correlation_id/causation_id/message_id columns (separate from IAuditEvent.CorrelationId
+            // and never read by this merge feature) — only the direct, synchronous
+            // IAuditEventPublisher.PublishAsync path intentionally does NOT also default this field,
+            // to avoid corrupting the pre-existing merge semantics. See CorrelationIdGuid for the
+            // string -> Guid mapping still used by the outbox/operation paths.
+            _ = executionContextAccessor; // retained for future scoped use (see remarks above)
+
             // AUD-03 / AUD-04 / NFR-01: payload and actor validation happen here so a rejected
             // event is logged and dropped without ever surfacing to (or failing) the business
             // operation that raised it. Sensitive values must simply never be persisted.

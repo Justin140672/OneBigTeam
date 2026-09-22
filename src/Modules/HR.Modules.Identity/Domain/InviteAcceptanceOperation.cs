@@ -1,3 +1,5 @@
+using HR.SharedKernel.ExecutionContext;
+
 namespace HR.Modules.Identity.Domain;
 
 /// <summary>
@@ -61,8 +63,15 @@ internal sealed class InviteAcceptanceOperation
     public DateTimeOffset UpdatedAt { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
 
+    // Ticket 23 (P2): durable correlation metadata, stamped from the ambient execution context at
+    // creation time - nullable so rows written before this migration remain fully usable.
+    public Guid? CorrelationId { get; private set; }
+    public Guid? CausationId { get; private set; }
+    public Guid? MessageId { get; private set; }
+
     public static InviteAcceptanceOperation CreatePending(
-        Guid id, Guid inviteId, Guid companyId, Guid employeeId, string email, DateTimeOffset now)
+        Guid id, Guid inviteId, Guid companyId, Guid employeeId, string email, DateTimeOffset now,
+        IExecutionContext? executionContext = null)
     {
         return new InviteAcceptanceOperation
         {
@@ -74,6 +83,9 @@ internal sealed class InviteAcceptanceOperation
             Status = StatusPending,
             CreatedAt = now,
             UpdatedAt = now,
+            CorrelationId = executionContext is null ? null : CorrelationIdGuid.Derive(executionContext.CorrelationId),
+            CausationId = executionContext?.MessageId,
+            MessageId = Guid.NewGuid(),
         };
     }
 

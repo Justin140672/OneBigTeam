@@ -42,6 +42,11 @@ internal sealed class CandidateDocumentDeletionOperationConfiguration
         builder.Property(o => o.LastRetryReason).HasColumnName("last_retry_reason").HasMaxLength(500);
         builder.Property(o => o.LastRetriedAt).HasColumnName("last_retried_at");
 
+        // Ticket 23 (P2): nullable so existing rows remain usable without a backfill.
+        builder.Property(o => o.CorrelationId).HasColumnName("correlation_id");
+        builder.Property(o => o.CausationId).HasColumnName("causation_id");
+        builder.Property(o => o.MessageId).HasColumnName("message_id");
+
         builder.HasIndex(o => o.CandidateId);
         builder.HasIndex(o => new { o.CompanyId, o.Status });
     }

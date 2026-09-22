@@ -33,6 +33,11 @@ internal sealed class TaskCompletionOperationConfiguration : IEntityTypeConfigur
         builder.Property(o => o.ClaimedBy).HasColumnName("claimed_by");
         builder.Property(o => o.LeaseExpiresAt).HasColumnName("lease_expires_at");
 
+        // Ticket 23 (P2): nullable so existing rows remain usable without a backfill.
+        builder.Property(o => o.CorrelationId).HasColumnName("correlation_id");
+        builder.Property(o => o.CausationId).HasColumnName("causation_id");
+        builder.Property(o => o.MessageId).HasColumnName("message_id");
+
         builder.HasIndex(o => o.TaskId);
         builder.HasIndex(o => new { o.CompanyId, o.Status });
 

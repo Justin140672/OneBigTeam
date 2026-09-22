@@ -2,6 +2,7 @@ using Hangfire;
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.ExecutionContext;
 using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -29,7 +30,8 @@ internal sealed class TaskCompletionEffectsJob(
     INotificationWriter notificationWriter,
     IClock clock,
     IAuditEventPublisher auditPublisher,
-    ILogger<TaskCompletionEffectsJob> logger)
+    ILogger<TaskCompletionEffectsJob> logger,
+    IExecutionContextAccessor? executionContextAccessor = null)
 {
     public const int MaxAttempts = 4;
 
@@ -71,6 +73,19 @@ internal sealed class TaskCompletionEffectsJob(
         var now = clock.UtcNowOffset();
         operation.RecordAttempt(now);
         await dbContext.SaveChangesAsync();
+
+        // Ticket 23 (P2): restore the persisted correlation/causation/message ids for the duration
+        // of this resumed background work (Origin = ReconciliationJob), so the resulting audit event
+        // carries the SAME correlation id as the original CompleteTask request even after a process
+        // restart between the original attempt and this retry. Rows written before this migration
+        // (all-null metadata) fall back to a fresh root context rather than throwing.
+        var restoredContext = operation.CorrelationId is { } correlationId
+            ? ExecutionContextInfo.Restore(
+                correlationId.ToString("D"), operation.MessageId ?? Guid.NewGuid(), operation.CausationId,
+                ExecutionOrigin.ReconciliationJob)
+            : ExecutionContextInfo.NewRoot(ExecutionOrigin.ReconciliationJob);
+
+        using var _ = executionContextAccessor?.Push(restoredContext);
 
         try
         {

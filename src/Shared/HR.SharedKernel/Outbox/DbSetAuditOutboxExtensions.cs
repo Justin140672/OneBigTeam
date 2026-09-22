@@ -1,4 +1,5 @@
 using System.Text.Json;
+using HR.SharedKernel.ExecutionContext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -21,9 +22,10 @@ public static class DbSetAuditOutboxExtensions
         this DbSet<TEntry> outbox,
         TAuditEvent auditEvent,
         Guid companyId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        IExecutionContextAccessor? executionContextAccessor = null)
         where TEntry : class, IAuditOutboxEntry, new() =>
-        Enqueue(outbox, OutboxChannel.Audit, auditEvent, companyId, now);
+        Enqueue(outbox, OutboxChannel.Audit, auditEvent, companyId, now, executionContextAccessor);
 
     /// <summary>
     /// Stages an outbox entry for <paramref name="integrationEvent"/> - call this instead of
@@ -35,14 +37,25 @@ public static class DbSetAuditOutboxExtensions
         this DbSet<TEntry> outbox,
         TIntegrationEvent integrationEvent,
         Guid companyId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        IExecutionContextAccessor? executionContextAccessor = null)
         where TEntry : class, IAuditOutboxEntry, new() =>
-        Enqueue(outbox, OutboxChannel.Integration, integrationEvent, companyId, now);
+        Enqueue(outbox, OutboxChannel.Integration, integrationEvent, companyId, now, executionContextAccessor);
 
     private static void Enqueue<TEntry, TEvent>(
-        DbSet<TEntry> outbox, string channel, TEvent @event, Guid companyId, DateTimeOffset now)
+        DbSet<TEntry> outbox, string channel, TEvent @event, Guid companyId, DateTimeOffset now,
+        IExecutionContextAccessor? executionContextAccessor)
         where TEntry : class, IAuditOutboxEntry, new()
     {
+        // Ticket 23 (P2): capture whatever execution context is ambient right now (the HTTP request
+        // or integration-event handler that is staging this entry) so durable redelivery after a
+        // crash/restart can restore the same correlation/causation identity rather than inventing a
+        // new one. Rows staged with nothing ambient (e.g. a very old call site, or a context genuinely
+        // not yet established) simply get a fresh MessageId and null Correlation/CausationId -
+        // callers are never required to pass metadata explicitly, satisfying the "avoid manually
+        // adding correlation params to every event constructor" guardrail.
+        var ambient = executionContextAccessor?.Current;
+
         outbox.Add(new TEntry
         {
             Id = Guid.NewGuid(),
@@ -51,6 +64,9 @@ public static class DbSetAuditOutboxExtensions
             PayloadJson = JsonSerializer.Serialize(@event),
             CompanyId = companyId,
             CreatedAt = now,
+            CorrelationId = ambient is null ? null : CorrelationIdGuid.Derive(ambient.CorrelationId),
+            CausationId = ambient?.MessageId,
+            MessageId = Guid.NewGuid(),
         });
     }
 
@@ -73,7 +89,8 @@ public static class DbSetAuditOutboxExtensions
         int batchSize,
         ILogger logger,
         CancellationToken cancellationToken,
-        IIntegrationEventPublisher? integrationPublisher = null)
+        IIntegrationEventPublisher? integrationPublisher = null,
+        IExecutionContextAccessor? executionContextAccessor = null)
         where TEntry : class, IAuditOutboxEntry
     {
         var pending = await outbox
@@ -108,7 +125,24 @@ public static class DbSetAuditOutboxExtensions
                 var publishMethod = target.Contract.GetMethod(nameof(IAuditEventPublisher.PublishAsync))!
                     .MakeGenericMethod(eventType);
 
-                await (Task)publishMethod.Invoke(target.Publisher, [payload, cancellationToken])!;
+                // Ticket 23 (P2): restore the persisted metadata as the ambient execution context for
+                // the duration of this redelivery (background job / reconciliation, possibly after a
+                // process restart) - a retry of the same row therefore keeps its original
+                // message/correlation/causation ids rather than being assigned fresh ones. Rows
+                // written before these columns existed (all null) fall back to a fresh root context
+                // rather than throwing, so they remain dispatchable.
+                var restoredContext = entry.CorrelationId is { } correlationId
+                    ? ExecutionContextInfo.Restore(
+                        correlationId.ToString("D"),
+                        entry.MessageId ?? Guid.NewGuid(),
+                        entry.CausationId,
+                        ExecutionOrigin.ReconciliationJob)
+                    : ExecutionContextInfo.NewRoot(ExecutionOrigin.ReconciliationJob);
+
+                using (executionContextAccessor?.Push(restoredContext))
+                {
+                    await (Task)publishMethod.Invoke(target.Publisher, [payload, cancellationToken])!;
+                }
 
                 entry.DispatchedAt = now;
                 entry.LastError = null;
