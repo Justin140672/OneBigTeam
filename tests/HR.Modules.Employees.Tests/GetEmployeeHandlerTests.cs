@@ -13,17 +13,31 @@ public class GetEmployeeHandlerTests
     private static readonly DateTime FixedUtcNow = new(2026, 6, 8, 10, 0, 0, DateTimeKind.Utc);
     private static readonly DateOnly StartDate = new(2026, 7, 1);
 
+    // Mirrors HR.Modules.Identity.Domain.SystemRoles.HrAdministrator — Employees cannot
+    // reference Identity's internal SystemRoles directly (see EmployeesResourceAuthorizer).
+    private static readonly Guid HrAdministratorRoleId = new("00000000-0000-0000-0000-000000000004");
+
+    // Authorization is not the subject of most of these tests, so BuildHandler defaults to an
+    // HR-Administrator-role authorizer (company-wide access, regardless of caller/target ids) —
+    // callers exercising the resource-authorization behaviour itself pass their own
+    // EmployeesResourceAuthorizer built from FakeRoleAuthorizationService/FakeDirectReportsReader
+    // instead (see the "Resource authorization" tests below).
+    private static EmployeesResourceAuthorizer AlwaysAuthorizedAuthorizer() =>
+        new(new FakeRoleAuthorizationService(HrAdministratorRoleId), new FakeDirectReportsReader());
+
     private static GetEmployeeHandler BuildHandler(
         EmployeesDbContext context,
         OnboardingStatusSummary? onboardingStatus = null,
         ProbationStatusSummary? probationStatus = null,
         OffboardingStatusSummary? offboardingStatus = null,
-        IEffectiveNoticePeriodResolver? effectiveNoticePeriodResolver = null) =>
+        IEffectiveNoticePeriodResolver? effectiveNoticePeriodResolver = null,
+        EmployeesResourceAuthorizer? resourceAuthorizer = null) =>
         new(context,
             new FakeOnboardingStatusReader(onboardingStatus),
             new FakeProbationStatusReader(probationStatus),
             new FakeOffboardingStatusReader(offboardingStatus),
-            effectiveNoticePeriodResolver ?? new FakeEffectiveNoticePeriodResolver());
+            effectiveNoticePeriodResolver ?? new FakeEffectiveNoticePeriodResolver(),
+            resourceAuthorizer ?? AlwaysAuthorizedAuthorizer());
 
     [Fact]
     public async Task HandleAsync_Returns_Employee_When_Found()
@@ -50,6 +64,87 @@ public class GetEmployeeHandlerTests
         Assert.Equal("alice@example.com", result.Value.WorkEmail);
         Assert.Equal(StartDate, result.Value.StartDate);
         Assert.Equal(EmploymentStatus.Draft, result.Value.Status);
+    }
+
+    // ── Resource authorization ───────────────────────────────────────────────────
+    // The employee data query/response-building above is only reached once
+    // EmployeesResourceAuthorizer.CanViewAsync has authorized the caller — these tests prove
+    // that check runs first and actually gates the result, rather than merely existing.
+
+    [Fact]
+    public async Task HandleAsync_Returns_Forbidden_For_Unauthorized_Caller_Without_Reading_Employee_Data()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        // Caller has no roles and manages nobody — an unrelated peer, not the target, not HR.
+        var resourceAuthorizer = new EmployeesResourceAuthorizer(
+            new FakeRoleAuthorizationService(), new FakeDirectReportsReader());
+
+        var handler = BuildHandler(context, resourceAuthorizer: resourceAuthorizer);
+
+        var result = await handler.HandleAsync(
+            new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id, CallerEmployeeId = Guid.NewGuid() },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("forbidden", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Allows_Direct_Manager_And_Returns_Employee()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var managerId = Guid.NewGuid();
+        // Caller holds no HR role, but manages the target employee — hierarchy access.
+        var resourceAuthorizer = new EmployeesResourceAuthorizer(
+            new FakeRoleAuthorizationService(), new FakeDirectReportsReader(employee.Id));
+
+        var handler = BuildHandler(context, resourceAuthorizer: resourceAuthorizer);
+
+        var result = await handler.HandleAsync(
+            new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id, CallerEmployeeId = managerId },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(employee.Id, result.Value!.Id);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Allows_Employee_Viewing_Own_Record()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        // Caller holds no HR role and manages nobody, but is the target employee themself.
+        var resourceAuthorizer = new EmployeesResourceAuthorizer(
+            new FakeRoleAuthorizationService(), new FakeDirectReportsReader());
+
+        var handler = BuildHandler(context, resourceAuthorizer: resourceAuthorizer);
+
+        var result = await handler.HandleAsync(
+            new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id, CallerEmployeeId = employee.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(employee.Id, result.Value!.Id);
     }
 
     [Fact]
