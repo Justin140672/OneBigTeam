@@ -97,7 +97,15 @@ For each environment under GitHub → Settings → Environments:
    - `RAILWAY_TOKEN` — the wrappers pass `RAILWAY_TOKEN_TEST` / `_STAGING` / `_PRODUCTION` as
      repo-level secrets; either name them that at repo scope, or rename in the wrappers to use
      per-environment `RAILWAY_TOKEN`. A Railway **project token** scoped to that environment.
-   - `API_HEALTH_BEARER_TOKEN` (optional) — only if `/health/startup-migrations` is put behind auth.
+   - `API_HEALTH_BEARER_TOKEN` — **required** whenever an `api` service is in scope for this
+     environment's deploy. `/health/startup-migrations` only returns per-module detail (and the
+     `release.sha` the deploy gate's `-ExpectedSha` check depends on) to a caller presenting this
+     token as `X-Health-Token`; without it the endpoint returns a minimal/anonymous payload and the
+     deploy/recovery migration check fails fast with a "missing authorization" error rather than
+     silently treating that as a real migration failure (reliability review issue 5). This value
+     **must exactly match** the deployed API's own `HealthChecks:ReadinessDetailToken` app
+     configuration for that same environment — see "Keeping the deploy secret and app config in
+     sync" below for how the two are provisioned and rotated together.
 4. Add environment variable `API_BASE_URL` — the public API base URL for that environment
    (e.g. `https://api-test.onebigteam.app`). Used by the readiness + migration probes.
 
@@ -112,6 +120,14 @@ the deploy wrappers and `deployment-health-check.yml`.
 - **Mechanism.** `HR.Api` applies EF Core migrations **on startup**, per module, in `Program.cs`
   (`Migrate<Module>Async()` inside individual try/catch blocks), then records each module's result
   at `GET /health/startup-migrations` (200 all-succeeded / 503 any-failed).
+- **The detailed response is token-gated, not anonymous.** `/health/startup-migrations` returns
+  per-module status and the `release` block (sha/version/etc.) **only** to a caller that sends
+  `X-Health-Token: <token>` matching the deployed app's `HealthChecks:ReadinessDetailToken`
+  configuration — the same gate `/health/ready`'s detail view uses (see
+  `HR.ServiceDefaults.HealthCheckEndpoints`). A request without a matching token gets a minimal
+  payload with no per-module detail and no `release.sha`. `check-startup-migrations.ps1` requires
+  its `-BearerToken` parameter (reliability review issue 5) precisely because this deploy gate
+  depends on that detail existing — see "Keeping the deploy secret and app config in sync" below.
 - **Deploy gate.** After `railway up`, the deploy workflow (Ticket 5,
   `.github/scripts/deploy/Invoke-VerifiedDeploy.ps1`) first waits — bounded — for **every** required
   service to report the new release identity at `GET /health/release` (EXACT git-SHA match; a
@@ -121,6 +137,19 @@ the deploy wrappers and `deployment-health-check.yml`.
   new release's migration check either. Any failure fails the deploy and triggers recovery
   (section 6). Migrations that throw do **not** crash the process — the health gate is what
   converts a failed migration into a failed, recovered deploy.
+- **Keeping the deploy secret and app config in sync.** `API_HEALTH_BEARER_TOKEN` (the GitHub
+  Environment secret consumed as `-MigrationBearerToken` / sent as `X-Health-Token`) and the
+  deployed API's `HealthChecks:ReadinessDetailToken` app configuration are **the same managed
+  per-environment secret**, provisioned from one source of truth (the environment's secret
+  manager / Railway variable) and referenced in both places rather than typed independently in two
+  places. To rotate: generate a new value, set it as the API service's
+  `HealthChecks__ReadinessDetailToken` Railway variable for the environment, redeploy the API so it
+  picks up the new value, **then** update the `API_HEALTH_BEARER_TOKEN` GitHub Environment secret to
+  match before the next pipeline run. Rotating the GitHub secret first (before the API redeploys)
+  causes the next deploy's migration check to fail with the "missing authorization" diagnostic
+  described above — safe (fails closed), but avoidable by rotating in that order. Both `deploy.yml`
+  and `deployment-health-check.yml` consume the same `API_HEALTH_BEARER_TOKEN` secret so they never
+  drift from each other.
 - **Release-safety declaration (`.github/scripts/deploy/release-safety.json`).** Checked into the
   repo, read by the recovery controller. Shape: `{ "appRollbackSafe": bool, "reason": "...",
   "notes": "..." }`, default `appRollbackSafe: true`. **Set `appRollbackSafe: false` in the same
@@ -330,7 +359,10 @@ _[OPERATOR, OPTIONAL]_ For a durable off-GitHub log, add a final step that appen
 - [ ] Confirm each Railway service's health-check path is `/alive` (availability runbook §7).
 - [ ] Run the first Test deploy manually and verify the readiness + migration gates pass.
 - [ ] Schedule and run the quarterly rollback test in Staging (section 6).
-- [ ] Decide whether `/health/startup-migrations` should be authenticated (currently anonymous).
+- [x] `/health/startup-migrations` detail is token-gated via `X-Health-Token` /
+      `HealthChecks:ReadinessDetailToken` (reliability review issue 5) — set
+      `API_HEALTH_BEARER_TOKEN` per environment and keep it in sync with the app's
+      `HealthChecks__ReadinessDetailToken` Railway variable (see section 5).
 
 ## 10. Sign-off block
 

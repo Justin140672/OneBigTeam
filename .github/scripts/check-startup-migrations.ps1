@@ -2,8 +2,17 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ApiBaseUrl,
 
-    [Parameter(Mandatory = $false)]
-    [string]$BearerToken = "",
+    # Reliability review issue 5 (P1): this script's entire purpose is DETAILED migration
+    # verification (per-module status + release.sha) — that detail is only ever returned by
+    # /health/startup-migrations to a caller presenting the same secret as the deployed app's
+    # HealthChecks:ReadinessDetailToken (see HR.ServiceDefaults.HealthCheckEndpoints /
+    # StartupMigrationRunner.ToHealthResult). A blank token here can no longer silently degrade to
+    # "send no auth, get back a minimal/anonymous payload, then fail with a confusing 'missing
+    # companies/identity' error" — it now fails immediately with an actionable config error before
+    # a single HTTP call is made.
+    [Parameter(Mandatory = $true)]
+    [ValidateNotNullOrWhiteSpace()]
+    [string]$BearerToken,
 
     [Parameter(Mandatory = $false)]
     [int]$MaxAttempts = 10,
@@ -53,19 +62,16 @@ $trimmedBaseUrl = $ApiBaseUrl.TrimEnd('/')
 $uri = "$trimmedBaseUrl/health/startup-migrations"
 $headers = @{}
 
-if (-not [string]::IsNullOrWhiteSpace($BearerToken)) {
-    $headers["Authorization"] = "Bearer $BearerToken"
-    # Security review ticket 6 (P2): /health/startup-migrations now only returns per-module detail
-    # (and the 'release' block this script's -ExpectedSha gate depends on) to a caller presenting
-    # the same HealthChecks:ReadinessDetailToken already required for /health/ready's detail view
-    # (see HR.ServiceDefaults.HealthCheckEndpoints / StartupMigrationRunner.ToHealthResult). This
-    # script already receives one deploy-pipeline secret token via -BearerToken/-MigrationBearerToken
-    # (previously sent only as an unused Authorization header, since the endpoint had no auth at
-    # all) — it is now also sent as X-Health-Token so this pipeline keeps working. The deployed
-    # environment's HealthChecks:ReadinessDetailToken configuration MUST be set to this same value
-    # for that to hold; see the ticket 6 follow-up note in the security review.
-    $headers["X-Health-Token"] = $BearerToken
-}
+$headers["Authorization"] = "Bearer $BearerToken"
+# Security review ticket 6 (P2) / reliability review issue 5 (P1): /health/startup-migrations only
+# returns per-module detail (and the 'release' block this script's -ExpectedSha gate depends on) to
+# a caller presenting the same HealthChecks:ReadinessDetailToken already required for
+# /health/ready's detail view (see HR.ServiceDefaults.HealthCheckEndpoints /
+# StartupMigrationRunner.ToHealthResult). This script's -BearerToken/-MigrationBearerToken is sent
+# as X-Health-Token for that reason. The deployed environment's HealthChecks:ReadinessDetailToken
+# configuration MUST be set to this exact same value — see
+# specifications/runbooks/deployment-pipeline.md for how the two are kept in sync and rotated.
+$headers["X-Health-Token"] = $BearerToken
 
 function Get-RemainingSeconds {
     if ($null -eq $DeadlineUtc) { return $null }
@@ -90,8 +96,17 @@ for ($attempt = 1; $attempt -le $MaxAttempts; $attempt++) {
             exit 1
         }
 
+        # Reliability review issue 5 (P1): distinguish "the token didn't grant detail access"
+        # (a mismatched/rotated-out token — the endpoint silently degrades to a minimal/anonymous
+        # payload rather than a 401, see HasDetailAccess in HR.ServiceDefaults.HealthCheckEndpoints)
+        # from "detail was returned but migrations are genuinely unhealthy". Conflating the two into
+        # one generic error previously made a token-rotation break at the deploy layer look
+        # identical to a real migration failure at the app layer.
         if ($null -eq $response.companies -or $null -eq $response.identity) {
-            throw "Health payload is missing 'companies' or 'identity' sections."
+            throw "No per-module detail was returned by '$uri' — this means X-Health-Token did not " + `
+                "match the deployed app's HealthChecks:ReadinessDetailToken (missing authorization), " + `
+                "not that migrations are unhealthy. Verify the deploy pipeline's migration bearer " + `
+                "token secret matches the app's configured ReadinessDetailToken for this environment."
         }
 
         # Every module key (everything except the 'release' sibling) must report "succeeded".

@@ -15,8 +15,13 @@ on:
         type: number
         default: 6
     secrets:
+      # Reliability review issue 5 (P1): required, not optional — check-startup-migrations.ps1's
+      # -BearerToken is now a mandatory parameter (the endpoint's per-module detail is token-gated,
+      # not anonymous). A caller that omits this secret now fails the workflow_call binding
+      # immediately instead of silently probing without a token and getting a confusing
+      # "missing companies/identity" failure.
       api_bearer_token:
-        required: false
+        required: true
 
   workflow_dispatch:
     inputs:

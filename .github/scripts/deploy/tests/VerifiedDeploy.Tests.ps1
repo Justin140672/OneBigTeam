@@ -425,7 +425,7 @@ Describe 'Invoke-VerifiedDeploy — verifier contract (defect 2)' {
         $failingProbe = { param($Uri, $Headers) throw 'connection refused' }
 
         # Standalone: must exit non-zero and must NOT raise a terminating error.
-        { & $script -ApiBaseUrl 'https://api.test' -MaxAttempts 2 -DelaySeconds 0 -HttpProbe $failingProbe } |
+        { & $script -ApiBaseUrl 'https://api.test' -BearerToken 'test-token' -MaxAttempts 2 -DelaySeconds 0 -HttpProbe $failingProbe } |
             Should -Not -Throw
         $LASTEXITCODE | Should -Not -Be 0
 
@@ -436,7 +436,7 @@ Describe 'Invoke-VerifiedDeploy — verifier contract (defect 2)' {
         }
         $verifier = {
             param($sha)
-            & $script -ApiBaseUrl 'https://api.test' -MaxAttempts 2 -DelaySeconds 0 -ExpectedSha $sha -HttpProbe $failingProbe
+            & $script -ApiBaseUrl 'https://api.test' -BearerToken 'test-token' -MaxAttempts 2 -DelaySeconds 0 -ExpectedSha $sha -HttpProbe $failingProbe
             if ($LASTEXITCODE -ne 0) { return [pscustomobject]@{ Ok = $false; Detail = "startup-migrations failed for $sha" } }
             return [pscustomobject]@{ Ok = $true; Detail = 'ok' }
         }.GetNewClosure()
@@ -455,7 +455,7 @@ Describe 'Invoke-VerifiedDeploy — verifier contract (defect 2)' {
         $calls = [ref]0
         $failingProbe = { param($Uri, $Headers, $TimeoutSec) $calls.Value++; throw 'connection refused' }.GetNewClosure()
         # 20 attempts * 6s would normally run minutes; the deadline is already in the past.
-        { & $script -ApiBaseUrl 'https://api.test' -MaxAttempts 20 -DelaySeconds 6 `
+        { & $script -ApiBaseUrl 'https://api.test' -BearerToken 'test-token' -MaxAttempts 20 -DelaySeconds 6 `
             -HttpProbe $failingProbe -DeadlineUtc ([datetime]::UtcNow.AddSeconds(-1)) } | Should -Not -Throw
         $LASTEXITCODE | Should -Not -Be 0
         $calls.Value | Should -Be 0   # never even started an attempt past the deadline
@@ -465,7 +465,7 @@ Describe 'Invoke-VerifiedDeploy — verifier contract (defect 2)' {
         $script = Join-Path (Split-Path -Parent $script:DeployDir) 'check-startup-migrations.ps1'
         $calls = [ref]0
         $failingProbe = { param($Uri, $Headers, $TimeoutSec) $calls.Value++; throw 'connection refused' }.GetNewClosure()
-        { & $script -ApiBaseUrl 'https://api.test' -MaxAttempts 3 -DelaySeconds 0 -HttpProbe $failingProbe } | Should -Not -Throw
+        { & $script -ApiBaseUrl 'https://api.test' -BearerToken 'test-token' -MaxAttempts 3 -DelaySeconds 0 -HttpProbe $failingProbe } | Should -Not -Throw
         $LASTEXITCODE | Should -Not -Be 0
         $calls.Value | Should -Be 3
     }
@@ -480,7 +480,7 @@ Describe 'Invoke-VerifiedDeploy — verifier contract (defect 2)' {
                 release   = [pscustomobject]@{ sha = 'OLD-SHA'; version = 'v-old' }
             }
         }
-        { & $script -ApiBaseUrl 'https://api.test' -MaxAttempts 2 -DelaySeconds 0 -ExpectedSha 'NEW-SHA' -HttpProbe $oldInstanceProbe } |
+        { & $script -ApiBaseUrl 'https://api.test' -BearerToken 'test-token' -MaxAttempts 2 -DelaySeconds 0 -ExpectedSha 'NEW-SHA' -HttpProbe $oldInstanceProbe } |
             Should -Not -Throw
         $LASTEXITCODE | Should -Not -Be 0
     }
@@ -1108,5 +1108,47 @@ Describe 'Invoke-Recovery — identity probe bounded by the remaining recovery b
         $seen[0] | Should -Be 14
         $global:CapturedTimeoutSec | Should -Be 14
         $r.Outcome | Should -Be 'recovered'
+    }
+}
+
+Describe 'Invoke-VerifiedDeploy.ps1 entrypoint — MigrationBearerToken fail-fast (reliability review issue 5)' {
+
+    BeforeAll {
+        $script:EntrypointScript = Join-Path $script:DeployDir 'Invoke-VerifiedDeploy.ps1'
+    }
+
+    It 'throws immediately (before any Railway call) when MigrationBearerToken is missing and an api service is in scope' {
+        $env:RAILWAY_TOKEN = 'dummy-token'
+        try {
+            { & $script:EntrypointScript -Environment 'test' -TargetSha 'abc123' `
+                -ServiceUrlsJson '{"api":"https://api.test","app":"https://app.test","marketing":"https://mkt.test","admin":"https://admin.test"}' } |
+                Should -Throw '*MigrationBearerToken*'
+        }
+        finally {
+            Remove-Item Env:\RAILWAY_TOKEN -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'does not require MigrationBearerToken when no api service is in scope' {
+        $env:RAILWAY_TOKEN = 'dummy-token'
+        try {
+            # No 'api' key in ServiceUrlsJson — should get past the MigrationBearerToken check and
+            # fail later (Railway context resolution, no real CLI available here) rather than on
+            # the migration-token check specifically.
+            $err = $null
+            try {
+                & $script:EntrypointScript -Environment 'test' -TargetSha 'abc123' `
+                    -ServiceUrlsJson '{"app":"https://app.test","marketing":"https://mkt.test","admin":"https://admin.test"}' `
+                    2>$null
+            }
+            catch { $err = $_ }
+
+            if ($null -ne $err) {
+                $err.Exception.Message | Should -Not -Match 'MigrationBearerToken'
+            }
+        }
+        finally {
+            Remove-Item Env:\RAILWAY_TOKEN -ErrorAction SilentlyContinue
+        }
     }
 }

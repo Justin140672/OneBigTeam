@@ -14,7 +14,8 @@
                            from -TargetSha when omitted. RELEASE_SHA is always set to -TargetSha.
     -RolloutTimeoutSeconds (default 900)   -RecoveryTimeoutSeconds (default 600)
     -PollSeconds (default 10)              -ApiReadyTimeoutSeconds (default 600)
-    -MigrationBearerToken
+    -MigrationBearerToken  REQUIRED whenever an 'api' service is in scope (forward OR recovery
+                           migration verification is enabled) — see the fail-fast check below.
     -RunMigrationsCheck    ($true default) gates the FORWARD deploy on startup-migrations. It does
                            NOT affect the recovery-side migration verification, which always runs.
     -RailwayApiEndpoint    (default https://backboard.railway.com/graphql/v2)
@@ -66,6 +67,22 @@ if ($missingUrls.Count -gt 0) {
 
 $railwayToken = $env:RAILWAY_TOKEN
 if ([string]::IsNullOrWhiteSpace($railwayToken)) { throw "RAILWAY_TOKEN is not set — cannot call the Railway API. Refusing to deploy." }
+
+# Reliability review issue 5 (P1): -MigrationBearerToken must be present whenever an 'api' service
+# is in scope. It gates BOTH the forward-deploy migration check (via -RunMigrationsCheck) AND the
+# recovery-side migration verifier, which always runs regardless of -RunMigrationsCheck — so a blank
+# token here cannot be safely allowed to "silently proceed" even when the forward check is skipped
+# for this run; recovery may still need it later in the same run. Fails immediately, before any
+# Railway state change, with an actionable config error rather than letting check-startup-
+# migrations.ps1 fail confusingly deep inside a later verification/recovery step.
+$apiInScope = $null -ne ($services | Where-Object { $_.Name -eq 'api' } | Select-Object -First 1)
+if ($apiInScope -and [string]::IsNullOrWhiteSpace($MigrationBearerToken)) {
+    throw ("MigrationBearerToken is not set but an 'api' service is in scope for this deploy. " +
+           "This secret is required for BOTH forward and recovery startup-migrations verification " +
+           "(see .github/workflows/deploy.yml's API_HEALTH_BEARER_TOKEN secret and " +
+           "specifications/runbooks/deployment-pipeline.md). Refusing to deploy rather than " +
+           "silently skipping migration verification.")
+}
 
 $runner = New-RailwayCommandRunner
 $httpProbe = {
