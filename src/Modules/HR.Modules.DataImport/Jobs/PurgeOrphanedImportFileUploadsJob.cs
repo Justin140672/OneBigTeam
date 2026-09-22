@@ -102,10 +102,11 @@ internal sealed class PurgeOrphanedImportFileUploadsJob(
 
             if (exists)
             {
-                // Leave DeletedAt/ClearedAt/ConfirmedAt untouched — the object genuinely exists and
-                // must be deleted. Falling through to the deletion loop below (same sweep) picks it
-                // up via the unchanged eligibility query there (ConfirmedAt/DeletedAt/ClearedAt all
-                // still null).
+                // Explicit state transition: only this grace-gated branch may mark a row eligible
+                // for deletion. Falling through to the deletion loop below (same sweep) picks it up
+                // via that new DeletionEligibleAt gate, not by re-deriving eligibility from
+                // ConfirmedAt/DeletedAt/ClearedAt alone.
+                intent.MarkDeletionEligible(now);
                 logger.LogWarning(
                     "PurgeOrphanedImportFileUploadsJob: unresolved upload intent {IntentId} (company {CompanyId}) has a blob in storage with no confirming session — will be deleted this sweep.",
                     intent.Id, intent.CompanyId);
@@ -132,7 +133,8 @@ internal sealed class PurgeOrphanedImportFileUploadsJob(
         try
         {
             var candidates = await db.OrphanedImportFileUploads
-                .Where(o => o.ConfirmedAt == null
+                .Where(o => o.DeletionEligibleAt != null
+                    && o.ConfirmedAt == null
                     && o.ClearedAt == null
                     && o.DeletedAt == null
                     && (o.LastAttemptedAt == null || o.LastAttemptedAt <= retryCutoff))
@@ -149,6 +151,39 @@ internal sealed class PurgeOrphanedImportFileUploadsJob(
                     logger.LogInformation(
                         "Skipping orphaned import file purge for {OrphanId}: company {CompanyId} is under a legal hold.",
                         orphan.Id, orphan.CompanyId);
+                    continue;
+                }
+
+                // Claim the row under its optimistic-concurrency token immediately before the
+                // destructive storage call. If a request confirmed this intent after we loaded it
+                // above (e.g. a slow upload finishing during this sweep), the confirming save already
+                // advanced Version and this update affects zero rows — EF throws, and we never call
+                // storage.DeleteAsync for a file a now-confirmed session depends on.
+                orphan.BeginDeletionAttempt(now);
+                try
+                {
+                    await db.SaveChangesAsync(cancellationToken);
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    db.ChangeTracker.Clear();
+                    var current = await db.OrphanedImportFileUploads
+                        .AsNoTracking()
+                        .SingleOrDefaultAsync(o => o.Id == orphan.Id, cancellationToken);
+
+                    if (current?.ConfirmedAt is not null)
+                    {
+                        logger.LogInformation(
+                            "Orphaned import file upload {OrphanId} (company {CompanyId}) was confirmed by a request that raced ahead of this reconciliation sweep — skipping deletion, storage was never touched.",
+                            orphan.Id, orphan.CompanyId);
+                    }
+                    else
+                    {
+                        logger.LogInformation(
+                            "Orphaned import file upload {OrphanId} (company {CompanyId}) changed concurrently before this sweep could claim it; will retry next sweep.",
+                            orphan.Id, orphan.CompanyId);
+                    }
+
                     continue;
                 }
 

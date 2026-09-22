@@ -1,3 +1,5 @@
+using HR.SharedKernel;
+
 namespace HR.Modules.DataImport.Domain;
 
 /// <summary>
@@ -29,7 +31,7 @@ namespace HR.Modules.DataImport.Domain;
 /// CandidateDocumentDeletionOperation — this workflow has no equivalent "purge" concurrency to guard
 /// against, so a simple attempt counter with a retry-grace window is sufficient.
 /// </summary>
-internal sealed class OrphanedImportFileUpload
+internal sealed class OrphanedImportFileUpload : IVersionedAggregate
 {
     private OrphanedImportFileUpload() { }
 
@@ -52,6 +54,25 @@ internal sealed class OrphanedImportFileUpload
     public DateTimeOffset? ClearedAt { get; private set; }
 
     /// <summary>
+    /// Explicit state transition (P1 fix, Sept 2026): null until <see cref="ResolveUnconfirmedIntentsAsync"/>-
+    /// equivalent logic in the reconciliation job proves, past the upload-intent grace period, that
+    /// this intent is unconfirmed AND has a real object in storage. Only once this is set may the
+    /// deletion phase consider the row at all — a row created moments ago (still mid-upload) can
+    /// never reach <c>DeleteAsync</c>, because nothing but the grace-gated resolution step sets this.
+    /// </summary>
+    public DateTimeOffset? DeletionEligibleAt { get; private set; }
+
+    /// <summary>Ticket 2 optimistic-concurrency token (see <see cref="IVersionedAggregate"/>). Every
+    /// save — including the confirming request's <see cref="MarkConfirmed"/> and the reconciliation
+    /// job's own updates — advances this automatically via <c>VersionAdvancingSaveChangesInterceptor</c>.
+    /// The job uses it to detect, immediately before the destructive storage delete, whether a
+    /// request confirmed this intent after the job loaded it — see
+    /// <c>PurgeOrphanedImportFileUploadsJob.DeleteConfirmedOrphansAsync</c>.</summary>
+    public int Version { get; private set; } = 1;
+
+    public void IncrementVersion() => Version++;
+
+    /// <summary>
     /// Reserves a durable upload intent for <paramref name="storageKey"/>. Must be persisted
     /// (SaveChangesAsync) BEFORE the corresponding storage upload call is made — that ordering is
     /// the entire point: durability no longer depends on any compensation path succeeding.
@@ -72,6 +93,17 @@ internal sealed class OrphanedImportFileUpload
     /// never need cleanup. Intended to be saved in the same SaveChangesAsync call as that business
     /// record's insert.</summary>
     public void MarkConfirmed(DateTimeOffset now) => ConfirmedAt = now;
+
+    /// <summary>Reconciliation determined, past the grace period, that this intent is unconfirmed
+    /// and has a real object in storage — the only way a row may become a candidate for
+    /// <see cref="MarkDeleted"/>. Must never be called before the grace-period cutoff.</summary>
+    public void MarkDeletionEligible(DateTimeOffset now) => DeletionEligibleAt = now;
+
+    /// <summary>Claims this row for a deletion attempt immediately before the destructive storage
+    /// call, by touching a field under the optimistic-concurrency token. Callers must persist this
+    /// alone (a dedicated <c>SaveChangesAsync</c>) and treat a concurrency conflict as proof a
+    /// request confirmed the intent concurrently — and therefore must NOT call storage delete.</summary>
+    public void BeginDeletionAttempt(DateTimeOffset now) => LastAttemptedAt = now;
 
     /// <summary>Idempotent: safe to call more than once — callers should skip deletion entirely
     /// once <see cref="DeletedAt"/> is already set.</summary>

@@ -46,8 +46,18 @@ internal sealed class OrphanedImportFileUploadConfiguration : IEntityTypeConfigu
         builder.Property(o => o.ClearedAt)
             .HasColumnName("cleared_at");
 
+        builder.Property(o => o.DeletionEligibleAt)
+            .HasColumnName("deletion_eligible_at");
+
+        builder.Property(o => o.Version)
+            .HasColumnName("version")
+            .IsRequired()
+            .HasDefaultValue(1)
+            .IsConcurrencyToken();
+
         builder.HasIndex(o => o.CompanyId);
         builder.HasIndex(o => o.DeletedAt);
         builder.HasIndex(o => new { o.ConfirmedAt, o.DeletedAt, o.ClearedAt, o.CreatedAt });
+        builder.HasIndex(o => new { o.DeletionEligibleAt, o.ConfirmedAt, o.ClearedAt, o.DeletedAt });
     }
 }
