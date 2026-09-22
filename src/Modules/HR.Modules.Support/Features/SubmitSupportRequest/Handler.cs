@@ -1,8 +1,10 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using HR.Infrastructure.Abstractions;
+using Microsoft.AspNetCore.Http;
 using HR.Modules.Support.Domain;
 using HR.Modules.Support.Persistence;
+using HR.Modules.Support.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -13,6 +15,8 @@ internal sealed class SubmitSupportRequestHandler(
     SupportDbContext db,
     IClock clock,
     ISupportAttachmentStorageService attachmentStorage,
+    ISupportAttachmentValidator attachmentValidator,
+    IUploadedFileScanner fileScanner,
     IEmailSender emailSender,
     IConfiguration configuration)
 {
@@ -22,6 +26,23 @@ internal sealed class SubmitSupportRequestHandler(
         Guid? employeeId,
         CancellationToken cancellationToken)
     {
+        // Security review ticket 4 (P1): validate the whole batch — count, per-file size, allowed
+        // extension/content-type, aggregate size — before uploading a single byte anywhere. A
+        // request that violates any limit is rejected in full; nothing is ever partially uploaded.
+        IReadOnlyList<IFormFile> files = request.Files is { Count: > 0 } collection
+            ? [.. collection]
+            : [];
+        var aggregateCheck = attachmentValidator.ValidateAggregate(files.Count, files.Sum(f => f.Length));
+        if (aggregateCheck.IsFailure)
+            return Result.Failure<SubmitSupportRequestResponse>(aggregateCheck.Error);
+
+        foreach (var file in files)
+        {
+            var fileCheck = attachmentValidator.ValidateFile(file.FileName, file.ContentType, file.Length);
+            if (fileCheck.IsFailure)
+                return Result.Failure<SubmitSupportRequestResponse>(fileCheck.Error);
+        }
+
         var now = clock.UtcNowOffset();
         var referenceNumber = await GenerateUniqueReferenceNumberAsync(now, cancellationToken);
 
@@ -60,22 +81,37 @@ internal sealed class SubmitSupportRequestHandler(
 
         db.SupportRequests.Add(entity);
 
-        if (request.Files is { Count: > 0 })
+        var uploadedKeys = new List<string>();
+        if (files.Count > 0)
         {
-            foreach (var file in request.Files)
-            {
-                await using var stream = file.OpenReadStream();
-                var storageKey = await attachmentStorage.UploadAsync(
-                    stream, file.FileName, file.ContentType,
-                    $"support/{request.CompanyId}/{entity.Id}", cancellationToken);
+            var uploadResult = await UploadValidatedAttachmentsAsync(
+                files, request.CompanyId, entity.Id, uploadedKeys, cancellationToken);
 
+            if (!uploadResult.IsSuccess)
+            {
+                await CleanUpUploadedAsync(uploadedKeys, cancellationToken);
+                return Result.Failure<SubmitSupportRequestResponse>(uploadResult.Error);
+            }
+
+            foreach (var (file, storageKey) in uploadResult.Value)
+            {
                 db.SupportAttachments.Add(SupportAttachment.Create(
                     Guid.NewGuid(), entity.Id, request.CompanyId, storageKey,
-                    file.FileName, file.ContentType, file.Length, userId, now));
+                    Path.GetFileName(file.FileName), file.ContentType, file.Length, userId, now));
             }
         }
 
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            // Security review ticket 4 (P1): never leave orphaned attachment blobs behind when
+            // persistence fails after a successful upload.
+            await CleanUpUploadedAsync(uploadedKeys, cancellationToken);
+            throw;
+        }
 
         await SendAdminNotificationAsync(entity, now, cancellationToken);
 
@@ -114,6 +150,79 @@ internal sealed class SubmitSupportRequestHandler(
 
         db.SupportNotificationAttempts.Add(attempt);
         await db.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Security review ticket 4 (P1): signature-checks and virus-scans each file in memory before
+    /// it is ever written to storage, then uploads it under a random (never filename-derived)
+    /// storage key. Aborts and returns the already-uploaded keys (for cleanup by the caller) the
+    /// moment any file fails signature verification, scanning, or upload — an infected/unscannable
+    /// file in a multi-file request means nothing from that request is exposed.
+    /// </summary>
+    private async Task<Result<List<(IFormFile File, string StorageKey)>>> UploadValidatedAttachmentsAsync(
+        IReadOnlyList<IFormFile> files, Guid companyId, Guid supportRequestId,
+        List<string> uploadedKeys, CancellationToken cancellationToken)
+    {
+        var uploaded = new List<(IFormFile File, string StorageKey)>();
+
+        foreach (var file in files)
+        {
+            using var buffer = new MemoryStream();
+            await using (var openStream = file.OpenReadStream())
+            {
+                await openStream.CopyToAsync(buffer, cancellationToken);
+            }
+            buffer.Position = 0;
+
+            var signatureCheck = attachmentValidator.ValidateContentSignature(buffer, file.ContentType);
+            if (signatureCheck.IsFailure)
+                return Result.Failure<List<(IFormFile, string)>>(signatureCheck.Error);
+
+            UploadedFileScanResult scanResult;
+            try
+            {
+                scanResult = await fileScanner.ScanAsync(buffer, file.FileName, cancellationToken);
+            }
+            catch
+            {
+                // Fail closed: an unreachable/errored scanner must never let a file through
+                // unscanned (mirrors HR.Modules.Documents' ScanUploadedFileJob failure handling).
+                return Result.Failure<List<(IFormFile, string)>>(
+                    Error.Validation("Attachment scanning is temporarily unavailable. Please try again shortly."));
+            }
+
+            if (!scanResult.IsClean)
+            {
+                return Result.Failure<List<(IFormFile, string)>>(
+                    Error.Validation("One or more attached files failed a security scan and were rejected."));
+            }
+
+            buffer.Position = 0;
+            var storageKey = await attachmentStorage.UploadAsync(
+                buffer, file.FileName, file.ContentType,
+                $"support/{companyId}/{supportRequestId}", cancellationToken);
+
+            uploadedKeys.Add(storageKey);
+            uploaded.Add((file, storageKey));
+        }
+
+        return Result.Success(uploaded);
+    }
+
+    private async Task CleanUpUploadedAsync(List<string> uploadedKeys, CancellationToken cancellationToken)
+    {
+        foreach (var key in uploadedKeys)
+        {
+            try
+            {
+                await attachmentStorage.DeleteAsync(key, cancellationToken);
+            }
+            catch
+            {
+                // Best-effort cleanup — the primary failure (validation/scan/persistence) is what
+                // gets returned to the caller; a cleanup failure here must not mask or replace it.
+            }
+        }
     }
 
     private async Task<string> GenerateUniqueReferenceNumberAsync(DateTimeOffset now, CancellationToken cancellationToken)

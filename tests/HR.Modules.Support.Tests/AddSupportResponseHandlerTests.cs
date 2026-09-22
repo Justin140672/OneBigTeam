@@ -1,6 +1,7 @@
 using HR.Modules.Support.Domain;
 using HR.Modules.Support.Features.AddSupportResponse;
 using HR.Modules.Support.Persistence;
+using HR.Modules.Support.Services;
 using HR.Modules.Support.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -26,8 +27,10 @@ public class AddSupportResponseHandlerTests
         SupportDbContext db,
         FakeSupportAttachmentStorageService? storage = null,
         FakeEmailSender? emailSender = null,
-        FakeUserEmailReader? userEmailReader = null) =>
+        FakeUserEmailReader? userEmailReader = null,
+        FakeUploadedFileScanner? fileScanner = null) =>
         new(db, new FakeClock(FixedUtcNow), storage ?? new FakeSupportAttachmentStorageService(),
+            new SupportAttachmentValidator(), fileScanner ?? new FakeUploadedFileScanner(),
             emailSender ?? new FakeEmailSender(), userEmailReader ?? new FakeUserEmailReader());
 
     [Fact]

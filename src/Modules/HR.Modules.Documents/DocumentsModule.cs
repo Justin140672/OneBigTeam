@@ -126,6 +126,10 @@ public static class DocumentsModule
         var clamAvHost = clamAvSection["Host"];
         var hasClamAvConfig = clamAvSection.Exists() && !string.IsNullOrWhiteSpace(clamAvHost);
 
+        // Security review ticket 4 (P1): expose whichever scanner is selected below to other
+        // modules via the shared HR.Infrastructure.Abstractions.IUploadedFileScanner contract.
+        services.AddScoped<HR.Infrastructure.Abstractions.IUploadedFileScanner, UploadedFileScannerAdapter>();
+
         if (hasClamAvConfig)
         {
             services.Configure<ClamAvOptions>(clamAvSection);

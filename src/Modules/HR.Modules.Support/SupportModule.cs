@@ -10,6 +10,7 @@ using HR.Modules.Support.Features.SubmitSupportRequest;
 using HR.Modules.Support.Features.UpdateSupportRequestStatus;
 using HR.Modules.Support.Jobs;
 using HR.Modules.Support.Persistence;
+using HR.Modules.Support.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,6 +34,10 @@ public static class SupportModule
 
     private static void AddFeatureServices(IServiceCollection services)
     {
+        // Security review ticket 4 (P1): shared attachment validation for both SubmitSupportRequest
+        // and AddSupportResponse.
+        services.AddScoped<ISupportAttachmentValidator, SupportAttachmentValidator>();
+
         services.AddScoped<SubmitSupportRequestHandler>();
         services.AddScoped<IValidator<SubmitSupportRequestRequest>, SubmitSupportRequestValidator>();
         services.AddScoped<ListSupportRequestsHandler>();

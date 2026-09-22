@@ -24,7 +24,13 @@ internal sealed class SupabaseSupportAttachmentStorageService : ISupportAttachme
         string storageFolder,
         CancellationToken cancellationToken)
     {
-        var storageKey = $"{storageFolder.Trim('/')}/{Guid.NewGuid():N}/{fileName}";
+        // Security review ticket 4 (P1): the storage key must never embed the caller-supplied
+        // original file name (path traversal / header-injection surface via signed-URL generation
+        // and any downstream tooling that parses the key). Only a random id and the file's own
+        // extension (itself validated against an allow-list before this is ever called) are used;
+        // the original name is retained only as display metadata on the owning entity.
+        var extension = Path.GetExtension(fileName);
+        var storageKey = $"{storageFolder.Trim('/')}/{Guid.NewGuid():N}{extension}";
 
         using var request = new HttpRequestMessage(
             HttpMethod.Post,

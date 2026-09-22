@@ -1,7 +1,9 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Support.Domain;
 using HR.Modules.Support.Persistence;
+using HR.Modules.Support.Services;
 using HR.SharedKernel;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Support.Features.AddSupportResponse;
@@ -10,6 +12,8 @@ internal sealed class AddSupportResponseHandler(
     SupportDbContext db,
     IClock clock,
     ISupportAttachmentStorageService attachmentStorage,
+    ISupportAttachmentValidator attachmentValidator,
+    IUploadedFileScanner fileScanner,
     IEmailSender emailSender,
     IUserEmailReader userEmailReader)
 {
@@ -25,32 +29,127 @@ internal sealed class AddSupportResponseHandler(
         if (supportRequest is null)
             return Result.Failure<AddSupportResponseResponse>(Error.NotFound("Support request not found."));
 
+        // Security review ticket 4 (P1): same reject-before-upload aggregate/per-file policy as
+        // SubmitSupportRequestHandler.
+        IReadOnlyList<IFormFile> files = request.Files is { Count: > 0 } collection
+            ? [.. collection]
+            : [];
+
+        var aggregateCheck = attachmentValidator.ValidateAggregate(files.Count, files.Sum(f => f.Length));
+        if (aggregateCheck.IsFailure)
+            return Result.Failure<AddSupportResponseResponse>(aggregateCheck.Error);
+
+        foreach (var file in files)
+        {
+            var fileCheck = attachmentValidator.ValidateFile(file.FileName, file.ContentType, file.Length);
+            if (fileCheck.IsFailure)
+                return Result.Failure<AddSupportResponseResponse>(fileCheck.Error);
+        }
+
         var now = clock.UtcNowOffset();
         var response = SupportResponse.Create(
             Guid.NewGuid(), supportRequest.Id, request.CompanyId, authorUserId, isStaffResponse, request.BodyHtml, now);
         db.SupportResponses.Add(response);
 
-        if (request.Files is { Count: > 0 })
+        var uploadedKeys = new List<string>();
+        if (files.Count > 0)
         {
-            foreach (var file in request.Files)
-            {
-                await using var stream = file.OpenReadStream();
-                var storageKey = await attachmentStorage.UploadAsync(
-                    stream, file.FileName, file.ContentType,
-                    $"support/{request.CompanyId}/{supportRequest.Id}/responses/{response.Id}", cancellationToken);
+            var uploadResult = await UploadValidatedAttachmentsAsync(
+                files, request.CompanyId, supportRequest.Id, response.Id, uploadedKeys, cancellationToken);
 
+            if (!uploadResult.IsSuccess)
+            {
+                await CleanUpUploadedAsync(uploadedKeys, cancellationToken);
+                return Result.Failure<AddSupportResponseResponse>(uploadResult.Error);
+            }
+
+            foreach (var (file, storageKey) in uploadResult.Value)
+            {
                 db.SupportResponseAttachments.Add(SupportResponseAttachment.Create(
-                    Guid.NewGuid(), response.Id, request.CompanyId, storageKey, file.FileName, file.ContentType, now));
+                    Guid.NewGuid(), response.Id, request.CompanyId, storageKey,
+                    Path.GetFileName(file.FileName), file.ContentType, now));
             }
         }
 
         supportRequest.Touch(now);
-        await db.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            await CleanUpUploadedAsync(uploadedKeys, cancellationToken);
+            throw;
+        }
 
         if (isStaffResponse)
             await SendCustomerNotificationAsync(supportRequest, now, cancellationToken);
 
         return Result.Success(new AddSupportResponseResponse(response.Id, response.IsStaffResponse, response.CreatedAt));
+    }
+
+    private async Task<Result<List<(IFormFile File, string StorageKey)>>> UploadValidatedAttachmentsAsync(
+        IReadOnlyList<IFormFile> files, Guid companyId, Guid supportRequestId, Guid responseId,
+        List<string> uploadedKeys, CancellationToken cancellationToken)
+    {
+        var uploaded = new List<(IFormFile File, string StorageKey)>();
+
+        foreach (var file in files)
+        {
+            using var buffer = new MemoryStream();
+            await using (var openStream = file.OpenReadStream())
+            {
+                await openStream.CopyToAsync(buffer, cancellationToken);
+            }
+            buffer.Position = 0;
+
+            var signatureCheck = attachmentValidator.ValidateContentSignature(buffer, file.ContentType);
+            if (signatureCheck.IsFailure)
+                return Result.Failure<List<(IFormFile, string)>>(signatureCheck.Error);
+
+            UploadedFileScanResult scanResult;
+            try
+            {
+                scanResult = await fileScanner.ScanAsync(buffer, file.FileName, cancellationToken);
+            }
+            catch
+            {
+                return Result.Failure<List<(IFormFile, string)>>(
+                    Error.Validation("Attachment scanning is temporarily unavailable. Please try again shortly."));
+            }
+
+            if (!scanResult.IsClean)
+            {
+                return Result.Failure<List<(IFormFile, string)>>(
+                    Error.Validation("One or more attached files failed a security scan and were rejected."));
+            }
+
+            buffer.Position = 0;
+            var storageKey = await attachmentStorage.UploadAsync(
+                buffer, file.FileName, file.ContentType,
+                $"support/{companyId}/{supportRequestId}/responses/{responseId}", cancellationToken);
+
+            uploadedKeys.Add(storageKey);
+            uploaded.Add((file, storageKey));
+        }
+
+        return Result.Success(uploaded);
+    }
+
+    private async Task CleanUpUploadedAsync(List<string> uploadedKeys, CancellationToken cancellationToken)
+    {
+        foreach (var key in uploadedKeys)
+        {
+            try
+            {
+                await attachmentStorage.DeleteAsync(key, cancellationToken);
+            }
+            catch
+            {
+                // Best-effort cleanup — see SubmitSupportRequestHandler's identical rationale.
+            }
+        }
     }
 
     private async Task SendCustomerNotificationAsync(SupportRequest supportRequest, DateTimeOffset now, CancellationToken cancellationToken)

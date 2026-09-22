@@ -49,7 +49,10 @@ public class SubmitSupportRequestEndpointTests
 
         if (includeFile)
         {
-            var fileContent = new ByteArrayContent([0x1, 0x2, 0x3, 0x4]);
+            // Real PNG magic bytes (0x89 'P' 'N' 'G') — ticket 4's SupportAttachmentValidator now
+            // verifies the file's signature against its declared content type, so an arbitrary byte
+            // sequence would be rejected as a tampered/mismatched upload.
+            var fileContent = new ByteArrayContent([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
             fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("image/png");
             content.Add(fileContent, "Files", "screenshot.png");
         }

@@ -1,6 +1,7 @@
 using HR.Modules.Support.Domain;
 using HR.Modules.Support.Features.SubmitSupportRequest;
 using HR.Modules.Support.Persistence;
+using HR.Modules.Support.Services;
 using HR.Modules.Support.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -44,6 +45,7 @@ public class SubmitSupportRequestHandlerTests
         var companyId = Guid.NewGuid();
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
+            new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
             new FakeEmailSender(), BuildConfiguration());
 
         var result = await handler.HandleAsync(ValidRequest(companyId), Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
@@ -73,6 +75,7 @@ public class SubmitSupportRequestHandlerTests
         var request = ValidRequest(companyId) with { Title = maliciousTitle };
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
+            new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
             emailSender, BuildConfiguration());
 
         var result = await handler.HandleAsync(request, Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
@@ -101,6 +104,7 @@ public class SubmitSupportRequestHandlerTests
             .Build();
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
+            new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
             emailSender, configuration);
 
         var result = await handler.HandleAsync(ValidRequest(companyId), Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
@@ -117,6 +121,7 @@ public class SubmitSupportRequestHandlerTests
         var companyId = Guid.NewGuid();
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
+            new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
             new FakeEmailSender(), BuildConfiguration());
 
         var refs = new HashSet<string>();
@@ -135,6 +140,7 @@ public class SubmitSupportRequestHandlerTests
         var companyId = Guid.NewGuid();
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
+            new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
             new FakeEmailSender(), BuildConfiguration());
 
         var request = ValidRequest(companyId);
@@ -155,6 +161,7 @@ public class SubmitSupportRequestHandlerTests
         var companyId = Guid.NewGuid();
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
+            new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
             new FakeEmailSender(), BuildConfiguration());
 
         var request = ValidRequest(companyId);
@@ -174,7 +181,8 @@ public class SubmitSupportRequestHandlerTests
         var companyId = Guid.NewGuid();
         var storage = new FakeSupportAttachmentStorageService();
         var handler = new SubmitSupportRequestHandler(
-            db, new FakeClock(FixedUtcNow), storage, new FakeEmailSender(), BuildConfiguration());
+            db, new FakeClock(FixedUtcNow), storage,
+            new SupportAttachmentValidator(), new FakeUploadedFileScanner(), new FakeEmailSender(), BuildConfiguration());
 
         var request = ValidRequest(companyId);
         request = request with { Files = TestFile.Collection(TestFile.Create("screenshot.png")) };
@@ -197,6 +205,7 @@ public class SubmitSupportRequestHandlerTests
         var companyId = Guid.NewGuid();
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
+            new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
             new FakeEmailSender(), BuildConfiguration());
 
         var result = await handler.HandleAsync(ValidRequest(companyId), Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
@@ -212,6 +221,7 @@ public class SubmitSupportRequestHandlerTests
         var emailSender = new FakeEmailSender();
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
+            new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
             emailSender, BuildConfiguration("admin@example.test"));
 
         var result = await handler.HandleAsync(ValidRequest(companyId), Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
@@ -230,6 +240,7 @@ public class SubmitSupportRequestHandlerTests
         var companyId = Guid.NewGuid();
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
+            new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
             new FakeEmailSender(), BuildConfiguration(adminEmail: null));
 
         var result = await handler.HandleAsync(ValidRequest(companyId), Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
@@ -248,6 +259,7 @@ public class SubmitSupportRequestHandlerTests
         var emailSender = new FakeEmailSender { ThrowOnSend = true };
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
+            new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
             emailSender, BuildConfiguration("admin@example.test"));
 
         var result = await handler.HandleAsync(ValidRequest(companyId), Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
@@ -267,6 +279,7 @@ public class SubmitSupportRequestHandlerTests
         var employeeId = Guid.NewGuid();
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
+            new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
             new FakeEmailSender(), BuildConfiguration());
 
         var result = await handler.HandleAsync(ValidRequest(companyId), userId, employeeId, CancellationToken.None);
