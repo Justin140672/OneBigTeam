@@ -81,6 +81,28 @@ steps** — use the incident identifier `PM-TOKEN-2026-09-INC1` to refer to it.
 4. Record rotation evidence below: new token creation timestamp (from Postmark's
    token audit log) and confirmation it's deployed in every required environment.
 
+## Residual local (untracked) exposure — no repo/history action needed
+
+A repo-wide search for the raw token value found no occurrences in git-tracked
+files. It does still appear in several **gitignored, untracked, local-only** paths
+on the developer machine where this incident was investigated:
+
+- A build-output copy under `src/HR.Api/bin/verify/` and per-target `Debug`/`Release`
+  build directories (`.claude-scratch-fullbuild/`, `src/HR.Api/.codex-build/`,
+  `tests/HR.Integration.Tests/.codex-build/`) — stale compiled `appsettings.json`
+  copies from prior local builds, all matched by `.gitignore` (`[Bb]in/`,
+  `.claude-scratch*/`).
+- A checked-out copy under `.claude/worktrees/nice-greider-120806/src/HR.Api/appsettings.json`
+  — a separate git worktree excluded via `.git/info/exclude`, not part of the
+  primary working tree or any branch history distinct from what's already in `main`.
+
+None of these are committed, pushed, or reachable by anyone without access to this
+specific machine, so they are not part of the repository's exposure surface and
+don't require a history rewrite or remote coordination. They should still be
+deleted or rebuilt locally as routine hygiene once the token is revoked (step 1
+above) — after revocation, the value in these files is inert. No separate tracking
+item is needed beyond this note.
+
 ## Containment plan approved in lieu of a git history rewrite
 
 A full history rewrite (`git filter-repo` / BFG + force-push + mandatory re-clone by
