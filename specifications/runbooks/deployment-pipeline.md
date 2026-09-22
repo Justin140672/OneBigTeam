@@ -142,22 +142,28 @@ the deploy wrappers and `deployment-health-check.yml`.
   deployed API's `HealthChecks:ReadinessDetailToken` app configuration are **the same managed
   per-environment secret**, provisioned from one source of truth (the environment's secret
   manager / Railway variable) and referenced in both places rather than typed independently in two
-  places. To rotate: generate a new value, set it as the API service's
-  `HealthChecks__ReadinessDetailToken` Railway variable for the environment, redeploy the API so it
-  picks up the new value, **then** update the `API_HEALTH_BEARER_TOKEN` GitHub Environment secret to
-  match before the next pipeline run. Rotating the GitHub secret first (before the API redeploys)
-  causes the next deploy's migration check to fail with the "missing authorization" diagnostic
-  described above — safe (fails closed), but avoidable by rotating in that order. Both `deploy.yml`
-  and `deployment-health-check.yml` consume the same `API_HEALTH_BEARER_TOKEN` secret so they never
-  drift from each other. `deploy.yml` declares this secret **`required: true`** in its
-  `workflow_call` contract — a wrapper that forgets to pass it fails workflow binding immediately,
-  before any job runs, rather than deploying with a blank token that would silently degrade the
-  migration gate to a false pass. `.github/scripts/deploy/tests/DeploySecretsWiring.Tests.ps1`
-  enforces both the `required: true` declaration and that every wrapper (`deploy-test.yml`,
-  `deploy-staging.yml`, `deploy-production.yml`) forwards it.
-  - **Rotation procedure — dual-token overlap window (authoritative; supersedes any other rotation
-    description).** Rotating this value has two real failure modes that a naive "change one side
-    then the other" ordering cannot avoid simultaneously:
+  places. `deploy.yml` declares this secret **`required: true`** in its `workflow_call` contract —
+  a wrapper that forgets to pass it fails workflow binding immediately, before any job runs, rather
+  than deploying with a blank token that would silently degrade the migration gate to a false pass.
+  `.github/scripts/deploy/tests/DeploySecretsWiring.Tests.ps1` enforces both the `required: true`
+  declaration and that every wrapper (`deploy-test.yml`, `deploy-staging.yml`,
+  `deploy-production.yml`) forwards it into `API_HEALTH_BEARER_TOKEN`.
+  - **How each caller actually gets this value.** `deploy.yml` (a reusable `workflow_call`
+    workflow) never reads a repo/environment secret directly — its caller (one of the
+    `deploy-*.yml` wrappers) forwards one of the repo-level `API_HEALTH_BEARER_TOKEN_TEST` /
+    `_STAGING` / `_PRODUCTION` secrets into the generic `api_bearer_token` input, which `deploy.yml`
+    then passes on to `deployment-health-check.yml` the same way. A **manual**
+    `workflow_dispatch` run of `deployment-health-check.yml` has no caller to forward that input
+    for it, so it resolves the bearer token itself: it binds to the selected GitHub Environment and
+    reads the matching `API_HEALTH_BEARER_TOKEN_TEST` / `_STAGING` / `_PRODUCTION` secret directly
+    (see the "Resolve bearer token for this invocation" step in that workflow). Both paths end up
+    presenting the same per-environment value to the API, so they never drift from each other — but
+    they are not "the same secret name consumed by both workflows"; only the reusable-workflow path
+    goes through the generic `api_bearer_token` / `API_HEALTH_BEARER_TOKEN` name.
+  - **Rotation procedure — dual-token overlap window. This is the only rotation procedure in this
+    runbook.** A single-token "replace current, deploy, then update the GitHub secret" order is
+    never used, because it has two real failure modes that no ordering of those three steps can
+    avoid simultaneously:
     1. If the GitHub secret is updated to the NEW value before the API is redeployed, that very
        redeploy's own forward-verification step (`check-startup-migrations.ps1`, run against the sha
        it just shipped) presents the NEW token to an API instance that (until that redeploy lands)
