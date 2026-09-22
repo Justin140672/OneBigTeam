@@ -55,6 +55,16 @@ $headers = @{}
 
 if (-not [string]::IsNullOrWhiteSpace($BearerToken)) {
     $headers["Authorization"] = "Bearer $BearerToken"
+    # Security review ticket 6 (P2): /health/startup-migrations now only returns per-module detail
+    # (and the 'release' block this script's -ExpectedSha gate depends on) to a caller presenting
+    # the same HealthChecks:ReadinessDetailToken already required for /health/ready's detail view
+    # (see HR.ServiceDefaults.HealthCheckEndpoints / StartupMigrationRunner.ToHealthResult). This
+    # script already receives one deploy-pipeline secret token via -BearerToken/-MigrationBearerToken
+    # (previously sent only as an unused Authorization header, since the endpoint had no auth at
+    # all) — it is now also sent as X-Health-Token so this pipeline keeps working. The deployed
+    # environment's HealthChecks:ReadinessDetailToken configuration MUST be set to this same value
+    # for that to hold; see the ticket 6 follow-up note in the security review.
+    $headers["X-Health-Token"] = $BearerToken
 }
 
 function Get-RemainingSeconds {

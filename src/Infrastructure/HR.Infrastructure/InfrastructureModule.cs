@@ -280,8 +280,25 @@ public static class InfrastructureModule
                 app.Services.GetRequiredService<IServiceScopeFactory>(),
                 app.Services.GetRequiredService<ILogger<BackgroundJobAuditFilter>>()));
 
-        app.MapGet("/health/background-jobs", (JobStorage jobStorage) =>
+        // Security review ticket 6 (P2): this endpoint discloses infrastructure detail (server names,
+        // queue depths, and — on failure — raw exception messages) that must not be exposed to an
+        // anonymous caller. Gated behind the same HealthChecks:ReadinessDetailToken already required
+        // for full /health/ready detail (Microsoft.Extensions.Hosting.HealthCheckEndpoints), checked
+        // manually (not via [Authorize]/RequireAuthorization) so this stays correct even if it is ever
+        // reached from a reduced pipeline with no auth middleware installed, exactly like
+        // /health/startup-migrations.
+        var backgroundJobsHealthLogger = app.Services.GetRequiredService<ILoggerFactory>()
+            .CreateLogger("HR.Infrastructure.BackgroundJobsHealthEndpoint");
+
+        app.MapGet("/health/background-jobs", (HttpContext httpContext, JobStorage jobStorage) =>
         {
+            var logger = backgroundJobsHealthLogger;
+
+            if (!Microsoft.Extensions.Hosting.HealthCheckEndpoints.HasDetailAccess(httpContext))
+            {
+                return Results.Json(new { status = "unauthorized" }, statusCode: StatusCodes.Status401Unauthorized);
+            }
+
             try
             {
                 var api = jobStorage.GetMonitoringApi();
@@ -328,7 +345,9 @@ public static class InfrastructureModule
             }
             catch (Exception ex)
             {
-                return Results.Json(new { status = "unhealthy", error = ex.Message, checkedAt = DateTimeOffset.UtcNow },
+                // The raw exception is logged internally only; the response never echoes ex.Message.
+                logger.LogError(ex, "Background job health check failed while querying Hangfire monitoring API");
+                return Results.Json(new { status = "unhealthy", checkedAt = DateTimeOffset.UtcNow },
                     statusCode: StatusCodes.Status503ServiceUnavailable);
             }
         });

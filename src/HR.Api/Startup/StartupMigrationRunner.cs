@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 
@@ -72,8 +73,19 @@ internal sealed class StartupMigrationRunner(ILogger<StartupMigrationRunner> log
     /// still a top-level key mapping to <c>{status,checkedAt,error}</c>. Ticket 5 adds one extra
     /// sibling key, <c>release</c> (<c>{sha,version}</c>), so the deploy pipeline can confirm the
     /// migration result it is reading belongs to the <b>new</b> release and not a healthy old API.
+    ///
+    /// <para>
+    /// Security review ticket 6 (P2): per-module detail (status/checkedAt, and especially the raw
+    /// exception <c>Message</c>) is only ever returned to a caller that presents the same
+    /// <c>HealthChecks:ReadinessDetailToken</c> token (or is Development) that already gates
+    /// <c>/health/ready</c> — see <see cref="Microsoft.Extensions.Hosting.HealthCheckEndpoints.HasDetailAccess"/>.
+    /// An anonymous/invalid-token caller only ever learns the coarse overall status and release tag,
+    /// matching <c>/health/ready</c>'s own public body shape. This endpoint is reachable even in the
+    /// reduced pipeline HR.Api falls back to when a required migration fails (no auth middleware
+    /// installed there), so the token check is performed here, not via [Authorize].
+    /// </para>
     /// </summary>
-    public IResult ToHealthResult()
+    public IResult ToHealthResult(HttpContext httpContext)
     {
         Dictionary<string, object> payload;
         bool allSucceeded;
@@ -86,6 +98,19 @@ internal sealed class StartupMigrationRunner(ILogger<StartupMigrationRunner> log
         }
 
         payload["release"] = ReleaseIdentity.ReleaseTag();
+
+        if (!Microsoft.Extensions.Hosting.HealthCheckEndpoints.HasDetailAccess(httpContext))
+        {
+            var minimal = new Dictionary<string, object>
+            {
+                ["status"] = allSucceeded ? "succeeded" : "failed",
+                ["release"] = ReleaseIdentity.ReleaseTag(),
+            };
+
+            return allSucceeded
+                ? Results.Ok(minimal)
+                : Results.Json(minimal, statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
 
         return allSucceeded
             ? Results.Ok(payload)

@@ -80,7 +80,7 @@ public static class HealthCheckEndpoints
             : StatusCodes.Status200OK;
         context.Response.ContentType = "application/json";
 
-        var includeDetail = ShouldIncludeDetail(context);
+        var includeDetail = HasDetailAccess(context);
 
         using var buffer = new MemoryStream();
         using (var writer = new Utf8JsonWriter(buffer))
@@ -117,7 +117,16 @@ public static class HealthCheckEndpoints
         return context.Response.Body.WriteAsync(buffer.ToArray()).AsTask();
     }
 
-    private static bool ShouldIncludeDetail(HttpContext context)
+    /// <summary>
+    /// Security review ticket 6 (P2): the same detail-gating check used by <c>/health/ready</c>,
+    /// exposed publicly so other detailed operational health endpoints (<c>/health/background-jobs</c>,
+    /// <c>/health/startup-migrations</c>) can require the identical token before disclosing
+    /// per-check/per-module names, descriptions, or exception detail. Works purely off
+    /// <see cref="HttpContext.RequestServices"/> and <see cref="HttpContext.Request"/>, so it also
+    /// works in the reduced pipeline HR.Api falls back to when a required startup migration fails
+    /// (no authentication/authorization middleware is installed on that path).
+    /// </summary>
+    public static bool HasDetailAccess(HttpContext context)
     {
         var environment = context.RequestServices.GetService(typeof(IHostEnvironment)) as IHostEnvironment;
         if (environment is not null && environment.IsDevelopment())

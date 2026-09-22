@@ -3,6 +3,11 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Shared\HR.SharedKernel\HR.SharedKernel.csproj" />
     <ProjectReference Include="..\HR.Infrastructure.Abstractions\HR.Infrastructure.Abstractions.csproj" />
+    <!-- Security review ticket 6 (P2): reuse the same readiness detail-token gate
+         (HealthCheckEndpoints.HasDetailAccess) that already protects /health/ready's detail for the
+         /health/background-jobs endpoint mapped below. HR.ServiceDefaults is shared cross-cutting
+         infrastructure (not a business module), so this is not a module boundary violation. -->
+    <ProjectReference Include="..\..\HR.ServiceDefaults\HR.ServiceDefaults.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -372,7 +372,7 @@ await migrationRunner.RunAsync("recruitment", app.Services, async sp =>
 	await sp.SeedRecruitmentAsync();
 });
 
-app.MapGet("/health/startup-migrations", () => migrationRunner.ToHealthResult());
+app.MapGet("/health/startup-migrations", (HttpContext httpContext) => migrationRunner.ToHealthResult(httpContext));
 
 // OBT-REM-01: a required migration failure must NOT let the API serve normal traffic or register
 // Hangfire recurring jobs. The process stays up in a non-ready state (health endpoints only) so
