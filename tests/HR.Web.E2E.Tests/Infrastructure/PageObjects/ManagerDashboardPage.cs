@@ -384,4 +384,31 @@ public sealed class ManagerDashboardPage(IPage page, string baseUrl)
         await card.GetByRole(AriaRole.Button, new() { Name = "Notify Sickness" }).ClickAsync();
         await page.WaitForSelectorAsync("[role='dialog'].record-sickness-dialog", new() { Timeout = 10_000 });
     }
+
+    /// <summary>
+    /// "View all team" link in the My Team widget header — navigates to MyTeamRoster.razor's
+    /// full team list (/companies/{companyId}/my-team). Preview-vs-full-list is the dashboard's
+    /// 8-card cap: see also HasViewAllTeamInlineLinkAsync for the second link shown below the
+    /// grid only when more than 8 members exist.
+    /// </summary>
+    public async Task ClickViewAllTeamAsync() =>
+        await MyTeamWidget.Locator("[data-testid='view-all-team-link']").ClickAsync();
+
+    /// <summary>
+    /// True once the "Showing 8 of N — view all team" inline overflow notice is visible below the
+    /// card grid (only rendered when the manager has more than 8 discoverable reports).
+    /// </summary>
+    public async Task<bool> HasViewAllTeamInlineLinkAsync() =>
+        await MyTeamWidget.Locator("[data-testid='view-all-team-inline-link']").IsVisibleAsync();
+
+    /// <summary>
+    /// Clicks the "View profile" button on the dashboard team-card whose name contains
+    /// <paramref name="nameFragment"/>, navigating to TeamMemberProfile.razor's read-only
+    /// manager team-view for that employee.
+    /// </summary>
+    public async Task ClickViewProfileForTeamMemberAsync(string nameFragment)
+    {
+        var card = MyTeamWidget.Locator(".team-card").Filter(new() { HasText = nameFragment }).First;
+        await card.GetByRole(AriaRole.Button, new() { Name = "View profile" }).ClickAsync();
+    }
 }

@@ -15,20 +15,20 @@
     }
     else if (_failureKind == ApiFailureKind.Forbidden)
     {
-        <div class="alert alert-warning" role="alert">
+        <div class="alert alert-warning" role="alert" data-testid="team-view-forbidden">
             You do not have permission to view this employee's profile. You can only view
             profiles for employees in your reporting hierarchy.
         </div>
     }
     else if (_failureKind == ApiFailureKind.NotFound)
     {
-        <div class="alert alert-warning" role="alert">
+        <div class="alert alert-warning" role="alert" data-testid="team-view-not-found">
             This employee could not be found.
         </div>
     }
     else if (_failureKind is not null)
     {
-        <div class="alert alert-danger" role="alert">
+        <div class="alert alert-danger" role="alert" data-testid="team-view-error">
             Something went wrong loading this profile. Please try again.
         </div>
     }
@@ -42,10 +42,10 @@
             properties for any of that (see EmployeeModels.cs's GetEmployeeTeamViewResponse and
             26-permissions-access-ux.md's field-level access matrix).
         -->
-        <h1 class="mb-1">@DisplayName(_employee)</h1>
-        <p class="text-muted mb-4">@(_employee.PositionTitle ?? "—")</p>
+        <h1 class="mb-1" data-testid="team-view-name">@DisplayName(_employee)</h1>
+        <p class="text-muted mb-4" data-testid="team-view-job-title">@(_employee.PositionTitle ?? "—")</p>
 
-        <div class="row g-3">
+        <div class="row g-3" data-testid="team-view-profile">
             <div class="col-md-6">
                 <div class="card">
                     <div class="card-body">
