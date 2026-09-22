@@ -16,12 +16,42 @@ namespace HR.Infrastructure.Tests;
 /// Development/an explicit test environment — Staging/Production must fail fast at startup if the
 /// corresponding Supabase configuration is missing.
 /// </summary>
+/// <remarks>
+/// Shares the "InfrastructureModuleRegistration" collection with <see cref="EmailSenderRegistrationTests"/>:
+/// that class briefly mutates the process-global E2E_TESTING environment variable, which
+/// AddInfrastructure/AddEmailSender reads — running both classes in the same non-parallel
+/// collection prevents that mutation from racing this class's own AddInfrastructure calls.
+/// </remarks>
+[Collection("InfrastructureModuleRegistration")]
 public class InfrastructureModuleStorageRegistrationTests
 {
     private const string ConnectionString =
         "Host=localhost;Database=hr_infrastructure_module_test_only;Username=none;Password=none";
 
     private static IConfiguration EmptyConfiguration() => new ConfigurationBuilder().Build();
+
+    // Security review ticket 5 (P1): AddEmailSender now also fails closed for a fully-unconfigured
+    // Staging/Production environment, and it runs before the storage registrations this test class
+    // targets. Supply a fully-configured Postmark section (mirrors the shape already committed in
+    // appsettings.json/appsettings.Staging.json) so these storage-focused tests keep isolating the
+    // storage check specifically — see EmailSenderRegistrationTests for the email-specific coverage.
+    private static IConfiguration WithFullPostmarkConfig(IConfiguration? baseConfiguration = null)
+    {
+        var builder = new ConfigurationBuilder();
+        if (baseConfiguration is not null)
+            builder.AddConfiguration(baseConfiguration);
+
+        builder.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Infrastructure:Postmark:ServerToken"] = "test-server-token",
+            ["Infrastructure:Postmark:FromEmail"] = "hello@example.com",
+            ["Infrastructure:Postmark:MessageStream"] = "outbound",
+            ["Infrastructure:Postmark:InvitationTemplateAlias"] = "user-invitation",
+            ["Infrastructure:Postmark:PasswordResetTemplateAlias"] = "password-reset",
+        });
+
+        return builder.Build();
+    }
 
     private static IServiceCollection BaseServices()
     {
@@ -39,7 +69,7 @@ public class InfrastructureModuleStorageRegistrationTests
         var environment = new HostingEnvironment { EnvironmentName = environmentName };
 
         var exception = Record.Exception(() =>
-            services.AddInfrastructure(ConnectionString, EmptyConfiguration(), environment));
+            services.AddInfrastructure(ConnectionString, WithFullPostmarkConfig(), environment));
 
         Assert.IsType<InvalidOperationException>(exception);
         Assert.Contains("Profile photo storage", exception!.Message);
@@ -83,7 +113,7 @@ public class InfrastructureModuleStorageRegistrationTests
             .Build();
 
         var exception = Record.Exception(() =>
-            services.AddInfrastructure(ConnectionString, configuration, environment));
+            services.AddInfrastructure(ConnectionString, WithFullPostmarkConfig(configuration), environment));
 
         Assert.Null(exception);
         Assert.DoesNotContain(services, d => d.ServiceType == typeof(IProfilePhotoStorageService)

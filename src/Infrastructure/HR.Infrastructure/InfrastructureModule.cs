@@ -35,7 +35,7 @@ public static class InfrastructureModule
         services.AddSingleton<HR.SharedKernel.ExecutionContext.IExecutionContextAccessor,
             HR.SharedKernel.ExecutionContext.ExecutionContextAccessor>();
 
-        AddEmailSender(services, configuration);
+        AddEmailSender(services, configuration, environment);
         services.AddSingleton<IInviteLinkBuilder, ConfiguredInviteLinkBuilder>();
         services.AddScoped<IAuditEventPublisher, DbAuditEventPublisher>();
         services.AddSingleton<ISupportSessionTokenIssuer, Security.SupportSessionTokenIssuer>();
@@ -206,10 +206,25 @@ public static class InfrastructureModule
         }
     }
 
-    private static void AddEmailSender(IServiceCollection services, IConfiguration configuration)
+    /// <summary>
+    /// Security review ticket 5 (P1): the logging-only email senders (<see cref="LoggingEmailSender"/>
+    /// / <see cref="LoggingInvitationEmailSender"/> / <see cref="LoggingPasswordResetEmailSender"/>)
+    /// unconditionally report every send as delivered (they return <c>true</c>/complete without ever
+    /// talking to a real provider). That is only acceptable where nothing downstream can mistake it
+    /// for a genuine delivery confirmation: Development, the "Test" environment name used by
+    /// WebApplicationFactory-hosted integration tests, or the explicit E2E harness (same
+    /// E2E_TESTING flag already used to keep the Playwright suite off the real Postmark API — see
+    /// the remarks below). Staging/Production MUST have a fully configured Postmark provider; a
+    /// missing token, sender identity, message stream, or template alias there is a deliberate hard
+    /// stop, exactly like the Ticket 2/3 malware-scanning and storage fail-closed checks this
+    /// mirrors — starting up with transactional email silently no-op'd risks invitations, password
+    /// resets, and support notifications that are never actually delivered while every call site
+    /// believes they were sent.
+    /// </summary>
+    private static void AddEmailSender(
+        IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
         var postmarkSection = configuration.GetSection("Infrastructure:Postmark");
-        var tokenConfigured = postmarkSection.Exists() && !string.IsNullOrWhiteSpace(postmarkSection["ServerToken"]);
 
         // Never wire the live Postmark senders into the Playwright E2E run. That suite boots the real
         // AppHost with ASPNETCORE_ENVIRONMENT=Development against seeded *.example / *.betacorp.example
@@ -219,7 +234,17 @@ public static class InfrastructureModule
         var e2eTesting = string.Equals(
             Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
 
-        if (tokenConfigured && !e2eTesting)
+        // Note: deliberately NOT including e2eTesting here. E2E_TESTING is only ever legitimately
+        // set under Development (HR.Api/Program.cs refuses to start otherwise), so by the time this
+        // runs for real it always coincides with IsDevelopment(). Keeping the flag out of this
+        // predicate means a hypothetical non-Development host with E2E_TESTING set still fails
+        // closed rather than getting a free pass into the logging stub.
+        var isLoggingSenderAllowedEnvironment = environment.IsDevelopment() || environment.IsEnvironment("Test");
+
+        var missingSettings = GetMissingPostmarkSettings(postmarkSection);
+        var isFullyConfigured = missingSettings.Count == 0;
+
+        if (isFullyConfigured && !e2eTesting)
         {
             services.Configure<PostmarkOptions>(postmarkSection);
             services.Configure<EmailBrandingOptions>(configuration.GetSection("EmailBranding"));
@@ -227,12 +252,40 @@ public static class InfrastructureModule
             services.AddHttpClient<IInvitationEmailSender, PostmarkInvitationEmailSender>();
             services.AddHttpClient<IPasswordResetEmailSender, PostmarkPasswordResetEmailSender>();
         }
-        else
+        else if (isLoggingSenderAllowedEnvironment)
         {
             services.AddSingleton<IEmailSender, LoggingEmailSender>();
             services.AddSingleton<IInvitationEmailSender, LoggingInvitationEmailSender>();
             services.AddSingleton<IPasswordResetEmailSender, LoggingPasswordResetEmailSender>();
         }
+        else
+        {
+            throw new InvalidOperationException(
+                "Transactional email is not fully configured for this environment. Missing: "
+                + string.Join(", ", missingSettings)
+                + ". The logging-only stub senders (which report every send as delivered without "
+                + "ever contacting a real provider) are only permitted in Development or an "
+                + "explicit automated-test environment — Staging/Production must have a fully "
+                + "configured Postmark provider under 'Infrastructure:Postmark'.");
+        }
+    }
+
+    private static IReadOnlyList<string> GetMissingPostmarkSettings(IConfigurationSection postmarkSection)
+    {
+        var missing = new List<string>();
+
+        if (string.IsNullOrWhiteSpace(postmarkSection["ServerToken"]))
+            missing.Add("Infrastructure:Postmark:ServerToken");
+        if (string.IsNullOrWhiteSpace(postmarkSection["FromEmail"]))
+            missing.Add("Infrastructure:Postmark:FromEmail");
+        if (string.IsNullOrWhiteSpace(postmarkSection["MessageStream"]))
+            missing.Add("Infrastructure:Postmark:MessageStream");
+        if (string.IsNullOrWhiteSpace(postmarkSection["InvitationTemplateAlias"]))
+            missing.Add("Infrastructure:Postmark:InvitationTemplateAlias");
+        if (string.IsNullOrWhiteSpace(postmarkSection["PasswordResetTemplateAlias"]))
+            missing.Add("Infrastructure:Postmark:PasswordResetTemplateAlias");
+
+        return missing;
     }
 
     public static IServiceCollection AddHangfireBackgroundJobs(
