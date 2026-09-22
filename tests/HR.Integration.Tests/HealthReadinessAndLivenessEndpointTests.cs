@@ -149,9 +149,15 @@ public sealed class HealthReadinessAndLivenessEndpointTests
         {
             base.ConfigureWebHost(builder);
 
-            // Force a non-Development environment so the token-gated detail path is exercised
-            // (Development always returns detail).
-            builder.UseEnvironment("Staging");
+            // "Test" (rather than "Staging") because the readiness token-gating this fixture wants
+            // to exercise only checks !IsDevelopment(), and "Test" is also one of the environments
+            // DataImportModule/DocumentsModule treat as allowed to fall back to their no-op local-
+            // storage/scanner implementations — avoiding both modules' Staging/Production guard,
+            // which requires real Supabase/ClamAv configuration, and avoiding registering a
+            // ClamAv health check that would try (and fail) to reach a real host, permanently
+            // tripping the "critical" tag this fixture's tests otherwise control themselves via
+            // CriticalDependencyDown.
+            builder.UseEnvironment("Test");
 
             builder.ConfigureAppConfiguration((_, config) =>
             {

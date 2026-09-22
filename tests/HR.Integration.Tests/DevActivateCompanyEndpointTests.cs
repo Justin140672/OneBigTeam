@@ -65,10 +65,16 @@ public class DevActivateCompanyEndpointTests
         // Reuse the shared collection's already-migrated Postgres container rather than spinning
         // up a dedicated one — only the hosting environment needs to differ. WithWebHostBuilder
         // composes on top of ApiWebApplicationFactory's ConfigureWebHost (TestAuthHandler, fakes).
-        using var productionFactory = _factory.WithWebHostBuilder(builder =>
-            builder.UseEnvironment("Production"));
+        //
+        // "Test" (rather than "Production"/"Staging") because the endpoint's gate only checks
+        // !IsDevelopment(), and "Test" is also one of the environments DataImportModule/
+        // DocumentsModule treat as allowed to fall back to their no-op local-storage/scanner
+        // implementations — avoiding both modules' Staging/Production guard, which requires real
+        // Supabase/ClamAv configuration that isn't available in this test host.
+        using var testFactory = _factory.WithWebHostBuilder(builder =>
+            builder.UseEnvironment("Test"));
 
-        using var client = productionFactory.CreateClient();
+        using var client = testFactory.CreateClient();
 
         var response = await client.PostAsJsonAsync("/api/dev/activate-company", new { companyId = Guid.NewGuid() });
 
