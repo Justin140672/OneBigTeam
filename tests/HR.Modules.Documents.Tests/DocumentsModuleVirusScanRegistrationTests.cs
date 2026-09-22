@@ -32,6 +32,25 @@ public class DocumentsModuleVirusScanRegistrationTests
             })
             .Build();
 
+    /// <summary>
+    /// Reliability review issue 6: since issue 2 introduced the same fail-fast storage guard
+    /// (AddStorageService) alongside the pre-existing malware-scanning guard, a Production/Staging
+    /// registration test now needs BOTH a fully configured scanner AND fully configured document
+    /// storage to succeed — a fixture with only ClamAv config throws on the storage check before
+    /// ever reaching the scanner assertions.
+    /// </summary>
+    private static IConfiguration ConfigurationWithClamAvAndStorage() =>
+        new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Documents:ClamAv:Host"] = "clamav.internal",
+                ["Documents:ClamAv:Port"] = "3310",
+                ["Documents:Supabase:SupabaseUrl"] = "https://example.supabase.co",
+                ["Documents:Supabase:ServiceRoleKey"] = "service-role-key",
+                ["Documents:Supabase:BucketName"] = "documents",
+            })
+            .Build();
+
     [Fact]
     public void Production_Without_ClamAv_Config_Throws_At_Registration()
     {
@@ -87,7 +106,9 @@ public class DocumentsModuleVirusScanRegistrationTests
         var services = new ServiceCollection();
         var environment = new HostingEnvironment { EnvironmentName = Environments.Production };
 
-        services.AddDocumentsModule(ConnectionString, ConfigurationWithClamAv(), environment);
+        // Requires storage config too (issue 2's fail-fast storage guard runs in the same
+        // AddDocumentsModule call) — see ConfigurationWithClamAvAndStorage for why.
+        services.AddDocumentsModule(ConnectionString, ConfigurationWithClamAvAndStorage(), environment);
 
         var scannerDescriptor = services.Single(d => d.ServiceType == typeof(IVirusScanService));
         Assert.Equal(typeof(ClamAvVirusScanService), scannerDescriptor.ImplementationType);
@@ -102,6 +123,45 @@ public class DocumentsModuleVirusScanRegistrationTests
         var options = provider.GetRequiredService<
             Microsoft.Extensions.Options.IOptions<Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckServiceOptions>>().Value;
         Assert.Contains(options.Registrations, r => r.Name == "clam-av");
+    }
+
+    [Fact]
+    public void Production_With_Full_Config_Registers_Both_Real_Scanner_And_Durable_Storage()
+    {
+        // Reliability review issue 6: proves a fully-configured production module registers BOTH
+        // real malware scanning AND durable (Supabase) document storage together — the two
+        // fail-fast guards are independent but must both succeed for the module to start.
+        var services = new ServiceCollection();
+        var environment = new HostingEnvironment { EnvironmentName = Environments.Production };
+
+        services.AddDocumentsModule(ConnectionString, ConfigurationWithClamAvAndStorage(), environment);
+
+        var scannerDescriptor = services.Single(d => d.ServiceType == typeof(IVirusScanService));
+        Assert.Equal(typeof(ClamAvVirusScanService), scannerDescriptor.ImplementationType);
+
+        var provider = services.BuildServiceProvider();
+        var storageService = provider.GetRequiredService<IDocumentStorageService>();
+        Assert.IsType<SupabaseDocumentStorageService>(storageService);
+
+        var options = provider.GetRequiredService<
+            Microsoft.Extensions.Options.IOptions<Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckServiceOptions>>().Value;
+        Assert.Contains(options.Registrations, r => r.Name == "clam-av");
+        Assert.Contains(options.Registrations, r => r.Name == "document-storage");
+    }
+
+    [Fact]
+    public void Production_With_ClamAv_Config_But_No_Storage_Config_Throws_At_Registration()
+    {
+        // Reliability review issue 6: the storage guard (issue 2) is independent of the scanner
+        // guard — a fully configured scanner must not mask a missing storage configuration.
+        var services = new ServiceCollection();
+        var environment = new HostingEnvironment { EnvironmentName = Environments.Production };
+
+        var exception = Record.Exception(() =>
+            services.AddDocumentsModule(ConnectionString, ConfigurationWithClamAv(), environment));
+
+        Assert.IsType<InvalidOperationException>(exception);
+        Assert.Contains("Document storage is not configured", exception!.Message);
     }
 
     [Fact]
