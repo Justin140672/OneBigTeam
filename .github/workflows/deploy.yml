@@ -51,8 +51,12 @@ on:
         description: Railway project token scoped to the target environment
         required: true
       API_HEALTH_BEARER_TOKEN:
-        description: Optional bearer token for the startup-migrations health probe
-        required: false
+        description: >-
+          Bearer token for the startup-migrations health probe. Required — /health/startup-migrations
+          only returns per-module detail (and the release.sha the -ExpectedSha gate depends on) to a
+          caller presenting this token, so a blank value would silently degrade the migration gate
+          into a false pass. See specifications/runbooks/deployment-pipeline.md section 5.
+        required: true
 
 concurrency:
   # Never run two deploys to the same environment at once.

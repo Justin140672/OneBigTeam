@@ -41,6 +41,13 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Baseline suppresses ONLY the two known, revoked fingerprints for
+          # PM-TOKEN-2026-09-INC1 (docs/incidents/2026-09-postmark-token-exposure.md
+          # and src/HR.Api/appsettings.json, both at commit-pinned locations from before
+          # the token was rotated on 2026-09-22). Any other finding — including the same
+          # value appearing in a new commit, or an unrelated secret anywhere in history —
+          # is NOT covered by this baseline and still fails the job.
+          GITLEAKS_BASELINE_PATH: .gitleaks-baseline.json
 
   # ------------------------------------------------------------------
   # Reproducible restore + dependency vulnerability gate (NFR-09).

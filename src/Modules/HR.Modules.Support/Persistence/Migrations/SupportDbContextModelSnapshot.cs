@@ -113,6 +113,11 @@ namespace HR.Modules.Support.Persistence.Migrations
 
                     b.HasIndex("ResolvedAt");
 
+                    b.HasIndex("StorageKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_support_attachment_pending_deletions_storage_key_unresolved")
+                        .HasFilter("resolved_at IS NULL");
+
                     b.ToTable("support_attachment_pending_deletions", "support");
                 });
 

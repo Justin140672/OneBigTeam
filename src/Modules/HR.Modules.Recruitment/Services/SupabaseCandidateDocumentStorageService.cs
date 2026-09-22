@@ -25,19 +25,21 @@ internal sealed class SupabaseCandidateDocumentStorageService : ICandidateDocume
         _options    = options.Value;
     }
 
-    public async Task<string> UploadAsync(
+    // The caller-supplied file name is untrusted and never embedded in the storage key (path
+    // traversal / header-injection surface); only a random id and the file's own extension are
+    // used, matching the Documents/Support-Attachments Supabase storage services.
+    public string GenerateStorageKey(string storageFolder, string fileName)
+    {
+        var extension = Path.GetExtension(fileName);
+        return $"{storageFolder.Trim('/')}/{Guid.NewGuid():N}{extension}";
+    }
+
+    public async Task UploadAsync(
         Stream content,
-        string fileName,
+        string storageKey,
         string contentType,
-        string storageFolder,
         CancellationToken cancellationToken)
     {
-        // The caller-supplied file name is untrusted and never embedded in the storage key (path
-        // traversal / header-injection surface); only a random id and the file's own extension are
-        // used, matching the Documents/Support-Attachments Supabase storage services.
-        var extension = Path.GetExtension(fileName);
-        var storageKey = $"{storageFolder.Trim('/')}/{Guid.NewGuid():N}{extension}";
-
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
             $"{_options.SupabaseUrl}/storage/v1/object/{_options.BucketName}/{storageKey}");
@@ -49,8 +51,20 @@ internal sealed class SupabaseCandidateDocumentStorageService : ICandidateDocume
 
         var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
+    }
 
-        return storageKey;
+    public async Task<bool> ExistsAsync(
+        string storageKey,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Head,
+            $"{_options.SupabaseUrl}/storage/v1/object/{_options.BucketName}/{storageKey}");
+
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ServiceRoleKey);
+
+        var response = await _httpClient.SendAsync(request, cancellationToken);
+        return response.IsSuccessStatusCode;
     }
 
     public async Task<Uri> GetDownloadUrlAsync(

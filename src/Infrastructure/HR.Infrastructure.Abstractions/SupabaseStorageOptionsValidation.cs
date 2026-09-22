@@ -17,12 +17,23 @@ namespace HR.Infrastructure.Abstractions;
 /// </summary>
 public static class SupabaseStorageOptionsValidation
 {
+    /// <summary>
+    /// Security review finding 6: the Supabase storage base URL carries the highly-privileged
+    /// service-role key (sent as the "apikey"/"Authorization" header on every request). Plain HTTP
+    /// would put that key on the wire in cleartext. HTTP is only tolerated when
+    /// <paramref name="allowInsecureHttp"/> is true — callers must only pass true for a local
+    /// Development or automated-test environment (mirroring the existing
+    /// IsLocalStorageAllowedEnvironment dev/test-only convention used for the local storage
+    /// fallback). Staging/Production must always pass false, so a plaintext URL fails startup
+    /// validation instead of silently shipping a credential leak.
+    /// </summary>
     public static List<string> Validate(
         string sectionName,
         string? supabaseUrl,
         string? serviceRoleKey,
         string? bucketName,
-        int? signedUrlExpirySeconds = null)
+        int? signedUrlExpirySeconds = null,
+        bool allowInsecureHttp = false)
     {
         var failures = new List<string>();
 
@@ -37,6 +48,13 @@ public static class SupabaseStorageOptionsValidation
         else if (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
         {
             failures.Add($"{sectionName}:SupabaseUrl must use the http or https scheme.");
+        }
+        else if (uri.Scheme == Uri.UriSchemeHttp && !allowInsecureHttp)
+        {
+            failures.Add(
+                $"{sectionName}:SupabaseUrl must use https. Plain http would send the Supabase "
+                + "service-role key in cleartext; http is only permitted in Development or an "
+                + "explicit automated-test environment.");
         }
 
         if (string.IsNullOrWhiteSpace(serviceRoleKey))

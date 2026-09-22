@@ -28,6 +28,12 @@ internal sealed class FakeSupportAttachmentStorageService : ISupportAttachmentSt
     /// <summary>Keys for which <see cref="DeleteAsync"/> should throw, simulating a storage-provider failure.</summary>
     public HashSet<string> FailDeleteForKeys { get; } = [];
 
+    /// <summary>Security review finding #4 (P1): when a test doesn't know a storage key in advance
+    /// (it's a random GUID minted inside <see cref="UploadAsync"/>), this makes every
+    /// <see cref="DeleteAsync"/> call fail regardless of key, so the compensating-delete-also-fails
+    /// path can be exercised deterministically.</summary>
+    public bool FailAllDeletes { get; set; }
+
     /// <summary>Reliability review issue 4 (P1): file names for which <see cref="UploadAsync"/>
     /// should throw, simulating a transport/provider error partway through a multi-file batch.</summary>
     public HashSet<string> FailUploadForFileNames { get; } = new(StringComparer.OrdinalIgnoreCase);
@@ -55,7 +61,7 @@ internal sealed class FakeSupportAttachmentStorageService : ISupportAttachmentSt
     {
         _deleteAttempts.Add(storageKey);
 
-        if (FailDeleteForKeys.Contains(storageKey))
+        if (FailAllDeletes || FailDeleteForKeys.Contains(storageKey))
             throw new InvalidOperationException($"Simulated delete failure for '{storageKey}'.");
 
         _activeKeys.TryRemove(storageKey, out _);

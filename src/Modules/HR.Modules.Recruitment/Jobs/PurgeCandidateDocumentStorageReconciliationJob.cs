@@ -1,10 +1,12 @@
 using Hangfire;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Recruitment.Jobs;
 
@@ -22,6 +24,17 @@ namespace HR.Modules.Recruitment.Jobs;
 ///    being re-enqueued every single sweep only to immediately re-suspend itself again.
 ///  - <see cref="CandidatePurgeAuditDelivery"/> rows left Pending (the inline publish attempt in the
 ///    handler failed) are republished here directly.
+///  - Follow-up review finding: durable pre-upload "upload intent" rows (status Reserved,
+///    <c>ConfirmedAt</c> still null) left behind by Features/UploadCandidateDocument/Handler.cs that
+///    have sat unresolved past the configured grace period. These rows are written BEFORE the
+///    storage upload call — see that handler's remarks — so this sweep is the authoritative backstop
+///    for every failure mode: an upload that never completed, a document save that failed after a
+///    successful upload, or a process crash at any point in between, including a persistent database
+///    outage that prevented every write after the initial intent. It checks whether the object
+///    actually exists in storage: if it does, the row is handed to the normal Pending claim/delete
+///    pipeline above; if it does not (the process crashed before the upload itself completed), the
+///    intent is simply cleared — there was never anything to delete. "Log an unrecoverable orphan and
+///    give up" is no longer a terminal outcome anywhere in the upload flow.
 ///
 /// Ticket 19 (P2): claim/lease protocol — same idiom as AccountDisablementReconciliationJob. Every
 /// eligible row (Pending, non-terminal Failed, stale-Processing by lease expiry, or a Held row
@@ -34,18 +47,87 @@ namespace HR.Modules.Recruitment.Jobs;
 /// </summary>
 internal sealed class PurgeCandidateDocumentStorageReconciliationJob(
     RecruitmentDbContext db,
+    ICandidateDocumentStorageService storage,
+    IOptions<CandidateDocumentUploadOptions> options,
     IClock clock,
     IAuditEventPublisher auditPublisher,
     ILegalHoldStatusReader legalHoldStatusReader,
     IBackgroundJobClient backgroundJobClient,
     ILogger<PurgeCandidateDocumentStorageReconciliationJob> logger)
 {
+    private const int IntentBatchSize = 200;
+
     [DisableConcurrentExecution(timeoutInSeconds: 300)]
     public async Task ExecuteAsync()
     {
+        await ResolveUnconfirmedUploadIntentsAsync();
         await ReconcileDocumentDeletionsAsync();
         await ReconcileHeldDocumentDeletionsAsync();
         await ReconcileAuditDeliveriesAsync();
+    }
+
+    /// <summary>
+    /// Resolves durable pre-upload intents (status Reserved) that were never confirmed within the
+    /// grace period — see class remarks. Never deletes anything directly: an intent found to have an
+    /// object in storage is transitioned to Pending and left for
+    /// <see cref="ReconcileDocumentDeletionsAsync"/> to actually claim/delete (on this same sweep,
+    /// since it runs immediately afterward), keeping exactly one code path responsible for the
+    /// destructive delete + retry/alert logic.
+    /// </summary>
+    private async Task ResolveUnconfirmedUploadIntentsAsync()
+    {
+        var now = clock.UtcNowOffset();
+        var graceCutoff = now.AddMinutes(-options.Value.UploadIntentGracePeriodMinutes);
+
+        var unconfirmed = await db.CandidateDocumentDeletionOperations
+            .Where(o => o.Status == CandidateDocumentDeletionOperation.StatusReserved
+                && o.ConfirmedAt == null
+                && o.CreatedAt <= graceCutoff)
+            .OrderBy(o => o.CreatedAt)
+            .Take(IntentBatchSize)
+            .ToListAsync();
+
+        foreach (var intent in unconfirmed)
+        {
+            if (await legalHoldStatusReader.IsUnderLegalHoldAsync(intent.CompanyId, CancellationToken.None))
+            {
+                logger.LogInformation(
+                    "Skipping unresolved upload-intent reconciliation for {IntentId}: company {CompanyId} is under a legal hold.",
+                    intent.Id, intent.CompanyId);
+                continue;
+            }
+
+            bool exists;
+            try
+            {
+                exists = await storage.ExistsAsync(intent.StorageKey, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex,
+                    "Failed to check storage existence for unresolved upload intent {IntentId} (company {CompanyId}); will retry on the next sweep.",
+                    intent.Id, intent.CompanyId);
+                continue;
+            }
+
+            if (exists)
+            {
+                intent.TransitionReservedToPending(now);
+                logger.LogWarning(
+                    "PurgeCandidateDocumentStorageReconciliationJob: unresolved upload intent {IntentId} (company {CompanyId}) has a blob in storage with no confirming document — handed to the deletion pipeline.",
+                    intent.Id, intent.CompanyId);
+            }
+            else
+            {
+                intent.MarkReservedIntentNeverUploaded(now);
+                logger.LogInformation(
+                    "PurgeCandidateDocumentStorageReconciliationJob: cleared unresolved upload intent {IntentId} (company {CompanyId}) — no object was ever uploaded to storage.",
+                    intent.Id, intent.CompanyId);
+            }
+        }
+
+        if (unconfirmed.Count > 0)
+            await db.SaveChangesAsync();
     }
 
     private async Task ReconcileDocumentDeletionsAsync()

@@ -3,13 +3,30 @@ namespace HR.Modules.DataImport.Services;
 internal interface IImportFileStorageService
 {
     /// <summary>
-    /// Uploads a file and returns the storage key used to reference it.
+    /// Reserves the final storage key for an upload before any bytes are written. Deterministic
+    /// given its inputs plus a fresh random component (never derived only after a successful
+    /// upload) so callers can persist a durable "upload intent" record naming this exact key prior
+    /// to calling <see cref="UploadAsync(Stream,string,string,CancellationToken)"/>.
     /// </summary>
-    Task<string> UploadAsync(
+    string GenerateStorageKey(string storageFolder, string fileName);
+
+    /// <summary>
+    /// Uploads a file to the given, previously reserved storage key (see
+    /// <see cref="GenerateStorageKey"/>).
+    /// </summary>
+    Task UploadAsync(
         Stream content,
-        string fileName,
+        string storageKey,
         string contentType,
-        string storageFolder,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Returns whether an object currently exists at the given storage key. Used by reconciliation
+    /// to distinguish a blob that was actually uploaded (and must be deleted) from one whose upload
+    /// never completed (nothing to delete, the durable intent can simply be cleared).
+    /// </summary>
+    Task<bool> ExistsAsync(
+        string storageKey,
         CancellationToken cancellationToken);
 
     /// <summary>
@@ -20,7 +37,10 @@ internal interface IImportFileStorageService
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Permanently removes a file from storage.
+    /// Permanently removes a file from storage. Must be idempotent: deleting a key that is
+    /// already gone (already deleted by a previous attempt, or never existed) must succeed rather
+    /// than throw, so retention retry/sweep logic can safely call this more than once for the
+    /// same storage key.
     /// </summary>
     Task DeleteAsync(
         string storageKey,

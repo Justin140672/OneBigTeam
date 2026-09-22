@@ -15,6 +15,7 @@ internal sealed class DataImportDbContext : DbContext
     public DbSet<ImportRowError> ImportRowErrors => Set<ImportRowError>();
     public DbSet<ImportStagingEmployee> ImportStagingEmployees => Set<ImportStagingEmployee>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
+    public DbSet<OrphanedImportFileUpload> OrphanedImportFileUploads => Set<OrphanedImportFileUpload>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

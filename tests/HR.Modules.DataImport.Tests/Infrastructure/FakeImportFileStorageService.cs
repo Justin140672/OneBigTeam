@@ -8,30 +8,56 @@ internal sealed class FakeImportFileStorageService : IImportFileStorageService
 
     private readonly Dictionary<string, byte[]> _contentByStorageKey = new();
 
-    public Task<string> UploadAsync(
+    public string GenerateStorageKey(string storageFolder, string fileName) =>
+        $"{storageFolder}/{Guid.NewGuid():N}/{fileName}";
+
+    public Task UploadAsync(
         Stream content,
-        string fileName,
+        string storageKey,
         string contentType,
-        string storageFolder,
         CancellationToken cancellationToken)
     {
-        var storageKey = $"{storageFolder}/{Guid.NewGuid():N}/{fileName}";
+        var fileName = storageKey[(storageKey.LastIndexOf('/') + 1)..];
         Uploads.Add((fileName, storageKey));
 
         using var memoryStream = new MemoryStream();
         content.CopyTo(memoryStream);
         _contentByStorageKey[storageKey] = memoryStream.ToArray();
 
-        return Task.FromResult(storageKey);
+        return Task.CompletedTask;
     }
+
+    public Task<bool> ExistsAsync(string storageKey, CancellationToken cancellationToken) =>
+        Task.FromResult(_contentByStorageKey.ContainsKey(storageKey));
 
     public Task<Uri> GetDownloadUrlAsync(string storageKey, CancellationToken cancellationToken)
         => Task.FromResult(new Uri($"https://storage.example.com/{storageKey}"));
 
     public List<string> Deletions { get; } = [];
 
+    /// <summary>
+    /// Test helper: when greater than zero, the next N calls to <see cref="DeleteAsync"/> throw
+    /// (simulating a transient storage failure) instead of succeeding, decrementing by one per
+    /// call. Used to exercise the retry/failed-attempt paths in ValidateImportSessionHandler and
+    /// PurgeImportSessionFilesJob.
+    /// </summary>
+    public int ThrowOnNextDeleteAttempts { get; set; }
+
+    /// <summary>Test helper: records the CancellationToken passed to each DeleteAsync call, so
+    /// tests can assert compensation used an independent cleanup token rather than a cancelled
+    /// request token.</summary>
+    public List<CancellationToken> DeleteCancellationTokens { get; } = [];
+
     public Task DeleteAsync(string storageKey, CancellationToken cancellationToken)
     {
+        DeleteCancellationTokens.Add(cancellationToken);
+
+        if (ThrowOnNextDeleteAttempts > 0)
+        {
+            ThrowOnNextDeleteAttempts--;
+            throw new IOException($"Simulated transient failure deleting storage key '{storageKey}'.");
+        }
+
         Deletions.Add(storageKey);
         _contentByStorageKey.Remove(storageKey);
         return Task.CompletedTask;

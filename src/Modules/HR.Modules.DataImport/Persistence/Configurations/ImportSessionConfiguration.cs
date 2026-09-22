@@ -91,7 +91,23 @@ internal sealed class ImportSessionConfiguration : IEntityTypeConfiguration<Impo
             .IsConcurrencyToken()
             .HasDefaultValue(1);
 
+        // Security review finding #2: retention/deletion tracking for the durable raw import file,
+        // kept separate from the session's business Status.
+        builder.Property(s => s.FileDeletedAt)
+            .HasColumnName("file_deleted_at");
+
+        builder.Property(s => s.FileDeletionLastAttemptedAt)
+            .HasColumnName("file_deletion_last_attempted_at");
+
+        builder.Property(s => s.FileDeletionAttemptCount)
+            .HasColumnName("file_deletion_attempt_count")
+            .IsRequired()
+            .HasDefaultValue(0);
+
         builder.HasIndex(s => s.CompanyId);
         builder.HasIndex(s => s.Status);
+
+        // Sweep job query pattern: find undeleted files where the deletion status is still open.
+        builder.HasIndex(s => s.FileDeletedAt);
     }
 }

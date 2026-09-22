@@ -1,6 +1,7 @@
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Jobs;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using HR.Modules.Recruitment.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -22,7 +23,9 @@ public class PurgeCandidateDocumentStorageReconciliationJobTests
     private static PurgeCandidateDocumentStorageReconciliationJob BuildJob(
         RecruitmentDbContext db, RecordingBackgroundJobClient jobClient, HR.SharedKernel.IAuditEventPublisher auditPublisher,
         FakeLegalHoldStatusReader? legalHoldStatusReader = null) =>
-        new(db, new FakeClock(FixedUtcNow), auditPublisher, legalHoldStatusReader ?? new FakeLegalHoldStatusReader(),
+        new(db, new FakeCandidateDocumentStorageService(),
+            Microsoft.Extensions.Options.Options.Create(new CandidateDocumentUploadOptions()),
+            new FakeClock(FixedUtcNow), auditPublisher, legalHoldStatusReader ?? new FakeLegalHoldStatusReader(),
             jobClient, NullLogger<PurgeCandidateDocumentStorageReconciliationJob>.Instance);
 
     private static CandidateDocumentDeletionOperation SeedDeletionOperation(
@@ -323,10 +326,14 @@ public class PurgeCandidateDocumentStorageReconciliationJobTests
                 var jobClientB = new RecordingBackgroundJobClient();
 
                 var jobA = new PurgeCandidateDocumentStorageReconciliationJob(
-                    dbA, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new FakeLegalHoldStatusReader(),
+                    dbA, new FakeCandidateDocumentStorageService(),
+                    Microsoft.Extensions.Options.Options.Create(new CandidateDocumentUploadOptions()),
+                    new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new FakeLegalHoldStatusReader(),
                     jobClientA, NullLogger<PurgeCandidateDocumentStorageReconciliationJob>.Instance);
                 var jobB = new PurgeCandidateDocumentStorageReconciliationJob(
-                    dbB, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new FakeLegalHoldStatusReader(),
+                    dbB, new FakeCandidateDocumentStorageService(),
+                    Microsoft.Extensions.Options.Options.Create(new CandidateDocumentUploadOptions()),
+                    new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new FakeLegalHoldStatusReader(),
                     jobClientB, NullLogger<PurgeCandidateDocumentStorageReconciliationJob>.Instance);
 
                 var taskA = jobA.ExecuteAsync();

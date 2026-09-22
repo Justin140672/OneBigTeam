@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 
@@ -21,8 +22,9 @@ internal sealed class SupabaseCandidateDocumentStorageHealthCheck(
     {
         var supabaseUrl = options.Value.SupabaseUrl;
         var serviceRoleKey = options.Value.ServiceRoleKey;
+        var bucketName = options.Value.BucketName;
 
-        if (string.IsNullOrWhiteSpace(supabaseUrl) || string.IsNullOrWhiteSpace(serviceRoleKey))
+        if (string.IsNullOrWhiteSpace(supabaseUrl) || string.IsNullOrWhiteSpace(serviceRoleKey) || string.IsNullOrWhiteSpace(bucketName))
         {
             return HealthCheckResult.Unhealthy("Candidate document storage (Supabase) is not configured.");
         }
@@ -37,9 +39,16 @@ internal sealed class SupabaseCandidateDocumentStorageHealthCheck(
 
             using var response = await client.SendAsync(request, cancellationToken);
 
-            return response.IsSuccessStatusCode
+            if (!response.IsSuccessStatusCode)
+            {
+                return HealthCheckResult.Unhealthy($"Candidate document storage (Supabase) returned {(int)response.StatusCode}.");
+            }
+
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            return SupabaseStorageBucketCheck.ContainsBucket(body, bucketName)
                 ? HealthCheckResult.Healthy("Candidate document storage (Supabase) reachable.")
-                : HealthCheckResult.Unhealthy($"Candidate document storage (Supabase) returned {(int)response.StatusCode}.");
+                : HealthCheckResult.Unhealthy("Candidate document storage (Supabase) is reachable but the configured bucket was not found.");
         }
         catch (Exception ex)
         {

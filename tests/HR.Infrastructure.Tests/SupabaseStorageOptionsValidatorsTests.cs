@@ -1,4 +1,5 @@
 using HR.Infrastructure.Storage;
+using Microsoft.Extensions.Hosting;
 using Xunit;
 
 namespace HR.Infrastructure.Tests;
@@ -10,10 +11,12 @@ namespace HR.Infrastructure.Tests;
 /// </summary>
 public class SupabaseStorageOptionsValidatorsTests
 {
+    private static IHostEnvironment ProductionEnvironment() => new FakeHostEnvironment("Production");
+
     [Fact]
     public void ProfilePhoto_Valid_Options_Pass()
     {
-        var validator = new SupabaseProfilePhotoStorageOptionsValidator();
+        var validator = new SupabaseProfilePhotoStorageOptionsValidator(ProductionEnvironment());
         var options = new SupabaseProfilePhotoStorageOptions
         {
             SupabaseUrl = "https://example.supabase.co",
@@ -34,7 +37,7 @@ public class SupabaseStorageOptionsValidatorsTests
     [InlineData("https://example.supabase.co", "key", "bucket", -1)]
     public void ProfilePhoto_Invalid_Options_Fail(string url, string key, string bucket, int expiry)
     {
-        var validator = new SupabaseProfilePhotoStorageOptionsValidator();
+        var validator = new SupabaseProfilePhotoStorageOptionsValidator(ProductionEnvironment());
         var options = new SupabaseProfilePhotoStorageOptions
         {
             SupabaseUrl = url,
@@ -51,7 +54,7 @@ public class SupabaseStorageOptionsValidatorsTests
     [Fact]
     public void SupportAttachment_Valid_Options_Pass()
     {
-        var validator = new SupabaseSupportAttachmentStorageOptionsValidator();
+        var validator = new SupabaseSupportAttachmentStorageOptionsValidator(ProductionEnvironment());
         var options = new SupabaseSupportAttachmentStorageOptions
         {
             SupabaseUrl = "https://example.supabase.co",
@@ -69,7 +72,7 @@ public class SupabaseStorageOptionsValidatorsTests
     [InlineData("https://example.supabase.co", "key", "")]
     public void SupportAttachment_Invalid_Options_Fail(string url, string key, string bucket)
     {
-        var validator = new SupabaseSupportAttachmentStorageOptionsValidator();
+        var validator = new SupabaseSupportAttachmentStorageOptionsValidator(ProductionEnvironment());
         var options = new SupabaseSupportAttachmentStorageOptions
         {
             SupabaseUrl = url,
@@ -84,7 +87,7 @@ public class SupabaseStorageOptionsValidatorsTests
     [Fact]
     public void OrganisationExport_Valid_Options_Pass()
     {
-        var validator = new SupabaseOrganisationDataExportStorageOptionsValidator();
+        var validator = new SupabaseOrganisationDataExportStorageOptionsValidator(ProductionEnvironment());
         var options = new SupabaseOrganisationDataExportStorageOptions
         {
             SupabaseUrl = "https://example.supabase.co",
@@ -101,7 +104,7 @@ public class SupabaseStorageOptionsValidatorsTests
     [InlineData("https://example.supabase.co", "key", "")]
     public void OrganisationExport_Invalid_Options_Fail(string url, string key, string bucket)
     {
-        var validator = new SupabaseOrganisationDataExportStorageOptionsValidator();
+        var validator = new SupabaseOrganisationDataExportStorageOptionsValidator(ProductionEnvironment());
         var options = new SupabaseOrganisationDataExportStorageOptions
         {
             SupabaseUrl = url,
@@ -111,4 +114,182 @@ public class SupabaseStorageOptionsValidatorsTests
 
         Assert.True(validator.Validate(null, options).Failed);
     }
+
+    [Theory]
+    [InlineData("Staging")]
+    [InlineData("Production")]
+    public void ProfilePhoto_Http_Url_Rejected_In_Staging_Or_Production(string environmentName)
+    {
+        var validator = new SupabaseProfilePhotoStorageOptionsValidator(new FakeHostEnvironment(environmentName));
+        var options = new SupabaseProfilePhotoStorageOptions
+        {
+            SupabaseUrl = "http://example.supabase.co",
+            ServiceRoleKey = "key",
+            BucketName = "profile-photos",
+            SignedUrlExpirySeconds = 3600,
+        };
+
+        var result = validator.Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("https", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("Development")]
+    [InlineData("Test")]
+    public void ProfilePhoto_Http_Url_Allowed_In_Development_Or_Test(string environmentName)
+    {
+        var validator = new SupabaseProfilePhotoStorageOptionsValidator(new FakeHostEnvironment(environmentName));
+        var options = new SupabaseProfilePhotoStorageOptions
+        {
+            SupabaseUrl = "http://example.supabase.co",
+            ServiceRoleKey = "key",
+            BucketName = "profile-photos",
+            SignedUrlExpirySeconds = 3600,
+        };
+
+        Assert.True(validator.Validate(null, options).Succeeded);
+    }
+
+    [Theory]
+    [InlineData("Staging")]
+    [InlineData("Production")]
+    [InlineData("Development")]
+    [InlineData("Test")]
+    public void ProfilePhoto_Https_Url_Passes_In_Every_Environment(string environmentName)
+    {
+        var validator = new SupabaseProfilePhotoStorageOptionsValidator(new FakeHostEnvironment(environmentName));
+        var options = new SupabaseProfilePhotoStorageOptions
+        {
+            SupabaseUrl = "https://example.supabase.co",
+            ServiceRoleKey = "key",
+            BucketName = "profile-photos",
+            SignedUrlExpirySeconds = 3600,
+        };
+
+        Assert.True(validator.Validate(null, options).Succeeded);
+    }
+
+    [Theory]
+    [InlineData("Staging")]
+    [InlineData("Production")]
+    public void SupportAttachment_Http_Url_Rejected_In_Staging_Or_Production(string environmentName)
+    {
+        var validator = new SupabaseSupportAttachmentStorageOptionsValidator(new FakeHostEnvironment(environmentName));
+        var options = new SupabaseSupportAttachmentStorageOptions
+        {
+            SupabaseUrl = "http://example.supabase.co",
+            ServiceRoleKey = "key",
+            BucketName = "support-attachments",
+            SignedUrlExpirySeconds = 3600,
+        };
+
+        var result = validator.Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("https", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("Development")]
+    [InlineData("Test")]
+    public void SupportAttachment_Http_Url_Allowed_In_Development_Or_Test(string environmentName)
+    {
+        var validator = new SupabaseSupportAttachmentStorageOptionsValidator(new FakeHostEnvironment(environmentName));
+        var options = new SupabaseSupportAttachmentStorageOptions
+        {
+            SupabaseUrl = "http://example.supabase.co",
+            ServiceRoleKey = "key",
+            BucketName = "support-attachments",
+            SignedUrlExpirySeconds = 3600,
+        };
+
+        Assert.True(validator.Validate(null, options).Succeeded);
+    }
+
+    [Theory]
+    [InlineData("Staging")]
+    [InlineData("Production")]
+    [InlineData("Development")]
+    [InlineData("Test")]
+    public void SupportAttachment_Https_Url_Passes_In_Every_Environment(string environmentName)
+    {
+        var validator = new SupabaseSupportAttachmentStorageOptionsValidator(new FakeHostEnvironment(environmentName));
+        var options = new SupabaseSupportAttachmentStorageOptions
+        {
+            SupabaseUrl = "https://example.supabase.co",
+            ServiceRoleKey = "key",
+            BucketName = "support-attachments",
+            SignedUrlExpirySeconds = 3600,
+        };
+
+        Assert.True(validator.Validate(null, options).Succeeded);
+    }
+
+    [Theory]
+    [InlineData("Staging")]
+    [InlineData("Production")]
+    public void OrganisationExport_Http_Url_Rejected_In_Staging_Or_Production(string environmentName)
+    {
+        var validator = new SupabaseOrganisationDataExportStorageOptionsValidator(new FakeHostEnvironment(environmentName));
+        var options = new SupabaseOrganisationDataExportStorageOptions
+        {
+            SupabaseUrl = "http://example.supabase.co",
+            ServiceRoleKey = "key",
+            BucketName = "organisation-exports",
+        };
+
+        var result = validator.Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("https", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("Development")]
+    [InlineData("Test")]
+    public void OrganisationExport_Http_Url_Allowed_In_Development_Or_Test(string environmentName)
+    {
+        var validator = new SupabaseOrganisationDataExportStorageOptionsValidator(new FakeHostEnvironment(environmentName));
+        var options = new SupabaseOrganisationDataExportStorageOptions
+        {
+            SupabaseUrl = "http://example.supabase.co",
+            ServiceRoleKey = "key",
+            BucketName = "organisation-exports",
+        };
+
+        Assert.True(validator.Validate(null, options).Succeeded);
+    }
+
+    [Theory]
+    [InlineData("Staging")]
+    [InlineData("Production")]
+    [InlineData("Development")]
+    [InlineData("Test")]
+    public void OrganisationExport_Https_Url_Passes_In_Every_Environment(string environmentName)
+    {
+        var validator = new SupabaseOrganisationDataExportStorageOptionsValidator(new FakeHostEnvironment(environmentName));
+        var options = new SupabaseOrganisationDataExportStorageOptions
+        {
+            SupabaseUrl = "https://example.supabase.co",
+            ServiceRoleKey = "key",
+            BucketName = "organisation-exports",
+        };
+
+        Assert.True(validator.Validate(null, options).Succeeded);
+    }
+}
+
+/// <summary>
+/// Minimal IHostEnvironment test double used to exercise the Development/Test-only HTTP allowance
+/// added for security review finding 6, without pulling in a full WebApplicationFactory host.
+/// </summary>
+internal sealed class FakeHostEnvironment(string environmentName) : IHostEnvironment
+{
+    public string EnvironmentName { get; set; } = environmentName;
+    public string ApplicationName { get; set; } = "HR.Infrastructure.Tests";
+    public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+    public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } =
+        new Microsoft.Extensions.FileProviders.NullFileProvider();
 }

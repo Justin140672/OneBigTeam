@@ -4,6 +4,7 @@ using HR.Modules.Support.Persistence;
 using HR.Modules.Support.Services;
 using HR.Modules.Support.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Support.Tests;
@@ -17,6 +18,16 @@ public class AddSupportResponseHandlerTests
         new(new DbContextOptionsBuilder<SupportDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
+
+    /// <summary>Security review finding #4 (P1): UploadedAttachmentCleanupScope now persists
+    /// cleanup bookkeeping through a genuinely separate DI scope/DbContext, not the ambient one.
+    /// None of these tests exercise cleanup failure paths, so an isolated in-memory database is
+    /// sufficient here.</summary>
+    private static IServiceScopeFactory BuildScopeFactory() =>
+        new ServiceCollection()
+            .AddDbContext<SupportDbContext>(o => o.UseInMemoryDatabase(Guid.NewGuid().ToString("N")))
+            .BuildServiceProvider()
+            .GetRequiredService<IServiceScopeFactory>();
 
     private static SupportRequest CreateRequest(Guid companyId, Guid submittedByUserId) =>
         SupportRequest.Create(
@@ -33,7 +44,7 @@ public class AddSupportResponseHandlerTests
         new(db, new FakeClock(FixedUtcNow), storage ?? new FakeSupportAttachmentStorageService(),
             new SupportAttachmentValidator(), fileScanner ?? new FakeUploadedFileScanner(),
             emailSender ?? new FakeEmailSender(), userEmailReader ?? new FakeUserEmailReader(),
-            Infrastructure.TestExecutionContext.Accessor, NullLogger<AddSupportResponseHandler>.Instance);
+            Infrastructure.TestExecutionContext.Accessor, BuildScopeFactory(), NullLogger<AddSupportResponseHandler>.Instance);
 
     [Fact]
     public async Task HandleAsync_Flags_Customer_Response_As_Not_Staff()

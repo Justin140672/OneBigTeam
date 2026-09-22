@@ -21,13 +21,15 @@ namespace HR.Integration.Tests;
 /// (Development always returns detail, same as <c>/health/ready</c>).
 /// </summary>
 public sealed class DetailedHealthEndpointAuthorizationTests
-    : IClassFixture<DetailedHealthEndpointAuthorizationTests.Factory>
+    : IClassFixture<DetailedHealthEndpointAuthorizationTests.Factory>, IDisposable
 {
     private const string DetailToken = "ticket6-test-detail-token";
 
     private readonly Factory _factory;
 
     public DetailedHealthEndpointAuthorizationTests(Factory factory) => _factory = factory;
+
+    public void Dispose() => _rotationFactory.Dispose();
 
     // ─── /health/background-jobs ───────────────────────────────────────────────
 
@@ -132,6 +134,49 @@ public sealed class DetailedHealthEndpointAuthorizationTests
         Assert.Equal(HttpStatusCode.OK, authorizedResponse.StatusCode);
     }
 
+    // ─── rotation overlap window (deployment-pipeline runbook section 5) ──────
+
+    [Fact]
+    public async Task Ready_current_token_returns_full_detail_during_rotation_overlap()
+    {
+        using var client = _rotationFactory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Health-Token", RotationFactory.CurrentToken);
+
+        var response = await client.GetAsync("/health/ready");
+
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        Assert.True(doc.RootElement.TryGetProperty("checks", out _));
+    }
+
+    [Fact]
+    public async Task Ready_previous_token_still_returns_full_detail_during_rotation_overlap()
+    {
+        using var client = _rotationFactory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Health-Token", RotationFactory.PreviousToken);
+
+        var response = await client.GetAsync("/health/ready");
+
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        Assert.True(doc.RootElement.TryGetProperty("checks", out _));
+    }
+
+    [Fact]
+    public async Task Ready_unrelated_token_is_rejected_even_during_rotation_overlap()
+    {
+        using var client = _rotationFactory.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Health-Token", "some-unrelated-token");
+
+        var response = await client.GetAsync("/health/ready");
+
+        var body = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(body);
+        Assert.False(doc.RootElement.TryGetProperty("checks", out _));
+    }
+
+    private readonly RotationFactory _rotationFactory = new();
+
     public sealed class Factory : ApiWebApplicationFactory
     {
         protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -153,6 +198,33 @@ public sealed class DetailedHealthEndpointAuthorizationTests
                 config.AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["HealthChecks:ReadinessDetailToken"] = DetailToken,
+                });
+            });
+        }
+    }
+
+    /// <summary>
+    /// Exercises the rotation overlap window: both a "current" and a "previous" token configured
+    /// at once (deployment-pipeline runbook section 5 rotation protocol) must each grant detail
+    /// access, while any other token must not.
+    /// </summary>
+    public sealed class RotationFactory : ApiWebApplicationFactory
+    {
+        public const string CurrentToken = "rotation-test-current-token";
+        public const string PreviousToken = "rotation-test-previous-token";
+
+        protected override void ConfigureWebHost(IWebHostBuilder builder)
+        {
+            base.ConfigureWebHost(builder);
+
+            builder.UseEnvironment("Test");
+
+            builder.ConfigureAppConfiguration((_, config) =>
+            {
+                config.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["HealthChecks:ReadinessDetailToken"] = CurrentToken,
+                    ["HealthChecks:ReadinessDetailTokenPrevious"] = PreviousToken,
                 });
             });
         }

@@ -6,6 +6,7 @@ using HR.SharedKernel;
 using HR.SharedKernel.ExecutionContext;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Support.Features.AddSupportResponse;
@@ -19,6 +20,7 @@ internal sealed class AddSupportResponseHandler(
     IEmailSender emailSender,
     IUserEmailReader userEmailReader,
     IExecutionContextAccessor executionContextAccessor,
+    IServiceScopeFactory serviceScopeFactory,
     ILogger<AddSupportResponseHandler> logger)
 {
     public async Task<Result<AddSupportResponseResponse>> HandleAsync(
@@ -59,7 +61,7 @@ internal sealed class AddSupportResponseHandler(
         // SubmitSupportRequestHandler — see its remarks for why this replaces the previous
         // list-plus-manual-try/catch approach.
         await using var cleanupScope = new UploadedAttachmentCleanupScope(
-            attachmentStorage, db, clock, executionContextAccessor, logger);
+            attachmentStorage, serviceScopeFactory, clock, executionContextAccessor, logger);
 
         if (files.Count > 0)
         {

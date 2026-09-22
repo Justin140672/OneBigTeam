@@ -26,16 +26,18 @@ internal sealed class SupabaseImportFileStorageService : IImportFileStorageServi
         _options    = options.Value;
     }
 
-    public async Task<string> UploadAsync(
-        Stream content,
-        string fileName,
-        string contentType,
-        string storageFolder,
-        CancellationToken cancellationToken)
+    public string GenerateStorageKey(string storageFolder, string fileName)
     {
         var extension = Path.GetExtension(fileName);
-        var storageKey = $"{storageFolder.Trim('/')}/{Guid.NewGuid():N}{extension}";
+        return $"{storageFolder.Trim('/')}/{Guid.NewGuid():N}{extension}";
+    }
 
+    public async Task UploadAsync(
+        Stream content,
+        string storageKey,
+        string contentType,
+        CancellationToken cancellationToken)
+    {
         using var request = new HttpRequestMessage(
             HttpMethod.Post,
             $"{_options.SupabaseUrl}/storage/v1/object/{_options.BucketName}/{storageKey}");
@@ -47,8 +49,20 @@ internal sealed class SupabaseImportFileStorageService : IImportFileStorageServi
 
         var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
+    }
 
-        return storageKey;
+    public async Task<bool> ExistsAsync(
+        string storageKey,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Head,
+            $"{_options.SupabaseUrl}/storage/v1/object/{_options.BucketName}/{storageKey}");
+
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ServiceRoleKey);
+
+        var response = await _httpClient.SendAsync(request, cancellationToken);
+        return response.IsSuccessStatusCode;
     }
 
     public async Task<Uri> GetDownloadUrlAsync(

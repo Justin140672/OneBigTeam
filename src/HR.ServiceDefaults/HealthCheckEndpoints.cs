@@ -39,6 +39,18 @@ public static class HealthCheckEndpoints
     public const string DetailTokenHeader = "X-Health-Token";
     public const string DetailTokenConfigKey = "HealthChecks:ReadinessDetailToken";
 
+    /// <summary>
+    /// Deployment-pipeline runbook section 5 (rotation protocol): an optional second config key
+    /// naming the token that was valid before the most recent rotation. When set, a caller
+    /// presenting EITHER the current or the previous token gets full detail access — a bounded
+    /// overlap window that lets a fresh deploy (new GitHub secret) and a rollback to the
+    /// immediately-prior known-good deployment (still holding the old GitHub secret, per the
+    /// deploy pipeline's dual-token overlap window) both authenticate without a forced-failure
+    /// rollback. Operators clear this key once the rotation is confirmed stable, ending the
+    /// overlap window and revoking the previous token.
+    /// </summary>
+    public const string DetailTokenPreviousConfigKey = "HealthChecks:ReadinessDetailTokenPrevious";
+
     public const string LiveTag = "live";
     public const string ReadyTag = "ready";
     public const string CriticalTag = "critical";
@@ -149,6 +161,18 @@ public static class HealthCheckEndpoints
 
         var presentedBytes = Encoding.UTF8.GetBytes(presented.ToString());
         var configuredBytes = Encoding.UTF8.GetBytes(configuredToken);
-        return CryptographicOperations.FixedTimeEquals(presentedBytes, configuredBytes);
+        if (CryptographicOperations.FixedTimeEquals(presentedBytes, configuredBytes))
+        {
+            return true;
+        }
+
+        var previousToken = configuration?[DetailTokenPreviousConfigKey];
+        if (string.IsNullOrWhiteSpace(previousToken))
+        {
+            return false;
+        }
+
+        var previousBytes = Encoding.UTF8.GetBytes(previousToken);
+        return CryptographicOperations.FixedTimeEquals(presentedBytes, previousBytes);
     }
 }

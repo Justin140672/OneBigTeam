@@ -1,11 +1,14 @@
 using ClosedXML.Excel;
 using HR.Modules.DataImport.Domain;
 using HR.Modules.DataImport.Features.UploadImportFile;
+using HR.Modules.DataImport.Jobs;
 using HR.Modules.DataImport.Persistence;
 using HR.Modules.DataImport.Services;
 using HR.Modules.DataImport.Tests.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace HR.Modules.DataImport.Tests;
@@ -26,7 +29,8 @@ public class UploadImportFileHandlerTests
         new(db,
             storage ?? new FakeImportFileStorageService(),
             new ImportFileValidator(Options.Create(options ?? new ImportFileUploadOptions())),
-            new FakeClock(FixedUtcNow));
+            new FakeClock(FixedUtcNow),
+            NullLogger<UploadImportFileHandler>.Instance);
 
     private static IFormFile FakeFile(string fileName, string contentType, byte[] content) =>
         new FormFile(new MemoryStream(content), 0, content.Length, "File", fileName)
@@ -234,17 +238,16 @@ public class UploadImportFileHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_When_SaveChangesAsync_Fails_Deletes_The_Uploaded_File()
+    public async Task HandleAsync_When_SessionSaveFails_After_A_Successful_Upload_Deletes_The_Uploaded_File()
     {
-        // DataImportDbContext is sealed (matching the dominant convention across this codebase's
-        // modules — Documents/Recruitment are the outliers, not the standard), so the usual
-        // "subclass and override SaveChangesAsync" trick isn't available here. Instead, point the
-        // context at a connection that genuinely fails when SaveChangesAsync opens it (nothing
-        // listens on 127.0.0.1:1, so the OS refuses the connection almost instantly) to force a
-        // real save failure without subclassing or weakening the module's DbContext sealing.
+        // Follow-up review finding: the intent-reservation save (call 1) succeeds — proving the
+        // upload genuinely happened against a durable pre-upload intent — and only the SECOND save
+        // (the session insert + intent confirmation) fails.
+        var interceptor = new ThrowFromCallSaveChangesInterceptor(failFromCallNumber: 2, persistent: false);
         await using var db = new DataImportDbContext(
             new DbContextOptionsBuilder<DataImportDbContext>()
-                .UseNpgsql("Host=127.0.0.1;Port=1;Database=edge_case;Username=x;Password=x;Timeout=2;Command Timeout=2")
+                .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+                .AddInterceptors(interceptor)
                 .Options);
 
         var storage = new FakeImportFileStorageService();
@@ -258,5 +261,162 @@ public class UploadImportFileHandlerTests
         Assert.Single(storage.Uploads);
         Assert.Single(storage.Deletions);
         Assert.Equal(storage.Uploads[0].StorageKey, storage.Deletions[0]);
+
+        // The immediate compensating delete succeeded, so the intent (persisted before the upload)
+        // is marked deleted — it will never need cleanup.
+        var intent = await db.OrphanedImportFileUploads.SingleAsync();
+        Assert.NotNull(intent.DeletedAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Compensates_Using_An_Independent_Cleanup_Token_Not_The_Cancelled_Request_Token()
+    {
+        // Security/code review finding #3: a cancelled/timed-out request must never prevent the
+        // compensating delete of a blob that was already uploaded — compensation must use its own
+        // independently-bounded token, never the (possibly already-cancelled) request token. The
+        // request's own token is cancelled only once the second save (after the upload) is reached.
+        var interceptor = new ThrowFromCallSaveChangesInterceptor(failFromCallNumber: 2, persistent: false);
+        await using var db = new DataImportDbContext(
+            new DbContextOptionsBuilder<DataImportDbContext>()
+                .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+                .AddInterceptors(interceptor)
+                .Options);
+
+        var storage = new FakeImportFileStorageService();
+        var handler = BuildHandler(db, storage);
+
+        using var requestCts = new CancellationTokenSource();
+
+        interceptor.BeforeThrow = () => requestCts.Cancel();
+
+        await Assert.ThrowsAnyAsync<Exception>(() => handler.HandleAsync(
+            BuildRequest(Guid.NewGuid(), file: FakeFile("employees.xlsx", XlsxContentType, XlsxBytes(3))),
+            Guid.NewGuid(),
+            requestCts.Token));
+
+        Assert.Single(storage.Deletions);
+        var deleteToken = Assert.Single(storage.DeleteCancellationTokens);
+        Assert.False(deleteToken.IsCancellationRequested);
+        Assert.NotEqual(requestCts.Token, deleteToken);
+    }
+
+    [Fact]
+    public async Task HandleAsync_When_SessionSaveFails_And_Immediate_Delete_Also_Fails_Leaves_The_Reserved_Intent_Unconfirmed_For_Reconciliation()
+    {
+        // Follow-up review finding: no separate durable orphan record is created any more — the
+        // Reserved intent already exists (persisted before the upload) and is simply left
+        // unconfirmed when both the session save and the immediate compensating delete fail.
+        var interceptor = new ThrowFromCallSaveChangesInterceptor(failFromCallNumber: 2, persistent: false);
+        await using var db = new DataImportDbContext(
+            new DbContextOptionsBuilder<DataImportDbContext>()
+                .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+                .AddInterceptors(interceptor)
+                .Options);
+
+        var storage = new FakeImportFileStorageService { ThrowOnNextDeleteAttempts = 1 };
+        var companyId = Guid.NewGuid();
+        var handler = BuildHandler(db, storage);
+
+        await Assert.ThrowsAsync<DbUpdateException>(() => handler.HandleAsync(
+            BuildRequest(companyId, file: FakeFile("employees.xlsx", XlsxContentType, XlsxBytes(3))),
+            Guid.NewGuid(),
+            CancellationToken.None));
+
+        // The immediate delete failed, so no delete is recorded, but the Reserved intent persisted
+        // BEFORE the upload must still be there, unconfirmed, so the reconciliation sweep can
+        // resolve it.
+        Assert.Empty(storage.Deletions);
+        Assert.Empty(await db.ImportSessions.ToListAsync());
+
+        var intent = await db.OrphanedImportFileUploads.SingleOrDefaultAsync();
+        Assert.NotNull(intent);
+        Assert.Equal(companyId, intent!.CompanyId);
+        Assert.Equal(storage.Uploads[0].StorageKey, intent.StorageKey);
+        Assert.Null(intent.DeletedAt);
+        Assert.Null(intent.ConfirmedAt);
+
+        // Proves reconciliation actually cleans this up, not merely that a log line was written:
+        // the object genuinely still exists in storage (the delete failed), so the sweep must find
+        // it and delete it, not merely clear the intent as "never uploaded".
+        var reconciliationStorage = new FakeImportFileStorageService();
+        reconciliationStorage.SeedContent(intent.StorageKey, [1, 2, 3]);
+        var job = new PurgeOrphanedImportFileUploadsJob(
+            db, reconciliationStorage,
+            Options.Create(new DataImportFileRetentionOptions { UploadIntentGracePeriodMinutes = 0 }),
+            new FakeLegalHoldStatusReader(), new FakeAdministrativeAlertWriter(),
+            new FakeClock(FixedUtcNow.AddHours(2)), NullLogger<PurgeOrphanedImportFileUploadsJob>.Instance);
+
+        await job.ExecuteAsync();
+
+        var resolved = await db.OrphanedImportFileUploads.SingleAsync(o => o.Id == intent.Id);
+        Assert.Contains(intent.StorageKey, reconciliationStorage.Deletions);
+        Assert.NotNull(resolved.DeletedAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_When_SessionSaveFails_Persistently_And_Delete_Also_Fails_Still_Rethrows_Original_Exception()
+    {
+        // Every SaveChangesAsync call from the second one onward fails identically (a persistent
+        // database outage that started right after the upload) — the ORIGINAL exception from the
+        // session save must still be the one that propagates, not a different exception from the
+        // compensation path. The first save (the pre-upload intent reservation) must still succeed,
+        // otherwise nothing would ever be uploaded and this scenario would be meaningless.
+        var interceptor = new ThrowFromCallSaveChangesInterceptor(failFromCallNumber: 2, persistent: true);
+        await using var db = new DataImportDbContext(
+            new DbContextOptionsBuilder<DataImportDbContext>()
+                .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+                .AddInterceptors(interceptor)
+                .Options);
+
+        var storage = new FakeImportFileStorageService { ThrowOnNextDeleteAttempts = int.MaxValue };
+        var handler = BuildHandler(db, storage);
+
+        var thrown = await Assert.ThrowsAsync<DbUpdateException>(() => handler.HandleAsync(
+            BuildRequest(Guid.NewGuid(), file: FakeFile("employees.xlsx", XlsxContentType, XlsxBytes(3))),
+            Guid.NewGuid(),
+            CancellationToken.None));
+
+        Assert.Equal("Simulated database failure.", thrown.Message);
+        Assert.Empty(storage.Deletions);
+    }
+
+    /// <summary>Throws a <see cref="DbUpdateException"/> from the given SaveChangesAsync call number
+    /// onward against a context this interceptor is attached to (every earlier call succeeds
+    /// normally). When <paramref name="persistent"/> is false, only that single call throws and
+    /// every call after it succeeds — modelling a single transient save failure. When true, every
+    /// call from that point on throws — modelling a persistent database outage. Used in place of
+    /// subclassing (DataImportDbContext is sealed).</summary>
+    private sealed class ThrowFromCallSaveChangesInterceptor(int failFromCallNumber, bool persistent) : SaveChangesInterceptor
+    {
+        private int _callCount;
+
+        /// <summary>Optional hook invoked immediately before this interceptor throws, e.g. to
+        /// cancel a request's own token to simulate a client disconnect racing the save.</summary>
+        public Action? BeforeThrow { get; set; }
+
+        public override InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result)
+        {
+            _callCount++;
+            if (_callCount == failFromCallNumber || (persistent && _callCount > failFromCallNumber))
+            {
+                BeforeThrow?.Invoke();
+                throw new DbUpdateException("Simulated database failure.");
+            }
+
+            return base.SavingChanges(eventData, result);
+        }
+
+        public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
+            DbContextEventData eventData, InterceptionResult<int> result, CancellationToken cancellationToken = default)
+        {
+            _callCount++;
+            if (_callCount == failFromCallNumber || (persistent && _callCount > failFromCallNumber))
+            {
+                BeforeThrow?.Invoke();
+                throw new DbUpdateException("Simulated database failure.");
+            }
+
+            return base.SavingChangesAsync(eventData, result, cancellationToken);
+        }
     }
 }

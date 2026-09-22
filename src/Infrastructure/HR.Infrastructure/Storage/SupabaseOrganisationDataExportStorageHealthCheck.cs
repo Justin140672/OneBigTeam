@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 
@@ -19,8 +20,9 @@ internal sealed class SupabaseOrganisationDataExportStorageHealthCheck(
     {
         var supabaseUrl = options.Value.SupabaseUrl;
         var serviceRoleKey = options.Value.ServiceRoleKey;
+        var bucketName = options.Value.BucketName;
 
-        if (string.IsNullOrWhiteSpace(supabaseUrl) || string.IsNullOrWhiteSpace(serviceRoleKey))
+        if (string.IsNullOrWhiteSpace(supabaseUrl) || string.IsNullOrWhiteSpace(serviceRoleKey) || string.IsNullOrWhiteSpace(bucketName))
         {
             return HealthCheckResult.Unhealthy("Organisation data export storage (Supabase) is not configured.");
         }
@@ -35,9 +37,16 @@ internal sealed class SupabaseOrganisationDataExportStorageHealthCheck(
 
             using var response = await client.SendAsync(request, cancellationToken);
 
-            return response.IsSuccessStatusCode
+            if (!response.IsSuccessStatusCode)
+            {
+                return HealthCheckResult.Unhealthy($"Organisation data export storage (Supabase) returned {(int)response.StatusCode}.");
+            }
+
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            return SupabaseStorageBucketCheck.ContainsBucket(body, bucketName)
                 ? HealthCheckResult.Healthy("Organisation data export storage (Supabase) reachable.")
-                : HealthCheckResult.Unhealthy($"Organisation data export storage (Supabase) returned {(int)response.StatusCode}.");
+                : HealthCheckResult.Unhealthy("Organisation data export storage (Supabase) is reachable but the configured bucket was not found.");
         }
         catch (Exception ex)
         {

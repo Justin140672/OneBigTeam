@@ -149,7 +149,77 @@ the deploy wrappers and `deployment-health-check.yml`.
   causes the next deploy's migration check to fail with the "missing authorization" diagnostic
   described above — safe (fails closed), but avoidable by rotating in that order. Both `deploy.yml`
   and `deployment-health-check.yml` consume the same `API_HEALTH_BEARER_TOKEN` secret so they never
-  drift from each other.
+  drift from each other. `deploy.yml` declares this secret **`required: true`** in its
+  `workflow_call` contract — a wrapper that forgets to pass it fails workflow binding immediately,
+  before any job runs, rather than deploying with a blank token that would silently degrade the
+  migration gate to a false pass. `.github/scripts/deploy/tests/DeploySecretsWiring.Tests.ps1`
+  enforces both the `required: true` declaration and that every wrapper (`deploy-test.yml`,
+  `deploy-staging.yml`, `deploy-production.yml`) forwards it.
+  - **Rotation procedure — dual-token overlap window (authoritative; supersedes any other rotation
+    description).** Rotating this value has two real failure modes that a naive "change one side
+    then the other" ordering cannot avoid simultaneously:
+    1. If the GitHub secret is updated to the NEW value before the API is redeployed, that very
+       redeploy's own forward-verification step (`check-startup-migrations.ps1`, run against the sha
+       it just shipped) presents the NEW token to an API instance that (until that redeploy lands)
+       still only recognises the OLD `HealthChecks__ReadinessDetailToken` — "missing authorization",
+       an unnecessary automatic rollback of an otherwise-healthy release.
+    2. If a rollback is later triggered — during or after a rotation — the recovery-side migration
+       verifier (`Invoke-Recovery` in `Invoke-VerifiedDeploy.ps1`) authenticates with the SAME
+       `MigrationBearerToken` the deploy run was given (i.e. whatever the GitHub secret currently
+       holds), while the known-good instance being rolled back to may still be running the token that
+       was current *when it was deployed*. A single-value app-side token cannot satisfy both the new
+       forward check and an old-token rollback target at once.
+
+    The app now resolves this by **accepting either of two tokens during a bounded window**, rather
+    than requiring the GitHub secret and the app config to flip atomically. `HealthCheckEndpoints`
+    (`src/HR.ServiceDefaults/HealthCheckEndpoints.cs`) checks the presented `X-Health-Token` against
+    `HealthChecks:ReadinessDetailToken` (current) OR, if configured, the optional
+    `HealthChecks:ReadinessDetailTokenPrevious` (previous) using a constant-time comparison against
+    each candidate. This was chosen over "the deploy script tries new-then-old token" because the
+    comparison already lives in one shared, tested place (`HasDetailAccess`) used by every detail
+    endpoint (`/health/ready`, `/health/background-jobs`, `/health/startup-migrations`); adding a
+    second optional config key there is a small, bounded, reviewable change, whereas teaching every
+    caller of the health scripts to retry with a fallback token would duplicate that logic across
+    `check-startup-migrations.ps1`, `Invoke-VerifiedDeploy.ps1`'s recovery path, and any future health
+    caller, and would still require the app to remember the old token somewhere for a rollback target
+    that never redeploys during the window anyway.
+
+    Rotation order:
+    1. Generate the new token value.
+    2. Deploy `HR.Api` for the environment with the app config set to
+       `HealthChecks__ReadinessDetailToken=<NEW>` and
+       `HealthChecks__ReadinessDetailTokenPrevious=<OLD current value>`. Do this as its own dedicated
+       deploy (config-only, no other release content) so a misordered rotation has a blast radius of
+       "one no-op rollback", not "rollback of unrelated functional changes." **Do not touch the
+       `API_HEALTH_BEARER_TOKEN` GitHub secret yet** — that deploy's own forward-verification step
+       still presents the OLD token (the GitHub secret hasn't moved), which the app now accepts via
+       `ReadinessDetailTokenPrevious`, so the deploy passes.
+    3. Confirm that deploy's forward-verification step reports "Startup migrations healthy". The
+       service now accepts both OLD and NEW tokens.
+    4. Update the `API_HEALTH_BEARER_TOKEN` GitHub Environment secret (all three environments as
+       applicable) to the NEW value. The next deploy's forward check now presents NEW, which the
+       service already accepts as `ReadinessDetailToken` (current) — no mismatch window.
+    5. **Rollback safety throughout steps 2–4**: any rollback target captured at or after step 2 is
+       running the dual-token config, so it authenticates against either token regardless of what the
+       GitHub secret currently holds. A rollback target captured *before* step 2 only recognises the
+       single OLD token — which is still exactly what the GitHub secret holds until step 4, so it
+       also still authenticates. There is no point in this sequence where a legitimate
+       forward-deploy or a legitimate rollback-to-known-good is unable to authenticate.
+    6. Once the NEW token has been confirmed working for at least one full deploy cycle (i.e. no
+       rollback candidate still expects the OLD token), deploy `HR.Api` again with
+       `HealthChecks__ReadinessDetailTokenPrevious` removed (or blank). This is the explicit
+       revocation step — after it, the OLD token is rejected everywhere and the overlap window is
+       closed; the service reverts to accepting exactly one value, matching the pre-rotation
+       behaviour. Do not leave `ReadinessDetailTokenPrevious` set indefinitely — it exists only to
+       bound the rotation window, not as a standing second credential.
+    - **Rehearsal.** Before rotating a production token for real, run a rehearsal in a
+      non-production environment using
+      `.github/scripts/deploy/tests/Invoke-TokenRotationRehearsal.ps1` (dry-run: it prints the exact
+      sequence of `railway variables --set` / GitHub-secret-update commands an operator would run for
+      steps 1–6 above, and does not touch Railway or GitHub state). An operator runs the printed
+      commands against the target environment and captures the evidence (deploy links, health-check
+      responses at each step) — see that script's header for the checklist. This is a manual,
+      live-environment step; nothing in this repository can execute it.
 - **Release-safety declaration (`.github/scripts/deploy/release-safety.json`).** Checked into the
   repo, read by the recovery controller. Shape: `{ "appRollbackSafe": bool, "reason": "...",
   "notes": "..." }`, default `appRollbackSafe: true`. **Set `appRollbackSafe: false` in the same

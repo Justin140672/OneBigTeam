@@ -5,6 +5,7 @@ using HR.Modules.DataImport.Persistence;
 using HR.Modules.DataImport.Services;
 using HR.Modules.DataImport.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.DataImport.Tests;
 
@@ -39,7 +40,8 @@ public class ValidateImportSessionHandlerTests
                 lookupReader ?? new FakeEmployeeImportLookupReader(),
                 lookupResolver ?? new FakeImportLookupResolver(),
                 new FakeCompanyEmployeeNumberSettingsReader()),
-            new FakeClock(FixedUtcNow));
+            new FakeClock(FixedUtcNow),
+            NullLogger<ValidateImportSessionHandler>.Instance);
 
     // Pre-seeds a lookup resolver with the Department/EmploymentType/Location/PositionProfile
     // names used by MandatoryFieldSuffix, so validating rows with those mandatory lookup fields

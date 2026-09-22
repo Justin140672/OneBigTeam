@@ -23,12 +23,21 @@ on:
       api_bearer_token:
         required: true
 
+  # Manual dispatch: no api_base_url is asked for here on purpose. The environment selector below
+  # drives BOTH which GitHub Environment (and therefore which environment-scoped secret) this run
+  # binds to AND which vars.API_BASE_URL is read, so a manual run exercises the exact same
+  # environment wiring as an automated deploy — see the "environment ->" step below and the
+  # deployment-pipeline runbook section 5.
   workflow_dispatch:
     inputs:
-      api_base_url:
-        description: Base URL for API, e.g. https://api.example.com
+      environment:
+        description: Environment to check (test | staging | production)
         required: true
-        type: string
+        type: choice
+        options:
+          - test
+          - staging
+          - production
       max_attempts:
         description: Max retry attempts
         required: false
@@ -45,15 +54,94 @@ jobs:
   startup-migrations-health:
     runs-on: ubuntu-latest
 
+    # Reusable (workflow_call) invocations pass api_base_url/api_bearer_token explicitly and do not
+    # bind to a GitHub Environment themselves — the caller (deploy.yml) already runs inside the
+    # target GitHub Environment, so its protection rules (including production's required
+    # reviewers) already gated this job before it started.
+    #
+    # Manual (workflow_dispatch) invocations bind directly to the selected GitHub Environment so
+    # its environment-scoped secrets are available and production's approval gate applies the same
+    # way it does for a real deploy — a manual production health check still needs a reviewer.
+    # `inputs.environment` only exists under workflow_dispatch above; on a workflow_call invocation
+    # (where this input is not declared) it resolves to an empty value and no environment binds —
+    # correct, because the workflow_call caller (deploy.yml) is already running inside its own
+    # GitHub Environment and already gated by that Environment's protection rules.
+    environment: ${{ inputs.environment }}
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Same secret name (API_HEALTH_BEARER_TOKEN) is used by deploy.yml's workflow_call contract
+      # and by the deploy-test/staging/production.yml wrappers, which each forward one of the
+      # repo-level API_HEALTH_BEARER_TOKEN_TEST / _STAGING / _PRODUCTION secrets into that single
+      # name (see DeploySecretsWiring.Tests.ps1). This job matches that established convention
+      # rather than inventing a third naming scheme: on workflow_call it reads the generic
+      # `api_bearer_token` input the caller supplied (unchanged); on workflow_dispatch it maps the
+      # selected environment to the same repo-level *_TEST/_STAGING/_PRODUCTION secret the deploy
+      # wrappers use, explicitly, since a manual dispatch has no caller to forward one for it.
+      - name: Resolve bearer token for this invocation
+        id: token
+        shell: bash
+        env:
+          WORKFLOW_CALL_TOKEN: ${{ secrets.api_bearer_token }}
+          DISPATCH_TOKEN_TEST: ${{ secrets.API_HEALTH_BEARER_TOKEN_TEST }}
+          DISPATCH_TOKEN_STAGING: ${{ secrets.API_HEALTH_BEARER_TOKEN_STAGING }}
+          DISPATCH_TOKEN_PRODUCTION: ${{ secrets.API_HEALTH_BEARER_TOKEN_PRODUCTION }}
+          DISPATCH_ENVIRONMENT: ${{ inputs.environment }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            case "$DISPATCH_ENVIRONMENT" in
+              test) token="$DISPATCH_TOKEN_TEST" ;;
+              staging) token="$DISPATCH_TOKEN_STAGING" ;;
+              production) token="$DISPATCH_TOKEN_PRODUCTION" ;;
+              *)
+                echo "::error::Unknown environment '$DISPATCH_ENVIRONMENT'."
+                exit 1
+                ;;
+            esac
+          else
+            token="$WORKFLOW_CALL_TOKEN"
+          fi
+          if [ -z "$token" ]; then
+            echo "::error::No bearer token resolved for this invocation. For workflow_dispatch, set \
+          API_HEALTH_BEARER_TOKEN_TEST/_STAGING/_PRODUCTION as environment secrets on the matching \
+          GitHub Environment. For workflow_call, the caller must pass secrets.api_bearer_token."
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve API base URL for this invocation
+        id: base_url
+        shell: bash
+        env:
+          WORKFLOW_CALL_BASE_URL: ${{ inputs.api_base_url }}
+          # vars.API_BASE_URL is the same per-environment variable deploy.yml's verified-deploy
+          # step already reads (deployment-pipeline runbook section 4) — resolved here only for
+          # workflow_dispatch, since it is scoped by the `environment:` binding above.
+          DISPATCH_BASE_URL: ${{ vars.API_BASE_URL }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            url="$DISPATCH_BASE_URL"
+          else
+            url="$WORKFLOW_CALL_BASE_URL"
+          fi
+          if [ -z "$url" ]; then
+            echo "::error::No API base URL resolved. For workflow_dispatch, set the API_BASE_URL \
+          variable on the selected GitHub Environment. For workflow_call, the caller must pass \
+          inputs.api_base_url."
+            exit 1
+          fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
       - name: Verify startup migrations endpoint
         shell: pwsh
         env:
-          API_BASE_URL: ${{ inputs.api_base_url }}
-          API_BEARER_TOKEN: ${{ secrets.api_bearer_token }}
+          API_BASE_URL: ${{ steps.base_url.outputs.url }}
+          API_BEARER_TOKEN: ${{ steps.token.outputs.token }}
           MAX_ATTEMPTS: ${{ inputs.max_attempts }}
           DELAY_SECONDS: ${{ inputs.delay_seconds }}
         run: |

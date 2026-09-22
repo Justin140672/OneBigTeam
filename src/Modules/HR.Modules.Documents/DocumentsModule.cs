@@ -71,6 +71,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 
@@ -98,6 +99,12 @@ public static class DocumentsModule
     private static void AddStorageService(
         IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
+        // The options validator resolves IHostEnvironment via constructor injection to gate the
+        // Development/Test-only HTTP allowance (security review finding 6). The host already
+        // registers IHostEnvironment in production; TryAddSingleton is a no-op there and only
+        // matters for tests that build a bare IServiceCollection.
+        services.TryAddSingleton(environment);
+
         services.Configure<FileUploadOptions>(configuration.GetSection("Documents:FileUpload"));
         services.AddScoped<IFileUploadValidator, FileUploadValidator>();
 

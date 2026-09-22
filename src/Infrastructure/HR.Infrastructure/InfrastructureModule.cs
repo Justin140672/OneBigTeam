@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -133,6 +134,12 @@ public static class InfrastructureModule
     private static void AddProfilePhotoStorageService(
         IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
+        // The options validator resolves IHostEnvironment via constructor injection to gate the
+        // Development/Test-only HTTP allowance (security review finding 6). The host already
+        // registers IHostEnvironment in production; TryAddSingleton is a no-op there and only
+        // matters for tests that build a bare IServiceCollection.
+        services.TryAddSingleton(environment);
+
         var supabaseSection = configuration.GetSection("Infrastructure:Supabase:ProfilePhotos");
 
         if (supabaseSection.Exists() && !string.IsNullOrWhiteSpace(supabaseSection["SupabaseUrl"]))
@@ -158,6 +165,8 @@ public static class InfrastructureModule
     private static void AddSupportAttachmentStorageService(
         IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
+        services.TryAddSingleton(environment);
+
         var supabaseSection = configuration.GetSection("Infrastructure:Supabase:SupportAttachments");
 
         if (supabaseSection.Exists() && !string.IsNullOrWhiteSpace(supabaseSection["SupabaseUrl"]))
@@ -185,6 +194,8 @@ public static class InfrastructureModule
     private static void AddOrganisationDataExportStorage(
         IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
+        services.TryAddSingleton(environment);
+
         var supabaseSection = configuration.GetSection("Infrastructure:Supabase:OrganisationExports");
 
         if (supabaseSection.Exists() && !string.IsNullOrWhiteSpace(supabaseSection["SupabaseUrl"]))

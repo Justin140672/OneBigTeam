@@ -18,7 +18,7 @@ namespace HR.Modules.DataImport.Persistence.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasDefaultSchema("data_import")
-                .HasAnnotation("ProductVersion", "10.0.11")
+                .HasAnnotation("ProductVersion", "10.0.12")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -109,6 +109,20 @@ namespace HR.Modules.DataImport.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("failed_rows");
 
+                    b.Property<DateTimeOffset?>("FileDeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("file_deleted_at");
+
+                    b.Property<int>("FileDeletionAttemptCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("file_deletion_attempt_count");
+
+                    b.Property<DateTimeOffset?>("FileDeletionLastAttemptedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("file_deletion_last_attempted_at");
+
                     b.Property<string>("FileName")
                         .IsRequired()
                         .HasMaxLength(260)
@@ -161,6 +175,8 @@ namespace HR.Modules.DataImport.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CompanyId");
+
+                    b.HasIndex("FileDeletedAt");
 
                     b.HasIndex("Status");
 
@@ -272,6 +288,59 @@ namespace HR.Modules.DataImport.Persistence.Migrations
                     b.HasIndex("ImportSessionId", "WorkEmail");
 
                     b.ToTable("import_staging_employees", "data_import");
+                });
+
+            modelBuilder.Entity("HR.Modules.DataImport.Domain.OrphanedImportFileUpload", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("AttemptCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("attempt_count");
+
+                    b.Property<DateTimeOffset?>("ClearedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cleared_at");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirmed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<DateTimeOffset?>("LastAttemptedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_attempted_at");
+
+                    b.Property<string>("StorageKey")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("storage_key");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CompanyId");
+
+                    b.HasIndex("DeletedAt");
+
+                    b.HasIndex("ConfirmedAt", "DeletedAt", "ClearedAt", "CreatedAt");
+
+                    b.ToTable("orphaned_import_file_uploads", "data_import");
                 });
 
             modelBuilder.Entity("HR.Modules.DataImport.Persistence.IdempotencyRecord", b =>

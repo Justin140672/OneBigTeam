@@ -41,5 +41,13 @@ internal sealed class SupportAttachmentPendingDeletionConfiguration
             .HasColumnName("resolved_at");
 
         builder.HasIndex(d => d.ResolvedAt);
+
+        // Security review finding #4 (P1): idempotency guard for unresolved deletion records — a
+        // retried/duplicated cleanup attempt for the same storage key must not create a second
+        // unresolved row; the retry job only ever needs one live record per key.
+        builder.HasIndex(d => d.StorageKey)
+            .HasDatabaseName("ix_support_attachment_pending_deletions_storage_key_unresolved")
+            .IsUnique()
+            .HasFilter("resolved_at IS NULL");
     }
 }

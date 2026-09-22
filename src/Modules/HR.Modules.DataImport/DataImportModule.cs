@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace HR.Modules.DataImport;
@@ -30,6 +31,7 @@ public static class DataImportModule
         IHostEnvironment environment)
     {
         services.Configure<ImportFileUploadOptions>(configuration.GetSection("DataImport:FileUpload"));
+        services.Configure<DataImportFileRetentionOptions>(configuration.GetSection("DataImport:FileRetention"));
         services.AddScoped<IImportFileValidator, ImportFileValidator>();
         AddImportFileStorage(services, configuration, environment);
 
@@ -63,6 +65,8 @@ public static class DataImportModule
         services.AddScoped<IValidator<DownloadImportTemplateRequest>, DownloadImportTemplateValidator>();
 
         services.AddScoped<IdempotencyMaintenanceJob>();
+        services.AddScoped<PurgeImportSessionFilesJob>();
+        services.AddScoped<PurgeOrphanedImportFileUploadsJob>();
 
         services.AddDbContext<DataImportDbContext>(options =>
             options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
@@ -83,6 +87,12 @@ public static class DataImportModule
     private static void AddImportFileStorage(
         IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
+        // The options validator resolves IHostEnvironment via constructor injection to gate the
+        // Development/Test-only HTTP allowance (security review finding 6). The host already
+        // registers IHostEnvironment in production; TryAddSingleton is a no-op there and only
+        // matters for tests that build a bare IServiceCollection.
+        services.TryAddSingleton(environment);
+
         var supabaseSection = configuration.GetSection("DataImport:Supabase:ImportFiles");
 
         if (supabaseSection.Exists() && !string.IsNullOrWhiteSpace(supabaseSection["SupabaseUrl"]))
@@ -120,6 +130,18 @@ public static class DataImportModule
             "dataimport-idempotency-maintenance",
             job => job.ExecuteAsync(),
             "*/5 * * * *");
+        // Security review finding #2: hourly sweep for raw import files not already deleted
+        // inline by ValidateImportSession (abandoned sessions, retries of a failed inline delete).
+        jobManager.AddOrUpdate<PurgeImportSessionFilesJob>(
+            "dataimport-purge-session-files",
+            job => job.ExecuteAsync(CancellationToken.None),
+            Cron.Hourly());
+        // Security review finding #3: hourly sweep for uploaded blobs whose owning session row
+        // failed to save and whose immediate compensating delete also failed.
+        jobManager.AddOrUpdate<PurgeOrphanedImportFileUploadsJob>(
+            "dataimport-purge-orphaned-uploads",
+            job => job.ExecuteAsync(CancellationToken.None),
+            Cron.Hourly());
         return app;
     }
 

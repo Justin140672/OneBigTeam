@@ -56,8 +56,8 @@ public class SupabaseCandidateDocumentStorageRestartSafetyTests
         var serviceA = new SupabaseCandidateDocumentStorageService(new HttpClient(handlerA), Options());
 
         using var content = new MemoryStream([1, 2, 3, 4]);
-        var storageKey = await serviceA.UploadAsync(
-            content, "cv.pdf", "application/pdf", "companies/c1/candidates/cand1", CancellationToken.None);
+        var storageKey = serviceA.GenerateStorageKey("companies/c1/candidates/cand1", "cv.pdf");
+        await serviceA.UploadAsync(content, storageKey, "application/pdf", CancellationToken.None);
 
         Assert.False(string.IsNullOrWhiteSpace(storageKey));
         Assert.DoesNotContain(Path.GetTempPath().Replace('\\', '/'), storageKey, StringComparison.OrdinalIgnoreCase);

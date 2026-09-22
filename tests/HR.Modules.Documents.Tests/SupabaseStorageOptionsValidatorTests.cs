@@ -1,4 +1,5 @@
 using HR.Modules.Documents.Services;
+using Microsoft.Extensions.Hosting;
 using Xunit;
 
 namespace HR.Modules.Documents.Tests;
@@ -18,7 +19,8 @@ public class SupabaseStorageOptionsValidatorTests
         SignedUrlExpirySeconds = 3600,
     };
 
-    private static readonly SupabaseStorageOptionsValidator Validator = new();
+    private static readonly SupabaseStorageOptionsValidator Validator =
+        new(new FakeHostEnvironment("Production"));
 
     [Fact]
     public void Valid_Options_Pass()
@@ -76,4 +78,57 @@ public class SupabaseStorageOptionsValidatorTests
 
         Assert.True(result.Failed);
     }
+
+    [Theory]
+    [InlineData("Staging")]
+    [InlineData("Production")]
+    public void Http_Url_Rejected_In_Staging_Or_Production(string environmentName)
+    {
+        var validator = new SupabaseStorageOptionsValidator(new FakeHostEnvironment(environmentName));
+        var options = ValidOptions();
+        options.SupabaseUrl = "http://example.supabase.co";
+
+        var result = validator.Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("https", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("Development")]
+    [InlineData("Test")]
+    public void Http_Url_Allowed_In_Development_Or_Test(string environmentName)
+    {
+        var validator = new SupabaseStorageOptionsValidator(new FakeHostEnvironment(environmentName));
+        var options = ValidOptions();
+        options.SupabaseUrl = "http://example.supabase.co";
+
+        Assert.True(validator.Validate(null, options).Succeeded);
+    }
+
+    [Theory]
+    [InlineData("Staging")]
+    [InlineData("Production")]
+    [InlineData("Development")]
+    [InlineData("Test")]
+    public void Https_Url_Passes_In_Every_Environment(string environmentName)
+    {
+        var validator = new SupabaseStorageOptionsValidator(new FakeHostEnvironment(environmentName));
+        var options = ValidOptions();
+
+        Assert.True(validator.Validate(null, options).Succeeded);
+    }
+}
+
+/// <summary>
+/// Minimal IHostEnvironment test double used to exercise the Development/Test-only HTTP allowance
+/// added for security review finding 6, without pulling in a full WebApplicationFactory host.
+/// </summary>
+internal sealed class FakeHostEnvironment(string environmentName) : IHostEnvironment
+{
+    public string EnvironmentName { get; set; } = environmentName;
+    public string ApplicationName { get; set; } = "HR.Modules.Documents.Tests";
+    public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+    public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } =
+        new Microsoft.Extensions.FileProviders.NullFileProvider();
 }

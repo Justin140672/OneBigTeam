@@ -17,4 +17,14 @@ internal sealed class CandidateDocumentUploadOptions
         "application/msword",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ];
+
+    /// <summary>
+    /// Follow-up review finding: how long a durable pre-upload "upload intent"
+    /// (<see cref="HR.Modules.Recruitment.Domain.CandidateDocumentDeletionOperation"/>, status
+    /// Reserved) may sit unconfirmed before PurgeCandidateDocumentStorageReconciliationJob treats it
+    /// as abandoned and resolves it (checks whether the object exists in storage and either hands it
+    /// to the delete pipeline or clears it). Mirrors
+    /// DataImportFileRetentionOptions.UploadIntentGracePeriodMinutes.
+    /// </summary>
+    public int UploadIntentGracePeriodMinutes { get; set; } = 60;
 }

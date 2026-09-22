@@ -18,7 +18,9 @@ public sealed class LocalCandidateDocumentStorageServiceContainmentTests
         var sut = CreateSut();
         using var upload = new MemoryStream([1, 2, 3]);
 
-        var storageKey = await sut.UploadAsync(upload, "../../escape.pdf", "application/pdf", $"test-{Guid.NewGuid():N}", CancellationToken.None);
+        var reservedKey = sut.GenerateStorageKey($"test-{Guid.NewGuid():N}", "../../escape.pdf");
+        await sut.UploadAsync(upload, reservedKey, "application/pdf", CancellationToken.None);
+        var storageKey = reservedKey;
 
         Assert.DoesNotContain("escape", storageKey);
         await sut.DeleteAsync(storageKey, CancellationToken.None);

@@ -1,4 +1,5 @@
 using HR.Modules.Recruitment.Services;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Xunit;
 
@@ -19,7 +20,8 @@ public class SupabaseCandidateDocumentStorageOptionsValidatorTests
         SignedUrlExpirySeconds = 3600,
     };
 
-    private static readonly SupabaseCandidateDocumentStorageOptionsValidator Validator = new();
+    private static readonly SupabaseCandidateDocumentStorageOptionsValidator Validator =
+        new(new FakeHostEnvironment("Production"));
 
     [Fact]
     public void Valid_Options_Pass()
@@ -111,4 +113,57 @@ public class SupabaseCandidateDocumentStorageOptionsValidatorTests
         Assert.True(result.Failed);
         Assert.Contains(result.Failures!, f => f.Contains("SignedUrlExpirySeconds", StringComparison.Ordinal));
     }
+
+    [Theory]
+    [InlineData("Staging")]
+    [InlineData("Production")]
+    public void Http_Url_Rejected_In_Staging_Or_Production(string environmentName)
+    {
+        var validator = new SupabaseCandidateDocumentStorageOptionsValidator(new FakeHostEnvironment(environmentName));
+        var options = ValidOptions();
+        options.SupabaseUrl = "http://example.supabase.co";
+
+        var result = validator.Validate(null, options);
+
+        Assert.True(result.Failed);
+        Assert.Contains(result.Failures!, f => f.Contains("https", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("Development")]
+    [InlineData("Test")]
+    public void Http_Url_Allowed_In_Development_Or_Test(string environmentName)
+    {
+        var validator = new SupabaseCandidateDocumentStorageOptionsValidator(new FakeHostEnvironment(environmentName));
+        var options = ValidOptions();
+        options.SupabaseUrl = "http://example.supabase.co";
+
+        Assert.True(validator.Validate(null, options).Succeeded);
+    }
+
+    [Theory]
+    [InlineData("Staging")]
+    [InlineData("Production")]
+    [InlineData("Development")]
+    [InlineData("Test")]
+    public void Https_Url_Passes_In_Every_Environment(string environmentName)
+    {
+        var validator = new SupabaseCandidateDocumentStorageOptionsValidator(new FakeHostEnvironment(environmentName));
+        var options = ValidOptions();
+
+        Assert.True(validator.Validate(null, options).Succeeded);
+    }
+}
+
+/// <summary>
+/// Minimal IHostEnvironment test double used to exercise the Development/Test-only HTTP allowance
+/// added for security review finding 6, without pulling in a full WebApplicationFactory host.
+/// </summary>
+internal sealed class FakeHostEnvironment(string environmentName) : IHostEnvironment
+{
+    public string EnvironmentName { get; set; } = environmentName;
+    public string ApplicationName { get; set; } = "HR.Modules.Recruitment.Tests";
+    public string ContentRootPath { get; set; } = AppContext.BaseDirectory;
+    public Microsoft.Extensions.FileProviders.IFileProvider ContentRootFileProvider { get; set; } =
+        new Microsoft.Extensions.FileProviders.NullFileProvider();
 }

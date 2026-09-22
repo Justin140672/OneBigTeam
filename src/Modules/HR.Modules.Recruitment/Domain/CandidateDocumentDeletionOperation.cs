@@ -35,6 +35,26 @@ internal sealed class CandidateDocumentDeletionOperation : IVersionedAggregate
     public const string StatusFailed     = "failed";
 
     /// <summary>
+    /// Follow-up review finding: a durable pre-upload "upload intent", persisted by
+    /// UploadCandidateDocumentHandler BEFORE the blob is uploaded — not only after a failure is
+    /// detected as compensation. Previously durable intent was only ever written as compensation
+    /// (see the class-level ticket-13 remarks), so a process crash immediately after a successful
+    /// upload — with the DB unreachable for both the document save AND the compensation write —
+    /// left the blob with zero durable trace. Because a row in this status now exists before the
+    /// upload is even attempted, that failure mode is closed.
+    ///
+    /// A Reserved row is fulfilled (<see cref="ConfirmedAt"/> set) in the SAME SaveChangesAsync call
+    /// as the owning <see cref="CandidateDocument"/> insert. If that save fails — for any reason,
+    /// including a persistent DB outage — the row is simply left Reserved and unconfirmed;
+    /// PurgeCandidateDocumentStorageReconciliationJob's intent sweep is what authoritatively
+    /// resolves it once the grace period elapses, by checking whether the object actually exists in
+    /// storage and either transitioning it to <see cref="StatusPending"/> (object exists — hands off
+    /// to the existing claim/delete pipeline) or marking it <see cref="ConfirmedAt"/> directly with
+    /// no object ever having existed (process crashed before the upload itself completed).
+    /// </summary>
+    public const string StatusReserved = "reserved";
+
+    /// <summary>
     /// Ticket 18 (P1): the owning company is under a legal hold at the moment
     /// PurgeCandidateDocumentStorageJob was about to perform the actual destructive storage delete.
     /// Distinct from <see cref="StatusFailed"/> — this is not an error, consumes no retry attempt,
@@ -76,6 +96,11 @@ internal sealed class CandidateDocumentDeletionOperation : IVersionedAggregate
     public Guid? CausationId { get; private set; }
     public Guid? MessageId { get; private set; }
 
+    /// <summary>Follow-up review finding: set when the owning <see cref="CandidateDocument"/> row
+    /// was durably saved (in the same SaveChangesAsync call as this flag being set) — a Reserved
+    /// intent is fulfilled and will never need cleanup.</summary>
+    public DateTimeOffset? ConfirmedAt { get; private set; }
+
     public void IncrementVersion() => Version++;
 
     public static CandidateDocumentDeletionOperation CreatePending(
@@ -96,6 +121,63 @@ internal sealed class CandidateDocumentDeletionOperation : IVersionedAggregate
             CausationId = executionContext?.MessageId,
             MessageId = Guid.NewGuid(),
         };
+    }
+
+    /// <summary>
+    /// Reserves a durable upload intent for <paramref name="storageKey"/>. Must be persisted
+    /// (SaveChangesAsync) BEFORE the corresponding storage upload call is made — see class remarks.
+    /// </summary>
+    public static CandidateDocumentDeletionOperation CreateReservedUploadIntent(
+        Guid id, Guid companyId, Guid candidateId, string storageKey, DateTimeOffset now,
+        IExecutionContext? executionContext = null)
+    {
+        return new CandidateDocumentDeletionOperation
+        {
+            Id = id,
+            CompanyId = companyId,
+            CandidateId = candidateId,
+            StorageKey = storageKey,
+            Status = StatusReserved,
+            AttemptCount = 0,
+            CreatedAt = now,
+            Version = 1,
+            CorrelationId = executionContext is null ? null : CorrelationIdGuid.Derive(executionContext.CorrelationId),
+            CausationId = executionContext?.MessageId,
+            MessageId = Guid.NewGuid(),
+        };
+    }
+
+    /// <summary>The owning <see cref="CandidateDocument"/> row was durably saved — this intent is
+    /// fulfilled and will never need cleanup. Intended to be saved in the same SaveChangesAsync call
+    /// as that document's insert.</summary>
+    public void MarkConfirmed(DateTimeOffset now) => ConfirmedAt = now;
+
+    /// <summary>
+    /// Reconciliation determined a Reserved intent's object actually exists in storage with no
+    /// confirming document — hands the row off to the existing Pending claim/delete pipeline
+    /// (<see cref="Claim"/> et al.) rather than duplicating deletion logic here.
+    /// </summary>
+    public void TransitionReservedToPending(DateTimeOffset now)
+    {
+        if (Status != StatusReserved)
+            throw new InvalidOperationException($"Cannot transition a document deletion operation with status '{Status}' to pending.");
+
+        Status = StatusPending;
+        LastAttemptAt = now;
+    }
+
+    /// <summary>
+    /// Reconciliation determined a Reserved intent's object was never actually uploaded (the
+    /// process crashed before the upload call completed) — there is nothing to delete, so the
+    /// intent is simply resolved.
+    /// </summary>
+    public void MarkReservedIntentNeverUploaded(DateTimeOffset now)
+    {
+        if (Status != StatusReserved)
+            throw new InvalidOperationException($"Cannot clear a document deletion operation with status '{Status}' as never-uploaded.");
+
+        ConfirmedAt = now;
+        LastAttemptAt = now;
     }
 
     /// <summary>

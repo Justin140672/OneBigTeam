@@ -69,8 +69,8 @@ public class SupabaseImportFileStorageRestartSafetyTests
         var serviceA = new SupabaseImportFileStorageService(new HttpClient(handlerA), Options());
 
         using var content = new MemoryStream(bytes);
-        var storageKey = await serviceA.UploadAsync(
-            content, "employees.csv", "text/csv", "companies/c1/imports/session1", CancellationToken.None);
+        var storageKey = serviceA.GenerateStorageKey("companies/c1/imports/session1", "employees.csv");
+        await serviceA.UploadAsync(content, storageKey, "text/csv", CancellationToken.None);
 
         Assert.False(string.IsNullOrWhiteSpace(storageKey));
         Assert.DoesNotContain(Path.GetTempPath().Replace('\\', '/'), storageKey, StringComparison.OrdinalIgnoreCase);

@@ -9,6 +9,7 @@ using HR.SharedKernel;
 using HR.SharedKernel.ExecutionContext;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Support.Features.SubmitSupportRequest;
@@ -22,6 +23,7 @@ internal sealed class SubmitSupportRequestHandler(
     IEmailSender emailSender,
     IConfiguration configuration,
     IExecutionContextAccessor executionContextAccessor,
+    IServiceScopeFactory serviceScopeFactory,
     ILogger<SubmitSupportRequestHandler> logger)
 {
     public async Task<Result<SubmitSupportRequestResponse>> HandleAsync(
@@ -91,7 +93,7 @@ internal sealed class SubmitSupportRequestHandler(
         // upload/persist sequence, including a second file's upload failing) reaches
         // DisposeAsync without a commit, guaranteeing cleanup regardless of which step failed.
         await using var cleanupScope = new UploadedAttachmentCleanupScope(
-            attachmentStorage, db, clock, executionContextAccessor, logger);
+            attachmentStorage, serviceScopeFactory, clock, executionContextAccessor, logger);
 
         if (files.Count > 0)
         {

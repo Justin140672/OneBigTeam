@@ -1,10 +1,12 @@
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.UploadCandidateDocument;
+using HR.Modules.Recruitment.Jobs;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Services;
 using HR.Modules.Recruitment.Tests.Infrastructure;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Recruitment.Tests;
@@ -26,7 +28,8 @@ public class UploadCandidateDocumentHandlerTests
         new(db,
             storage ?? new FakeCandidateDocumentStorageService(),
             Options.Create(options ?? new CandidateDocumentUploadOptions()),
-            new FakeClock(FixedUtcNow));
+            new FakeClock(FixedUtcNow),
+            NullLogger<UploadCandidateDocumentHandler>.Instance);
 
     private static IFormFile FakePdfFile(string fileName = "resume.pdf", int size = 1024) =>
         FakeFile(fileName, "application/pdf", new byte[size]);
@@ -221,7 +224,10 @@ public class UploadCandidateDocumentHandlerTests
         var options = new DbContextOptionsBuilder<RecruitmentDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
-        await using var db = new ThrowingRecruitmentDbContext(options);
+        // Throws only on the SECOND SaveChangesAsync call (the document/intent-confirmation save) —
+        // the first call (the pre-upload intent reservation) must succeed for this scenario ("upload
+        // already happened, then the document save fails") to be meaningful.
+        await using var db = new ThrowOnceRecruitmentDbContext(options);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
         db.Candidates.Add(candidate);
         await db.BaseSaveChangesAsync();
@@ -237,6 +243,138 @@ public class UploadCandidateDocumentHandlerTests
         Assert.Single(storage.Uploads);
         Assert.Single(storage.Deletions);
         Assert.Equal(storage.Uploads[0].StorageKey, storage.Deletions[0]);
+
+        // The immediate compensating delete succeeded, so the Reserved intent (persisted before the
+        // upload) is marked confirmed/resolved — it will never need cleanup.
+        var operation = await db.CandidateDocumentDeletionOperations.SingleAsync();
+        Assert.Equal(CandidateDocumentDeletionOperation.StatusReserved, operation.Status);
+        Assert.NotNull(operation.ConfirmedAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Compensates_Using_An_Independent_Cleanup_Token_Not_The_Cancelled_Request_Token()
+    {
+        // Security/code review finding #3: a cancelled/timed-out request must never prevent the
+        // compensating delete of a blob that was already uploaded — compensation must use its own
+        // independently-bounded token, never the (possibly already-cancelled) request token. The
+        // request's own token is cancelled exactly at the point SaveChangesAsync is invoked (the
+        // upload itself has already completed by then), mirroring a client disconnect/timeout that
+        // races the DB save.
+        var storage = new FakeCandidateDocumentStorageService();
+        var companyId = Guid.NewGuid();
+        using var requestCts = new CancellationTokenSource();
+
+        var options = new DbContextOptionsBuilder<RecruitmentDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+        await using var db = new CancellingOnSaveRecruitmentDbContext(options, requestCts);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        db.Candidates.Add(candidate);
+        await db.BaseSaveChangesAsync();
+
+        var handler = BuildHandler(db, storage);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            handler.HandleAsync(
+                new UploadCandidateDocumentRequest { CompanyId = companyId, CandidateId = candidate.Id, Title = "Resume", File = FakePdfFile() },
+                Guid.NewGuid(),
+                requestCts.Token));
+
+        Assert.True(requestCts.IsCancellationRequested);
+
+        // Compensation must still have run, using a token that is NOT the cancelled request token.
+        Assert.Single(storage.Deletions);
+        var deleteToken = Assert.Single(storage.DeleteCancellationTokens);
+        Assert.False(deleteToken.IsCancellationRequested);
+        Assert.NotEqual(requestCts.Token, deleteToken);
+    }
+
+    [Fact]
+    public async Task HandleAsync_DbSave_Fails_And_Immediate_Delete_Also_Fails_Leaves_The_Reserved_Intent_Unconfirmed_For_Reconciliation()
+    {
+        // Follow-up review finding: no NEW operation row is created here any more — the durable
+        // Reserved intent already exists (persisted before the upload, in HandleAsync) and is simply
+        // left unconfirmed. That single row alone is what guarantees
+        // PurgeCandidateDocumentStorageReconciliationJob's intent sweep resolves it correctly.
+        var storage = new FakeCandidateDocumentStorageService { ThrowOnNextDeleteAttempts = 1 };
+        var companyId = Guid.NewGuid();
+
+        var options = new DbContextOptionsBuilder<RecruitmentDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+        await using var db = new ThrowOnceRecruitmentDbContext(options);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        db.Candidates.Add(candidate);
+        await db.BaseSaveChangesAsync();
+
+        var handler = BuildHandler(db, storage);
+
+        await Assert.ThrowsAsync<DbUpdateException>(() =>
+            handler.HandleAsync(
+                new UploadCandidateDocumentRequest { CompanyId = companyId, CandidateId = candidate.Id, Title = "Resume", File = FakePdfFile() },
+                Guid.NewGuid(),
+                CancellationToken.None));
+
+        // The immediate delete failed, so no delete is recorded.
+        Assert.Empty(storage.Deletions);
+
+        var operation = await db.CandidateDocumentDeletionOperations.SingleOrDefaultAsync();
+        Assert.NotNull(operation);
+        Assert.Equal(companyId, operation!.CompanyId);
+        Assert.Equal(candidate.Id, operation.CandidateId);
+        Assert.Equal(CandidateDocumentDeletionOperation.StatusReserved, operation.Status);
+        Assert.Null(operation.ConfirmedAt);
+
+        // Proves reconciliation actually resolves it: the object genuinely still exists in storage
+        // (the delete failed), so the sweep must hand it to the normal deletion pipeline rather than
+        // clearing it as "never uploaded".
+        var reconciliationStorage = new FakeCandidateDocumentStorageService();
+        reconciliationStorage.ExistingKeys.Add(operation.StorageKey);
+        var job = new PurgeCandidateDocumentStorageReconciliationJob(
+            db, reconciliationStorage,
+            Options.Create(new CandidateDocumentUploadOptions { UploadIntentGracePeriodMinutes = 0 }),
+            new FakeClock(FixedUtcNow.AddHours(2)), new FakeAuditPublisher(), new FakeLegalHoldStatusReader(),
+            new RecordingBackgroundJobClient(), NullLogger<PurgeCandidateDocumentStorageReconciliationJob>.Instance);
+
+        await job.ExecuteAsync();
+
+        var reconciled = await db.CandidateDocumentDeletionOperations.SingleAsync(o => o.Id == operation.Id);
+        Assert.Equal(CandidateDocumentDeletionOperation.StatusProcessing, reconciled.Status);
+    }
+
+    [Fact]
+    public async Task HandleAsync_DbSave_Fails_And_Both_Delete_And_Durable_Persistence_Fail_Still_Rethrows_Original_Exception()
+    {
+        var storage = new FakeCandidateDocumentStorageService { ThrowOnNextDeleteAttempts = 1 };
+        var companyId = Guid.NewGuid();
+
+        var options = new DbContextOptionsBuilder<RecruitmentDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+        // Throws on EVERY SaveChangesAsync call after the initial intent reservation — the original
+        // DbUpdateException from the document save must still be the one that propagates, not some
+        // secondary failure from the compensation path.
+        await using var db = new ThrowOnceRecruitmentDbContext(options, throwFromCallNumber: 2);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        db.Candidates.Add(candidate);
+        await db.BaseSaveChangesAsync();
+
+        var handler = BuildHandler(db, storage);
+
+        var thrown = await Assert.ThrowsAsync<DbUpdateException>(() =>
+            handler.HandleAsync(
+                new UploadCandidateDocumentRequest { CompanyId = companyId, CandidateId = candidate.Id, Title = "Resume", File = FakePdfFile() },
+                Guid.NewGuid(),
+                CancellationToken.None));
+
+        Assert.Equal("Simulated database failure.", thrown.Message);
+        Assert.Empty(storage.Deletions);
+
+        // Even though every downstream persistence failed, the Reserved intent saved BEFORE the
+        // upload is untouched and still durable — nothing is lost.
+        var operation = await db.CandidateDocumentDeletionOperations.SingleAsync();
+        Assert.Equal(CandidateDocumentDeletionOperation.StatusReserved, operation.Status);
+        Assert.Null(operation.ConfirmedAt);
     }
 
     [Fact]
@@ -262,13 +400,52 @@ public class UploadCandidateDocumentHandlerTests
         Assert.Empty(await db.CandidateDocuments.ToListAsync());
     }
 
-    private sealed class ThrowingRecruitmentDbContext(DbContextOptions<RecruitmentDbContext> options)
+    /// <summary>Simulates the request's own token being cancelled at the moment the SECOND
+    /// SaveChangesAsync call is invoked — i.e. after the pre-upload intent reservation (call 1) and
+    /// the upload itself have already completed — mirroring a client disconnect racing the document
+    /// save. Used to prove compensation uses an independent token rather than this (by-then
+    /// cancelled) one.</summary>
+    private sealed class CancellingOnSaveRecruitmentDbContext(
+        DbContextOptions<RecruitmentDbContext> options, CancellationTokenSource requestCts)
         : RecruitmentDbContext(options)
     {
+        private int _callCount;
+
         public Task<int> BaseSaveChangesAsync(CancellationToken ct = default) =>
             base.SaveChangesAsync(ct);
 
-        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
-            throw new DbUpdateException("Simulated database failure.");
+        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            _callCount++;
+            if (_callCount == 1)
+                return base.SaveChangesAsync(cancellationToken);
+
+            requestCts.Cancel();
+            throw new OperationCanceledException(cancellationToken);
+        }
+    }
+
+    /// <summary>Throws only on the Nth SaveChangesAsync call after seeding (default 2 — the
+    /// document-row insert + intent confirmation, since call 1 is now the pre-upload intent
+    /// reservation and must succeed for the scenario to be meaningful) — every other call succeeds
+    /// normally. Used to exercise "document save fails, but the reserved intent / compensation
+    /// still behaves correctly".</summary>
+    private sealed class ThrowOnceRecruitmentDbContext(
+        DbContextOptions<RecruitmentDbContext> options, int throwFromCallNumber = 2)
+        : RecruitmentDbContext(options)
+    {
+        private int _callCount;
+
+        public Task<int> BaseSaveChangesAsync(CancellationToken ct = default) =>
+            base.SaveChangesAsync(ct);
+
+        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+            _callCount++;
+            if (_callCount == throwFromCallNumber)
+                return Task.FromException<int>(new DbUpdateException("Simulated database failure."));
+
+            return base.SaveChangesAsync(cancellationToken);
+        }
     }
 }

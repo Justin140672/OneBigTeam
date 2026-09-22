@@ -5,6 +5,7 @@ using HR.Modules.Support.Services;
 using HR.Modules.Support.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Support.Tests;
@@ -17,6 +18,16 @@ public class SubmitSupportRequestHandlerTests
         new(new DbContextOptionsBuilder<SupportDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
+
+    /// <summary>Security review finding #4 (P1): UploadedAttachmentCleanupScope now persists
+    /// cleanup bookkeeping through a genuinely separate DI scope/DbContext, not the ambient one.
+    /// None of these tests exercise cleanup failure paths, so an isolated in-memory database is
+    /// sufficient here.</summary>
+    private static IServiceScopeFactory BuildScopeFactory() =>
+        new ServiceCollection()
+            .AddDbContext<SupportDbContext>(o => o.UseInMemoryDatabase(Guid.NewGuid().ToString("N")))
+            .BuildServiceProvider()
+            .GetRequiredService<IServiceScopeFactory>();
 
     private static IConfiguration BuildConfiguration(string? adminEmail = "support-admin@example.test") =>
         new ConfigurationBuilder()
@@ -47,7 +58,7 @@ public class SubmitSupportRequestHandlerTests
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
             new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
-            new FakeEmailSender(), BuildConfiguration(), Infrastructure.TestExecutionContext.Accessor, NullLogger<SubmitSupportRequestHandler>.Instance);
+            new FakeEmailSender(), BuildConfiguration(), Infrastructure.TestExecutionContext.Accessor, BuildScopeFactory(), NullLogger<SubmitSupportRequestHandler>.Instance);
 
         var result = await handler.HandleAsync(ValidRequest(companyId), Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
 
@@ -77,7 +88,7 @@ public class SubmitSupportRequestHandlerTests
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
             new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
-            emailSender, BuildConfiguration(), Infrastructure.TestExecutionContext.Accessor, NullLogger<SubmitSupportRequestHandler>.Instance);
+            emailSender, BuildConfiguration(), Infrastructure.TestExecutionContext.Accessor, BuildScopeFactory(), NullLogger<SubmitSupportRequestHandler>.Instance);
 
         var result = await handler.HandleAsync(request, Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
 
@@ -106,7 +117,7 @@ public class SubmitSupportRequestHandlerTests
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
             new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
-            emailSender, configuration, Infrastructure.TestExecutionContext.Accessor, NullLogger<SubmitSupportRequestHandler>.Instance);
+            emailSender, configuration, Infrastructure.TestExecutionContext.Accessor, BuildScopeFactory(), NullLogger<SubmitSupportRequestHandler>.Instance);
 
         var result = await handler.HandleAsync(ValidRequest(companyId), Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
 
@@ -123,7 +134,7 @@ public class SubmitSupportRequestHandlerTests
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
             new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
-            new FakeEmailSender(), BuildConfiguration(), Infrastructure.TestExecutionContext.Accessor, NullLogger<SubmitSupportRequestHandler>.Instance);
+            new FakeEmailSender(), BuildConfiguration(), Infrastructure.TestExecutionContext.Accessor, BuildScopeFactory(), NullLogger<SubmitSupportRequestHandler>.Instance);
 
         var refs = new HashSet<string>();
         for (var i = 0; i < 10; i++)
@@ -142,7 +153,7 @@ public class SubmitSupportRequestHandlerTests
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
             new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
-            new FakeEmailSender(), BuildConfiguration(), Infrastructure.TestExecutionContext.Accessor, NullLogger<SubmitSupportRequestHandler>.Instance);
+            new FakeEmailSender(), BuildConfiguration(), Infrastructure.TestExecutionContext.Accessor, BuildScopeFactory(), NullLogger<SubmitSupportRequestHandler>.Instance);
 
         var request = ValidRequest(companyId);
         request = request with { IncludeDiagnostics = true };
@@ -163,7 +174,7 @@ public class SubmitSupportRequestHandlerTests
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
             new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
-            new FakeEmailSender(), BuildConfiguration(), Infrastructure.TestExecutionContext.Accessor, NullLogger<SubmitSupportRequestHandler>.Instance);
+            new FakeEmailSender(), BuildConfiguration(), Infrastructure.TestExecutionContext.Accessor, BuildScopeFactory(), NullLogger<SubmitSupportRequestHandler>.Instance);
 
         var request = ValidRequest(companyId);
         request = request with { IncludeDiagnostics = false };
@@ -183,7 +194,7 @@ public class SubmitSupportRequestHandlerTests
         var storage = new FakeSupportAttachmentStorageService();
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), storage,
-            new SupportAttachmentValidator(), new FakeUploadedFileScanner(), new FakeEmailSender(), BuildConfiguration(), Infrastructure.TestExecutionContext.Accessor, NullLogger<SubmitSupportRequestHandler>.Instance);
+            new SupportAttachmentValidator(), new FakeUploadedFileScanner(), new FakeEmailSender(), BuildConfiguration(), Infrastructure.TestExecutionContext.Accessor, BuildScopeFactory(), NullLogger<SubmitSupportRequestHandler>.Instance);
 
         var request = ValidRequest(companyId);
         request = request with { Files = TestFile.Collection(TestFile.Create("screenshot.png")) };
@@ -207,7 +218,7 @@ public class SubmitSupportRequestHandlerTests
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
             new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
-            new FakeEmailSender(), BuildConfiguration(), Infrastructure.TestExecutionContext.Accessor, NullLogger<SubmitSupportRequestHandler>.Instance);
+            new FakeEmailSender(), BuildConfiguration(), Infrastructure.TestExecutionContext.Accessor, BuildScopeFactory(), NullLogger<SubmitSupportRequestHandler>.Instance);
 
         var result = await handler.HandleAsync(ValidRequest(companyId), Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
 
@@ -223,7 +234,7 @@ public class SubmitSupportRequestHandlerTests
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
             new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
-            emailSender, BuildConfiguration("admin@example.test"), Infrastructure.TestExecutionContext.Accessor, NullLogger<SubmitSupportRequestHandler>.Instance);
+            emailSender, BuildConfiguration("admin@example.test"), Infrastructure.TestExecutionContext.Accessor, BuildScopeFactory(), NullLogger<SubmitSupportRequestHandler>.Instance);
 
         var result = await handler.HandleAsync(ValidRequest(companyId), Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
 
@@ -242,7 +253,7 @@ public class SubmitSupportRequestHandlerTests
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
             new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
-            new FakeEmailSender(), BuildConfiguration(adminEmail: null), Infrastructure.TestExecutionContext.Accessor, NullLogger<SubmitSupportRequestHandler>.Instance);
+            new FakeEmailSender(), BuildConfiguration(adminEmail: null), Infrastructure.TestExecutionContext.Accessor, BuildScopeFactory(), NullLogger<SubmitSupportRequestHandler>.Instance);
 
         var result = await handler.HandleAsync(ValidRequest(companyId), Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
 
@@ -261,7 +272,7 @@ public class SubmitSupportRequestHandlerTests
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
             new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
-            emailSender, BuildConfiguration("admin@example.test"), Infrastructure.TestExecutionContext.Accessor, NullLogger<SubmitSupportRequestHandler>.Instance);
+            emailSender, BuildConfiguration("admin@example.test"), Infrastructure.TestExecutionContext.Accessor, BuildScopeFactory(), NullLogger<SubmitSupportRequestHandler>.Instance);
 
         var result = await handler.HandleAsync(ValidRequest(companyId), Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
 
@@ -281,7 +292,7 @@ public class SubmitSupportRequestHandlerTests
         var handler = new SubmitSupportRequestHandler(
             db, new FakeClock(FixedUtcNow), new FakeSupportAttachmentStorageService(),
             new SupportAttachmentValidator(), new FakeUploadedFileScanner(),
-            new FakeEmailSender(), BuildConfiguration(), Infrastructure.TestExecutionContext.Accessor, NullLogger<SubmitSupportRequestHandler>.Instance);
+            new FakeEmailSender(), BuildConfiguration(), Infrastructure.TestExecutionContext.Accessor, BuildScopeFactory(), NullLogger<SubmitSupportRequestHandler>.Instance);
 
         var result = await handler.HandleAsync(ValidRequest(companyId), userId, employeeId, CancellationToken.None);
 

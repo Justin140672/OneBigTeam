@@ -71,6 +71,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 
 namespace HR.Modules.Recruitment;
@@ -105,6 +106,12 @@ public static class RecruitmentModule
     private static void AddCandidateDocumentStorage(
         IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
+        // The options validator resolves IHostEnvironment via constructor injection to gate the
+        // Development/Test-only HTTP allowance (security review finding 6). The host already
+        // registers IHostEnvironment in production; TryAddSingleton is a no-op there and only
+        // matters for tests that build a bare IServiceCollection.
+        services.TryAddSingleton(environment);
+
         services.Configure<CandidateDocumentUploadOptions>(configuration.GetSection("Recruitment:CandidateDocuments"));
 
         var supabaseSection = configuration.GetSection("Recruitment:Supabase:CandidateDocuments");

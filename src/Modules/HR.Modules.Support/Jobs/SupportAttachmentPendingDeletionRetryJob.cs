@@ -1,5 +1,6 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Support.Persistence;
+using HR.Modules.Support.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -42,7 +43,7 @@ internal sealed class SupportAttachmentPendingDeletionRetryJob(
 
                 logger.LogInformation(
                     "SupportAttachmentPendingDeletionRetryJob: resolved pending deletion for {StorageKey} on attempt {AttemptCount}.",
-                    entry.StorageKey, entry.AttemptCount);
+                    UploadedAttachmentCleanupScope.RedactStorageKey(entry.StorageKey), entry.AttemptCount);
             }
             catch (Exception ex)
             {
@@ -50,7 +51,7 @@ internal sealed class SupportAttachmentPendingDeletionRetryJob(
 
                 logger.LogWarning(ex,
                     "SupportAttachmentPendingDeletionRetryJob: attempt {AttemptCount} failed to delete {StorageKey} — will retry on the next sweep.",
-                    entry.AttemptCount, entry.StorageKey);
+                    entry.AttemptCount, UploadedAttachmentCleanupScope.RedactStorageKey(entry.StorageKey));
             }
         }
 

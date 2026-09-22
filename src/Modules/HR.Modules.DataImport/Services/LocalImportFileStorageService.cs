@@ -9,28 +9,36 @@ internal sealed class LocalImportFileStorageService : IImportFileStorageService
     private readonly string _basePath =
         Path.Combine(Path.GetTempPath(), "onebigteam", "data-import");
 
-    public async Task<string> UploadAsync(
-        Stream content,
-        string fileName,
-        string contentType,
-        string storageFolder,
-        CancellationToken cancellationToken)
+    // The original file name is untrusted and is recorded separately as display metadata
+    // (ImportSession.FileName); the physical storage key never incorporates it, so it cannot
+    // be used to escape the storage root via ".." or rooted path segments.
+    public string GenerateStorageKey(string storageFolder, string fileName)
     {
-        // The original file name is untrusted and is recorded separately as display metadata
-        // (ImportSession.FileName); the physical storage key never incorporates it, so it cannot
-        // be used to escape the storage root via ".." or rooted path segments.
         var extension  = Path.GetExtension(fileName);
         var safeFolder = string.Join('/', storageFolder.Split('/', StringSplitOptions.RemoveEmptyEntries)
             .Select(segment => Uri.EscapeDataString(segment)));
-        var storageKey = $"{safeFolder}/{Guid.NewGuid():N}{extension}";
-        var fullPath   = ToFullPath(storageKey);
+        return $"{safeFolder}/{Guid.NewGuid():N}{extension}";
+    }
+
+    public async Task UploadAsync(
+        Stream content,
+        string storageKey,
+        string contentType,
+        CancellationToken cancellationToken)
+    {
+        var fullPath = ToFullPath(storageKey);
 
         Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
 
         await using var file = File.Create(fullPath);
         await content.CopyToAsync(file, cancellationToken);
+    }
 
-        return storageKey;
+    public Task<bool> ExistsAsync(
+        string storageKey,
+        CancellationToken cancellationToken)
+    {
+        return Task.FromResult(File.Exists(ToFullPath(storageKey)));
     }
 
     public Task<Uri> GetDownloadUrlAsync(

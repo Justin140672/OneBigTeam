@@ -362,4 +362,89 @@ public class ImportSessionTests
         Assert.Equal(initialVersion + 1, afterFirstClaim);
         Assert.Equal(initialVersion + 2, session.Version);
     }
+
+    // --- Security review finding #2: raw-file deletion tracking ---
+
+    [Fact]
+    public void MarkFileDeleted_Sets_FileDeletedAt_And_FileDeletionLastAttemptedAt()
+    {
+        var session = CreateSession(FixedNow);
+        var deletedAt = FixedNow.AddMinutes(5);
+
+        session.MarkFileDeleted(deletedAt);
+
+        Assert.Equal(deletedAt, session.FileDeletedAt);
+        Assert.Equal(deletedAt, session.FileDeletionLastAttemptedAt);
+    }
+
+    [Fact]
+    public void MarkFileDeleted_Does_Not_Increment_FileDeletionAttemptCount()
+    {
+        var session = CreateSession(FixedNow);
+
+        session.MarkFileDeleted(FixedNow.AddMinutes(5));
+
+        Assert.Equal(0, session.FileDeletionAttemptCount);
+    }
+
+    [Fact]
+    public void MarkFileDeleted_Does_Not_Touch_Business_Status()
+    {
+        var session = CreateSession(FixedNow);
+        session.Start(FixedNow.AddMinutes(1));
+        session.Validate(successfulRows: 1, failedRows: 0, FixedNow.AddMinutes(2));
+
+        session.MarkFileDeleted(FixedNow.AddMinutes(5));
+
+        Assert.Equal(ImportStatus.Validated, session.Status);
+    }
+
+    [Fact]
+    public void Create_Leaves_FileDeletion_Fields_Null_Or_Zero()
+    {
+        var session = CreateSession(FixedNow);
+
+        Assert.Null(session.FileDeletedAt);
+        Assert.Null(session.FileDeletionLastAttemptedAt);
+        Assert.Equal(0, session.FileDeletionAttemptCount);
+    }
+
+    [Fact]
+    public void RecordFileDeletionAttemptFailed_Sets_FileDeletionLastAttemptedAt_And_Increments_Count()
+    {
+        var session = CreateSession(FixedNow);
+        var attemptAt = FixedNow.AddMinutes(3);
+
+        session.RecordFileDeletionAttemptFailed(attemptAt);
+
+        Assert.Equal(attemptAt, session.FileDeletionLastAttemptedAt);
+        Assert.Equal(1, session.FileDeletionAttemptCount);
+        Assert.Null(session.FileDeletedAt);
+    }
+
+    [Fact]
+    public void RecordFileDeletionAttemptFailed_Increments_Count_Across_Repeated_Calls()
+    {
+        var session = CreateSession(FixedNow);
+
+        session.RecordFileDeletionAttemptFailed(FixedNow.AddMinutes(1));
+        session.RecordFileDeletionAttemptFailed(FixedNow.AddMinutes(2));
+        var thirdAttemptAt = FixedNow.AddMinutes(3);
+        session.RecordFileDeletionAttemptFailed(thirdAttemptAt);
+
+        Assert.Equal(3, session.FileDeletionAttemptCount);
+        Assert.Equal(thirdAttemptAt, session.FileDeletionLastAttemptedAt);
+    }
+
+    [Fact]
+    public void RecordFileDeletionAttemptFailed_Does_Not_Touch_Business_Status()
+    {
+        var session = CreateSession(FixedNow);
+        session.Start(FixedNow.AddMinutes(1));
+        session.Fail("boom", FixedNow.AddMinutes(2));
+
+        session.RecordFileDeletionAttemptFailed(FixedNow.AddMinutes(3));
+
+        Assert.Equal(ImportStatus.Failed, session.Status);
+    }
 }

@@ -134,7 +134,13 @@ public class Ticket23CandidateDocumentDeletionOperationMetadataTests
     {
         public IExecutionContext? ObservedDuringDelete { get; private set; }
 
-        public Task<string> UploadAsync(Stream content, string fileName, string contentType, string storageFolder, CancellationToken cancellationToken)
+        public string GenerateStorageKey(string storageFolder, string fileName)
+            => throw new NotSupportedException();
+
+        public Task UploadAsync(Stream content, string storageKey, string contentType, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public Task<bool> ExistsAsync(string storageKey, CancellationToken cancellationToken)
             => throw new NotSupportedException();
 
         public Task<Uri> GetDownloadUrlAsync(string storageKey, CancellationToken cancellationToken)

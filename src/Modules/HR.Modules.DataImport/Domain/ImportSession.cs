@@ -26,6 +26,17 @@ internal sealed class ImportSession
     // persisted-column pattern used by CompanySettings.Version.
     public int Version { get; private set; } = 1;
 
+    // Security review finding #2: raw-file deletion status is tracked separately from the
+    // session's business Status so a retry of a failed deletion (or a concurrent sweep run) is
+    // safe and idempotent, and so an operator can tell "file purged" apart from "import failed"
+    // at a glance. FileDeletedAt is the durable idempotency marker: once set, no code path
+    // attempts deletion again. FileDeletionAttemptCount/FileDeletionLastAttemptedAt exist purely
+    // to detect and log exhausted cleanup attempts (see PurgeImportSessionFilesJob); they never
+    // gate business behaviour.
+    public DateTimeOffset? FileDeletedAt { get; private set; }
+    public DateTimeOffset? FileDeletionLastAttemptedAt { get; private set; }
+    public int FileDeletionAttemptCount { get; private set; }
+
     public static ImportSession Create(
         Guid id,
         Guid companyId,
@@ -137,5 +148,27 @@ internal sealed class ImportSession
         Status = ImportStatus.Cancelled;
         CompletedAt = now;
         UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// Records that the raw uploaded file was successfully (and idempotently) deleted from
+    /// storage. Safe to call more than once; callers should skip deletion entirely once
+    /// <see cref="FileDeletedAt"/> is already set.
+    /// </summary>
+    public void MarkFileDeleted(DateTimeOffset now)
+    {
+        FileDeletedAt = now;
+        FileDeletionLastAttemptedAt = now;
+    }
+
+    /// <summary>
+    /// Records a failed (or not-yet-attempted-to-completion) deletion attempt so the sweep job
+    /// can back off and so exhausted-attempt logging has a count to compare against a threshold.
+    /// Does not touch the session's business Status.
+    /// </summary>
+    public void RecordFileDeletionAttemptFailed(DateTimeOffset now)
+    {
+        FileDeletionLastAttemptedAt = now;
+        FileDeletionAttemptCount++;
     }
 }
