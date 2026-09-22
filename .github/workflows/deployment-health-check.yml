@@ -70,7 +70,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       # Same secret name (API_HEALTH_BEARER_TOKEN) is used by deploy.yml's workflow_call contract
       # and by the deploy-test/staging/production.yml wrappers, which each forward one of the
