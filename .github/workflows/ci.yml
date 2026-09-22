@@ -25,6 +25,24 @@ env:
 
 jobs:
   # ------------------------------------------------------------------
+  # Secret scanning gate (security review ticket, Sept 2026).
+  # Fails the build if a credential/token/secret is detected anywhere in
+  # the git history for this push/PR. See docs/incidents/2026-09-postmark-token-exposure.md
+  # for the incident that prompted this control.
+  # ------------------------------------------------------------------
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ------------------------------------------------------------------
   # Reproducible restore + dependency vulnerability gate (NFR-09).
   # Fails on any moderate or higher advisory (direct or transitive).
   # ------------------------------------------------------------------
@@ -266,7 +284,7 @@ jobs:
     # Only inspects `needs` context - no checkout, no GitHub API call.
     permissions: {}
     if: always()
-    needs: [dependency-audit, build-test, integration-tests, e2e-compile, package, deploy-scripts-test]
+    needs: [secret-scan, dependency-audit, build-test, integration-tests, e2e-compile, package, deploy-scripts-test]
     steps:
       - name: Verify all required jobs passed
         shell: bash
