@@ -4,7 +4,7 @@
 @inject AppSession Session
 @using HR.SharedKernel.Http
 
-<PageTitle>@(_employee?.FirstName is null ? "Team Member" : $"{_employee.FirstName} {_employee.LastName}")</PageTitle>
+<PageTitle>@(_employee is null ? "Team Member" : DisplayName(_employee))</PageTitle>
 
 <div class="container py-4">
     <BackButton />
@@ -42,7 +42,7 @@
             properties for any of that (see EmployeeModels.cs's GetEmployeeTeamViewResponse and
             26-permissions-access-ux.md's field-level access matrix).
         -->
-        <h1 class="mb-1">@_employee.FirstName @_employee.LastName</h1>
+        <h1 class="mb-1">@DisplayName(_employee)</h1>
         <p class="text-muted mb-4">@(_employee.PositionTitle ?? "—")</p>
 
         <div class="row g-3">
@@ -73,7 +73,7 @@
                             <dd class="col-7">@_employee.StartDate.ToString("d MMM yyyy")</dd>
 
                             <dt class="col-5">Status</dt>
-                            <dd class="col-7">@_employee.Status</dd>
+                            <dd class="col-7">@StatusLabel(_employee.Status)</dd>
                         </dl>
                     </div>
                 </div>
@@ -147,4 +147,18 @@
 
         _loading = false;
     }
+
+    private static string DisplayName(GetEmployeeTeamViewResponse employee) =>
+        string.IsNullOrWhiteSpace(employee.PreferredName)
+            ? $"{employee.FirstName} {employee.LastName}"
+            : $"{employee.PreferredName} {employee.LastName}";
+
+    private static string StatusLabel(string status) => status switch
+    {
+        "Draft" => "Draft",
+        "Active" => "Active",
+        "Suspended" => "Suspended",
+        "Leaving" => "Leaving",
+        _ => status,
+    };
 }

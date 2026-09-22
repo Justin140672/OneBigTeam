@@ -2,7 +2,11 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Employees.Domain;
+using HR.Modules.Employees.Persistence;
 using HR.Modules.Identity.Domain;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
@@ -266,6 +270,25 @@ public class GetEmployeeResourceAuthorizationTests(ApiWebApplicationFactory fact
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    [Fact]
+    public async Task TeamView_Returns_Forbidden_For_Former_Employee_Report()
+    {
+        // Agreed status scope: FormerEmployee reports are excluded from manager team-view access
+        // entirely, not merely hidden from the roster list.
+        var manager = await CreateEmployeeAsync();
+        var report = await CreateEmployeeAsync();
+
+        using (var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true))
+            await AssignManagerAsync(setupClient, report, manager);
+
+        await MarkFormerEmployeeAsync(report);
+
+        using var managerClient = await AuthenticatedClient(manager);
+        var response = await managerClient.GetAsync($"/api/companies/{SeededCompanyId}/employees/{report}/team-view");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(
@@ -336,6 +359,15 @@ public class GetEmployeeResourceAuthorizationTests(ApiWebApplicationFactory fact
             $"/api/companies/{SeededCompanyId}/employees/{employeeId}/manager",
             new { companyId = SeededCompanyId, id = employeeId, managerId });
         response.EnsureSuccessStatusCode();
+    }
+
+    private async Task MarkFormerEmployeeAsync(Guid employeeId)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
+        var employee = await db.Employees.SingleAsync(e => e.Id == employeeId);
+        employee.SetStatusForTesting(EmploymentStatus.FormerEmployee, DateTimeOffset.UtcNow);
+        await db.SaveChangesAsync();
     }
 
     private sealed record IdPayload(Guid Id);

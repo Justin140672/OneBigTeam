@@ -81,6 +81,33 @@ public class GetEmployeeTeamViewHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Returns_Forbidden_For_Manager_Viewing_A_Former_Employee_Report()
+    {
+        // Agreed status scope: managers can view Draft/Active/Suspended/Leaving reports, never
+        // FormerEmployee ones — narrowed in resource authorization itself, not just the UI list.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var employee = CreateEmployee(companyId, now);
+        employee.SetStatusForTesting(EmploymentStatus.FormerEmployee, now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+
+        var managerId = Guid.NewGuid();
+        var resourceAuthorizer = new EmployeesResourceAuthorizer(
+            new FakeRoleAuthorizationService(), new FakeDirectReportsReader(employee.Id));
+        var handler = BuildHandler(context, resourceAuthorizer);
+
+        var result = await handler.HandleAsync(
+            new GetEmployeeTeamViewRequest { CompanyId = companyId, Id = employee.Id, CallerEmployeeId = managerId },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("forbidden", result.Error.Code);
+    }
+
+    [Fact]
     public async Task HandleAsync_Allows_Manager_In_Hierarchy_And_Returns_Operational_Fields()
     {
         await using var context = BuildContext();

@@ -1,0 +1,150 @@
+@page "/companies/{CompanyId:guid}/my-team"
+@rendermode InteractiveServer
+@inject EmployeeService EmployeeService
+@inject AppSession Session
+@inject NavigationManager Navigation
+
+<PageTitle>My Team</PageTitle>
+
+<div class="container py-4">
+    <BackButton />
+    <h1 class="mb-1">My Team</h1>
+    <p class="text-muted mb-4">Every direct and indirect report you're authorized to view.</p>
+
+    <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+        <div class="team-widget-scope" role="group" aria-label="Team scope">
+            <SfButton CssClass="e-small" IsPrimary="@(!_includeIndirect)" Disabled="_loading" OnClick="@(() => SetScopeAsync(false))">Direct Reports</SfButton>
+            <SfButton CssClass="e-small" IsPrimary="@_includeIndirect" Disabled="_loading" OnClick="@(() => SetScopeAsync(true))">All Reports</SfButton>
+        </div>
+
+        <SfTextBox @bind-Value="_search"
+                   Placeholder="Search by name…"
+                   CssClass="my-team-search"
+                   data-testid="my-team-search"
+                   Input="OnSearchInput" />
+    </div>
+
+    @if (_loading)
+    {
+        <HrLoadingIndicator Label="Loading team…" />
+    }
+    else if (_filteredItems.Count == 0)
+    {
+        <div class="widget-empty">
+            <i class="fa-solid fa-people-group fa-lg mb-2"></i>
+            <p class="mb-0">@(_items.Count == 0 ? (_includeIndirect ? "No one reports up to you." : "You have no direct reports.") : "No team members match your search.")</p>
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" data-testid="my-team-roster-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Job title</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var member in _filteredItems)
+                    {
+                        <tr @key="member.EmployeeId">
+                            <td>
+                                <a href="@ProfileUrl(member.EmployeeId)" class="d-flex align-items-center gap-2 text-decoration-none">
+                                    <ProfilePhotoAvatar PhotoUrl="@member.ProfilePhotoUrl" Initials="@Initials(member.FullName)" SizePx="32" />
+                                    <span>@DisplayName(member)</span>
+                                </a>
+                            </td>
+                            <td>@(member.JobTitle ?? "—")</td>
+                            <td><span class="badge @StatusBadgeClass(member.Status)">@StatusLabel(member.Status)</span></td>
+                            <td class="text-end">
+                                <SfButton CssClass="e-small e-outline"
+                                          data-testid="@($"roster-view-profile-{member.EmployeeId}")"
+                                          OnClick="@(() => Navigation.NavigateTo(ProfileUrl(member.EmployeeId)))">
+                                    View profile
+                                </SfButton>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private bool _loading = true;
+    private bool _includeIndirect;
+    private string _search = string.Empty;
+    private List<TeamRosterItem> _items = [];
+
+    private IReadOnlyList<TeamRosterItem> _filteredItems =>
+        string.IsNullOrWhiteSpace(_search)
+            ? _items
+            : _items.Where(m => m.FullName.Contains(_search, StringComparison.OrdinalIgnoreCase)
+                || (m.PreferredName?.Contains(_search, StringComparison.OrdinalIgnoreCase) ?? false))
+                .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.InitialiseAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var result = await EmployeeService.GetMyTeamRosterAsync(CompanyId, _includeIndirect);
+        _items = result?.Items.ToList() ?? [];
+        _loading = false;
+    }
+
+    private async Task SetScopeAsync(bool includeIndirect)
+    {
+        if (_includeIndirect == includeIndirect) return;
+        _includeIndirect = includeIndirect;
+        await LoadAsync();
+    }
+
+    private void OnSearchInput(Syncfusion.Blazor.Inputs.InputEventArgs args) => _search = args.Value ?? string.Empty;
+
+    private string ProfileUrl(Guid employeeId) => $"/companies/{CompanyId}/employees/{employeeId}/team-view";
+
+    private static string DisplayName(TeamRosterItem member) =>
+        string.IsNullOrWhiteSpace(member.PreferredName)
+            ? member.FullName
+            : $"{member.PreferredName} {member.LastName}";
+
+    private static string Initials(string fullName)
+    {
+        var parts = fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length switch
+        {
+            0 => "?",
+            1 => parts[0][..1].ToUpperInvariant(),
+            _ => (parts[0][..1] + parts[^1][..1]).ToUpperInvariant(),
+        };
+    }
+
+    private static string StatusLabel(string status) => status switch
+    {
+        "Draft" => "Draft",
+        "Active" => "Active",
+        "Suspended" => "Suspended",
+        "Leaving" => "Leaving",
+        _ => status,
+    };
+
+    private static string StatusBadgeClass(string status) => status switch
+    {
+        "Draft" => "bg-secondary",
+        "Active" => "bg-success",
+        "Suspended" => "bg-warning text-dark",
+        "Leaving" => "bg-warning text-dark",
+        _ => "bg-secondary",
+    };
+}

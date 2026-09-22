@@ -101,6 +101,16 @@ internal sealed class GetEmployeeTeamViewHandler
                 Error.NotFound($"Employee with id '{request.Id}' was not found."));
         }
 
+        // A former employee is not discoverable through the manager team-view, regardless of
+        // hierarchy — narrowing resource authorization itself (not just the UI list) per the
+        // agreed status scope: managers see Draft/Active/Suspended/Leaving reports, never
+        // FormerEmployee ones. See 26-permissions-access-ux.md's field-level access matrix.
+        if (result.Status == EmploymentStatus.FormerEmployee)
+        {
+            return Result.Failure<GetEmployeeTeamViewResponse>(
+                Error.Forbidden("You are not authorized to view this employee's record."));
+        }
+
         var onboardingStatusTask = _onboardingStatusReader.GetStatusAsync(
             request.CompanyId, result.Id, cancellationToken);
         var probationStatusTask = _probationStatusReader.GetStatusAsync(

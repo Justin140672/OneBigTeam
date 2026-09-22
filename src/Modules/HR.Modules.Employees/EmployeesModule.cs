@@ -226,6 +226,7 @@ public static class EmployeesModule
         services.AddScoped<Features.GetEmployeeTeamView.GetEmployeeTeamViewHandler>();
         services.AddScoped<GetMyEmployeeHandler>();
         services.AddScoped<GetMyTeamHandler>();
+        services.AddScoped<Features.GetMyTeamRoster.GetMyTeamRosterHandler>();
         services.AddScoped<Features.GetManagerTeamStatusSummary.GetManagerTeamStatusSummaryHandler>();
         services.AddScoped<IValidator<Features.GetManagerTeamStatusSummary.GetManagerTeamStatusSummaryRequest>,
             Features.GetManagerTeamStatusSummary.GetManagerTeamStatusSummaryValidator>();

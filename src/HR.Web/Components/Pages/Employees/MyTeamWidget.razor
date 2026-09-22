@@ -32,6 +32,9 @@
                 {
                     <span class="widget-count-badge">@_items.Count</span>
                 }
+                <a href="@($"/companies/{Session.CompanyId}/my-team")" class="ms-auto small" data-testid="view-all-team-link">
+                    View all team@(_items.Count > 8 ? $" ({_items.Count})" : "")
+                </a>
             </div>
 
             <div class="team-widget-scope" role="group" aria-label="Team scope">
@@ -96,6 +99,13 @@
                             </div>
                         }
                     </div>
+                    @if (_items.Count > 8)
+                    {
+                        <p class="text-muted small mt-2 mb-0">
+                            Showing 8 of @_items.Count —
+                            <a href="@($"/companies/{Session.CompanyId}/my-team")" data-testid="view-all-team-inline-link">view all team</a>
+                        </p>
+                    }
                 }
             </div>
         </div>

@@ -196,6 +196,13 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         Http.GetFromJsonAsync<TeamStatusSummaryResponse>(
             $"api/companies/{companyId}/employees/{managerId}/team-status-summary", HrApiJsonOptions.Default);
 
+    // Full discoverable roster behind "View all team" (MyTeamRoster.razor) — every direct/indirect
+    // report GetEmployeeTeamView still authorizes (Draft/Active/Suspended/Leaving), unlike
+    // GetMyTeamAsync above, which stays scoped to the compact, Active-only dashboard preview.
+    public Task<GetMyTeamRosterResponse?> GetMyTeamRosterAsync(Guid companyId, bool includeIndirect) =>
+        Http.GetFromJsonAsync<GetMyTeamRosterResponse>(
+            $"api/companies/{companyId}/employees/me/team/roster?includeIndirect={includeIndirect}", HrApiJsonOptions.Default);
+
     public async Task<GetEmployeeResponse?> GetEmployeeAsync(Guid companyId, Guid id)
     {
         try

@@ -713,6 +713,26 @@ public sealed record TeamMemberItem(
     string? ProfilePhotoUrl,
     string Status);
 
+// ── MY TEAM: FULL ROSTER (behind "View all team") ───────────────────────────────
+
+public sealed record GetMyTeamRosterResponse(IReadOnlyList<TeamRosterItem> Items);
+
+public sealed record TeamRosterItem(
+    Guid EmployeeId,
+    string FirstName,
+    string LastName,
+    string? PreferredName,
+    string? JobTitle,
+    string WorkEmail,
+    string? ProfilePhotoUrl,
+    // Raw HR.Modules.Employees.Domain.EmploymentStatus name (Draft/Active/Suspended/Leaving —
+    // FormerEmployee is excluded server-side, never returned here). Humanize for display, don't
+    // show the raw identifier.
+    string Status)
+{
+    public string FullName => $"{FirstName} {LastName}";
+}
+
 // ── DASHBOARD: TEAM STATUS SUMMARY ──────────────────────────────────────────────
 
 public sealed record TeamStatusSummaryResponse(
