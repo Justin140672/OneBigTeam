@@ -39,36 +39,30 @@ internal sealed class EmployeesResourceAuthorizer
             .Contains(HrAdministratorRoleId);
 
     /// <summary>
-    /// View the full employee record: the employee themself, any manager in their full reporting
-    /// hierarchy, or an HR Administrator.
+    /// View the full HR employee record (GetEmployee): the employee themself or an HR
+    /// Administrator only. A manager in the target's reporting hierarchy is deliberately excluded
+    /// here — the full record contains fields (personal contact details, DOB, demographic data,
+    /// home address, HR notes, leaving-process detail, notice period, system-access state) a
+    /// manager is not approved to see. Manager access goes through the separate, field-restricted
+    /// GetEmployeeTeamView endpoint/CanViewAsManagerAsync below instead, backed by its own
+    /// operational-only database projection — see 26-permissions-access-ux.md's field-level access
+    /// matrix.
     /// </summary>
-    public Task<bool> CanViewAsync(
+    public Task<bool> CanViewFullRecordAsync(
         Guid companyId, Guid callerEmployeeId, Guid targetEmployeeId, CancellationToken cancellationToken)
         => _resourceAuthorizer.CanAccessAsync(
-            companyId, companyId, callerEmployeeId, targetEmployeeId, cancellationToken);
+            companyId, companyId, callerEmployeeId, targetEmployeeId, cancellationToken, allowHierarchy: false);
 
     /// <summary>
-    /// Resolves the field-level scope CanViewAsync's caller is entitled to for a target employee's
-    /// record. Does not itself check whether the caller is authorized at all — call CanViewAsync
-    /// (or note that only its three paths — self, hierarchy, HR-admin — ever lead here) first.
+    /// View the operational-only manager team-view of an employee record (GetEmployeeTeamView):
+    /// any manager anywhere in the target's reporting hierarchy, direct or indirect. Excludes
+    /// self-access (an employee views their own record through GetEmployee, never this reduced
+    /// view) — HR Administrators still pass here too (the shared authorizer's company-wide check
+    /// runs unconditionally), which is harmless: HR simply has no reason to call this endpoint
+    /// when GetEmployee already gives them the full record.
     /// </summary>
-    public async Task<EmployeeViewScope> ResolveViewScopeAsync(
-        Guid callerEmployeeId, Guid targetEmployeeId, CancellationToken cancellationToken)
-    {
-        if (await IsHrAdministratorAsync(callerEmployeeId, cancellationToken))
-            return EmployeeViewScope.Full;
-
-        if (callerEmployeeId == targetEmployeeId)
-            return EmployeeViewScope.Full;
-
-        // The only remaining authorized path is manager hierarchy (see CanViewAsync) — the
-        // operational-only field subset (IAM-08 access matrix).
-        return EmployeeViewScope.ManagerRestricted;
-    }
-}
-
-internal enum EmployeeViewScope
-{
-    Full,
-    ManagerRestricted,
+    public Task<bool> CanViewAsManagerAsync(
+        Guid companyId, Guid callerEmployeeId, Guid targetEmployeeId, CancellationToken cancellationToken)
+        => _resourceAuthorizer.CanAccessAsync(
+            companyId, companyId, callerEmployeeId, targetEmployeeId, cancellationToken, allowSelf: false);
 }

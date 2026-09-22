@@ -98,8 +98,12 @@ public class GetEmployeeHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Allows_Direct_Manager_And_Returns_Employee()
+    public async Task HandleAsync_Returns_Forbidden_For_Manager_Hierarchy_Caller()
     {
+        // GetEmployee (the full HR record) is self/HR-admin only — a manager in the target's
+        // reporting hierarchy must be rejected here and served instead by the separate,
+        // field-restricted GetEmployeeTeamView endpoint/handler (see GetEmployeeTeamViewHandlerTests).
+        // CanViewFullRecordAsync's allowHierarchy:false is what this test actually exercises.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
@@ -109,38 +113,8 @@ public class GetEmployeeHandlerTests
         await context.SaveChangesAsync();
 
         var managerId = Guid.NewGuid();
-        // Caller holds no HR role, but manages the target employee — hierarchy access.
-        var resourceAuthorizer = new EmployeesResourceAuthorizer(
-            new FakeRoleAuthorizationService(), new FakeDirectReportsReader(employee.Id));
-
-        var handler = BuildHandler(context, resourceAuthorizer: resourceAuthorizer);
-
-        var result = await handler.HandleAsync(
-            new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id, CallerEmployeeId = managerId },
-            CancellationToken.None);
-        var value = (GetEmployeeManagerResponse)result.Value!;
-
-        Assert.True(result.IsSuccess);
-        Assert.Equal(employee.Id, value.Id);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Manager_Response_Contains_Only_Operational_Fields()
-    {
-        // GetEmployee field-level access matrix (see 30-administrative-role-separation-matrix.md): a manager (hierarchy access, not self, not HR) must
-        // receive GetEmployeeManagerResponse — a distinct, narrower contract that structurally
-        // cannot carry personal email, date of birth, nationality/gender, home phone, home
-        // address, leaving-process detail, notice period or HR notes, rather than the full
-        // GetEmployeeResponse with those fields merely left unpopulated.
-        await using var context = BuildContext();
-        var companyId = Guid.NewGuid();
-        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
-
-        var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
-        context.Employees.Add(employee);
-        await context.SaveChangesAsync();
-
-        var managerId = Guid.NewGuid();
+        // Caller holds no HR role, but manages the target employee — hierarchy alone must not be
+        // enough to reach GetEmployee's full record.
         var resourceAuthorizer = new EmployeesResourceAuthorizer(
             new FakeRoleAuthorizationService(), new FakeDirectReportsReader(employee.Id));
 
@@ -150,57 +124,8 @@ public class GetEmployeeHandlerTests
             new GetEmployeeRequest { CompanyId = companyId, Id = employee.Id, CallerEmployeeId = managerId },
             CancellationToken.None);
 
-        Assert.True(result.IsSuccess);
-
-        // Type-level guarantee, not a field-by-field null check: GetEmployeeManagerResponse's
-        // constructor has no parameter for any sensitive field at all, so this assertion fails to
-        // compile (not just fails at runtime) the moment a sensitive field is ever added to it.
-        var value = Assert.IsType<GetEmployeeManagerResponse>(result.Value);
-
-        Assert.Equal(employee.Id, value.Id);
-        Assert.Equal("Alice", value.FirstName);
-        Assert.Equal("Smith", value.LastName);
-        Assert.Equal("alice@example.com", value.WorkEmail);
-        Assert.Equal(StartDate, value.StartDate);
-        Assert.Equal(EmploymentStatus.Draft, value.Status);
-        Assert.Equal("EMP-0001", value.EmployeeNumber);
-
-        var managerResponseFieldNames = typeof(GetEmployeeManagerResponse)
-            .GetProperties()
-            .Select(p => p.Name)
-            .ToHashSet(StringComparer.Ordinal);
-
-        string[] sensitiveFieldNames =
-        [
-            nameof(GetEmployeeResponse.PersonalEmail),
-            nameof(GetEmployeeResponse.DateOfBirth),
-            nameof(GetEmployeeResponse.Nationality),
-            nameof(GetEmployeeResponse.Gender),
-            nameof(GetEmployeeResponse.GenderOther),
-            nameof(GetEmployeeResponse.PhoneNumber),
-            nameof(GetEmployeeResponse.HomePhone),
-            nameof(GetEmployeeResponse.AddressLine1),
-            nameof(GetEmployeeResponse.AddressLine2),
-            nameof(GetEmployeeResponse.City),
-            nameof(GetEmployeeResponse.County),
-            nameof(GetEmployeeResponse.PostCode),
-            nameof(GetEmployeeResponse.Country),
-            nameof(GetEmployeeResponse.HasSystemAccess),
-            nameof(GetEmployeeResponse.WorkingDaysOverride),
-            nameof(GetEmployeeResponse.HoursPerDayOverride),
-            nameof(GetEmployeeResponse.ContinuousServiceDate),
-            nameof(GetEmployeeResponse.ProbationEndDate),
-            nameof(GetEmployeeResponse.LeavingDate),
-            nameof(GetEmployeeResponse.NoticePeriodUnitOverride),
-            nameof(GetEmployeeResponse.NoticePeriodLengthOverride),
-            nameof(GetEmployeeResponse.Notes),
-            nameof(GetEmployeeResponse.EffectiveNoticePeriodUnit),
-            nameof(GetEmployeeResponse.EffectiveNoticePeriodLength),
-            nameof(GetEmployeeResponse.EffectiveNoticePeriodSource),
-        ];
-
-        foreach (var sensitiveFieldName in sensitiveFieldNames)
-            Assert.DoesNotContain(sensitiveFieldName, managerResponseFieldNames);
+        Assert.True(result.IsFailure);
+        Assert.Equal("forbidden", result.Error.Code);
     }
 
     [Fact]

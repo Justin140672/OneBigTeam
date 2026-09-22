@@ -2,23 +2,28 @@ using FastEndpoints;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
-namespace HR.Modules.Employees.Features.GetEmployee;
+namespace HR.Modules.Employees.Features.GetEmployeeTeamView;
 
+/// <summary>
+/// The manager-facing, read-only counterpart to GetEmployee — a distinctly typed endpoint/route
+/// rather than a shared response shape, so the public API contract for each caller scope is
+/// explicit (see 26-permissions-access-ux.md's field-level access matrix and the GetEmployee
+/// endpoint this splits from).
+/// </summary>
 internal sealed class Endpoint(
-    GetEmployeeHandler handler, ICurrentUser currentUser) : Endpoint<GetEmployeeRequest, GetEmployeeResponse>
+    GetEmployeeTeamViewHandler handler, ICurrentUser currentUser)
+    : Endpoint<GetEmployeeTeamViewRequest, GetEmployeeTeamViewResponse>
 {
     public override void Configure()
     {
-        Get("/api/companies/{companyId:guid}/employees/{id:guid}");
+        Get("/api/companies/{companyId:guid}/employees/{id:guid}/team-view");
         Policies("role:employee");
     }
 
     public override async Task HandleAsync(
-        GetEmployeeRequest request,
+        GetEmployeeTeamViewRequest request,
         CancellationToken cancellationToken)
     {
-        // NOT User.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's
-        // resolved Employee/UserId (see GetMyEmployee/Endpoint.cs for the rationale).
         if (currentUser.UserId is not { } callerEmployeeId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());

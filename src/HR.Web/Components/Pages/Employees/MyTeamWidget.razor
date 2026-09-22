@@ -1,5 +1,6 @@
 @inject EmployeeService EmployeeService
 @inject AppSession Session
+@inject NavigationManager Navigation
 
 <RecordSicknessDialog CompanyId="Session.CompanyId"
                       EmployeeId="@(_sicknessTargetEmployeeId ?? Guid.Empty)"
@@ -66,8 +67,10 @@
                                     }
                                     <span class="team-card-status team-card-status--@StatusCss(m.Status)">@StatusLabel(m.Status)</span>
                                 </div>
-                                <ProfilePhotoAvatar PhotoUrl="@m.ProfilePhotoUrl" Initials="@Initials(m.FullName)" SizePx="48" />
-                                <span class="team-card-name" title="@m.FullName">@m.FullName</span>
+                                <a href="@($"/companies/{Session.CompanyId}/employees/{m.EmployeeId}/team-view")" class="team-card-profile-link">
+                                    <ProfilePhotoAvatar PhotoUrl="@m.ProfilePhotoUrl" Initials="@Initials(m.FullName)" SizePx="48" />
+                                    <span class="team-card-name" title="@m.FullName">@m.FullName</span>
+                                </a>
                                 <span class="team-card-title" title="@(m.JobTitle ?? "—")">@(m.JobTitle ?? "—")</span>
                                 <div class="team-card-contact">
                                     @if (!string.IsNullOrEmpty(m.PhoneNumber))
@@ -82,7 +85,14 @@
                                         <span class="team-card-contact-text">@m.WorkEmail</span>
                                     </a>
                                 </div>
-                                <SfButton CssClass="e-small e-outline team-card-notify-btn" OnClick="@(() => OpenNotifySickness(m.EmployeeId))">Notify Sickness</SfButton>
+                                <div class="d-flex gap-2">
+                                    <SfButton CssClass="e-small e-outline team-card-notify-btn" OnClick="@(() => OpenNotifySickness(m.EmployeeId))">Notify Sickness</SfButton>
+                                    <SfButton CssClass="e-small e-outline"
+                                              data-testid="@($"team-card-view-profile-{m.EmployeeId}")"
+                                              OnClick="@(() => Navigation.NavigateTo($"/companies/{Session.CompanyId}/employees/{m.EmployeeId}/team-view"))">
+                                        View profile
+                                    </SfButton>
+                                </div>
                             </div>
                         }
                     </div>

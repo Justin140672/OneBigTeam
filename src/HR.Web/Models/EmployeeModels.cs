@@ -118,6 +118,40 @@ public record GetEmployeeResponse(
 // the employee themselves.
 public sealed record ReportingChainItemModel(Guid EmployeeId, string Name, string? JobTitle);
 
+// ── GET (manager team-view: operational fields only) ────────────────────────────
+// Deliberately a distinct model from GetEmployeeResponse above, not a shared type with unused
+// properties — mirrors HR.Modules.Employees.Features.GetEmployeeTeamView.GetEmployeeTeamViewResponse
+// field-for-field. Deserializing the manager-scope API response into the full GetEmployeeResponse
+// model would silently leave every restricted field at its default value instead of surfacing
+// that this is a different, reduced contract — see 26-permissions-access-ux.md's field-level
+// access matrix.
+public sealed record GetEmployeeTeamViewResponse(
+    Guid Id,
+    Guid CompanyId,
+    Guid? DepartmentId,
+    string? DepartmentName,
+    Guid? LocationId,
+    string? LocationName,
+    Guid? PositionProfileId,
+    string? PositionTitle,
+    Guid? ManagerId,
+    string? ManagerFullName,
+    int DirectReportsCount,
+    IReadOnlyList<ReportingChainItemModel> ReportingChain,
+    string FirstName,
+    string LastName,
+    string? PreferredName,
+    string WorkEmail,
+    DateOnly StartDate,
+    string Status,
+    string? EmployeeNumber,
+    Guid? EmploymentTypeId,
+    string? EmploymentTypeName,
+    bool ShowOnboardingTab,
+    bool ShowProbationTab,
+    bool ShowOffboardingTab,
+    bool ShowLeavingTab);
+
 // ── PERSONAL DETAILS ──────────────────────────────────────────────────────────
 
 public sealed record GetMyPersonalDetailsResponse(

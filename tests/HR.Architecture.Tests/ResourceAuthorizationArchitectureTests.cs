@@ -75,6 +75,8 @@ public class ResourceAuthorizationArchitectureTests
             // GetEmployeeHandler), so it is checked there rather than at the endpoint.
             Add<HR.Modules.Employees.Features.GetEmployee.Endpoint,
                 HR.Modules.Employees.Features.GetEmployee.GetEmployeeHandler>();
+            Add<HR.Modules.Employees.Features.GetEmployeeTeamView.Endpoint,
+                HR.Modules.Employees.Features.GetEmployeeTeamView.GetEmployeeTeamViewHandler>();
 
             return data;
         }

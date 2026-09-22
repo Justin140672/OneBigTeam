@@ -209,6 +209,16 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
+    // Manager-facing, operational-only counterpart to GetEmployeeAsync above — hits the separate
+    // GetEmployeeTeamView endpoint and deserializes into the distinct, reduced
+    // GetEmployeeTeamViewResponse model, never the full GetEmployeeResponse. Non-swallowing (the
+    // caller needs to distinguish 403/404 from a genuine API error to render the right page
+    // state) — see TeamMemberProfile.razor.
+    public Task<ApiResult<GetEmployeeTeamViewResponse>> GetEmployeeTeamViewAsync(Guid companyId, Guid id) =>
+        ApiResponseReader.ExecuteAsync<GetEmployeeTeamViewResponse>(
+            ct => Http.GetAsync($"api/companies/{companyId}/employees/{id}/team-view", ct),
+            HrApiJsonOptions.Default);
+
     public async Task<ApiSaveResult> UpdateEmployeeProfileAsync(
         Guid companyId, Guid id, UpdateEmployeeProfileRequest request)
     {

@@ -223,6 +223,7 @@ public static class EmployeesModule
 
         services.AddScoped<Services.EmployeesResourceAuthorizer>();
         services.AddScoped<GetEmployeeHandler>();
+        services.AddScoped<Features.GetEmployeeTeamView.GetEmployeeTeamViewHandler>();
         services.AddScoped<GetMyEmployeeHandler>();
         services.AddScoped<GetMyTeamHandler>();
         services.AddScoped<Features.GetManagerTeamStatusSummary.GetManagerTeamStatusSummaryHandler>();

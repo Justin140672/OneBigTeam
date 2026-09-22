@@ -1,0 +1,150 @@
+@page "/companies/{CompanyId:guid}/employees/{Id:guid}/team-view"
+@rendermode InteractiveServer
+@inject EmployeeService EmployeeService
+@inject AppSession Session
+@using HR.SharedKernel.Http
+
+<PageTitle>@(_employee?.FirstName is null ? "Team Member" : $"{_employee.FirstName} {_employee.LastName}")</PageTitle>
+
+<div class="container py-4">
+    <BackButton />
+
+    @if (_loading)
+    {
+        <HrLoadingIndicator />
+    }
+    else if (_failureKind == ApiFailureKind.Forbidden)
+    {
+        <div class="alert alert-warning" role="alert">
+            You do not have permission to view this employee's profile. You can only view
+            profiles for employees in your reporting hierarchy.
+        </div>
+    }
+    else if (_failureKind == ApiFailureKind.NotFound)
+    {
+        <div class="alert alert-warning" role="alert">
+            This employee could not be found.
+        </div>
+    }
+    else if (_failureKind is not null)
+    {
+        <div class="alert alert-danger" role="alert">
+            Something went wrong loading this profile. Please try again.
+        </div>
+    }
+    else if (_employee is not null)
+    {
+        <!--
+            Read-only, manager-facing profile — deliberately does NOT reuse EmployeeEdit.razor.
+            Renders only the operational fields GetEmployeeTeamViewResponse actually carries; there
+            is no edit control, "More actions" menu, notes, compensation, system-access, personal-
+            details or leaving-process administration here, because the underlying model has no
+            properties for any of that (see EmployeeModels.cs's GetEmployeeTeamViewResponse and
+            26-permissions-access-ux.md's field-level access matrix).
+        -->
+        <h1 class="mb-1">@_employee.FirstName @_employee.LastName</h1>
+        <p class="text-muted mb-4">@(_employee.PositionTitle ?? "—")</p>
+
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h2 class="h6 text-muted text-uppercase mb-3">Employment</h2>
+                        <dl class="row mb-0">
+                            <dt class="col-5">Work email</dt>
+                            <dd class="col-7"><a href="mailto:@_employee.WorkEmail">@_employee.WorkEmail</a></dd>
+
+                            <dt class="col-5">Job title</dt>
+                            <dd class="col-7">@(_employee.PositionTitle ?? "—")</dd>
+
+                            <dt class="col-5">Department</dt>
+                            <dd class="col-7">@(_employee.DepartmentName ?? "—")</dd>
+
+                            <dt class="col-5">Location</dt>
+                            <dd class="col-7">@(_employee.LocationName ?? "—")</dd>
+
+                            <dt class="col-5">Employment type</dt>
+                            <dd class="col-7">@(_employee.EmploymentTypeName ?? "—")</dd>
+
+                            <dt class="col-5">Employee number</dt>
+                            <dd class="col-7">@(_employee.EmployeeNumber ?? "—")</dd>
+
+                            <dt class="col-5">Start date</dt>
+                            <dd class="col-7">@_employee.StartDate.ToString("d MMM yyyy")</dd>
+
+                            <dt class="col-5">Status</dt>
+                            <dd class="col-7">@_employee.Status</dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h2 class="h6 text-muted text-uppercase mb-3">Reporting</h2>
+                        <dl class="row mb-0">
+                            <dt class="col-5">Manager</dt>
+                            <dd class="col-7">@(_employee.ManagerFullName ?? "—")</dd>
+
+                            <dt class="col-5">Direct reports</dt>
+                            <dd class="col-7">@_employee.DirectReportsCount</dd>
+                        </dl>
+
+                        @if (_employee.ReportingChain.Count > 0)
+                        {
+                            <h3 class="h6 text-muted text-uppercase mt-3 mb-2">Reporting chain</h3>
+                            <ol class="mb-0">
+                                @foreach (var link in _employee.ReportingChain)
+                                {
+                                    <li>@link.Name @(link.JobTitle is null ? "" : $"— {link.JobTitle}")</li>
+                                }
+                            </ol>
+                        }
+                    </div>
+                </div>
+
+                @if (_employee.ShowOnboardingTab || _employee.ShowProbationTab || _employee.ShowOffboardingTab || _employee.ShowLeavingTab)
+                {
+                    <div class="card mt-3">
+                        <div class="card-body">
+                            <h2 class="h6 text-muted text-uppercase mb-3">Lifecycle</h2>
+                            <ul class="mb-0">
+                                @if (_employee.ShowOnboardingTab) { <li>Onboarding in progress</li> }
+                                @if (_employee.ShowProbationTab) { <li>Probation in progress</li> }
+                                @if (_employee.ShowOffboardingTab) { <li>Offboarding in progress</li> }
+                                @if (_employee.ShowLeavingTab) { <li>Leaving process on file</li> }
+                            </ul>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid Id { get; set; }
+
+    private bool _loading = true;
+    private ApiFailureKind? _failureKind;
+    private GetEmployeeTeamViewResponse? _employee;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Session.InitialiseAsync();
+
+        var result = await EmployeeService.GetEmployeeTeamViewAsync(CompanyId, Id);
+        if (result.Success)
+        {
+            _employee = result.Value;
+        }
+        else
+        {
+            _failureKind = result.FailureKind;
+        }
+
+        _loading = false;
+    }
+}

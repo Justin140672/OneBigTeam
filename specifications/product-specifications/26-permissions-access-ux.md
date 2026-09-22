@@ -189,15 +189,24 @@ Company Administrator is a company-settings role, not an HR role. The initial co
 
 Directory-style lists may expose a deliberately reduced set of work fields to a wider audience, but must not reuse a detailed employee response containing personal or sensitive fields.
 
-## Field-level access matrix (GetEmployee)
+## Field-level access matrix and the GetEmployee / GetEmployeeTeamView split
 
 A manager's hierarchy access to "the detailed employee record" above is **not** the same
 response shape HR receives — reconciles the ambiguity previously between this document and
 `30-administrative-role-separation-matrix.md` (which listed manager access as "Self", meaning
-"no more than self-service" rather than describing hierarchy scope at all). GetEmployee returns
-one of two contracts depending on the caller's resolved scope:
+"no more than self-service" rather than describing hierarchy scope at all). Self and HR access,
+and manager access, are served by two separately typed API endpoints rather than one endpoint
+returning different shapes — this keeps the public contract of each endpoint explicit (no
+endpoint declares its response as an untyped `object`) and lets each endpoint's database query
+select only the columns its own response can ever carry, rather than fetching the full record
+and discarding fields afterwards:
 
-| Field group | Employee (self) | Manager (hierarchy) | HR Administrator |
+| Endpoint | Route | Authorized callers | Response |
+|---|---|---|---|
+| GetEmployee | `GET /api/companies/{companyId}/employees/{id}` | Self, HR Administrator | `GetEmployeeResponse` (full HR record) |
+| GetEmployeeTeamView | `GET /api/companies/{companyId}/employees/{id}/team-view` | Manager, anywhere in the target's reporting hierarchy (direct or indirect) | `GetEmployeeTeamViewResponse` (operational-only) |
+
+| Field group | Employee (self, via GetEmployee) | Manager (via GetEmployeeTeamView) | HR Administrator (via GetEmployee) |
 |---|---|---|---|
 | Identity, name, work email | Y | Y | Y |
 | Department / location / position / employment type | Y | Y | Y |
@@ -207,16 +216,30 @@ one of two contracts depending on the caller's resolved scope:
 | Personal email, phone numbers, home address | Y | — | Y |
 | Date of birth, nationality, gender | Y | — | Y |
 | System-access state, working-pattern overrides | Y | — | Y |
-| Leaving-process dates, notice period (raw + effective) | Y | — | Y |
+| Leaving-process dates, notice period (raw + effective), "start leaving process" action | Y | — | Y |
 | HR notes | Y | — | Y |
-| Optimistic-concurrency version token | Y | — | Y |
+| Optimistic-concurrency version token, timestamps | Y | — | Y |
 
-Implemented by `HR.Modules.Employees.Features.GetEmployee.GetEmployeeHandler`: the manager path
-returns `GetEmployeeManagerResponse`, a distinct, narrower response contract with no property for
-any row marked "—" above — the full record is never fetched-and-hidden client-side. Covered by
-`GetEmployeeHandlerTests.HandleAsync_Manager_Response_Contains_Only_Operational_Fields` (unit) and
-`GetEmployeeResourceAuthorizationTests.Manager_Response_Contains_Only_Operational_Fields_Over_The_Wire`
-(integration, asserts the actual JSON payload).
+Implemented by `HR.Modules.Employees.Features.GetEmployee.GetEmployeeHandler` (authorized via
+`EmployeesResourceAuthorizer.CanViewFullRecordAsync` — self or HR-admin only, hierarchy
+explicitly excluded) and `HR.Modules.Employees.Features.GetEmployeeTeamView.GetEmployeeTeamViewHandler`
+(authorized via `CanViewAsManagerAsync` — hierarchy only, self excluded). The team-view handler
+has no dependency on `IEffectiveNoticePeriodResolver` at all and its database projection has no
+column not represented in `GetEmployeeTeamViewResponse` — the full record is never
+fetched-and-hidden, at either the API or the UI layer.
+
+UI route: managers reach the restricted view via a "View profile" action on each report in the
+My Team widget (`MyTeamWidget.razor`), landing on `TeamMemberProfile.razor` at
+`/companies/{companyId}/employees/{id}/team-view` — a distinct, read-only page, not a relaxed
+guard on the existing HR administration page (`EmployeeEdit.razor`, still gated on
+`Session.CanManageEmployees`). `TeamMemberProfile.razor` renders only the fields
+`GetEmployeeTeamViewResponse` carries and has no edit control, "More actions" menu, or HR-only
+tab.
+
+Covered by `GetEmployeeHandlerTests` / `GetEmployeeTeamViewHandlerTests` (unit — including a
+reflection-based assertion that the team-view response type has no property for any sensitive
+field, so a future regression fails to compile) and `GetEmployeeResourceAuthorizationTests`
+(integration — asserts the actual JSON payload for both endpoints, not just status codes).
 
 UI visibility never substitutes for API authorization.
 

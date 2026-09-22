@@ -7,11 +7,16 @@ using HR.Modules.Identity.Domain;
 namespace HR.Integration.Tests;
 
 /// <summary>
-/// Resource-level (self / manager-hierarchy / HR-admin) authorization for GetEmployee, guarded by
-/// HR.Modules.Employees.Services.EmployeesResourceAuthorizer. Endpoint-level Policies("role:employee")
-/// only proves tenant/role membership; it never proves the caller has a relationship to the specific
-/// employeeId in the route, so these tests exercise that resource-ownership check end-to-end over
-/// real HTTP — mirroring LeaveResourceAuthorizationTests's pattern for the same class of bug.
+/// Resource-level (self / manager-hierarchy / HR-admin) authorization for GetEmployee and its
+/// manager-facing counterpart GetEmployeeTeamView, guarded by
+/// HR.Modules.Employees.Services.EmployeesResourceAuthorizer. Endpoint-level
+/// Policies("role:employee") only proves tenant/role membership; it never proves the caller has a
+/// relationship to the specific employeeId in the route, so these tests exercise that
+/// resource-ownership check end-to-end over real HTTP — mirroring
+/// LeaveResourceAuthorizationTests's pattern for the same class of bug.
+///
+/// GetEmployee (the full HR record) is self/HR-admin only. GetEmployeeTeamView (operational-only
+/// fields) is manager-hierarchy only. See 26-permissions-access-ux.md's field-level access matrix.
 /// </summary>
 [Collection("Integration")]
 public class GetEmployeeResourceAuthorizationTests(ApiWebApplicationFactory factory)
@@ -22,8 +27,10 @@ public class GetEmployeeResourceAuthorizationTests(ApiWebApplicationFactory fact
     private static readonly Guid PositionProfileId = Guid.Parse("20000000-0000-0000-0000-000000000002");
     private static readonly Guid SeededCompanyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
+    // ── GetEmployee (full HR record: self / HR-admin only) ─────────────────────
+
     [Fact]
-    public async Task Allows_Employee_Viewing_Own_Record()
+    public async Task GetEmployee_Allows_Employee_Viewing_Own_Record()
     {
         var employee = await CreateEmployeeAsync();
 
@@ -34,7 +41,7 @@ public class GetEmployeeResourceAuthorizationTests(ApiWebApplicationFactory fact
     }
 
     [Fact]
-    public async Task Returns_Forbidden_For_Unrelated_Peer_Employee()
+    public async Task GetEmployee_Returns_Forbidden_For_Unrelated_Peer_Employee()
     {
         var employee = await CreateEmployeeAsync();
         var peer = await CreateEmployeeAsync();
@@ -46,8 +53,10 @@ public class GetEmployeeResourceAuthorizationTests(ApiWebApplicationFactory fact
     }
 
     [Fact]
-    public async Task Allows_Direct_Manager_Viewing_Report()
+    public async Task GetEmployee_Returns_Forbidden_For_Direct_Manager()
     {
+        // Manager hierarchy alone is no longer enough to reach the full HR record — managers use
+        // GetEmployeeTeamView instead (see below).
         var manager = await CreateEmployeeAsync();
         var report = await CreateEmployeeAsync();
 
@@ -57,109 +66,45 @@ public class GetEmployeeResourceAuthorizationTests(ApiWebApplicationFactory fact
         using var managerClient = await AuthenticatedClient(manager);
         var response = await managerClient.GetAsync($"/api/companies/{SeededCompanyId}/employees/{report}");
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Allows_Skip_Level_Manager_In_Three_Level_Hierarchy()
-    {
-        var seniorManager = await CreateEmployeeAsync(); // C
-        var manager = await CreateEmployeeAsync();       // B
-        var employee = await CreateEmployeeAsync();      // A
-
-        using (var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true))
-        {
-            await AssignManagerAsync(setupClient, employee, manager);
-            await AssignManagerAsync(setupClient, manager, seniorManager);
-        }
-
-        using var seniorManagerClient = await AuthenticatedClient(seniorManager);
-        var response = await seniorManagerClient.GetAsync($"/api/companies/{SeededCompanyId}/employees/{employee}");
-
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Returns_Forbidden_For_Unrelated_Branch_Manager()
-    {
-        var manager = await CreateEmployeeAsync();
-        var report = await CreateEmployeeAsync();
-        var unrelatedEmployee = await CreateEmployeeAsync();
-
-        using (var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true))
-            await AssignManagerAsync(setupClient, report, manager);
-
-        using var managerClient = await AuthenticatedClient(manager);
-        var response = await managerClient.GetAsync($"/api/companies/{SeededCompanyId}/employees/{unrelatedEmployee}");
-
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
-    public async Task Returns_Forbidden_For_Own_Manager_Viewed_Bottom_Up()
+    public async Task GetEmployee_Allows_HrAdministrator()
     {
-        // Denial case: being someone's report does not grant you view rights over your manager's
-        // record — the hierarchy check is one-directional (manager -> report only).
-        var manager = await CreateEmployeeAsync();
-        var report = await CreateEmployeeAsync();
-
-        using (var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true))
-            await AssignManagerAsync(setupClient, report, manager);
-
-        using var reportClient = await AuthenticatedClient(report);
-        var response = await reportClient.GetAsync($"/api/companies/{SeededCompanyId}/employees/{manager}");
-
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Manager_Response_Contains_Only_Operational_Fields_Over_The_Wire()
-    {
-        // GetEmployee field-level access matrix (see 30-administrative-role-separation-matrix.md): assert on the actual JSON payload a manager receives,
-        // not just the HTTP status code — permitted operational fields must be present, and every
-        // sensitive field the ticket calls out (personal email, DOB, nationality/gender, home
-        // phone, home address, leaving-process detail, notice period, HR notes, system-access
-        // state) must be structurally absent from the response, not merely null.
         var employee = await CreateEmployeeAsync();
-        var manager = await CreateEmployeeAsync();
 
-        using (var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true))
-            await AssignManagerAsync(setupClient, employee, manager);
+        using var hrClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true);
+        var response = await hrClient.GetAsync($"/api/companies/{SeededCompanyId}/employees/{employee}");
 
-        using var managerClient = await AuthenticatedClient(manager);
-        var response = await managerClient.GetAsync($"/api/companies/{SeededCompanyId}/employees/{employee}");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-
-        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
-
-        string[] permittedFields =
-        [
-            "id", "companyId", "firstName", "lastName", "workEmail", "startDate", "status",
-            "employeeNumber", "employmentTypeId", "showOnboardingTab", "showProbationTab",
-            "showOffboardingTab", "showLeavingTab", "canStartLeavingProcess",
-        ];
-        foreach (var field in permittedFields)
-            Assert.True(json.TryGetProperty(field, out _), $"Expected permitted field '{field}' to be present.");
-
-        string[] restrictedFields =
-        [
-            "personalEmail", "dateOfBirth", "nationality", "gender", "genderOther",
-            "phoneNumber", "homePhone", "addressLine1", "addressLine2", "city", "county",
-            "postCode", "country", "hasSystemAccess", "workingDaysOverride", "hoursPerDayOverride",
-            "continuousServiceDate", "probationEndDate", "leavingDate", "noticePeriodUnitOverride",
-            "noticePeriodLengthOverride", "notes", "effectiveNoticePeriodUnit",
-            "effectiveNoticePeriodLength", "effectiveNoticePeriodSource", "version",
-        ];
-        foreach (var field in restrictedFields)
-            Assert.False(json.TryGetProperty(field, out _), $"Expected restricted field '{field}' to be absent.");
     }
 
     [Fact]
-    public async Task Hr_Response_Contains_Sensitive_Fields()
+    public async Task GetEmployee_Returns_Forbidden_For_Company_Administrator_Without_Hr_Role()
     {
-        // The counterpart to the manager test above: HR Administrator access must still return
-        // the full administrative record, proving the restriction is scoped to manager access
-        // only, not applied globally.
+        var employee = await CreateEmployeeAsync();
+
+        using var client = await AuthenticatedClient(Guid.NewGuid(), companyAdministrator: true);
+        var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/employees/{employee}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetEmployee_Returns_Forbidden_For_Recruiter_Without_Relationship_To_Target()
+    {
+        var employee = await CreateEmployeeAsync();
+
+        using var client = await AuthenticatedClient(Guid.NewGuid(), recruiter: true);
+        var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/employees/{employee}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetEmployee_Response_Contains_Sensitive_Fields_For_HrAdministrator()
+    {
         var employee = await CreateEmployeeAsync();
 
         using var hrClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true);
@@ -174,37 +119,151 @@ public class GetEmployeeResourceAuthorizationTests(ApiWebApplicationFactory fact
         Assert.True(json.TryGetProperty("notes", out _));
     }
 
-    [Fact]
-    public async Task Allows_HrAdministrator()
-    {
-        var employee = await CreateEmployeeAsync();
+    // ── GetEmployeeTeamView (operational-only fields: manager hierarchy only) ──
 
-        using var hrClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true);
-        var response = await hrClient.GetAsync($"/api/companies/{SeededCompanyId}/employees/{employee}");
+    [Fact]
+    public async Task TeamView_Allows_Direct_Manager_Viewing_Report()
+    {
+        var manager = await CreateEmployeeAsync();
+        var report = await CreateEmployeeAsync();
+
+        using (var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true))
+            await AssignManagerAsync(setupClient, report, manager);
+
+        using var managerClient = await AuthenticatedClient(manager);
+        var response = await managerClient.GetAsync($"/api/companies/{SeededCompanyId}/employees/{report}/team-view");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
-    public async Task Returns_Forbidden_For_Company_Administrator_Without_Hr_Role()
+    public async Task TeamView_Allows_Skip_Level_Manager_In_Three_Level_Hierarchy()
     {
-        var employee = await CreateEmployeeAsync();
+        var seniorManager = await CreateEmployeeAsync(); // C
+        var manager = await CreateEmployeeAsync();       // B
+        var employee = await CreateEmployeeAsync();      // A
 
-        using var client = await AuthenticatedClient(Guid.NewGuid(), companyAdministrator: true);
-        var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/employees/{employee}");
+        using (var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true))
+        {
+            await AssignManagerAsync(setupClient, employee, manager);
+            await AssignManagerAsync(setupClient, manager, seniorManager);
+        }
+
+        using var seniorManagerClient = await AuthenticatedClient(seniorManager);
+        var response = await seniorManagerClient.GetAsync(
+            $"/api/companies/{SeededCompanyId}/employees/{employee}/team-view");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task TeamView_Returns_Forbidden_For_Unrelated_Branch_Manager()
+    {
+        var manager = await CreateEmployeeAsync();
+        var report = await CreateEmployeeAsync();
+        var unrelatedEmployee = await CreateEmployeeAsync();
+
+        using (var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true))
+            await AssignManagerAsync(setupClient, report, manager);
+
+        using var managerClient = await AuthenticatedClient(manager);
+        var response = await managerClient.GetAsync(
+            $"/api/companies/{SeededCompanyId}/employees/{unrelatedEmployee}/team-view");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
-    public async Task Returns_Forbidden_For_Recruiter_Without_Relationship_To_Target()
+    public async Task TeamView_Returns_Forbidden_For_Own_Manager_Viewed_Bottom_Up()
+    {
+        // Denial case: being someone's report does not grant you view rights over your manager's
+        // record — the hierarchy check is one-directional (manager -> report only).
+        var manager = await CreateEmployeeAsync();
+        var report = await CreateEmployeeAsync();
+
+        using (var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true))
+            await AssignManagerAsync(setupClient, report, manager);
+
+        using var reportClient = await AuthenticatedClient(report);
+        var response = await reportClient.GetAsync($"/api/companies/{SeededCompanyId}/employees/{manager}/team-view");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task TeamView_Returns_Forbidden_For_Self()
     {
         var employee = await CreateEmployeeAsync();
 
-        using var client = await AuthenticatedClient(Guid.NewGuid(), recruiter: true);
-        var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/employees/{employee}");
+        using var client = await AuthenticatedClient(employee);
+        var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/employees/{employee}/team-view");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task TeamView_Returns_Forbidden_For_Unrelated_Peer_Employee()
+    {
+        var employee = await CreateEmployeeAsync();
+        var peer = await CreateEmployeeAsync();
+
+        using var client = await AuthenticatedClient(peer);
+        var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/employees/{employee}/team-view");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task TeamView_Response_Contains_Only_Operational_Fields_Over_The_Wire()
+    {
+        // Assert on the actual JSON payload a manager receives, not just the HTTP status code —
+        // permitted operational fields must be present, and every sensitive field the ticket
+        // calls out (personal email, DOB, nationality/gender, home phone, home address,
+        // leaving-process detail, notice period, HR notes, system-access state, concurrency
+        // token) must be structurally absent from the response, not merely null.
+        var employee = await CreateEmployeeAsync();
+        var manager = await CreateEmployeeAsync();
+
+        using (var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true))
+            await AssignManagerAsync(setupClient, employee, manager);
+
+        using var managerClient = await AuthenticatedClient(manager);
+        var response = await managerClient.GetAsync($"/api/companies/{SeededCompanyId}/employees/{employee}/team-view");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var json = await response.Content.ReadFromJsonAsync<JsonElement>();
+
+        string[] permittedFields =
+        [
+            "id", "companyId", "firstName", "lastName", "workEmail", "startDate", "status",
+            "employeeNumber", "employmentTypeId", "showOnboardingTab", "showProbationTab",
+            "showOffboardingTab", "showLeavingTab",
+        ];
+        foreach (var field in permittedFields)
+            Assert.True(json.TryGetProperty(field, out _), $"Expected permitted field '{field}' to be present.");
+
+        string[] restrictedFields =
+        [
+            "personalEmail", "dateOfBirth", "nationality", "gender", "genderOther",
+            "phoneNumber", "homePhone", "addressLine1", "addressLine2", "city", "county",
+            "postCode", "country", "hasSystemAccess", "workingDaysOverride", "hoursPerDayOverride",
+            "continuousServiceDate", "probationEndDate", "leavingDate", "noticePeriodUnitOverride",
+            "noticePeriodLengthOverride", "notes", "effectiveNoticePeriodUnit",
+            "effectiveNoticePeriodLength", "effectiveNoticePeriodSource", "version",
+            "createdAt", "updatedAt", "canStartLeavingProcess",
+        ];
+        foreach (var field in restrictedFields)
+            Assert.False(json.TryGetProperty(field, out _), $"Expected restricted field '{field}' to be absent.");
+    }
+
+    [Fact]
+    public async Task TeamView_Returns_Unauthorized_Without_Auth()
+    {
+        using var client = factory.CreateClient();
+        var response = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/employees/{Guid.NewGuid()}/team-view");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────────
