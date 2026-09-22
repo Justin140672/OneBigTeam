@@ -18,6 +18,8 @@ using HR.Modules.Tasks;
 using HR.SharedKernel;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Hosting.Internal;
 using Microsoft.Extensions.Logging;
 
 namespace HR.Architecture.Tests;
@@ -63,7 +65,11 @@ public class ServiceContainerCompositionTests
 
         services.AddCompaniesModule(connectionString, configuration);
         services.AddDataImportModule(connectionString, configuration);
-        services.AddDocumentsModule(connectionString, configuration);
+        // Development environment: this test validates DI graph composition only, not the
+        // staging/production fail-fast behaviour for missing ClamAv/Supabase config (see
+        // DocumentsModuleArchitectureTests / DocumentsModuleTests for that).
+        var environment = new HostingEnvironment { EnvironmentName = Environments.Development };
+        services.AddDocumentsModule(connectionString, configuration, environment);
         services.AddEmployeesModule(connectionString);
         services.AddIdentityModule(connectionString, configuration);
         services.AddLeaveModule(connectionString);

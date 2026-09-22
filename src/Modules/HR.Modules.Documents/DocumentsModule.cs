@@ -71,6 +71,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Hosting;
 
 namespace HR.Modules.Documents;
 
@@ -79,10 +81,11 @@ public static class DocumentsModule
     public static IServiceCollection AddDocumentsModule(
         this IServiceCollection services,
         string connectionString,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IHostEnvironment environment)
     {
         AddFeatureServices(services);
-        AddStorageService(services, configuration);
+        AddStorageService(services, configuration, environment);
         AddProfilePhotoServices(services, configuration);
 
         services.AddDbContext<DocumentsDbContext>(options =>
@@ -92,7 +95,8 @@ public static class DocumentsModule
         return services;
     }
 
-    private static void AddStorageService(IServiceCollection services, IConfiguration configuration)
+    private static void AddStorageService(
+        IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
         services.Configure<FileUploadOptions>(configuration.GetSection("Documents:FileUpload"));
         services.AddScoped<IFileUploadValidator, FileUploadValidator>();
@@ -108,17 +112,46 @@ public static class DocumentsModule
         var isE2ETestingForVirusScan = string.Equals(
             Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
 
+        // Security review ticket 2 (P1): the no-op scanner marks every upload "clean" without ever
+        // inspecting it. That is only acceptable in Development or an explicit automated-test
+        // environment (IsDevelopment(), the "Test" environment name used by WebApplicationFactory-
+        // hosted integration tests, or the E2E harness above) — never in Staging/Production, even if
+        // ClamAv configuration happens to be absent there.
+        var isNoOpAllowedEnvironment =
+            isE2ETestingForVirusScan
+            || environment.IsDevelopment()
+            || environment.IsEnvironment("Test");
+
         var clamAvSection = configuration.GetSection("Documents:ClamAv");
-        if (!isE2ETestingForVirusScan && clamAvSection.Exists() && !string.IsNullOrWhiteSpace(clamAvSection["Host"]))
+        var clamAvHost = clamAvSection["Host"];
+        var hasClamAvConfig = clamAvSection.Exists() && !string.IsNullOrWhiteSpace(clamAvHost);
+
+        if (hasClamAvConfig)
         {
             services.Configure<ClamAvOptions>(clamAvSection);
             services.AddScoped<IVirusScanService, ClamAvVirusScanService>();
+            // Tags match the "ready"/"critical" convention used by every other dependency check
+            // registered across the app (see HR.ServiceDefaults.HealthCheckEndpoints) — a module
+            // cannot reference that shared-host project directly, so the tag strings are duplicated
+            // here rather than adding a new cross-project dependency for two constants.
+            services.AddHealthChecks().AddCheck<ClamAvHealthCheck>(
+                "clam-av",
+                failureStatus: HealthStatus.Unhealthy,
+                tags: ["ready", "critical"]);
         }
-        else
+        else if (isNoOpAllowedEnvironment)
         {
             // No ClamAv configured (local/dev default) — same environment-based fallback
             // pattern as the Supabase-vs-local storage switch below.
             services.AddScoped<IVirusScanService, NoOpVirusScanService>();
+        }
+        else
+        {
+            throw new InvalidOperationException(
+                "Malware scanning is not configured for this environment. "
+                + "'Documents:ClamAv:Host' (and Port/TimeoutSeconds) must be set in Staging/Production — "
+                + "the no-op scanner that marks every upload as clean is only permitted in Development "
+                + "or an explicit automated-test environment.");
         }
 
         var supabaseSection = configuration.GetSection("Documents:Supabase");

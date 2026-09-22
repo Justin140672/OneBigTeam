@@ -78,7 +78,7 @@ connectionString += isE2ETestingRun
 builder.Services.AddCompaniesModule(connectionString, builder.Configuration);
 builder.Services.AddCompanyOnboardingModule(connectionString);
 builder.Services.AddDataImportModule(connectionString, builder.Configuration);
-builder.Services.AddDocumentsModule(connectionString, builder.Configuration);
+builder.Services.AddDocumentsModule(connectionString, builder.Configuration, builder.Environment);
 builder.Services.AddEmployeesModule(connectionString, builder.Configuration);
 builder.Services.AddIdentityModule(connectionString, builder.Configuration);
 builder.Services.AddLeaveModule(connectionString);
