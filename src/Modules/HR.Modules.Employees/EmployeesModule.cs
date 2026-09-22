@@ -221,6 +221,7 @@ public static class EmployeesModule
 
         services.AddScoped<IEmployeeRenumberingService, EmployeeRenumberingService>();
 
+        services.AddScoped<Services.EmployeesResourceAuthorizer>();
         services.AddScoped<GetEmployeeHandler>();
         services.AddScoped<GetMyEmployeeHandler>();
         services.AddScoped<GetMyTeamHandler>();
@@ -511,6 +512,7 @@ public static class EmployeesModule
             (55, "SeedInviteA", false), (56, "SeedInviteB", false), (57, "SeedInviteC", false),
             (58, "SeedInviteD", false), (59, "SeedInviteE", false), (60, "SeedInviteF", false),
             (61, "SeedInviteG", false), (62, "SeedInviteH", false),
+            (63, "SeedCompEdit", false),
         };
 
         return Array.ConvertAll(defs, d => (

@@ -14,25 +14,38 @@ internal sealed class GetEmployeeHandler
     private readonly IProbationStatusReader _probationStatusReader;
     private readonly IOffboardingStatusReader _offboardingStatusReader;
     private readonly IEffectiveNoticePeriodResolver _effectiveNoticePeriodResolver;
+    private readonly EmployeesResourceAuthorizer _resourceAuthorizer;
 
     public GetEmployeeHandler(
         EmployeesDbContext dbContext,
         IOnboardingStatusReader onboardingStatusReader,
         IProbationStatusReader probationStatusReader,
         IOffboardingStatusReader offboardingStatusReader,
-        IEffectiveNoticePeriodResolver effectiveNoticePeriodResolver)
+        IEffectiveNoticePeriodResolver effectiveNoticePeriodResolver,
+        EmployeesResourceAuthorizer resourceAuthorizer)
     {
         _dbContext = dbContext;
         _onboardingStatusReader = onboardingStatusReader;
         _probationStatusReader = probationStatusReader;
         _offboardingStatusReader = offboardingStatusReader;
         _effectiveNoticePeriodResolver = effectiveNoticePeriodResolver;
+        _resourceAuthorizer = resourceAuthorizer;
     }
 
     public async Task<Result<GetEmployeeResponse>> HandleAsync(
         GetEmployeeRequest request,
         CancellationToken cancellationToken)
     {
+        // IAM-07: only the employee themself, a manager anywhere in their reporting hierarchy, or
+        // an HR Administrator may view this employee's full HR record. This must be checked
+        // before any of that record's fields are read, not left to the UI to hide — see the
+        // GetEmployee security ticket this closes.
+        var isAuthorized = await _resourceAuthorizer.CanViewAsync(
+            request.CompanyId, request.CallerEmployeeId, request.Id, cancellationToken);
+        if (!isAuthorized)
+            return Result.Failure<GetEmployeeResponse>(
+                Error.Forbidden("You are not authorized to view this employee's record."));
+
         var result = await _dbContext.Employees
             .AsNoTracking()
             .Where(e => e.Id == request.Id && e.CompanyId == request.CompanyId)

@@ -26,6 +26,7 @@ public class ResourceAuthorizationArchitectureTests
             typeof(HR.Modules.Sickness.SicknessModule).Assembly,
             typeof(HR.Modules.Probation.ProbationModule).Assembly,
             typeof(HR.Modules.Tasks.TasksModule).Assembly,
+            typeof(HR.Modules.Employees.EmployeesModule).Assembly,
         ];
 
     /// <summary>
@@ -68,6 +69,12 @@ public class ResourceAuthorizationArchitectureTests
                 HR.Modules.Tasks.Features.GetTask.GetTaskHandler>();
             Add<HR.Modules.Tasks.Features.CompleteTask.Endpoint,
                 HR.Modules.Tasks.Features.CompleteTask.CompleteTaskHandler>();
+
+            // Employees — GetEmployee's target id is the route's own {id}, but ownership isn't
+            // known until the resource-authorizer check runs in the handler (see
+            // GetEmployeeHandler), so it is checked there rather than at the endpoint.
+            Add<HR.Modules.Employees.Features.GetEmployee.Endpoint,
+                HR.Modules.Employees.Features.GetEmployee.GetEmployeeHandler>();
 
             return data;
         }

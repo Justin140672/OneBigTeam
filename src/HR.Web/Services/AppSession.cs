@@ -41,6 +41,7 @@ public sealed class AppSession(HrApiHttpClientFactory httpClientFactory, Employe
     public bool CanViewRecruitmentReports     => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000035"));
     public bool CanViewEqualityReports        => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000046"));
     public bool CanManageSharedDocuments      => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000030"));
+    public bool CanViewCompliance             => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000043"));
 
     // OBT-IAM-09: Getting Started and Support Requests must be gated on their own explicit
     // permissions (onboarding:view, support:manage), not on CanManageCompany — a

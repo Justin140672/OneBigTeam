@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Http;
 namespace HR.Modules.Employees.Features.GetEmployee;
 
 internal sealed class Endpoint(
-    GetEmployeeHandler handler) : Endpoint<GetEmployeeRequest, GetEmployeeResponse>
+    GetEmployeeHandler handler, ICurrentUser currentUser) : Endpoint<GetEmployeeRequest, GetEmployeeResponse>
 {
     public override void Configure()
     {
@@ -17,7 +17,17 @@ internal sealed class Endpoint(
         GetEmployeeRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(request, cancellationToken);
+        // NOT User.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's
+        // resolved Employee/UserId (see GetMyEmployee/Endpoint.cs for the rationale).
+        if (currentUser.UserId is not { } callerEmployeeId)
+        {
+            await Send.ResultAsync(TypedResults.Unauthorized());
+            return;
+        }
+
+        var result = await handler.HandleAsync(
+            request with { CallerEmployeeId = callerEmployeeId },
+            cancellationToken);
 
         if (result.IsFailure)
         {

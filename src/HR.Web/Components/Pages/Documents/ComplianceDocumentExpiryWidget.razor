@@ -2,7 +2,7 @@
 @inject NavigationManager Navigation
 @inject AppSession Session
 
-@if (Session.CanManageEmployees)
+@if (Session.CanViewCompliance)
 {
     @if (_loading)
     {
@@ -90,7 +90,7 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (!Session.CanManageEmployees)
+        if (!Session.CanViewCompliance)
         {
             _loading = false;
             return;

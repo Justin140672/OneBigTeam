@@ -32,6 +32,54 @@ public class GetExpiringDocumentsEndpointTests
     }
 
     [Fact]
+    public async Task Ordinary_Employee_Is_Forbidden()
+    {
+        var response = await RequestAsAsync(SystemRoles.Employee);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Manager_Without_Compliance_Permission_Is_Forbidden()
+    {
+        var response = await RequestAsAsync(SystemRoles.Manager);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Recruiter_Without_Compliance_Permission_Is_Forbidden()
+    {
+        var response = await RequestAsAsync(SystemRoles.Recruiter);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Company_Administrator_Without_Hr_Role_Is_Forbidden()
+    {
+        var response = await RequestAsAsync(SystemRoles.CompanyAdministrator);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Hr_Administrator_Is_Authorized()
+    {
+        var response = await RequestAsAsync(SystemRoles.HrAdministrator);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    private async Task<HttpResponseMessage> RequestAsAsync(Guid roleId)
+    {
+        var companyId = Guid.NewGuid();
+        var userId    = Guid.NewGuid();
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, roleId, companyId);
+
+        return await client.GetAsync(ExpiringUrl(companyId));
+    }
+
+    [Fact]
     public async Task Returns_Empty_When_No_Documents_Have_ExpiryDate()
     {
         var (companyId, docTypeId, client) = await SetupAsync();
