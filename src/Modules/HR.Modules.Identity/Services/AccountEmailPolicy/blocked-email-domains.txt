@@ -1,0 +1,206 @@
+# Ticket 9: public and disposable email domains that may NOT be used to create a One Big Team
+# user account (public signup, employee invitations, invitation acceptance, platform
+# administrators). Existing accounts on these domains are unaffected and can still log in.
+#
+# Format: one domain per line; blank lines and lines starting with '#' are ignored. Entries are
+# normalised exactly like submitted addresses (trimmed, lower-cased, trailing dot removed, IDN
+# converted to punycode) and match the exact domain AND any of its subdomains, so do not list
+# subdomains separately. Every entry is validated at API startup (ValidateOnStart) — a malformed
+# entry, or an empty/missing list, stops the API from starting rather than silently allowing
+# every address.
+#
+# Operators can add further domains without a code change via configuration:
+#   Identity:AccountEmailDomainPolicy:AdditionalBlockedDomains
+#
+# Do NOT add domains here just because a provider also hosts organisation mail (Google Workspace,
+# Microsoft 365, Zoho Workplace, ...): an organisation's own domain (person@company.co.uk) stays
+# valid regardless of who hosts its mailboxes. Only the provider's consumer domains belong here.
+
+# --- Google (consumer) ---
+gmail.com
+googlemail.com
+
+# --- Microsoft (consumer: Hotmail / Outlook.com / Live / MSN) ---
+hotmail.com
+hotmail.co.uk
+hotmail.fr
+hotmail.de
+hotmail.it
+hotmail.es
+hotmail.nl
+hotmail.be
+hotmail.ca
+hotmail.com.au
+outlook.com
+outlook.co.uk
+outlook.fr
+outlook.de
+outlook.es
+outlook.it
+outlook.ie
+live.com
+live.co.uk
+live.fr
+live.de
+live.it
+live.nl
+live.ie
+live.ca
+live.com.au
+msn.com
+windowslive.com
+passport.com
+
+# --- Yahoo ---
+yahoo.com
+yahoo.co.uk
+yahoo.fr
+yahoo.de
+yahoo.it
+yahoo.es
+yahoo.ie
+yahoo.ca
+yahoo.com.au
+yahoo.co.in
+yahoo.co.jp
+ymail.com
+rocketmail.com
+
+# --- Apple ---
+icloud.com
+me.com
+mac.com
+
+# --- AOL ---
+aol.com
+aol.co.uk
+aim.com
+
+# --- Proton Mail ---
+proton.me
+protonmail.com
+protonmail.ch
+pm.me
+
+# --- GMX / Mail.com ---
+gmx.com
+gmx.net
+gmx.de
+gmx.co.uk
+gmx.at
+gmx.ch
+gmx.fr
+gmx.us
+mail.com
+email.com
+usa.com
+
+# --- Zoho (consumer) ---
+zohomail.com
+zoho.com
+
+# --- Other common free / consumer providers ---
+yandex.com
+yandex.ru
+ya.ru
+mail.ru
+inbox.ru
+list.ru
+bk.ru
+qq.com
+163.com
+126.com
+sina.com
+naver.com
+hanmail.net
+daum.net
+web.de
+t-online.de
+freenet.de
+libero.it
+virgilio.it
+laposte.net
+orange.fr
+wanadoo.fr
+free.fr
+sfr.fr
+rediffmail.com
+tutanota.com
+tutanota.de
+tuta.io
+tuta.com
+fastmail.com
+fastmail.fm
+hushmail.com
+mailfence.com
+posteo.de
+posteo.net
+runbox.com
+inbox.com
+lycos.com
+hey.com
+btinternet.com
+btopenworld.com
+virginmedia.com
+ntlworld.com
+blueyonder.co.uk
+talktalk.net
+
+# --- Disposable / temporary providers ---
+mailinator.com
+guerrillamail.com
+guerrillamail.net
+guerrillamail.org
+guerrillamail.biz
+guerrillamail.de
+guerrillamail.info
+guerrillamailblock.com
+sharklasers.com
+grr.la
+pokemail.net
+spam4.me
+10minutemail.com
+10minutemail.net
+20minutemail.com
+temp-mail.org
+temp-mail.io
+tempmail.com
+tempmail.net
+tempmailo.com
+tempail.com
+tempr.email
+tempinbox.com
+mytemp.email
+discard.email
+discardmail.com
+yopmail.com
+yopmail.net
+yopmail.fr
+trashmail.com
+trashmail.de
+trashmail.net
+throwawaymail.com
+getnada.com
+nada.email
+maildrop.cc
+mailnesia.com
+mintemail.com
+mohmal.com
+dispostable.com
+fakeinbox.com
+emailondeck.com
+spamgourmet.com
+mailcatch.com
+moakt.com
+burnermail.io
+getairmail.com
+dropmail.me
+inboxkitten.com
+mailpoof.com
+mail.tm
+mail.gw
+emailfake.com
+jetable.org
+mailsac.com
+harakirimail.com
+wegwerfmail.de

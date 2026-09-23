@@ -27,6 +27,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Ticket 9: version-controlled account-creation email-domain denylist (see BlockedEmailDomainList). -->
+    <EmbeddedResource Include="Services\AccountEmailPolicy\blocked-email-domains.txt"
+                      LogicalName="HR.Modules.Identity.AccountEmailPolicy.blocked-email-domains.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="HR.Architecture.Tests" />
     <InternalsVisibleTo Include="HR.Modules.Identity.Tests" />
     <InternalsVisibleTo Include="HR.Integration.Tests" />

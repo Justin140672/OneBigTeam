@@ -25,18 +25,9 @@ internal sealed class Endpoint(
 
         if (result.IsFailure)
         {
-            var error = new { error = result.Error.Message };
-            if (result.Error.Code == "not_found")
-            {
-                await Send.ResultAsync(TypedResults.NotFound(error));
-                return;
-            }
-            if (result.Error.Code == "conflict")
-            {
-                await Send.ResultAsync(TypedResults.Conflict(error));
-                return;
-            }
-            await Send.ResultAsync(TypedResults.BadRequest(error));
+            // Ticket 9: canonical translator (same status codes as before) so a rejected public
+            // email domain surfaces as 400 with code "work_email_required".
+            await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }
 

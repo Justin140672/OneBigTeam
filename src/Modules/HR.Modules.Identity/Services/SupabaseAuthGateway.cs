@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using HR.SharedKernel;
+using HR.Modules.Identity.Services.AccountEmailPolicy;
 using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Identity.Services;
@@ -16,10 +17,30 @@ namespace HR.Modules.Identity.Services;
 // diagnostic fields) rather than the raw body: Supabase token, recovery-link and password
 // endpoints echo access tokens, refresh tokens and single-use action links in both success and
 // error payloads, and these exception messages are logged by callers (see LoginHandler).
-internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, IOptions<SupabaseAuthOptions> options)
+internal sealed class SupabaseAuthGateway(
+    IHttpClientFactory httpClientFactory,
+    IOptions<SupabaseAuthOptions> options,
+    // Ticket 9: optional only so direct constructions (unit tests) keep compiling; falls back to
+    // the embedded baseline denylist, never to "allow everything". DI always supplies the
+    // configured singleton.
+    IAccountEmailDomainPolicy? accountEmailDomainPolicy = null)
     : ISupabaseAuthGateway
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    /// <summary>
+    /// Ticket 9: last line of defence for the account-creation email-domain policy — every method
+    /// that creates a NEW identity-provider account calls this before any HTTP request, so a future
+    /// account-creation path that forgets <see cref="AccountCreationEmailGuard"/> still cannot
+    /// create a Gmail/Hotmail/disposable-domain account. Never applied to sign-in, password reset
+    /// or lookups, so existing accounts on those domains keep working.
+    /// </summary>
+    private void EnsureAccountEmailPermitted(string email)
+    {
+        var evaluation = (accountEmailDomainPolicy ?? AccountEmailDomainPolicy.Default).Evaluate(email);
+        if (!evaluation.IsAllowed)
+            throw new AccountEmailDomainNotPermittedException(evaluation.Domain);
+    }
 
     // Non-sensitive fields that are safe to echo from a Supabase error body. Everything else
     // (tokens, hashed_token, action_link, user objects, ...) is dropped.
@@ -67,6 +88,8 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
 
     public async Task<Guid> CreateUserAsync(string email, string password, string redirectTo, CancellationToken cancellationToken)
     {
+        EnsureAccountEmailPermitted(email);
+
         var http = CreateClient(options.Value.SecretKey);
 
         // Deliberately NOT /auth/v1/invite: confirmed via live diagnosis that invite-created users
@@ -317,6 +340,8 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
         string email, string password, CancellationToken cancellationToken,
         IReadOnlyDictionary<string, string>? metadata = null)
     {
+        EnsureAccountEmailPermitted(email);
+
         var http = CreateClient(options.Value.SecretKey);
 
         object requestBody = metadata is { Count: > 0 }
@@ -505,6 +530,8 @@ internal sealed class SupabaseAuthGateway(IHttpClientFactory httpClientFactory, 
     public async Task<Guid> CreatePendingUserWithMetadataAsync(
         string email, string redirectTo, IReadOnlyDictionary<string, string> metadata, CancellationToken cancellationToken)
     {
+        EnsureAccountEmailPermitted(email);
+
         var http = CreateClient(options.Value.SecretKey);
 
         // Random password this app never persists or returns — the recipient authenticates for the

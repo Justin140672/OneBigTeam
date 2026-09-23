@@ -95,4 +95,23 @@ public class CreateCandidateValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateCandidateRequest.Phone));
     }
+
+    // Ticket 9 regression: the account-creation work-email policy must NOT apply to candidates —
+    // external applicants legitimately use personal/public addresses.
+    [Theory]
+    [InlineData("emma.clarke@gmail.com")]
+    [InlineData("emma.clarke@hotmail.co.uk")]
+    [InlineData("emma.clarke@mailinator.com")]
+    public void Validate_Passes_For_Public_Email_Domain(string email)
+    {
+        var result = _validator.Validate(new CreateCandidateRequest
+        {
+            CompanyId = Guid.NewGuid(),
+            FirstName = "Emma",
+            LastName  = "Clarke",
+            Email     = email,
+        });
+
+        Assert.True(result.IsValid);
+    }
 }

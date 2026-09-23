@@ -695,3 +695,37 @@ internal sealed record PlatformAdministratorProvisioningRetriedAuditEvent(
     object? IAuditEvent.After          => null;
     object? IAuditEvent.Metadata       => null;
 }
+
+// Ticket 9: published when an account-creation attempt (public signup, individual or bulk employee
+// invitation, invitation acceptance, platform administrator creation) is rejected because the email
+// address uses a public/disposable domain or could not be parsed. Deliberately carries NO email
+// address or local part — only the normalised domain(s), the path, a count and (for invitations)
+// the affected employee ids — see 05-database-standards.md PII minimisation and
+// SensitiveDataScrubber. Anonymous paths (signup, acceptance) have no actor identity yet, so they
+// are classified as AuditActorType.Anonymous rather than being dropped by the AUD-04 actor guard.
+internal sealed record AccountCreationEmailRejectedAuditEvent(
+    Guid CompanyId,
+    Guid EntityId,
+    string Path,
+    IReadOnlyList<string> Domains,
+    IReadOnlyList<Guid> SubjectEmployeeIds,
+    int RejectedCount,
+    Guid? ActorUserId,
+    AuditActorType ActorKind,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    AuditActorType IAuditEvent.ActorType => ActorKind;
+    string  IAuditEvent.EventType      => "account-creation.email-domain-rejected";
+    string  IAuditEvent.EntityType     => "AccountCreationAttempt";
+    Guid    IAuditEvent.EntityId       => EntityId;
+    Guid?   IAuditEvent.EmployeeId     => SubjectEmployeeIds.Count == 1 ? SubjectEmployeeIds[0] : null;
+    Guid?   IAuditEvent.ActorUserId    => ActorUserId;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId  => null;
+    string? IAuditEvent.Summary        => RejectedCount == 1
+        ? $"Account creation rejected ({Path}): email domain not permitted"
+        : $"Account creation rejected ({Path}) for {RejectedCount} recipients: email domain not permitted";
+    object? IAuditEvent.Before         => null;
+    object? IAuditEvent.After          => null;
+    object? IAuditEvent.Metadata       => new { Path, Domains, RejectedCount, SubjectEmployeeIds };
+}

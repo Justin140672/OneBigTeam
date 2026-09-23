@@ -121,10 +121,11 @@ app.MapPost("/signup-submit", async (HttpRequest request, IHttpClientFactory htt
 
     // Round-trip everything except the password on a correctable error, so the visitor doesn't
     // have to retype the whole form (mirrors /contact-submit's retry-URL pattern below).
-    string BuildRetryUrl(string errorMessage, bool existingEmail = false) =>
+    string BuildRetryUrl(string errorMessage, bool existingEmail = false, string? emailError = null) =>
         "/signup?"
         + $"error={Uri.EscapeDataString(errorMessage)}"
         + (existingEmail ? "&existingEmail=true" : "")
+        + (emailError is not null ? $"&emailError={Uri.EscapeDataString(emailError)}" : "")
         + $"&companyName={Uri.EscapeDataString(model.CompanyName)}"
         + $"&firstName={Uri.EscapeDataString(model.AdminFirstName)}"
         + $"&lastName={Uri.EscapeDataString(model.AdminLastName)}"
@@ -159,6 +160,19 @@ app.MapPost("/signup-submit", async (HttpRequest request, IHttpClientFactory htt
             return Results.Redirect(BuildRetryUrl(
                 "We couldn't create your account with those details.",
                 existingEmail: true));
+        }
+
+        // Ticket 9: HR.Api's authoritative work-email policy rejected a public/disposable email
+        // domain (400, code "work_email_required"). Surface the API's own message and flag the
+        // email field so SignUp.razor can mark it invalid accessibly. Company name, admin name and
+        // email are still round-tripped; the password never is.
+        if (signUpResponse.StatusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            var problem = await TryReadSignUpProblemAsync(signUpResponse);
+            if (problem?.Code == SignUpProblem.WorkEmailRequiredCode && !string.IsNullOrWhiteSpace(problem.Error))
+            {
+                return Results.Redirect(BuildRetryUrl(problem.Error, emailError: SignUpProblem.WorkEmailRequiredCode));
+            }
         }
 
         return Results.Redirect(BuildRetryUrl("We couldn't create your account. Please check your details and try again."));
@@ -248,4 +262,27 @@ app.MapPost("/contact-submit", async (HttpRequest request, IHttpClientFactory ht
 
 app.Run();
 
+static async Task<SignUpProblem?> TryReadSignUpProblemAsync(HttpResponseMessage response)
+{
+    try
+    {
+        return await response.Content.ReadFromJsonAsync<SignUpProblem>();
+    }
+    catch (System.Text.Json.JsonException)
+    {
+        return null;
+    }
+    catch (NotSupportedException)
+    {
+        // Non-JSON body (e.g. a proxy/gateway error page) — fall back to the generic message.
+        return null;
+    }
+}
+
 internal sealed record StartTrialSignUpResult(Guid UserId, Guid CompanyId, string Email, string FirstName, string LastName);
+
+// Ticket 9: HR.Api's canonical error body ({ error, code } — see HR.SharedKernel.ProblemResults).
+internal sealed record SignUpProblem(string? Error, string? Code)
+{
+    public const string WorkEmailRequiredCode = "work_email_required";
+}

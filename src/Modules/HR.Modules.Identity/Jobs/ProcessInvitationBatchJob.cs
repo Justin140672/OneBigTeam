@@ -1,5 +1,6 @@
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
+using HR.Modules.Identity.Services.AccountEmailPolicy;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +25,7 @@ internal sealed class ProcessInvitationBatchJob(
     IInvitationEmailSender invitationEmailSender,
     IInviteLinkBuilder inviteLinkBuilder,
     IAuditEventPublisher auditEventPublisher,
+    AccountCreationEmailGuard accountCreationEmailGuard,
     ILogger<ProcessInvitationBatchJob> logger)
 {
     public async Task RunAsync(Guid batchId, CancellationToken cancellationToken)
@@ -100,6 +102,25 @@ internal sealed class ProcessInvitationBatchJob(
         {
             recipient.MarkSkipped("AlreadyHasAccount", clock.UtcNow);
             await db.SaveChangesAsync(cancellationToken);
+            return;
+        }
+
+        // Ticket 9: re-check the email-domain policy before creating/sending anything — the queue
+        // handler already excluded public/disposable addresses, but the denylist may have been
+        // extended between queuing and processing (or a recipient row predates the policy).
+        var emailEvaluation = accountCreationEmailGuard.Evaluate(recipient.Email);
+        if (!emailEvaluation.IsAllowed)
+        {
+            recipient.MarkSkipped(AccountCreationEmailGuard.BulkExclusionReason, clock.UtcNow);
+            await db.SaveChangesAsync(cancellationToken);
+
+            await accountCreationEmailGuard.RecordRejectionsAsync(
+                AccountCreationPath.BulkEmployeeInvitation,
+                batch.CompanyId,
+                [(recipient.EmployeeId, emailEvaluation)],
+                batch.RequestedByUserId,
+                cancellationToken,
+                AuditActorType.ScheduledJob);
             return;
         }
 

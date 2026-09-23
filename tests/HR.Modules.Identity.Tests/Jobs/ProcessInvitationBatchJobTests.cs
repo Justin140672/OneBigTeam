@@ -29,6 +29,7 @@ public class ProcessInvitationBatchJobTests(IdentityDatabaseFixture fixture)
             emailSender ?? new FakeInvitationEmailSender(),
             new FakeInviteLinkBuilder(),
             auditPublisher,
+            TestAccountCreationEmailGuard.Create(auditPublisher, Clock),
             NullLogger<ProcessInvitationBatchJob>.Instance);
 
     private async Task<(InvitationBatch Batch, InvitationBatchRecipient Recipient)> SeedWaitingRecipientAsync(
@@ -216,5 +217,82 @@ public class ProcessInvitationBatchJobTests(IdentityDatabaseFixture fixture)
 
             return Task.FromResult(true);
         }
+    }
+
+    // ── Ticket 9: work-email policy recheck ─────────────────────────────────────
+
+    [Theory]
+    [InlineData("queued-before-policy@gmail.com", "gmail.com")]
+    [InlineData("queued-before-policy@HOTMAIL.COM", "hotmail.com")]
+    public async Task RunAsync_Skips_Recipient_With_Public_Email_Without_Creating_Invite_Or_Sending(string email, string expectedDomain)
+    {
+        var companyId = Guid.NewGuid();
+        var (batch, recipient) = await SeedWaitingRecipientAsync(companyId, email);
+        var candidateReader = new FakeEmployeeInviteCandidateReader(
+            new EmployeeInviteCandidate(recipient.EmployeeId, "Test Person", recipient.Email, null, null));
+        var auditPublisher = new FakeAuditEventPublisher();
+        var emailSender = new FakeInvitationEmailSender();
+
+        await using var db = fixture.BuildContext();
+        await BuildJob(db, candidateReader, auditPublisher, emailSender).RunAsync(batch.Id, CancellationToken.None);
+
+        await using var verifyDb = fixture.BuildContext();
+        var reloadedRecipient = await verifyDb.InvitationBatchRecipients.SingleAsync(r => r.Id == recipient.Id);
+        Assert.Equal(InvitationBatchRecipient.StatusSkipped, reloadedRecipient.Status);
+        Assert.Equal("PublicEmailDomain", reloadedRecipient.FailureReason);
+        Assert.Null(reloadedRecipient.InviteId);
+
+        Assert.False(await verifyDb.UserInvites.AnyAsync(i => i.EmployeeId == recipient.EmployeeId));
+        Assert.Empty(emailSender.Sent);
+        Assert.DoesNotContain(auditPublisher.PublishedEvents, e => e is UserInvitedAuditEvent);
+
+        var rejection = Assert.IsType<HR.Modules.Identity.AccountCreationEmailRejectedAuditEvent>(
+            Assert.Single(auditPublisher.PublishedEvents, e => e is HR.Modules.Identity.AccountCreationEmailRejectedAuditEvent));
+        Assert.Equal(AuditActorType.ScheduledJob, rejection.ActorKind);
+        Assert.Equal(AuditActorType.ScheduledJob, ((IAuditEvent)rejection).ActorType);
+        Assert.Equal("bulk-employee-invitation", rejection.Path);
+        Assert.Equal(companyId, rejection.CompanyId);
+        Assert.Equal(new[] { recipient.EmployeeId }, rejection.SubjectEmployeeIds);
+        Assert.Equal(new[] { expectedDomain }, rejection.Domains);
+    }
+
+    [Fact]
+    public async Task RunAsync_Public_Email_Recipient_Does_Not_Block_Other_Org_Recipients_In_The_Same_Batch()
+    {
+        var companyId = Guid.NewGuid();
+        Guid batchId;
+        InvitationBatchRecipient publicRecipient;
+        InvitationBatchRecipient orgRecipient;
+        await using (var seed = fixture.BuildContext())
+        {
+            var batch = InvitationBatch.Create(companyId, Guid.NewGuid(), Now, null);
+            publicRecipient = InvitationBatchRecipient.Create(batch.Id, Guid.NewGuid(), "mixed-public@yahoo.co.uk", Now);
+            orgRecipient = InvitationBatchRecipient.Create(batch.Id, Guid.NewGuid(), $"mixed-org-{Guid.NewGuid():N}@acme.example", Now);
+            seed.InvitationBatches.Add(batch);
+            seed.InvitationBatchRecipients.AddRange(publicRecipient, orgRecipient);
+            await seed.SaveChangesAsync();
+            batchId = batch.Id;
+        }
+
+        var candidateReader = new FakeEmployeeInviteCandidateReader(
+            new EmployeeInviteCandidate(publicRecipient.EmployeeId, "Public Person", publicRecipient.Email, null, null),
+            new EmployeeInviteCandidate(orgRecipient.EmployeeId, "Org Person", orgRecipient.Email, null, null));
+        var auditPublisher = new FakeAuditEventPublisher();
+        var emailSender = new FakeInvitationEmailSender();
+
+        await using var db = fixture.BuildContext();
+        await BuildJob(db, candidateReader, auditPublisher, emailSender).RunAsync(batchId, CancellationToken.None);
+
+        await using var verifyDb = fixture.BuildContext();
+        var reloadedPublic = await verifyDb.InvitationBatchRecipients.SingleAsync(r => r.Id == publicRecipient.Id);
+        var reloadedOrg = await verifyDb.InvitationBatchRecipients.SingleAsync(r => r.Id == orgRecipient.Id);
+        Assert.Equal(InvitationBatchRecipient.StatusSkipped, reloadedPublic.Status);
+        Assert.Equal("PublicEmailDomain", reloadedPublic.FailureReason);
+        Assert.Equal(InvitationBatchRecipient.StatusSent, reloadedOrg.Status);
+
+        var sent = Assert.Single(emailSender.Sent);
+        Assert.Equal(orgRecipient.Email, sent.ToEmail);
+        Assert.False(await verifyDb.UserInvites.AnyAsync(i => i.EmployeeId == publicRecipient.EmployeeId));
+        Assert.True(await verifyDb.UserInvites.AnyAsync(i => i.EmployeeId == orgRecipient.EmployeeId));
     }
 }

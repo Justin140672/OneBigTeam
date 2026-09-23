@@ -1,6 +1,7 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
+using HR.Modules.Identity.Services.AccountEmailPolicy;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using HR.SharedKernel.Idempotency;
@@ -15,7 +16,8 @@ internal sealed class InviteEmployeeUserHandler(
     IEmployeeNameReader employeeNameReader,
     IInvitationEmailSender invitationEmailSender,
     IInviteLinkBuilder inviteLinkBuilder,
-    IAuditEventPublisher auditEventPublisher)
+    IAuditEventPublisher auditEventPublisher,
+    AccountCreationEmailGuard accountCreationEmailGuard)
 {
     public async Task<Result<InviteEmployeeUserResponse>> HandleAsync(
         InviteEmployeeUserRequest request,
@@ -50,6 +52,15 @@ internal sealed class InviteEmployeeUserHandler(
         if (!names.ContainsKey(request.EmployeeId))
             return Result.Failure<InviteEmployeeUserResponse>(
                 Error.NotFound("Employee was not found in this company."));
+
+        // Ticket 9: an invitation creates a login account on acceptance, so the invited address must
+        // be an organisation email — rejected here, before any invite row is persisted or any
+        // email is sent.
+        var emailPolicy = await accountCreationEmailGuard.EnsureAllowedAsync(
+            request.Email, AccountCreationPath.EmployeeInvitation,
+            request.CompanyId, request.EmployeeId, actorUserId, cancellationToken);
+        if (emailPolicy.IsFailure)
+            return Result.Failure<InviteEmployeeUserResponse>(emailPolicy.Error);
 
         // No existing linked account — ApplicationUser.Id == EmployeeId by convention (see
         // UserInvite.EmployeeId). Real Supabase-backed accounts (self-service SignUp, AcceptInvite)

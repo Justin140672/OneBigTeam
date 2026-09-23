@@ -14,6 +14,9 @@ public sealed class InvitationBatchProgressPanelPage(IPage page)
 
     public Task<bool> IsVisibleAsync() => Root.IsVisibleAsync();
 
+    /// <summary>Per-recipient rows of the panel's table (Email, Status, Detail) — for auto-waiting assertions.</summary>
+    public ILocator RecipientRows => Root.Locator("table tbody tr");
+
     public Task WaitForVisibleAsync(int timeoutMs = 15_000) =>
         Root.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = timeoutMs });
 

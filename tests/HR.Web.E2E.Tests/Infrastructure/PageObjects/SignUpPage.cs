@@ -57,4 +57,22 @@ public sealed class SignUpPage(IPage page, string marketingBaseUrl)
 
     public Task<bool> IsExistingAccountMessageVisibleAsync() =>
         page.Locator(".form-status-error").IsVisibleAsync();
+
+    // ── Ticket 9: organisation (work) email requirement ─────────────────────────────────────────
+
+    /// <summary>The top-of-form error banner (role="alert", data-status="error").</summary>
+    public ILocator ErrorBanner => page.Locator(".form-status-error[role='alert'][data-status='error']");
+
+    public ILocator PasswordInput => page.Locator("#password");
+
+    public ILocator EmailInput => page.Locator("#email");
+
+    /// <summary>The organisation-email hint rendered under the "Work email" label before any submission.</summary>
+    public ILocator EmailHint => page.Locator("#email-hint[data-email-hint]");
+
+    /// <summary>The email field's <c>.form-field</c> wrapper; gets the <c>is-invalid</c> class on a work-email rejection.</summary>
+    public ILocator EmailFieldWrapper => page.Locator(".form-field[data-email-field]");
+
+    /// <summary>The email field error rendered only when the server rejected the email domain.</summary>
+    public ILocator WorkEmailError => page.Locator("#email-error[data-work-email-error]");
 }

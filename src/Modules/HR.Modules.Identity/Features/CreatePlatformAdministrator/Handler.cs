@@ -1,6 +1,7 @@
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
 using HR.Modules.Identity.Services;
+using HR.Modules.Identity.Services.AccountEmailPolicy;
 using HR.SharedKernel;
 using HR.SharedKernel.Idempotency;
 using Microsoft.AspNetCore.Http;
@@ -20,6 +21,7 @@ internal sealed class CreatePlatformAdministratorHandler(
     IClock clock,
     IConfiguration configuration,
     IAuditEventPublisher auditEventPublisher,
+    AccountCreationEmailGuard accountCreationEmailGuard,
     ILogger<CreatePlatformAdministratorHandler> logger)
 {
     public async Task<Result<CreatePlatformAdministratorResponse>> HandleAsync(
@@ -50,6 +52,15 @@ internal sealed class CreatePlatformAdministratorHandler(
         if (!await IsEnabledPlatformOwnerAsync(db, currentUser, cancellationToken))
             return Result.Failure<CreatePlatformAdministratorResponse>(
                 Error.Unauthorized("Only an enabled platform owner may manage administrator accounts."));
+
+        // Ticket 9: new platform administrator accounts must use an organisation email address.
+        // Checked before the existing-administrator lookup and before any local row, provider
+        // account or onboarding email is created. Existing administrators are unaffected.
+        var emailPolicy = await accountCreationEmailGuard.EnsureAllowedAsync(
+            request.Email, AccountCreationPath.PlatformAdministrator,
+            companyId: Guid.Empty, subjectEmployeeId: null, currentUser.UserId, cancellationToken);
+        if (emailPolicy.IsFailure)
+            return Result.Failure<CreatePlatformAdministratorResponse>(emailPolicy.Error);
 
         // 1. Validate and normalize email (FluentValidation already checked format at the endpoint;
         // normalization here is what the DB unique index and every later lookup key off).

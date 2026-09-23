@@ -1,3 +1,4 @@
+using HR.Modules.Identity.Services.AccountEmailPolicy;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Features.SignUp;
 using HR.Modules.Identity.Tests.Infrastructure;
@@ -36,6 +37,7 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
             dependencies.EmployeeProvisioningService,
             dependencies.SupabaseAuthGateway,
             dependencies.AuditEventPublisher,
+            TestAccountCreationEmailGuard.Create(dependencies.AuditEventPublisher, Clock),
             EmptyConfiguration,
             Clock,
             NullLogger<SignUpHandler>.Instance);
@@ -348,5 +350,110 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
         await using var db = fixture.BuildContext();
         var profileExists = await db.UserProfiles.AnyAsync(p => p.Email == request.AdminEmail);
         Assert.False(profileExists);
+    }
+
+    // ── Ticket 9: work-email policy ─────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("gmail.com")]
+    [InlineData("GMAIL.COM")]
+    [InlineData("hotmail.co.uk")]
+    [InlineData("mailinator.com")]
+    public async Task HandleAsync_Rejects_Public_Email_Domain_With_WorkEmailRequired_And_Has_No_Side_Effects(string domain)
+    {
+        var deps = BuildDependencies();
+        var handler = BuildHandler(deps);
+        var request = ValidRequest() with { AdminEmail = $"ada-{Guid.NewGuid():N}@{domain}" };
+
+        int profilesBefore, rolesBefore, usersBefore;
+        await using (var before = fixture.BuildContext())
+        {
+            profilesBefore = await before.UserProfiles.CountAsync();
+            rolesBefore = await before.UserRoles.CountAsync();
+            usersBefore = await before.Users.CountAsync();
+        }
+
+        var result = await handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(AccountCreationEmailGuard.WorkEmailRequiredCode, result.Error.Code);
+        Assert.Equal(AccountCreationEmailGuard.WorkEmailRequiredMessage, result.Error.Message);
+
+        // No provisioning side effects at all.
+        Assert.Equal(0, deps.Provisioner.CallCount);
+        Assert.Empty(deps.Provisioner.ProvisionedCompanyNames);
+        Assert.Empty(deps.Provisioner.DeactivatedCompanyIds);
+        Assert.Equal(0, deps.DefaultDataSeeder.CallCount);
+        Assert.Equal(0, deps.EmployeeProvisioningService.CallCount);
+        Assert.Empty(deps.EmployeeProvisioningService.MarkedAsInitialCompanyAdmin);
+        Assert.Empty(deps.SupabaseAuthGateway.CreatedUsers);
+        Assert.Empty(deps.SupabaseAuthGateway.ConfirmedUsersCreated);
+        Assert.Empty(deps.SupabaseAuthGateway.PendingUsersCreatedWithMetadata);
+        Assert.Empty(deps.SupabaseAuthGateway.ResentEmails);
+
+        await using var db = fixture.BuildContext();
+        Assert.Equal(profilesBefore, await db.UserProfiles.CountAsync());
+        Assert.Equal(rolesBefore, await db.UserRoles.CountAsync());
+        Assert.Equal(usersBefore, await db.Users.CountAsync());
+        Assert.False(await db.UserProfiles.AnyAsync(p => p.Email.ToLower() == request.AdminEmail.ToLower()));
+
+        // Only the rejection audit — never a RegistrationCreated event.
+        var rejection = Assert.IsType<AccountCreationEmailRejectedAuditEvent>(Assert.Single(deps.AuditEventPublisher.PublishedEvents));
+        Assert.Equal("public-signup", rejection.Path);
+        Assert.Equal(new[] { domain.ToLowerInvariant() }, rejection.Domains);
+        Assert.Equal(HR.SharedKernel.AuditActorType.Anonymous, rejection.ActorKind);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Rejects_Public_Email_Before_The_Account_Exists_Check()
+    {
+        // The policy runs BEFORE the "email already in use" lookup, so the response for a public
+        // address never reveals whether an account already exists for it (existing accounts on
+        // public domains are unaffected — they just can't sign up again).
+        var existingEmail = $"existing-{Guid.NewGuid():N}@gmail.com";
+        await using (var seed = fixture.BuildContext())
+        {
+            seed.UserProfiles.Add(UserProfile.Create(
+                Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), existingEmail, "Existing", "User", Now));
+            await seed.SaveChangesAsync();
+        }
+
+        var deps = BuildDependencies();
+        var result = await BuildHandler(deps).HandleAsync(ValidRequest() with { AdminEmail = existingEmail }, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(AccountCreationEmailGuard.WorkEmailRequiredCode, result.Error.Code);
+        Assert.NotEqual("conflict", result.Error.Code);
+        Assert.Equal(0, deps.Provisioner.CallCount);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Rejects_Malformed_Email_With_Validation_And_Has_No_Side_Effects()
+    {
+        var deps = BuildDependencies();
+
+        var result = await BuildHandler(deps).HandleAsync(ValidRequest() with { AdminEmail = "ada@localhost" }, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Equal(0, deps.Provisioner.CallCount);
+        Assert.Empty(deps.SupabaseAuthGateway.CreatedUsers);
+    }
+
+    [Theory]
+    [InlineData("brightsparks-consulting.co.uk")] // Google Workspace / Microsoft 365 hosted organisation domain
+    [InlineData("olive.com")]                     // not caught by "live.com"
+    [InlineData("acme.com")]                      // not caught by "me.com"
+    public async Task HandleAsync_Allows_Organisation_Domain(string domain)
+    {
+        var deps = BuildDependencies();
+        var request = ValidRequest() with { AdminEmail = $"ada-{Guid.NewGuid():N}@{domain}" };
+
+        var result = await BuildHandler(deps).HandleAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, deps.Provisioner.CallCount);
+        Assert.Contains(deps.SupabaseAuthGateway.CreatedUsers, u => u.Email == request.AdminEmail);
+        Assert.DoesNotContain(deps.AuditEventPublisher.PublishedEvents, e => e is AccountCreationEmailRejectedAuditEvent);
     }
 }

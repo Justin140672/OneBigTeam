@@ -21,7 +21,8 @@ internal static class IdentityUserAdminTestHelpers
         ApiWebApplicationFactory factory,
         Guid companyId,
         string firstName = "Test",
-        string lastName = "Employee")
+        string lastName = "Employee",
+        string? workEmail = null)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
@@ -35,7 +36,9 @@ internal static class IdentityUserAdminTestHelpers
             companyId,
             firstName,
             lastName,
-            workEmail: $"{firstName}.{lastName}.{Guid.NewGuid():N}@test.example".ToLowerInvariant(),
+            // Ticket 9: optional explicit work email so bulk-invitation tests can seed an employee
+            // whose work email is on a public/disposable domain.
+            workEmail: workEmail ?? $"{firstName}.{lastName}.{Guid.NewGuid():N}@test.example".ToLowerInvariant(),
             startDate: new DateOnly(2026, 1, 1),
             hasSystemAccess: false,
             dateOfBirth: new DateOnly(1990, 1, 1),

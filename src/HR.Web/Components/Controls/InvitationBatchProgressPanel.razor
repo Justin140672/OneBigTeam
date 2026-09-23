@@ -52,7 +52,7 @@
                         <tr>
                             <td>@recipient.Email</td>
                             <td>@recipient.Status</td>
-                            <td>@(recipient.FailureReason ?? "—")</td>
+                            <td>@InvitationReasonDisplay.Label(recipient.FailureReason)</td>
                         </tr>
                     }
                 </tbody>

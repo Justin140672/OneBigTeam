@@ -1,3 +1,4 @@
+using HR.Modules.Identity.Services.AccountEmailPolicy;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Features.CreatePlatformAdministrator;
 using HR.Modules.Identity.Tests.Infrastructure;
@@ -16,6 +17,7 @@ public class CreatePlatformAdministratorHandlerTests(IdentityDatabaseFixture fix
 
     private CreatePlatformAdministratorHandler BuildHandler(FakeAuditEventPublisher auditPublisher, FakeSupabaseAuthGateway? gateway = null) =>
         new(fixture.BuildContext(), gateway ?? new FakeSupabaseAuthGateway(), Clock, Configuration, auditPublisher,
+            TestAccountCreationEmailGuard.Create(auditPublisher, Clock),
             NullLogger<CreatePlatformAdministratorHandler>.Instance);
 
     private async Task SeedOwnerAsync(string email, bool isEnabled = true)
@@ -272,5 +274,113 @@ public class CreatePlatformAdministratorHandlerTests(IdentityDatabaseFixture fix
         await using var db = fixture.BuildContext();
         var count = await db.PlatformAdministrators.CountAsync(a => a.Email == sharedEmail.Trim().ToLowerInvariant());
         Assert.Equal(1, count);
+    }
+
+    // ── Ticket 9: work-email policy ─────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("gmail.com")]
+    [InlineData("OUTLOOK.COM")]
+    [InlineData("proton.me")]
+    public async Task HandleAsync_Rejects_Public_Email_Domain_Before_Any_Row_Or_Provider_Call(string domain)
+    {
+        var ownerEmail = $"owner-{Guid.NewGuid():N}@test.com";
+        await SeedOwnerAsync(ownerEmail);
+
+        var auditPublisher = new FakeAuditEventPublisher();
+        // If the provider lookup were reached it would throw and surface as "unexpected" — so a
+        // work_email_required result proves the policy ran before any provider interaction.
+        var gateway = new FakeSupabaseAuthGateway { ShouldThrowOnGetUserIdByEmail = true };
+        var handler = BuildHandler(auditPublisher, gateway);
+        var actorId = Guid.NewGuid();
+        var newEmail = $"new-admin-{Guid.NewGuid():N}@{domain}";
+
+        var result = await handler.HandleAsync(
+            new CreatePlatformAdministratorRequest(newEmail, PlatformAdministratorRole.SupportStaff),
+            new FakeCurrentUser(actorId, ownerEmail),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(AccountCreationEmailGuard.WorkEmailRequiredCode, result.Error.Code);
+        Assert.Equal(AccountCreationEmailGuard.WorkEmailRequiredMessage, result.Error.Message);
+
+        await using var db = fixture.BuildContext();
+        Assert.False(await db.PlatformAdministrators.AnyAsync(a => a.Email == newEmail.Trim().ToLowerInvariant()));
+
+        Assert.Empty(gateway.CreatedUsers);
+        Assert.Empty(gateway.ConfirmedUsersCreated);
+        Assert.Empty(gateway.PendingUsersCreatedWithMetadata);
+        Assert.Empty(gateway.PasswordResetRequests);
+        Assert.Empty(gateway.RecoveryLinksGenerated);
+
+        var rejection = Assert.IsType<AccountCreationEmailRejectedAuditEvent>(Assert.Single(auditPublisher.PublishedEvents));
+        Assert.Equal("platform-administrator", rejection.Path);
+        Assert.Equal(actorId, rejection.ActorUserId);
+        Assert.Equal(HR.SharedKernel.AuditActorType.Human, rejection.ActorKind);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Public_Email_Matching_An_Existing_Administrator_Returns_WorkEmailRequired_Not_Conflict()
+    {
+        // The policy check precedes the existing-administrator lookup, so the response never
+        // reveals whether an administrator already exists for a public address.
+        var ownerEmail = $"owner-{Guid.NewGuid():N}@test.com";
+        await SeedOwnerAsync(ownerEmail);
+
+        var existingPublicEmail = $"legacy-admin-{Guid.NewGuid():N}@gmail.com";
+        await using (var seed = fixture.BuildContext())
+        {
+            seed.PlatformAdministrators.Add(
+                PlatformAdministrator.Create(existingPublicEmail, PlatformAdministratorRole.SupportStaff, Now));
+            await seed.SaveChangesAsync();
+        }
+
+        var result = await BuildHandler(new FakeAuditEventPublisher()).HandleAsync(
+            new CreatePlatformAdministratorRequest(existingPublicEmail, PlatformAdministratorRole.SupportStaff),
+            new FakeCurrentUser(Guid.NewGuid(), ownerEmail),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(AccountCreationEmailGuard.WorkEmailRequiredCode, result.Error.Code);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Unauthorized_Caller_Is_Rejected_Before_The_Email_Policy_Runs()
+    {
+        var auditPublisher = new FakeAuditEventPublisher();
+
+        var result = await BuildHandler(auditPublisher).HandleAsync(
+            new CreatePlatformAdministratorRequest("new-admin@gmail.com", PlatformAdministratorRole.SupportStaff),
+            new FakeCurrentUser(Guid.NewGuid(), $"not-an-owner-{Guid.NewGuid():N}@test.com"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("unauthorized", result.Error.Code);
+        Assert.Empty(auditPublisher.PublishedEvents);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Existing_Owner_On_A_Public_Domain_Can_Still_Create_An_Org_Domain_Administrator()
+    {
+        // Existing accounts on public domains are unaffected by the policy — only the NEW
+        // administrator's address is evaluated.
+        var ownerEmail = $"owner-{Guid.NewGuid():N}@gmail.com";
+        await SeedOwnerAsync(ownerEmail);
+
+        var auditPublisher = new FakeAuditEventPublisher();
+        var handler = BuildHandler(auditPublisher);
+        var newEmail = $"new-admin-{Guid.NewGuid():N}@acme.example";
+
+        var result = await handler.HandleAsync(
+            new CreatePlatformAdministratorRequest(newEmail, PlatformAdministratorRole.SupportStaff),
+            new FakeCurrentUser(Guid.NewGuid(), ownerEmail),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(newEmail, result.Value.Email);
+
+        await using var db = fixture.BuildContext();
+        Assert.True(await db.PlatformAdministrators.AnyAsync(a => a.Email == newEmail));
+        Assert.DoesNotContain(auditPublisher.PublishedEvents, e => e is AccountCreationEmailRejectedAuditEvent);
     }
 }

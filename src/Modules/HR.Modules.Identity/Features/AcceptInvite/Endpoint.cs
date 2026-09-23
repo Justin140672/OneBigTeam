@@ -3,6 +3,7 @@ using FastEndpoints;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
 using HR.Modules.Identity.Services;
+using HR.Modules.Identity.Services.AccountEmailPolicy;
 using HR.SharedKernel;
 using HR.SharedKernel.ExecutionContext;
 using Microsoft.AspNetCore.Http;
@@ -24,6 +25,7 @@ internal sealed class Endpoint(
     IdentityDbContext db,
     ISupabaseAuthGateway supabaseAuthGateway,
     IClock clock,
+    AccountCreationEmailGuard accountCreationEmailGuard,
     // Ticket 23 (P2): reference wiring for Identity's invite-acceptance durable operation -
     // optional so any direct/unit construction of this endpoint is unaffected; production DI
     // (FastEndpoints) always supplies the real singleton.
@@ -79,6 +81,22 @@ internal sealed class Endpoint(
         var profileExists = await db.UserProfiles.AnyAsync(p => p.Id == invite.EmployeeId, ct);
         if (!profileExists)
         {
+            // Ticket 9 (defence in depth): re-check the invited address against the email-domain
+            // policy before any operation record, Supabase account or UserProfile is created — an
+            // invitation issued before the policy existed (or before its domain was added to the
+            // denylist) must not produce a new login account. Only evaluated when a NEW account
+            // would be created; an already-provisioned profile is an existing account and is left
+            // alone. The invite itself is left untouched so an administrator can cancel it and
+            // re-invite the employee with an organisation address.
+            var emailPolicy = await accountCreationEmailGuard.EnsureAllowedAsync(
+                invite.Email, AccountCreationPath.InvitationAcceptance,
+                invite.CompanyId, invite.EmployeeId, actorUserId: null, ct);
+            if (emailPolicy.IsFailure)
+            {
+                await Send.ResultAsync(ProblemResults.FromError(emailPolicy.Error));
+                return;
+            }
+
             // Ticket 8 (P2): persist a durable operation record BEFORE calling Supabase, so a retry
             // after a crash/failure between "Supabase user created" and "local commit" can tell that
             // apart from a genuinely fresh first attempt (see InviteAcceptanceOperation remarks).

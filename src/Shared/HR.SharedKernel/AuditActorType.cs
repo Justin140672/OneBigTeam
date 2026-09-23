@@ -31,4 +31,10 @@ public enum AuditActorType
     /// Both the support actor and the tenant context should be identifiable via the event payload.
     /// </summary>
     SupportSession = 3,
+
+    /// <summary>
+    /// An unauthenticated public request (e.g. self-service signup or invitation acceptance) for
+    /// which no user or employee identity exists yet. No actor is expected.
+    /// </summary>
+    Anonymous = 4,
 }

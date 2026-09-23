@@ -30,6 +30,23 @@
 
     <InvitationBatchProgressPanel @ref="_progressPanel" CompanyId="CompanyId" OnRecipientsUpdated="HandleInvitationRecipientsUpdatedAsync" />
 
+    @if (_inviteBatchExcluded.Count > 0)
+    {
+        <div class="alert alert-warning alert-dismissible" data-testid="invite-batch-excluded">
+            <p class="fw-medium mb-1">@_inviteBatchExcluded.Count employee(s) were not invited:</p>
+            <ul class="mb-0">
+                @foreach (var excluded in _inviteBatchExcluded)
+                {
+                    <li data-testid="invite-batch-excluded-row">
+                        <strong>@excluded.Name</strong>@(excluded.Email is not null && excluded.Email != excluded.Name ? $" ({excluded.Email})" : string.Empty)
+                        — @InvitationReasonDisplay.Explanation(excluded.Reason)
+                    </li>
+                }
+            </ul>
+            <button type="button" class="btn-close" aria-label="Dismiss" @onclick="@(() => _inviteBatchExcluded = [])"></button>
+        </div>
+    }
+
     @if (_isInviteMode)
     {
         <InviteModeCandidateGrid @ref="_inviteModeGrid"
@@ -310,6 +327,7 @@
 
     private bool _showInviteConfirmDialog;
     private List<InvitationRecipientCandidate> _inviteConfirmRecipients = [];
+    private List<InvitationExclusionCandidate> _inviteBatchExcluded = [];
     private List<InvitationExclusionCandidate> _inviteConfirmExcluded = [];
 
     private Guid? FilterDepartmentId =>
@@ -436,6 +454,7 @@
         _actionSuccess = null;
         _inviteConfirmRecipients = recipients;
         _inviteConfirmExcluded = excluded;
+        _inviteBatchExcluded = [];
         _showInviteConfirmDialog = true;
     }
 
@@ -445,6 +464,7 @@
         _actionSuccess = null;
         _inviteConfirmRecipients = selection.Recipients;
         _inviteConfirmExcluded = selection.Excluded;
+        _inviteBatchExcluded = [];
         _showInviteConfirmDialog = true;
         await Task.CompletedTask;
     }
@@ -458,6 +478,19 @@
     {
         _showInviteConfirmDialog = false;
         _actionSuccess = "Invitations queued — you can navigate away, processing will continue.";
+
+        // Surface server-side exclusions (e.g. PublicEmailDomain) so the administrator can see
+        // exactly which selected employees were not invited and why. Names are resolved from the
+        // recipients shown in the confirm dialog; fall back to the email if the id isn't found.
+        var namesById = _inviteConfirmRecipients
+            .GroupBy(r => r.EmployeeId)
+            .ToDictionary(g => g.Key, g => g.First().Name);
+        _inviteBatchExcluded = (result.Excluded ?? [])
+            .Select(e => new InvitationExclusionCandidate(
+                namesById.TryGetValue(e.EmployeeId, out var name) ? name : (e.Email ?? "Unknown employee"),
+                e.Email,
+                e.Reason))
+            .ToList();
 
         if (Grid is not null)
             await Grid.ClearSelectionAsync();

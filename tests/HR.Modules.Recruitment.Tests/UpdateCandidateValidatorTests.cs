@@ -53,4 +53,23 @@ public class UpdateCandidateValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateCandidateRequest.Email));
     }
+
+    // Ticket 9 regression: the account-creation work-email policy must NOT apply to candidates.
+    [Theory]
+    [InlineData("emma.clarke@gmail.com")]
+    [InlineData("emma.clarke@outlook.com")]
+    public void Validate_Passes_For_Public_Email_Domain(string email)
+    {
+        var result = _validator.Validate(new UpdateCandidateRequest
+        {
+            CompanyId   = Guid.NewGuid(),
+            CandidateId = Guid.NewGuid(),
+            FirstName   = "Emma",
+            LastName    = "Clarke",
+            Email       = email,
+            ExpectedVersion = 1,
+        });
+
+        Assert.True(result.IsValid);
+    }
 }

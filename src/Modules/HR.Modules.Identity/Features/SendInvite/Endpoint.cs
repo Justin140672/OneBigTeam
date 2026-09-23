@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
+using HR.Modules.Identity.Services.AccountEmailPolicy;
 using HR.SharedKernel;
 
 using Microsoft.EntityFrameworkCore;
@@ -15,6 +16,8 @@ internal sealed class Endpoint(
     IClock clock,
     IInvitationEmailSender invitationEmailSender,
     IInviteLinkBuilder inviteLinkBuilder,
+    AccountCreationEmailGuard accountCreationEmailGuard,
+    ICurrentUser currentUser,
     ILogger<Endpoint> logger) : Endpoint<SendInviteRequest, SendInviteResponse>
 {
     public override void Configure()
@@ -25,6 +28,17 @@ internal sealed class Endpoint(
 
     public override async Task HandleAsync(SendInviteRequest req, CancellationToken ct)
     {
+        // Ticket 9: same work-email rule as InviteEmployeeUser — checked before any existing invite
+        // is replaced, any new invite is persisted, or any email is sent.
+        var emailPolicy = await accountCreationEmailGuard.EnsureAllowedAsync(
+            req.Email, AccountCreationPath.EmployeeInvitation,
+            req.CompanyId, req.EmployeeId, currentUser.UserId, ct);
+        if (emailPolicy.IsFailure)
+        {
+            await Send.ResultAsync(ProblemResults.FromError(emailPolicy.Error));
+            return;
+        }
+
         var now = clock.UtcNow;
 
         // Cancel any existing pending invites for this employee

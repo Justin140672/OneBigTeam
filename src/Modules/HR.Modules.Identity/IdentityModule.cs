@@ -38,6 +38,7 @@ using HR.Modules.Identity.Features.VerifyEmail;
 using HR.Modules.Identity.Jobs;
 using HR.Modules.Identity.Persistence;
 using HR.Modules.Identity.Services;
+using HR.Modules.Identity.Services.AccountEmailPolicy;
 using HR.Modules.Identity.Services.OnboardingTasks;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
@@ -86,6 +87,17 @@ public static class IdentityModule
             // NFR-03: authentication (Supabase Auth) is a critical dependency — if it is Unhealthy
             // no user can sign in, so the service is "not ready" (503 on /health/ready).
             .AddCheck<SupabaseAuthHealthCheck>("auth", tags: ["ready", "critical"]);
+
+        // Ticket 9: shared account-creation email-domain policy (public/disposable denylist). The
+        // options validator re-loads the embedded denylist and validates every embedded and
+        // configured entry at startup, so a missing/empty/malformed list stops the host instead of
+        // silently allowing every address.
+        services.AddOptions<AccountEmailDomainPolicyOptions>()
+            .Bind(configuration.GetSection(AccountEmailDomainPolicyOptions.SectionName))
+            .ValidateOnStart();
+        services.AddSingleton<Microsoft.Extensions.Options.IValidateOptions<AccountEmailDomainPolicyOptions>, AccountEmailDomainPolicyOptionsValidator>();
+        services.AddSingleton<IAccountEmailDomainPolicy, AccountEmailDomainPolicy>();
+        services.AddScoped<AccountCreationEmailGuard>();
 
         services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
         services.AddScoped<ICurrentTenant, HttpContextCurrentTenant>();
@@ -571,6 +583,14 @@ public static class IdentityModule
                 // SupabaseAuthUserId that doesn't match the "sub" claim actually issued on tokens,
                 // permanently 404/403ing every request for that persona until corrected.
                 profile.UpdateSupabaseAuthUserId(supabaseUserId, now);
+            }
+
+            // Ticket 9: converge a persona whose seeded login email changed (the Justin Etherington
+            // persona moved from a Hotmail address to an organisation-style test domain) so an
+            // existing dev database doesn't keep showing the old address on the profile.
+            if (profile is not null && !string.Equals(profile.Email, persona.Email, StringComparison.OrdinalIgnoreCase))
+            {
+                profile.UpdateEmail(persona.Email, now);
             }
         }
 

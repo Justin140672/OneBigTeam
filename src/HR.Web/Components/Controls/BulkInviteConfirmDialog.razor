@@ -129,13 +129,5 @@
 
     private Task HandleDialogClosed() => CancelAsync();
 
-    private static string ExclusionReasonLabel(string reason) => reason switch
-    {
-        "NotEligible"       => "Not eligible",
-        "MissingEmail"      => "No work email on file",
-        "AlreadyInvited"    => "Already invited",
-        "AlreadyHasAccount" => "Already has an account",
-        "DuplicateEmail"    => "Duplicate email address",
-        _                   => reason,
-    };
+    private static string ExclusionReasonLabel(string reason) => InvitationReasonDisplay.Label(reason);
 }

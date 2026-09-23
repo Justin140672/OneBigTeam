@@ -1,3 +1,4 @@
+using HR.Modules.Identity.Services.AccountEmailPolicy;
 using HR.Modules.Employees.Contracts;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Features.QueueInvitationBatch;
@@ -21,7 +22,8 @@ public class QueueInvitationBatchHandlerTests(IdentityDatabaseFixture fixture)
             Clock,
             candidateReader,
             jobClient ?? new RecordingBackgroundJobClient(),
-            auditPublisher ?? new FakeAuditEventPublisher());
+            auditPublisher ?? new FakeAuditEventPublisher(),
+            TestAccountCreationEmailGuard.Create(auditPublisher ?? new FakeAuditEventPublisher(), Clock));
 
     [Fact]
     public async Task HandleAsync_Queues_Eligible_Employees_And_Enqueues_Job()
@@ -320,5 +322,155 @@ public class QueueInvitationBatchHandlerTests(IdentityDatabaseFixture fixture)
 
         // Only the first call's save should have enqueued the processing job.
         Assert.Single(jobClient.CreatedJobs);
+    }
+
+    // ── Ticket 9: work-email policy ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task HandleAsync_Mixed_Batch_Queues_Org_Email_And_Excludes_Public_Email()
+    {
+        var companyId = Guid.NewGuid();
+        var orgEmployeeId = Guid.NewGuid();
+        var publicEmployeeId = Guid.NewGuid();
+        var candidateReader = new FakeEmployeeInviteCandidateReader(
+            new EmployeeInviteCandidate(orgEmployeeId, "Org Person", "org.person@acme.example", null, null),
+            new EmployeeInviteCandidate(publicEmployeeId, "Public Person", "public.person@gmail.com", null, null));
+        var jobClient = new RecordingBackgroundJobClient();
+        var auditPublisher = new FakeAuditEventPublisher();
+        var actorId = Guid.NewGuid();
+        var handler = BuildHandler(candidateReader, jobClient, auditPublisher);
+
+        var result = await handler.HandleAsync(
+            new QueueInvitationBatchRequest(companyId, [orgEmployeeId, publicEmployeeId]),
+            actorId,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value.QueuedCount);
+        var excluded = Assert.Single(result.Value.Excluded);
+        Assert.Equal(publicEmployeeId, excluded.EmployeeId);
+        Assert.Equal(AccountCreationEmailGuard.BulkExclusionReason, excluded.Reason);
+        Assert.Equal("PublicEmailDomain", excluded.Reason);
+        Assert.Equal("public.person@gmail.com", excluded.Email);
+
+        await using var db = fixture.BuildContext();
+        var recipient = Assert.Single(await db.InvitationBatchRecipients.Where(r => r.BatchId == result.Value.BatchId).ToListAsync());
+        Assert.Equal(orgEmployeeId, recipient.EmployeeId);
+        Assert.False(await db.InvitationBatchRecipients.AnyAsync(r => r.EmployeeId == publicEmployeeId));
+
+        Assert.Single(jobClient.CreatedJobs);
+
+        var rejection = Assert.IsType<AccountCreationEmailRejectedAuditEvent>(
+            Assert.Single(auditPublisher.PublishedEvents, e => e is AccountCreationEmailRejectedAuditEvent));
+        Assert.Equal("bulk-employee-invitation", rejection.Path);
+        Assert.Equal(new[] { publicEmployeeId }, rejection.SubjectEmployeeIds);
+        Assert.Equal(new[] { "gmail.com" }, rejection.Domains);
+        Assert.Equal(1, rejection.RejectedCount);
+        Assert.Equal(actorId, rejection.ActorUserId);
+        Assert.Single(auditPublisher.PublishedEvents, e => e is InvitationBatchQueuedAuditEvent);
+    }
+
+    [Fact]
+    public async Task HandleAsync_All_Public_Batch_Fails_With_WorkEmailRequired_Listing_Each_Address_And_Creates_Nothing()
+    {
+        var companyId = Guid.NewGuid();
+        var gmailId = Guid.NewGuid();
+        var hotmailId = Guid.NewGuid();
+        var yahooId = Guid.NewGuid();
+        var candidateReader = new FakeEmployeeInviteCandidateReader(
+            new EmployeeInviteCandidate(gmailId, "Gmail Person", "gmail.person@gmail.com", null, null),
+            new EmployeeInviteCandidate(hotmailId, "Hotmail Person", "hotmail.person@hotmail.co.uk", null, null),
+            new EmployeeInviteCandidate(yahooId, "Yahoo Person", "yahoo.person@YAHOO.COM", null, null));
+        var jobClient = new RecordingBackgroundJobClient();
+        var auditPublisher = new FakeAuditEventPublisher();
+        var handler = BuildHandler(candidateReader, jobClient, auditPublisher);
+
+        var result = await handler.HandleAsync(
+            new QueueInvitationBatchRequest(companyId, [gmailId, hotmailId, yahooId]),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(AccountCreationEmailGuard.WorkEmailRequiredCode, result.Error.Code);
+        Assert.Contains("gmail.person@gmail.com", result.Error.Message);
+        Assert.Contains("hotmail.person@hotmail.co.uk", result.Error.Message);
+        Assert.Contains("yahoo.person@YAHOO.COM", result.Error.Message);
+
+        await using var db = fixture.BuildContext();
+        Assert.False(await db.InvitationBatches.AnyAsync(b => b.CompanyId == companyId));
+        Assert.False(await db.InvitationBatchRecipients.AnyAsync(r =>
+            r.EmployeeId == gmailId || r.EmployeeId == hotmailId || r.EmployeeId == yahooId));
+        Assert.Empty(jobClient.CreatedJobs);
+
+        // Exactly one audit row for the whole request, and no batch-queued audit.
+        var rejection = Assert.IsType<AccountCreationEmailRejectedAuditEvent>(Assert.Single(auditPublisher.PublishedEvents));
+        Assert.Equal(3, rejection.RejectedCount);
+        Assert.Equal(new[] { "gmail.com", "hotmail.co.uk", "yahoo.com" }, rejection.Domains);
+    }
+
+    [Fact]
+    public async Task HandleAsync_No_Eligible_Recipients_For_Non_Policy_Reasons_Keeps_Plain_Validation_Error()
+    {
+        // Negative branch of the all-rejected message: when nobody was rejected by the email
+        // policy the original validation error (not work_email_required) is returned.
+        var candidateReader = new FakeEmployeeInviteCandidateReader();
+        var auditPublisher = new FakeAuditEventPublisher();
+        var handler = BuildHandler(candidateReader, auditPublisher: auditPublisher);
+
+        var result = await handler.HandleAsync(
+            new QueueInvitationBatchRequest(Guid.NewGuid(), [Guid.NewGuid()]),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Empty(auditPublisher.PublishedEvents);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Malformed_Work_Email_Is_Excluded_As_PublicEmailDomain()
+    {
+        var companyId = Guid.NewGuid();
+        var orgId = Guid.NewGuid();
+        var malformedId = Guid.NewGuid();
+        var candidateReader = new FakeEmployeeInviteCandidateReader(
+            new EmployeeInviteCandidate(orgId, "Org Person", "org.person2@acme.example", null, null),
+            new EmployeeInviteCandidate(malformedId, "Malformed Person", "malformed@localhost", null, null));
+        var auditPublisher = new FakeAuditEventPublisher();
+        var handler = BuildHandler(candidateReader, auditPublisher: auditPublisher);
+
+        var result = await handler.HandleAsync(
+            new QueueInvitationBatchRequest(companyId, [orgId, malformedId]),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var excluded = Assert.Single(result.Value.Excluded);
+        Assert.Equal(malformedId, excluded.EmployeeId);
+        Assert.Equal("PublicEmailDomain", excluded.Reason);
+
+        var rejection = Assert.IsType<AccountCreationEmailRejectedAuditEvent>(
+            Assert.Single(auditPublisher.PublishedEvents, e => e is AccountCreationEmailRejectedAuditEvent));
+        Assert.Equal(new[] { "(malformed)" }, rejection.Domains);
+    }
+
+    [Fact]
+    public async Task HandleAsync_All_Org_Batch_Publishes_No_Rejection_Audit()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var candidateReader = new FakeEmployeeInviteCandidateReader(
+            new EmployeeInviteCandidate(employeeId, "Org Person", "org.person3@brightsparks-consulting.co.uk", null, null));
+        var auditPublisher = new FakeAuditEventPublisher();
+        var handler = BuildHandler(candidateReader, auditPublisher: auditPublisher);
+
+        var result = await handler.HandleAsync(
+            new QueueInvitationBatchRequest(companyId, [employeeId]),
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value.Excluded);
+        Assert.DoesNotContain(auditPublisher.PublishedEvents, e => e is AccountCreationEmailRejectedAuditEvent);
     }
 }

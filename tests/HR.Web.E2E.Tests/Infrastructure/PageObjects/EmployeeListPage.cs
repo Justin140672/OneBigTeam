@@ -859,4 +859,14 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     public Task<bool> IsInviteSelectedToolbarButtonDisabledAsync() => InviteSelectedToolbarButton.IsDisabledAsync();
 
     public Task ClickInviteSelectedToolbarButtonAsync() => InviteSelectedToolbarButton.ClickAsync();
+
+    /// <summary>
+    /// Ticket 9: the warning shown after a batch is queued listing the selected employees the
+    /// server excluded (e.g. reason PublicEmailDomain) — heading "{N} employee(s) were not invited:".
+    /// </summary>
+    public ILocator InviteBatchExcludedAlert => page.Locator("[data-testid='invite-batch-excluded']");
+
+    /// <summary>One row per server-excluded employee inside <see cref="InviteBatchExcludedAlert"/>.</summary>
+    public ILocator InviteBatchExcludedRows =>
+        InviteBatchExcludedAlert.Locator("[data-testid='invite-batch-excluded-row']");
 }

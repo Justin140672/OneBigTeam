@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Builder;
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Identity.Features.SignUp;
@@ -28,15 +29,11 @@ internal sealed class Endpoint(
 
         if (result.IsFailure)
         {
-            var businessError = new { error = result.Error.Message };
-
-            if (result.Error.Code == "conflict")
-            {
-                await Send.ResultAsync(TypedResults.Conflict(businessError));
-                return;
-            }
-
-            await Send.ResultAsync(TypedResults.BadRequest(businessError));
+            // Ticket 9: routed through the canonical translator so the body carries the
+            // machine-readable code (e.g. "work_email_required" -> 400) that the marketing
+            // /signup-submit proxy uses to mark the email field invalid. Status codes are unchanged
+            // (conflict -> 409, everything else -> 400).
+            await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }
 

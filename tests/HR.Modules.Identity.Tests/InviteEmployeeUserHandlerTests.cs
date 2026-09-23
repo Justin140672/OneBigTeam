@@ -1,3 +1,4 @@
+using HR.Modules.Identity.Services.AccountEmailPolicy;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Features.InviteEmployeeUser;
 using HR.Modules.Identity.Tests.Infrastructure;
@@ -21,7 +22,8 @@ public class InviteEmployeeUserHandlerTests(IdentityDatabaseFixture fixture)
             nameReader,
             emailSender ?? new FakeInvitationEmailSender(),
             new FakeInviteLinkBuilder(),
-            auditPublisher);
+            auditPublisher,
+            TestAccountCreationEmailGuard.Create(auditPublisher, Clock));
 
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Employee_Does_Not_Resolve()
@@ -389,5 +391,119 @@ public class InviteEmployeeUserHandlerTests(IdentityDatabaseFixture fixture)
         await using var db = fixture.BuildContext();
         var invite = await db.UserInvites.SingleAsync(i => i.EmployeeId == employeeId);
         Assert.Null(invite.EmailSentAt);
+    }
+
+    // ── Ticket 9: work-email policy ─────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("new.hire@hotmail.com")]
+    [InlineData("new.hire@GMAIL.COM")]
+    [InlineData("new.hire@mx.yopmail.com")]
+    public async Task HandleAsync_Rejects_Public_Email_Domain_Without_Persisting_Or_Sending(string email)
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var actorId = Guid.NewGuid();
+        var nameReader = new FakeEmployeeNameReader(new Dictionary<Guid, string> { [employeeId] = "New Hire" });
+        var auditPublisher = new FakeAuditEventPublisher();
+        var emailSender = new FakeInvitationEmailSender();
+        var handler = BuildHandler(nameReader, auditPublisher, emailSender);
+
+        var result = await handler.HandleAsync(
+            new InviteEmployeeUserRequest
+            {
+                CompanyId = companyId,
+                EmployeeId = employeeId,
+                Email = email,
+                RoleIds = [Guid.NewGuid()],
+            },
+            actorId,
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal(AccountCreationEmailGuard.WorkEmailRequiredCode, result.Error.Code);
+        Assert.Equal(AccountCreationEmailGuard.WorkEmailRequiredMessage, result.Error.Message);
+
+        await using var db = fixture.BuildContext();
+        Assert.False(await db.UserInvites.AnyAsync(i => i.EmployeeId == employeeId));
+        Assert.Empty(emailSender.Sent);
+
+        var rejection = Assert.IsType<AccountCreationEmailRejectedAuditEvent>(Assert.Single(auditPublisher.PublishedEvents));
+        Assert.Equal("employee-invitation", rejection.Path);
+        Assert.Equal(companyId, rejection.CompanyId);
+        Assert.Contains(employeeId, rejection.SubjectEmployeeIds);
+        Assert.Equal(actorId, rejection.ActorUserId);
+        Assert.Equal(HR.SharedKernel.AuditActorType.Human, rejection.ActorKind);
+        Assert.DoesNotContain(auditPublisher.PublishedEvents, e => e is UserInvitedAuditEvent);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Public_Email_Rejection_Does_Not_Replace_An_Existing_Expired_Invite()
+    {
+        // The policy check runs before any existing (non-actionable) invite is removed/superseded.
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        Guid existingInviteId;
+        await using (var seed = fixture.BuildContext())
+        {
+            var expired = UserInvite.Create(employeeId, companyId, "old.address@acme.example", Now.AddDays(-30));
+            seed.UserInvites.Add(expired);
+            await seed.SaveChangesAsync();
+            existingInviteId = expired.Id;
+        }
+
+        var nameReader = new FakeEmployeeNameReader(new Dictionary<Guid, string> { [employeeId] = "New Hire" });
+        var handler = BuildHandler(nameReader, new FakeAuditEventPublisher());
+
+        var result = await handler.HandleAsync(
+            new InviteEmployeeUserRequest { CompanyId = companyId, EmployeeId = employeeId, Email = "new.hire@gmail.com", RoleIds = [Guid.NewGuid()] },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        await using var db = fixture.BuildContext();
+        var invites = await db.UserInvites.Where(i => i.EmployeeId == employeeId).ToListAsync();
+        var remaining = Assert.Single(invites);
+        Assert.Equal(existingInviteId, remaining.Id);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Unknown_Employee_Still_Returns_NotFound_For_A_Public_Email()
+    {
+        // The company-membership 404 check precedes the policy check (no audit for a request that
+        // doesn't even target a real employee).
+        var auditPublisher = new FakeAuditEventPublisher();
+        var handler = BuildHandler(new FakeEmployeeNameReader(), auditPublisher);
+
+        var result = await handler.HandleAsync(
+            new InviteEmployeeUserRequest { CompanyId = Guid.NewGuid(), EmployeeId = Guid.NewGuid(), Email = "new.hire@gmail.com", RoleIds = [Guid.NewGuid()] },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+        Assert.Empty(auditPublisher.PublishedEvents);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Allows_Organisation_Domain_Invite()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var nameReader = new FakeEmployeeNameReader(new Dictionary<Guid, string> { [employeeId] = "New Hire" });
+        var auditPublisher = new FakeAuditEventPublisher();
+        var emailSender = new FakeInvitationEmailSender();
+        var handler = BuildHandler(nameReader, auditPublisher, emailSender);
+
+        var result = await handler.HandleAsync(
+            new InviteEmployeeUserRequest { CompanyId = companyId, EmployeeId = employeeId, Email = "new.hire@brightsparks-consulting.co.uk", RoleIds = [Guid.NewGuid()] },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        await using var db = fixture.BuildContext();
+        Assert.True(await db.UserInvites.AnyAsync(i => i.EmployeeId == employeeId));
+        Assert.Single(emailSender.Sent);
+        Assert.DoesNotContain(auditPublisher.PublishedEvents, e => e is AccountCreationEmailRejectedAuditEvent);
     }
 }

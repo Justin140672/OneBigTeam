@@ -91,6 +91,16 @@ public sealed class BulkInviteConfirmDialogPage(IPage page)
 
     public Task<bool> IsSendButtonDisabledAsync() => SendButton.IsDisabledAsync();
 
+    /// <summary>
+    /// The dialog's own error alert (BulkInviteConfirmDialog._error), rendered when queueing the
+    /// batch fails — e.g. Ticket 9's work_email_required rejection when every selected employee
+    /// has a public/personal work email. The dialog stays open in that case.
+    /// </summary>
+    public ILocator ErrorAlert => Dialog.Locator(".alert-danger");
+
+    /// <summary>Clicks "Send N Invitation(s)" WITHOUT waiting for the dialog to close (for failure paths).</summary>
+    public Task ClickSendAsync() => SendButton.ClickAsync();
+
     /// <summary>Clicks "Send N Invitation(s)" and waits for the dialog to close (batch queued).</summary>
     public async Task SendAsync()
     {

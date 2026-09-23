@@ -21,6 +21,7 @@ public class RetryPlatformAdministratorProvisioningHandlerTests(IdentityDatabase
     {
         var provisioningDelivery = new CreatePlatformAdministratorHandler(
             db, gateway ?? new FakeSupabaseAuthGateway(), Clock, Configuration, auditPublisher,
+            TestAccountCreationEmailGuard.Create(auditPublisher, Clock),
             NullLogger<CreatePlatformAdministratorHandler>.Instance);
 
         return new RetryPlatformAdministratorProvisioningHandler(db, provisioningDelivery, Configuration, Clock, auditPublisher);

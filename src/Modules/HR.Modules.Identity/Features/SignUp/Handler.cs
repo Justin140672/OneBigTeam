@@ -3,6 +3,7 @@ using HR.Modules.Companies.Contracts;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Persistence;
 using HR.Modules.Identity.Services;
+using HR.Modules.Identity.Services.AccountEmailPolicy;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using HR.SharedKernel.Idempotency;
@@ -45,6 +46,7 @@ internal sealed class SignUpHandler(
     IEmployeeProvisioningService employeeProvisioningService,
     ISupabaseAuthGateway supabaseAuthGateway,
     IAuditEventPublisher auditEventPublisher,
+    AccountCreationEmailGuard accountCreationEmailGuard,
     IConfiguration configuration,
     IClock clock,
     ILogger<SignUpHandler> logger)
@@ -78,6 +80,16 @@ internal sealed class SignUpHandler(
                         Error.Conflict("This Idempotency-Key was already used for a different request."));
             }
         }
+
+        // Ticket 9: authoritative work-email check. Runs BEFORE the account-exists lookup (so the
+        // response never reveals whether an account exists for a public address) and before ANY
+        // provisioning side effect — no company, default data, employee, UserProfile, Supabase
+        // account or verification email is created for a rejected address.
+        var emailPolicy = await accountCreationEmailGuard.EnsureAllowedAsync(
+            request.AdminEmail, AccountCreationPath.PublicSignup,
+            companyId: Guid.Empty, subjectEmployeeId: null, actorUserId: null, cancellationToken);
+        if (emailPolicy.IsFailure)
+            return Result.Failure<SignUpResponse>(emailPolicy.Error);
 
         var normalizedEmail = request.AdminEmail.Trim().ToUpperInvariant();
 

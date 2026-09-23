@@ -2,6 +2,7 @@ using Hangfire;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Jobs;
 using HR.Modules.Identity.Persistence;
+using HR.Modules.Identity.Services.AccountEmailPolicy;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using HR.SharedKernel.Idempotency;
@@ -15,7 +16,8 @@ internal sealed class QueueInvitationBatchHandler(
     IClock clock,
     IEmployeeInviteCandidateReader inviteCandidateReader,
     IBackgroundJobClient backgroundJobClient,
-    IAuditEventPublisher auditEventPublisher)
+    IAuditEventPublisher auditEventPublisher,
+    AccountCreationEmailGuard accountCreationEmailGuard)
 {
     public async Task<Result<QueueInvitationBatchResponse>> HandleAsync(
         QueueInvitationBatchRequest request,
@@ -83,6 +85,7 @@ internal sealed class QueueInvitationBatchHandler(
 
         var excluded = new List<ExcludedInvitationCandidate>();
         var resolved = new List<(Guid EmployeeId, string Email)>();
+        var rejectedByEmailPolicy = new List<(Guid? SubjectEmployeeId, AccountEmailDomainEvaluation Evaluation)>();
         var seenEmails = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var duplicateEmails = requestedIds
             .Select(id => candidatesById.TryGetValue(id, out var c) ? c.WorkEmail : null)
@@ -118,6 +121,18 @@ internal sealed class QueueInvitationBatchHandler(
                 continue;
             }
 
+            // Ticket 9: a public/disposable (or unparseable) work email can't be used to create an
+            // account — excluded individually, never queued, so no invite row or email is ever
+            // created for it while the rest of the batch still proceeds.
+            var emailEvaluation = accountCreationEmailGuard.Evaluate(candidate.WorkEmail);
+            if (!emailEvaluation.IsAllowed)
+            {
+                excluded.Add(new ExcludedInvitationCandidate(
+                    employeeId, candidate.WorkEmail, AccountCreationEmailGuard.BulkExclusionReason));
+                rejectedByEmailPolicy.Add((employeeId, emailEvaluation));
+                continue;
+            }
+
             if (duplicateEmails.Contains(candidate.WorkEmail))
             {
                 excluded.Add(new ExcludedInvitationCandidate(employeeId, candidate.WorkEmail, "DuplicateEmail"));
@@ -135,9 +150,32 @@ internal sealed class QueueInvitationBatchHandler(
             resolved.Add((employeeId, candidate.WorkEmail));
         }
 
+        // Ticket 9: one audit row (domains + employee ids only, no addresses) for every recipient
+        // rejected by the email-domain policy in this request.
+        await accountCreationEmailGuard.RecordRejectionsAsync(
+            AccountCreationPath.BulkEmployeeInvitation, request.CompanyId, rejectedByEmailPolicy, actorUserId, cancellationToken);
+
         if (resolved.Count == 0)
+        {
+            if (rejectedByEmailPolicy.Count > 0)
+            {
+                // Name every affected address so the administrator knows exactly which employee
+                // records need an organisation email before they can be invited.
+                var rejectedEmails = excluded
+                    .Where(e => e.Reason == AccountCreationEmailGuard.BulkExclusionReason)
+                    .Select(e => e.Email)
+                    .ToList();
+
+                return Result.Failure<QueueInvitationBatchResponse>(new Error(
+                    AccountCreationEmailGuard.WorkEmailRequiredCode,
+                    "No eligible recipients remain after resolving the submitted employees. " +
+                    $"{AccountCreationEmailGuard.BulkExclusionMessage} These employees have a public or personal " +
+                    $"email address as their work email: {string.Join(", ", rejectedEmails)}."));
+            }
+
             return Result.Failure<QueueInvitationBatchResponse>(
                 Error.Validation("No eligible recipients remain after resolving the submitted employees."));
+        }
 
         var now = clock.UtcNow;
         var batch = InvitationBatch.Create(request.CompanyId, actorUserId ?? Guid.Empty, now, request.IdempotencyKey);

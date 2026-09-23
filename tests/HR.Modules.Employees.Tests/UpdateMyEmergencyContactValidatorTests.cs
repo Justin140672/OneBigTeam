@@ -123,4 +123,16 @@ public class UpdateMyEmergencyContactValidatorTests
         });
         Assert.True(result.IsValid);
     }
+
+    // Ticket 9 regression: emergency-contact emails are not login accounts, so the account-creation
+    // work-email policy must not apply to them.
+    [Theory]
+    [InlineData("jane.doe@hotmail.com")]
+    [InlineData("jane.doe@yahoo.co.uk")]
+    public void Validate_Passes_When_Email_Is_On_A_Public_Domain(string email)
+    {
+        var v = new UpdateMyEmergencyContactValidator();
+        var result = v.Validate(ValidRequest() with { Email = email });
+        Assert.True(result.IsValid);
+    }
 }
