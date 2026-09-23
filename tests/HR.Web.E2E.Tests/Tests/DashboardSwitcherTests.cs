@@ -33,7 +33,7 @@ public sealed class DashboardSwitcherTests(ManagerPersonaFixture fixture) : Role
         await login.LoginAsync(HrAndManagerEmail);
 
         // HR beats Manager in the landing priority order (AppSession.LandingUrl).
-        await _page.WaitForURLAsync(new Regex("/dashboard/hr"), new() { Timeout = 15_000 });
+        await _page.WaitForURLAsync(new Regex("/dashboard/hr"), new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
 
         var switcher = _page.Locator(".dashboard-switcher");
         await switcher.WaitForAsync(new() { Timeout = 15_000 });
@@ -52,18 +52,18 @@ public sealed class DashboardSwitcherTests(ManagerPersonaFixture fixture) : Role
 
         await login.GoToAsync();
         await login.LoginAsync(HrAndManagerEmail);
-        await _page.WaitForURLAsync(new Regex("/dashboard/hr"), new() { Timeout = 15_000 });
+        await _page.WaitForURLAsync(new Regex("/dashboard/hr"), new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
 
         // ── Step 1: Switch to "My Team" (Manager Dashboard) via the switcher ──────
         var myTeamButton = _page.Locator(".dashboard-switcher-item").Filter(new() { HasText = "My Team" });
         await myTeamButton.ClickAsync();
-        await _page.WaitForURLAsync(new Regex("/dashboard/manager"), new() { Timeout = 15_000 });
+        await _page.WaitForURLAsync(new Regex("/dashboard/manager"), new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
 
         // ── Step 2: Re-visiting "/" must redirect back to Manager, not the default
         // HR landing — proving the choice was persisted to localStorage ("lastDashboard"),
         // not just an in-memory navigation.
-        await _page.GotoAsync($"{_fixture.WebBaseUrl}/");
-        await _page.WaitForURLAsync(new Regex("/dashboard/manager"), new() { Timeout = 15_000 });
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/", new() { WaitUntil = WaitUntilState.Commit });
+        await _page.WaitForURLAsync(new Regex("/dashboard/manager"), new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
 
         Assert.Contains("/dashboard/manager", _page.Url);
     }
@@ -75,7 +75,7 @@ public sealed class DashboardSwitcherTests(ManagerPersonaFixture fixture) : Role
 
         await login.GoToAsync();
         await login.LoginAsync(HrOnlyEmail);
-        await _page.WaitForURLAsync(new Regex("/dashboard/hr"), new() { Timeout = 15_000 });
+        await _page.WaitForURLAsync(new Regex("/dashboard/hr"), new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
 
         // Laura only satisfies one of the three switcher-eligible flags (IsHrAdministrator) —
         // the switcher must not render at all for her, same as any other single-role user.

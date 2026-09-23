@@ -26,6 +26,55 @@ public static class LocatorExtensions
     }
 
     /// <summary>
+    /// True if a grid cell containing <paramref name="text"/> exists on ANY page of the (single)
+    /// Syncfusion grid on the page — not just the page currently displayed. List pages bind the full
+    /// result set to a client-paged grid (PageSize=20) with no search box, and every E2E run keeps
+    /// adding "E2E ..." rows that sort ahead of or alongside the one a test just created, so "is it
+    /// on page 1" is order- and history-dependent. Checks the current page first (with a short
+    /// render wait), then rewinds to page 1 and pages forward, waiting for each page swap to land
+    /// (the old page's rows are still in the DOM right after the pager click) before re-checking.
+    /// </summary>
+    public static async Task<bool> HasGridCellOnAnyPageAsync(this IPage page, string text)
+    {
+        var match = page.Locator(".e-grid .e-rowcell").Filter(new() { HasText = text }).First;
+        if (await match.WaitUntilVisibleAsync(5_000))
+            return true;
+
+        await ClickGridPagerAndWaitAsync(page, ".e-grid .e-pager .e-first:not(.e-disable)");
+
+        for (var guard = 0; guard < 50; guard++)
+        {
+            if (await match.IsVisibleAsync())
+                return true;
+
+            if (!await ClickGridPagerAndWaitAsync(page, ".e-grid .e-pager .e-next:not(.e-disable)"))
+                return false;
+        }
+
+        return false;
+    }
+
+    private static async Task<bool> ClickGridPagerAndWaitAsync(IPage page, string pagerSelector)
+    {
+        var control = page.Locator(pagerSelector).First;
+        if (await control.CountAsync() == 0)
+            return false;
+
+        var firstRow = page.Locator(".e-grid .e-row").First;
+        var before = await firstRow.CountAsync() > 0 ? await firstRow.InnerTextAsync() : "";
+        await control.ClickAsync();
+
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (DateTime.UtcNow < deadline &&
+               (await firstRow.CountAsync() == 0 || await firstRow.InnerTextAsync() == before))
+        {
+            await page.WaitForTimeoutAsync(100);
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// Waits out a Blazor Server "busy" round trip after clicking a save/confirm/deactivate button,
     /// without the classic race of checking "spinner gone" as the only condition. A bare
     /// WaitForFunctionAsync("!spinner || !visible") can resolve the instant it's called if the

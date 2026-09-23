@@ -173,7 +173,10 @@
         // only carries name/stage/dates (see GetRecruitmentKanbanResponse), no email or employee
         // number field. See report: this is a known contract gap for ticket #69's email/employee
         // number search scope.
-        var candidatesTask = CandidateService.ListCandidatesAsync(CompanyId, pageSize: 200);
+        // ListAllCandidatesAsync, not one oversized page: ListCandidatesValidator caps PageSize at
+        // 100, so the previous pageSize=200 request always failed validation and left every card
+        // without an email for the search box to match.
+        var candidatesTask = CandidateService.ListAllCandidatesAsync(CompanyId);
         // Only needed for the StageId -> TerminalOutcome lookup used by card styling — reused rather
         // than re-fetched from scratch every board load isn't worth the added caching complexity
         // here since a Kanban board load is already a multi-request operation.
@@ -195,7 +198,7 @@
         _columns = kanban.Columns.ToList();
         _cards = kanban.Columns.SelectMany(c => c.Candidates).ToList();
 
-        var candidates = (await candidatesTask)?.Items ?? [];
+        var candidates = await candidatesTask ?? [];
         _candidateEmails = candidates.ToDictionary(c => c.Id, c => c.Email);
 
         var stages = (await stagesTask)?.Items ?? [];

@@ -29,7 +29,10 @@ namespace HR.Web.Services;
 // This never touches the browser: the claim lives only on an in-memory ClaimsPrincipal built by an
 // AuthenticationHandler per-request (no cookie/SignInAsync involved), and nothing here is ever
 // exposed as a component [Parameter] or serialized page state.
-public sealed class AppSessionAuthStateProvider(HrApiHttpClientFactory httpClientFactory, CircuitSessionState sessionState)
+public sealed class AppSessionAuthStateProvider(
+    HrApiHttpClientFactory httpClientFactory,
+    CircuitSessionState sessionState,
+    ILogger<AppSessionAuthStateProvider> logger)
     : AuthenticationStateProvider, IHostEnvironmentAuthenticationStateProvider
 {
     private static readonly AuthenticationState Anonymous =
@@ -104,6 +107,9 @@ public sealed class AppSessionAuthStateProvider(HrApiHttpClientFactory httpClien
 
         if (string.IsNullOrEmpty(token))
         {
+            logger.LogInformation(
+                "[e2e-diag] ApplyState: no token claim on incoming principal (isAuthenticated={IsAuthenticated}) -> Clear() (prevStatus={PrevStatus})",
+                state.User.Identity?.IsAuthenticated, sessionState.Status);
             sessionState.Clear();
             NotifyAuthenticationStateChanged(Task.FromResult(Anonymous));
             return;
@@ -113,18 +119,25 @@ public sealed class AppSessionAuthStateProvider(HrApiHttpClientFactory httpClien
         // one carrying a legitimately new token — may revive it.
         if (sessionState.Status == CircuitAuthStatus.Invalidated)
         {
+            logger.LogInformation(
+                "[e2e-diag] ApplyState: circuit already Invalidated, ignoring incoming token (tokenPrefix={TokenPrefix})",
+                token[..Math.Min(8, token.Length)]);
             return;
         }
 
         if (token == sessionState.AccessToken)
         {
             // Same-user (same-token) reconnect: state is already correct, nothing to do.
+            logger.LogInformation("[e2e-diag] ApplyState: same token as current session, no-op");
             return;
         }
 
         var isFirstSeed = sessionState.Status == CircuitAuthStatus.Uninitialized;
         if (isFirstSeed)
         {
+            logger.LogInformation(
+                "[e2e-diag] ApplyState: first seed, accepting token (tokenPrefix={TokenPrefix})",
+                token[..Math.Min(8, token.Length)]);
             sessionState.SetToken(token);
             NotifyAuthenticationStateChanged(Task.FromResult(state));
             return;
@@ -133,6 +146,10 @@ public sealed class AppSessionAuthStateProvider(HrApiHttpClientFactory httpClien
         // A live, already-Authenticated circuit just received a different token — treat as a
         // different-identity reconnect and fail closed (see policy note above). Clear() transitions
         // this circuit's Status to Invalidated, so it cannot be revived by any later callback.
+        logger.LogInformation(
+            "[e2e-diag] ApplyState: already-Authenticated circuit received a DIFFERENT token (oldPrefix={OldPrefix}, newPrefix={NewPrefix}) -> Clear()/Invalidate",
+            sessionState.AccessToken is { Length: > 0 } old ? old[..Math.Min(8, old.Length)] : "(none)",
+            token[..Math.Min(8, token.Length)]);
         sessionState.Clear();
         NotifyAuthenticationStateChanged(Task.FromResult(Anonymous));
     }
@@ -141,15 +158,25 @@ public sealed class AppSessionAuthStateProvider(HrApiHttpClientFactory httpClien
     {
         try
         {
-            var http     = httpClientFactory.CreateClient();
-            var response = await http.GetAsync("api/me");
+            var http          = httpClientFactory.CreateClient();
+            var hasAuthHeader = http.DefaultRequestHeaders.Authorization is not null;
+            var response      = await http.GetAsync("api/me");
 
             if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                logger.LogInformation(
+                    "[e2e-diag] GET api/me -> {StatusCode} (sentAuthHeader={HasAuthHeader}, sessionStatus={SessionStatus}) body={Body}",
+                    (int)response.StatusCode, hasAuthHeader, sessionState.Status, body);
                 return Anonymous;
+            }
 
             var me = await response.Content.ReadFromJsonAsync<MeResponse>();
             if (me is null)
+            {
+                logger.LogInformation("[e2e-diag] GET api/me -> 200 but body deserialized to null (sentAuthHeader={HasAuthHeader})", hasAuthHeader);
                 return Anonymous;
+            }
 
             var claims = new[]
             {
@@ -161,8 +188,9 @@ public sealed class AppSessionAuthStateProvider(HrApiHttpClientFactory httpClien
             var identity = new ClaimsIdentity(claims, authenticationType: "hrapi");
             return new AuthenticationState(new ClaimsPrincipal(identity));
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogInformation(ex, "[e2e-diag] GET api/me threw");
             return Anonymous;
         }
     }

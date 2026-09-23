@@ -53,11 +53,28 @@ public sealed class AdminUsersPage(IPage page, string baseUrl)
         return await RowByEmail(emailFragment).First.IsVisibleAsync();
     }
 
+    // Wait (bounded) for the expected pill rather than snapshotting: AdminUsers.razor deliberately
+    // renders the ".admin-action-success" banner BEFORE its post-action list reload, and that banner
+    // also stays visible from a previous action — so "banner visible" never proves the row's status
+    // pill has been re-rendered yet. Only used for positive assertions.
     public Task<bool> IsEnabledAsync(string emailFragment) =>
-        RowByEmail(emailFragment).Locator(".status-pill-enabled").IsVisibleAsync();
+        WaitForVisibleAsync(RowByEmail(emailFragment).Locator(".status-pill-enabled"));
 
     public Task<bool> IsDisabledAsync(string emailFragment) =>
-        RowByEmail(emailFragment).Locator(".status-pill-disabled").IsVisibleAsync();
+        WaitForVisibleAsync(RowByEmail(emailFragment).Locator(".status-pill-disabled"));
+
+    private static async Task<bool> WaitForVisibleAsync(ILocator locator)
+    {
+        try
+        {
+            await locator.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     public Task<string?> GetRoleTextAsync(string emailFragment)
     {

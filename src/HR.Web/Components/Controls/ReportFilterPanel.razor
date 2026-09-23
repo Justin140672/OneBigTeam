@@ -39,23 +39,20 @@
             }
         </div>
 
-        @if (_showSaveAs)
-        {
-            <SfDialog Visible="_showSaveAs" IsModal="true" Width="420px" ShowCloseIcon="true" CssClass="report-save-view-dialog">
-                <DialogEvents Closed="@(() => _showSaveAs = false)" />
-                <DialogTemplates>
-                    <Header>Save current filters as view</Header>
-                    <Content>
-                        <label class="form-label">View name</label>
-                        <HrTextBox @bind-Value="_newViewName" Placeholder="View name" />
-                    </Content>
-                    <FooterTemplate>
-                        <SfButton CssClass="e-success e-small" Disabled="@(string.IsNullOrWhiteSpace(_newViewName))" OnClick="SaveCurrentAsViewAsync">Save</SfButton>
-                        <SfButton CssClass="e-outline e-small" OnClick="@(() => _showSaveAs = false)">Cancel</SfButton>
-                    </FooterTemplate>
-                </DialogTemplates>
-            </SfDialog>
-        }
+        <SfDialog Visible="_showSaveAs" IsModal="true" Width="420px" ShowCloseIcon="true" CssClass="report-save-view-dialog">
+            <DialogEvents Closed="@(() => _showSaveAs = false)" />
+            <DialogTemplates>
+                <Header>Save current filters as view</Header>
+                <Content>
+                    <label class="form-label">View name</label>
+                    <HrTextBox @bind-Value="_newViewName" Placeholder="View name" />
+                </Content>
+                <FooterTemplate>
+                    <SfButton CssClass="e-success e-small" Disabled="@(string.IsNullOrWhiteSpace(_newViewName))" OnClick="SaveCurrentAsViewAsync">Save</SfButton>
+                    <SfButton CssClass="e-outline e-small" OnClick="@(() => _showSaveAs = false)">Cancel</SfButton>
+                </FooterTemplate>
+            </DialogTemplates>
+        </SfDialog>
         @if (_showRename)
         {
             <div class="row g-3 align-items-end mb-2">

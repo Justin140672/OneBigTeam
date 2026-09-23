@@ -462,6 +462,8 @@ public static class IdentityModule
             (Id: new Guid("30000000-0000-0000-0000-000000000011"), First: "Alice",  Last: "Morgan",  Email: "alice.morgan@betacorp.example",    Roles: new[] { SystemRoles.Employee, SystemRoles.Manager }),
             (Id: new Guid("30000000-0000-0000-0000-000000000012"), First: "Bob",    Last: "Taylor",  Email: "bob.taylor@betacorp.example",      Roles: new[] { SystemRoles.Employee }),
             (Id: new Guid("30000000-0000-0000-0000-000000000015"), First: "Grace",  Last: "Kim",     Email: "grace.kim@betacorp.example",       Roles: new[] { SystemRoles.Employee, SystemRoles.HrAdministrator }),
+            // Dedicated to CrossTabLogoutEnforcementTests only — see DevPersonaStore's remarks.
+            (Id: new Guid("30000000-0000-0000-0000-000000000016"), First: "Olivia", Last: "Reyes",   Email: "olivia.reyes@acme.example",        Roles: new[] { SystemRoles.Employee, SystemRoles.HrAdministrator }),
         };
 
         foreach (var persona in personas)

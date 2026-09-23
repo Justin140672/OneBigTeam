@@ -1,6 +1,7 @@
 using System.Text.RegularExpressions;
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
+using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
@@ -11,9 +12,10 @@ namespace HR.Web.E2E.Tests.Tests;
 ///
 /// Ticket 13 — cross-tab logout enforcement. Two independent <see cref="Microsoft.Playwright.IBrowserContext"/>s
 /// (two genuinely separate browser sessions/cookie jars, from the same <see cref="Microsoft.Playwright.IBrowser"/>)
-/// both log in as the same persona (Laura Bennett — HR Administrator, same persona used by
-/// <see cref="RealSupabaseLoginFlowTests"/>). Context A then logs out; context B, which never touched
-/// logout, must be rejected on its very next authenticated navigation — proving the server-side
+/// both log in as the same persona — Olivia Reyes, an HR Administrator persona dedicated to this test
+/// class only (see <see cref="Email"/> remarks for why). Context A then logs out; context B, which
+/// never touched logout, must be rejected on its very next authenticated navigation — proving the
+/// server-side
 /// revocation record (HR.Modules.Identity.Domain.SessionRevocation, keyed by SupabaseAuthUserId, not
 /// by any client-held state) is what enforces this, not something local to context A's own tab/cookie.
 ///
@@ -32,10 +34,19 @@ namespace HR.Web.E2E.Tests.Tests;
 /// </summary>
 public sealed class CrossTabLogoutEnforcementTests : IAsyncLifetime
 {
-    // Laura Bennett — HR Administrator persona, same as RealSupabaseLoginFlowTests /
-    // CircuitInvalidationBlocksReauthenticationTests. Reused so this test can lean on the same
-    // known-working "authenticated as Laura" sidebar/top-bar assertions those tests already establish.
-    private const string Email = "laura.bennett@acme.example";
+    // Olivia Reyes — a dedicated HR Administrator persona used ONLY by this test class (see
+    // DevPersonaStore/IdentityModule.SeedDevUserAsync). This test's whole point is to revoke this
+    // persona's session server-side (keyed globally by SupabaseAuthUserId — see
+    // SupabaseJwtBearerConfiguration.OnTokenValidated/IdentityModule.IsSessionRevokedAsync, which has
+    // no concept of "per session", only "per user"). Laura Bennett was used here previously, but she
+    // is also PersonaLoginCache's shared HrAdminPersonaFixture identity, reused by ~110 of ~170 E2E
+    // test classes (see FakeSupabaseAuthGateway's remarks on that number) — logging her out here, under
+    // 15-way parallel execution, revoked every one of those classes' already-cached login out from
+    // under them for however long it took PersonaLoginCache to detect the failure and re-login,
+    // producing exactly the mysterious "healthy, then a burst of /api/me 401s across unrelated tests,
+    // then recovery" symptom chased at length before this was diagnosed. A revocation test must use a
+    // persona nothing else in the suite ever logs in as.
+    private const string Email = "olivia.reyes@acme.example";
 
     private AppFixture _app = null!;
     private Microsoft.Playwright.IBrowserContext _contextA = null!;
@@ -109,8 +120,13 @@ public sealed class CrossTabLogoutEnforcementTests : IAsyncLifetime
         // production sign-out request path end-to-end (cookie access token forwarded as the bearer to
         // HR.Api's POST /api/logout, which writes the session_revocations row before attempting the
         // upstream Supabase call).
-        await _pageA.GotoAsync($"{_app.WebBaseUrl}/logout");
-        await _pageA.WaitForURLAsync(new Regex("/login"), new() { Timeout = 15_000 });
+        // WaitUntil=Commit, not the default Load — the app's host page pulls in third-party
+        // resources (Google Fonts, jsDelivr Bootstrap CSS) whose "load" can stall for tens of
+        // seconds under a full parallel headless run, regardless of this specific endpoint being a
+        // plain server-side redirect rather than a Blazor navigation (same reasoning already
+        // established for LoginPage.GoToAsync).
+        await _pageA.GotoAsync($"{_app.WebBaseUrl}/logout", new() { WaitUntil = WaitUntilState.Commit });
+        await _pageA.WaitForURLAsync(new Regex("/login"), new() { Timeout = 20_000 });
 
         // Context B never touched logout. Its live circuit's next authenticated action must now be
         // rejected — HR.Api's JWT bearer pipeline rejects the still-technically-unexpired bearer token

@@ -233,11 +233,16 @@ public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) 
     public async Task EditFutureCompensation_UpdatesSalary_WithoutChangingEffectiveDate()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        var empEdit = await CreateFreshEmployeeOnCompensationTabAsync("Edit");
+        // Seeded, dedicated-to-this-test employee (SeededE2eEmployees.CompensationEdit) instead of
+        // paying the full New Employee form — see that member's doc comment for why it's a
+        // dedicated pool member rather than the shared Sarah Chen/Tom Williams employees.
+        await empEdit.GoToAsync(AcmeId, SeededE2eEmployees.CompensationEdit.EmployeeId);
+        await empEdit.OpenCompensationTabAsync();
 
         await empEdit.ClickAddCompensationAsync();
         await empEdit.FillAddCompensationEffectiveFromAsync("01/06/2030");

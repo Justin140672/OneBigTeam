@@ -155,6 +155,16 @@ public sealed class HrDashboardPage(IPage page, string baseUrl)
         await AttentionQueueWidget.Locator(".attention-queue-item, .attention-queue-all-clear").First
             .WaitForAsync(new() { Timeout = 15_000 });
 
+    /// <summary>
+    /// Actionable queue rows only. AttentionQueuePanel renders three row kinds that ALL carry
+    /// ".attention-queue-item": actionable &lt;button&gt; rows (the only ones with
+    /// ".attention-queue-action", the "--overdue" modifier class, and keyboard focus), read-only
+    /// &lt;div&gt; rows (owned by someone else, e.g. a manager-owned leave approval shown to HR) and
+    /// stale &lt;div&gt; rows. Which kind sorts first depends on what other tests have created, so
+    /// structural/keyboard/ordering assertions must target the button rows explicitly.
+    /// </summary>
+    public ILocator ActionableAttentionQueueRows => AttentionQueueWidget.Locator("button.attention-queue-item");
+
     /// <summary>Returns the subject text (task-widget-title) of every currently visible queue row, in DOM order.</summary>
     public async Task<IReadOnlyList<string>> GetAttentionQueueSubjectsAsync()
     {
@@ -233,6 +243,22 @@ public sealed class HrDashboardPage(IPage page, string baseUrl)
     {
         await WaitForAttentionQueueLoadedAsync();
         return await AttentionQueueWidget.Locator(".attention-queue-item").CountAsync();
+    }
+
+    /// <summary>
+    /// Whether each row currently carries the "attention-queue-item--overdue" class, in DOM order —
+    /// read via one atomic JS evaluation rather than N sequential GetAttributeAsync round-trips
+    /// (Nth(i) is positional; reading classes one row at a time across several awaits risks a
+    /// stale/mixed read if anything on the page re-renders mid-loop). Also scoped to
+    /// AttentionQueueWidget specifically, not a bare page-wide ".attention-queue-item" selector.
+    /// </summary>
+    public async Task<IReadOnlyList<bool>> GetAttentionQueueOverdueFlagsAsync()
+    {
+        await WaitForAttentionQueueLoadedAsync();
+        // Actionable rows only — read-only/stale rows never carry the "--overdue" class (see
+        // ActionableAttentionQueueRows). A sorted list stays sorted as a subsequence.
+        return await ActionableAttentionQueueRows.EvaluateAllAsync<bool[]>(
+            "els => els.map(e => e.classList.contains('attention-queue-item--overdue'))");
     }
 
     /// <summary>Number of inline per-source failure warnings (".widget-source-warning") shown inside the card.</summary>

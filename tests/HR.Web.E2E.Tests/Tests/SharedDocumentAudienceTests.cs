@@ -66,6 +66,17 @@ public sealed class SharedDocumentAudienceTests(HrAdminPersonaFixture fixture) :
             // outside-click handler before reaching for the footer Save button.
             await dialog.Locator("p.text-muted.small").ClickAsync();
 
+            // The SfMultiSelect only round-trips its bound value to the Blazor Server circuit
+            // asynchronously after the checkbox click/popup-close — same class of race already
+            // documented on SharedDocumentDetailPage.FillAcknowledgementStatementAsync for the
+            // acknowledgement statement HrTextBox. Clicking Save immediately after closing the
+            // popup can beat that round-trip, saving the value as it was BEFORE the selection
+            // (observed: summary stayed "All Employees" after a save that appeared to succeed).
+            // Wait for evidence the bound value has actually updated before clicking Save: once
+            // the popup is closed, the only remaining "Engineering" text visible in this dialog is
+            // the multiselect's own selected-item chip.
+            await dialog.GetByText("Engineering").WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+
             await dialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
             await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 30_000 });
 

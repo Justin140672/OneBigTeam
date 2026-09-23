@@ -72,11 +72,10 @@
         return Task.CompletedTask;
     }
 
-    protected override async Task<IReadOnlyList<CandidateListItemModel>?> FetchItemsAsync(string? search)
-    {
-        var result = await CandidateService.ListCandidatesAsync(CompanyId, search, pageSize: 100, includeInactive: ShowInactive);
-        return result?.Items;
-    }
+    // The grid pages client-side (PageSize=20), so it needs the complete set — a single
+    // pageSize=100 request silently hid every candidate sorted past the 100th.
+    protected override Task<IReadOnlyList<CandidateListItemModel>?> FetchItemsAsync(string? search) =>
+        CandidateService.ListAllCandidatesAsync(CompanyId, search, includeInactive: ShowInactive);
 
     protected override string LoadErrorMessage => "Failed to load candidates.";
 

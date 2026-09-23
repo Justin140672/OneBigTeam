@@ -330,7 +330,16 @@ else
                 // unrelated list-reload query, not by the action that had already completed. The action
                 // itself (reset password / disable / etc.) is already done by this point; showing its
                 // result doesn't need to wait on a subsequent, logically separate list refresh.
+                //
+                // StateHasChanged() alone only QUEUES a render — it does not guarantee the renderer's
+                // dispatch queue actually flushes it to the client before this method's very next line
+                // runs. Immediately calling LoadAsync() right after risked that queued render still
+                // being coalesced with LoadAsync()'s own later changes into one combined batch (this
+                // test was STILL observed timing out after adding the bare StateHasChanged() call).
+                // An explicit Task.Yield() hands control back to the synchronization context so the
+                // renderer gets a real opportunity to process and send this render on its own first.
                 StateHasChanged();
+                await Task.Yield();
                 await LoadAsync();
             }
         }

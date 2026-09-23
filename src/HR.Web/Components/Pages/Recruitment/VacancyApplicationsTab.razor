@@ -898,18 +898,27 @@
     private static bool HasPendingInterview(ApplicationListItemModel row) =>
         row.InterviewOutcome == "Pending";
 
-    // "Offer" stage = the same stage OfferCandidateHandler moves an application TO (the last
-    // active non-terminal stage by DisplayOrder) — stages are fully data-driven per company, so
-    // there's no fixed enum/name to compare against; this mirrors the backend's own resolution
-    // logic exactly rather than hardcoding a stage name like "Offer". Once an application is here,
-    // an offer has already been made — Schedule Interview/Offer/Reject no longer make sense (Hire
-    // and Withdraw remain the only valid next actions).
+    // "Offer" stage = the same stage OfferCandidateHandler moves an application TO — stages are
+    // fully data-driven per company, so there's no fixed enum/name to compare against. Mirrors the
+    // backend's own resolution exactly (OfferCandidate/Handler.cs): prefer the stage the company
+    // has explicitly flagged via RecruitmentStagePurpose.Offer, and only fall back to "last active
+    // non-terminal stage by DisplayOrder" when no stage carries that purpose. A previous version of
+    // this method used the DisplayOrder fallback unconditionally, which silently diverged from the
+    // backend the moment a company's stages were reordered/customized so the Purpose=Offer stage was
+    // no longer also the highest-DisplayOrder one (e.g. a fresh, un-started application could then
+    // be misidentified as already being on the offer stage, permanently disabling Schedule
+    // Interview/Offer/Reject for it). Once an application is here, an offer has already been made —
+    // Schedule Interview/Offer/Reject no longer make sense (Hire and Withdraw remain the only valid
+    // next actions).
     private bool IsOnOfferStage(ApplicationListItemModel row)
     {
-        var offerStage = _stages
+        var activeNonTerminalStages = _stages
             .Where(s => s.IsActive && !s.IsTerminal)
             .OrderByDescending(s => s.DisplayOrder)
-            .FirstOrDefault();
+            .ToList();
+
+        var offerStage = activeNonTerminalStages.FirstOrDefault(s => s.Purpose == RecruitmentStagePurpose.Offer)
+            ?? activeNonTerminalStages.FirstOrDefault();
 
         return offerStage is not null && row.CurrentStageId == offerStage.Id;
     }

@@ -23,7 +23,12 @@ public sealed class OperationalAlertsPage(IPage page, string baseUrl)
     public async Task GotoAsync()
     {
         await page.GotoAsync($"{baseUrl}/operational-alerts");
-        await page.WaitForSelectorAsync(SettledSelector, new() { Timeout = 20_000 });
+        // Widened 20s -> 30s to match this suite's established convention for a real server
+        // round-trip (OperationalAlertsService's query) under concurrent E2E load — the wait
+        // condition itself is correct (all 4 states genuinely exist in OperationalAlerts.razor:
+        // "Loading…"/.dashboard-error/.activity-empty/.e-grid), so a failure here is app-under-
+        // load latency, not a stale locator.
+        await page.WaitForSelectorAsync(SettledSelector, new() { Timeout = 30_000 });
     }
 
     public Task<bool> IsErrorBannerVisibleAsync() =>

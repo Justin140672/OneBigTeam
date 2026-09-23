@@ -185,7 +185,31 @@ public sealed class MyProfileDocumentsTabTests(CrossUserFixture fixture) : Cross
             await dialog.Locator("input[type='file']").SetInputFilesAsync(tempFile);
 
             await dialog.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true }).ClickAsync();
-            await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 30_000 });
+            try
+            {
+                await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 30_000 });
+            }
+            catch (TimeoutException)
+            {
+                // Diagnostic capture — this exact wait has been seen stuck with the dialog fully
+                // visible for the entire 30s budget (not a fading-overlay race) in more than one
+                // test file now. UploadSharedCompanyDocumentHandler queues virus scanning as a
+                // background job rather than blocking the response, so that's been ruled out as
+                // the cause — capture real evidence (any validation/server error renders inside
+                // the dialog) instead of guessing again.
+                try
+                {
+                    var dir = Path.Combine(AppContext.BaseDirectory, "diag");
+                    Directory.CreateDirectory(dir);
+                    var stamp = $"{DateTime.UtcNow:HHmmss_fff}_{Guid.NewGuid().ToString("N")[..6]}_upload-dialog-stuck";
+                    await _page.ScreenshotAsync(new() { Path = Path.Combine(dir, $"{stamp}.png"), FullPage = true });
+                    await File.WriteAllTextAsync(
+                        Path.Combine(dir, $"{stamp}.html"),
+                        $"URL: {_page.Url}\n\n=== Dialog text ===\n{await dialog.InnerTextAsync()}\n\n=== Dialog HTML ===\n{await dialog.InnerHTMLAsync()}");
+                }
+                catch { /* diagnostics only */ }
+                throw;
+            }
 
             await _page.WaitForSelectorAsync($"text={title}", new() { Timeout = 15_000 });
 

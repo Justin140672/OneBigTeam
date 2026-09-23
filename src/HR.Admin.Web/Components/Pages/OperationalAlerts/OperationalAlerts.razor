@@ -96,12 +96,25 @@ else
 
         Guid? companyId = Guid.TryParse(_companyIdText, out var parsed) ? parsed : null;
 
-        _response = await OperationalAlertsService.GetAlertsAsync(new OperationalAlertFilter(
-            companyId,
-            string.IsNullOrEmpty(_categoryFilter) ? null : _categoryFilter,
-            _statusFilter,
-            _page,
-            PageSize));
+        try
+        {
+            _response = await OperationalAlertsService.GetAlertsAsync(new OperationalAlertFilter(
+                companyId,
+                string.IsNullOrEmpty(_categoryFilter) ? null : _categoryFilter,
+                _statusFilter,
+                _page,
+                PageSize));
+        }
+        catch (Exception)
+        {
+            // Leave _response null — the markup's "else if (_response is null)" branch already
+            // renders the "not authorised, or they couldn't be loaded" banner for exactly this
+            // case. Without this catch, any exception here (a transient network blip, an
+            // unauthorised/failed call) left the page stuck showing "Loading…" forever: _loading
+            // never reached its "= false" below, so that already-built fallback banner was
+            // unreachable regardless of the real failure reason.
+            _response = null;
+        }
 
         _loading = false;
     }

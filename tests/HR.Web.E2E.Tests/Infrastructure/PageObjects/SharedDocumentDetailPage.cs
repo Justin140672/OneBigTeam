@@ -38,7 +38,19 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     // their own distinct "Edit audience"/"Edit acknowledgement settings" names — see the renamed
     // locators below), so this no longer needs the old .First-based disambiguation against a
     // shared generic "Edit" name.
-    private ILocator EditMetadataHeaderButton => page.GetByRole(AriaRole.Button, new() { Name = "Edit details", Exact = true });
+    //
+    // NOT Exact — confirmed via a captured DOM dump (diag/*_shareddoc-header-missing.html) that
+    // this specific SfButton carries aria-label="Edit details for {Title}" (see
+    // SharedDocumentDetail.razor). Per the WAI-ARIA accessible-name computation algorithm, a
+    // non-empty aria-label completely OVERRIDES an element's visible text content for accessible-
+    // name purposes — Playwright's GetByRole Name match is against that computed name, not what's
+    // on screen. So the button's real accessible name is "Edit details for {Title}", never exactly
+    // "Edit details", and Exact=true could never match it — the button was visible and clickable
+    // the entire time; every prior "fix" to GoToAsync's timing/retries was chasing a symptom that
+    // couldn't be timing-related, since the target literally didn't have the name being searched
+    // for. Non-exact matching is substring-based in Playwright, so "Edit details" now matches
+    // against "Edit details for {Title}" correctly.
+    private ILocator EditMetadataHeaderButton => page.GetByRole(AriaRole.Button, new() { Name = "Edit details" });
     private ILocator EditMetadataDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Edit Document Metadata" });
 
     private ILocator PublishDialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Publish Document" });
@@ -165,17 +177,100 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
 
     public async Task GoToAsync(Guid companyId, Guid documentId)
     {
-        await page.GotoAsync($"{baseUrl}/companies/{companyId}/shared-documents/{documentId}");
-        // SharedDocumentDetail.razor has no grid at all (".e-grid" — the previous wait condition
-        // here — never appears on this page), so that wait provided no real readiness signal: it
-        // either matched nothing until a 20s timeout, or matched by coincidence, without confirming
+        // SharedDocumentDetail.razor has no grid at all (".e-grid" — an earlier wait condition here
+        // — never appears on this page), so that wait provided no real readiness signal: it either
+        // matched nothing until a 20s timeout, or matched by coincidence, without confirming
         // _detail had actually finished loading. The page's own three render states are: loading
-        // (HrLoadingIndicator), not-found (".alert-danger"), or loaded (h1.doc-detail-title plus the
-        // "More actions" SfDropDownButton, whose Items are computed from _detail). Waiting for
-        // either of the latter two is what actually confirms the document data — and therefore the
-        // "More actions" menu's real item list (Archive/Mark Expired only while Draft/Published) —
-        // has loaded, instead of racing a freshly-navigated page whose data fetch is still in flight.
-        await page.WaitForSelectorAsync("h1.doc-detail-title, .alert-danger", new() { Timeout = 20_000 });
+        // (HrLoadingIndicator), not-found (".alert-danger" — GetSharedCompanyDocumentAsync returned
+        // null), or loaded (h1.doc-detail-title plus the "More actions" SfDropDownButton, whose
+        // Items are computed from _detail).
+        //
+        // Most callers navigate here immediately after uploading a document (GetUploadedDocumentIdAsync
+        // reads the id straight off the just-appeared list row), which is a genuine read-after-write
+        // race: this page's own GET can transiently 404 a document whose write the list grid already
+        // reflects. Treating a lone ".alert-danger" sighting as this page having "loaded" (as an
+        // earlier version of this method did) let that transient 404 through immediately — the old,
+        // technically-wrong ".e-grid" wait had incidentally masked this by always burning close to a
+        // full 20s before ever checking, giving the backend time to catch up. Retry the navigation a
+        // few times before accepting ".alert-danger" as final, so a genuine not-found (the document
+        // really doesn't exist) still surfaces reliably, but a transient one resolves instead of
+        // wrongly reporting the document missing and leaving every subsequent locator in the caller
+        // (e.g. "Edit details") timing out against a page that was never going to render them.
+        for (var attempt = 1; attempt <= 4; attempt++)
+        {
+            await page.GotoAsync($"{baseUrl}/companies/{companyId}/shared-documents/{documentId}");
+            await page.WaitForSelectorAsync("h1.doc-detail-title, .alert-danger", new() { Timeout = 20_000 });
+
+            if (await page.Locator("h1.doc-detail-title").IsVisibleAsync())
+            {
+                await DumpDiagnosticsIfHeaderActionsMissingAsync();
+                return;
+            }
+
+            if (attempt < 4)
+                await page.WaitForTimeoutAsync(500 * attempt);
+        }
+
+        // Every attempt landed on ".alert-danger" ("Document was not found") — fail loudly here
+        // instead of silently returning with the caller left on that page. A silent return
+        // previously made a genuine/persistent not-found masquerade as a much-later, unrelated-
+        // looking timeout on whatever locator the caller tried next (e.g. "Edit details" never
+        // appearing, since that button only exists in the loaded branch) — which is exactly the
+        // wrong diagnostic to chase. This documentId/companyId pairing is either genuinely wrong
+        // (a caller bug upstream, e.g. GetUploadedDocumentIdAsync parsed something other than the
+        // real id) or the read-after-write race is worse than 4 retries can cover.
+        throw new TimeoutException(
+            $"SharedDocumentDetailPage.GoToAsync: document {documentId} (company {companyId}) still shows " +
+            "'Document was not found' after 4 attempts. Either the id is wrong or the document " +
+            "genuinely isn't resolvable via GetSharedCompanyDocumentAsync — this is NOT a rendering-timing issue.");
+    }
+
+    /// <summary>
+    /// Best-effort, non-throwing diagnostic capture. A captured DOM dump already explained the
+    /// "Edit details" case: that SfButton carries aria-label="Edit details for {Title}", which per
+    /// WAI-ARIA accessible-name computation OVERRIDES its visible text entirely — an Exact=true
+    /// role+name match could never succeed against it regardless of timing, which is why several
+    /// rounds of timing/retry fixes to GoToAsync had no effect (EditMetadataHeaderButton is now
+    /// non-exact to fix this — see its own remarks). "Edit audience"/"Edit acknowledgement
+    /// settings" carry no aria-label in source, so they're presumed unaffected by that specific
+    /// bug, but their failures haven't been directly evidenced yet — this checks all three
+    /// (non-exact, matching the now-fixed locator strategy) and captures a screenshot + full DOM if
+    /// any is still genuinely missing, so a recurrence points at real, new evidence rather than a
+    /// re-guess.
+    /// </summary>
+    private async Task DumpDiagnosticsIfHeaderActionsMissingAsync()
+    {
+        try
+        {
+            var editDetails = page.GetByRole(AriaRole.Button, new() { Name = "Edit details" });
+            var editAudience = page.GetByRole(AriaRole.Button, new() { Name = "Edit audience" });
+            var editAcknowledgement = page.GetByRole(AriaRole.Button, new() { Name = "Edit acknowledgement settings" });
+
+            // Give it a brief, bounded moment in case of a genuine late re-render, without adding
+            // meaningful cost when everything's already there.
+            var deadline = DateTime.UtcNow.AddSeconds(2);
+            while (DateTime.UtcNow < deadline)
+            {
+                if (await editDetails.IsVisibleAsync() && await editAudience.IsVisibleAsync()
+                    && await editAcknowledgement.IsVisibleAsync())
+                {
+                    return; // All present as expected — nothing to capture.
+                }
+                await page.WaitForTimeoutAsync(200);
+            }
+
+            var dir = Path.Combine(AppContext.BaseDirectory, "diag");
+            Directory.CreateDirectory(dir);
+            var stamp = $"{DateTime.UtcNow:HHmmss_fff}_{Guid.NewGuid().ToString("N")[..6]}_shareddoc-header-missing";
+            await page.ScreenshotAsync(new() { Path = Path.Combine(dir, $"{stamp}.png"), FullPage = true });
+            await File.WriteAllTextAsync(
+                Path.Combine(dir, $"{stamp}.html"),
+                $"URL: {page.Url}\n\n=== DOM ===\n{await page.ContentAsync()}");
+        }
+        catch
+        {
+            // Diagnostics only — never let capture failure affect the caller.
+        }
     }
 
     /// <summary>
@@ -532,7 +627,10 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// </summary>
     public async Task RequireAcknowledgementAsync(DateOnly dueDate)
     {
-        await AcknowledgementCard.GetByRole(AriaRole.Button, new() { Name = "Edit acknowledgement settings", Exact = true }).ClickAsync();
+        // Not Exact — see EditMetadataHeaderButton's remarks: an SfButton's aria-label (if any)
+        // overrides its visible text for accessible-name purposes, so Exact matching is fragile
+        // here even though this particular button carries no aria-label in source today.
+        await AcknowledgementCard.GetByRole(AriaRole.Button, new() { Name = "Edit acknowledgement settings" }).ClickAsync();
         await EditAcknowledgementDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
         var checkboxWrapper = EditAcknowledgementDialog.Locator(".e-checkbox-wrapper")
@@ -643,7 +741,8 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// </summary>
     public async Task OpenEditAcknowledgementDialogAsync()
     {
-        await AcknowledgementCard.GetByRole(AriaRole.Button, new() { Name = "Edit acknowledgement settings", Exact = true }).ClickAsync();
+        // Not Exact — see EditMetadataHeaderButton's remarks.
+        await AcknowledgementCard.GetByRole(AriaRole.Button, new() { Name = "Edit acknowledgement settings" }).ClickAsync();
         await EditAcknowledgementDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
 
@@ -656,12 +755,30 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// SaveEditAcknowledgementDialogAsync followed by another OpenEditAcknowledgementDialogAsync)
     /// can otherwise hit "subtree intercepts pointer events" on the stale overlay. Best-effort: if
     /// no overlay is present at all, this is a no-op.
+    ///
+    /// Also waits for ".e-dlg-container" (the dialog's own outer wrapper, a DIFFERENT element from
+    /// ".e-dlg-overlay") to clear — a captured failure (RenamedEditButtons_EachOpenTheirOwnDialog,
+    /// closing the "Edit details" dialog via Escape then immediately clicking "Edit audience")
+    /// showed the intercepting element was specifically ".e-dlg-container", not the overlay: on
+    /// Escape (rather than a Save-triggered close), the container can still be mid-close/lingering
+    /// in the DOM briefly after the dialog role itself reports Hidden, independently of whatever
+    /// the overlay is doing.
     /// </summary>
     public async Task WaitForOverlayToClearAsync()
     {
         try
         {
             await page.Locator(".e-dlg-overlay").WaitForAsync(
+                new() { State = WaitForSelectorState.Detached, Timeout = 5_000 });
+        }
+        catch (TimeoutException)
+        {
+            // Ignore — best-effort settle only.
+        }
+
+        try
+        {
+            await page.Locator(".e-dlg-container").WaitForAsync(
                 new() { State = WaitForSelectorState.Detached, Timeout = 5_000 });
         }
         catch (TimeoutException)
@@ -1089,7 +1206,8 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     /// <summary>Opens the Audience-edit dialog (EditSharedCompanyDocumentAudienceDialog.razor) via the "Audience" overview-card's "Edit audience" button.</summary>
     public async Task OpenEditAudienceDialogAsync()
     {
-        await AudienceCard.GetByRole(AriaRole.Button, new() { Name = "Edit audience", Exact = true }).ClickAsync();
+        // Not Exact — see EditMetadataHeaderButton's remarks.
+        await AudienceCard.GetByRole(AriaRole.Button, new() { Name = "Edit audience" }).ClickAsync();
         await page.GetByRole(AriaRole.Dialog, new() { Name = "Edit Document Audience" })
             .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
@@ -1403,6 +1521,24 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
             .ToHaveValueAsync(expected, new() { Timeout = 15_000 });
 
     public Task<bool> IsMetadataDialogOpenAsync() => EditMetadataDialog.IsVisibleAsync();
+
+    /// <summary>
+    /// Closes the Edit Document Metadata dialog via its header "X" (ShowCloseIcon), NOT the
+    /// Escape key. A captured failure (RenamedEditButtons_EachOpenTheirOwnDialog) showed Escape
+    /// unreliably closing this specific dialog — this dialog has a nested SfDatePicker (Effective
+    /// Date), and if focus is on/near it, Escape is plausibly consumed by the date-picker's own
+    /// popup handling rather than propagating up to the SfDialog, leaving the dialog and its
+    /// ".e-dlg-container" genuinely still mounted (not just mid-close-animation) — no amount of
+    /// waiting after the keypress fixes that, since the dialog was never actually told to close.
+    /// The header close button is a real, deterministic click target unaffected by focus location.
+    /// </summary>
+    public async Task CloseMetadataDialogAsync()
+    {
+        await EditMetadataDialog.GetByRole(AriaRole.Button, new() { Name = "Close" }).ClickAsync();
+        await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+        await WaitForOverlayToClearAsync();
+    }
+
     public Task<bool> IsMetadataConflictBannerVisibleAsync() => ConflictBannerIn(EditMetadataDialog).IsVisibleAsync();
     public Task SaveMetadataDialogExpectingConflictAsync() => SaveDialogExpectingConflictAsync(EditMetadataDialog);
     public Task SaveMetadataDialogExpectingSuccessAsync() => SaveDialogExpectingSuccessAsync(EditMetadataDialog);
@@ -1437,6 +1573,15 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     }
 
     public Task<bool> IsAudienceDialogOpenAsync() => EditAudienceDialog.IsVisibleAsync();
+
+    /// <summary>Closes the Edit Document Audience dialog via its header "X" — see CloseMetadataDialogAsync's remarks on why Escape is unreliable for these SfDialogs.</summary>
+    public async Task CloseAudienceDialogAsync()
+    {
+        await EditAudienceDialog.GetByRole(AriaRole.Button, new() { Name = "Close" }).ClickAsync();
+        await EditAudienceDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
+        await WaitForOverlayToClearAsync();
+    }
+
     public Task<bool> IsAudienceConflictBannerVisibleAsync() => ConflictBannerIn(EditAudienceDialog).IsVisibleAsync();
     public Task SaveAudienceDialogExpectingConflictAsync() => SaveDialogExpectingConflictAsync(EditAudienceDialog);
     public Task SaveAudienceDialogExpectingSuccessAsync() => SaveDialogExpectingSuccessAsync(EditAudienceDialog);

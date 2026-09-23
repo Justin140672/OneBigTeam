@@ -129,6 +129,32 @@ public static class SeededE2eEmployees
         P(53, "SeedContactSaveC"), P(54, "SeedContactSaveD"),
     ];
 
+    // ── Bulk employee invitations (each test consumes one — no linked user account, so every
+    // member is "eligible" for the invite flow exactly as seeded, without paying the New Employee
+    // form) ────────────────────────────────────────────────────────────────
+    public static readonly IReadOnlyList<Pooled> BulkInvite =
+    [
+        P(55, "SeedInviteA"), P(56, "SeedInviteB"), P(57, "SeedInviteC"), P(58, "SeedInviteD"),
+        P(59, "SeedInviteE"), P(60, "SeedInviteF"), P(61, "SeedInviteG"), P(62, "SeedInviteH"),
+    ];
+
+    // ── Compensation tab future-dated edit (EmployeeCompensationTabTests) ────
+    // Dedicated (not shared with any other test file), same reasoning as EmployeeCompensationTabTests'
+    // own doc comment for why it doesn't reuse Tom Williams: adding/editing/deleting compensation
+    // rows on a widely-shared employee would race the ~40+ other test files mutating them in
+    // parallel. This member replaces that test's own full New-Employee-form arrange (4 combobox
+    // selections + 2 navigations) with the seeded pool employee, which already has a starting
+    // Compensation record — the test only adds/edits a distinct FUTURE-dated row, so the existing
+    // seeded record doesn't interfere.
+    public static readonly Pooled CompensationEdit = P(63, "SeedCompEdit");
+
+    // ── Row-level Quick Invite happy path (UserAdministrationManagementTests) ─
+    // Dedicated: that test actually SENDS an invitation, which permanently removes its target from
+    // the invitable set. It previously shared the seeded "Emma Jones" with
+    // InviteUserFromAdminTests (which also sends to her), so whichever ran second in a run found her
+    // already invited and failed — order-dependent, not flaky.
+    public static readonly Pooled QuickInvite = P(64, "SeedQuickInvite");
+
     /// <summary>Every pool member, for callers that just need to enumerate them.</summary>
     public static IEnumerable<Pooled> All()
     {
@@ -149,5 +175,8 @@ public static class SeededE2eEmployees
         yield return ConcurrencyAdmin;
         yield return ConcurrencySelf;
         foreach (var p in ContactSaveControl) yield return p;
+        foreach (var p in BulkInvite) yield return p;
+        yield return CompensationEdit;
+        yield return QuickInvite;
     }
 }

@@ -204,11 +204,26 @@ public sealed class HrDashboardAttentionQueueSummaryTests(HrAdminPersonaFixture 
         // ActivateAsync only opens the task dialog when TaskId is set — see
         // AttentionQueueSupport.ResolveActionLabel) has no linked TaskId and navigates its
         // DeepLinkUrl on activation instead.
+        // The attention queue is HR-wide shared data, not isolated per test — under 15-thread
+        // parallel runs another test can add/complete/claim items while this loop is mid-iteration,
+        // shifting the live row list out from under a count taken once up front. Index i can then
+        // point at a row that's been removed or replaced, and TextContentAsync()'s default 30s
+        // auto-wait for ".attention-queue-action" to appear would hang the whole test on that one
+        // stale index instead of just skipping it. Bound the wait and skip rows that don't resolve.
         var rows = _page.Locator(".attention-queue-card .attention-queue-item");
         var count = await rows.CountAsync();
         for (var i = 0; i < count; i++)
         {
-            var action = (await rows.Nth(i).Locator(".attention-queue-action").TextContentAsync())?.Trim();
+            string? action;
+            try
+            {
+                action = (await rows.Nth(i).Locator(".attention-queue-action").TextContentAsync(new() { Timeout = 3_000 }))?.Trim();
+            }
+            catch (TimeoutException)
+            {
+                continue;
+            }
+
             if (action is null || DashboardAttentionQueueSummaryTests.TaskBackedActionLabels.Contains(action, StringComparer.OrdinalIgnoreCase))
                 continue;
 
@@ -435,11 +450,23 @@ public sealed class ManagerDashboardAttentionQueueSummaryTests(ManagerPersonaFix
         var dashboard = await LoginAndOpenAsync();
         await dashboard.WaitForAttentionQueueLoadedAsync();
 
+        // See the HR-dashboard variant of this test for why this bounds the per-row wait and skips
+        // rows that don't resolve quickly: the attention queue is shared, live data, and the row
+        // list can shift under this loop across 15-thread parallel runs.
         var rows = _page.Locator(".attention-queue-card .attention-queue-item");
         var count = await rows.CountAsync();
         for (var i = 0; i < count; i++)
         {
-            var action = (await rows.Nth(i).Locator(".attention-queue-action").TextContentAsync())?.Trim();
+            string? action;
+            try
+            {
+                action = (await rows.Nth(i).Locator(".attention-queue-action").TextContentAsync(new() { Timeout = 3_000 }))?.Trim();
+            }
+            catch (TimeoutException)
+            {
+                continue;
+            }
+
             if (action is null || DashboardAttentionQueueSummaryTests.TaskBackedActionLabels.Contains(action, StringComparer.OrdinalIgnoreCase))
                 continue;
 

@@ -145,7 +145,7 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
     }
 
     [Fact]
-    public async Task OffboardingTab_IsHidden_AfterCompletion()
+    public async Task OffboardingTab_RemainsVisibleAsHistoricalRecord_AfterCompletion()
     {
         var login       = new LoginPage(_page, _fixture.WebBaseUrl);
         var empList     = new EmployeeListPage(_page, _fixture.WebBaseUrl);
@@ -226,20 +226,31 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
             }
         }
 
-        // Revisiting the employee's profile should no longer show an Offboarding tab. There is no
-        // manual "Start Offboarding" entry point to reappear anymore — that button no longer
-        // exists anywhere in the UI.
+        // Revisiting the employee's profile should still show the unified "Leaving & Offboarding"
+        // tab — SPEC-OFF-01 deliberately keeps it visible forever once any leaving process has ever
+        // existed for the employee ("Historical attempts must remain accessible and clearly
+        // distinguished from the current attempt" — see GetEmployeeHandler's showLeavingTab, which
+        // is `hasAnyLeavingProcess` with no completion/cancellation check at all). There is no
+        // manual "Start Offboarding" entry point to reappear, though — that button no longer exists
+        // anywhere in the UI regardless of tab visibility.
         await empEdit.GoToAsync(AcmeId, employeeId);
 
         // Same race documented on EmployeeOnboardingTabTests's equivalent post-completion check:
         // GoToAsync's own wait condition (the Details tab's combobox) can resolve on an earlier
-        // render pass than the Offboarding tab's own visibility, which depends on its own async
-        // plan-status load — a bare IsSectionTabPresentAsync() snapshot right after navigation can
-        // catch that transient state instead of the settled (hidden) one. Use an auto-retrying
-        // negative assertion instead of a one-shot check.
+        // render pass than this tab's own visibility, which depends on its own async plan-status
+        // load — a bare IsSectionTabPresentAsync() snapshot right after navigation can catch that
+        // transient state. Use an auto-retrying assertion instead of a one-shot check.
         await EmployeeEditPage.SelectOwningGroupAsync(_page, "Offboarding");
         await Assertions.Expect(EmployeeEditPage.SectionTab(_page, "Offboarding"))
-            .Not.ToBeVisibleAsync(new() { Timeout = 15_000 });
+            .ToBeVisibleAsync(new() { Timeout = 15_000 });
+
+        // Its content should reflect the completed/historical state, not an active offboarding —
+        // EmployeeLeavingTab.razor labels a Completed/Cancelled process "isHistorical" and shows a
+        // "Completed" status badge rather than the in-progress checklist.
+        await EmployeeEditPage.SectionTab(_page, "Offboarding").ClickAsync();
+        await Assertions.Expect(_page.GetByText("Completed", new() { Exact = false }).First)
+            .ToBeVisibleAsync(new() { Timeout = 15_000 });
+
         Assert.False(
             await _page.GetByRole(AriaRole.Button, new() { Name = "Start Offboarding" }).IsVisibleAsync(),
             "Expected no manual 'Start Offboarding' entry point anywhere");

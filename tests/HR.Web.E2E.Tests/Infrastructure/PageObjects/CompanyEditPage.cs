@@ -164,40 +164,44 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
     /// no HR/Recruitment/Manager dashboard) straight back to this same Company edit page, so
     /// that's the URL that actually settles. See AppSession.LandingUrl.
     /// </summary>
-    public async Task CloseAndWaitForDashboardAsync(string baseUrl, Guid companyId)
-    {
-        await ClickCloseAsync();
-        await page.WaitForURLAsync($"{baseUrl}/companies/{companyId}/edit", new() { Timeout = 15_000 });
-    }
+    public Task CloseAndWaitForDashboardAsync(string baseUrl, Guid companyId) =>
+        ClickAndWaitForRoundTripBackToEditAsync(ClickCloseAsync, baseUrl, companyId);
 
-    public async Task ConfirmDiscardChangesAsync(string baseUrl, Guid companyId)
-    {
-        await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Discard Changes" }).ClickAsync();
-        // Close navigates to "/" first (CompanyEdit has no dedicated list page — see
-        // CloseAndWaitForDashboardAsync's own remarks), which then immediately redirects a
-        // CompanyAdministrator back to this same /companies/{id}/edit page via Home.razor's
-        // role-based landing redirect (AppSession.LandingUrl). That's two navigations in
-        // sequence, not one — under load the intermediate "/" landing can take longer to redirect
-        // than this was originally budgeted for, observed as the caller reading _page.Url and
-        // finding the bare "/" root instead of the final destination.
-        await page.WaitForURLAsync($"{baseUrl}/companies/{companyId}/edit", new() { Timeout = 20_000 });
-    }
+    public Task ConfirmDiscardChangesAsync(string baseUrl, Guid companyId) =>
+        ClickAndWaitForRoundTripBackToEditAsync(
+            () => UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Discard Changes" }).ClickAsync(),
+            baseUrl, companyId);
 
     /// <summary>
     /// Choosing "Save" from the unsaved-changes prompt always navigates away on success — unlike
     /// the page's own Save button, which stays put and shows an inline success banner instead.
     /// </summary>
-    public async Task ConfirmSaveFromUnsavedChangesDialogAsync(string baseUrl, Guid companyId)
+    public Task ConfirmSaveFromUnsavedChangesDialogAsync(string baseUrl, Guid companyId) =>
+        ClickAndWaitForRoundTripBackToEditAsync(
+            () => UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync(),
+            baseUrl, companyId);
+
+    /// <summary>
+    /// Close/Discard/Save-and-close all end in EditPageBase.NavigateToList(), which does a
+    /// forceLoad (full document) navigation to "/" (CompanyEdit's ListUrl — it has no list page);
+    /// Home.razor then client-side-redirects a CompanyAdministrator straight back to this same
+    /// /companies/{id}/edit URL. Because the final URL equals the starting URL, waiting for it
+    /// matches instantly — before the "/" document navigation has even started — and the caller's
+    /// next GotoAsync then collides with that in-flight navigation (net::ERR_ABORTED) or reads
+    /// pre-save data. Instead, start listening for the "/" document navigation BEFORE clicking
+    /// (so it can't be missed), then wait for the redirect back and for the page to render.
+    /// </summary>
+    private async Task ClickAndWaitForRoundTripBackToEditAsync(Func<Task> click, string baseUrl, Guid companyId)
     {
-        // The "Save from unsaved changes" flow lands back on the SAME /edit URL it started from,
-        // so WaitForURLAsync's pattern already matches the current URL before the click even
-        // happens — it resolves instantly rather than actually waiting for the save round-trip to
-        // complete, letting the caller re-navigate (GoToAsync) and read stale, unsaved data. Wait
-        // for the confirmation dialog to actually close first, which only happens once the save
-        // (and subsequent client-side navigation) has gone through.
-        await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
-        await UnsavedChangesDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
-        await page.WaitForURLAsync($"{baseUrl}/companies/{companyId}/edit", new() { Timeout = 15_000 });
+        await page.RunAndWaitForNavigationAsync(click, new()
+        {
+            UrlFunc = url => new Uri(url).AbsolutePath == "/",
+            WaitUntil = WaitUntilState.Commit,
+            Timeout = 30_000,
+        });
+        await page.WaitForURLAsync($"{baseUrl}/companies/{companyId}/edit",
+            new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
+        await page.WaitForSelectorAsync("#company-name", new() { Timeout = 20_000 });
     }
 
     public Task CancelUnsavedChangesDialogAsync() =>

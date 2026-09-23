@@ -127,15 +127,17 @@ public sealed class SharedDocumentDetailRedesignTests(HrAdminPersonaFixture fixt
             await detail.OpenMetadataDialogAsync();
             Assert.True(await detail.IsMetadataDialogOpenAsync(),
                 "Expected 'Edit details' to open the Edit Document Metadata dialog");
-            await _page.Keyboard.PressAsync("Escape");
-            await detail.WaitForOverlayToClearAsync();
+            // Closed via its header "X", not Escape — see CloseMetadataDialogAsync's remarks: a
+            // captured failure showed Escape unreliably closing this dialog (plausibly consumed by
+            // its nested SfDatePicker rather than propagating to the SfDialog), leaving it and its
+            // ".e-dlg-container" genuinely still mounted and intercepting the next click.
+            await detail.CloseMetadataDialogAsync();
 
             // "Edit audience" (Audience card) -> EditSharedCompanyDocumentAudienceDialog.razor.
             await detail.OpenAudienceDialogAsync();
             Assert.True(await detail.IsAudienceDialogOpenAsync(),
                 "Expected 'Edit audience' to open the Edit Document Audience dialog");
-            await _page.Keyboard.PressAsync("Escape");
-            await detail.WaitForOverlayToClearAsync();
+            await detail.CloseAudienceDialogAsync();
 
             // "Edit acknowledgement settings" (Acknowledgement card) -> EditSharedCompanyDocumentAcknowledgementDialog.razor.
             await detail.OpenEditAcknowledgementDialogAsync();
@@ -214,7 +216,31 @@ public sealed class SharedDocumentDetailRedesignTests(HrAdminPersonaFixture fixt
         await dialog.Locator("input[type='file']").SetInputFilesAsync(filePath);
 
         await dialog.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true }).ClickAsync();
-        await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 30_000 });
+        try
+        {
+            await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 30_000 });
+        }
+        catch (TimeoutException)
+        {
+            // Diagnostic capture — a captured failure showed this wait timing out with the dialog
+            // still fully visible for the entire 30s budget (63 consecutive "still visible" polls,
+            // not a fading-overlay race), which points at a genuine stuck/erroring upload rather
+            // than a timing issue. Best-effort: dump a screenshot + the dialog's own text (any
+            // validation/server error would render inside it) before rethrowing, so the actual
+            // cause — not another guess — drives the next fix.
+            try
+            {
+                var dir = Path.Combine(AppContext.BaseDirectory, "diag");
+                Directory.CreateDirectory(dir);
+                var stamp = $"{DateTime.UtcNow:HHmmss_fff}_{Guid.NewGuid().ToString("N")[..6]}_upload-dialog-stuck";
+                await _page.ScreenshotAsync(new() { Path = Path.Combine(dir, $"{stamp}.png"), FullPage = true });
+                await File.WriteAllTextAsync(
+                    Path.Combine(dir, $"{stamp}.html"),
+                    $"URL: {_page.Url}\n\n=== Dialog text ===\n{await dialog.InnerTextAsync()}\n\n=== Dialog HTML ===\n{await dialog.InnerHTMLAsync()}");
+            }
+            catch { /* diagnostics only */ }
+            throw;
+        }
 
         await _page.WaitForSelectorAsync($"text={title}", new() { Timeout = 15_000 });
     }

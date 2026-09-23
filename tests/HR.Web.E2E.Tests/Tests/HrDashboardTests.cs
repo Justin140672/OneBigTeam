@@ -186,7 +186,10 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : HrFavourit
         // changes), assert on the structural contract every row makes: a subject
         // (.task-widget-title), a category/status line (.task-widget-meta), and a primary action
         // control (.attention-queue-action) — see AttentionQueueWidget.razor's row markup.
-        var firstRow = _page.Locator(".attention-queue-item").First;
+        // Actionable (button) rows only — read-only/stale rows have no ".attention-queue-action"
+        // and can legitimately sort first depending on other tests' data (see
+        // HrDashboardPage.ActionableAttentionQueueRows).
+        var firstRow = dashboard.ActionableAttentionQueueRows.First;
         if (!await firstRow.IsVisibleAsync())
         {
             // No exceptions currently seeded for this run — covered separately by the "all clear"
@@ -214,9 +217,8 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : HrFavourit
 
         await dashboard.WaitForAttentionQueueLoadedAsync();
 
-        var rows = _page.Locator(".attention-queue-item");
-        var count = await rows.CountAsync();
-        if (count == 0)
+        var overdueFlags = await dashboard.GetAttentionQueueOverdueFlagsAsync();
+        if (overdueFlags.Count == 0)
         {
             // Empty queue for this run — ordering has nothing to assert; covered by the
             // structural test above and the "all clear" test below.
@@ -227,10 +229,9 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : HrFavourit
         // a row's class stops carrying "attention-queue-item--overdue", no later row should have
         // it either.
         var seenNonOverdue = false;
-        for (var i = 0; i < count; i++)
+        for (var i = 0; i < overdueFlags.Count; i++)
         {
-            var classes = await rows.Nth(i).GetAttributeAsync("class") ?? "";
-            var isOverdue = classes.Contains("attention-queue-item--overdue");
+            var isOverdue = overdueFlags[i];
 
             if (!isOverdue)
                 seenNonOverdue = true;
@@ -530,7 +531,9 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : HrFavourit
 
         await dashboard.WaitForAttentionQueueLoadedAsync();
 
-        var firstItem = _page.Locator(".attention-queue-item").First;
+        // Actionable (button) rows only — read-only/stale rows are deliberately non-focusable
+        // divs (see HrDashboardPage.ActionableAttentionQueueRows).
+        var firstItem = dashboard.ActionableAttentionQueueRows.First;
         if (!await firstItem.IsVisibleAsync())
         {
             // Empty queue for this run — nothing to tab to; covered by the "all clear" test.

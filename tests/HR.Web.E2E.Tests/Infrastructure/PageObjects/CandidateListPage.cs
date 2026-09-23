@@ -68,35 +68,26 @@ public sealed class CandidateListPage(IPage page, string baseUrl)
     public async Task<bool> HasCandidateAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
-
-        var matchOnCurrentPage = page.Locator(".e-rowcell").Filter(new() { HasText = nameFragment }).First;
-
-        for (var guard = 0; guard < 25; guard++)
-        {
-            if (await matchOnCurrentPage.IsVisibleAsync())
-                return true;
-
-            var nextPage = page.Locator(".e-pagernextprevdiv.e-next:not(.e-disable), a.e-next:not(.e-disable)").First;
-            if (!await nextPage.IsVisibleAsync())
-                return false;
-
-            await nextPage.ClickAsync();
-            await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
-            await page.WaitForTimeoutAsync(200);
-        }
-
-        return false;
+        // Shared helper waits for each page swap to land — the previous inline loop re-waited on
+        // RowsRenderedSelector (already satisfied by the OLD page's rows) plus a fixed 200ms, so it
+        // could re-read a stale page and skip past the one holding the match.
+        return await page.HasGridCellOnAnyPageAsync(nameFragment);
     }
 
     public async Task ClickCandidateAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
+        // Page to the row first (see HasCandidateAsync) — the grid pages at 20 rows and a
+        // candidate can sort onto any page; this leaves the grid on the page holding the match.
+        if (!await page.HasGridCellOnAnyPageAsync(nameFragment))
+            throw new InvalidOperationException($"Candidate '{nameFragment}' was not found on any page of the list.");
+
         var link = page.Locator(".e-rowcell a")
             .Filter(new() { HasText = nameFragment })
             .First;
         await link.ClickAsync();
-        await page.WaitForURLAsync("**/candidates/**", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/candidates/**", new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
     }
 
     // ── Active/Inactive filter + status badge (Status column, ActiveStatusBadge) ────────────────

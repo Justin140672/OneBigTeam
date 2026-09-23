@@ -23,6 +23,7 @@ public sealed class LoginPage(IPage page, string baseUrl)
 
     public async Task GoToAsync()
     {
+        using var totalTimer = E2eDiag.Time("LoginPage", "GoToAsync total");
         // WaitUntil=Commit (not the Playwright default of Load): the app's host page pulls in
         // third-party resources — the Google Fonts stylesheet, the jsDelivr Bootstrap CSS — whose
         // "load" can stall for tens of seconds under a full parallel headless run (15 circuits all
@@ -30,23 +31,29 @@ public sealed class LoginPage(IPage page, string baseUrl)
         // waiting until 'load'" across dozens of unrelated classes even though the login form itself
         // was already interactive. We only need the navigation to commit; the loop below then polls
         // for the real readiness signal (form field or app shell) on its own generous deadline.
+        var gotoTimer = E2eDiag.Time("LoginPage", "GoToAsync: GotoAsync(/login, Commit)");
         await page.GotoAsync($"{baseUrl}/login", new()
         {
             WaitUntil = WaitUntilState.Commit,
             Timeout = 60_000,
         });
+        gotoTimer.Dispose();
 
         // Either the login form renders (fresh/unauthenticated context) or, if this context was
         // built from a role fixture's storageState (see RolePersonaFixtureBase), the app redirects
         // straight past /login to the shell because a session cookie is already present. Wait for
         // whichever shows up first instead of always blocking for the full form-render timeout.
+        var pollTimer = E2eDiag.Time("LoginPage", "GoToAsync: poll for login form / app shell (30s budget)");
         var deadline = DateTime.UtcNow.AddSeconds(30);
         while (true)
         {
-            if (await page.Locator("[placeholder='you@example.com']").IsVisibleAsync()) return;
-            if (await page.Locator(AuthenticatedSelector).First.IsVisibleAsync()) return;
+            if (await page.Locator("[placeholder='you@example.com']").IsVisibleAsync()) { pollTimer.Dispose(); return; }
+            if (await page.Locator(AuthenticatedSelector).First.IsVisibleAsync()) { pollTimer.Dispose(); return; }
             if (DateTime.UtcNow > deadline)
+            {
+                pollTimer.Dispose();
                 throw new TimeoutException("Timed out waiting for the login form or app shell after navigating to /login.");
+            }
             await Task.Delay(100);
         }
     }
@@ -122,6 +129,8 @@ public sealed class LoginPage(IPage page, string baseUrl)
     /// </summary>
     internal async Task RealFormLoginAsync(string email, string password = DevPersonaPassword)
     {
+        using var totalTimer = E2eDiag.Time("LoginPage", $"RealFormLoginAsync({email}) total");
+
         if (await page.Locator(AuthenticatedSelector).First.IsVisibleAsync())
         {
             await page.Context.ClearCookiesAsync();
@@ -129,11 +138,13 @@ public sealed class LoginPage(IPage page, string baseUrl)
             await page.WaitForSelectorAsync("[placeholder='you@example.com']", new() { Timeout = 30_000 });
         }
 
+        var fillTimer = E2eDiag.Time("LoginPage", $"RealFormLoginAsync({email}): fill + submit form");
         await page.GetByPlaceholder("you@example.com").FillAsync(email);
         await page.Keyboard.PressAsync("Tab");
         await page.GetByPlaceholder("••••••••").FillAsync(password);
         await page.Keyboard.PressAsync("Tab");
         await page.GetByRole(AriaRole.Button, new() { Name = "Login" }).ClickAsync();
+        fillTimer.Dispose();
 
         // Wait for whichever of "shell loaded" or "Login.razor's own inline error banner shown"
         // happens first, rather than only waiting for the shell — a real credential/Supabase
@@ -148,6 +159,7 @@ public sealed class LoginPage(IPage page, string baseUrl)
         // under this suite's current concurrency; every fresh, single-use employee login (asset
         // acknowledge/return, self-service document upload) pays this same real, uncacheable cost
         // on every run.
+        using var waitTimer = E2eDiag.Time("LoginPage", $"RealFormLoginAsync({email}): wait for app shell / login error (45s budget)");
         var deadline = DateTime.UtcNow.AddSeconds(45);
         while (true)
         {
@@ -157,13 +169,17 @@ public sealed class LoginPage(IPage page, string baseUrl)
             if (await errorLocator.IsVisibleAsync())
             {
                 var errorText = (await errorLocator.InnerTextAsync())?.Trim();
+                E2eDiag.Log("LoginPage", $"RealFormLoginAsync({email}): rejected — \"{errorText}\"");
                 throw new InvalidOperationException(
                     $"Login for '{email}' was rejected instead of reaching the app shell: \"{errorText}\"");
             }
 
             if (DateTime.UtcNow > deadline)
+            {
+                E2eDiag.Log("LoginPage", $"RealFormLoginAsync({email}): 45s app-shell wait TIMED OUT — this is the app itself not rendering the shell in time, not a credential/Supabase rejection");
                 throw new TimeoutException(
                     $"Timed out waiting for the app shell (or a login error) after submitting real credentials for '{email}'.");
+            }
 
             await Task.Delay(100);
         }

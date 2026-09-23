@@ -128,6 +128,11 @@ public static class SupabaseJwtBearerConfiguration
 
                 if (isRevoked)
                 {
+                    context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+                        .CreateLogger("SupabaseJwtBearer")
+                        .LogInformation(
+                            "[e2e-diag] Session revoked for sub={Sub} tokenIssuedAt={TokenIssuedAt} path={Path}",
+                            supabaseAuthUserId, tokenIssuedAt, context.HttpContext.Request.Path);
                     context.Fail("Session has been revoked.");
                 }
             },

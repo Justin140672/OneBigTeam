@@ -207,11 +207,19 @@ public sealed class AdminUsersManagementTests(ParallelBlankPersonaFixture fixtur
 
         await adminUsers.GoToAsync();
 
-        var email = NewAdminEmail();
-        await adminUsers.CreateAdministratorAsync(email, "SupportStaff");
-        Assert.True(await adminUsers.HasAdministratorAsync(email));
+        // Reset-password (unlike Disable/Enable/AssignRole/ResetMfa above) targets an already-active
+        // seeded admin, NOT a freshly created one: ResetPlatformAdministratorPasswordHandler requires
+        // ProvisioningStatus == Active and returns a Conflict otherwise ("has not completed activation
+        // yet... resend the activation invitation instead"). A brand-new administrator created via
+        // CreateAdministratorAsync starts PendingProvisioning/PendingLinkVerification, not Active (see
+        // PlatformAdministrator.cs), so immediately resetting ITS password would always hit that
+        // Conflict — that isn't a login/infra flake, it's this test asserting success against a
+        // precondition the handler deliberately rejects. laura.bennett@acme.example is bootstrap-
+        // seeded Active via PlatformAdmin:AllowedEmails (same as AllowListedAdminEmail, priya.shah,
+        // who is the current session and shouldn't be self-resetting through this admin flow).
+        const string activeSeededAdminEmail = "laura.bennett@acme.example";
 
-        await adminUsers.ClickResetPasswordAsync(email);
+        await adminUsers.ClickResetPasswordAsync(activeSeededAdminEmail);
         Assert.True(await adminUsers.ResetPasswordDialog.IsVisibleAsync(),
             "Expected the Reset password confirmation dialog to open");
 
@@ -219,9 +227,9 @@ public sealed class AdminUsersManagementTests(ParallelBlankPersonaFixture fixtur
         await adminUsers.ClickDialogConfirmAsync(adminUsers.ResetPasswordDialog, "Reset password");
 
         // Matches the 20s timeout other admin-action-success waits use elsewhere in the suite
-        // (e.g. AdminSupportRequestDetailPage.SaveAsync, OperationalAlertDetailsPage) — this
-        // flow chains create-administrator + reset-password + a full admin-list reload before the
-        // success message renders, and 15s was tight for that under load.
+        // (e.g. AdminSupportRequestDetailPage.SaveAsync, OperationalAlertDetailsPage) — reset-
+        // password chains a full admin-list reload before the success message renders, and 15s
+        // was tight for that under load.
         await _page.WaitForSelectorAsync(".admin-action-success", new() { Timeout = 20_000 });
         Assert.True(await adminUsers.IsActionSuccessVisibleAsync(),
             "Expected a success message after resetting the administrator's password");

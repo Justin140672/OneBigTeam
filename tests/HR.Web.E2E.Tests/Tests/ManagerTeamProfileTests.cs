@@ -29,6 +29,7 @@ public sealed class ManagerTeamProfileTests(ManagerPersonaFixture fixture) : Rol
 
     private const string JamesEmail = "james.okafor@acme.example";
     private const string DavidEmail = "david.park@acme.example";
+    private const string MarcusEmail = "marcus.diallo@acme.example";
     private const string TomEmail = "tom.williams@acme.example";
 
     // Reference data reused by every employee this file creates via the API (see
@@ -146,17 +147,25 @@ public sealed class ManagerTeamProfileTests(ManagerPersonaFixture fixture) : Rol
     [Fact]
     public async Task UnrelatedManager_DeepLinking_ReceivesForbiddenState()
     {
-        // David Park manages Emma Jones/Carlos Rivera, not Tom Williams — an unrelated manager.
+        // NOT David Park: he's a Manager (Emma Jones/Carlos Rivera, not Tom Williams — genuinely
+        // unrelated hierarchically) but he's ALSO an HR Administrator, and
+        // EmployeesResourceAuthorizer.CanViewAsManagerAsync's shared IAM-07 check grants company-
+        // wide access to any HR Administrator before it ever reaches the hierarchy check (see its
+        // own remarks: "HR Administrators still pass here too... which is harmless") — so David
+        // always sees Tom's team-view regardless of hierarchy, by design. Use Marcus Diallo
+        // instead: an Acme employee with no HrAdministrator role and no place in Tom's reporting
+        // chain (Tom → James Okafor → Sarah Chen), so only the hierarchy check applies and it
+        // correctly denies him.
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var profile = new TeamMemberProfilePage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(DavidEmail);
+        await login.LoginAsync(MarcusEmail);
 
         await profile.GoToAsync(AcmeId, TomId);
 
         Assert.True(await profile.IsForbiddenAsync(),
-            "Expected David Park (not Tom Williams's manager) to see the forbidden state deep-linking to Tom's team-view.");
+            "Expected Marcus Diallo (not Tom Williams's manager, not an HR Administrator) to see the forbidden state deep-linking to Tom's team-view.");
         Assert.False(await profile.IsProfileVisibleAsync());
     }
 
@@ -176,21 +185,17 @@ public sealed class ManagerTeamProfileTests(ManagerPersonaFixture fixture) : Rol
     }
 
     [Fact]
-    public async Task NoRestrictedFields_AppearInTeamViewNetworkResponseOrDom()
+    public async Task NoRestrictedFields_AppearInTeamViewDom()
     {
+        // NOTE: this app is Blazor Server — EmployeeService.GetEmployeeTeamViewAsync calls the HR
+        // API via a server-side HttpClient (see EmployeeService.cs), entirely server-to-server. The
+        // browser never sees that request/response as a network event, so a Playwright
+        // page.Response listener can never observe it — teamViewResponseBody would be null on every
+        // run, not just a flaky one. The only client-observable surface for "did a restricted field
+        // leak" is the rendered DOM itself, which is what this test now checks exclusively.
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var dashboard = new ManagerDashboardPage(_page, _fixture.WebBaseUrl);
         var profile = new TeamMemberProfilePage(_page, _fixture.WebBaseUrl);
-
-        string? teamViewResponseBody = null;
-        _page.Response += async (_, res) =>
-        {
-            if (res.Url.Contains("/team-view") && res.Url.Contains("/api/companies/"))
-            {
-                try { teamViewResponseBody = await res.TextAsync(); }
-                catch { /* response body may not be available for every intercepted response */ }
-            }
-        };
 
         await login.GoToAsync();
         await login.LoginAsync(JamesEmail);
@@ -198,18 +203,6 @@ public sealed class ManagerTeamProfileTests(ManagerPersonaFixture fixture) : Rol
         await dashboard.GetMyTeamMemberNamesAsync();
         await dashboard.ClickViewProfileForTeamMemberAsync("Tom Williams");
         await profile.WaitForSettledAsync();
-
-        Assert.NotNull(teamViewResponseBody);
-        string[] restrictedFields =
-        [
-            "personalEmail", "dateOfBirth", "nationality", "\"gender\"", "genderOther",
-            "phoneNumber", "homePhone", "addressLine1", "addressLine2", "hasSystemAccess",
-            "workingDaysOverride", "hoursPerDayOverride", "continuousServiceDate",
-            "probationEndDate", "leavingDate", "noticePeriodUnitOverride", "notes",
-            "effectiveNoticePeriodUnit", "\"version\"", "createdAt", "updatedAt",
-        ];
-        foreach (var field in restrictedFields)
-            Assert.DoesNotContain(field, teamViewResponseBody, StringComparison.OrdinalIgnoreCase);
 
         var pageText = await profile.GetPageTextAsync();
         Assert.DoesNotContain("tom.williams@hotmail.com", pageText); // Tom's PersonalEmail — never in the DOM.
@@ -308,9 +301,42 @@ public sealed class ManagerTeamProfileTests(ManagerPersonaFixture fixture) : Rol
         var created = await response.Content.ReadFromJsonAsync<IdPayload>();
         Assert.NotNull(created);
 
-        return (created!.Id, $"{firstName} {lastName}");
+        // CreateEmployeeHandler always creates new employees as EmploymentStatus.Draft (see
+        // Employee.Create), regardless of StartDate — there is no "create as Active" option via
+        // this endpoint. GetMyTeamHandler (My Team widget / roster) only counts Status == Active
+        // employees, so a Draft employee is invisible there even with a past start date. Activate
+        // it via the same PUT .../employment endpoint the Employment tab's own Save uses.
+        // UpdateEmploymentDetailsValidator.RequireLoadedVersion() makes ExpectedVersion mandatory
+        // (Ticket 2 optimistic concurrency) despite the request record's own comment suggesting
+        // null is fine for "standalone callers" — it isn't, for this endpoint. Load the just-
+        // created record's real Version via GetEmployee first.
+        var getResponse = await http.GetAsync($"/api/companies/{AcmeId}/employees/{created!.Id}");
+        getResponse.EnsureSuccessStatusCode();
+        var currentEmployee = await getResponse.Content.ReadFromJsonAsync<VersionPayload>();
+        Assert.NotNull(currentEmployee);
+
+        var activateResponse = await http.PutAsJsonAsync(
+            $"/api/companies/{AcmeId}/employees/{created.Id}/employment",
+            new
+            {
+                companyId = AcmeId,
+                id = created.Id,
+                employeeNumber = $"E2E-TEAM-{unique}",
+                employmentTypeId = EmploymentTypeId,
+                status = "Active",
+                departmentId = DepartmentId,
+                locationId = LocationId,
+                positionProfileId = PositionProfileId,
+                managerId,
+                startDate = "2026-03-01",
+                expectedVersion = currentEmployee!.Version,
+            });
+        activateResponse.EnsureSuccessStatusCode();
+
+        return (created.Id, $"{firstName} {lastName}");
     }
 
     private sealed record DevPersonaSessionResult(string AccessToken, string RefreshToken, int ExpiresIn);
     private sealed record IdPayload(Guid Id);
+    private sealed record VersionPayload(int Version);
 }

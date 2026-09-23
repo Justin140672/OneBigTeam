@@ -142,10 +142,15 @@ public sealed class ManagerDashboardTests(ManagerPersonaFixture fixture) : RoleE
     [Fact]
     public async Task MyTeamWidget_ShowsDirectReportsPhoneAndEmail_AsVisibleText()
     {
-        // Tom Williams is seeded with phone "07700 900004" and work email
-        // "tom.williams@acme.example" (see EmployeesModule.SeedEmployeesAsync's MakeAcme call for
-        // empDev1Id). MyTeamWidget.razor renders these as visible ".team-card-contact-text" spans
-        // next to each icon, not just hidden in the link's "title" tooltip attribute.
+        // MyTeamWidget.razor renders the phone and work email as visible ".team-card-contact-text"
+        // spans next to each icon, not just hidden in the link's "title" tooltip attribute.
+        //
+        // The phone is NOT asserted against Tom's seed value ("07700 900004"): ContactDetailsTabTests
+        // and ContactDetailsTabAccessibilityTests log in as Tom and legitimately save new mobile
+        // numbers to his own record (never restored), so the seed value only held when this test
+        // happened to run first. Compare the visible text with the same card's tel: link instead —
+        // same render, same data, so it proves "visible text, not just a tooltip" whatever the
+        // current number is. Work email is not editable by those tests.
         var login     = new LoginPage(_page, _fixture.WebBaseUrl);
         var dashboard = new ManagerDashboardPage(_page, _fixture.WebBaseUrl);
 
@@ -155,8 +160,10 @@ public sealed class ManagerDashboardTests(ManagerPersonaFixture fixture) : RoleE
 
         await dashboard.GetMyTeamMemberNamesAsync();
         var contactText = await dashboard.GetTeamMemberContactTextAsync("Tom Williams");
+        var phone = await dashboard.GetTeamMemberPhoneFromLinkAsync("Tom Williams");
 
-        Assert.Contains(contactText, t => t.Contains("07700 900004"));
+        Assert.False(string.IsNullOrWhiteSpace(phone), "Expected Tom Williams's card to carry a tel: phone link");
+        Assert.Contains(contactText, t => t == phone);
         Assert.Contains(contactText, t => t.Contains("tom.williams@acme.example", StringComparison.OrdinalIgnoreCase));
     }
 

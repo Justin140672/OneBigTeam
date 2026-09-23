@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Runtime.ExceptionServices;
 using System.Text.Json;
 using Microsoft.Playwright;
 
@@ -63,6 +64,25 @@ internal static class PersonaLoginCache
     // load-adding work.
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> _refreshGates = new();
 
+    // Diagnostics (added to chase the laura.bennett stampede) showed the refresh gate above only
+    // coalesces racing callers when the gate-holder's relogin SUCCEEDS. When the app itself is the
+    // one failing to render the shell in time, the gate-holder's attempt burns a full ~275s (5
+    // attempts x 45s + backoff) and then fails — and because GetOrLoginWithEntryAsync's catch block
+    // removes the now-poisoned cache entry, the very NEXT queued caller finds a cold cache and pays
+    // its own full ~275s failing cycle, then the next, and so on. One real 24-minute run showed a
+    // single caller queued 1410s (≈5 chained ~275s cycles) behind this gate. That isn't coalescing
+    // caller work — it's serializing N independent copies of the same doomed attempt.
+    //
+    // This cooldown breaks that chain: once ANY caller's relogin for a persona fails, every other
+    // caller that reaches the gate within the cooldown window rethrows that SAME captured failure
+    // immediately instead of repeating the attempt. 60s is comfortably shorter than one failing
+    // cycle (~275s) — so a pileup of queued callers fails fast together instead of serially — while
+    // still being long enough that a caller arriving just after the failure (which is exactly what
+    // "queued behind the gate" callers do) hits it. A caller arriving after the cooldown expires gets
+    // a genuinely fresh attempt, so the app recovering is still detected on the next real request.
+    private static readonly TimeSpan _recentFailureCooldown = TimeSpan.FromSeconds(60);
+    private static readonly ConcurrentDictionary<string, (DateTime FailedAtUtc, ExceptionDispatchInfo Failure)> _recentFailures = new();
+
     public static Task<BrowserNewContextOptions> GetOrLoginAsync(AppFixture app, string personaEmail) =>
         GetOrLoginAsync(app.Browser, app.WebBaseUrl, personaEmail);
 
@@ -97,14 +117,17 @@ internal static class PersonaLoginCache
     private static async Task<(BrowserNewContextOptions Options, Lazy<Task<BrowserNewContextOptions>> Entry)> GetOrLoginWithEntryAsync(
         IBrowser browser, string baseUrl, string personaEmail)
     {
+        var alreadyCached = _cache.ContainsKey(personaEmail);
         var entry = _cache.GetOrAdd(
             personaEmail,
             email => new Lazy<Task<BrowserNewContextOptions>>(
                 () => LoginAndCaptureStorageStateAsync(browser, baseUrl, email),
                 LazyThreadSafetyMode.ExecutionAndPublication));
+        E2eDiag.Log("PersonaLoginCache", $"{personaEmail}: cache {(alreadyCached ? "HIT (awaiting existing entry, may already be settled or in-flight)" : "MISS (this call will trigger LoginAndCaptureStorageStateAsync)")}");
 
         try
         {
+            using var _ = E2eDiag.Time("PersonaLoginCache", $"{personaEmail}: await cache entry");
             return (await entry.Value, entry);
         }
         catch
@@ -140,17 +163,37 @@ internal static class PersonaLoginCache
         IBrowser browser, string baseUrl, string personaEmail, object staleEntry)
     {
         var gate = _refreshGates.GetOrAdd(personaEmail, _ => new SemaphoreSlim(1, 1));
+        var gateWait = E2eDiag.Time("PersonaLoginCache", $"{personaEmail}: refresh gate wait (contended: {gate.CurrentCount == 0})");
         await gate.WaitAsync();
+        gateWait.Dispose();
         try
         {
+            if (_recentFailures.TryGetValue(personaEmail, out var recent) &&
+                DateTime.UtcNow - recent.FailedAtUtc < _recentFailureCooldown)
+            {
+                E2eDiag.Log("PersonaLoginCache",
+                    $"{personaEmail}: short-circuiting — another caller's relogin failed {(DateTime.UtcNow - recent.FailedAtUtc).TotalSeconds:F1}s ago " +
+                    $"(within {_recentFailureCooldown.TotalSeconds:F0}s cooldown); rethrowing that failure instead of repeating a doomed ~275s attempt");
+                recent.Failure.Throw();
+            }
+
             if (staleEntry is Lazy<Task<BrowserNewContextOptions>> typedStaleEntry)
             {
                 ((ICollection<KeyValuePair<string, Lazy<Task<BrowserNewContextOptions>>>>)_cache)
                     .Remove(new KeyValuePair<string, Lazy<Task<BrowserNewContextOptions>>>(personaEmail, typedStaleEntry));
             }
 
-            var (options, _) = await GetOrLoginWithEntryAsync(browser, baseUrl, personaEmail);
-            return options;
+            try
+            {
+                var (options, _) = await GetOrLoginWithEntryAsync(browser, baseUrl, personaEmail);
+                _recentFailures.TryRemove(personaEmail, out _);
+                return options;
+            }
+            catch (Exception ex)
+            {
+                _recentFailures[personaEmail] = (DateTime.UtcNow, ExceptionDispatchInfo.Capture(ex));
+                throw;
+            }
         }
         finally
         {
@@ -265,7 +308,10 @@ internal static class PersonaLoginCache
             }
         }
 
+        var gotoTimer = E2eDiag.Time("PersonaLoginCache", "TryApplyStorageStateAsync: GotoAsync(/)");
         await page.GotoAsync($"{baseUrl}/");
+        gotoTimer.Dispose();
+        var shellWaitTimer = E2eDiag.Time("PersonaLoginCache", "TryApplyStorageStateAsync: wait for .app-shell/.employee-completion-dialog (10s budget)");
         try
         {
             // ".employee-completion-dialog" too: a brand-new company's initial admin
@@ -276,13 +322,21 @@ internal static class PersonaLoginCache
         }
         catch (TimeoutException)
         {
+            E2eDiag.Log("PersonaLoginCache", "TryApplyStorageStateAsync: 10s app-shell wait TIMED OUT — treating cached session as stale (may be a false negative under load, not an actually-stale session)");
             return false;
+        }
+        finally
+        {
+            shellWaitTimer.Dispose();
         }
     }
 
     private static async Task<BrowserNewContextOptions> LoginAndCaptureStorageStateAsync(IBrowser browser, string baseUrl, string personaEmail)
     {
+        E2eDiag.Log("PersonaLoginCache", $"{personaEmail}: waiting on real-login gate (available slots: {_realLoginGate.CurrentCount}/6)");
+        var gateWait = E2eDiag.Time("PersonaLoginCache", $"{personaEmail}: real-login gate wait");
         await _realLoginGate.WaitAsync();
+        gateWait.Dispose();
         try
         {
             // A single transient real-Supabase hiccup (timeout, momentary rate-limit) shouldn't fail
@@ -303,6 +357,7 @@ internal static class PersonaLoginCache
             Exception? lastError = null;
             for (var attempt = 1; attempt <= maxAttempts; attempt++)
             {
+                using var attemptTimer = E2eDiag.Time("PersonaLoginCache", $"{personaEmail}: real login attempt {attempt}/{maxAttempts}");
                 try
                 {
                     await using var bootstrapContext = await browser.NewContextAsync();
@@ -323,6 +378,7 @@ internal static class PersonaLoginCache
                 catch (Exception ex)
                 {
                     lastError = ex;
+                    E2eDiag.Log("PersonaLoginCache", $"{personaEmail}: attempt {attempt}/{maxAttempts} FAILED — {ex.GetType().Name}: {ex.Message}");
                     if (attempt < maxAttempts)
                         await Task.Delay(TimeSpan.FromSeconds(5 * attempt));
                 }

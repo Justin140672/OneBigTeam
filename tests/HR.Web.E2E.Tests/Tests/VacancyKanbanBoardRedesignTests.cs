@@ -173,10 +173,33 @@ public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixt
     {
         var (candidateLast, kanban) = await ArrangeAppliedApplicationAsync();
 
-        // First get the card onto a terminal stage via the (already-covered) drag path.
-        await kanban.DragCardToColumnAsync(candidateLast, TerminalHired);
+        // Get the card onto a terminal stage via the dedicated Hire workflow — NOT drag. The generic
+        // Kanban move endpoint (MoveApplicationStageHandler) always rejects any target stage that
+        // IsTerminal, specifically because a terminal stage like "Hired" has required side effects
+        // (provisioning the Employee record) that only the dedicated HireCandidate endpoint performs;
+        // dragging a card onto "Hired" can never succeed. Route through the real Hire dialog instead,
+        // the only sanctioned way onto a Hired stage (see HireCandidateHandler's remarks).
+        var vacancyId = ExtractVacancyIdFromUrl(_page.Url);
+        var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
+        await vacancyDetail.GoToAsync(AcmeId, vacancyId);
+        await vacancyDetail.OpenApplicationsTabAsync();
+
+        await vacancyDetail.ClickHireForAsync(candidateLast);
+        await vacancyDetail.WaitForHireDialogAsync();
+        await vacancyDetail.FillHireStartDateAsync("01/10/2026");
+        await vacancyDetail.FillHireDateOfBirthAsync("15/06/1990");
+        await vacancyDetail.SelectHireNationalityAsync("British");
+        await vacancyDetail.SelectHireGenderAsync("Male");
+        await vacancyDetail.SelectHireDropdownAsync("Employment Type", "Permanent");
+        await vacancyDetail.SubmitHireAsync();
+
+        Assert.Equal("Hired", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
+
+        // Back to the standalone Kanban board (fresh GetRecruitmentKanbanHandler query) to attempt
+        // the further move against a genuinely terminal-stage card.
+        await kanban.GoToStandaloneAsync(AcmeId, vacancyId);
         Assert.True(await kanban.IsCardInColumnAsync(candidateLast, TerminalHired),
-            $"Sanity check: expected the drag to land the card on '{TerminalHired}' before attempting a further move");
+            $"Sanity check: expected the Hire workflow to land the card on '{TerminalHired}' before attempting a further move");
 
         // Now attempt a further move via the keyboard "Move to stage…" menu on the now-terminal
         // card — MoveApplicationStageHandler rejects any move off a terminal stage, and this

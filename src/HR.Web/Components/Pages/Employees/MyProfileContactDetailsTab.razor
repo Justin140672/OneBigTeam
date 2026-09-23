@@ -249,6 +249,16 @@ else
         {
             await JS.InvokeVoidAsync("hrFocusFirstInvalid", "#cd-form");
         }
+        else if (error is null)
+        {
+            // Disabled="@_saving" above disables the Save button the instant this method set
+            // _saving = true — while it still held keyboard focus from the click/Enter that
+            // triggered this save, since a disabled element cannot hold focus, the browser forces
+            // focus out to <body> at that moment. Nothing else restores it on a successful save
+            // (unlike DismissSuccessAsync/DismissGlobalErrorAsync, which already do this for their
+            // own cases), so a keyboard user's focus was silently lost. Restore it once re-enabled.
+            await JS.InvokeVoidAsync("hrFocusById", "cd-save-button");
+        }
     }
 
     // Concurrency-conflict recovery: explicit user reload — adopt the latest server values and

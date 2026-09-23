@@ -863,8 +863,27 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     /// </summary>
     private async Task SelectApplicationRowAsync(string candidateNameFragment)
     {
-        await ApplicationRow(candidateNameFragment).First.Locator(".e-rowcell").Nth(1).ClickAsync();
-        await page.WaitForTimeoutAsync(250);
+        var row = ApplicationRow(candidateNameFragment).First;
+
+        // A single click doesn't always land as a genuine row selection — the click can arrive
+        // between the grid's own re-renders under load (Blazor swaps the ".e-rowcell" DOM node out
+        // from under the click), leaving RowSelected never firing and the toolbar's "Offer"/etc.
+        // items permanently disabled with no further click to unstick them. Verify the selection
+        // actually took (Syncfusion marks the selected <tr> with "e-active") and retry the click a
+        // few times rather than trusting one click blindly.
+        for (var attempt = 1; attempt <= 5; attempt++)
+        {
+            await row.Locator(".e-rowcell").Nth(1).ClickAsync();
+
+            var deadline = DateTime.UtcNow.AddSeconds(attempt < 5 ? 1 : 5);
+            while (DateTime.UtcNow < deadline)
+            {
+                var cls = await row.GetAttributeAsync("class") ?? "";
+                if (cls.Contains("e-active"))
+                    return;
+                await page.WaitForTimeoutAsync(100);
+            }
+        }
     }
 
     /// <summary>
@@ -876,7 +895,8 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     /// button isn't directly visible there, open the overflow popup ("..." nav button) and look
     /// inside it instead.
     /// </summary>
-    private async Task<ILocator> ApplicationsToolbarButtonAsync(string name, bool exact = false)
+    private async Task<ILocator> ApplicationsToolbarButtonAsync(
+        string name, bool exact = false, string? reselectCandidateNameFragment = null)
     {
         var direct = ApplicationsTab.Locator(".e-toolbar").GetByRole(AriaRole.Button, new() { Name = name, Exact = exact });
 
@@ -889,24 +909,73 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         while (DateTime.UtcNow < deadline)
         {
             if (await direct.IsVisibleAsync())
-                return direct;
+                break;
             await page.WaitForTimeoutAsync(200);
         }
 
-        var overflowToggle = ApplicationsTab.Locator(".e-toolbar .e-nav-right, .e-toolbar .e-hscroll-bar .e-nav-right");
-        if (await overflowToggle.CountAsync() == 0)
+        ILocator resolved;
+        if (await direct.IsVisibleAsync())
         {
-            // No overflow either — give the direct button one last, longer wait so the real
-            // failure (if any) surfaces as a clear timeout on it rather than on a toggle that was
-            // never going to appear.
-            await direct.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
-            return direct;
+            resolved = direct;
+        }
+        else
+        {
+            var overflowToggle = ApplicationsTab.Locator(".e-toolbar .e-nav-right, .e-toolbar .e-hscroll-bar .e-nav-right");
+            if (await overflowToggle.CountAsync() == 0)
+            {
+                // No overflow either — give the direct button one last, longer wait so the real
+                // failure (if any) surfaces as a clear timeout on it rather than on a toggle that
+                // was never going to appear.
+                await direct.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+                resolved = direct;
+            }
+            else
+            {
+                await overflowToggle.ClickAsync();
+                var popup = page.Locator(".e-toolbar-pop:visible").GetByRole(AriaRole.Button, new() { Name = name, Exact = exact });
+                await popup.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+                resolved = popup;
+            }
         }
 
-        await overflowToggle.ClickAsync();
-        var popup = page.Locator(".e-toolbar-pop:visible").GetByRole(AriaRole.Button, new() { Name = name, Exact = exact });
-        await popup.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
-        return popup;
+        if (reselectCandidateNameFragment is null)
+            return resolved;
+
+        // Being visible doesn't mean being ENABLED — Syncfusion's EnableToolbarItemsAsync JS
+        // interop (RefreshToolbarStateAsync) occasionally never lands even though the server-side
+        // state it's meant to apply is correct, leaving the item stuck aria-disabled="true"
+        // indefinitely (a plain Playwright click-retry loop just times out against it forever,
+        // since nothing ever nudges the interop to run again). If it's still disabled after a
+        // couple of seconds, force RefreshToolbarStateAsync to refire by deselecting and
+        // reselecting the row — the same recovery SelectApplicationRowAsync's own retry uses for
+        // a dropped click, applied here to a dropped enable-interop instead.
+        var enableDeadline = DateTime.UtcNow.AddSeconds(3);
+        while (DateTime.UtcNow < enableDeadline)
+        {
+            if (await resolved.GetAttributeAsync("aria-disabled") != "true")
+                return resolved;
+            await page.WaitForTimeoutAsync(200);
+        }
+
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            if (await resolved.GetAttributeAsync("aria-disabled") != "true")
+                return resolved;
+
+            await ApplicationRow(reselectCandidateNameFragment).First.Locator(".e-rowcell").Nth(1).ClickAsync(); // deselect
+            await page.WaitForTimeoutAsync(300);
+            await SelectApplicationRowAsync(reselectCandidateNameFragment); // reselect (verified via e-active)
+
+            var reDeadline = DateTime.UtcNow.AddSeconds(3);
+            while (DateTime.UtcNow < reDeadline)
+            {
+                if (await resolved.GetAttributeAsync("aria-disabled") != "true")
+                    return resolved;
+                await page.WaitForTimeoutAsync(200);
+            }
+        }
+
+        return resolved;
     }
 
     /// <summary>
@@ -924,13 +993,13 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task ClickScheduleInterviewForAsync(string candidateNameFragment)
     {
         await SelectApplicationRowAsync(candidateNameFragment);
-        await (await ApplicationsToolbarButtonAsync("Schedule Interview")).ClickAsync();
+        await (await ApplicationsToolbarButtonAsync("Schedule Interview", reselectCandidateNameFragment: candidateNameFragment)).ClickAsync();
     }
 
     public async Task ClickOfferForAsync(string candidateNameFragment)
     {
         await SelectApplicationRowAsync(candidateNameFragment);
-        await (await ApplicationsToolbarButtonAsync("Offer", exact: true)).ClickAsync();
+        await (await ApplicationsToolbarButtonAsync("Offer", exact: true, reselectCandidateNameFragment: candidateNameFragment)).ClickAsync();
 
         // Ticket #2: the "Offer" toolbar item now opens the "Make an Offer" dialog instead of
         // advancing directly. Accept the pre-populated defaults and submit.
@@ -956,13 +1025,13 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task ClickRejectForAsync(string candidateNameFragment)
     {
         await SelectApplicationRowAsync(candidateNameFragment);
-        await (await ApplicationsToolbarButtonAsync("Reject")).ClickAsync();
+        await (await ApplicationsToolbarButtonAsync("Reject", reselectCandidateNameFragment: candidateNameFragment)).ClickAsync();
     }
 
     public async Task ClickWithdrawForAsync(string candidateNameFragment)
     {
         await SelectApplicationRowAsync(candidateNameFragment);
-        await (await ApplicationsToolbarButtonAsync("Withdraw")).ClickAsync();
+        await (await ApplicationsToolbarButtonAsync("Withdraw", reselectCandidateNameFragment: candidateNameFragment)).ClickAsync();
 
         // WithdrawAsync sets _actionSuccess and awaits LoadAsync's grid refetch within the same
         // event handler, with no intermediate render in between — so the alert showing this exact
@@ -979,7 +1048,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task ClickHireForAsync(string candidateNameFragment)
     {
         await SelectApplicationRowAsync(candidateNameFragment);
-        await (await ApplicationsToolbarButtonAsync("Hire")).ClickAsync();
+        await (await ApplicationsToolbarButtonAsync("Hire", reselectCandidateNameFragment: candidateNameFragment)).ClickAsync();
     }
 
     // ── Schedule Interview dialog ────────────────────────────────────────────────
@@ -1260,7 +1329,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task OpenMakeOfferDialogAsync(string candidateNameFragment)
     {
         await SelectApplicationRowAsync(candidateNameFragment);
-        await (await ApplicationsToolbarButtonAsync("Offer", exact: true)).ClickAsync();
+        await (await ApplicationsToolbarButtonAsync("Offer", exact: true, candidateNameFragment)).ClickAsync();
         await OfferDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
     }
 
@@ -1369,7 +1438,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task OpenRecordOfferResponseDialogAsync(string candidateNameFragment)
     {
         await SelectApplicationRowAsync(candidateNameFragment);
-        await (await ApplicationsToolbarButtonAsync("Record Offer Response", exact: true)).ClickAsync();
+        await (await ApplicationsToolbarButtonAsync("Record Offer Response", exact: true, reselectCandidateNameFragment: candidateNameFragment)).ClickAsync();
         await OfferResponseDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
     }
 

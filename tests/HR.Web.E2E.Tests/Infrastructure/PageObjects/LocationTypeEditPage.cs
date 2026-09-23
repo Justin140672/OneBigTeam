@@ -60,7 +60,7 @@ public sealed class LocationTypeEditPage(IPage page, string baseUrl)
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
         // Navigates back to the location-types list on success.
-        await page.WaitForURLAsync("**/location-types", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/location-types", new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 

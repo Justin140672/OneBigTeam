@@ -34,6 +34,10 @@ internal static class SharedAppFixture
         {
             if (_instance is null)
             {
+                // Started before InitializeAsync so we also capture the app/Postgres boot itself, not
+                // just steady-state test execution — see ResourceSampler's remarks for why this exists.
+                ResourceSampler.StartOnce();
+
                 var candidate = new AppFixture();
                 // Only publish to the static field once InitializeAsync has actually succeeded. If it
                 // throws (a transient Aspire/Postgres/Chromium startup failure), the caller that

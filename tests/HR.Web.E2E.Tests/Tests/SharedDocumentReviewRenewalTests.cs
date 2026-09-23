@@ -90,7 +90,10 @@ public sealed class SharedDocumentReviewRenewalTests(HrAdminPersonaFixture fixtu
             Assert.Equal("v1", await detail.GetVersionRowCellAsync(originalFileNameFragment, 0));
             Assert.Equal("Superseded", await detail.GetVersionRowCellAsync(originalFileNameFragment, 1));
 
-            Assert.Equal("v2", await detail.GetVersionRowCellAsync(renewedFileNameFragment, 0));
+            // The renewed version is now current, so its cell carries the "Current" badge suffix
+            // (concatenated with no separator in InnerText) — see SharedDocumentVersionHistoryTests
+            // for the same pattern.
+            Assert.Equal("v2Current", await detail.GetVersionRowCellAsync(renewedFileNameFragment, 0));
             Assert.Equal("Draft", await detail.GetVersionRowCellAsync(renewedFileNameFragment, 1));
 
             // CompleteSharedCompanyDocumentReviewDialog.razor prefixes the version note with

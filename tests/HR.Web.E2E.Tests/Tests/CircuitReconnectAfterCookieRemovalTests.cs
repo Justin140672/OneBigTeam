@@ -8,13 +8,6 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Ticket 11 regression: browser coverage for "cookie removal/logout followed by reconnection of an
 /// existing (still-open) Blazor Server circuit".
 ///
-/// NOT RUN / UNVERIFIED — written per the Ticket 11 requirement to add this coverage, but this
-/// environment cannot run Playwright/E2E tests or start a dev server (project policy). This file has
-/// never been executed. Before relying on it, a maintainer with a runnable environment must execute
-/// it, confirm it actually exercises a genuine SignalR RECONNECT (not merely a fresh negotiate from a
-/// full page reload — see remarks below on why that distinction is easy to get wrong here), and fix
-/// up any selector/timing issues that only show up under a live browser.
-///
 /// Context: AppSessionAuthStateProvider.SetAuthenticationState (see HR.Web/Services/
 /// AppSessionAuthStateProvider.cs) is invoked by Blazor Server's CircuitHost both at circuit creation
 /// AND on every reconnect of an already-open circuit (see
@@ -55,6 +48,11 @@ public sealed class CircuitReconnectAfterCookieRemovalTests : IAsyncLifetime
     {
         _app = await SharedAppFixture.AcquireAsync();
         _context = await _app.Browser.NewContextAsync();
+        // Track every WebSocket the page opens so the test can sever Blazor's SignalR socket on
+        // demand (see the "Force the existing SignalR connection to drop" step). Plain page-level JS
+        // on this test's OWN context only — no Playwright routing, so nothing touches Playwright's
+        // internal connection state or any other test's context.
+        await _context.AddInitScriptAsync(TrackWebSocketsScript);
         _page = await _context.NewPageAsync();
         _page.SetDefaultTimeout(30_000);
         _page.SetDefaultNavigationTimeout(30_000);
@@ -87,16 +85,22 @@ public sealed class CircuitReconnectAfterCookieRemovalTests : IAsyncLifetime
         // "cookie expired" while this tab's circuit is still alive.
         await _context.ClearCookiesAsync();
 
-        // Force the existing SignalR connection to drop and (attempt to) reconnect by briefly taking
-        // the browser context offline and then restoring connectivity. On restore, Blazor Server's
-        // client attempts to resume the same circuit, which is what triggers CircuitHost to call
-        // SetAuthenticationState again with the now-cookie-less request's HttpContext.User.
-        await _context.SetOfflineAsync(true);
-        await _page.WaitForTimeoutAsync(2_000);
-        await _context.SetOfflineAsync(false);
-
-        // Give the client time to detect the drop and complete (or fail) its reconnect attempt.
-        await _page.WaitForTimeoutAsync(5_000);
+        // Force the existing SignalR connection to drop so Blazor's client reconnects the SAME
+        // circuit, which is what triggers CircuitHost to call SetAuthenticationState again with the
+        // now-cookie-less request's HttpContext.User.
+        //
+        // Closed from inside the page (non-1000 close code => SignalR treats it as an unexpected
+        // drop => Blazor's reconnection handler runs immediately). Previously this used
+        // SetOfflineAsync(true/false) for 2s, but Chromium's offline emulation does NOT close an
+        // already-open WebSocket — SignalR only notices via its 30s server timeout, so the check
+        // below ran against the original, never-disconnected (and correctly still-authenticated)
+        // circuit and failed nondeterministically. RouteWebSocketAsync was also tried and reverted:
+        // it corrupted Playwright's internal dispatcher state for later tests.
+        var closedSockets = await _page.EvaluateAsync<int>(
+            "() => { let n = 0; for (const s of (window.__e2eSockets || [])) { " +
+            "if (s.readyState === WebSocket.OPEN) { s.close(4000, 'e2e forced drop'); n++; } } return n; }");
+        Assert.True(closedSockets > 0,
+            "Expected at least one open Blazor WebSocket to sever — the reconnect path was not exercised.");
 
         // Drive an in-app navigation (not a full page reload/GotoAsync) so this exercises whatever
         // circuit is now live — if the fix worked, this must NOT succeed as Laura Bennett. Depending
@@ -117,21 +121,50 @@ public sealed class CircuitReconnectAfterCookieRemovalTests : IAsyncLifetime
             // assertions below, which are the actual source of truth for this test.
         }
 
-        var stillOnLoginOrUnauthenticated =
-            _page.Url.Contains("/login", StringComparison.OrdinalIgnoreCase);
-
-        if (!stillOnLoginOrUnauthenticated)
+        // Acceptable outcomes: redirected to /login (Routes.razor's NotAuthorized forceLoad), or the
+        // top bar no longer showing Laura. The reconnect + fail-closed re-render is asynchronous, so
+        // poll for either signal rather than snapshotting once. CountAsync/AllInnerTextsAsync (not
+        // InnerTextAsync) so a top bar that has gone away entirely never auto-waits/throws.
+        var topBarUserInfo = _page.Locator(".top-bar-user-info");
+        var resumedAsLaura = true;
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (DateTime.UtcNow < deadline)
         {
-            // If the app didn't redirect to /login, it must not be showing Laura Bennett as the
-            // authenticated user in the top bar any more (a fresh, correctly-anonymous circuit's
-            // top bar should not resolve to her display name, since that requires a valid /api/me
-            // call which now has no bearer token to send).
-            var topBarStillShowsLaura = await _page.Locator(".top-bar-user-info")
-                .GetByText("Laura Bennett", new() { Exact = false })
-                .CountAsync() > 0;
+            if (_page.Url.Contains("/login", StringComparison.OrdinalIgnoreCase))
+            {
+                resumedAsLaura = false;
+                break;
+            }
 
-            Assert.False(topBarStillShowsLaura,
-                "Circuit resumed showing Laura Bennett as authenticated after its session cookie was removed and the connection reconnected — the stale token was not cleared.");
+            var texts = await topBarUserInfo.AllInnerTextsAsync();
+            if (!texts.Any(t => t.Contains("Laura Bennett", StringComparison.OrdinalIgnoreCase)))
+            {
+                resumedAsLaura = false;
+                break;
+            }
+
+            await _page.WaitForTimeoutAsync(250);
         }
+
+        Assert.False(resumedAsLaura,
+            "Circuit resumed showing Laura Bennett as authenticated after its session cookie was removed and the connection reconnected — the stale token was not cleared.");
     }
+
+    // Wraps window.WebSocket so every socket the page creates is recorded on window.__e2eSockets.
+    // Subclassing keeps instanceof/constants intact for the SignalR client.
+    private const string TrackWebSocketsScript = """
+        (() => {
+            if (window.__e2eSocketsInstalled) return;
+            window.__e2eSocketsInstalled = true;
+            window.__e2eSockets = [];
+            const Native = window.WebSocket;
+            class TrackedWebSocket extends Native {
+                constructor(...args) {
+                    super(...args);
+                    window.__e2eSockets.push(this);
+                }
+            }
+            window.WebSocket = TrackedWebSocket;
+        })();
+        """;
 }

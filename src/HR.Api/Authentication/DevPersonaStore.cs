@@ -27,6 +27,9 @@ public sealed class DevPersonaStore
         new("30000000-0000-0000-0000-000000000011", BetaCorp, "Alice Morgan",  "Engineering Manager", "alice.morgan@betacorp.example"),
         new("30000000-0000-0000-0000-000000000012", BetaCorp, "Bob Taylor",    "Software Developer",  "bob.taylor@betacorp.example"),
         new("30000000-0000-0000-0000-000000000015", BetaCorp, "Grace Kim",     "HR Administrator",    "grace.kim@betacorp.example"),
+        // Dedicated to CrossTabLogoutEnforcementTests only — see that test's Email remarks for why a
+        // revocation test cannot reuse a persona any other E2E class also logs in as.
+        new("30000000-0000-0000-0000-000000000016", Acme,     "Olivia Reyes",  "HR Administrator",    "olivia.reyes@acme.example"),
     ];
 
     // Personas created via the self-service SignUp flow (HR.Modules.Identity's SignUp feature) —

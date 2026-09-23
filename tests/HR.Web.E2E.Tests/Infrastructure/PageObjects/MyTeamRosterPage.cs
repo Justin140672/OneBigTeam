@@ -36,7 +36,11 @@ public sealed class MyTeamRosterPage(IPage page, string baseUrl)
     public async Task<IReadOnlyList<string>> GetRowNamesAsync()
     {
         await WaitForLoadedAsync();
-        var cells = await Rows.Locator("td:first-child span").AllAsync();
+        // "td:first-child span" alone also matches ProfilePhotoAvatar's own initials span
+        // (class="hr-profile-avatar hr-profile-avatar--initials", rendered before the name span
+        // whenever the member has no photo) — excluding it, since otherwise each such row yields
+        // two "names" (e.g. "ET" and the real full name) instead of one.
+        var cells = await Rows.Locator("td:first-child span:not(.hr-profile-avatar--initials)").AllAsync();
         var names = new List<string>();
         foreach (var c in cells)
             names.Add((await c.TextContentAsync())?.Trim() ?? "");

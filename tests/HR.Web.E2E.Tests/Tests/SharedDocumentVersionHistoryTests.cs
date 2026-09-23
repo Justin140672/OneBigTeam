@@ -57,9 +57,10 @@ public sealed class SharedDocumentVersionHistoryTests(HrAdminPersonaFixture fixt
             // Newly uploaded documents start as Draft (per "new documents are created as
             // drafts", also asserted at list level in SharedDocumentUploadTests) — the current
             // version's Publication Status must reflect that, not a hardcoded "Published"/etc.
-            // SharedDocumentDetail.razor's Version column renders "v{VersionNumber}", not a bare
-            // number.
-            Assert.Equal("v1", await detail.GetVersionRowCellAsync(fileNameFragment, 0));
+            // SharedDocumentDetail.razor's Version column renders "v{VersionNumber}", plus a
+            // "Current" badge (concatenated with no separator in InnerText) for whichever row is
+            // the document's current version — this is the only version, so it's always current.
+            Assert.Equal("v1Current", await detail.GetVersionRowCellAsync(fileNameFragment, 0));
             Assert.Equal("Draft", await detail.GetVersionRowCellAsync(fileNameFragment, 1));
 
             // Effective Date moved out of the grid's own columns and into the per-row "Details"
@@ -117,8 +118,9 @@ public sealed class SharedDocumentVersionHistoryTests(HrAdminPersonaFixture fixt
             Assert.Contains($"shared-documents/{documentId}/versions/1/download", firstHref);
 
             // v2 is now the current version — its Publication Status tracks the document's live
-            // status (still "Draft"; this test never publishes).
-            Assert.Equal("v2", await detail.GetVersionRowCellAsync(secondFileNameFragment, 0));
+            // status (still "Draft"; this test never publishes). Version cell carries the "Current"
+            // badge suffix now too — see the comment above on the first assertion in this file.
+            Assert.Equal("v2Current", await detail.GetVersionRowCellAsync(secondFileNameFragment, 0));
             Assert.Equal("Draft", await detail.GetVersionRowCellAsync(secondFileNameFragment, 1));
 
             var secondHref = await detail.GetVersionDownloadHrefAsync(secondFileNameFragment);

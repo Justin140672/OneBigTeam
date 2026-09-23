@@ -6,6 +6,7 @@ using HR.Web.Models;
 using HR.Web.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Web.Tests;
 
@@ -37,7 +38,7 @@ public class AppSessionTests
             new CompanyOnboardingService(factory),
             new SubscriptionService(factory),
             circuitSessionState,
-            new AppSessionAuthStateProvider(factory, circuitSessionState),
+            new AppSessionAuthStateProvider(factory, circuitSessionState, NullLogger<AppSessionAuthStateProvider>.Instance),
             new TestNavigationManager());
     }
 

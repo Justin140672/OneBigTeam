@@ -9,6 +9,19 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// </summary>
 public sealed class PositionProfileEditPage(IPage page, string baseUrl)
 {
+    // A "**/position-profiles" glob only matches when the post-navigation URL ends EXACTLY there —
+    // but EditPageBase.NavigateToList() navigates to TargetListUrl, which is ReturnUrl (a decoded
+    // "?returnUrl=" query param) when present, falling back to plain ListUrl otherwise. Getting here
+    // via ClickNewPositionProfileAsync always carries a returnUrl (that method's own comment/glob —
+    // "**/position-profiles/new**" — exists BECAUSE the list page appends one to the create route),
+    // so the save-triggered navigation back can legitimately land on ".../position-profiles" with a
+    // query string still attached in some flows, which the bare glob silently never matches: the
+    // page is genuinely on the list (visually correct) while WaitForURLAsync keeps waiting until its
+    // own 30s timeout, misreported as "never got to the list". Match the list path with an optional
+    // trailing query string, but never a sub-path like "/position-profiles/new" or "/{id}".
+    private static bool IsPositionProfilesListUrl(string url) =>
+        System.Text.RegularExpressions.Regex.IsMatch(url, @"/position-profiles(\?.*)?$");
+
     public async Task GoToNewAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/position-profiles/new");
@@ -41,7 +54,7 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
         // Navigates back to the position-profiles list on success. WaitUntil=Commit, not the
         // default Load: a Blazor interactive navigation may never re-fire the target document's
         // "load" event (same fix as PositionProfileListPage.ClickNewPositionProfileAsync).
-        await page.WaitForURLAsync("**/position-profiles",
+        await page.WaitForURLAsync(IsPositionProfilesListUrl,
             new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
         // With prerender:false the circuit connects after navigation, wait for the grid.
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
@@ -220,7 +233,7 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
     {
         await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Discard Changes" }).ClickAsync();
         // WaitUntil=Commit, not the default Load — see SaveAsync's comment above.
-        await page.WaitForURLAsync("**/position-profiles",
+        await page.WaitForURLAsync(IsPositionProfilesListUrl,
             new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
@@ -228,7 +241,7 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
     public async Task ConfirmSaveFromUnsavedChangesDialogAsync()
     {
         await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
-        await page.WaitForURLAsync("**/position-profiles",
+        await page.WaitForURLAsync(IsPositionProfilesListUrl,
             new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
@@ -239,7 +252,7 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
     public async Task CloseAndWaitForListAsync()
     {
         await ClickCloseAsync();
-        await page.WaitForURLAsync("**/position-profiles",
+        await page.WaitForURLAsync(IsPositionProfilesListUrl,
             new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }

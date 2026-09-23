@@ -23,6 +23,35 @@ public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
         return result.Success ? result.Value : null;
     }
 
+    /// <summary>
+    /// Every candidate matching the filter, fetched page-by-page at the API's maximum page size
+    /// (ListCandidatesValidator caps PageSize at 100). For callers that bind the whole set to a
+    /// client-paged grid or build a lookup from it — a single pageSize=100 request silently dropped
+    /// every candidate past the 100th (ordered by last name), and a pageSize above 100 fails
+    /// validation and returns nothing at all. Returns null only if the first page fails.
+    /// </summary>
+    public async Task<IReadOnlyList<CandidateListItemModel>?> ListAllCandidatesAsync(
+        Guid companyId, string? search = null, bool includeInactive = false)
+    {
+        const int maxPageSize = 100;
+        const int maxPages = 1000; // Defensive bound against a malformed TotalPages.
+
+        var first = await ListCandidatesAsync(companyId, search, 1, maxPageSize, includeInactive);
+        if (first is null)
+            return null;
+
+        var items = new List<CandidateListItemModel>(first.Items);
+        for (var pageNumber = 2; pageNumber <= Math.Min(first.TotalPages, maxPages); pageNumber++)
+        {
+            var next = await ListCandidatesAsync(companyId, search, pageNumber, maxPageSize, includeInactive);
+            if (next is null || next.Items.Count == 0)
+                break;
+            items.AddRange(next.Items);
+        }
+
+        return items;
+    }
+
     public async Task<GetCandidateResponse?> GetCandidateAsync(Guid companyId, Guid id)
     {
         var result = await ApiResponseReader.ExecuteAsync<GetCandidateResponse>(

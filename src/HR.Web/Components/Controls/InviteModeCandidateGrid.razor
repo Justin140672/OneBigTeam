@@ -1,5 +1,6 @@
 @using HR.Web.Models
 @using HR.Web.Services
+@using Syncfusion.Blazor.Buttons
 @inject UserAdministrationService UserAdministrationService
 
 <div class="invite-mode-candidate-grid">
@@ -16,28 +17,43 @@
         <div class="d-flex align-items-center gap-2 mb-2">
             <SfButton CssClass="e-small" OnClick="SelectAllEligibleAsync">Select all eligible</SfButton>
             <SfButton CssClass="e-small" OnClick="ClearSelectionAsync">Clear selection</SfButton>
-            <span class="text-muted">@_selectedCount selected</span>
+            <span class="text-muted">@SelectedCount selected</span>
             <span class="ms-auto">
-                <SfButton IsPrimary="true" Disabled="@(_selectedCount == 0)" OnClick="InviteSelectedClickedAsync">
-                    Invite selected (@_selectedCount)
+                <SfButton id="invite-mode-invite-selected-btn" IsPrimary="true" Disabled="@(SelectedCount == 0)" OnClick="InviteSelectedClickedAsync">
+                    Invite selected (@SelectedCount)
                 </SfButton>
             </span>
         </div>
 
-        <HrGrid @ref="_grid"
-                TValue="InvitableEmployeeModel"
+        @* Selection is owned by this component (_selectedIds, keyed by EmployeeId) and rendered
+           through the checkbox template below — NOT Syncfusion row selection. SfGrid's
+           SelectRowsAsync(int[]) only applies to the CURRENT page's row indexes, so the previous
+           "select every eligible index" pass silently skipped every eligible employee past page 1
+           (PageSize=20), and its indexes were into the unsorted/unfiltered source list, so they
+           pointed at the wrong rows as soon as the grid was sorted or filtered. PersistSelection
+           also requires a primary-key column, which this grid never had. Rendering the checkbox
+           from server-side state keeps it correct across paging, sorting and filtering, with no
+           JS-interop selection round-trip to race. *@
+        <HrGrid TValue="InvitableEmployeeModel"
                 DataSource="@_candidates"
                 class="invite-mode-grid"
                 AllowPaging="true"
                 AllowSorting="true"
-                AllowFiltering="true">
-            <GridEvents TValue="InvitableEmployeeModel" RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
-            <GridSelectionSettings Type="Syncfusion.Blazor.Grids.SelectionType.Multiple"
-                                   Mode="Syncfusion.Blazor.Grids.SelectionMode.Row"
-                                   PersistSelection="true"></GridSelectionSettings>
+                AllowFiltering="true"
+                AllowSelection="false">
             <GridPageSettings PageSize="20" />
             <GridColumns>
-                <GridColumn Type="Syncfusion.Blazor.Grids.ColumnType.CheckBox" Width="50"></GridColumn>
+                <GridColumn HeaderText="Select" Width="70" AllowSorting="false" AllowFiltering="false">
+                    <Template>
+                        @{
+                            var row = (context as InvitableEmployeeModel)!;
+                        }
+                        <SfCheckBox TChecked="bool"
+                                    Checked="@_selectedIds.Contains(row.EmployeeId)"
+                                    CheckedChanged="@((bool isChecked) => OnRowCheckedChanged(row.EmployeeId, isChecked))"
+                                    HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = $"Select {row.Name}" })" />
+                    </Template>
+                </GridColumn>
                 <GridColumn Field="@nameof(InvitableEmployeeModel.Name)" HeaderText="Employee" Width="220">
                     <Template>
                         @{
@@ -77,27 +93,31 @@
     [Parameter] public bool CanManageUsers { get; set; }
     [Parameter] public EventCallback<(List<InvitationRecipientCandidate> Recipients, List<InvitationExclusionCandidate> Excluded)> OnInviteSelectedRequested { get; set; }
 
-    private HrGrid<InvitableEmployeeModel>? _grid;
     private bool _loading = true;
     private string? _error;
     private List<InvitableEmployeeModel> _candidates = [];
-    private int _selectedCount;
+
+    // The authoritative selection, across every page/sort/filter of the grid.
+    private readonly HashSet<Guid> _selectedIds = [];
 
     // Employees the admin has explicitly unchecked during this page visit — never re-auto-selected
-    // for the lifetime of this component instance (no persistence needed beyond that).
+    // for the lifetime of this component instance (e.g. across ReloadAsync after a batch is sent).
     private readonly HashSet<Guid> _userDeselected = [];
-    private bool _autoSelected;
+    private Guid? _loadedForCompanyId;
 
+    private int SelectedCount => _selectedIds.Count;
+
+    // Blazor invokes OnParametersSetAsync on every parent re-render that reaches this component
+    // (e.g. any StateHasChanged() in EmployeeList.razor for pagination, selection summaries,
+    // etc.), not just when CompanyId actually changes. Only reload when the company we last
+    // loaded for has changed — otherwise every unrelated parent re-render would wipe _loading
+    // back to true, hide the grid/button behind the loading indicator, and reset the selection.
     protected override async Task OnParametersSetAsync()
     {
-        if (_candidates.Count == 0 && !_loading)
+        if (_loadedForCompanyId == CompanyId)
             return;
 
-        await LoadCandidatesAsync();
-    }
-
-    protected override async Task OnInitializedAsync()
-    {
+        _loadedForCompanyId = CompanyId;
         await LoadCandidatesAsync();
     }
 
@@ -116,8 +136,14 @@
         }
 
         _candidates = result;
+
+        // Preselect every eligible employee (has a work email) the admin hasn't explicitly
+        // unchecked. Done on the data, not the grid, so it covers every page at once.
+        _selectedIds.Clear();
+        foreach (var id in EligibleIds())
+            _selectedIds.Add(id);
+
         _loading = false;
-        _autoSelected = false;
     }
 
     public async Task ReloadAsync()
@@ -126,78 +152,48 @@
         StateHasChanged();
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
+    private IEnumerable<Guid> EligibleIds() =>
+        _candidates
+            .Where(c => !string.IsNullOrWhiteSpace(c.WorkEmail) && !_userDeselected.Contains(c.EmployeeId))
+            .Select(c => c.EmployeeId);
+
+    private void OnRowCheckedChanged(Guid employeeId, bool isChecked)
     {
-        if (!_autoSelected && !_loading && _error is null && _grid is not null && _candidates.Count > 0)
+        if (isChecked)
         {
-            _autoSelected = true;
-            await SelectEligibleIndexesAsync(EligibleIndexes());
-            await RefreshSelectedCountAsync();
+            _selectedIds.Add(employeeId);
+            _userDeselected.Remove(employeeId);
+        }
+        else
+        {
+            _selectedIds.Remove(employeeId);
+            _userDeselected.Add(employeeId);
         }
     }
 
-    private IEnumerable<int> EligibleIndexes() =>
-        _candidates
-            .Select((c, i) => (c, i))
-            .Where(x => !string.IsNullOrWhiteSpace(x.c.WorkEmail) && !_userDeselected.Contains(x.c.EmployeeId))
-            .Select(x => x.i);
-
-    private async Task SelectEligibleIndexesAsync(IEnumerable<int> indexes)
-    {
-        if (_grid is null) return;
-        var list = indexes.ToArray();
-        if (list.Length == 0) return;
-        await _grid.SelectRowsAsync(list);
-    }
-
-    private async Task SelectAllEligibleAsync()
+    private Task SelectAllEligibleAsync()
     {
         _userDeselected.Clear();
-        if (_grid is null) return;
-        await _grid.ClearSelectionAsync();
-        await SelectEligibleIndexesAsync(EligibleIndexes());
-        _selectedCount = (await _grid.GetSelectedRecordsAsync()).Count;
+        _selectedIds.Clear();
+        foreach (var id in EligibleIds())
+            _selectedIds.Add(id);
         StateHasChanged();
+        return Task.CompletedTask;
     }
 
-    public async Task ClearSelectionAsync()
+    public Task ClearSelectionAsync()
     {
+        _selectedIds.Clear();
         _userDeselected.Clear();
         foreach (var candidate in _candidates)
             _userDeselected.Add(candidate.EmployeeId);
-
-        if (_grid is not null)
-            await _grid.ClearSelectionAsync();
-        _selectedCount = 0;
         StateHasChanged();
-    }
-
-    private async Task OnRowSelected(Syncfusion.Blazor.Grids.RowSelectEventArgs<InvitableEmployeeModel> args)
-    {
-        if (args.Data is not null)
-            _userDeselected.Remove(args.Data.EmployeeId);
-        await RefreshSelectedCountAsync();
-    }
-
-    private async Task OnRowDeselected(Syncfusion.Blazor.Grids.RowDeselectEventArgs<InvitableEmployeeModel> args)
-    {
-        if (args.Data is not null)
-            _userDeselected.Add(args.Data.EmployeeId);
-        await RefreshSelectedCountAsync();
-    }
-
-    private async Task RefreshSelectedCountAsync()
-    {
-        if (_grid is null) return;
-        _selectedCount = (await _grid.GetSelectedRecordsAsync()).Count;
-        StateHasChanged();
+        return Task.CompletedTask;
     }
 
     private async Task InviteSelectedClickedAsync()
     {
-        if (_grid is null) return;
-
-        var selected = await _grid.GetSelectedRecordsAsync();
+        var selected = _candidates.Where(c => _selectedIds.Contains(c.EmployeeId)).ToList();
         if (selected.Count == 0) return;
 
         var recipients = new List<InvitationRecipientCandidate>();

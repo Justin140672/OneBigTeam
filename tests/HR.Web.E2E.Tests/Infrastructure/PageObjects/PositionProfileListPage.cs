@@ -44,26 +44,11 @@ public sealed class PositionProfileListPage(IPage page, string baseUrl)
     /// not a one-off data collision — paginate through the grid instead of assuming page 1 is
     /// exhaustive.
     /// </summary>
-    public async Task<bool> HasPositionProfileAsync(string titleFragment)
-    {
-        var matchOnCurrentPage = page.Locator(".e-rowcell").Filter(new() { HasText = titleFragment }).First;
-
-        for (var guard = 0; guard < 25; guard++)
-        {
-            if (await matchOnCurrentPage.IsVisibleAsync())
-                return true;
-
-            var nextPage = page.Locator(".e-pagernextprevdiv.e-next:not(.e-disable), a.e-next:not(.e-disable)").First;
-            if (!await nextPage.IsVisibleAsync())
-                return false;
-
-            await nextPage.ClickAsync();
-            await page.WaitForSpinnerToClearAsync();
-            await page.WaitForTimeoutAsync(200);
-        }
-
-        return false;
-    }
+    public Task<bool> HasPositionProfileAsync(string titleFragment) =>
+        // Shared helper waits for each page swap to actually land. The previous inline loop only
+        // slept 200ms after clicking "next" (client-side paging shows no spinner), so under load it
+        // could re-read the stale page, click "next" again and skip the page holding the match.
+        page.HasGridCellOnAnyPageAsync(titleFragment);
 
     public async Task<IReadOnlyList<string>> GetPositionProfileTitlesAsync()
     {
@@ -76,6 +61,13 @@ public sealed class PositionProfileListPage(IPage page, string baseUrl)
 
     public async Task OpenPositionProfileAsync(string title)
     {
+        // Page to the row first: titles sort alphabetically and the suite's accumulated "E2E ..."
+        // profiles push seeded ones like "QA Engineer" past page 1, where a bare click just
+        // auto-waited out the 30s default timeout. HasGridCellOnAnyPageAsync leaves the grid on the
+        // page that contains the match.
+        if (!await page.HasGridCellOnAnyPageAsync(title))
+            throw new InvalidOperationException($"Position profile '{title}' was not found on any page of the list.");
+
         await page.Locator(".e-rowcell a").Filter(new() { HasText = title }).First.ClickAsync();
         await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
     }

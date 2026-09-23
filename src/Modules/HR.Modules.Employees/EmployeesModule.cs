@@ -515,6 +515,7 @@ public static class EmployeesModule
             (58, "SeedInviteD", false), (59, "SeedInviteE", false), (60, "SeedInviteF", false),
             (61, "SeedInviteG", false), (62, "SeedInviteH", false),
             (63, "SeedCompEdit", false),
+            (64, "SeedQuickInvite", false),
         };
 
         return Array.ConvertAll(defs, d => (

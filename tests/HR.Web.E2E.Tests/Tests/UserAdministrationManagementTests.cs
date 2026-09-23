@@ -18,10 +18,9 @@ namespace HR.Web.E2E.Tests.Tests;
 ///   project's convention expects for every list+edit page pair).
 ///
 /// Uses Laura Bennett (HR Administrator) and Tom Williams (plain Employee) against the seeded
-/// Acme company, matching the personas described for this feature. "Emma Jones" is a seeded Acme
-/// employee with no corresponding dev-persona user account (see EmployeesModule's MakeAcme seed
-/// list vs. IdentityModule.SeedDevUserAsync's persona list), so she is the "NoAccount" invite
-/// target for the happy-path test below. The Resend/Cancel toolbar tests create their own fresh
+/// Acme company, matching the personas described for this feature. The happy-path invite target is
+/// the dedicated E2E pool employee SeededE2eEmployees.QuickInvite (no linked user account; see
+/// UninvitedEmployeeName's remarks). The Resend/Cancel toolbar tests create their own fresh
 /// employee per run instead of reusing another shared seeded "no account" employee (see
 /// CreateFreshUninvitedEmployeeAsync's doc comment for why).
 /// </summary>
@@ -32,12 +31,12 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
     private const string HrAdminEmail = "laura.bennett@acme.example";
     private const string PlainEmployeeEmail = "tom.williams@acme.example";
 
-    // Seeded Acme employee with no dev-persona user account, used as the invite target. If the
-    // seed data ever changes so this employee gains an account, the Employee List's row-level
-    // "Invite User" link will no longer render for them and
-    // InviteEmployee_EndToEnd_ShowsPendingInvitation below will fail fast — pick a different
-    // unlinked seeded employee at that point.
-    private const string UninvitedEmployeeName = "Emma Jones";
+    // Dedicated seeded pool employee (no linked user account) used as the row-level Quick Invite
+    // target. NOT the seeded "Emma Jones": InviteUserFromAdminTests also sends her an invitation,
+    // and a sent invitation permanently removes its target from the invitable set, so whichever
+    // of the two ran second in a run found no "Invite" action for her. See
+    // SeededE2eEmployees.QuickInvite.
+    private static readonly string UninvitedEmployeeName = SeededE2eEmployees.QuickInvite.FullName;
 
     /// <summary>
     /// Creates a fresh, uniquely-named Acme employee with no linked user account, to use as an

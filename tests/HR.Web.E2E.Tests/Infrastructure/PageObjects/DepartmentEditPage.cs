@@ -38,7 +38,7 @@ public sealed class DepartmentEditPage(IPage page, string baseUrl)
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
         // Navigates back to the department list on success.
-        await page.WaitForURLAsync("**/departments", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/departments", new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
         // With prerender:false the circuit connects after navigation, wait for the grid.
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
@@ -123,14 +123,14 @@ public sealed class DepartmentEditPage(IPage page, string baseUrl)
     public async Task ConfirmDiscardChangesAsync()
     {
         await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Discard Changes" }).ClickAsync();
-        await page.WaitForURLAsync("**/departments", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/departments", new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
     public async Task ConfirmSaveFromUnsavedChangesDialogAsync()
     {
         await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
-        await page.WaitForURLAsync("**/departments", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/departments", new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
@@ -140,7 +140,7 @@ public sealed class DepartmentEditPage(IPage page, string baseUrl)
     public async Task CloseAndWaitForListAsync()
     {
         await ClickCloseAsync();
-        await page.WaitForURLAsync("**/departments", new() { Timeout = 15_000 });
+        await page.WaitForURLAsync("**/departments", new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 }

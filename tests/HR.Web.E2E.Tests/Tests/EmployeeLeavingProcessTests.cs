@@ -29,6 +29,16 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
 
     private const string LauraEmail = "laura.bennett@acme.example";
 
+    // Relative to today, never hard-coded: StartLeavingProcess treats any leaving date before today
+    // as BACKDATED (confirmation step + immediate finalisation to FormerEmployee), so a fixed
+    // resignation date like "01/09/2026" silently turned every "in-progress leaving process" test
+    // (amend/cancel/persist) into a backdated one once the calendar passed it plus the notice
+    // period. The deliberate backdating test below keeps its own fixed 2023/2024 dates.
+    private static string DaysFromToday(int days) =>
+        DateTime.Today.AddDays(days).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+
+    private static string ResignationReceivedToday => DaysFromToday(0);
+
     // Uses a dedicated pre-seeded pool employee (SeededE2eEmployees.LeavingProcess[slot]) — a
     // "QA Engineer" with no leaving process and a company-default effective notice period, exactly
     // as the old New Employee form flow produced. Tests that actually start/amend/cancel a leaving
@@ -133,7 +143,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
 
         await CreateEmployeeAsync(empList, empEdit, slot: 1);
 
-        await StartLeavingProcessViaWizardAsync(dialog, "01/09/2026", "Resignation");
+        await StartLeavingProcessViaWizardAsync(dialog, ResignationReceivedToday, "Resignation");
 
         Assert.Equal("Leaving & Offboarding", await employee.GetActiveTabNameAsync());
         Assert.Equal("Leaving", await empEdit.GetEmployeeStatusBadgeTextAsync());
@@ -161,7 +171,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
 
         var employeeId = await CreateEmployeeAsync(empList, empEdit, slot: 2);
 
-        var result = await StartLeavingProcessViaWizardAsync(dialog, "15/10/2026", "End of Contract");
+        var result = await StartLeavingProcessViaWizardAsync(dialog, DaysFromToday(14), "End of Contract");
 
         // Revisit the employee's profile fresh (no query string) — the tab should render on its
         // own now that a process is active, showing the same details entered above.
@@ -198,7 +208,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         await CreateEmployeeAsync(empList, empEdit, slot: 0);
 
         await dialog.OpenAsync();
-        await dialog.FillResignationReceivedDateAsync("01/09/2026");
+        await dialog.FillResignationReceivedDateAsync(ResignationReceivedToday);
         await dialog.ClickNextAsync();
 
         var leavingDateRaw = await dialog.GetLeavingDateTextAsync();
@@ -213,7 +223,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
 
         Assert.True(await dialog.IsVisibleAsync(),
             "Expected the Start Leaving Process dialog to stay open when Leaving Reason is missing");
-        Assert.Equal("4. Reason", await dialog.GetActiveStepLabelAsync());
+        Assert.Equal("4. Reason & Notes", await dialog.GetActiveStepLabelAsync());
 
         var error = await dialog.GetStepErrorAsync();
         Assert.False(string.IsNullOrWhiteSpace(error),
@@ -235,7 +245,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         await CreateEmployeeAsync(empList, empEdit, slot: 0);
 
         await dialog.OpenAsync();
-        await dialog.FillResignationReceivedDateAsync("01/09/2026");
+        await dialog.FillResignationReceivedDateAsync(ResignationReceivedToday);
         await dialog.ClickNextAsync();
 
         var leavingDateRaw = await dialog.GetLeavingDateTextAsync();
@@ -283,7 +293,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         Assert.Contains("resignation", error, StringComparison.OrdinalIgnoreCase);
 
         // Filling the field now lets the wizard advance.
-        await dialog.FillResignationReceivedDateAsync("01/09/2026");
+        await dialog.FillResignationReceivedDateAsync(ResignationReceivedToday);
         await dialog.ClickNextAsync();
         Assert.Equal("2. Leaving Date", await dialog.GetActiveStepLabelAsync());
     }
@@ -302,7 +312,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         await CreateEmployeeAsync(empList, empEdit, slot: 0);
 
         await dialog.OpenAsync();
-        await dialog.FillResignationReceivedDateAsync("01/09/2026");
+        await dialog.FillResignationReceivedDateAsync(ResignationReceivedToday);
         await dialog.ClickNextAsync();
         Assert.Equal("2. Leaving Date", await dialog.GetActiveStepLabelAsync());
 
@@ -320,7 +330,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         Assert.Contains("leaving date", error, StringComparison.OrdinalIgnoreCase);
 
         // Re-entering a valid leaving date lets the wizard advance.
-        await dialog.FillLeavingDateAsync("30/09/2026");
+        await dialog.FillLeavingDateAsync(DaysFromToday(30));
         await dialog.ClickNextAsync();
         Assert.Equal("3. Last Working Day", await dialog.GetActiveStepLabelAsync());
     }
@@ -350,7 +360,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
 
         await CreateEmployeeAsync(empList, empEdit, slot: 3);
 
-        var started = await StartLeavingProcessViaWizardAsync(startDialog, "01/09/2026", "Resignation");
+        var started = await StartLeavingProcessViaWizardAsync(startDialog, ResignationReceivedToday, "Resignation");
 
         Assert.True(await leavingTab.HasAmendButtonAsync(),
             "Expected an 'Amend' button while the leaving process is InProgress");
@@ -369,7 +379,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         Assert.Equal(expectedCurrentDdMMyyyy, await amendDialog.GetLastWorkingDayTextAsync());
         Assert.Equal(started.ReasonLabel, await amendDialog.GetLeavingReasonTextAsync());
 
-        const string newDateDdMMyyyy = "20/10/2026";
+        var newDateDdMMyyyy = DaysFromToday(60);
         var expectedNewSummary = DateOnly
             .ParseExact(newDateDdMMyyyy, "dd/MM/yyyy", CultureInfo.InvariantCulture)
             .ToString("dd MMM yyyy");
@@ -410,13 +420,13 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
 
         await CreateEmployeeAsync(empList, empEdit, slot: 4);
 
-        await StartLeavingProcessViaWizardAsync(startDialog, "01/09/2026", "Resignation");
+        await StartLeavingProcessViaWizardAsync(startDialog, ResignationReceivedToday, "Resignation");
 
         await amendDialog.OpenAsync();
 
         // Deliberately set Last Working Day after Leaving Date.
-        await amendDialog.FillLeavingDateAsync("10/10/2026");
-        await amendDialog.FillLastWorkingDayAsync("15/10/2026");
+        await amendDialog.FillLeavingDateAsync(DaysFromToday(40));
+        await amendDialog.FillLastWorkingDayAsync(DaysFromToday(45));
 
         await amendDialog.SaveAsync();
 
@@ -444,7 +454,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
 
         await CreateEmployeeAsync(empList, empEdit, slot: 5);
 
-        await StartLeavingProcessViaWizardAsync(startDialog, "01/09/2026", "Resignation");
+        await StartLeavingProcessViaWizardAsync(startDialog, ResignationReceivedToday, "Resignation");
 
         await cancelDialog.OpenAsync();
 
@@ -494,7 +504,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
 
         var employeeId = await CreateEmployeeAsync(empList, empEdit, slot: 7);
 
-        await StartLeavingProcessViaWizardAsync(startDialog, "01/09/2026", "Resignation");
+        await StartLeavingProcessViaWizardAsync(startDialog, ResignationReceivedToday, "Resignation");
 
         await cancelDialog.OpenAsync();
         await cancelDialog.FillCancellationReasonAsync("Employee withdrew resignation.");
@@ -543,7 +553,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         await empEdit.GoToAsync(AcmeId, seeded.EmployeeId);
 
         await dialog.OpenAsync();
-        await dialog.FillResignationReceivedDateAsync("01/09/2026");
+        await dialog.FillResignationReceivedDateAsync(ResignationReceivedToday);
         await dialog.ClickNextAsync();
 
         var leavingDateRaw = await dialog.GetLeavingDateTextAsync();
@@ -606,7 +616,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         var employeeId = seeded.EmployeeId;
         await empEdit.GoToAsync(AcmeId, employeeId);
 
-        await StartLeavingProcessViaWizardAsync(startDialog, "01/09/2026", "Resignation");
+        await StartLeavingProcessViaWizardAsync(startDialog, ResignationReceivedToday, "Resignation");
 
         // Current bookmark value.
         await empEdit.GoToAsync(AcmeId, employeeId, "tab=leaving");
@@ -732,7 +742,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
 
         await CreateEmployeeAsync(empList, empEdit, slot: 6);
 
-        await StartLeavingProcessViaWizardAsync(startDialog, "01/09/2026", "Resignation");
+        await StartLeavingProcessViaWizardAsync(startDialog, ResignationReceivedToday, "Resignation");
 
         await cancelDialog.OpenAsync();
 

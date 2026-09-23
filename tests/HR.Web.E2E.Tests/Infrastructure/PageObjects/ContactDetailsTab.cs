@@ -201,9 +201,15 @@ public sealed class ContactDetailsTab(IPage page)
 
     // ── Accessibility / keyboard accessors (Ticket 7) ─────────────────────────
 
-    /// <summary>The primary "Save Changes" button as a locator.</summary>
-    public ILocator SaveButton =>
-        page.GetByRole(AriaRole.Button, new() { Name = "Save Changes" });
+    /// <summary>
+    /// The primary "Save Changes" button as a locator. Scoped by id (matching what
+    /// ActiveElementIsSaveButtonAsync/DescribeActiveElementAsync check for "is this the Save
+    /// button") rather than role+accessible-name — a role/name lookup can resolve to a different
+    /// node than the one carrying id="cd-save-button" (e.g. Syncfusion's ripple/inner-span wrapper
+    /// also exposing role="button"), which would focus the "wrong" element and make the id-based
+    /// checks elsewhere report false even though something visually indistinguishable was focused.
+    /// </summary>
+    public ILocator SaveButton => page.Locator("#cd-save-button");
 
     /// <summary>Places keyboard focus on the first editable field (Personal Email).</summary>
     public async Task FocusFirstFieldAsync() =>
@@ -275,7 +281,10 @@ public sealed class ContactDetailsTab(IPage page)
                     if (w) name = w.textContent.trim();
                 }
                 if (!name && isSave) name = (el.textContent || '').trim();
-                return [inForm, isControl, isSave, tag, name].join('§');
+                // JS booleans stringify lowercase ('true'/'false') via join/String(), but the C#
+                // side parses for 'True'/'False' — map explicitly rather than relying on implicit
+                // coercion, otherwise every boolean here always parses back as false.
+                return [inForm ? 'True' : 'False', isControl ? 'True' : 'False', isSave ? 'True' : 'False', tag, name].join('§');
             }");
         var parts = raw.Split('§');
         return new FocusedControlInfo(

@@ -5,6 +5,7 @@ using HR.Web.Models;
 using HR.Web.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Web.Tests;
 
@@ -26,7 +27,7 @@ public class AppSessionAuthStateProviderTests
     public async Task GetAuthenticationStateAsync_ReturnsUnauthenticated_When_ApiMe_Returns401()
     {
         var factory  = BuildFactory(new StaticResponseHandler(HttpStatusCode.Unauthorized));
-        var provider = new AppSessionAuthStateProvider(factory, new CircuitSessionState());
+        var provider = new AppSessionAuthStateProvider(factory, new CircuitSessionState(), NullLogger<AppSessionAuthStateProvider>.Instance);
 
         var state = await provider.GetAuthenticationStateAsync();
 
@@ -37,7 +38,7 @@ public class AppSessionAuthStateProviderTests
     public async Task GetAuthenticationStateAsync_ReturnsUnauthenticated_When_ApiMe_Returns403()
     {
         var factory  = BuildFactory(new StaticResponseHandler(HttpStatusCode.Forbidden));
-        var provider = new AppSessionAuthStateProvider(factory, new CircuitSessionState());
+        var provider = new AppSessionAuthStateProvider(factory, new CircuitSessionState(), NullLogger<AppSessionAuthStateProvider>.Instance);
 
         var state = await provider.GetAuthenticationStateAsync();
 
@@ -52,7 +53,7 @@ public class AppSessionAuthStateProviderTests
         var me        = new MeResponse(userId, companyId, "alice@example.com", [], [], false, false, false, false, true);
 
         var factory  = BuildFactory(new JsonResponseHandler(me));
-        var provider = new AppSessionAuthStateProvider(factory, new CircuitSessionState());
+        var provider = new AppSessionAuthStateProvider(factory, new CircuitSessionState(), NullLogger<AppSessionAuthStateProvider>.Instance);
 
         var state = await provider.GetAuthenticationStateAsync();
 
@@ -66,7 +67,7 @@ public class AppSessionAuthStateProviderTests
     public async Task GetAuthenticationStateAsync_ReturnsUnauthenticated_When_NetworkFails()
     {
         var factory  = BuildFactory(new ThrowingHandler());
-        var provider = new AppSessionAuthStateProvider(factory, new CircuitSessionState());
+        var provider = new AppSessionAuthStateProvider(factory, new CircuitSessionState(), NullLogger<AppSessionAuthStateProvider>.Instance);
 
         var state = await provider.GetAuthenticationStateAsync();
 
@@ -96,7 +97,7 @@ public class AppSessionAuthStateProviderTests
         var circuitSessionState      = new CircuitSessionState();
 
         var factory  = BuildFactory(new StaticResponseHandler(HttpStatusCode.OK));
-        var provider = new AppSessionAuthStateProvider(factory, circuitSessionState);
+        var provider = new AppSessionAuthStateProvider(factory, circuitSessionState, NullLogger<AppSessionAuthStateProvider>.Instance);
 
         const string token = "circuit-only-token";
         var principal = BuildPrincipalWithAccessTokenClaim(token);
@@ -122,7 +123,7 @@ public class AppSessionAuthStateProviderTests
     {
         var circuitSessionState = new CircuitSessionState();
         var factory  = BuildFactory(new StaticResponseHandler(HttpStatusCode.OK));
-        var provider = new AppSessionAuthStateProvider(factory, circuitSessionState);
+        var provider = new AppSessionAuthStateProvider(factory, circuitSessionState, NullLogger<AppSessionAuthStateProvider>.Instance);
 
         var anonymousPrincipal = new ClaimsPrincipal(new ClaimsIdentity());
 
@@ -145,9 +146,9 @@ public class AppSessionAuthStateProviderTests
         var sessionStateB = new CircuitSessionState();
 
         var providerA = new AppSessionAuthStateProvider(
-            BuildFactory(new StaticResponseHandler(HttpStatusCode.OK)), sessionStateA);
+            BuildFactory(new StaticResponseHandler(HttpStatusCode.OK)), sessionStateA, NullLogger<AppSessionAuthStateProvider>.Instance);
         var providerB = new AppSessionAuthStateProvider(
-            BuildFactory(new StaticResponseHandler(HttpStatusCode.OK)), sessionStateB);
+            BuildFactory(new StaticResponseHandler(HttpStatusCode.OK)), sessionStateB, NullLogger<AppSessionAuthStateProvider>.Instance);
 
         var principalA = BuildPrincipalWithAccessTokenClaim("token-circuit-a");
         var principalB = BuildPrincipalWithAccessTokenClaim("token-circuit-b");
@@ -183,7 +184,7 @@ public class AppSessionAuthStateProviderTests
     {
         var circuitSessionState = new CircuitSessionState();
         var factory  = BuildFactory(new StaticResponseHandler(HttpStatusCode.OK));
-        var provider = new AppSessionAuthStateProvider(factory, circuitSessionState);
+        var provider = new AppSessionAuthStateProvider(factory, circuitSessionState, NullLogger<AppSessionAuthStateProvider>.Instance);
 
         // Simulate the circuit's initial authenticated seed (circuit creation with a valid cookie).
         ((IHostEnvironmentAuthenticationStateProvider)provider)
@@ -210,7 +211,7 @@ public class AppSessionAuthStateProviderTests
     {
         var circuitSessionState = new CircuitSessionState();
         var factory  = BuildFactory(new StaticResponseHandler(HttpStatusCode.OK));
-        var provider = new AppSessionAuthStateProvider(factory, circuitSessionState);
+        var provider = new AppSessionAuthStateProvider(factory, circuitSessionState, NullLogger<AppSessionAuthStateProvider>.Instance);
 
         ((IHostEnvironmentAuthenticationStateProvider)provider)
             .SetAuthenticationState(Task.FromResult(new AuthenticationState(BuildPrincipalWithAccessTokenClaim("token-a"))));
@@ -237,7 +238,7 @@ public class AppSessionAuthStateProviderTests
     {
         var circuitSessionState = new CircuitSessionState();
         var factory  = BuildFactory(new StaticResponseHandler(HttpStatusCode.OK));
-        var provider = new AppSessionAuthStateProvider(factory, circuitSessionState);
+        var provider = new AppSessionAuthStateProvider(factory, circuitSessionState, NullLogger<AppSessionAuthStateProvider>.Instance);
 
         ((IHostEnvironmentAuthenticationStateProvider)provider)
             .SetAuthenticationState(Task.FromResult(new AuthenticationState(BuildPrincipalWithAccessTokenClaim("token-user-a"))));
@@ -264,7 +265,7 @@ public class AppSessionAuthStateProviderTests
     {
         var circuitSessionState = new CircuitSessionState();
         var factory  = BuildFactory(new StaticResponseHandler(HttpStatusCode.OK));
-        var provider = new AppSessionAuthStateProvider(factory, circuitSessionState);
+        var provider = new AppSessionAuthStateProvider(factory, circuitSessionState, NullLogger<AppSessionAuthStateProvider>.Instance);
 
         ((IHostEnvironmentAuthenticationStateProvider)provider)
             .SetAuthenticationState(Task.FromResult(new AuthenticationState(BuildPrincipalWithAccessTokenClaim("token-a"))));
@@ -301,7 +302,7 @@ public class AppSessionAuthStateProviderTests
     {
         var circuitSessionState = new CircuitSessionState();
         var factory  = BuildFactory(new StaticResponseHandler(HttpStatusCode.OK));
-        var provider = new AppSessionAuthStateProvider(factory, circuitSessionState);
+        var provider = new AppSessionAuthStateProvider(factory, circuitSessionState, NullLogger<AppSessionAuthStateProvider>.Instance);
 
         // A: initial authenticated seed.
         ((IHostEnvironmentAuthenticationStateProvider)provider)
@@ -335,7 +336,7 @@ public class AppSessionAuthStateProviderTests
     {
         var circuitSessionState = new CircuitSessionState();
         var factory  = BuildFactory(new StaticResponseHandler(HttpStatusCode.OK));
-        var provider = new AppSessionAuthStateProvider(factory, circuitSessionState);
+        var provider = new AppSessionAuthStateProvider(factory, circuitSessionState, NullLogger<AppSessionAuthStateProvider>.Instance);
 
         // A: initial authenticated seed.
         ((IHostEnvironmentAuthenticationStateProvider)provider)
@@ -372,7 +373,7 @@ public class AppSessionAuthStateProviderTests
         Assert.Equal(CircuitAuthStatus.Uninitialized, circuitSessionState.Status);
 
         var factory  = BuildFactory(new StaticResponseHandler(HttpStatusCode.OK));
-        var provider = new AppSessionAuthStateProvider(factory, circuitSessionState);
+        var provider = new AppSessionAuthStateProvider(factory, circuitSessionState, NullLogger<AppSessionAuthStateProvider>.Instance);
 
         ((IHostEnvironmentAuthenticationStateProvider)provider)
             .SetAuthenticationState(Task.FromResult(new AuthenticationState(BuildPrincipalWithAccessTokenClaim("token-a"))));

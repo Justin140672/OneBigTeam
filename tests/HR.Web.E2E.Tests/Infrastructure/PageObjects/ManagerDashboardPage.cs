@@ -342,6 +342,23 @@ public sealed class ManagerDashboardPage(IPage page, string baseUrl)
     /// <paramref name="nameFragment"/> — proves the phone number/email are rendered as visible
     /// text next to their icons, not just present in a hidden "title" tooltip attribute.
     /// </summary>
+    /// <summary>
+    /// The phone number carried by the team-member card's own <c>tel:</c> link (without the
+    /// scheme), or null when the card renders no phone link. Read from the same render as
+    /// <see cref="GetTeamMemberContactTextAsync"/>, so callers can assert "the visible text shows
+    /// the member's phone" without hard-coding a seed value other tests may legitimately edit.
+    /// </summary>
+    public async Task<string?> GetTeamMemberPhoneFromLinkAsync(string nameFragment)
+    {
+        var card = MyTeamWidget.Locator(".team-card").Filter(new() { HasText = nameFragment }).First;
+        var telLink = card.Locator("a.team-card-contact-link[href^='tel:']");
+        if (await telLink.CountAsync() == 0)
+            return null;
+
+        var href = await telLink.First.GetAttributeAsync("href");
+        return href is null ? null : href["tel:".Length..].Trim();
+    }
+
     public async Task<IReadOnlyList<string>> GetTeamMemberContactTextAsync(string nameFragment)
     {
         var card = MyTeamWidget.Locator(".team-card").Filter(new() { HasText = nameFragment }).First;

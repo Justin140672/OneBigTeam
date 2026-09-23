@@ -118,10 +118,27 @@ public sealed class EmployeeOffboardingConfirmationTests(HrAdminPersonaFixture f
         // "Starting offboarding..." sentence, but every reason still shares the same explanation
         // that confirming automatically creates the checklist with no separate "start offboarding"
         // step — assert on that shared, reason-independent portion.
-        var dialogText = await _page.GetByRole(Microsoft.Playwright.AriaRole.Dialog, new() { Name = "Start Leaving Process" }).TextContentAsync();
-        Assert.Contains("This employee has resigned", dialogText);
-        Assert.Contains("no separate \"start offboarding\" step", dialogText, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("offboarding checklist", dialogText, StringComparison.OrdinalIgnoreCase);
+        //
+        // ClickNextAsync only waits for the stepper's own label to change (".hr-stepper-item--current"),
+        // not for step 5's body content to finish its own Blazor Server render, so a raw snapshot
+        // read immediately after landing on step 5 can race that body render.
+        //
+        // Also: the source markup wraps this sentence across multiple lines
+        // (StartLeavingProcessDialog.razor: "...there is no" / "separate \"start offboarding\"
+        // step..."), so the RAW text content read via TextContentAsync() literally contains a
+        // newline + indentation whitespace between "no" and "separate" — a plain string
+        // Assert.Contains("no separate...") can never match that, even once the content has fully
+        // rendered (this is what actually failed, not the render-timing race originally suspected
+        // here). Playwright's own ToContainTextAsync/text-matching normalizes whitespace when
+        // comparing, so use that for all three checks instead of a raw TextContentAsync() + string
+        // Assert.Contains.
+        var confirmDialog = _page.GetByRole(Microsoft.Playwright.AriaRole.Dialog, new() { Name = "Start Leaving Process" });
+        await Microsoft.Playwright.Assertions.Expect(confirmDialog)
+            .ToContainTextAsync("This employee has resigned", new() { Timeout = 10_000 });
+        await Microsoft.Playwright.Assertions.Expect(confirmDialog)
+            .ToContainTextAsync("no separate \"start offboarding\" step", new() { Timeout = 5_000 });
+        await Microsoft.Playwright.Assertions.Expect(confirmDialog)
+            .ToContainTextAsync("offboarding checklist", new() { Timeout = 5_000 });
     }
 
     [Fact]

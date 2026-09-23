@@ -28,10 +28,10 @@ public sealed class LocationTypeListPage(IPage page, string baseUrl)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
-        return await page.Locator(".e-rowcell")
-            .Filter(new() { HasText = nameFragment })
-            .First
-            .WaitUntilVisibleAsync();
+        // Pagination-aware: LocationTypeList pages client-side at 20 rows with no search box, and
+        // every run adds more "E2E Location Type <random>" rows, so a just-created one can sort
+        // onto page 2+.
+        return await page.HasGridCellOnAnyPageAsync(nameFragment);
     }
 
     /// <summary>The href of the grid row link whose text contains <paramref name="nameFragment"/>.</summary>

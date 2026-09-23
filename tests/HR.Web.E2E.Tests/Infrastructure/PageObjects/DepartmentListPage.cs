@@ -39,10 +39,9 @@ public sealed class DepartmentListPage(IPage page, string baseUrl)
     public async Task<bool> HasDepartmentAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
-        return await page.Locator(".e-rowcell")
-            .Filter(new() { HasText = nameFragment })
-            .First
-            .WaitUntilVisibleAsync();
+        // Pagination-aware: DepartmentList pages client-side at 20 rows with no search box, and
+        // the suite's accumulated "E2E ..." departments push a just-created one past page 1.
+        return await page.HasGridCellOnAnyPageAsync(nameFragment);
     }
 
     /// <summary>The href of the grid row link whose text contains <paramref name="nameFragment"/>.</summary>

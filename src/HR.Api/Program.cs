@@ -221,6 +221,8 @@ builder.Services
 
 // A required migration failure must make the instance NOT ready (see StartupMigrationRunner).
 builder.Services.AddSingleton<StartupMigrationRunner>();
+// E2E-only diagnostic (no-ops outside E2E_TESTING) — see ThreadPoolDiagnosticsService's remarks.
+builder.Services.AddHostedService<ThreadPoolDiagnosticsService>();
 builder.Services.AddHealthChecks()
 	.AddCheck<StartupMigrationHealthCheck>(
 		"startup-migrations",

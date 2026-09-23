@@ -63,7 +63,14 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         await empEdit.SelectDropdownAsync("Gender", "Male");
         await empEdit.SelectDropdownAsync("Nationality", "British");
         await empEdit.FillDateOfBirthAsync("15/06/1990");
-        await empEdit.FillStartDateAsync("01/03/2026");
+        // Deliberately EARLIER than the E2E pool's 2026-03-01 start date (and every other test's
+        // new-employee start date). The HR Inbox (GetUnassignedTasks) returns at most 200 tasks
+        // ordered by priority, then due date, then created-at, and onboarding task due dates derive
+        // from the start date. The seeded pool alone contributes ~190 unassigned onboarding tasks
+        // due 2026-03-01/08, so a fresh employee sharing that start date sorted behind all of them
+        // (later CreatedAt) and fell past the 200 cap — this test then found no matching inbox
+        // card. An earlier due date keeps this employee's tasks inside the returned window.
+        await empEdit.FillStartDateAsync("01/01/2026");
         await empEdit.FillEmployeeNumberAsync($"E2E-ONB-{unique}");
         await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
         await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");

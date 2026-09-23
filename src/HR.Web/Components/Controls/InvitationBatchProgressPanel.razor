@@ -22,7 +22,7 @@
             }
         </div>
 
-        @if (_batch.Status is "Queued" or "Processing")
+        @if (IsActiveStatus(_batch.Status))
         {
             <p class="text-muted small mb-2">Processing continues even if you navigate away — check back here for the latest status.</p>
         }
@@ -83,7 +83,7 @@
         if (result is not null)
         {
             _batch = result;
-            if (result.Status is "Queued" or "Processing")
+            if (IsActiveStatus(result.Status))
                 StartPolling(result.BatchId);
         }
     }
@@ -97,7 +97,7 @@
         if (result is not null)
         {
             _batch = result;
-            if (result.Status is "Queued" or "Processing")
+            if (IsActiveStatus(result.Status))
                 StartPolling(batchId);
         }
         StateHasChanged();
@@ -117,7 +117,7 @@
         if (result is not null)
         {
             ApplyUpdatedStatus(result);
-            if (result.Status is "Queued" or "Processing")
+            if (IsActiveStatus(result.Status))
                 StartPolling(result.BatchId);
         }
 
@@ -160,7 +160,7 @@
                     StateHasChanged();
                 });
 
-                if (result.Status == "Completed")
+                if (IsCompletedStatus(result.Status))
                     return;
             }
         }
@@ -173,7 +173,7 @@
     private void ApplyUpdatedStatus(InvitationBatchStatusResponse updated)
     {
         var sentIncreased = updated.Counts.Sent > (_batch?.Counts.Sent ?? -1);
-        var justCompleted = updated.Status == "Completed" && _batch?.Status != "Completed";
+        var justCompleted = IsCompletedStatus(updated.Status) && !IsCompletedStatus(_batch?.Status ?? "");
         _batch = updated;
         _error = null;
 
@@ -181,13 +181,22 @@
             _ = OnRecipientsUpdated.InvokeAsync();
     }
 
-    private static string StatusLabel(string status) => status switch
+    private static string StatusLabel(string status) => status.ToLowerInvariant() switch
     {
-        "Queued"     => "Queued",
-        "Processing" => "Processing…",
-        "Completed"  => "Completed",
+        "queued"     => "Queued",
+        "processing" => "Processing…",
+        "completed"  => "Completed",
         _            => status,
     };
+
+    // Backend statuses (InvitationBatch.StatusQueued/StatusProcessing/StatusCompleted) are stored
+    // and returned lowercase; compare case-insensitively rather than assuming any particular casing.
+    private static bool IsActiveStatus(string status) =>
+        string.Equals(status, "Queued", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(status, "Processing", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsCompletedStatus(string status) =>
+        string.Equals(status, "Completed", StringComparison.OrdinalIgnoreCase);
 
     public async ValueTask DisposeAsync()
     {
