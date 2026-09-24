@@ -173,3 +173,15 @@ The agent must reject any implementation that:
 - creates generic repositories
 - places business logic in Web, API, or Infrastructure
 - ignores vertical slice structure
+
+## Supabase migration review
+
+For every task that creates or replaces a database object, enforce the Supabase Data API rules in
+`specifications/architecture/05-database-standards.md`:
+
+- Treat module data as direct-PostgreSQL/server-only unless Data API exposure is an explicit requirement.
+- Require the migration to classify each table, view, sequence, and function.
+- Confirm server-only objects have no grants to `anon`, `authenticated`, or `service_role`.
+- For intentional Data API exposure, review least-privilege grants role by role and require the grants, RLS enablement, and policies together in the same migration.
+- Reject blanket grants to all Supabase API roles, broad default privileges, or grants added solely because PostgreSQL is hosted by Supabase.
+- Include the classification and grant/RLS decision in the final review summary.

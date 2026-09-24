@@ -48,6 +48,13 @@ Entity Framework Core
 
 Database access occurs through module-owned DbContexts.
 
+Application tables are read and written through direct PostgreSQL connections from the API
+server (EF Core/Npgsql). Supabase Auth and Supabase Storage HTTP APIs are separate services and do
+not make module-owned database tables part of the Supabase Data API (PostgREST/GraphQL).
+
+Do not expose a module schema or object through the Supabase Data API unless a feature explicitly
+requires that access and the exposure has been reviewed as part of the feature design.
+
 ---
 
 ## Multi-Tenancy Strategy
@@ -313,6 +320,40 @@ Employees.Migrations
 Leave.Migrations
 Recruitment.Migrations
 ```
+
+### Supabase Data API grants
+
+Every migration that creates or replaces a table, view, sequence, or function must first classify
+the object as one of the following:
+
+1. **Server-only/direct PostgreSQL** — the normal One Big Team case. Do not grant the object to
+   Supabase Data API roles. In particular, do not add grants to `anon`, `authenticated`, or
+   `service_role` merely because the database is hosted by Supabase.
+2. **Intentionally exposed through the Supabase Data API** — an exceptional case that must be
+   stated in the feature requirements. In the same migration that creates the object:
+   - grant only the exact object privileges required by each concrete caller;
+   - grant schema `USAGE`, sequence privileges, view access, or function `EXECUTE` only when the
+     caller actually needs them;
+   - enable RLS and create the required policies for exposed tables/views; and
+   - keep the `GRANT`, RLS enablement, and policies together so the migration cannot leave an
+     exposed but unprotected object between changes.
+
+Never grant `anon`, `authenticated`, and `service_role` as a standard bundle. Assess each role
+independently. `anon` must have no access unless a deliberately public, unauthenticated Data API
+use case requires it. `authenticated` receives only the operations needed by signed-in clients.
+`service_role` receives access only for a documented server-side Data API caller; direct Npgsql
+access does not require a `service_role` grant.
+
+Do not restore broad automatic exposure with `ALTER DEFAULT PRIVILEGES`, bulk grants across a
+schema, or an `auto_expose_new_tables` setting. Prefer explicit per-object grants. RLS is not a
+substitute for a grant, and a grant is not a substitute for RLS. Functions are not protected by
+table RLS, so review `EXECUTE` and every `SECURITY DEFINER` function separately.
+
+When reviewing or generating an EF Core migration, inspect the generated migration after creation.
+If Data API exposure is required, add the explicit SQL to that migration and test the intended
+role/operation matrix. If it is not required, confirm that the migration adds no Supabase API-role
+grants. This rule applies to fresh database replays as well as upgrades of an existing database.
+
 
 ---
 

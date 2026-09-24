@@ -61,4 +61,16 @@ If any of the following rejection criteria are violated by the requested impleme
 - State which model was created or updated.\r
 - State which DbContext file was changed and whether a migration was generated.\r
 - State which FastEndpoints files were created or updated.\r
-- If work cannot proceed, report the exact missing prerequisite."""
+- If work cannot proceed, report the exact missing prerequisite.\r
+\r
+## Supabase migration gate\r
+\r
+Before finalizing any migration, apply the Supabase Data API rules in\r
+`specifications/architecture/05-database-standards.md`:\r
+\r
+- Treat module data as direct-PostgreSQL/server-only unless the feature explicitly requires Data API access.\r
+- Classify every created or replaced table, view, sequence, and function in the migration.\r
+- For server-only objects, add no grants to `anon`, `authenticated`, or `service_role`.\r
+- For intentional Data API exposure, put least-privilege per-role grants, RLS enablement, and policies in the same migration; include schema, sequence, view, or function privileges only when required.\r
+- Never grant all three Supabase API roles as a default bundle or merely because Supabase hosts PostgreSQL.\r
+- Report the classification and any Data API grants in the migration summary."""

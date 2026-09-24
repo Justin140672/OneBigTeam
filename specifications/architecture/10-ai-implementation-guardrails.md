@@ -110,12 +110,19 @@ AI must:
 - Use module schema
 - Use UUID keys
 - Respect company_id filtering
+- Classify every new database object as direct-PostgreSQL-only or intentionally exposed through
+  the Supabase Data API
+- For intentional Data API exposure, keep least-privilege grants, RLS enablement, and policies in
+  the same migration and verify privileges per role
 
 AI must not:
 
 - Create shared DbContexts
 - Create generic repositories
 - Query another module's schema
+- Grant `anon`, `authenticated`, or `service_role` by default or as an undifferentiated bundle
+- Add Data API grants to server-only objects, restore broad default privileges, or rely on
+  automatic table exposure
 
 ---
 
