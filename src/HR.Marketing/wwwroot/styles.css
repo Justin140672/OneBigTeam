@@ -567,12 +567,64 @@ a.card:focus-visible,
     margin-top: 28px;
 }
 
-.hero-shot {
-    --placeholder-ratio: 16 / 10;
+.product-window {
     position: relative;
     overflow: hidden;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border-strong);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
+}
+
+.product-window-bar {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 7px 12px;
+    background: var(--color-bg-muted);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.product-window-dots {
+    display: flex;
+    gap: 5px;
+}
+
+.product-window-dots i {
+    width: 7px;
+    height: 7px;
+    background: var(--color-border-strong);
+    border-radius: 50%;
+}
+
+.product-window-address {
+    position: absolute;
+    left: 50%;
+    padding: 2px 28px;
+    color: var(--color-ink-faint);
+    font-size: 0.68rem;
+    line-height: 1.2;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 999px;
+    transform: translateX(-50%);
+}
+
+.hero-shot {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1905 / 1172;
+    overflow: hidden;
+    background: var(--color-surface);
+}
+
+.hero-shot img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
 }
 
 .image-placeholder:has(img) {
@@ -631,6 +683,24 @@ a.card:focus-visible,
     .hero-shot-figure {
         width: min(640px, 100%);
         margin: 32px auto 0;
+    }
+}
+
+@media (max-width: 640px) {
+    .hero-shot {
+        aspect-ratio: 4 / 3;
+    }
+
+    .hero-shot img {
+        object-position: 28% top;
+    }
+
+    .product-window-address {
+        max-width: 58%;
+        padding-inline: 18px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 }
 
