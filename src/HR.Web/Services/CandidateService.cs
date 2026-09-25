@@ -103,25 +103,33 @@ public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
     public static string GetCandidateDocumentProxyUrl(Guid companyId, Guid candidateId, Guid documentId) =>
         $"/companies/{companyId}/candidates/{candidateId}/cv/{documentId}";
 
-    // Returns null on success, or an error message string on failure. Pass kind "Cv" for a CV upload.
-    public async Task<string?> UploadCandidateDocumentAsync(
+    public const long MaxCandidateDocumentBytes = 20 * 1024 * 1024;
+
+    // Returns the created document on success, or an error message on failure. Pass kind "Cv" for a CV upload.
+    public async Task<(UploadedCandidateDocumentModel? Document, string? Error)> UploadCandidateDocumentAsync(
         Guid companyId, Guid candidateId, string title, string kind, IBrowserFile file,
         CancellationToken cancellationToken = default)
     {
+        // OpenReadStream throws for anything over maxAllowedSize — report it instead of faulting the circuit.
+        if (file.Size > MaxCandidateDocumentBytes)
+            return (null, "The file is larger than the 20 MB limit.");
+
         using var content = new MultipartFormDataContent();
         content.Add(new StringContent(title), "Title");
         content.Add(new StringContent(kind), "Kind");
 
-        await using var stream = file.OpenReadStream(maxAllowedSize: 20 * 1024 * 1024, cancellationToken);
+        await using var stream = file.OpenReadStream(maxAllowedSize: MaxCandidateDocumentBytes, cancellationToken);
         var fileContent = new StreamContent(stream);
         fileContent.Headers.ContentType = new MediaTypeHeaderValue(
             string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType);
         content.Add(fileContent, "File", file.Name);
 
-        var result = await ApiResponseReader.ExecuteNoContentAsync(
+        var result = await ApiResponseReader.ExecuteAsync<UploadedCandidateDocumentModel>(
             ct => Http.PostAsync($"api/companies/{companyId}/candidates/{candidateId}/documents", content, ct),
-            cancellationToken: cancellationToken);
-        return result.Success ? null : (result.DisplayMessage ?? "Upload failed.");
+            HrApiJsonOptions.Default, cancellationToken);
+        return result.Success && result.Value is not null
+            ? (result.Value, null)
+            : (null, result.DisplayMessage ?? "Upload failed.");
     }
 
     // ── IEditService<CandidateEditModel, Guid> ──────────────────────────────────

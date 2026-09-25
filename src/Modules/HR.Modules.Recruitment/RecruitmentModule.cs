@@ -10,6 +10,7 @@ using HR.Modules.Recruitment.Features.CloseVacancy;
 using HR.Modules.Recruitment.Features.CloseVacancyOnEmployeePromoted;
 using HR.Modules.Recruitment.Features.CreateApplication;
 using HR.Modules.Recruitment.Features.CreateCandidate;
+using HR.Modules.Recruitment.Features.CreateCandidateApplication;
 using HR.Modules.Recruitment.Features.CreateExternalRecruiter;
 using HR.Modules.Recruitment.Features.CreateVacancy;
 using HR.Modules.Recruitment.Features.DeactivateCandidate;
@@ -42,6 +43,7 @@ using HR.Modules.Recruitment.Features.ListVacancies;
 using HR.Modules.Recruitment.Features.MoveApplicationForward;
 using HR.Modules.Recruitment.Features.MoveApplicationStage;
 using HR.Modules.Recruitment.Features.SaveCvReviewNotes;
+using HR.Modules.Recruitment.Features.SetApplicationCv;
 using HR.Modules.Recruitment.Features.OfferCandidate;
 using HR.Modules.Recruitment.Features.PublishVacancy;
 using HR.Modules.Recruitment.Features.PurgeEligibleCandidates;
@@ -206,6 +208,11 @@ public static class RecruitmentModule
         services.AddScoped<CreateApplicationHandler>();
         services.AddScoped<IValidator<CreateApplicationRequest>, CreateApplicationValidator>();
 
+        // Internal recruitment Ticket 3: create candidate + optional CV + application in one call.
+        services.AddScoped<CandidateApplicationIntake>();
+        services.AddScoped<CreateCandidateApplicationHandler>();
+        services.AddScoped<IValidator<CreateCandidateApplicationRequest>, CreateCandidateApplicationValidator>();
+
         services.AddScoped<GetApplicationHandler>();
 
         services.AddScoped<ListApplicationsForVacancyHandler>();
@@ -218,6 +225,8 @@ public static class RecruitmentModule
         services.AddScoped<IValidator<MoveApplicationStageRequest>, MoveApplicationStageValidator>();
 
         services.AddScoped<SaveCvReviewNotesHandler>();
+        services.AddScoped<SetApplicationCvHandler>();
+        services.AddScoped<IValidator<SetApplicationCvRequest>, SetApplicationCvValidator>();
         services.AddScoped<IValidator<SaveCvReviewNotesRequest>, SaveCvReviewNotesValidator>();
 
         services.AddScoped<MoveApplicationForwardHandler>();

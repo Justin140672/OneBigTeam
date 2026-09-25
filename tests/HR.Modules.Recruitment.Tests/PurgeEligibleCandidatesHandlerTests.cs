@@ -267,6 +267,75 @@ public class PurgeEligibleCandidatesHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Clears_Submitted_Cv_Reference_And_Deletes_The_Cv_Document()
+    {
+        // Internal recruitment Ticket 1: the purge deletes every CandidateDocument, including a CV
+        // recorded as submitted with an application — so the application's reference must be
+        // released in the same save (the real FK is ON DELETE RESTRICT; see the Postgres-backed
+        // equivalent in ApplicationCvDocumentConstraintTests).
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var oldEnough = Now.AddDays(-731);
+        var candidate = CreateCandidateUpdatedAt(companyId, oldEnough);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var cv = CandidateDocument.Create(
+            Guid.NewGuid(), companyId, candidate.Id, "CV", "cv.pdf", 2048, "application/pdf",
+            $"{companyId}/{candidate.Id}/{Guid.NewGuid():N}/cv.pdf", Guid.NewGuid(), oldEnough, CandidateDocumentKind.Cv);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, oldEnough);
+        application.AttachCv(cv, oldEnough);
+        application.Withdraw(oldEnough);
+        db.Candidates.Add(candidate);
+        db.Vacancies.Add(vacancy);
+        db.CandidateDocuments.Add(cv);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new PurgeEligibleCandidatesRequest { CompanyId = companyId },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value!.PurgedCount);
+
+        var savedApplication = await db.Applications.AsNoTracking().SingleAsync();
+        Assert.Null(savedApplication.CvDocumentId);
+        Assert.Empty(await db.CandidateDocuments.ToListAsync());
+        Assert.Equal(cv.StorageKey, (await db.CandidateDocumentDeletionOperations.SingleAsync()).StorageKey);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Clear_Cv_Reference_On_NonEligible_Candidates_Application()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var recentCandidate = CreateCandidateUpdatedAt(companyId, Now.AddDays(-10));
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var cv = CandidateDocument.Create(
+            Guid.NewGuid(), companyId, recentCandidate.Id, "CV", "cv.pdf", 2048, "application/pdf",
+            $"{companyId}/{recentCandidate.Id}/{Guid.NewGuid():N}/cv.pdf", Guid.NewGuid(), Now.AddDays(-10), CandidateDocumentKind.Cv);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, recentCandidate.Id, stages.Interview.Id, null, Now.AddDays(-10));
+        application.AttachCv(cv, Now.AddDays(-10));
+        db.Candidates.Add(recentCandidate);
+        db.Vacancies.Add(vacancy);
+        db.CandidateDocuments.Add(cv);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new PurgeEligibleCandidatesRequest { CompanyId = companyId },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0, result.Value!.PurgedCount);
+        Assert.Equal(cv.Id, (await db.Applications.AsNoTracking().SingleAsync()).CvDocumentId);
+        Assert.True(await db.CandidateDocuments.AnyAsync(d => d.Id == cv.Id));
+    }
+
+    [Fact]
     public async Task HandleAsync_Purges_Eligible_Candidates_Documents_And_Enqueues_Storage_Deletion_Job_Per_Document()
     {
         await using var db = BuildContext();

@@ -9,4 +9,8 @@ internal sealed record CandidateDocumentListItem(
     string FileName,
     long FileSize,
     string ContentType,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    // Internal recruitment Ticket 2: true only for the newest Kind = Cv document.
+    bool IsCurrentCv = false,
+    // Internal recruitment Ticket 2: number of applications that reference this document as their submitted CV.
+    int ReferencingApplicationCount = 0);

@@ -168,6 +168,22 @@ public sealed class ApplicationService(HrApiHttpClientFactory httpClientFactory)
         return (null, await ReadErrorAsync(response, "Failed to move the application forward."));
     }
 
+    // Internal recruitment Ticket 1: set (or, with null, remove) the CV submitted with this application.
+    // 409 {error, code:"concurrency"} on a stale expectedVersion; 400 {error, code:"validation"} for a
+    // document that isn't a CV belonging to this application's candidate.
+    public async Task<(SetApplicationCvResponse? Result, string? Error)> SetApplicationCvAsync(
+        Guid companyId, Guid vacancyId, Guid applicationId, Guid? cvDocumentId, int expectedVersion)
+    {
+        var response = await Http.PutAsJsonAsync(
+            $"api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/cv",
+            new SetApplicationCvRequest(cvDocumentId, expectedVersion), HrApiJsonOptions.Default);
+
+        if (response.IsSuccessStatusCode)
+            return (await response.Content.ReadFromJsonAsync<SetApplicationCvResponse>(HrApiJsonOptions.Default), null);
+
+        return (null, await ReadErrorAsync(response, "Failed to update the application's CV."));
+    }
+
     private static async Task<string?> ReadErrorAsync(HttpResponseMessage response, string fallback)
     {
         try

@@ -46,6 +46,15 @@ internal sealed class DeleteCandidateDocumentHandler(
         if (document is null)
             return Result.Failure(Error.NotFound($"Candidate document '{request.DocumentId}' was not found."));
 
+        // Internal recruitment Ticket 1: a CV recorded as submitted with an application is part of
+        // that application's history and must not disappear from under it. The database enforces
+        // this too (ON DELETE RESTRICT); this pre-check turns it into a clear 409 instead of a 500.
+        var referencingApplications = await db.Applications
+            .CountAsync(a => a.CompanyId == request.CompanyId && a.CvDocumentId == document.Id, cancellationToken);
+
+        if (referencingApplications > 0)
+            return Result.Failure(ReferencedByApplicationsConflict(referencingApplications));
+
         var now = clock.UtcNowOffset();
         var storageKey = document.StorageKey;
 
@@ -57,7 +66,19 @@ internal sealed class DeleteCandidateDocumentHandler(
         // crashes immediately after this commit.
         db.CandidateDocumentDeletionOperations.Add(operation);
         db.CandidateDocuments.Remove(document);
-        await db.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex) when (IsForeignKeyViolation(ex))
+        {
+            // Race: an application started referencing this CV between the pre-check above and the
+            // delete. The FK rejected the delete, so nothing (including the deletion operation row)
+            // was committed; the blob is untouched.
+            db.ChangeTracker.Clear();
+            return Result.Failure(ReferencedByApplicationsConflict(null));
+        }
 
         try
         {
@@ -80,4 +101,12 @@ internal sealed class DeleteCandidateDocumentHandler(
 
         return Result.Success();
     }
+
+    private static Error ReferencedByApplicationsConflict(int? applicationCount) => Error.Conflict(
+        applicationCount is int count
+            ? $"This CV is recorded as the submitted CV on {count} application(s). Change or remove the CV on those applications before deleting it."
+            : "This CV is recorded as the submitted CV on an application. Change or remove the CV on that application before deleting it.");
+
+    private static bool IsForeignKeyViolation(DbUpdateException ex) =>
+        ex.InnerException is Npgsql.PostgresException { SqlState: Npgsql.PostgresErrorCodes.ForeignKeyViolation };
 }

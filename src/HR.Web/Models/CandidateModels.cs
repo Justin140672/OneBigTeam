@@ -122,15 +122,32 @@ public record UpdateCandidateResponse(
 
 public record ListCandidateDocumentsResponse(List<CandidateDocumentListItemModel> Items);
 
+// Mirrors the API's list item. Newest first. IsCurrentCv is server-computed (true only for the
+// newest Kind = "Cv" document) — never re-derive it client-side. ReferencingApplicationCount is the
+// number of applications whose submitted CV is this document.
 public record CandidateDocumentListItemModel(
     Guid Id,
     string Title,
-    string? FileName,
-    string? ContentType,
-    long? FileSize,
     // Ticket #1: "Cv" or "Other".
     string Kind,
-    DateTimeOffset UploadedAt);
+    string FileName,
+    long FileSize,
+    string ContentType,
+    DateTimeOffset CreatedAt,
+    bool IsCurrentCv = false,
+    int ReferencingApplicationCount = 0);
+
+// 201 body of POST .../candidates/{candidateId}/documents.
+public record UploadedCandidateDocumentModel(
+    Guid Id,
+    Guid CompanyId,
+    Guid CandidateId,
+    string Title,
+    string Kind,
+    string FileName,
+    long FileSize,
+    string ContentType,
+    DateTimeOffset CreatedAt);
 
 // ── EDIT MODEL ────────────────────────────────────────────────────────────────
 

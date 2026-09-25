@@ -29,5 +29,11 @@ internal sealed class CreateApplicationValidator : AbstractValidator<CreateAppli
             .Empty()
             .WithMessage("SourceExternalRecruiterId must not be supplied unless Source is ExternalRecruiter.")
             .When(r => r.Source != Domain.ApplicationSource.ExternalRecruiter);
+
+        // Internal recruitment Ticket 1: optional, but an explicit empty GUID is a malformed request.
+        RuleFor(r => r.CvDocumentId)
+            .NotEqual(Guid.Empty)
+            .WithMessage("CvDocumentId must not be an empty identifier.")
+            .When(r => r.CvDocumentId is not null);
     }
 }

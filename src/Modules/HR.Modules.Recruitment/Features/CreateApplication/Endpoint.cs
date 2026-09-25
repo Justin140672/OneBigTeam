@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Recruitment.Features.CreateApplication;
 
-internal sealed class Endpoint(CreateApplicationHandler handler)
+internal sealed class Endpoint(CreateApplicationHandler handler, ICurrentUser currentUser)
     : Endpoint<CreateApplicationRequest, CreateApplicationResponse>
 {
     public override void Configure()
@@ -17,7 +17,9 @@ internal sealed class Endpoint(CreateApplicationHandler handler)
         CreateApplicationRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(request, cancellationToken);
+        var result = await handler.HandleAsync(
+            request with { PerformedByUserId = currentUser.UserId },
+            cancellationToken);
 
         if (result.IsFailure)
         {

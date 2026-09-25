@@ -48,6 +48,9 @@ public record GetApplicationResponse(
     string? CvReviewNotes = null,
     DateTimeOffset? CvReviewedAt = null,
     Guid? CvReviewedByUserId = null,
+    // Internal recruitment Ticket 1: Cv* describe ONLY the CV submitted with this application —
+    // null when none was captured (e.g. historic applications). Never substitute the candidate's
+    // current CV here; use the CurrentCandidateCv* fields and label them as such.
     Guid? CvDocumentId = null,
     string? CvFileName = null,
     string? CvContentType = null,
@@ -56,7 +59,29 @@ public record GetApplicationResponse(
     // Ticket #2: offer terms & response.
     string? OfferResponseStatus = null,
     decimal? OfferedSalary = null,
-    DateOnly? OfferedStartDate = null);
+    DateOnly? OfferedStartDate = null,
+    // Optimistic concurrency: round-trip as ExpectedVersion on SetApplicationCv.
+    int Version = 1,
+    // Internal recruitment Ticket 1: the candidate's most recently uploaded CV, independent of the
+    // submitted CV (may equal CvDocumentId). Null when the candidate has no uploaded CV.
+    Guid? CurrentCandidateCvDocumentId = null,
+    string? CurrentCandidateCvFileName = null,
+    string? CurrentCandidateCvContentType = null,
+    long? CurrentCandidateCvFileSize = null,
+    DateTimeOffset? CurrentCandidateCvUploadedAt = null);
+
+// ── INTERNAL RECRUITMENT TICKET 1: SUBMITTED CV ──────────────────────────────
+
+// PUT .../applications/{applicationId}/cv — null CvDocumentId removes the submitted-CV reference.
+public record SetApplicationCvRequest(Guid? CvDocumentId, int ExpectedVersion);
+
+public record SetApplicationCvResponse(
+    Guid Id,
+    Guid VacancyId,
+    Guid CandidateId,
+    Guid? CvDocumentId,
+    int Version,
+    DateTimeOffset UpdatedAt);
 
 // ── TICKET #1: CV REVIEW ──────────────────────────────────────────────────────
 
@@ -102,7 +127,9 @@ public record CreateApplicationRequest(
     // Ticket #78. Both optional; SourceExternalRecruiterId is required if and only if
     // Source == "ExternalRecruiter" (enforced server-side by CreateApplicationValidator).
     string? Source = null,
-    Guid? SourceExternalRecruiterId = null);
+    Guid? SourceExternalRecruiterId = null,
+    // Internal recruitment Ticket 1: optional candidate CV document (Kind = Cv) submitted with this application.
+    Guid? CvDocumentId = null);
 
 public record CreateApplicationResponse(
     Guid Id,
@@ -116,7 +143,8 @@ public record CreateApplicationResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     string? Source = null,
-    Guid? SourceExternalRecruiterId = null);
+    Guid? SourceExternalRecruiterId = null,
+    Guid? CvDocumentId = null);
 
 // ── STATUS TRANSITIONS ────────────────────────────────────────────────────────
 

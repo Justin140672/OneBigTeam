@@ -520,6 +520,38 @@ internal sealed record ApplicationSourceSetAuditEvent(
     object? IAuditEvent.Metadata => new { VacancyId, CandidateId };
 }
 
+// Internal recruitment Ticket 1: published whenever the CV recorded as submitted with an application
+// is set at creation, attached, replaced or removed. Only document identifiers are recorded — never the
+// file name or content, which may carry personal data. A null PreviousCvDocumentId on an existing
+// application means it had no captured CV (e.g. a historic application); a null NewCvDocumentId means
+// the reference was removed.
+internal sealed record ApplicationCvReferenceChangedAuditEvent(
+    Guid CompanyId,
+    Guid ApplicationId,
+    Guid VacancyId,
+    Guid CandidateId,
+    Guid? PreviousCvDocumentId,
+    Guid? NewCvDocumentId,
+    Guid? ChangedByUserId,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "application.cv_reference_changed";
+    string IAuditEvent.EntityType => "Application";
+    Guid IAuditEvent.EntityId => ApplicationId;
+    Guid? IAuditEvent.ActorUserId => ChangedByUserId;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => (PreviousCvDocumentId, NewCvDocumentId) switch
+    {
+        (null, not null) => "Submitted CV recorded for application",
+        (not null, null) => "Submitted CV removed from application",
+        _ => "Submitted CV replaced on application",
+    };
+    object? IAuditEvent.Before => new { CvDocumentId = PreviousCvDocumentId };
+    object? IAuditEvent.After => new { CvDocumentId = NewCvDocumentId };
+    object? IAuditEvent.Metadata => new { VacancyId, CandidateId };
+}
+
 internal sealed record CandidateHiredAuditEvent(
     Guid CompanyId,
     Guid CandidateId,

@@ -121,6 +121,23 @@ internal sealed class ApplicationConfiguration : IEntityTypeConfiguration<Applic
         builder.Property(a => a.SourceExternalRecruiterId)
             .HasColumnName("source_external_recruiter_id");
 
+        builder.Property(a => a.CvDocumentId)
+            .HasColumnName("cv_document_id");
+
+        // Internal recruitment Ticket 1: the submitted CV. A composite FK onto the candidate_documents
+        // alternate key (id, candidate_id, company_id) makes the database itself guarantee the
+        // referenced document belongs to this application's candidate and company — not just the
+        // handlers. PostgreSQL's default MATCH SIMPLE semantics skip the check when cv_document_id is
+        // null, so historic applications with no captured CV are unaffected. RESTRICT stops a
+        // referenced CV being deleted until the application's reference is changed or removed.
+        builder.HasOne<CandidateDocument>()
+            .WithMany()
+            .HasForeignKey(a => new { a.CvDocumentId, a.CandidateId, a.CompanyId })
+            .HasPrincipalKey(cd => new { cd.Id, cd.CandidateId, cd.CompanyId })
+            .HasConstraintName("fk_applications_candidate_documents_cv_document")
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasOne<Vacancy>()
             .WithMany()
             .HasForeignKey(a => a.VacancyId)
@@ -142,5 +159,11 @@ internal sealed class ApplicationConfiguration : IEntityTypeConfiguration<Applic
         builder.HasIndex(a => new { a.VacancyId, a.CandidateId }).IsUnique();
         builder.HasIndex(a => a.SourceExternalRecruiterId);
         builder.HasIndex(a => a.CurrentStageId);
+
+        // Supports the FK (restrict-delete checks and "which applications reference this CV?"
+        // lookups in DeleteCandidateDocument). Partial: most historic rows have no CV reference.
+        builder.HasIndex(a => new { a.CvDocumentId, a.CandidateId, a.CompanyId })
+            .HasDatabaseName("ix_applications_cv_document_id")
+            .HasFilter("cv_document_id IS NOT NULL");
     }
 }

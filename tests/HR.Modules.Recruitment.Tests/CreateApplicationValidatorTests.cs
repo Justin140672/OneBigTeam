@@ -121,4 +121,51 @@ public class CreateApplicationValidatorTests
 
         Assert.True(result.IsValid);
     }
+
+    // Internal recruitment Ticket 1: optional submitted-CV reference.
+
+    [Fact]
+    public void Validate_Passes_When_CvDocumentId_Omitted()
+    {
+        var result = _validator.Validate(new CreateApplicationRequest
+        {
+            CompanyId    = Guid.NewGuid(),
+            VacancyId    = Guid.NewGuid(),
+            CandidateId  = Guid.NewGuid(),
+            CvDocumentId = null,
+        });
+
+        Assert.True(result.IsValid);
+        Assert.DoesNotContain(result.Errors, e => e.PropertyName == nameof(CreateApplicationRequest.CvDocumentId));
+    }
+
+    [Fact]
+    public void Validate_Passes_When_CvDocumentId_Supplied()
+    {
+        var result = _validator.Validate(new CreateApplicationRequest
+        {
+            CompanyId    = Guid.NewGuid(),
+            VacancyId    = Guid.NewGuid(),
+            CandidateId  = Guid.NewGuid(),
+            CvDocumentId = Guid.NewGuid(),
+        });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_CvDocumentId_Is_Empty_Guid()
+    {
+        var result = _validator.Validate(new CreateApplicationRequest
+        {
+            CompanyId    = Guid.NewGuid(),
+            VacancyId    = Guid.NewGuid(),
+            CandidateId  = Guid.NewGuid(),
+            CvDocumentId = Guid.Empty,
+        });
+
+        Assert.False(result.IsValid);
+        var error = Assert.Single(result.Errors, e => e.PropertyName == nameof(CreateApplicationRequest.CvDocumentId));
+        Assert.Equal("CvDocumentId must not be an empty identifier.", error.ErrorMessage);
+    }
 }

@@ -134,6 +134,23 @@ internal static class RecruitmentTestSeeder
         return document.Id;
     }
 
+    /// <summary>
+    /// Internal recruitment Ticket 1: records <paramref name="documentId"/> as the CV submitted with
+    /// the application directly via the domain (no HTTP, no audit), bumping Version as a real save
+    /// would. The document must be a Kind = Cv document of the application's candidate.
+    /// </summary>
+    public static async Task AttachApplicationCvAsync(
+        ApiWebApplicationFactory factory, Guid applicationId, Guid documentId, DateTimeOffset now)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+        var application = await db.Applications.SingleAsync(a => a.Id == applicationId);
+        var document = await db.CandidateDocuments.AsNoTracking().SingleAsync(d => d.Id == documentId);
+        application.AttachCv(document, now);
+        application.IncrementVersion();
+        await db.SaveChangesAsync();
+    }
+
     public static async Task MarkApplicationOnStageAsync(
         ApiWebApplicationFactory factory, Guid applicationId, Guid stageId, DateTimeOffset now)
     {

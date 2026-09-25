@@ -9,6 +9,9 @@ namespace HR.Integration.Tests;
 /// <summary>
 /// Ticket 1 end-to-end: uploading a document with the <c>Kind=Cv</c> form field marks it as the
 /// candidate's CV, and GET application then surfaces that CV summary alongside the CV review notes.
+/// Internal recruitment Ticket 1: the upload appears as the candidate's CURRENT CV
+/// (CurrentCandidateCv*); it only becomes an application's submitted CV (Cv*) when explicitly
+/// recorded — see SetApplicationCvEndpointTests / CreateApplicationSubmittedCvEndpointTests.
 /// </summary>
 [Collection("Integration")]
 public class CandidateCvUploadEndpointTests
@@ -84,10 +87,21 @@ public class CandidateCvUploadEndpointTests
         var application = await getResponse.Content.ReadFromJsonAsync<ApplicationPayload>();
         Assert.NotNull(application);
         Assert.Equal("Great CV", application!.CvReviewNotes);
-        Assert.Equal(uploaded.Id, application.CvDocumentId);
-        Assert.Equal("emma-cv.pdf", application.CvFileName);
-        Assert.Equal("application/pdf", application.CvContentType);
-        Assert.NotNull(application.CvUploadedAt);
+
+        // Internal recruitment Ticket 1: uploading a CV against the candidate never becomes the
+        // application's SUBMITTED CV implicitly — this application has no captured CV reference, so
+        // the Cv* fields stay null and the upload is surfaced as the candidate's current CV instead.
+        Assert.Null(application.CvDocumentId);
+        Assert.Null(application.CvFileName);
+        Assert.Null(application.CvContentType);
+        Assert.Null(application.CvFileSize);
+        Assert.Null(application.CvUploadedAt);
+
+        Assert.Equal(uploaded.Id, application.CurrentCandidateCvDocumentId);
+        Assert.Equal("emma-cv.pdf", application.CurrentCandidateCvFileName);
+        Assert.Equal("application/pdf", application.CurrentCandidateCvContentType);
+        Assert.Equal(2048L, application.CurrentCandidateCvFileSize);
+        Assert.NotNull(application.CurrentCandidateCvUploadedAt);
     }
 
     [Fact]
@@ -105,6 +119,7 @@ public class CandidateCvUploadEndpointTests
         var getResponse = await client.GetAsync(ApplicationUrl(companyId, seeded.VacancyId, seeded.ApplicationId));
         var application = await getResponse.Content.ReadFromJsonAsync<ApplicationPayload>();
         Assert.Null(application!.CvDocumentId);
+        Assert.Null(application.CurrentCandidateCvDocumentId);
     }
 
     [Fact]
@@ -135,5 +150,10 @@ public class CandidateCvUploadEndpointTests
     private sealed record ApplicationPayload(
         Guid Id, string? CvReviewNotes, DateTimeOffset? CvReviewedAt, Guid? CvReviewedByUserId,
         Guid? CvDocumentId, string? CvFileName, string? CvContentType, long? CvFileSize,
-        DateTimeOffset? CvUploadedAt);
+        DateTimeOffset? CvUploadedAt,
+        // Internal recruitment Ticket 1: the candidate's current (newest) CV, independent of the
+        // CV submitted with the application.
+        Guid? CurrentCandidateCvDocumentId, string? CurrentCandidateCvFileName,
+        string? CurrentCandidateCvContentType, long? CurrentCandidateCvFileSize,
+        DateTimeOffset? CurrentCandidateCvUploadedAt);
 }

@@ -81,6 +81,17 @@ internal sealed class Application : HR.SharedKernel.IVersionedAggregate
     // only deactivated) — so this FK must survive assignment removal.
     public Guid? SourceExternalRecruiterId { get; private set; }
 
+    // Internal recruitment Ticket 1: the exact CandidateDocument (Kind = Cv) submitted with this
+    // application. Deliberately a fixed reference rather than "the candidate's latest CV": uploading a
+    // newer CV against the Candidate must never change what a historical application was assessed on.
+    // Null for applications created before this concept existed (no automatic backfill) and for
+    // applications where no CV was captured — the UI may then show the candidate's current CV, but
+    // must label it as current/legacy material rather than the submitted CV. The database enforces
+    // (composite FK on cv_document_id + candidate_id + company_id, ON DELETE RESTRICT) that the
+    // document belongs to this application's candidate and company and cannot be deleted while
+    // referenced; the Kind = Cv rule is enforced by AttachCv / DescribeCvDocumentViolation.
+    public Guid? CvDocumentId { get; private set; }
+
     public static Application Create(
         Guid id,
         Guid companyId,
@@ -117,6 +128,64 @@ internal sealed class Application : HR.SharedKernel.IVersionedAggregate
         Source = source;
         SourceExternalRecruiterId = source == ApplicationSource.ExternalRecruiter ? sourceExternalRecruiterId : null;
         UpdatedAt = now;
+    }
+
+    /// <summary>
+    /// Internal recruitment Ticket 1: returns a user-facing reason why <paramref name="document"/>
+    /// cannot be recorded as the submitted CV for an application owned by
+    /// <paramref name="companyId"/>/<paramref name="candidateId"/>, or null when it is acceptable.
+    /// Shared by the create and set-CV handlers so both apply identical rules before persisting.
+    /// A document from another company is reported as "not found" so its existence is not revealed.
+    /// </summary>
+    public static string? DescribeCvDocumentViolation(CandidateDocument document, Guid companyId, Guid candidateId)
+    {
+        if (document.CompanyId != companyId)
+            return CvDocumentNotFoundMessage;
+
+        if (document.CandidateId != candidateId)
+            return "The selected CV document belongs to a different candidate.";
+
+        if (document.Kind != CandidateDocumentKind.Cv)
+            return "The selected document is not a CV. Only candidate documents of kind 'Cv' can be recorded as an application's CV.";
+
+        return null;
+    }
+
+    public const string CvDocumentNotFoundMessage = "The selected CV document was not found.";
+
+    /// <summary>
+    /// Internal recruitment Ticket 1: records <paramref name="document"/> as the exact CV submitted
+    /// with this application, replacing any previous reference. Returns false (and changes nothing)
+    /// when the application already references that document. Throws if the document violates the
+    /// ownership/kind invariants — callers must check <see cref="DescribeCvDocumentViolation"/> first
+    /// and surface a validation failure; the throw is a last line of defence only.
+    /// </summary>
+    public bool AttachCv(CandidateDocument document, DateTimeOffset now)
+    {
+        var violation = DescribeCvDocumentViolation(document, CompanyId, CandidateId);
+        if (violation is not null)
+            throw new InvalidOperationException(violation);
+
+        if (CvDocumentId == document.Id)
+            return false;
+
+        CvDocumentId = document.Id;
+        UpdatedAt    = now;
+        return true;
+    }
+
+    /// <summary>
+    /// Internal recruitment Ticket 1: removes the submitted-CV reference (for example so that the
+    /// referenced document can then be deleted). Returns false when there was no reference.
+    /// </summary>
+    public bool RemoveCv(DateTimeOffset now)
+    {
+        if (CvDocumentId is null)
+            return false;
+
+        CvDocumentId = null;
+        UpdatedAt    = now;
+        return true;
     }
 
     /// <summary>
@@ -240,6 +309,10 @@ internal sealed class Application : HR.SharedKernel.IVersionedAggregate
         RejectionReason = null;
         CvReviewNotes = null;
         OfferNotes = null;
+        // Internal recruitment Ticket 1: the purge deletes every CandidateDocument for the candidate,
+        // including any submitted CV. cv_document_id is ON DELETE RESTRICT, so the reference must be
+        // released here, in the same save, for the purge to succeed.
+        CvDocumentId = null;
         UpdatedAt = now;
     }
 

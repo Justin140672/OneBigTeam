@@ -26,7 +26,7 @@
     else
     {
         <h1 class="mb-1">@PageTitle</h1>
-        <p class="text-muted mb-4">Record the candidate's contact details and resume link.</p>
+        <p class="text-muted mb-4">Record the candidate's contact details.</p>
 
         <SaveConflictBanner Visible="SaveConflict" Disabled="@Saving" OnReload="ReloadLatestValuesAsync"
                             Message="Someone else changed this candidate while you were editing. Your changes have not been saved." />
@@ -66,10 +66,10 @@
             </div>
         }
 
-        <EditForm EditContext="EditContext">
-            <DataAnnotationsValidator />
-            <div class="row">
-                <div class="col-lg-8">
+        <div class="row">
+            <div class="col-lg-8">
+                <EditForm EditContext="EditContext">
+                    <DataAnnotationsValidator />
                     <div class="card mb-4">
                         <div class="card-header">
                             <h5 class="mb-0">Candidate Details</h5>
@@ -96,7 +96,7 @@
                                     <HrTextBox @bind-Value="Model.Phone" Placeholder="e.g. 07700 900000" />
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label">Resume URL</label>
+                                    <label class="form-label">Legacy resume URL</label>
                                     <HrTextBox @bind-Value="Model.ResumeUrl" Placeholder="Link to CV / resume" />
                                 </div>
                             </div>
@@ -131,9 +131,96 @@
                         }
                         <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
                     </div>
-                </div>
+                </EditForm>
+
+                @if (!IsNew && _candidate is not null)
+                {
+                    @* Internal recruitment Ticket 2: deliberately OUTSIDE the EditForm so its buttons can't
+                       submit the candidate form, and nothing here touches Model (dirty tracking). *@
+                    <div class="card mt-4 mb-4" data-testid="candidate-cv-card">
+                        <div class="card-header">
+                            <h5 class="mb-0">CV documents</h5>
+                        </div>
+                        <div class="card-body">
+                            @if (_cvError is not null)
+                            {
+                                <div class="alert alert-danger" data-testid="candidate-cv-error">@_cvError</div>
+                            }
+                            @if (_cvSuccess is not null)
+                            {
+                                <div class="alert alert-success" data-testid="candidate-cv-success">@_cvSuccess</div>
+                            }
+
+                            @if (_cvDocuments is null)
+                            {
+                                <p class="text-muted">CV documents could not be loaded.</p>
+                            }
+                            else if (_cvDocuments.Count == 0)
+                            {
+                                <p class="text-muted" data-testid="candidate-cv-empty">No CV has been uploaded for this candidate.</p>
+                            }
+                            else
+                            {
+                                <ul class="list-group mb-3">
+                                    @foreach (var doc in _cvDocuments)
+                                    {
+                                        <li class="list-group-item" data-testid="candidate-cv-row">
+                                            <div class="d-flex flex-wrap align-items-center gap-2">
+                                                <a href="@CandidateService.GetCandidateDocumentProxyUrl(CompanyId, Id!.Value, doc.Id)"
+                                                   target="_blank" rel="noopener">@doc.FileName</a>
+                                                @if (doc.IsCurrentCv)
+                                                {
+                                                    <span class="badge bg-success" data-testid="candidate-cv-current-badge">Current CV</span>
+                                                }
+                                            </div>
+                                            <div class="small text-muted">
+                                                Uploaded @doc.CreatedAt.LocalDateTime.ToString("d MMM yyyy, HH:mm") · @FormatFileSize(doc.FileSize)
+                                            </div>
+                                            @if (doc.ReferencingApplicationCount > 0)
+                                            {
+                                                <div class="small text-muted" data-testid="candidate-cv-referenced">
+                                                    Submitted with @doc.ReferencingApplicationCount application(s)
+                                                </div>
+                                            }
+                                        </li>
+                                    }
+                                </ul>
+                            }
+
+                            @if (!string.IsNullOrWhiteSpace(_candidate.ResumeUrl))
+                            {
+                                <p data-testid="candidate-cv-legacy-link">
+                                    <a href="@_candidate.ResumeUrl" target="_blank" rel="noopener">Legacy CV link</a>
+                                    <span class="text-muted small"> (legacy link recorded on the candidate record — not an uploaded document)</span>
+                                </p>
+                            }
+
+                            @if (CanUploadCv)
+                            {
+                                <div class="mt-3">
+                                    <InputFile @key="_cvFileInputKey" class="form-control" OnChange="OnCvFileSelected"
+                                               accept=".pdf,.doc,.docx" data-testid="candidate-cv-file-input" />
+                                    <div class="form-text">
+                                        PDF, DOC or DOCX, up to 20 MB. Uploading a replacement makes it the candidate's current CV;
+                                        earlier CVs are kept and applications continue to show the CV they were submitted with.
+                                    </div>
+                                    <div class="mt-2">
+                                        <SfButton IsPrimary="true" Disabled="@(_cvBusy || _selectedCvFile is null)"
+                                                  OnClick="UploadCvAsync" data-testid="candidate-cv-upload">
+                                            @if (_cvBusy)
+                                            {
+                                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                            }
+                                            @(_cvDocuments is { Count: > 0 } ? "Upload replacement CV" : "Upload CV")
+                                        </SfButton>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                }
             </div>
-        </EditForm>
+        </div>
     }
 
     <NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges" />
@@ -245,8 +332,71 @@
             return;
 
         if (!IsNew)
+        {
             _candidate = await CandidateService.GetCandidateAsync(CompanyId, Id!.Value);
+            await LoadCvDocumentsAsync();
+        }
     }
+
+    // ── CV documents (internal recruitment Ticket 2) ────────────────────────────
+
+    private List<CandidateDocumentListItemModel>? _cvDocuments = [];
+    private IBrowserFile? _selectedCvFile;
+    private int _cvFileInputKey;
+    private bool _cvBusy;
+    private string? _cvError;
+    private string? _cvSuccess;
+
+    // GetCandidateResponse exposes no purge flag, so IsActive is the only lifecycle gate here.
+    private bool CanUploadCv => Session.CanManageRecruitment && _candidate is { IsActive: true };
+
+    private async Task LoadCvDocumentsAsync()
+    {
+        var response = await CandidateService.ListCandidateDocumentsAsync(CompanyId, Id!.Value);
+        // API order is newest first — keep it.
+        _cvDocuments = response?.Items.Where(d => d.Kind == "Cv").ToList();
+    }
+
+    private void OnCvFileSelected(InputFileChangeEventArgs e)
+    {
+        _selectedCvFile = e.File;
+        _cvError = null;
+        _cvSuccess = null;
+    }
+
+    private async Task UploadCvAsync()
+    {
+        if (_selectedCvFile is null || _cvBusy)
+            return;
+
+        _cvBusy = true;
+        _cvError = null;
+        _cvSuccess = null;
+
+        var file = _selectedCvFile;
+        var (_, error) = await CandidateService.UploadCandidateDocumentAsync(
+            CompanyId, Id!.Value, file.Name, "Cv", file);
+
+        if (error is not null)
+        {
+            _cvError = error;
+        }
+        else
+        {
+            _cvSuccess = "CV uploaded. It is now the candidate's current CV.";
+            await LoadCvDocumentsAsync();
+        }
+
+        // Re-key the InputFile so the same file can be picked again.
+        _selectedCvFile = null;
+        _cvFileInputKey++;
+        _cvBusy = false;
+    }
+
+    private static string FormatFileSize(long bytes) =>
+        bytes < 1024 ? $"{bytes} B"
+        : bytes < 1024 * 1024 ? $"{bytes / 1024.0:0.#} KB"
+        : $"{bytes / (1024.0 * 1024.0):0.#} MB";
 
     protected override string? ListUrl => !string.IsNullOrWhiteSpace(ReturnUrl)
         ? ReturnUrl

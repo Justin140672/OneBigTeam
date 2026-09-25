@@ -44,16 +44,16 @@ internal sealed class RecruitmentDataExportSource(RecruitmentDbContext db) : IRe
 
         var applications = await db.Applications.AsNoTracking()
             .Where(a => a.CompanyId == companyId)
-            .Select(a => new { a.Id, a.VacancyId, a.CandidateId, a.CurrentStageId, a.InterviewOutcome, a.RejectionReason, a.WithdrawnAt, a.OfferApprovedAt, a.AppliedAt })
+            .Select(a => new { a.Id, a.VacancyId, a.CandidateId, a.CurrentStageId, a.InterviewOutcome, a.RejectionReason, a.WithdrawnAt, a.OfferApprovedAt, a.AppliedAt, a.CvDocumentId })
             .ToListAsync(cancellationToken);
 
         var applicationsTable = new DataExportTable(
             "applications",
-            ["Id", "VacancyId", "CandidateId", "CurrentStageId", "InterviewOutcome", "RejectionReason", "WithdrawnAt", "OfferApprovedAt", "AppliedAt"],
+            ["Id", "VacancyId", "CandidateId", "CurrentStageId", "InterviewOutcome", "RejectionReason", "WithdrawnAt", "OfferApprovedAt", "AppliedAt", "CvDocumentId"],
             applications.Select(a => (IReadOnlyList<string?>)new string?[]
             {
                 a.Id.ToString(), a.VacancyId.ToString(), a.CandidateId.ToString(), a.CurrentStageId.ToString(),
-                a.InterviewOutcome?.ToString(), a.RejectionReason, T(a.WithdrawnAt), T(a.OfferApprovedAt), T(a.AppliedAt)
+                a.InterviewOutcome?.ToString(), a.RejectionReason, T(a.WithdrawnAt), T(a.OfferApprovedAt), T(a.AppliedAt), a.CvDocumentId?.ToString()
             }).ToList());
 
         var interviews = await db.Interviews.AsNoTracking()

@@ -58,6 +58,25 @@ internal sealed class CreateApplicationHandler(
                     Error.NotFound($"External recruiter '{request.SourceExternalRecruiterId}' was not found."));
         }
 
+        // Internal recruitment Ticket 1: the submitted CV must be a Kind = Cv document belonging to
+        // this candidate in this company. Looked up tenant-scoped, so another company's document is
+        // indistinguishable from a non-existent one. The composite FK enforces ownership again in
+        // the database.
+        CandidateDocument? submittedCv = null;
+        if (request.CvDocumentId is Guid cvDocumentId)
+        {
+            submittedCv = await db.CandidateDocuments
+                .AsNoTracking()
+                .SingleOrDefaultAsync(cd => cd.Id == cvDocumentId && cd.CompanyId == request.CompanyId, cancellationToken);
+
+            var violation = submittedCv is null
+                ? Application.CvDocumentNotFoundMessage
+                : Application.DescribeCvDocumentViolation(submittedCv, request.CompanyId, request.CandidateId);
+
+            if (violation is not null)
+                return Result.Failure<CreateApplicationResponse>(Error.Validation(violation));
+        }
+
         var now = clock.UtcNowOffset();
 
         // Defensive: normally already seeded by CreateVacancyHandler (a Vacancy must exist before an
@@ -87,8 +106,26 @@ internal sealed class CreateApplicationHandler(
             request.Source,
             request.SourceExternalRecruiterId);
 
+        if (submittedCv is not null)
+            application.AttachCv(submittedCv, now);
+
         db.Applications.Add(application);
         await db.SaveChangesAsync(cancellationToken);
+
+        if (application.CvDocumentId is Guid recordedCvId)
+        {
+            await auditPublisher.PublishAsync(
+                new ApplicationCvReferenceChangedAuditEvent(
+                    application.CompanyId,
+                    application.Id,
+                    application.VacancyId,
+                    application.CandidateId,
+                    PreviousCvDocumentId: null,
+                    NewCvDocumentId: recordedCvId,
+                    request.PerformedByUserId,
+                    now),
+                cancellationToken);
+        }
 
         if (application.Source is not null)
         {
@@ -116,6 +153,7 @@ internal sealed class CreateApplicationHandler(
             application.CreatedAt,
             application.UpdatedAt,
             application.Source,
-            application.SourceExternalRecruiterId));
+            application.SourceExternalRecruiterId,
+            application.CvDocumentId));
     }
 }

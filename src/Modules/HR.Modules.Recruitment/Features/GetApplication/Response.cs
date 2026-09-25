@@ -25,10 +25,12 @@ internal sealed record GetApplicationResponse(
     // Source != ExternalRecruiter or the recruiter row could not be resolved (should not normally
     // happen since ExternalRecruiter rows are never deleted, only deactivated).
     string? SourceExternalRecruiterAgencyName,
-    // Ticket 1: CV review notes recorded against this application via the Review CV workflow, plus a
-    // summary of the candidate's current (most recently uploaded) CV document. CvDocumentId is null
-    // when the candidate has no uploaded CV — the legacy Candidate.ResumeUrl link (see
-    // GetCandidate) then remains the only CV reference for historical records.
+    // Ticket 1: CV review notes recorded against this application via the Review CV workflow.
+    // Internal recruitment Ticket 1: CvDocumentId/CvFileName/CvContentType/CvFileSize/CvUploadedAt
+    // describe the exact CV SUBMITTED with this application (Application.CvDocumentId). They are all
+    // null when no CV was captured (e.g. historic applications) — in that case the candidate's
+    // current CV, if any, is available via the CurrentCandidateCv* fields below and must be labelled
+    // as current/legacy material, never as the submitted CV.
     string? CvReviewNotes,
     DateTimeOffset? CvReviewedAt,
     Guid? CvReviewedByUserId,
@@ -51,7 +53,17 @@ internal sealed record GetApplicationResponse(
     string? OfferNotes = null,
     string? OfferResponseStatus = null,
     DateTimeOffset? OfferMadeAt = null,
-    DateTimeOffset? OfferRespondedAt = null);
+    DateTimeOffset? OfferRespondedAt = null,
+    // Ticket 2 (optimistic concurrency): round-trip as ExpectedVersion on SetApplicationCv.
+    int Version = 1,
+    // Internal recruitment Ticket 1: the candidate's current (most recently uploaded) CV, independent
+    // of what was submitted with this application. May equal CvDocumentId. Null when the candidate has
+    // no uploaded CV.
+    Guid? CurrentCandidateCvDocumentId = null,
+    string? CurrentCandidateCvFileName = null,
+    string? CurrentCandidateCvContentType = null,
+    long? CurrentCandidateCvFileSize = null,
+    DateTimeOffset? CurrentCandidateCvUploadedAt = null);
 
 internal sealed record ApplicationStageHistoryItem(
     Guid Id,

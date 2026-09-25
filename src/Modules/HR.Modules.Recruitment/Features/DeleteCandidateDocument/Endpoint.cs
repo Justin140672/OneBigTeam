@@ -1,4 +1,5 @@
 using FastEndpoints;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Recruitment.Features.DeleteCandidateDocument;
@@ -20,7 +21,8 @@ internal sealed class Endpoint(DeleteCandidateDocumentHandler handler)
 
         if (result.IsFailure)
         {
-            await Send.ResultAsync(TypedResults.NotFound(new { error = result.Error.Message }));
+            // not_found -> 404; conflict (CV still referenced by an application) -> 409.
+            await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }
 

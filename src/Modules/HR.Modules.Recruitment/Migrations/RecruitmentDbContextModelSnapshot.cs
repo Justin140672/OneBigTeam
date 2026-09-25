@@ -49,6 +49,10 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("current_stage_id");
 
+                    b.Property<Guid?>("CvDocumentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cv_document_id");
+
                     b.Property<string>("CvReviewNotes")
                         .HasMaxLength(4000)
                         .HasColumnType("character varying(4000)")
@@ -163,6 +167,10 @@ namespace HR.Modules.Recruitment.Migrations
 
                     b.HasIndex("VacancyId", "CandidateId")
                         .IsUnique();
+
+                    b.HasIndex("CvDocumentId", "CandidateId", "CompanyId")
+                        .HasDatabaseName("ix_applications_cv_document_id")
+                        .HasFilter("cv_document_id IS NOT NULL");
 
                     b.ToTable("applications", "recruitment");
                 });
@@ -373,6 +381,9 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasColumnName("uploaded_by");
 
                     b.HasKey("Id");
+
+                    b.HasAlternateKey("Id", "CandidateId", "CompanyId")
+                        .HasName("ak_candidate_documents_id_candidate_id_company_id");
 
                     b.HasIndex("CandidateId");
 
@@ -893,6 +904,13 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasForeignKey("VacancyId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("HR.Modules.Recruitment.Domain.CandidateDocument", null)
+                        .WithMany()
+                        .HasForeignKey("CvDocumentId", "CandidateId", "CompanyId")
+                        .HasPrincipalKey("Id", "CandidateId", "CompanyId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_applications_candidate_documents_cv_document");
                 });
 
             modelBuilder.Entity("HR.Modules.Recruitment.Domain.ApplicationStageHistoryEntry", b =>

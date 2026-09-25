@@ -68,6 +68,12 @@ internal sealed class CandidateDocumentConfiguration : IEntityTypeConfiguration<
             .HasForeignKey(cd => cd.CandidateId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Internal recruitment Ticket 1: principal key for applications.cv_document_id's composite FK
+        // (see ApplicationConfiguration). Trivially unique because id is the primary key; it exists so
+        // the FK can also pin candidate_id and company_id.
+        builder.HasAlternateKey(cd => new { cd.Id, cd.CandidateId, cd.CompanyId })
+            .HasName("ak_candidate_documents_id_candidate_id_company_id");
+
         builder.HasIndex(cd => cd.CompanyId);
         builder.HasIndex(cd => cd.CandidateId);
         builder.HasIndex(cd => new { cd.CandidateId, cd.Kind });

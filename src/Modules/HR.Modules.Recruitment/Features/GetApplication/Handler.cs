@@ -46,6 +46,8 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
                 a.OfferResponseStatus,
                 a.OfferMadeAt,
                 a.OfferRespondedAt,
+                a.CvDocumentId,
+                a.Version,
             })
             .SingleOrDefaultAsync(cancellationToken);
 
@@ -63,12 +65,27 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
                 .SingleOrDefaultAsync(cancellationToken);
         }
 
-        var cv = await db.CandidateDocuments
+        // Internal recruitment Ticket 1: the CV submitted with this application is the exact document
+        // the application references — never "the candidate's latest CV", so uploading a newer CV
+        // cannot change what this application shows as submitted.
+        var cv = row.CvDocumentId is Guid submittedCvId
+            ? await db.CandidateDocuments
+                .AsNoTracking()
+                .Where(cd => cd.Id == submittedCvId && cd.CompanyId == request.CompanyId)
+                .Select(cd => new { cd.Id, cd.FileName, cd.ContentType, cd.FileSize, cd.CreatedAt })
+                .SingleOrDefaultAsync(cancellationToken)
+            : null;
+
+        // The candidate's current (most recently uploaded) CV, returned separately so the UI can offer
+        // it as clearly labelled current/legacy material — e.g. for historic applications with no
+        // captured CV — without ever presenting it as the submitted CV.
+        var currentCv = await db.CandidateDocuments
             .AsNoTracking()
             .Where(cd => cd.CompanyId == request.CompanyId &&
                          cd.CandidateId == row.CandidateId &&
                          cd.Kind == Domain.CandidateDocumentKind.Cv)
             .OrderByDescending(cd => cd.CreatedAt)
+            .ThenByDescending(cd => cd.Id) // Same deterministic order as ListCandidateDocuments' IsCurrentCv.
             .Select(cd => new { cd.Id, cd.FileName, cd.ContentType, cd.FileSize, cd.CreatedAt })
             .FirstOrDefaultAsync(cancellationToken);
 
@@ -119,6 +136,12 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
             row.OfferNotes,
             row.OfferResponseStatus?.ToString(),
             row.OfferMadeAt,
-            row.OfferRespondedAt));
+            row.OfferRespondedAt,
+            row.Version,
+            currentCv?.Id,
+            currentCv?.FileName,
+            currentCv?.ContentType,
+            currentCv?.FileSize,
+            currentCv?.CreatedAt));
     }
 }

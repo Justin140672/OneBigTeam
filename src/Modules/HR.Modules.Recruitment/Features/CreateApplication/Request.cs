@@ -14,4 +14,13 @@ internal sealed record CreateApplicationRequest
     // (enforced in CreateApplicationValidator).
     public ApplicationSource? Source { get; init; }
     public Guid? SourceExternalRecruiterId { get; init; }
+
+    // Internal recruitment Ticket 1: optional id of the CandidateDocument (Kind = Cv) submitted with
+    // this application. Must belong to the same company and candidate (enforced in the handler and by
+    // the database). Omitted/null leaves the application with no captured CV.
+    public Guid? CvDocumentId { get; init; }
+
+    // Populated by the endpoint from ICurrentUser (never bound from the client) so the CV-reference
+    // audit event carries an actor, as AUD-04 requires for human-triggered events.
+    internal Guid? PerformedByUserId { get; init; }
 }

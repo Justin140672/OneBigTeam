@@ -14,4 +14,6 @@ internal sealed record CreateApplicationResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     ApplicationSource? Source,
-    Guid? SourceExternalRecruiterId);
+    Guid? SourceExternalRecruiterId,
+    // Internal recruitment Ticket 1: the submitted CV reference; null when none was captured.
+    Guid? CvDocumentId = null);
