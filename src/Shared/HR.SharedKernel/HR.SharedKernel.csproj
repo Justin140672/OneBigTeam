@@ -21,6 +21,9 @@
     <!-- Ticket 3 (P1) follow-up item 4: IdempotencyKeyHeaderValidator is a FastEndpoints global
          pre-processor. -->
     <PackageReference Include="FastEndpoints" />
+    <!-- P1 support-conversation XSS: the single allow-list HTML sanitiser (Html/SupportHtmlSanitizer)
+         shared by the Support module (write time), HR.Web and HR.Admin.Web (render time). -->
+    <PackageReference Include="HtmlSanitizer" />
   </ItemGroup>
 
   <ItemGroup>

@@ -130,7 +130,9 @@ else
                         <p class="admin-actions-intro">
                             @(response.IsStaffResponse ? "Staff" : "Customer") — @response.CreatedAt.ToString("dd MMM yyyy HH:mm")
                         </p>
-                        <p>@((MarkupString)response.BodyHtml)</p>
+                        @* P1 stored-XSS fix: never render stored support HTML raw — always through the shared allow-list
+                           (defence in depth; bodies are also sanitised before persistence). *@
+                        <div class="support-response-body">@((MarkupString)HR.SharedKernel.Html.SupportHtmlSanitizer.Sanitize(response.BodyHtml))</div>
                         @if (response.Attachments.Count > 0)
                         {
                             <ul>

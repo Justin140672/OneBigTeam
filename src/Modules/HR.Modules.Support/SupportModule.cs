@@ -52,7 +52,11 @@ public static class SupportModule
         // best-effort delete during cleanup-on-failure.
         services.AddScoped<Jobs.SupportAttachmentPendingDeletionRetryJob>();
         services.AddScoped<Jobs.IdempotencyMaintenanceJob>();
+        // P1 stored-XSS fix: idempotent backfill that re-sanitises historical support response bodies.
+        services.AddScoped<Jobs.SupportResponseBodySanitisationJob>();
     }
+
+    internal const string SupportResponseBodySanitisationJobId = "support-response-body-sanitisation";
 
     public static WebApplication UseSupportRecurringJobs(this WebApplication app)
     {
@@ -72,6 +76,16 @@ public static class SupportModule
             "support-idempotency-maintenance",
             job => job.ExecuteAsync(),
             "*/5 * * * *");
+        // P1 stored-XSS fix: one-off backfill of historical support response bodies. Registered with
+        // no schedule (Cron.Never) so it can also be re-run by hand from the Hangfire dashboard, and
+        // triggered once per API startup so every deploy converges existing rows. The job is
+        // idempotent and writes nothing once the table is clean, so repeated or concurrent runs
+        // (multiple instances/restarts) are safe.
+        jobManager.AddOrUpdate<Jobs.SupportResponseBodySanitisationJob>(
+            SupportResponseBodySanitisationJobId,
+            job => job.ExecuteAsync(CancellationToken.None),
+            Cron.Never());
+        jobManager.Trigger(SupportResponseBodySanitisationJobId);
         return app;
     }
 

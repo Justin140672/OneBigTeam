@@ -47,7 +47,9 @@ internal sealed class Endpoint(AddSupportResponseHandler handler, IAuthorization
 
         if (result.IsFailure)
         {
-            await Send.ResultAsync(Results.Json(new { error = result.Error.Message }, statusCode: StatusCodes.Status404NotFound));
+            // P1 stored-XSS fix: validation failures (e.g. a body that sanitises to nothing, or a
+            // rejected attachment) are 400s, not 404s — use the canonical translator.
+            await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }
 

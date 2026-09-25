@@ -98,6 +98,9 @@ if (!app.Environment.IsDevelopment())
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
+// P1 support-conversation stored-XSS fix: CSP as secondary mitigation (see AdminContentSecurityPolicy).
+app.UseAdminContentSecurityPolicy(app.Environment.IsDevelopment());
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();

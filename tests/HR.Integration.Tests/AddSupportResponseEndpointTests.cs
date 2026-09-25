@@ -2,6 +2,10 @@ using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
+using HR.Modules.Support.Persistence;
+using HR.SharedKernel.Html;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
@@ -90,6 +94,92 @@ public class AddSupportResponseEndpointTests
         Assert.True(responsePayload!.IsStaffResponse);
     }
 
+    // ── P1 stored-XSS fix ────────────────────────────────────────────────────────────────────────
+
+    private const string MaliciousBody =
+        "<p>Hi <strong>there</strong></p><script>alert(1)</script><img src=x onerror=alert(1)>" +
+        "<a href=\"javascript:alert(1)\">x</a><iframe src=\"https://evil.example\"></iframe>" +
+        "<a href=\"https://example.com/help\">help</a>";
+
+    private static void AssertSanitised(string bodyHtml)
+    {
+        Assert.DoesNotContain("<script", bodyHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<iframe", bodyHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<img", bodyHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("onerror", bodyHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("javascript:", bodyHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<strong>there</strong>", bodyHtml);
+        Assert.Contains("href=\"https://example.com/help\"", bodyHtml);
+        Assert.Contains($"rel=\"{SupportHtmlSanitizer.LinkRel}\"", bodyHtml);
+    }
+
+    private async Task<Guid> SubmitRequestAsync(HttpClient client, Guid companyId, string title)
+    {
+        var created = await client.PostAsync($"/api/companies/{companyId}/support/requests", BuildSubmission(companyId, title));
+        created.EnsureSuccessStatusCode();
+        var payload = await created.Content.ReadFromJsonAsync<SubmitPayload>();
+        Assert.NotNull(payload);
+        return payload!.Id;
+    }
+
+    [Fact]
+    public async Task Post_SupportResponse_Persists_Sanitised_Html()
+    {
+        var companyId = Guid.NewGuid();
+        using var adminClient = await AdminClient(companyId);
+        var requestId = await SubmitRequestAsync(adminClient, companyId, "Sanitised response issue");
+
+        var response = await adminClient.PostAsync(
+            $"/api/companies/{companyId}/support/requests/{requestId}/responses",
+            BuildResponse(companyId, requestId, MaliciousBody));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var responsePayload = await response.Content.ReadFromJsonAsync<ResponsePayload>();
+        Assert.NotNull(responsePayload);
+
+        // Persisted row is sanitised (write-time control, not only render-time).
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<SupportDbContext>();
+            var saved = await db.SupportResponses.AsNoTracking().SingleAsync(r => r.Id == responsePayload!.Id);
+            AssertSanitised(saved.BodyHtml);
+            Assert.Equal(SupportHtmlSanitizer.Sanitize(MaliciousBody), saved.BodyHtml);
+            Assert.Equal(companyId, saved.CompanyId);
+        }
+
+        // The API read model returns the sanitised body too.
+        var detail = await adminClient.GetAsync($"/api/companies/{companyId}/support/requests/{requestId}");
+        Assert.Equal(HttpStatusCode.OK, detail.StatusCode);
+        var detailPayload = await detail.Content.ReadFromJsonAsync<SupportRequestDetailPayload>();
+        Assert.NotNull(detailPayload);
+        var thread = Assert.Single(detailPayload!.Responses);
+        Assert.Equal(responsePayload!.Id, thread.Id);
+        AssertSanitised(thread.BodyHtml);
+    }
+
+    [Theory]
+    [InlineData("<img src=x onerror=alert(1)><iframe src=\"javascript:alert(1)\"></iframe><svg onload=alert(1)></svg>")]
+    [InlineData("<script></script>")]
+    [InlineData("<script>alert(1)</script>")]
+    public async Task Post_SupportResponse_Returns_BadRequest_When_Body_Has_No_Permitted_Content(string body)
+    {
+        var companyId = Guid.NewGuid();
+        using var adminClient = await AdminClient(companyId);
+        var requestId = await SubmitRequestAsync(adminClient, companyId, "Empty sanitised response issue");
+
+        var response = await adminClient.PostAsync(
+            $"/api/companies/{companyId}/support/requests/{requestId}/responses",
+            BuildResponse(companyId, requestId, body));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<SupportDbContext>();
+        Assert.False(await db.SupportResponses.AnyAsync(r => r.SupportRequestId == requestId));
+    }
+
     private sealed record SubmitPayload(Guid Id, string ReferenceNumber);
     private sealed record ResponsePayload(Guid Id, bool IsStaffResponse, DateTimeOffset CreatedAt);
+    private sealed record SupportRequestDetailPayload(Guid Id, List<SupportResponseDtoPayload> Responses);
+    private sealed record SupportResponseDtoPayload(Guid Id, bool IsStaffResponse, string BodyHtml);
 }

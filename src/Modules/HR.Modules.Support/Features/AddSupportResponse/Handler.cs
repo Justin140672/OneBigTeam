@@ -53,8 +53,19 @@ internal sealed class AddSupportResponseHandler(
         }
 
         var now = clock.UtcNowOffset();
+
+        // P1 stored-XSS fix: SupportResponse.Create sanitises the body with the shared support
+        // allow-list before it can be persisted. A body made up entirely of disallowed markup
+        // (e.g. only a <script> block) sanitises to nothing — reject it rather than store an
+        // empty reply.
         var response = SupportResponse.Create(
             Guid.NewGuid(), supportRequest.Id, request.CompanyId, authorUserId, isStaffResponse, request.BodyHtml, now);
+        if (string.IsNullOrWhiteSpace(response.BodyHtml))
+        {
+            return Result.Failure<AddSupportResponseResponse>(
+                Error.Validation("The response must contain some text. Scripts, embedded content and unsupported formatting are removed."));
+        }
+
         db.SupportResponses.Add(response);
 
         // Reliability review issue 4 (P1): same ownership-scope guarantee as

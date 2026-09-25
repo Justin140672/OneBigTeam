@@ -239,4 +239,96 @@ public class AddSupportResponseHandlerTests
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
     }
+
+    // ── P1 stored-XSS fix ────────────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task HandleAsync_Persists_Sanitised_Body_For_Malicious_Input()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var submitter = Guid.NewGuid();
+        var request = CreateRequest(companyId, submitter);
+        db.SupportRequests.Add(request);
+        await db.SaveChangesAsync();
+
+        const string malicious =
+            "<p>Hi <strong>there</strong></p><script>alert(1)</script><img src=x onerror=alert(1)><a href=\"javascript:alert(1)\">x</a>";
+
+        var handler = BuildHandler(db);
+        var result = await handler.HandleAsync(
+            new AddSupportResponseRequest { CompanyId = companyId, Id = request.Id, BodyHtml = malicious },
+            submitter, isStaffResponse: false, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var saved = await db.SupportResponses.AsNoTracking().SingleAsync(r => r.Id == result.Value!.Id);
+        Assert.DoesNotContain("<script", saved.BodyHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("<img", saved.BodyHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("onerror", saved.BodyHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("javascript:", saved.BodyHtml, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("<strong>there</strong>", saved.BodyHtml);
+        Assert.Equal(HR.SharedKernel.Html.SupportHtmlSanitizer.Sanitize(malicious), saved.BodyHtml);
+    }
+
+    [Theory]
+    [InlineData("<img src=x onerror=alert(1)>")]
+    [InlineData("<img src=x onerror=alert(1)><iframe src=\"javascript:alert(1)\"></iframe><svg onload=alert(1)></svg>")]
+    [InlineData("<script></script>")]
+    [InlineData("<script>alert(1)</script>")]
+    [InlineData("<ScRiPt>fetch('https://evil.example')</sCrIpT><style>p{}</style>")]
+    [InlineData("<img src=x onerror=alert(1)>   <iframe src=\"https://evil.example\"></iframe>")]
+    public async Task HandleAsync_Returns_Validation_And_Persists_Nothing_When_Body_Has_No_Permitted_Content(string body)
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var submitter = Guid.NewGuid();
+        var request = CreateRequest(companyId, submitter);
+        db.SupportRequests.Add(request);
+        await db.SaveChangesAsync();
+        var updatedAtBefore = request.UpdatedAt;
+
+        var emailSender = new FakeEmailSender();
+        var handler = BuildHandler(db, emailSender: emailSender, userEmailReader: new FakeUserEmailReader("customer@example.test"));
+        var result = await handler.HandleAsync(
+            new AddSupportResponseRequest { CompanyId = companyId, Id = request.Id, BodyHtml = body },
+            Guid.NewGuid(), isStaffResponse: true, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Empty(await db.SupportResponses.ToListAsync());
+        Assert.Empty(await db.SupportNotificationAttempts.ToListAsync());
+        Assert.Empty(emailSender.Sent);
+
+        var reloaded = await db.SupportRequests.AsNoTracking().SingleAsync(r => r.Id == request.Id);
+        Assert.Equal(updatedAtBefore, reloaded.UpdatedAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Rejects_Empty_Sanitised_Body_Before_Uploading_Attachments()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var submitter = Guid.NewGuid();
+        var request = CreateRequest(companyId, submitter);
+        db.SupportRequests.Add(request);
+        await db.SaveChangesAsync();
+
+        var storage = new FakeSupportAttachmentStorageService();
+        var handler = BuildHandler(db, storage: storage);
+        var result = await handler.HandleAsync(
+            new AddSupportResponseRequest
+            {
+                CompanyId = companyId,
+                Id = request.Id,
+                BodyHtml = "<img src=x onerror=alert(1)>",
+                Files = TestFile.Collection(TestFile.Create("evidence.png")),
+            },
+            submitter, isStaffResponse: false, CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Empty(storage.Uploads);
+        Assert.Empty(await db.SupportResponseAttachments.ToListAsync());
+    }
 }

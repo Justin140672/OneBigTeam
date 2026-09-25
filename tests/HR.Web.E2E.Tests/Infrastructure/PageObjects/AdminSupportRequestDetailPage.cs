@@ -99,4 +99,31 @@ public sealed class AdminSupportRequestDetailPage(IPage page, string baseUrl)
 
     public ILocator BackToSupportRequestsLink =>
         page.GetByRole(AriaRole.Link, new() { Name = "Back to support requests" });
+
+    /// <summary>
+    /// The Conversation section (a <c>section.details-panel</c> whose own h2 is "Conversation" —
+    /// the page has several <c>.details-panel</c> sections, so the heading is what identifies it).
+    /// Only rendered once the request has at least one response.
+    /// </summary>
+    private ILocator ConversationSection =>
+        page.Locator("section.details-panel")
+            .Filter(new() { Has = page.GetByRole(AriaRole.Heading, new() { Name = "Conversation", Level = 2, Exact = true }) });
+
+    /// <summary>
+    /// Every rendered support response body in the Conversation section (P1 stored-XSS fix: these
+    /// are the <c>div.support-response-body</c> containers rendered through the shared
+    /// SupportHtmlSanitizer). Plural by design — use <c>.First</c>/<c>.Nth</c> or count it.
+    /// </summary>
+    public ILocator ConversationBodies => ConversationSection.Locator("div.support-response-body");
+
+    /// <summary>
+    /// Waits until the Conversation section has rendered exactly
+    /// <paramref name="expectedCount"/> response bodies (Blazor Server renders the detail
+    /// markup after its API round trip, so this is later than <see cref="GoToAsync"/>'s signal).
+    /// </summary>
+    public async Task WaitForConversationAsync(int expectedCount = 1)
+    {
+        await ConversationBodies.First.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
+        await Assertions.Expect(ConversationBodies).ToHaveCountAsync(expectedCount, new() { Timeout = 20_000 });
+    }
 }

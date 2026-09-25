@@ -14,7 +14,8 @@
     <link rel="stylesheet" href="@Assets["HR.Admin.Web.styles.css"]" />
     <link rel="icon" type="image/png" href="favicon.png" media="(prefers-color-scheme: light)" />
     <link rel="icon" type="image/png" href="favicon-dark.png" media="(prefers-color-scheme: dark)" />
-    <ImportMap />
+    @* The import map is the only inline script; the CSP authorises it via this request's nonce. *@
+    <ImportMap nonce="@AdminContentSecurityPolicy.GetNonce(HttpContext)" />
     <HeadOutlet />
 </head>
 
@@ -30,3 +31,8 @@
 </body>
 
 </html>
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+}

@@ -17,7 +17,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="HtmlSanitizer" />
     <PackageReference Include="Syncfusion.Blazor.Buttons" />
     <PackageReference Include="Syncfusion.Blazor.Charts" />
     <PackageReference Include="Syncfusion.Blazor.Diagram" />

@@ -444,6 +444,7 @@
         "dependencies": {
           "FastEndpoints": "[8.3.0, )",
           "FluentValidation": "[12.1.1, )",
+          "HtmlSanitizer": "[9.2.1039, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Microsoft.EntityFrameworkCore.Relational": "[10.0.12, )"
         }
@@ -455,7 +456,6 @@
           "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
           "HR.ServiceDefaults": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
-          "HtmlSanitizer": "[9.2.1039, )",
           "Syncfusion.Blazor.Buttons": "[34.2.3, )",
           "Syncfusion.Blazor.Charts": "[34.2.3, )",
           "Syncfusion.Blazor.Diagram": "[34.2.3, )",
