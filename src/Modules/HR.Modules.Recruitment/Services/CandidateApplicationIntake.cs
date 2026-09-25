@@ -25,14 +25,6 @@ internal sealed record CandidateApplicationIntakeCommand(
     IFormFile? CvFile,
     Guid PerformedByUserId);
 
-/// <summary>An existing candidate in the same company whose email matches (case-insensitively).</summary>
-internal sealed record ExistingCandidateMatch(
-    Guid CandidateId,
-    string FirstName,
-    string LastName,
-    string Email,
-    bool IsActive);
-
 internal sealed record CandidateApplicationIntakeCreated(
     Candidate Candidate,
     Application Application,
@@ -69,11 +61,11 @@ internal sealed class CandidateApplicationIntakeOutcome
 /// compensates; the unconfirmed intent is the reconciliation backstop.</description></item>
 /// </list>
 ///
-/// Duplicate email: there is no unique constraint on (company_id, email) — existing data is not
-/// guaranteed to satisfy one (the legacy CreateCandidate check is case-sensitive). Instead, on
-/// PostgreSQL the transaction takes a transaction-scoped advisory lock keyed on
-/// (company, lower(email)) and re-checks for a match under the lock, so two concurrent intakes for the
-/// same email serialise and the second one reports the first's candidate instead of creating another.
+/// Duplicate email: follows <see cref="CandidateEmailUniqueness"/>, shared with the legacy
+/// CreateCandidate slice — compare on the normalised email, take the same transaction-scoped advisory
+/// lock and re-check under it, so concurrent intakes (or an intake racing a legacy create) serialise
+/// and the loser reports the winner's candidate. The unique index on (company_id, normalised_email) is
+/// the final safeguard; a 23505 on it is reported as the same duplicate outcome.
 /// </summary>
 internal sealed class CandidateApplicationIntake(
     RecruitmentDbContext db,
@@ -121,10 +113,11 @@ internal sealed class CandidateApplicationIntake(
         }
 
         var email = command.Email.Trim();
+        var normalisedEmail = CandidateEmail.Normalise(email);
 
         // Cheap pre-check outside the transaction so the common duplicate case never uploads a file.
         // Re-checked under the advisory lock below — this one alone is not race-safe.
-        var existing = await FindExistingCandidateAsync(companyId, email, cancellationToken);
+        var existing = await CandidateEmailUniqueness.FindExistingAsync(db, companyId, normalisedEmail, cancellationToken);
         if (existing is not null)
             return CandidateApplicationIntakeOutcome.Duplicate(existing);
 
@@ -153,28 +146,22 @@ internal sealed class CandidateApplicationIntake(
             staged = await staging.ReserveAndUploadAsync(companyId, candidateId, file, cancellationToken);
 
         CandidateApplicationIntakeCreated? created = null;
-        ExistingCandidateMatch? raceWinner;
+        ExistingCandidateMatch? raceWinner = null;
+        var hitUniqueIndex = false;
 
         try
         {
-            var isRelational = db.Database.IsRelational();
-
             // Disposed (and therefore rolled back unless committed) when this try block exits,
             // before the catch below or the duplicate compensation runs.
-            await using var transaction = isRelational
+            await using var transaction = db.Database.IsRelational()
                 ? await db.Database.BeginTransactionAsync(cancellationToken)
                 : null;
 
-            if (isRelational)
-            {
-                // Serialises concurrent intakes for the same company + email until commit/rollback.
-                var lockKey = $"recruitment:candidate-email:{companyId:N}:{email.ToLowerInvariant()}";
-                await db.Database.ExecuteSqlAsync(
-                    $"SELECT pg_advisory_xact_lock(hashtextextended({lockKey}, 0))",
-                    cancellationToken);
-            }
+            // Serialises concurrent creations for the same company + normalised email (this intake
+            // and the legacy CreateCandidate slice use the same key) until commit/rollback.
+            await CandidateEmailUniqueness.AcquireCreationLockAsync(db, companyId, normalisedEmail, cancellationToken);
 
-            raceWinner = await FindExistingCandidateAsync(companyId, email, cancellationToken);
+            raceWinner = await CandidateEmailUniqueness.FindExistingAsync(db, companyId, normalisedEmail, cancellationToken);
             if (raceWinner is null)
             {
                 created = StageNewRecords(command, candidateId, email, initialStageId, staged, clock.UtcNowOffset());
@@ -184,6 +171,13 @@ internal sealed class CandidateApplicationIntake(
                 if (transaction is not null)
                     await transaction.CommitAsync(cancellationToken);
             }
+        }
+        catch (DbUpdateException ex) when (CandidateEmailUniqueness.IsViolation(ex))
+        {
+            // Final safeguard: a writer that does not take the creation lock (e.g. an UpdateCandidate
+            // email change) claimed this email first. Report it exactly like the lock re-check does.
+            created = null;
+            hitUniqueIndex = true;
         }
         catch
         {
@@ -196,11 +190,24 @@ internal sealed class CandidateApplicationIntake(
 
         if (created is null)
         {
-            // Another intake created a candidate with this email between the pre-check and the lock.
+            // Another writer created a candidate with this email between the pre-check and the lock
+            // (or, if the unique index fired, before our insert).
             db.ChangeTracker.Clear();
             if (staged is not null)
                 await staging.CompensateAsync(staged);
-            return CandidateApplicationIntakeOutcome.Duplicate(raceWinner!);
+
+            if (hitUniqueIndex)
+            {
+                logger.LogInformation(
+                    "Candidate intake for vacancy {VacancyId} in company {CompanyId} hit the candidate email unique index; reporting the existing candidate.",
+                    command.VacancyId, companyId);
+                raceWinner = await CandidateEmailUniqueness.FindExistingAsync(db, companyId, normalisedEmail, cancellationToken);
+            }
+
+            return raceWinner is not null
+                ? CandidateApplicationIntakeOutcome.Duplicate(raceWinner)
+                : CandidateApplicationIntakeOutcome.Failure(
+                    Error.Conflict("A candidate with this email already exists in this company."));
         }
 
         await PublishAuditAsync(created, command, cancellationToken);
@@ -307,23 +314,5 @@ internal sealed class CandidateApplicationIntake(
                     application.CreatedAt),
                 cancellationToken);
         }
-    }
-
-    /// <summary>Case-insensitive match on the trimmed email within the company. Prefers an active
-    /// record, then the oldest, if legacy data already holds more than one.</summary>
-    private async Task<ExistingCandidateMatch?> FindExistingCandidateAsync(
-        Guid companyId,
-        string trimmedEmail,
-        CancellationToken cancellationToken)
-    {
-        var normalised = trimmedEmail.ToLowerInvariant();
-
-        return await db.Candidates
-            .AsNoTracking()
-            .Where(c => c.CompanyId == companyId && c.Email.ToLower() == normalised)
-            .OrderByDescending(c => c.IsActive)
-            .ThenBy(c => c.CreatedAt)
-            .Select(c => new ExistingCandidateMatch(c.Id, c.FirstName, c.LastName, c.Email, c.IsActive))
-            .FirstOrDefaultAsync(cancellationToken);
     }
 }

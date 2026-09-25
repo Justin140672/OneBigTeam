@@ -13,7 +13,27 @@ internal sealed class Candidate : HR.SharedKernel.IVersionedAggregate
     public Guid CompanyId { get; private set; }
     public string FirstName { get; private set; } = string.Empty;
     public string LastName { get; private set; } = string.Empty;
-    public string Email { get; private set; } = string.Empty;
+    /// <summary>
+    /// Every assignment also refreshes <see cref="NormalisedEmail"/>, so no domain method can change
+    /// the email without keeping the uniqueness key in step. EF materialises through the backing
+    /// field, and <see cref="NormalisedEmail"/> is loaded from its own column.
+    /// </summary>
+    public string Email
+    {
+        get;
+        private set
+        {
+            field = value;
+            NormalisedEmail = CandidateEmail.Normalise(value);
+        }
+    } = string.Empty;
+
+    /// <summary>
+    /// Canonical form of <see cref="Email"/> (see <see cref="CandidateEmail.Normalise"/>). Unique per
+    /// company in the database (ux_candidates_company_id_normalised_email).
+    /// </summary>
+    public string NormalisedEmail { get; private set; } = string.Empty;
+
     public string? Phone { get; private set; }
     public string? ResumeUrl { get; private set; }
     public Guid? EmployeeId { get; private set; }

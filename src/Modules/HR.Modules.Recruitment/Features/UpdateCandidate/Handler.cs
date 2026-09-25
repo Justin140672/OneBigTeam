@@ -1,3 +1,4 @@
+using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -27,20 +28,19 @@ internal sealed class UpdateCandidateHandler(RecruitmentDbContext db, IClock clo
                 Error.Conflict("This candidate's data has been purged under the retention policy and can no longer be edited."));
 
         var newEmail = request.Email.Trim();
-        if (!string.Equals(candidate.Email, newEmail, StringComparison.Ordinal))
-        {
-            var emailExists = await db.Candidates
-                .AnyAsync(
-                    c => c.CompanyId == request.CompanyId &&
-                         c.Id != request.CandidateId &&
-                         c.Email == newEmail,
-                    cancellationToken);
+        var newNormalisedEmail = CandidateEmail.Normalise(newEmail);
+        var duplicateEmailError = Error.Conflict($"A candidate with email '{newEmail}' already exists in this company.");
 
-            if (emailExists)
-            {
-                return Result.Failure<UpdateCandidateResponse>(
-                    Error.Conflict($"A candidate with email '{newEmail}' already exists in this company."));
-            }
+        // Uniqueness is on the normalised email (see CandidateEmailUniqueness), so a case-only change
+        // to this candidate's own email is never a conflict, and another candidate differing only in
+        // case/whitespace always is.
+        if (!string.Equals(candidate.NormalisedEmail, newNormalisedEmail, StringComparison.Ordinal))
+        {
+            var existing = await CandidateEmailUniqueness.FindExistingAsync(
+                db, request.CompanyId, newNormalisedEmail, cancellationToken, excludingCandidateId: request.CandidateId);
+
+            if (existing is not null)
+                return Result.Failure<UpdateCandidateResponse>(duplicateEmailError);
         }
 
         var now = clock.UtcNowOffset();
@@ -60,11 +60,20 @@ internal sealed class UpdateCandidateHandler(RecruitmentDbContext db, IClock clo
             request.ResumeUrl,
             now);
 
-        var saveResult = await db.SaveChangesWithConcurrencyAsync(
-            candidate,
-            request.ExpectedVersion,
-            "This candidate was changed by someone else since you opened it. Reload the latest details and try again.",
-            cancellationToken);
+        Result saveResult;
+        try
+        {
+            saveResult = await db.SaveChangesWithConcurrencyAsync(
+                candidate,
+                request.ExpectedVersion,
+                "This candidate was changed by someone else since you opened it. Reload the latest details and try again.",
+                cancellationToken);
+        }
+        catch (DbUpdateException ex) when (CandidateEmailUniqueness.IsViolation(ex))
+        {
+            // Final safeguard: another writer claimed the new email after the check above.
+            return Result.Failure<UpdateCandidateResponse>(duplicateEmailError);
+        }
 
         if (saveResult.IsFailure)
             return Result.Failure<UpdateCandidateResponse>(saveResult.Error);

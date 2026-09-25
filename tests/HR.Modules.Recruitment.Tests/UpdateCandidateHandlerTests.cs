@@ -162,6 +162,100 @@ public class UpdateCandidateHandlerTests
         Assert.NotEqual("someone.else@example.com", saved.Email);
     }
 
+    [Theory]
+    [InlineData("Emma.Clarke@Example.com")]
+    [InlineData("EMMA.CLARKE@EXAMPLE.COM")]
+    [InlineData("  emma.clarke@example.com  ")]
+    public async Task HandleAsync_Allows_Case_Or_Whitespace_Only_Change_Of_Own_Email(string variant)
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        db.Candidates.Add(candidate);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new UpdateCandidateRequest
+            {
+                CompanyId   = companyId,
+                CandidateId = candidate.Id,
+                FirstName   = "Emma",
+                LastName    = "Clarke",
+                Email       = variant,
+                ExpectedVersion = 1,
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(variant.Trim(), result.Value!.Email);
+
+        var saved = await db.Candidates.SingleAsync();
+        Assert.Equal(variant.Trim(), saved.Email);
+        Assert.Equal("emma.clarke@example.com", saved.NormalisedEmail);
+    }
+
+    [Theory]
+    [InlineData("LIAM.TURNER@EXAMPLE.COM")]
+    [InlineData("  liam.turner@example.com ")]
+    [InlineData("Liam.Turner@Example.com")]
+    public async Task HandleAsync_Returns_Conflict_When_New_Email_Is_Case_Or_Whitespace_Variant_Of_Another_Candidate(string variant)
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var emma = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var liam = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        db.Candidates.AddRange(emma, liam);
+        await db.SaveChangesAsync();
+
+        var auditPublisher = new FakeAuditPublisher();
+
+        var result = await handler(db, auditPublisher).HandleAsync(
+            new UpdateCandidateRequest
+            {
+                CompanyId   = companyId,
+                CandidateId = emma.Id,
+                FirstName   = "Emma",
+                LastName    = "Clarke",
+                Email       = variant,
+                ExpectedVersion = 1,
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+        Assert.Empty(auditPublisher.Published);
+
+        var savedEmma = await db.Candidates.AsNoTracking().SingleAsync(c => c.Id == emma.Id);
+        Assert.Equal("emma.clarke@example.com", savedEmma.NormalisedEmail);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Allows_Case_Variant_Of_Candidate_Email_In_Another_Company()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var emma = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var otherCompanyLiam = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        db.Candidates.AddRange(emma, otherCompanyLiam);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new UpdateCandidateRequest
+            {
+                CompanyId   = companyId,
+                CandidateId = emma.Id,
+                FirstName   = "Emma",
+                LastName    = "Clarke",
+                Email       = "LIAM.TURNER@example.com",
+                ExpectedVersion = 1,
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+    }
+
     private static UpdateCandidateHandler handler(RecruitmentDbContext db, FakeAuditPublisher? auditPublisher = null) =>
         new(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher());
 

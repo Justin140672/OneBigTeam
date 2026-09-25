@@ -16,8 +16,18 @@ internal sealed class Endpoint(CreateCandidateHandler handler)
         CreateCandidateRequest request,
         CancellationToken cancellationToken)
     {
-        var result = await handler.HandleAsync(request, cancellationToken);
+        var outcome = await handler.HandleAsync(request, cancellationToken);
 
+        // A duplicate (case/whitespace-insensitive) email is a 409 whose body also identifies the
+        // existing candidate, whether it was caught by the pre-check, the lock re-check, or the
+        // unique index.
+        if (outcome.DuplicateCandidate is { } duplicate)
+        {
+            await Send.ResultAsync(TypedResults.Conflict(duplicate));
+            return;
+        }
+
+        var result = outcome.Result;
         if (result.IsFailure)
         {
             var businessError = new { error = result.Error.Message };
