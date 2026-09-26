@@ -1,6 +1,7 @@
 using System.Net;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
+using HR.Modules.Recruitment.Domain;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace HR.Integration.Tests;
@@ -9,7 +10,9 @@ namespace HR.Integration.Tests;
 /// Postgres integration coverage for GET /candidates/{c}/documents/{d}/download. See
 /// DownloadCandidateDocumentHandlerTests in HR.Modules.Recruitment.Tests for the unit-level
 /// equivalent. Covers: anonymous 401, wrong-role 403, happy 302 redirect to a storage URL,
-/// unknown document 404, cross-company 404.
+/// unknown document 404, cross-company 404. [P1] The redirect is only issued for a Clean
+/// (malware-scanned) document — see CandidateDocumentScanGatingEndpointTests for the
+/// Pending/Scanning/Infected/Failed gates.
 /// </summary>
 [Collection("Integration")]
 public class DownloadCandidateDocumentEndpointTests
@@ -73,7 +76,8 @@ public class DownloadCandidateDocumentEndpointTests
     {
         var companyId = Guid.NewGuid();
         var candidateId = await RecruitmentTestSeeder.SeedCandidateAsync(_factory, companyId, Now);
-        var documentId = await RecruitmentTestSeeder.SeedCandidateDocumentAsync(_factory, companyId, candidateId, Now);
+        var documentId = await RecruitmentTestSeeder.SeedCandidateDocumentAsync(_factory, companyId, candidateId, Now,
+            scanStatus: CandidateDocumentScanStatus.Clean);
         using var client = await ClientAs(RecruiterUser, companyId);
 
         var response = await client.GetAsync(Url(companyId, candidateId, documentId));
@@ -100,7 +104,8 @@ public class DownloadCandidateDocumentEndpointTests
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
         var candidateId = await RecruitmentTestSeeder.SeedCandidateAsync(_factory, companyA, Now);
-        var documentId = await RecruitmentTestSeeder.SeedCandidateDocumentAsync(_factory, companyA, candidateId, Now);
+        var documentId = await RecruitmentTestSeeder.SeedCandidateDocumentAsync(_factory, companyA, candidateId, Now,
+            scanStatus: CandidateDocumentScanStatus.Clean);
         using var clientB = await ClientAs(RecruiterUser, companyB);
 
         var response = await clientB.GetAsync(Url(companyB, candidateId, documentId));

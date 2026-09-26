@@ -43,6 +43,16 @@ internal sealed class LocalCandidateDocumentStorageService(IHttpContextAccessor 
         return Task.FromResult(File.Exists(ToFullPath(storageKey)));
     }
 
+    public Task<Stream> OpenReadAsync(
+        string storageKey,
+        CancellationToken cancellationToken)
+    {
+        // Throws FileNotFoundException for a missing blob — the scan job records that as a failed
+        // (never clean) attempt.
+        Stream stream = File.OpenRead(ToFullPath(storageKey));
+        return Task.FromResult(stream);
+    }
+
     // A raw file:// path isn't followable by a browser redirect once served from an http(s)://
     // page — route through the dev-only streaming endpoint in Program.cs instead, which serves
     // the same local file over HTTP.

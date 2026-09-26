@@ -74,6 +74,42 @@ public sealed class CandidateCvDocumentsTests(RecruiterPersonaFixture fixture) :
         Assert.True(await cvs.RowHasCurrentBadgeAsync(fileName));
     }
 
+    /// <summary>
+    /// [P1] Malware scanning: a new upload is not downloadable until its scan is Clean. In E2E the
+    /// no-op scanner clears it within seconds, so the first observation may already be Clean — the
+    /// test only asserts the "blocked" shape when it actually observes a non-Clean state (no race).
+    /// Infected/Failed states cannot be produced here and are covered by
+    /// HR.Integration.Tests.CandidateDocumentScanGatingEndpointTests.
+    /// </summary>
+    [Fact]
+    public async Task Upload_ShowsScanState_AndEnablesDownloadOnlyOnceClean()
+    {
+        using var api = await CandidateCvApi.CreateRecruiterApiClientAsync(_fixture.ApiBaseUrl);
+        var candidateId = await CreateFreshCandidateAsync(api);
+        var cvs = await OpenCandidateCvsAsync(candidateId);
+
+        var fileName = $"e2e-scan-cv-{Guid.NewGuid():N}.pdf";
+        await cvs.UploadCvAsync(fileName, CandidateCvApi.BuildTestPdf());
+        await cvs.ExpectRowCountAsync(1);
+
+        var firstStatus = await cvs.GetRowScanStatusAsync(fileName);
+        Assert.Contains(firstStatus, new[] { "Pending", "Scanning", "Clean" });
+        if (firstStatus is "Pending" or "Scanning")
+        {
+            // Re-read in case the scan completed between the two reads.
+            var disabled = await cvs.IsRowDownloadDisabledAsync(fileName);
+            var enabled = await cvs.IsRowDownloadLinkEnabledAsync(fileName);
+            Assert.True(disabled ^ enabled, "A row must show exactly one of: disabled file name, download link");
+        }
+
+        await cvs.WaitForRowScanStatusAsync(fileName, "Clean");
+
+        Assert.True(await cvs.IsRowDownloadLinkEnabledAsync(fileName), "A Clean CV must be downloadable");
+        Assert.False(await cvs.IsRowDownloadDisabledAsync(fileName));
+        Assert.Contains($"/candidates/{candidateId}/cv/", await cvs.GetRowDownloadHrefAsync(fileName));
+        Assert.Equal(new[] { fileName }, await cvs.GetRowFileNamesAsync());
+    }
+
     [Fact]
     public async Task UploadReplacement_RetainsOlderCv_NewestFirst_CurrentBadgeOnlyOnNewest()
     {

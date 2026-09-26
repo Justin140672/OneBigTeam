@@ -9,4 +9,6 @@ internal sealed record UploadCandidateDocumentResponse(
     string FileName,
     long FileSize,
     string ContentType,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    // [P1] Always "Pending" for a fresh upload — the document is not downloadable until scanned Clean.
+    string ScanStatus = "Pending");

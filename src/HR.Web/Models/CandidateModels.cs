@@ -135,7 +135,11 @@ public record CandidateDocumentListItemModel(
     string ContentType,
     DateTimeOffset CreatedAt,
     bool IsCurrentCv = false,
-    int ReferencingApplicationCount = 0);
+    int ReferencingApplicationCount = 0,
+    // Malware-scan gate: "Pending" / "Scanning" / "Clean" / "Infected" / "Failed". IsDownloadable is
+    // server-computed (true only for Clean). Defaults fail closed — a missing value is NOT downloadable.
+    string? ScanStatus = null,
+    bool IsDownloadable = false);
 
 // 201 body of POST .../candidates/{candidateId}/documents.
 public record UploadedCandidateDocumentModel(
@@ -147,7 +151,30 @@ public record UploadedCandidateDocumentModel(
     string FileName,
     long FileSize,
     string ContentType,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    // Always "Pending" on upload — the malware scan runs asynchronously afterwards.
+    string? ScanStatus = null);
+
+// Display helpers for the candidate-document malware-scan state. Anything other than an explicit
+// "Clean" is treated as not viewable (fail closed); the API remains the real enforcement point.
+public static class CandidateDocumentScanStatuses
+{
+    public const string Pending = "Pending";
+    public const string Scanning = "Scanning";
+    public const string Clean = "Clean";
+    public const string Infected = "Infected";
+    public const string Failed = "Failed";
+
+    public static bool IsClean(string? status) =>
+        string.Equals(status, Clean, StringComparison.OrdinalIgnoreCase);
+
+    public static bool IsInProgress(string? status) =>
+        string.Equals(status, Pending, StringComparison.OrdinalIgnoreCase)
+        || string.Equals(status, Scanning, StringComparison.OrdinalIgnoreCase);
+
+    public static bool IsInfected(string? status) =>
+        string.Equals(status, Infected, StringComparison.OrdinalIgnoreCase);
+}
 
 // ── EDIT MODEL ────────────────────────────────────────────────────────────────
 

@@ -30,7 +30,17 @@ internal interface ICandidateDocumentStorageService
         CancellationToken cancellationToken);
 
     /// <summary>
-    /// Returns a URL that can be used to download the file.
+    /// Opens the stored bytes for server-side processing (malware scanning) using the service's own
+    /// credentials. Deliberately distinct from <see cref="GetDownloadUrlAsync"/>: scanning must never
+    /// mint a signed URL for content that has not yet been proven clean.
+    /// </summary>
+    Task<Stream> OpenReadAsync(
+        string storageKey,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Returns a URL that can be used to download the file. Callers must only request one for a
+    /// document whose malware scan is Clean (see CandidateDocument.IsDownloadable).
     /// </summary>
     Task<Uri> GetDownloadUrlAsync(
         string storageKey,

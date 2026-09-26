@@ -161,17 +161,41 @@
                             }
                             else
                             {
+                                <div class="d-flex justify-content-end mb-2">
+                                    <SfButton CssClass="e-small e-flat" Disabled="@(_cvBusy || _cvRefreshing)"
+                                              OnClick="RefreshCvDocumentsAsync" data-testid="candidate-documents-refresh">
+                                        Refresh
+                                    </SfButton>
+                                </div>
                                 <ul class="list-group mb-3">
                                     @foreach (var doc in _cvDocuments)
                                     {
                                         <li class="list-group-item" data-testid="candidate-cv-row">
                                             <div class="d-flex flex-wrap align-items-center gap-2">
-                                                <a href="@CandidateService.GetCandidateDocumentProxyUrl(CompanyId, Id!.Value, doc.Id)"
-                                                   target="_blank" rel="noopener">@doc.FileName</a>
+                                                @if (doc.IsDownloadable)
+                                                {
+                                                    <a href="@CandidateService.GetCandidateDocumentProxyUrl(CompanyId, Id!.Value, doc.Id)"
+                                                       target="_blank" rel="noopener">@doc.FileName</a>
+                                                }
+                                                else
+                                                {
+                                                    @* Malware-scan gate: no href, so this never navigates to the download proxy.
+                                                       Kept as an <a> (role=link, aria-disabled) so the file name stays in the
+                                                       same position/element for assistive tech and existing row locators. *@
+                                                    <a role="link" aria-disabled="true" class="candidate-document__file--disabled"
+                                                       title="@DownloadDisabledReason(doc.ScanStatus)"
+                                                       data-testid="candidate-document-download-disabled">@doc.FileName</a>
+                                                }
                                                 @if (doc.IsCurrentCv)
                                                 {
                                                     <span class="badge bg-success" data-testid="candidate-cv-current-badge">Current CV</span>
                                                 }
+                                                <span class="badge @ScanBadgeCssClass(doc.ScanStatus)"
+                                                      data-testid="candidate-document-scan-status"
+                                                      data-scan-status="@(doc.ScanStatus ?? string.Empty)"
+                                                      title="@ScanBadgeTitle(doc.ScanStatus)">
+                                                    @ScanBadgeText(doc.ScanStatus)
+                                                </span>
                                             </div>
                                             <div class="small text-muted">
                                                 Uploaded @doc.CreatedAt.LocalDateTime.ToString("d MMM yyyy, HH:mm") · @FormatFileSize(doc.FileSize)
@@ -355,7 +379,131 @@
         var response = await CandidateService.ListCandidateDocumentsAsync(CompanyId, Id!.Value);
         // API order is newest first — keep it.
         _cvDocuments = response?.Items.Where(d => d.Kind == "Cv").ToList();
+        StartScanPollingIfNeeded();
     }
+
+    // ── Malware-scan status (candidate documents are scanned asynchronously after upload) ──
+
+    private const int ScanPollIntervalMs = 3_000;
+    private const int ScanPollMaxAttempts = 10; // ~30s, then the user can press Refresh.
+    private CancellationTokenSource? _scanPollCts;
+    private bool _cvRefreshing;
+
+    private bool AnyScanInProgress =>
+        _cvDocuments?.Any(d => CandidateDocumentScanStatuses.IsInProgress(d.ScanStatus)) == true;
+
+    private async Task RefreshCvDocumentsAsync()
+    {
+        if (_cvRefreshing || _cvBusy) return;
+        _cvRefreshing = true;
+        try
+        {
+            await LoadCvDocumentsAsync();
+        }
+        finally
+        {
+            _cvRefreshing = false;
+        }
+    }
+
+    // Bounded auto-refresh while any row is still Pending/Scanning. A new call (initial load, upload,
+    // Refresh) replaces any running poll loop with a fresh ~30s budget; the loop stops once nothing
+    // is in progress, after the attempt cap, or on dispose.
+    private void StartScanPollingIfNeeded()
+    {
+        StopScanPolling();
+        if (!AnyScanInProgress)
+            return;
+
+        var cts = new CancellationTokenSource();
+        _scanPollCts = cts;
+        _ = PollScanStatusAsync(cts);
+    }
+
+    private void StopScanPolling()
+    {
+        var cts = _scanPollCts;
+        _scanPollCts = null;
+        if (cts is null) return;
+        cts.Cancel();
+        cts.Dispose();
+    }
+
+    private async Task PollScanStatusAsync(CancellationTokenSource cts)
+    {
+        var token = cts.Token;
+        try
+        {
+            for (var attempt = 0; attempt < ScanPollMaxAttempts && !token.IsCancellationRequested; attempt++)
+            {
+                await Task.Delay(ScanPollIntervalMs, token);
+                if (_cvRefreshing || _cvBusy) continue;
+
+                var response = await CandidateService.ListCandidateDocumentsAsync(CompanyId, Id!.Value);
+                if (token.IsCancellationRequested) return;
+                if (response is not null)
+                {
+                    await InvokeAsync(() =>
+                    {
+                        if (token.IsCancellationRequested) return;
+                        _cvDocuments = response.Items.Where(d => d.Kind == "Cv").ToList();
+                        StateHasChanged();
+                    });
+                }
+
+                if (!AnyScanInProgress) break;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Component disposed / polling superseded.
+        }
+        catch (ObjectDisposedException)
+        {
+            // Circuit torn down mid-poll.
+        }
+        finally
+        {
+            // Finished naturally → release it. (If superseded/disposed, StopScanPolling already did.)
+            if (ReferenceEquals(_scanPollCts, cts))
+            {
+                _scanPollCts = null;
+                cts.Dispose();
+            }
+        }
+    }
+
+    public override void Dispose()
+    {
+        StopScanPolling();
+        base.Dispose();
+    }
+
+    private static string ScanBadgeText(string? status) =>
+        CandidateDocumentScanStatuses.IsClean(status) ? "Checked"
+        : CandidateDocumentScanStatuses.IsInProgress(status) ? "Security check pending"
+        : CandidateDocumentScanStatuses.IsInfected(status) ? "Quarantined — malware detected"
+        : "Security check failed";
+
+    private static string ScanBadgeCssClass(string? status) =>
+        CandidateDocumentScanStatuses.IsClean(status) ? "candidate-document__scan--clean"
+        : CandidateDocumentScanStatuses.IsInProgress(status) ? "bg-info text-dark"
+        : CandidateDocumentScanStatuses.IsInfected(status) ? "bg-danger"
+        : "bg-warning text-dark";
+
+    private static string ScanBadgeTitle(string? status) =>
+        CandidateDocumentScanStatuses.IsClean(status)
+            ? "This file passed the malware check."
+            : DownloadDisabledReason(status);
+
+    private static string DownloadDisabledReason(string? status) =>
+        CandidateDocumentScanStatuses.IsInProgress(status)
+            ? "This file is being security checked and can be opened once the check completes."
+        : CandidateDocumentScanStatuses.IsInfected(status)
+            ? "This file failed a malware check and has been quarantined. It cannot be opened."
+        : CandidateDocumentScanStatuses.IsClean(status)
+            ? "This file is not currently available to download."
+            : "This file could not be security checked and cannot be opened. Upload it again.";
 
     private void OnCvFileSelected(InputFileChangeEventArgs e)
     {

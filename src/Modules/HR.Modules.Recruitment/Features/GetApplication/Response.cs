@@ -63,7 +63,11 @@ internal sealed record GetApplicationResponse(
     string? CurrentCandidateCvFileName = null,
     string? CurrentCandidateCvContentType = null,
     long? CurrentCandidateCvFileSize = null,
-    DateTimeOffset? CurrentCandidateCvUploadedAt = null);
+    DateTimeOffset? CurrentCandidateCvUploadedAt = null,
+    // [P1] Malware scan state (Pending | Scanning | Clean | Infected | Failed) of the submitted CV and of
+    // the current CV. Null when the corresponding CV is absent. Only "Clean" is downloadable/viewable.
+    string? CvScanStatus = null,
+    string? CurrentCandidateCvScanStatus = null);
 
 internal sealed record ApplicationStageHistoryItem(
     Guid Id,

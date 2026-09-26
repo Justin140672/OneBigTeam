@@ -58,6 +58,53 @@ public sealed class CandidateCvDocumentsSection(IPage page)
 
     private ILocator RowFor(string fileName) => Rows.Filter(new() { HasText = fileName });
 
+    // ── Malware-scan state ([P1] candidate CV scanning) ──────────────────────────────────────
+    // Each row carries a scan badge (data-scan-status = raw status). The file name is a real link
+    // (<a href>) only once the scan is Clean; before that it is an <a> without href marked
+    // data-testid='candidate-document-download-disabled'. In E2E the no-op scanner makes every
+    // upload Clean shortly after the Hangfire job runs; the page auto-polls, and Refresh reloads.
+
+    private ILocator RefreshButton => Card.Locator("[data-testid='candidate-documents-refresh']");
+
+    public async Task<string?> GetRowScanStatusAsync(string fileName) =>
+        await RowFor(fileName).Locator("[data-testid='candidate-document-scan-status']").GetAttributeAsync("data-scan-status");
+
+    public Task<bool> IsRowDownloadLinkEnabledAsync(string fileName) =>
+        RowFor(fileName).Locator("a[href]").IsVisibleAsync();
+
+    public async Task<string?> GetRowDownloadHrefAsync(string fileName) =>
+        await RowFor(fileName).Locator("a[href]").GetAttributeAsync("href");
+
+    public Task<bool> IsRowDownloadDisabledAsync(string fileName) =>
+        RowFor(fileName).Locator("[data-testid='candidate-document-download-disabled']").IsVisibleAsync();
+
+    public Task ClickRefreshAsync() => RefreshButton.ClickAsync();
+
+    /// <summary>
+    /// Bounded wait for a row's scan badge to reach <paramref name="expectedStatus"/>. Relies on the
+    /// page's own auto-poll first, then presses Refresh between waits (the auto-poll stops after
+    /// ~30s), so it is deterministic whether the scan finished before or after the first check.
+    /// </summary>
+    public async Task WaitForRowScanStatusAsync(string fileName, string expectedStatus, int timeoutMs = 90_000)
+    {
+        var badge = RowFor(fileName).Locator(
+            $"[data-testid='candidate-document-scan-status'][data-scan-status='{expectedStatus}']");
+        var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
+        while (true)
+        {
+            try
+            {
+                await badge.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+                return;
+            }
+            catch (System.TimeoutException) when (DateTime.UtcNow < deadline)
+            {
+                if (await RefreshButton.IsEnabledAsync())
+                    await RefreshButton.ClickAsync();
+            }
+        }
+    }
+
     public Task<bool> RowHasCurrentBadgeAsync(string fileName) =>
         RowFor(fileName).Locator("[data-testid='candidate-cv-current-badge']").IsVisibleAsync();
 

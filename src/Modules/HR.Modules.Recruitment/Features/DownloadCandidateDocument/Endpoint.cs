@@ -20,7 +20,18 @@ internal sealed class Endpoint(DownloadCandidateDocumentHandler handler)
 
         if (result.IsFailure)
         {
-            await Send.ResultAsync(TypedResults.NotFound(new { error = result.Error.Message }));
+            var body = new { error = result.Error.Message, code = result.Error.Code };
+
+            // [P1] Not yet scanned → 409 (retry later); quarantined or unscannable → 403 (denied).
+            IResult response = result.Error.Code switch
+            {
+                DownloadCandidateDocumentHandler.ScanPendingCode => TypedResults.Conflict(body),
+                DownloadCandidateDocumentHandler.QuarantinedCode or DownloadCandidateDocumentHandler.ScanFailedCode =>
+                    TypedResults.Json(body, statusCode: StatusCodes.Status403Forbidden),
+                _ => TypedResults.NotFound(new { error = result.Error.Message }),
+            };
+
+            await Send.ResultAsync(response);
             return;
         }
 

@@ -72,7 +72,7 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
             ? await db.CandidateDocuments
                 .AsNoTracking()
                 .Where(cd => cd.Id == submittedCvId && cd.CompanyId == request.CompanyId)
-                .Select(cd => new { cd.Id, cd.FileName, cd.ContentType, cd.FileSize, cd.CreatedAt })
+                .Select(cd => new { cd.Id, cd.FileName, cd.ContentType, cd.FileSize, cd.CreatedAt, cd.ScanStatus })
                 .SingleOrDefaultAsync(cancellationToken)
             : null;
 
@@ -86,7 +86,7 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
                          cd.Kind == Domain.CandidateDocumentKind.Cv)
             .OrderByDescending(cd => cd.CreatedAt)
             .ThenByDescending(cd => cd.Id) // Same deterministic order as ListCandidateDocuments' IsCurrentCv.
-            .Select(cd => new { cd.Id, cd.FileName, cd.ContentType, cd.FileSize, cd.CreatedAt })
+            .Select(cd => new { cd.Id, cd.FileName, cd.ContentType, cd.FileSize, cd.CreatedAt, cd.ScanStatus })
             .FirstOrDefaultAsync(cancellationToken);
 
         var stageHistory = await db.ApplicationStageHistoryEntries
@@ -142,6 +142,8 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
             currentCv?.FileName,
             currentCv?.ContentType,
             currentCv?.FileSize,
-            currentCv?.CreatedAt));
+            currentCv?.CreatedAt,
+            cv?.ScanStatus.ToString(),
+            currentCv?.ScanStatus.ToString()));
     }
 }

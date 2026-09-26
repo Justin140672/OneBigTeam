@@ -1,0 +1,14 @@
+/* Malware-scan gate: file name shown without a link while the document is not downloadable. */
+.candidate-document__file--disabled {
+    color: var(--bs-secondary-color, #6c757d);
+    text-decoration: none;
+    cursor: not-allowed;
+}
+
+/* Subtle "Checked" badge for documents that passed the malware scan. */
+.candidate-document__scan--clean {
+    color: var(--bs-secondary-color, #6c757d);
+    background-color: transparent;
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    font-weight: 500;
+}

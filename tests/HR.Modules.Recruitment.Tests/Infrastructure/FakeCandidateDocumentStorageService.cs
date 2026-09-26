@@ -8,6 +8,29 @@ internal sealed class FakeCandidateDocumentStorageService : ICandidateDocumentSt
     public List<string> Deletions { get; } = [];
     public HashSet<string> ExistingKeys { get; } = [];
 
+    /// <summary>Stored bytes per key (populated by UploadAsync, or directly by a test), served by OpenReadAsync.</summary>
+    public Dictionary<string, byte[]> Contents { get; } = [];
+
+    /// <summary>Test helper: when greater than zero, the next N OpenReadAsync calls throw (simulated storage outage).</summary>
+    public int ThrowOnNextOpenReadAttempts { get; set; }
+
+    /// <summary>Every key a signed download URL was requested for — lets tests prove none was minted.</summary>
+    public List<string> DownloadUrlRequests { get; } = [];
+
+    public Task<Stream> OpenReadAsync(string storageKey, CancellationToken cancellationToken)
+    {
+        if (ThrowOnNextOpenReadAttempts > 0)
+        {
+            ThrowOnNextOpenReadAttempts--;
+            throw new IOException($"Simulated storage failure reading '{storageKey}'.");
+        }
+
+        if (!Contents.TryGetValue(storageKey, out var bytes))
+            throw new FileNotFoundException("Simulated missing blob.", storageKey);
+
+        return Task.FromResult<Stream>(new MemoryStream(bytes, writable: false));
+    }
+
     public string GenerateStorageKey(string storageFolder, string fileName) =>
         $"{storageFolder}/{Guid.NewGuid():N}/{fileName}";
 
@@ -20,6 +43,10 @@ internal sealed class FakeCandidateDocumentStorageService : ICandidateDocumentSt
         var fileName = storageKey[(storageKey.LastIndexOf('/') + 1)..];
         Uploads.Add((fileName, storageKey));
         ExistingKeys.Add(storageKey);
+
+        using var buffer = new MemoryStream();
+        content.CopyTo(buffer);
+        Contents[storageKey] = buffer.ToArray();
         return Task.CompletedTask;
     }
 
@@ -27,7 +54,10 @@ internal sealed class FakeCandidateDocumentStorageService : ICandidateDocumentSt
         Task.FromResult(ExistingKeys.Contains(storageKey));
 
     public Task<Uri> GetDownloadUrlAsync(string storageKey, CancellationToken cancellationToken)
-        => Task.FromResult(new Uri($"https://storage.example.com/{storageKey}"));
+    {
+        DownloadUrlRequests.Add(storageKey);
+        return Task.FromResult(new Uri($"https://storage.example.com/{storageKey}"));
+    }
 
     /// <summary>
     /// Test helper: when greater than zero, the next N calls to <see cref="DeleteAsync"/> throw
@@ -53,6 +83,7 @@ internal sealed class FakeCandidateDocumentStorageService : ICandidateDocumentSt
 
         Deletions.Add(storageKey);
         ExistingKeys.Remove(storageKey);
+        Contents.Remove(storageKey);
         return Task.CompletedTask;
     }
 }

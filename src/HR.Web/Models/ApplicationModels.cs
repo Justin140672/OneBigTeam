@@ -68,7 +68,11 @@ public record GetApplicationResponse(
     string? CurrentCandidateCvFileName = null,
     string? CurrentCandidateCvContentType = null,
     long? CurrentCandidateCvFileSize = null,
-    DateTimeOffset? CurrentCandidateCvUploadedAt = null);
+    DateTimeOffset? CurrentCandidateCvUploadedAt = null,
+    // Malware-scan state ("Pending"/"Scanning"/"Clean"/"Infected"/"Failed") of the submitted CV and of
+    // the candidate's current CV respectively. Only "Clean" may be viewed/downloaded.
+    string? CvScanStatus = null,
+    string? CurrentCandidateCvScanStatus = null);
 
 // ── INTERNAL RECRUITMENT TICKET 1: SUBMITTED CV ──────────────────────────────
 

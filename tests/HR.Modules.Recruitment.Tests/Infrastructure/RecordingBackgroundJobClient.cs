@@ -14,9 +14,14 @@ internal sealed class RecordingBackgroundJobClient : IBackgroundJobClient
 {
     public List<Job> CreatedJobs { get; } = [];
 
+    /// <summary>The state each job in <see cref="CreatedJobs"/> was created with (same index) — lets
+    /// tests tell an immediate Enqueue (EnqueuedState) from a delayed Schedule (ScheduledState).</summary>
+    public List<IState> CreatedStates { get; } = [];
+
     public string Create(Job job, IState state)
     {
         CreatedJobs.Add(job);
+        CreatedStates.Add(state);
         return Guid.NewGuid().ToString();
     }
 

@@ -67,6 +67,33 @@ internal sealed class SupabaseCandidateDocumentStorageService : ICandidateDocume
         return response.IsSuccessStatusCode;
     }
 
+    public async Task<Stream> OpenReadAsync(
+        string storageKey,
+        CancellationToken cancellationToken)
+    {
+        // Authenticated (service-role) server-side read of the private object — no signed URL is
+        // created. Buffered so the HTTP response can be disposed before the scanner consumes it;
+        // candidate documents are size-capped at upload (CandidateDocumentUploadOptions).
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"{_options.SupabaseUrl}/storage/v1/object/authenticated/{_options.BucketName}/{storageKey}");
+
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ServiceRoleKey);
+
+        using var response = await _httpClient.SendAsync(
+            request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var buffer = new MemoryStream();
+        await using (var content = await response.Content.ReadAsStreamAsync(cancellationToken))
+        {
+            await content.CopyToAsync(buffer, cancellationToken);
+        }
+
+        buffer.Position = 0;
+        return buffer;
+    }
+
     public async Task<Uri> GetDownloadUrlAsync(
         string storageKey,
         CancellationToken cancellationToken)

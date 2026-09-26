@@ -63,6 +63,48 @@ internal sealed class CandidateDocumentConfiguration : IEntityTypeConfiguration<
             .HasColumnName("created_at")
             .IsRequired();
 
+        // [P1] Candidate CV malware scanning. The database default is Pending so any row inserted
+        // without an explicit status — and every row that existed before this column was added — is
+        // treated as unscanned (never downloadable) until ScanCandidateDocumentJob records a result.
+        builder.Property(cd => cd.ScanStatus)
+            .HasColumnName("scan_status")
+            .HasConversion<string>()
+            .HasMaxLength(20)
+            .HasDefaultValue(CandidateDocumentScanStatus.Pending)
+            .IsRequired();
+
+        // Doubles as the optimistic-concurrency token for scan claims: every claim increments it, so
+        // two workers racing to claim the same document cannot both succeed.
+        builder.Property(cd => cd.ScanAttemptCount)
+            .HasColumnName("scan_attempt_count")
+            .HasDefaultValue(0)
+            .IsConcurrencyToken()
+            .IsRequired();
+
+        builder.Property(cd => cd.ScanLastAttemptAt)
+            .HasColumnName("scan_last_attempt_at");
+
+        builder.Property(cd => cd.ScanNextAttemptAt)
+            .HasColumnName("scan_next_attempt_at");
+
+        builder.Property(cd => cd.ScanCompletedAt)
+            .HasColumnName("scan_completed_at");
+
+        // Only closed-set categories or a sanitised threat name — never raw exception text.
+        builder.Property(cd => cd.ScanFailureReason)
+            .HasColumnName("scan_failure_reason")
+            .HasMaxLength(200);
+
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint(
+                "ck_candidate_documents_scan_status",
+                "scan_status IN ('Pending', 'Scanning', 'Clean', 'Infected', 'Failed')");
+            t.HasCheckConstraint(
+                "ck_candidate_documents_scan_attempt_count",
+                "scan_attempt_count >= 0");
+        });
+
         builder.HasOne<Candidate>()
             .WithMany()
             .HasForeignKey(cd => cd.CandidateId)
@@ -77,5 +119,9 @@ internal sealed class CandidateDocumentConfiguration : IEntityTypeConfiguration<
         builder.HasIndex(cd => cd.CompanyId);
         builder.HasIndex(cd => cd.CandidateId);
         builder.HasIndex(cd => new { cd.CandidateId, cd.Kind });
+
+        // Drives ReconcileCandidateDocumentScansJob's cross-company sweep for Pending/Scanning rows.
+        builder.HasIndex(cd => new { cd.ScanStatus, cd.CreatedAt })
+            .HasDatabaseName("ix_candidate_documents_scan_status_created_at");
     }
 }

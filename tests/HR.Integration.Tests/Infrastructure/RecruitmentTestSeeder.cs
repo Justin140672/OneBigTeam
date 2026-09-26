@@ -120,18 +120,74 @@ internal static class RecruitmentTestSeeder
         return interview.Id;
     }
 
+    /// <summary>
+    /// Seeds a candidate document row (no blob is written to storage). [P1] Documents start
+    /// <see cref="CandidateDocumentScanStatus.Pending"/> exactly as a real upload does, so a download
+    /// of one is refused (409) until it is scanned; pass <paramref name="scanStatus"/> =
+    /// <see cref="CandidateDocumentScanStatus.Clean"/> for a test that needs a downloadable document.
+    /// The status is reached through the real domain transitions (see <see cref="ApplyScanStatus"/>).
+    /// </summary>
     public static async Task<Guid> SeedCandidateDocumentAsync(
         ApiWebApplicationFactory factory, Guid companyId, Guid candidateId, DateTimeOffset now,
-        string title = "CV", string fileName = "cv.pdf", CandidateDocumentKind kind = CandidateDocumentKind.Other)
+        string title = "CV", string fileName = "cv.pdf", CandidateDocumentKind kind = CandidateDocumentKind.Other,
+        CandidateDocumentScanStatus scanStatus = CandidateDocumentScanStatus.Pending)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
         var document = CandidateDocument.Create(
             Guid.NewGuid(), companyId, candidateId, title, fileName, 2048, "application/pdf",
             $"{companyId}/{candidateId}/{Guid.NewGuid():N}/{fileName}", Guid.NewGuid(), now, kind);
+        ApplyScanStatus(document, scanStatus, DateTimeOffset.UtcNow);
         db.CandidateDocuments.Add(document);
         await db.SaveChangesAsync();
         return document.Id;
+    }
+
+    /// <summary>
+    /// [P1] Moves an existing Pending candidate document to <paramref name="scanStatus"/> through the
+    /// domain methods (as ScanCandidateDocumentJob would), without running a scanner.
+    /// </summary>
+    public static async Task SetCandidateDocumentScanStatusAsync(
+        ApiWebApplicationFactory factory, Guid documentId, CandidateDocumentScanStatus scanStatus)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+        var document = await db.CandidateDocuments.SingleAsync(d => d.Id == documentId);
+        ApplyScanStatus(document, scanStatus, DateTimeOffset.UtcNow);
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>Drives a Pending document to the requested scan status via the domain API. Scan
+    /// transitions are stamped with <paramref name="at"/> — callers pass the real current time so a
+    /// Scanning claim stays live (the recurring reconciliation sweep releases claims older than the
+    /// 15-minute lease), independent of the document's own CreatedAt.</summary>
+    public static void ApplyScanStatus(CandidateDocument document, CandidateDocumentScanStatus scanStatus, DateTimeOffset at)
+    {
+        switch (scanStatus)
+        {
+            case CandidateDocumentScanStatus.Pending:
+                break;
+            case CandidateDocumentScanStatus.Scanning:
+                document.BeginScanAttempt(at);
+                break;
+            case CandidateDocumentScanStatus.Clean:
+                document.BeginScanAttempt(at);
+                document.MarkScanClean(at);
+                break;
+            case CandidateDocumentScanStatus.Infected:
+                document.BeginScanAttempt(at);
+                document.MarkScanInfected("Eicar-Test-Signature", at);
+                break;
+            case CandidateDocumentScanStatus.Failed:
+                for (var attempt = 0; attempt < CandidateDocument.MaxScanAttempts; attempt++)
+                {
+                    document.BeginScanAttempt(at);
+                    document.RecordFailedScanAttempt(CandidateDocumentScanFailureReasons.ScannerUnavailable, at, at);
+                }
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(scanStatus), scanStatus, null);
+        }
     }
 
     /// <summary>

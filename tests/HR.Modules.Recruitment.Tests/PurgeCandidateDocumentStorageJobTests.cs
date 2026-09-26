@@ -225,6 +225,9 @@ public class PurgeCandidateDocumentStorageJobTests
         public Task<bool> ExistsAsync(string storageKey, CancellationToken cancellationToken)
             => throw new NotSupportedException();
 
+        public Task<Stream> OpenReadAsync(string storageKey, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
         public Task<Uri> GetDownloadUrlAsync(string storageKey, CancellationToken cancellationToken)
             => throw new NotSupportedException();
 

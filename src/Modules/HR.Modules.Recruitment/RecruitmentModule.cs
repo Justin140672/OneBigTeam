@@ -90,9 +90,28 @@ public static class RecruitmentModule
         AddCandidateDocumentStorage(services, configuration, environment);
         services.AddScoped<IInterviewFeedbackService, InterviewFeedbackService>();
 
-        services.AddDbContext<RecruitmentDbContext>(options =>
+        services.AddDbContext<RecruitmentDbContext>((sp, options) =>
+        {
             options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
-                npgsql.MigrationsHistoryTable("__ef_migrations_history", "recruitment")));
+                npgsql.MigrationsHistoryTable("__ef_migrations_history", "recruitment"));
+
+            // [P1] Dispatches a malware scan for every committed candidate-document insert (one
+            // interceptor instance per context/unit of work). Hosts without Hangfire (design-time
+            // tooling, bare test containers) skip it; ReconcileCandidateDocumentScansJob remains the
+            // durable backstop for any Pending document either way.
+            var backgroundJobClient = sp.GetService<IBackgroundJobClient>();
+            if (backgroundJobClient is not null)
+            {
+                options.AddInterceptors(new CandidateDocumentScanDispatchInterceptor(
+                    backgroundJobClient,
+                    sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<CandidateDocumentScanDispatchInterceptor>>()));
+            }
+        });
+
+        // [P1] Candidate CV malware scanning — see Jobs/ScanCandidateDocumentJob.cs.
+        services.AddScoped<ScanCandidateDocumentJob>();
+        services.AddScoped<ReconcileCandidateDocumentScansJob>();
+        services.AddHostedService<CandidateDocumentScannerStartupCheck>();
 
         return services;
     }
@@ -383,6 +402,13 @@ public static class RecruitmentModule
             "recruitment-purge-storage-reconciliation",
             job => job.ExecuteAsync(),
             "*/10 * * * *");
+        // [P1] Re-dispatches Pending candidate-document scans whose job was lost (or which were
+        // backfilled to Pending) and releases abandoned Scanning claims — bounded by
+        // CandidateDocument.MaxScanAttempts.
+        jobManager.AddOrUpdate<ReconcileCandidateDocumentScansJob>(
+            "recruitment-candidate-document-scan-reconciliation",
+            job => job.ExecuteAsync(),
+            "*/5 * * * *");
         return app;
     }
 

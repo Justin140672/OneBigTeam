@@ -27,6 +27,7 @@ internal sealed class ListCandidateDocumentsHandler(RecruitmentDbContext db)
                 cd.FileSize,
                 cd.ContentType,
                 cd.CreatedAt,
+                cd.ScanStatus,
                 // Internal recruitment Ticket 2: how many applications record this document as the CV
                 // submitted with them — lets the UI show that an older CV is still in use (and is
                 // retained) after a replacement has been uploaded.
@@ -50,7 +51,9 @@ internal sealed class ListCandidateDocumentsHandler(RecruitmentDbContext db)
                 r.ContentType,
                 r.CreatedAt,
                 IsCurrentCv: r.Id == currentCvId,
-                r.ReferencingApplicationCount))
+                r.ReferencingApplicationCount,
+                r.ScanStatus.ToString(),
+                IsDownloadable: r.ScanStatus == CandidateDocumentScanStatus.Clean))
             .ToList();
 
         return Result.Success(new ListCandidateDocumentsResponse(items));
