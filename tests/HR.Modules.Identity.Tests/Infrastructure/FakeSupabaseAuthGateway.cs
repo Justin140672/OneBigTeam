@@ -111,8 +111,15 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
     /// "nothing persisted on lookup failure" behavior.</summary>
     public bool ShouldThrowOnGetUserIdByEmail { get; set; }
 
+    /// <summary>CodeQL #61: when set, the lookup throws the exception this factory builds from the
+    /// submitted email — lets a test simulate a provider error that echoes the address back.</summary>
+    public Func<string, Exception>? GetUserIdByEmailFailure { get; set; }
+
     public Task<Guid?> GetUserIdByEmailAsync(string email, CancellationToken cancellationToken)
     {
+        if (GetUserIdByEmailFailure is not null)
+            throw GetUserIdByEmailFailure(email);
+
         if (ShouldThrowOnGetUserIdByEmail)
             throw new InvalidOperationException("Simulated Supabase lookup failure.");
 
@@ -181,9 +188,16 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
 
     public List<(string Email, string RedirectTo, IReadOnlyDictionary<string, string> Metadata)> PendingUsersCreatedWithMetadata { get; } = [];
 
+    /// <summary>CodeQL #61: when set, pending-user creation throws the exception this factory
+    /// builds from the submitted email (a provider error echoing the address).</summary>
+    public Func<string, Exception>? CreatePendingUserFailure { get; set; }
+
     public Task<Guid> CreatePendingUserWithMetadataAsync(
         string email, string redirectTo, IReadOnlyDictionary<string, string> metadata, CancellationToken cancellationToken)
     {
+        if (CreatePendingUserFailure is not null)
+            throw CreatePendingUserFailure(email);
+
         if (ShouldThrowEmailAlreadyRegistered)
             throw new EmailAlreadyRegisteredException(email);
 

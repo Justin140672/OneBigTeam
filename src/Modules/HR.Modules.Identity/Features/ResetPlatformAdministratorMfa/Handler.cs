@@ -64,9 +64,11 @@ internal sealed class ResetPlatformAdministratorMfaHandler(
             }
             catch (Exception ex)
             {
-                logger.LogError(ex,
-                    "Resolving the identity-provider account for platform administrator {AdministratorId} failed.",
-                    administrator.Id);
+                // CodeQL #61: an email-keyed lookup — log the exception type, never the exception
+                // (its message may echo the address).
+                logger.LogError(
+                    "ResetPlatformAdministratorMfa failed at stage {FailureStage} ({ExceptionType}). AdministratorId={AdministratorId}",
+                    "provider_account_lookup", ex.GetType().FullName, administrator.Id);
                 supabaseUserId = null;
             }
 
@@ -163,9 +165,11 @@ internal sealed class ResetPlatformAdministratorMfaHandler(
         catch (Exception ex)
         {
             // Logs the administrator ID (a safe correlation identifier), never the email address.
-            logger.LogWarning(ex,
-                "Failed to send MFA-reset notification email to platform administrator {AdministratorId}.",
-                administratorId);
+            // CodeQL #61: the exception object is not logged either — an email-delivery failure
+            // message can quote the recipient address.
+            logger.LogWarning(
+                "Failed to send MFA-reset notification email ({ExceptionType}). AdministratorId={AdministratorId}",
+                ex.GetType().FullName, administratorId);
             return false;
         }
     }

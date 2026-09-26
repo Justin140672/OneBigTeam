@@ -78,6 +78,7 @@ internal sealed class CreatePlatformAdministratorHandler(
         // 2. Determine whether a provider (Supabase Auth) account already exists for this email.
         // A failure here leaves NOTHING persisted yet, so the caller can simply retry the whole
         // request — there is no partial/orphaned local state to reconcile from a lookup failure.
+        var correlationId = Guid.NewGuid();
         Guid? existingProviderUserId;
         try
         {
@@ -85,15 +86,19 @@ internal sealed class CreatePlatformAdministratorHandler(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex,
-                "Resolving the identity-provider account for a new platform administrator ({Email}) failed before any local record was created.",
-                normalizedEmail);
+            // CodeQL #61: operational logs never carry the submitted email address, masked or not.
+            // The exception object itself is deliberately NOT logged either: this lookup is keyed
+            // by email, so a provider exception message may echo the address back. Only the
+            // exception type plus non-personal identifiers are recorded; no administrator record
+            // exists yet at this stage, so the correlation id is the durable diagnostic handle.
+            logger.LogError(
+                "CreatePlatformAdministrator failed at stage {FailureStage} ({ExceptionType}) before any local record was created. CorrelationId={CorrelationId} ActorUserId={ActorUserId}",
+                "provider_account_lookup", ex.GetType().FullName, correlationId, currentUser.UserId);
             return Result.Failure<CreatePlatformAdministratorResponse>(Error.Unexpected(
                 "Could not reach the identity provider to check for an existing account. No changes were made — please retry."));
         }
 
         var isNewProviderAccount = existingProviderUserId is null;
-        var correlationId = Guid.NewGuid();
 
         // 3. Persist the local record FIRST, already in a well-defined Pending* provisioning state
         // (never left silently "created but not really usable"). This is the durable checkpoint a
@@ -197,12 +202,16 @@ internal sealed class CreatePlatformAdministratorHandler(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex,
-                "Identity-provider provisioning step failed for platform administrator {AdministratorId}.",
-                administrator.Id);
+            var failureStage = isNewProviderAccount ? "provider_account_creation_failed" : "link_verification_email_failed";
 
-            administrator.MarkProvisioningFailed(
-                isNewProviderAccount ? "provider_account_creation_failed" : "link_verification_email_failed", now);
+            // CodeQL #61: both provider calls above are keyed by the administrator's email, so the
+            // raw exception (whose message may echo the address) is not logged — only its type
+            // plus the durable administrator record id and provisioning correlation id.
+            logger.LogError(
+                "Platform administrator provisioning failed at stage {FailureStage} ({ExceptionType}). AdministratorId={AdministratorId} CorrelationId={CorrelationId}",
+                failureStage, ex.GetType().FullName, administrator.Id, correlationId);
+
+            administrator.MarkProvisioningFailed(failureStage, now);
 
             await db.SaveChangesAsync(cancellationToken);
 

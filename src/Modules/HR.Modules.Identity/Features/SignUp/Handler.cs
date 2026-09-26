@@ -145,7 +145,10 @@ internal sealed class SignUpHandler(
             // table check above didn't catch it (e.g. a Supabase user left over from a prior signup
             // attempt whose local UserProfile row never got created) — tell the customer the real
             // reason instead of falling into the generic "registration failed" message below.
-            logger.LogWarning(ex, "Self-service registration failed for company {CompanyId}: email already registered with Supabase", companyId);
+            // CodeQL #61: EmailAlreadyRegisteredException carries the submitted address in its
+            // Email property, which exception destructuring/telemetry could emit — so the exception
+            // object is not logged; its type is fully described by this message.
+            logger.LogWarning("Self-service registration failed for company {CompanyId}: email already registered with Supabase", companyId);
             await CompensateFailedRegistrationAsync(companyId, ex.Message, cancellationToken);
             return Result.Failure<SignUpResponse>(Error.Conflict("An account with this email already exists."));
         }

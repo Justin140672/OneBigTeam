@@ -61,10 +61,13 @@ internal sealed class Endpoint(
 
         if (!emailSent)
         {
+            // CodeQL #61: the recipient address is never logged; the employee, company and invite
+            // ids identify the failed delivery without exposing personal data.
             logger.LogWarning(
-                "Invitation email could not be sent. EmployeeId={EmployeeId} To={Email}",
+                "Invitation email could not be sent. EmployeeId={EmployeeId} CompanyId={CompanyId} InviteId={InviteId}",
                 req.EmployeeId,
-                req.Email);
+                req.CompanyId,
+                invite.Id);
         }
 
         await Send.ResultAsync(TypedResults.Ok(new SendInviteResponse(invite.Token, invite.ExpiresAt, emailSent)));
