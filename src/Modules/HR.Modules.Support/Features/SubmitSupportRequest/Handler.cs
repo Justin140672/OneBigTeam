@@ -1,4 +1,3 @@
-using System.Text.Encodings.Web;
 using System.Text.Json;
 using HR.Infrastructure.Abstractions;
 using Microsoft.AspNetCore.Http;
@@ -136,11 +135,9 @@ internal sealed class SubmitSupportRequestHandler(
             try
             {
                 var link = BuildAdminRequestLink(configuration["Support:AdminBaseUrl"], entity.Id);
-                await emailSender.SendAsync(
-                    adminEmail,
-                    $"New support request: {entity.ReferenceNumber}",
-                    BuildEmailHtml(entity, link),
-                    cancellationToken);
+                var email = SupportEmailRenderer.RenderNewRequestAdminAlert(
+                    entity.ReferenceNumber, entity.Type, entity.Priority, entity.Title, link);
+                await emailSender.SendAsync(adminEmail, email.Subject, email.HtmlBody, cancellationToken);
                 attempt.MarkSent(clock.UtcNowOffset());
             }
             catch (Exception ex)
@@ -238,7 +235,7 @@ internal sealed class SubmitSupportRequestHandler(
 
     /// <summary>
     /// Builds the "view request" link from a trusted, configured base URI plus fixed path
-    /// segments, validating the scheme before it is ever HTML-encoded for the anchor's <c>href</c>
+    /// segments, validating the scheme before it is ever HTML-encoded (by SupportEmailRenderer) for the anchor's <c>href</c>
     /// attribute. <paramref name="requestId"/> is a server-generated GUID, but is included via
     /// <see cref="Uri"/> composition rather than string concatenation regardless.
     /// </summary>
@@ -257,40 +254,5 @@ internal sealed class SubmitSupportRequestHandler(
 
         var link = new Uri(baseUri, $"/support/requests/{requestId:D}");
         return link.ToString();
-    }
-
-    private static string BuildEmailHtml(SupportRequest entity, string? link)
-    {
-        // entity.Title is user-controlled free text; HTML-encode it for the text context it is
-        // rendered into. Reference/Type/Priority are server-generated/enum values but are encoded
-        // too for defence in depth. The link is a trusted, validated absolute http(s) URI (or
-        // omitted entirely when not configured) — HTML-encode it for the href attribute context.
-        var referenceNumber = HtmlEncoder.Default.Encode(entity.ReferenceNumber);
-        var type = HtmlEncoder.Default.Encode(entity.Type.ToString());
-        var priority = HtmlEncoder.Default.Encode(entity.Priority.ToString());
-        var title = HtmlEncoder.Default.Encode(entity.Title);
-
-        var linkHtml = link is null
-            ? string.Empty
-            : $"""
-              <p style="margin:24px 0">
-                <a href="{HtmlEncoder.Default.Encode(link)}" style="background:#0d6efd;color:#fff;padding:12px 24px;text-decoration:none;border-radius:4px">
-                  View Request
-                </a>
-              </p>
-              """;
-
-        return $"""
-            <html>
-            <body style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
-              <h1>New Support Request</h1>
-              <p><strong>Reference:</strong> {referenceNumber}</p>
-              <p><strong>Type:</strong> {type}</p>
-              <p><strong>Priority:</strong> {priority}</p>
-              <p><strong>Title:</strong> {title}</p>
-              {linkHtml}
-            </body>
-            </html>
-            """;
     }
 }

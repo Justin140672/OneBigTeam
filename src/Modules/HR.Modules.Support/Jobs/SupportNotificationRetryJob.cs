@@ -1,5 +1,6 @@
 using HR.Modules.Support.Domain;
 using HR.Modules.Support.Persistence;
+using HR.Modules.Support.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -42,11 +43,8 @@ internal sealed class SupportNotificationRetryJob(
 
             try
             {
-                await emailSender.SendAsync(
-                    attempt.RecipientEmail,
-                    $"[Retry] Support request update: {supportRequest.ReferenceNumber}",
-                    $"<p>This is a retried notification for support request {supportRequest.ReferenceNumber}.</p>",
-                    default);
+                var email = SupportEmailRenderer.RenderRetryNotification(supportRequest.ReferenceNumber);
+                await emailSender.SendAsync(attempt.RecipientEmail, email.Subject, email.HtmlBody, default);
                 attempt.MarkSent(clock.UtcNowOffset());
             }
             catch (Exception ex)

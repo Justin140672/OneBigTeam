@@ -173,12 +173,12 @@ internal sealed class AddSupportResponseHandler(
         {
             try
             {
-                var subject = $"Update on your support request {supportRequest.ReferenceNumber}";
-                var body =
-                    $"<p>There's a new reply on your support request <strong>{supportRequest.ReferenceNumber}</strong> — \"{supportRequest.Title}\".</p>" +
-                    $"<p>Sign in to view the full conversation and respond.</p>";
+                // The title is user-controlled plain text: the shared renderer HTML-encodes it (and
+                // every other dynamic value) and header-sanitises the subject.
+                var email = SupportEmailRenderer.RenderStaffReplyCustomerNotification(
+                    supportRequest.ReferenceNumber, supportRequest.Title);
 
-                await emailSender.SendAsync(recipientEmail, subject, body, cancellationToken);
+                await emailSender.SendAsync(recipientEmail, email.Subject, email.HtmlBody, cancellationToken);
                 attempt.MarkSent(now);
             }
             catch (Exception ex)
