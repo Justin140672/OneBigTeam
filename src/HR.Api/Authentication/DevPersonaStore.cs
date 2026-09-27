@@ -30,6 +30,11 @@ public sealed class DevPersonaStore
         // Dedicated to CrossTabLogoutEnforcementTests only — see that test's Email remarks for why a
         // revocation test cannot reuse a persona any other E2E class also logs in as.
         new("30000000-0000-0000-0000-000000000016", Acme,     "Olivia Reyes",  "HR Administrator",    "olivia.reyes@acme.example"),
+        // Dedicated to ManagerTeamProfileTests only — a manager whose team those tests may grow
+        // (9+ extra direct reports, indirect reports) without polluting James Okafor's/David Park's
+        // shared seeded teams that other E2E classes assert on. Its Employee row is seeded only
+        // for the E2E run (EmployeesModule.SeedEmployeesAsync's E2E test pool section).
+        new("30000000-0000-0000-0000-000000000017", Acme,     "Nina Patel",    "Team Lead",           "nina.patel@acme.example"),
     ];
 
     // Personas created via the self-service SignUp flow (HR.Modules.Identity's SignUp feature) —

@@ -19,6 +19,34 @@ internal sealed class EmployeePromotion
     public DateTimeOffset CreatedDate { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
 
+    // Internal recruitment Ticket 7: the department the employee moves to when this promotion is
+    // finalised, taken from the new position profile's own department. Null for promotions recorded
+    // before this column existed; the employee's department is then left unchanged (the previous
+    // behaviour).
+    public Guid? NewDepartmentId { get; private set; }
+
+    // Internal recruitment Ticket 7: NewManagerId == null has always meant "keep the current
+    // manager". An internal appointment can deliberately leave the employee with no manager, so that
+    // intent is persisted explicitly rather than overloading the null.
+    public bool ClearsManager { get; private set; }
+
+    // Internal recruitment Ticket 7: stable idempotency key for promotions recorded as a side effect of
+    // another module's workflow ("recruitment:application:{id}" for an internal appointment). The
+    // filtered unique index on (company_id, source_reference) makes a duplicate impossible, so a
+    // retried appointment returns this promotion instead of recording a second change. Null for
+    // promotions entered directly by HR.
+    public string? SourceReference { get; private set; }
+
+    public const string InternalAppointmentSourcePrefix = "recruitment:application:";
+
+    public bool IsInternalAppointment =>
+        SourceReference is not null &&
+        SourceReference.StartsWith(InternalAppointmentSourcePrefix, StringComparison.Ordinal);
+
+    /// <summary>The manager the employee reports to once this promotion is applied.</summary>
+    public Guid? ResolveManagerId(Guid? currentManagerId) =>
+        ClearsManager ? null : NewManagerId ?? currentManagerId;
+
     public static EmployeePromotion Create(
         Guid id,
         Guid companyId,
@@ -32,8 +60,14 @@ internal sealed class EmployeePromotion
         string? notes,
         Guid? compensationId,
         Guid createdBy,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Guid? newDepartmentId = null,
+        bool clearsManager = false,
+        string? sourceReference = null)
     {
+        if (clearsManager && newManagerId is not null)
+            throw new ArgumentException("A promotion cannot both clear the manager and assign a new one.", nameof(clearsManager));
+
         return new EmployeePromotion
         {
             Id = id,
@@ -49,6 +83,9 @@ internal sealed class EmployeePromotion
             CompensationId = compensationId,
             CreatedBy = createdBy,
             CreatedDate = now,
+            NewDepartmentId = newDepartmentId,
+            ClearsManager = clearsManager,
+            SourceReference = string.IsNullOrWhiteSpace(sourceReference) ? null : sourceReference.Trim(),
         };
     }
 

@@ -39,7 +39,12 @@
                     <div class="card-body">
                         <dl class="row mb-0">
                             <dt class="col-5">Name</dt>
-                            <dd class="col-7" data-testid="review-cv-candidate-name">@_app.CandidateFirstName @_app.CandidateLastName</dd>
+                            @* data-testid stays on the name text alone (E2E reads it verbatim); the
+                               Internal badge (Ticket 6) sits beside it, driven only by IsInternal. *@
+                            <dd class="col-7 review-cv__candidate-name">
+                                <span data-testid="review-cv-candidate-name">@_app.CandidateFirstName @_app.CandidateLastName</span>
+                                <InternalApplicationBadge IsInternal="@_app.IsInternal" />
+                            </dd>
                             <dt class="col-5">Email</dt>
                             <dd class="col-7">@_app.CandidateEmail</dd>
                             <dt class="col-5">Position</dt>

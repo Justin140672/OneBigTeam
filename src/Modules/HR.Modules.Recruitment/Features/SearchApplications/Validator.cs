@@ -10,5 +10,6 @@ internal sealed class SearchApplicationsValidator : AbstractValidator<SearchAppl
         RuleFor(r => r.Search).MaximumLength(200).When(r => r.Search is not null);
         RuleFor(r => r.PageNumber).GreaterThanOrEqualTo(1);
         RuleFor(r => r.PageSize).InclusiveBetween(1, 200);
+        RuleFor(r => r.CandidateId).NotEqual(Guid.Empty).When(r => r.CandidateId is not null);
     }
 }

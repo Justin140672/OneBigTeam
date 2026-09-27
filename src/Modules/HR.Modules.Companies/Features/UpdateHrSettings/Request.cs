@@ -25,7 +25,12 @@ internal sealed record UpdateHrSettingsRequest
 	public bool AutoDisableAccessOnLeavingDate { get; init; } = true;
 	public EmployeeNumberMode EmployeeNumberMode { get; init; } = EmployeeNumberMode.Manual;
 	public string? EmployeeNumberPrefix { get; init; }
-	public int NextEmployeeNumber { get; init; } = 1;
+	// Null = "not changed by the administrator": keep the company's LIVE counter. The counter is
+	// advanced concurrently by Automatic-mode employee creation (EmployeeNumberGenerator's atomic
+	// UPDATE, which deliberately doesn't bump Version), so echoing back the value the settings form
+	// loaded would silently rewind it on every unrelated HR-settings save and hand out numbers that
+	// are already taken. Only an explicit value (the admin edited "Next Number") is applied.
+	public int? NextEmployeeNumber { get; init; }
 	public int EmployeeNumberMinimumLength { get; init; } = 1;
 	public AssetNumberMode AssetNumberMode { get; init; } = AssetNumberMode.Manual;
 	public string? AssetNumberPrefix { get; init; }

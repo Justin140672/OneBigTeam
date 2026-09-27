@@ -20,6 +20,13 @@ internal sealed class ListApplicationsForVacancyHandler(RecruitmentDbContext db)
         if (request.StageId.HasValue)
             query = query.Where(x => x.a.CurrentStageId == request.StageId.Value);
 
+        // Internal recruitment Ticket 6: Source is the authoritative internal indicator — never
+        // Candidate.EmployeeId, which is also set on external candidates once they are hired.
+        if (request.IsInternal == true)
+            query = query.Where(x => x.a.Source == Domain.ApplicationSource.Internal);
+        else if (request.IsInternal == false)
+            query = query.Where(x => x.a.Source == null || x.a.Source != Domain.ApplicationSource.Internal);
+
         var rows = await query
             .OrderByDescending(x => x.a.AppliedAt)
             .Select(x => new
@@ -36,6 +43,10 @@ internal sealed class ListApplicationsForVacancyHandler(RecruitmentDbContext db)
                 x.a.OfferResponseStatus,
                 x.a.OfferedSalary,
                 x.a.OfferedStartDate,
+                IsInternal = x.a.Source == Domain.ApplicationSource.Internal,
+                InternalEmployeeId = x.a.Source == Domain.ApplicationSource.Internal ? x.c.EmployeeId : null,
+                x.a.AppointmentStatus,
+                x.a.AppointmentEffectiveDate,
             })
             .ToListAsync(cancellationToken);
 
@@ -52,7 +63,11 @@ internal sealed class ListApplicationsForVacancyHandler(RecruitmentDbContext db)
                 r.AppliedAt,
                 r.OfferResponseStatus?.ToString(),
                 r.OfferedSalary,
-                r.OfferedStartDate))
+                r.OfferedStartDate,
+                r.IsInternal,
+                r.InternalEmployeeId,
+                r.AppointmentStatus?.ToString(),
+                r.AppointmentEffectiveDate))
             .ToList();
 
         return Result.Success(new ListApplicationsForVacancyResponse(items));

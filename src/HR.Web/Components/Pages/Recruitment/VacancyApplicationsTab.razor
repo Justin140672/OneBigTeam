@@ -15,6 +15,7 @@
 @inject IJSRuntime JS
 
 <div data-testid="vacancy-applications-tab">
+    <SelectedApplicationMarker @ref="_selectionMarker" />
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="mb-0">Applications</h5>
         <SfButton IsPrimary="true" OnClick="OpenAddDialog" data-testid="add-application-btn">
@@ -34,13 +35,33 @@
         <div class="alert alert-success">@_actionSuccess</div>
     }
 
+    @* Internal recruitment Ticket 6: server-side Internal/External filter. Explicit "All" item rather
+       than a clear button. Rendered outside the loading/empty branches so it stays usable when a
+       filter matches nothing. data-testid is on the wrapper so E2E can scope the combobox. *@
+    <div class="application-type-filter" data-testid="application-type-filter">
+        <label class="form-label mb-0" for="application-type-filter">Application type</label>
+        <SfDropDownList TValue="ApplicationTypeFilter" TItem="ApplicationTypeFilterOption"
+                        ID="application-type-filter" Width="180px"
+                        DataSource="@_applicationTypeOptions"
+                        Value="@_applicationType" ValueChanged="OnApplicationTypeChangedAsync">
+            <DropDownListFieldSettings Value="Value" Text="Label" />
+        </SfDropDownList>
+    </div>
+
     @if (_loading)
     {
         <HrLoadingIndicator />
     }
     else if (_applications.Count == 0)
     {
-        <p class="text-muted">No applications yet for this vacancy.</p>
+        <p class="text-muted" data-testid="applications-empty">
+            @(_applicationType switch
+            {
+                ApplicationTypeFilter.Internal => "No internal applications for this vacancy.",
+                ApplicationTypeFilter.External => "No external applications for this vacancy.",
+                _ => "No applications yet for this vacancy.",
+            })
+        </p>
     }
     else
     {
@@ -51,14 +72,21 @@
                 AllowFiltering="false"
                 AllowPaging="false">
             <GridEvents TValue="ApplicationListItemModel" OnToolbarClick="OnToolbarClick"
-                        RowSelected="OnRowSelected" RowDeselected="OnRowDeselected" />
+                        RowSelected="OnRowSelected" RowDeselected="OnRowDeselected"
+                        RowDataBound="OnApplicationRowDataBound" />
             <GridColumns>
                 <GridColumn HeaderText="Candidate" Width="200">
                     <Template>
                         @{
                             var row = (ApplicationListItemModel)context;
-                            <a href="/companies/@CompanyId/candidates/@row.CandidateId">@row.CandidateFirstName @row.CandidateLastName</a>
                         }
+                        @* Internal recruitment Ticket 6: the Internal badge sits in the Candidate cell
+                           (not a new column — E2E addresses later cells by index). *@
+                        <span class="application-candidate-cell" data-testid="application-candidate-cell">
+                            <a href="/companies/@CompanyId/candidates/@row.CandidateId"
+                               data-testid="application-candidate-link">@row.CandidateFirstName @row.CandidateLastName</a>
+                            <InternalApplicationBadge IsInternal="@row.IsInternal" />
+                        </span>
                     </Template>
                 </GridColumn>
                 <GridColumn Field="@nameof(ApplicationListItemModel.CandidateEmail)" HeaderText="Email" Width="200" />
@@ -67,7 +95,9 @@
                         @{
                             var row = (ApplicationListItemModel)context;
                         }
-                        <StatusBadge Variant="@StatusVariant(row)">@StageName(row.CurrentStageId)</StatusBadge>
+                        @* Stable hook for the STAGE badge: the Candidate cell can render an "Internal" badge before it,
+                           so a row-level ".badge" first-match is not the stage. *@
+                        <span data-testid="application-stage-badge"><StatusBadge Variant="@StatusVariant(row)">@StageName(row.CurrentStageId)</StatusBadge></span>
                         @if (row.IsWithdrawn)
                         {
                             <span class="text-muted ms-1">(Withdrawn)</span>
@@ -130,29 +160,122 @@
     }
 </div>
 
-<SfDialog Width="480px" IsModal="true" @bind-Visible="_showAddDialog" Header="Add Candidate" CssClass="add-application-dialog">
+<SfDialog Width="560px" IsModal="true" @bind-Visible="_showAddDialog" Header="Add Candidate" CssClass="add-application-dialog">
     <DialogTemplates>
         <Content>
             <EditForm EditContext="_addEditContext">
                 <DataAnnotationsValidator />
-                <div class="mb-3">
-                    <label class="form-label">Candidate <span class="text-danger">*</span></label>
-                    <SfDropDownList @ref="_candidateDropdown"
-                                    TValue="Guid?" TItem="CandidateListItemModel"
-                                    DataSource="@_candidates" @bind-Value="_addModel.CandidateId"
-                                    Placeholder="Select a candidate" AllowFiltering="true">
-                        <DropDownListFieldSettings Value="Id" Text="FullName" />
-                        <DropDownListEvents TValue="Guid?" TItem="CandidateListItemModel" Filtering="OnCandidateFilteringAsync" />
-                        <DropDownListTemplates TItem="CandidateListItemModel">
-                            <ItemTemplate Context="ddItem">
-                                @{ var c = (CandidateListItemModel)ddItem; }
-                                <span>@c.FirstName @c.LastName</span>
-                            </ItemTemplate>
-                        </DropDownListTemplates>
-                    </SfDropDownList>
-                    <ValidationMessage For="@(() => _addModel.CandidateId)" />
+                @* Internal recruitment Ticket 3: pick an existing candidate, or create a new one (and
+                   their application) without leaving the vacancy. Deliberately NOT a ".mb-3" group —
+                   E2E locates the Recruiter field via ".add-application-dialog .mb-3" + text filter. *@
+                <div class="add-candidate-mode" role="group" aria-label="Candidate type">
+                    <SfButton IsPrimary="@(_addModel.Mode == AddCandidateMode.Existing)"
+                              aria-pressed="@(_addModel.Mode == AddCandidateMode.Existing ? "true" : "false")"
+                              Disabled="_adding"
+                              OnClick="() => SetAddMode(AddCandidateMode.Existing)"
+                              data-testid="add-candidate-mode-existing">
+                        <i class="fa-solid fa-user-check me-1"></i>Select existing candidate
+                    </SfButton>
+                    <SfButton IsPrimary="@(_addModel.Mode == AddCandidateMode.New)"
+                              aria-pressed="@(_addModel.Mode == AddCandidateMode.New ? "true" : "false")"
+                              Disabled="_adding"
+                              OnClick="() => SetAddMode(AddCandidateMode.New)"
+                              data-testid="add-candidate-mode-new">
+                        <i class="fa-solid fa-user-plus me-1"></i>Create new candidate
+                    </SfButton>
                 </div>
-                <div class="mb-3">
+                @if (_addModel.Mode == AddCandidateMode.Existing)
+                {
+                    <div class="mb-3" data-testid="add-application-candidate-field">
+                        <label class="form-label">Candidate <span class="text-danger">*</span></label>
+                        <SfDropDownList @ref="_candidateDropdown"
+                                        TValue="Guid?" TItem="CandidateListItemModel"
+                                        DataSource="@_candidates"
+                                        @bind-Value="_addModel.CandidateId" @bind-Value:after="OnCandidateSelectedAsync"
+                                        Placeholder="Select a candidate" AllowFiltering="true">
+                            <DropDownListFieldSettings Value="Id" Text="FullName" />
+                            <DropDownListEvents TValue="Guid?" TItem="CandidateListItemModel" Filtering="OnCandidateFilteringAsync" />
+                            <DropDownListTemplates TItem="CandidateListItemModel">
+                                <ItemTemplate Context="ddItem">
+                                    @{ var c = (CandidateListItemModel)ddItem; }
+                                    <span>@c.FirstName @c.LastName</span>
+                                </ItemTemplate>
+                            </DropDownListTemplates>
+                        </SfDropDownList>
+                        <ValidationMessage For="@(() => _addModel.CandidateId)" />
+                    </div>
+                    @if (CurrentCvForSelection is { } currentCv)
+                    {
+                        <div class="mb-3" data-testid="attach-current-cv">
+                            <SfCheckBox TChecked="bool" ID="attach-current-cv-input"
+                                        Label="@($"Attach current CV ({currentCv.FileName})")"
+                                        @bind-Checked="_attachCurrentCv"
+                                        Disabled="_adding" />
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="row g-3 mb-3" data-testid="new-candidate-fields">
+                        <div class="col-md-6">
+                            <label class="form-label" for="new-candidate-first-name">First name <span class="text-danger">*</span></label>
+                            <HrTextBox ID="new-candidate-first-name" @bind-Value="_addModel.FirstName" Maxlength="100"
+                                       data-testid="new-candidate-first-name" />
+                            <ValidationMessage For="@(() => _addModel.FirstName)" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="new-candidate-last-name">Last name <span class="text-danger">*</span></label>
+                            <HrTextBox ID="new-candidate-last-name" @bind-Value="_addModel.LastName" Maxlength="100"
+                                       data-testid="new-candidate-last-name" />
+                            <ValidationMessage For="@(() => _addModel.LastName)" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="new-candidate-email">Email <span class="text-danger">*</span></label>
+                            <HrTextBox ID="new-candidate-email" @bind-Value="_addModel.Email" Maxlength="256"
+                                       data-testid="new-candidate-email" />
+                            <ValidationMessage For="@(() => _addModel.Email)" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="new-candidate-phone">Phone (optional)</label>
+                            <HrTextBox ID="new-candidate-phone" @bind-Value="_addModel.Phone" Maxlength="30"
+                                       data-testid="new-candidate-phone" />
+                            <ValidationMessage For="@(() => _addModel.Phone)" />
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="new-candidate-cv-input">CV (optional)</label>
+                            @* Kept rendered while a file is selected — Blazor Server streams the file from
+                               this input element at submit time, so it must stay in the DOM. *@
+                            <InputFile @key="_newCvInputKey" id="new-candidate-cv-input" class="form-control"
+                                       OnChange="OnNewCvSelected" accept=".pdf,.doc,.docx" disabled="@_adding"
+                                       data-testid="new-candidate-cv-input" />
+                            <div class="form-text">PDF, DOC or DOCX, up to 20 MB. Uploaded as the candidate's current CV and submitted with this application.</div>
+                            @if (_newCvFile is not null)
+                            {
+                                <div class="add-candidate-cv-selected" data-testid="new-candidate-cv-selected">
+                                    <i class="fa-solid fa-file-lines"></i>
+                                    <span data-testid="new-candidate-cv-file-name">@_newCvFile.Name</span>
+                                    <span class="text-muted small">(@FormatFileSize(_newCvFile.Size))</span>
+                                    <SfButton CssClass="e-flat e-small" Disabled="_adding" OnClick="RemoveNewCv"
+                                              data-testid="new-candidate-cv-remove">
+                                        <i class="fa-solid fa-xmark me-1"></i>Remove
+                                    </SfButton>
+                                </div>
+                            }
+                            @if (_newCvError is not null)
+                            {
+                                <div class="text-danger small mt-1" data-testid="new-candidate-cv-error">@_newCvError</div>
+                            }
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="new-candidate-resume-url">Legacy resume URL (optional)</label>
+                            <HrTextBox ID="new-candidate-resume-url" @bind-Value="_addModel.ResumeUrl" Maxlength="500"
+                                       Placeholder="https://…" data-testid="new-candidate-resume-url" />
+                            <div class="form-text">Legacy link to a CV hosted elsewhere. Prefer uploading the CV file above.</div>
+                            <ValidationMessage For="@(() => _addModel.ResumeUrl)" />
+                        </div>
+                    </div>
+                }
+                <div class="mb-3" data-testid="add-application-source-field">
                     <label class="form-label">Source (optional)</label>
                     <SfDropDownList TValue="string" TItem="SourceOption" DataSource="@_sourceOptions"
                                     @bind-Value="_addModel.Source" Placeholder="Select a source"
@@ -162,7 +285,7 @@
                 </div>
                 @if (_addModel.Source == "ExternalRecruiter")
                 {
-                    <div class="mb-3">
+                    <div class="mb-3" data-testid="add-application-recruiter-field">
                         <label class="form-label">Recruiter <span class="text-danger">*</span></label>
                         <SfDropDownList TValue="Guid?" TItem="ExternalRecruiterListItemModel"
                                         DataSource="@_activeRecruitersForSource" @bind-Value="_addModel.SourceRecruiterId"
@@ -195,17 +318,53 @@
                     <HrTextBox @bind-Value="_addModel.Notes" Multiline="true" Rows="2" />
                     <ValidationMessage For="@(() => _addModel.Notes)" />
                 </div>
+                @if (_duplicateCandidate is { } duplicate)
+                {
+                    <div class="alert alert-warning py-2" role="alert" data-testid="duplicate-candidate-alert">
+                        <div>
+                            A candidate with this email already exists:
+                            <strong data-testid="duplicate-candidate-name">@duplicate.FullName</strong>
+                            (<span data-testid="duplicate-candidate-email">@duplicate.Email</span>).
+                        </div>
+                        @if (duplicate.IsActive)
+                        {
+                            <div class="mt-2">
+                                <SfButton IsPrimary="true" CssClass="e-small" Disabled="_adding"
+                                          OnClick="SelectDuplicateCandidateAsync"
+                                          data-testid="select-existing-candidate-btn">
+                                    Select existing candidate
+                                </SfButton>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="mt-1" data-testid="duplicate-candidate-inactive">
+                                This candidate is inactive and must be reactivated before they can be added to a vacancy.
+                                <a href="/companies/@CompanyId/candidates/@duplicate.CandidateId" target="_blank" rel="noopener"
+                                   data-testid="duplicate-candidate-details-link">View candidate details</a>
+                            </div>
+                        }
+                    </div>
+                }
                 @if (_dialogError is not null)
                 {
-                    <div class="alert alert-danger py-2">@_dialogError</div>
+                    <div class="alert alert-danger py-2" role="alert" data-testid="add-application-error">@_dialogError</div>
                 }
             </EditForm>
         </Content>
+        <FooterTemplate>
+            @* Disabled while a request is in flight so a double click can't submit twice (a second
+               new-candidate submit would otherwise trip the duplicate-email protection). *@
+            <SfButton IsPrimary="true" Disabled="_adding" OnClick="ConfirmAddAsync" data-testid="add-application-submit">
+                @if (_adding)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Add
+            </SfButton>
+            <SfButton Disabled="_adding" OnClick="() => _showAddDialog = false" data-testid="add-application-cancel">Cancel</SfButton>
+        </FooterTemplate>
     </DialogTemplates>
-    <DialogButtons>
-        <DialogButton Content="Add" IsPrimary="true" OnClick="ConfirmAddAsync" />
-        <DialogButton Content="Cancel" OnClick="() => _showAddDialog = false" />
-    </DialogButtons>
 </SfDialog>
 
 <SfDialog Width="480px" IsModal="true" @bind-Visible="_showScheduleDialog" Header="Schedule Interview" CssClass="schedule-interview-dialog">
@@ -513,6 +672,31 @@
     private EditContext _addEditContext = default!;
     private int _candidateFilterRequestId;
 
+    // True while an Add request is in flight — disables the footer/mode buttons (no double submits).
+    private bool _adding;
+
+    // Existing mode: the selected candidate's current CV (IsCurrentCv), looked up on selection.
+    // _currentCvCandidateId records which candidate the lookup was for, so a stale result can never
+    // attach another candidate's CV; _cvLookupRequestId discards out-of-order lookup responses.
+    private CandidateDocumentListItemModel? _currentCv;
+    private Guid? _currentCvCandidateId;
+    private bool _attachCurrentCv = true;
+    private int _cvLookupRequestId;
+
+    private CandidateDocumentListItemModel? CurrentCvForSelection =>
+        _currentCv is not null && _currentCvCandidateId is not null && _currentCvCandidateId == _addModel.CandidateId
+            ? _currentCv
+            : null;
+
+    // New mode: optional CV file (validated client-side for type/size before it is accepted).
+    private IBrowserFile? _newCvFile;
+    private string? _newCvError;
+    private int _newCvInputKey;
+    private static readonly string[] _allowedCvExtensions = [".pdf", ".doc", ".docx"];
+
+    // New mode: set when the API reports a candidate with the entered email already exists (409).
+    private DuplicateCandidateModel? _duplicateCandidate;
+
     // Ticket #78 — application source. Options mirror Domain.ApplicationSource with display-friendly
     // labels; "Unspecified" is treated the same as "not selected" (Source sent as null either way).
     private sealed record SourceOption(string Value, string Label);
@@ -712,11 +896,35 @@
         await LoadAsync();
     }
 
+    public enum AddCandidateMode { Existing, New }
+
+    // One model for both modes so Source/Recruiter/Notes (and their validation) are shared. The
+    // mode-specific required rules live in Validate() rather than [Required] attributes, since
+    // which fields are required depends on Mode. Length limits mirror the API validators.
     public sealed class AddApplicationFormModel : IValidatableObject
     {
-        [Required(ErrorMessage = "Please select a candidate.")]
+        public AddCandidateMode Mode { get; set; } = AddCandidateMode.Existing;
+
+        // Existing mode.
         public Guid? CandidateId { get; set; }
 
+        // New mode (internal recruitment Ticket 3).
+        [MaxLength(100, ErrorMessage = "First name cannot exceed 100 characters.")]
+        public string? FirstName { get; set; }
+
+        [MaxLength(100, ErrorMessage = "Last name cannot exceed 100 characters.")]
+        public string? LastName { get; set; }
+
+        [MaxLength(256, ErrorMessage = "Email cannot exceed 256 characters.")]
+        public string? Email { get; set; }
+
+        [MaxLength(30, ErrorMessage = "Phone cannot exceed 30 characters.")]
+        public string? Phone { get; set; }
+
+        [MaxLength(500, ErrorMessage = "Resume URL cannot exceed 500 characters.")]
+        public string? ResumeUrl { get; set; }
+
+        // Both modes.
         public string Source { get; set; } = "Unspecified";
 
         public Guid? SourceRecruiterId { get; set; }
@@ -726,6 +934,25 @@
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
         {
+            if (Mode == AddCandidateMode.Existing)
+            {
+                if (CandidateId is null)
+                    yield return new ValidationResult("Please select a candidate.", [nameof(CandidateId)]);
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(FirstName))
+                    yield return new ValidationResult("First name is required.", [nameof(FirstName)]);
+
+                if (string.IsNullOrWhiteSpace(LastName))
+                    yield return new ValidationResult("Last name is required.", [nameof(LastName)]);
+
+                if (string.IsNullOrWhiteSpace(Email))
+                    yield return new ValidationResult("Email is required.", [nameof(Email)]);
+                else if (!new EmailAddressAttribute().IsValid(Email.Trim()))
+                    yield return new ValidationResult("Enter a valid email address.", [nameof(Email)]);
+            }
+
             if (Source == "ExternalRecruiter" && SourceRecruiterId is null)
                 yield return new ValidationResult(
                     "Please select a recruiter, or choose a different source.",
@@ -825,13 +1052,20 @@
     {
         _loading = true;
 
+        // Reloading re-binds (and, while _loading, re-creates) the grid, which drops Syncfusion's
+        // row selection without raising RowDeselected. Clear the server-side selection with it so
+        // the toolbar state / selection marker never describe a row that is no longer selected.
+        _selectedRow = null;
+        _selectionMarker?.Set(null);
+
         if (_stages.Count == 0)
         {
             var stagesResult = await RecruitmentStageService.ListStagesAsync(CompanyId);
             _stages = stagesResult?.Items.ToList() ?? [];
         }
 
-        var result = await ApplicationService.ListApplicationsForVacancyAsync(CompanyId, VacancyId);
+        var result = await ApplicationService.ListApplicationsForVacancyAsync(
+            CompanyId, VacancyId, isInternal: _applicationType.ToIsInternal());
         _applications = result?.Items ?? [];
 
         // Source isn't in ListApplicationsForVacancy's response — fetch each application's detail
@@ -846,6 +1080,38 @@
         }
 
         _loading = false;
+    }
+
+    // ── Internal recruitment Ticket 6: Application type filter + row testids ──
+    private ApplicationTypeFilter _applicationType = ApplicationTypeFilter.All;
+
+    private static readonly ApplicationTypeFilterOption[] _applicationTypeOptions =
+    [
+        new(ApplicationTypeFilter.All, "All"),
+        new(ApplicationTypeFilter.Internal, "Internal"),
+        new(ApplicationTypeFilter.External, "External"),
+    ];
+
+    private async Task OnApplicationTypeChangedAsync(ApplicationTypeFilter value)
+    {
+        if (value == _applicationType) return;
+        _applicationType = value;
+        // The previous selection may not be in the filtered list any more.
+        _selectedRow = null;
+        await LoadAsync();
+    }
+
+    // Stable row hooks for E2E: data-testid="application-row" plus the application/candidate ids and
+    // the IsInternal flag on each grid <tr>.
+    private void OnApplicationRowDataBound(RowDataBoundEventArgs<ApplicationListItemModel> args)
+    {
+        args.Row.SetAttribute(new Dictionary<string, object>
+        {
+            ["data-testid"] = "application-row",
+            ["data-application-id"] = args.Data.Id.ToString(),
+            ["data-candidate-id"] = args.Data.CandidateId.ToString(),
+            ["data-internal"] = args.Data.IsInternal ? "true" : "false",
+        });
     }
 
     private string StageName(Guid stageId) =>
@@ -926,11 +1192,24 @@
     private async Task OpenAddDialog()
     {
         _dialogError = null;
+        _addModel.Mode = AddCandidateMode.Existing;
         _addModel.CandidateId = null;
+        _addModel.FirstName = null;
+        _addModel.LastName = null;
+        _addModel.Email = null;
+        _addModel.Phone = null;
+        _addModel.ResumeUrl = null;
         _addModel.Notes = null;
         _addModel.Source = "Unspecified";
         _addModel.SourceRecruiterId = null;
         _addEditContext = new EditContext(_addModel);
+
+        _cvLookupRequestId++;
+        _currentCv = null;
+        _currentCvCandidateId = null;
+        _attachCurrentCv = true;
+        ClearNewCv();
+        _duplicateCandidate = null;
 
         // ListCandidatesValidator caps PageSize at 100 (InclusiveBetween(1, 100)) — requesting
         // more than that fails FluentValidation validation, and CandidateService.ListCandidatesAsync
@@ -983,20 +1262,170 @@
         await _candidateDropdown.FilterAsync(_candidates, new Query());
     }
 
+    // Existing mode: look up the selected candidate's current CV so it can be attached. Responses are
+    // applied only if they belong to the latest lookup AND the selection hasn't moved on since.
+    private async Task OnCandidateSelectedAsync()
+    {
+        var requestId = ++_cvLookupRequestId;
+        _currentCv = null;
+        _currentCvCandidateId = null;
+        _attachCurrentCv = true;
+
+        if (_addModel.CandidateId is not Guid candidateId)
+            return;
+
+        var documents = await CandidateService.ListCandidateDocumentsAsync(CompanyId, candidateId);
+        if (requestId != _cvLookupRequestId || _addModel.CandidateId != candidateId)
+            return;
+
+        _currentCv = documents?.Items.FirstOrDefault(d => d.IsCurrentCv);
+        _currentCvCandidateId = _currentCv is null ? null : candidateId;
+    }
+
+    private void SetAddMode(AddCandidateMode mode)
+    {
+        if (_adding || _addModel.Mode == mode)
+            return;
+
+        _addModel.Mode = mode;
+        _dialogError = null;
+        _duplicateCandidate = null;
+
+        // The CV file can only be streamed from its (new-mode) InputFile while that input is still
+        // rendered, so a selection doesn't survive leaving new mode.
+        if (mode == AddCandidateMode.Existing)
+            ClearNewCv();
+
+        // Clear the other mode's stale "required" messages: the validator re-validates a notified
+        // field against its attributes only, and the mode-dependent required rules aren't attributes.
+        foreach (var field in new[] { nameof(AddApplicationFormModel.CandidateId), nameof(AddApplicationFormModel.FirstName),
+                                      nameof(AddApplicationFormModel.LastName), nameof(AddApplicationFormModel.Email) })
+        {
+            _addEditContext.NotifyFieldChanged(new FieldIdentifier(_addModel, field));
+        }
+    }
+
+    private void OnNewCvSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+
+        string? error = null;
+        if (!_allowedCvExtensions.Contains(extension))
+            error = "The CV must be a PDF, DOC or DOCX file.";
+        else if (file.Size > CandidateService.MaxCandidateDocumentBytes)
+            error = "The CV file is larger than the 20 MB limit.";
+        else if (file.Size == 0)
+            error = "The selected CV file is empty.";
+
+        if (error is not null)
+        {
+            ClearNewCv();
+            _newCvError = error;
+            return;
+        }
+
+        _newCvFile = file;
+        _newCvError = null;
+    }
+
+    private void RemoveNewCv() => ClearNewCv();
+
+    // Re-keys the InputFile so it is emptied (and the same file can be chosen again).
+    private void ClearNewCv()
+    {
+        _newCvFile = null;
+        _newCvError = null;
+        _newCvInputKey++;
+    }
+
+    private static string FormatFileSize(long bytes) =>
+        bytes < 1024 ? $"{bytes} B"
+        : bytes < 1024 * 1024 ? $"{bytes / 1024.0:0.#} KB"
+        : $"{bytes / (1024.0 * 1024.0):0.#} MB";
+
+    // Duplicate-email follow-up: switch to existing mode with the existing (active) candidate
+    // pre-selected. It's added to the picker's data source first in case it wasn't in the loaded page.
+    private async Task SelectDuplicateCandidateAsync()
+    {
+        if (_adding || _duplicateCandidate is not { IsActive: true } duplicate)
+            return;
+
+        if (_candidates.All(c => c.Id != duplicate.CandidateId))
+        {
+            _candidates = _candidates
+                .Prepend(new CandidateListItemModel(
+                    duplicate.CandidateId, duplicate.FirstName, duplicate.LastName, duplicate.Email,
+                    Phone: null, CreatedAt: default, IsActive: true))
+                .ToList();
+        }
+
+        SetAddMode(AddCandidateMode.Existing);
+        _addModel.CandidateId = duplicate.CandidateId;
+        _addEditContext.NotifyFieldChanged(new FieldIdentifier(_addModel, nameof(AddApplicationFormModel.CandidateId)));
+        await OnCandidateSelectedAsync();
+    }
+
     private async Task ConfirmAddAsync()
     {
+        if (_adding)
+            return;
+
         if (!_addEditContext.Validate())
             return;
 
-        var (created, error) = await ApplicationService.CreateApplicationAsync(
-            CompanyId, VacancyId, _addModel.CandidateId!.Value, _addModel.Notes,
-            source: _addModel.Source == "Unspecified" ? null : _addModel.Source,
-            sourceExternalRecruiterId: _addModel.Source == "ExternalRecruiter" ? _addModel.SourceRecruiterId : null);
-        if (created is null)
+        var source = _addModel.Source == "Unspecified" ? null : _addModel.Source;
+        var sourceExternalRecruiterId = _addModel.Source == "ExternalRecruiter" ? _addModel.SourceRecruiterId : null;
+
+        _adding = true;
+        _dialogError = null;
+        var succeeded = false;
+        try
         {
-            _dialogError = error;
-            return;
+            if (_addModel.Mode == AddCandidateMode.Existing)
+            {
+                var cvDocumentId = _attachCurrentCv ? CurrentCvForSelection?.Id : null;
+                var (created, error) = await ApplicationService.CreateApplicationAsync(
+                    CompanyId, VacancyId, _addModel.CandidateId!.Value, _addModel.Notes,
+                    source: source,
+                    sourceExternalRecruiterId: sourceExternalRecruiterId,
+                    cvDocumentId: cvDocumentId);
+
+                if (created is null)
+                    _dialogError = error ?? "Failed to create application.";
+                else
+                    succeeded = true;
+            }
+            else
+            {
+                _duplicateCandidate = null;
+                var request = new CreateCandidateApplicationRequest(
+                    FormText.Required(_addModel.FirstName!),
+                    FormText.Required(_addModel.LastName!),
+                    FormText.Required(_addModel.Email!),
+                    FormText.Optional(_addModel.Phone),
+                    FormText.Optional(_addModel.ResumeUrl),
+                    FormText.Optional(_addModel.Notes),
+                    source,
+                    sourceExternalRecruiterId);
+
+                var result = await ApplicationService.CreateCandidateApplicationAsync(CompanyId, VacancyId, request, _newCvFile);
+
+                if (result.Duplicate is not null)
+                    _duplicateCandidate = result.Duplicate;
+                else if (result.Created is null)
+                    _dialogError = result.Error ?? "Failed to add the candidate.";
+                else
+                    succeeded = true;
+            }
         }
+        finally
+        {
+            _adding = false;
+        }
+
+        if (!succeeded)
+            return;
 
         _showAddDialog = false;
         _actionSuccess = "Candidate added to vacancy.";
@@ -1205,16 +1634,23 @@
         }
     }
 
+    // Hidden marker (see SelectedApplicationMarker.razor) mirroring _selectedRow into the DOM once
+    // RefreshToolbarStateAsync has run for it — updated via the child's own repaint, not by
+    // re-rendering this component (which would re-assign the grid's Toolbar parameter).
+    private SelectedApplicationMarker? _selectionMarker;
+
     private async Task OnRowSelected(RowSelectEventArgs<ApplicationListItemModel> args)
     {
         _selectedRow = args.Data;
         await RefreshToolbarStateAsync();
+        _selectionMarker?.Set(_selectedRow?.Id);
     }
 
     private async Task OnRowDeselected(RowDeselectEventArgs<ApplicationListItemModel> args)
     {
         _selectedRow = null;
         await RefreshToolbarStateAsync();
+        _selectionMarker?.Set(null);
     }
 
     // Same rationale as SearchPageBase.OnRowSelected/OnRowDeselected: re-assigning the Toolbar

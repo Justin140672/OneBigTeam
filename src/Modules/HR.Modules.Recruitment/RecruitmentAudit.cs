@@ -573,6 +573,33 @@ internal sealed record CandidateHiredAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
+// Internal recruitment Ticket 7: an internal application completed by changing the existing
+// employee's role. Distinct from candidate.hired — no employee was provisioned. Contains no
+// compensation values (sensitive data never goes into audit payloads).
+internal sealed record InternalCandidateAppointedAuditEvent(
+    Guid CompanyId,
+    Guid CandidateId,
+    Guid ApplicationId,
+    Guid VacancyId,
+    Guid EmployeeId,
+    Guid PromotionId,
+    DateOnly EffectiveDate,
+    Guid PerformedBy,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "candidate.internally_appointed";
+    string IAuditEvent.EntityType => "Application";
+    Guid IAuditEvent.EntityId => ApplicationId;
+    Guid? IAuditEvent.EmployeeId => EmployeeId;
+    Guid? IAuditEvent.ActorUserId => PerformedBy == Guid.Empty ? null : PerformedBy;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Internal candidate appointed to the vacancy's role";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { VacancyId, EmployeeId, PromotionId, EffectiveDate };
+    object? IAuditEvent.Metadata => new { CandidateId };
+}
+
 // Ticket #99: published whenever a candidate withdraws an application. Deliberately not folded into
 // ApplicationStageChangedAuditEvent, since withdrawal never changes CurrentStageId (see
 // Application.WithdrawnAt's remarks) — this is a distinct, additive fact about the application.
@@ -681,4 +708,40 @@ internal sealed record RecruitmentStageActiveStatusChangedAuditEvent(
     object? IAuditEvent.Before => new { IsActive = PreviousIsActive };
     object? IAuditEvent.After => new { IsActive = NewIsActive };
     object? IAuditEvent.Metadata => null;
+}
+
+// Internal recruitment Ticket 4: published when a current employee applies for an internally
+// advertised vacancy through the employee Apply endpoint. The acting user is the applying employee
+// (ActorUserId == ActorEmployeeId == EmployeeId under this app's UserId/EmployeeId convention).
+// Records identifiers only — never the employee's name, email or the CV file name.
+internal sealed record InternalApplicationSubmittedAuditEvent(
+    Guid CompanyId,
+    Guid ApplicationId,
+    Guid VacancyId,
+    Guid CandidateId,
+    Guid ApplicantEmployeeId,
+    Guid CvDocumentId,
+    bool CandidateCreated,
+    bool CandidateIdentityRefreshed,
+    bool CandidateReactivated,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "application.internal_submitted";
+    string IAuditEvent.EntityType => "Application";
+    Guid IAuditEvent.EntityId => ApplicationId;
+    Guid? IAuditEvent.EmployeeId => ApplicantEmployeeId;
+    Guid? IAuditEvent.ActorUserId => ApplicantEmployeeId;
+    Guid? IAuditEvent.ActorEmployeeId => ApplicantEmployeeId;
+    Guid? IAuditEvent.CorrelationId => null;
+    string? IAuditEvent.Summary => "Employee applied for an internal vacancy";
+    object? IAuditEvent.Before => null;
+    object? IAuditEvent.After => new { Source = Domain.ApplicationSource.Internal, CvDocumentId };
+    object? IAuditEvent.Metadata => new
+    {
+        VacancyId,
+        CandidateId,
+        CandidateCreated,
+        CandidateIdentityRefreshed,
+        CandidateReactivated,
+    };
 }

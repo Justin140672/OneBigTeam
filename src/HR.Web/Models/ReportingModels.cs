@@ -232,7 +232,9 @@ public enum RecruitmentPipelineGroupBy
 public record RecruitmentPipelineReportFilter(
     DateOnly? StartDate = null,
     DateOnly? EndDate = null,
-    RecruitmentPipelineGroupBy GroupBy = RecruitmentPipelineGroupBy.Recruiter);
+    RecruitmentPipelineGroupBy GroupBy = RecruitmentPipelineGroupBy.Recruiter,
+    // Internal recruitment Ticket 6: null = all applications; true = internal only; false = external only.
+    bool? IsInternal = null);
 
 public record GetRecruitmentPipelineReportResponse(List<RecruitmentPipelineReportRowModel> Items);
 
@@ -249,7 +251,9 @@ public record RecruitmentPipelineReportRowModel(
 
 public record VacancyPerformanceReportFilter(
     DateOnly? StartDate = null,
-    DateOnly? EndDate = null);
+    DateOnly? EndDate = null,
+    // Internal recruitment Ticket 6: null = all applications; true = internal only; false = external only.
+    bool? IsInternal = null);
 
 public record GetVacancyPerformanceReportResponse(List<VacancyPerformanceReportRowModel> Items);
 
@@ -429,7 +433,8 @@ public record WorkloadActionSummaryModel(
 
 // ── Recruitment Pipeline Summary report ─────────────────────────────────────
 
-public record RecruitmentPipelineSummaryReportFilter(bool IncludeClosed = false);
+// IsInternal (internal recruitment Ticket 6): null = all applications; true = internal only; false = external only.
+public record RecruitmentPipelineSummaryReportFilter(bool IncludeClosed = false, bool? IsInternal = null);
 
 public record GetRecruitmentPipelineSummaryReportResponse(
     List<RecruitmentPipelineSummaryRowModel> Vacancies,

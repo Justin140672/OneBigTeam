@@ -448,6 +448,7 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
         if (filter.StartDate is not null) query["startDate"] = filter.StartDate.Value.ToString("yyyy-MM-dd");
         if (filter.EndDate is not null) query["endDate"] = filter.EndDate.Value.ToString("yyyy-MM-dd");
         query["groupBy"] = filter.GroupBy.ToString();
+        if (filter.IsInternal is not null) query["isInternal"] = filter.IsInternal.Value ? "true" : "false";
 
         return query.ToString() ?? string.Empty;
     }
@@ -502,6 +503,7 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
 
         if (filter.StartDate is not null) query["startDate"] = filter.StartDate.Value.ToString("yyyy-MM-dd");
         if (filter.EndDate is not null) query["endDate"] = filter.EndDate.Value.ToString("yyyy-MM-dd");
+        if (filter.IsInternal is not null) query["isInternal"] = filter.IsInternal.Value ? "true" : "false";
 
         return query.ToString() ?? string.Empty;
     }
@@ -882,6 +884,7 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
     {
         var query = HttpUtility.ParseQueryString(string.Empty);
         query["includeClosed"] = filter.IncludeClosed.ToString();
+        if (filter.IsInternal is not null) query["isInternal"] = filter.IsInternal.Value ? "true" : "false";
         return query.ToString() ?? string.Empty;
     }
 

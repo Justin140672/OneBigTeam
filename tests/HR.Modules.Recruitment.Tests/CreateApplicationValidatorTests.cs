@@ -168,4 +168,75 @@ public class CreateApplicationValidatorTests
         var error = Assert.Single(result.Errors, e => e.PropertyName == nameof(CreateApplicationRequest.CvDocumentId));
         Assert.Equal("CvDocumentId must not be an empty identifier.", error.ErrorMessage);
     }
+
+    // ----- Internal recruitment Ticket 4: Source "Internal" is never recruiter-selectable -----
+
+    [Fact]
+    public void Validate_Fails_When_Source_Is_Internal()
+    {
+        var result = _validator.Validate(new CreateApplicationRequest
+        {
+            CompanyId   = Guid.NewGuid(),
+            VacancyId   = Guid.NewGuid(),
+            CandidateId = Guid.NewGuid(),
+            Source      = ApplicationSource.Internal,
+        });
+
+        Assert.False(result.IsValid);
+        var error = Assert.Single(result.Errors, e => e.PropertyName == nameof(CreateApplicationRequest.Source));
+        Assert.Contains("Internal", error.ErrorMessage);
+    }
+
+    [Fact]
+    public void Validate_Fails_Only_On_Source_When_Internal_And_Every_Other_Field_Valid()
+    {
+        var result = _validator.Validate(new CreateApplicationRequest
+        {
+            CompanyId    = Guid.NewGuid(),
+            VacancyId    = Guid.NewGuid(),
+            CandidateId  = Guid.NewGuid(),
+            Notes        = "Applied via the careers page.",
+            CvDocumentId = Guid.NewGuid(),
+            Source       = ApplicationSource.Internal,
+        });
+
+        Assert.False(result.IsValid);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal(nameof(CreateApplicationRequest.Source), error.PropertyName);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_Source_Is_Internal_With_A_Recruiter_Id()
+    {
+        var result = _validator.Validate(new CreateApplicationRequest
+        {
+            CompanyId                 = Guid.NewGuid(),
+            VacancyId                 = Guid.NewGuid(),
+            CandidateId               = Guid.NewGuid(),
+            Source                    = ApplicationSource.Internal,
+            SourceExternalRecruiterId = Guid.NewGuid(),
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateApplicationRequest.Source));
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateApplicationRequest.SourceExternalRecruiterId));
+    }
+
+    [Fact]
+    public void Validate_Passes_For_Every_Non_Internal_Source_Without_Recruiter_Requirement()
+    {
+        foreach (var source in Enum.GetValues<ApplicationSource>()
+                     .Where(s => s is not (ApplicationSource.Internal or ApplicationSource.ExternalRecruiter)))
+        {
+            var result = _validator.Validate(new CreateApplicationRequest
+            {
+                CompanyId   = Guid.NewGuid(),
+                VacancyId   = Guid.NewGuid(),
+                CandidateId = Guid.NewGuid(),
+                Source      = source,
+            });
+
+            Assert.True(result.IsValid, $"Expected {source} to be accepted.");
+        }
+    }
 }

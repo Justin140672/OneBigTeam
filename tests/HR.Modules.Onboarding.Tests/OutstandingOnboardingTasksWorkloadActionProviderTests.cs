@@ -299,4 +299,107 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
 
         Assert.Empty(result);
     }
+
+    // ── Manager workspace: only tasks the manager may actually open are actionable ─────────────
+    // GetTask authorizes only the task's assignee, a manager anywhere in the ASSIGNEE's reporting
+    // line, or an HR Administrator (unassigned tasks are HR-only). A manager's queue row must not
+    // offer "Open task" for a task GetTask will then reject.
+
+    private static OutstandingOnboardingTasksWorkloadActionProvider ManagerProvider(
+        Guid callerId, Guid reportId, Guid onboardingTaskId, Guid linkedTaskId, Guid? assignee) =>
+        new(
+            new FakeOnboardingReportReader(
+            [
+                BuildItem(reportId, new OnboardingReportTaskItem("Set up workstation", null, "Unassigned", true, onboardingTaskId)),
+            ]),
+            new FakeDirectReportsReader([reportId]),
+            new FakeEmployeeDepartmentReader(),
+            new FakeAuthorizationService("reporting:view-onboarding"),
+            new FakeOpenTaskBySourceEntityReader(
+                new Dictionary<Guid, Guid> { [onboardingTaskId] = linkedTaskId },
+                new Dictionary<Guid, Guid?> { [linkedTaskId] = assignee }),
+            new FakeCurrentUser(callerId));
+
+    [Fact]
+    public async Task ManagerScope_UnassignedTask_IsShownButNotOwnerActionable()
+    {
+        var callerId = Guid.NewGuid();
+        var reportId = Guid.NewGuid();
+        var onboardingTaskId = Guid.NewGuid();
+        var linkedTaskId = Guid.NewGuid();
+
+        var provider = ManagerProvider(callerId, reportId, onboardingTaskId, linkedTaskId, assignee: null);
+
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), WorkloadScope.Manager, CancellationToken.None);
+
+        var action = Assert.Single(result);
+        Assert.Equal(linkedTaskId, action.TaskId);
+        Assert.False(action.IsOwnerActionable);
+        Assert.Equal("Unassigned — owned by HR", action.OwnerLabel);
+    }
+
+    [Fact]
+    public async Task ManagerScope_TaskAssignedOutsideTeam_IsNotOwnerActionable()
+    {
+        var callerId = Guid.NewGuid();
+        var reportId = Guid.NewGuid();
+        var onboardingTaskId = Guid.NewGuid();
+        var linkedTaskId = Guid.NewGuid();
+
+        var provider = ManagerProvider(callerId, reportId, onboardingTaskId, linkedTaskId, assignee: Guid.NewGuid());
+
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), WorkloadScope.Manager, CancellationToken.None);
+
+        var action = Assert.Single(result);
+        Assert.False(action.IsOwnerActionable);
+        Assert.Equal("Assigned outside your team", action.OwnerLabel);
+    }
+
+    [Theory]
+    [InlineData(true)]  // assigned to the manager themself
+    [InlineData(false)] // assigned to the report (in the manager's reporting sub-tree)
+    public async Task ManagerScope_TaskAssignedToManagerOrReport_IsOwnerActionable(bool assignedToManager)
+    {
+        var callerId = Guid.NewGuid();
+        var reportId = Guid.NewGuid();
+        var onboardingTaskId = Guid.NewGuid();
+        var linkedTaskId = Guid.NewGuid();
+
+        var provider = ManagerProvider(callerId, reportId, onboardingTaskId, linkedTaskId,
+            assignee: assignedToManager ? callerId : reportId);
+
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), WorkloadScope.Manager, CancellationToken.None);
+
+        var action = Assert.Single(result);
+        Assert.Equal(linkedTaskId, action.TaskId);
+        Assert.True(action.IsOwnerActionable);
+        Assert.Null(action.OwnerLabel);
+    }
+
+    [Fact]
+    public async Task HrScope_UnassignedTask_RemainsOwnerActionable()
+    {
+        var callerId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var onboardingTaskId = Guid.NewGuid();
+        var linkedTaskId = Guid.NewGuid();
+
+        var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
+            new FakeOnboardingReportReader(
+            [
+                BuildItem(employeeId, new OnboardingReportTaskItem("Set up workstation", null, "Unassigned", false, onboardingTaskId)),
+            ]),
+            new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
+            new FakeAuthorizationService("reporting:view-hr"),
+            new FakeOpenTaskBySourceEntityReader(
+                new Dictionary<Guid, Guid> { [onboardingTaskId] = linkedTaskId },
+                new Dictionary<Guid, Guid?> { [linkedTaskId] = null }),
+            new FakeCurrentUser(callerId));
+
+        var result = await provider.GetActionsAsync(Guid.NewGuid(), CallerWithSub(callerId), WorkloadScope.Hr, CancellationToken.None);
+
+        var action = Assert.Single(result);
+        Assert.True(action.IsOwnerActionable);
+        Assert.Null(action.OwnerLabel);
+    }
 }

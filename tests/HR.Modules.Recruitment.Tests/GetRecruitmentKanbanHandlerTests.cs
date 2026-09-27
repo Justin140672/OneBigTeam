@@ -225,6 +225,88 @@ public class GetRecruitmentKanbanHandlerTests
         Assert.Equal("not_found", result.Error.Code);
     }
 
+    // ----- Internal recruitment Ticket 6: IsInternal / EmployeeId on kanban cards -----
+
+    [Fact]
+    public async Task HandleAsync_Internal_And_External_Applications_Share_The_Same_Configured_Stage_Column()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        db.Vacancies.Add(vacancy);
+        var (_, internalApp) = InternalApplicationTestData.AddInternal(db, companyId, vacancy.Id, stages.CvReview.Id, employeeId, Now);
+        var (_, externalApp) = InternalApplicationTestData.AddExternal(db, companyId, vacancy.Id, stages.CvReview.Id, ApplicationSource.Direct, Now.AddMinutes(1));
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new GetRecruitmentKanbanRequest { CompanyId = companyId, VacancyId = vacancy.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        // No separate "Internal" column — same six configured stages.
+        Assert.Equal(6, result.Value!.Columns.Count);
+        var cvReviewColumn = result.Value.Columns.Single(c => c.StageId == stages.CvReview.Id);
+        Assert.Equal(2, cvReviewColumn.Count);
+
+        var internalCard = cvReviewColumn.Candidates.Single(c => c.ApplicationId == internalApp.Id);
+        Assert.True(internalCard.IsInternal);
+        Assert.Equal(employeeId, internalCard.EmployeeId);
+        Assert.Equal(stages.CvReview.Id, internalCard.StageId);
+
+        var externalCard = cvReviewColumn.Candidates.Single(c => c.ApplicationId == externalApp.Id);
+        Assert.False(externalCard.IsInternal);
+        Assert.Null(externalCard.EmployeeId);
+
+        Assert.All(result.Value.Columns.Where(c => c.StageId != stages.CvReview.Id), c => Assert.Empty(c.Candidates));
+    }
+
+    [Fact]
+    public async Task HandleAsync_Legacy_Null_Source_Application_Is_Not_Internal()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        db.Vacancies.Add(vacancy);
+        InternalApplicationTestData.AddExternal(db, companyId, vacancy.Id, stages.ApplicationReceived.Id, null, Now);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new GetRecruitmentKanbanRequest { CompanyId = companyId, VacancyId = vacancy.Id },
+            CancellationToken.None);
+
+        var card = result.Value!.Columns.Single(c => c.StageId == stages.ApplicationReceived.Id).Candidates.Single();
+        Assert.False(card.IsInternal);
+        Assert.Null(card.EmployeeId);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Direct")]
+    public async Task HandleAsync_Hired_External_Candidate_Linked_To_Employee_Is_Not_Internal(string? source)
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        db.Vacancies.Add(vacancy);
+        var (candidate, hired) = InternalApplicationTestData.AddHiredExternal(
+            db, companyId, vacancy.Id, stages.Hired.Id, InternalApplicationTestData.ParseSource(source), Guid.NewGuid(), Now);
+        await db.SaveChangesAsync();
+        Assert.NotNull(candidate.EmployeeId);
+
+        var result = await handler(db).HandleAsync(
+            new GetRecruitmentKanbanRequest { CompanyId = companyId, VacancyId = vacancy.Id },
+            CancellationToken.None);
+
+        var card = result.Value!.Columns.Single(c => c.StageId == stages.Hired.Id).Candidates.Single();
+        Assert.Equal(hired.Id, card.ApplicationId);
+        Assert.False(card.IsInternal);
+        Assert.Null(card.EmployeeId);
+    }
+
     private static GetRecruitmentKanbanHandler handler(RecruitmentDbContext db, IPositionProfileReader? positionProfileReader = null) =>
         new(db, positionProfileReader ?? new FakePositionProfileReader());
 

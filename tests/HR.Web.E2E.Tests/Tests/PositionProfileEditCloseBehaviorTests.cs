@@ -37,7 +37,7 @@ public sealed class PositionProfileEditCloseBehaviorTests(HrAdminPersonaFixture 
         var href = await _page.Locator(".e-rowcell a").Filter(new() { HasText = title }).First.GetAttributeAsync("href");
         Assert.NotNull(href);
         await _page.GotoAsync($"{_fixture.WebBaseUrl}{href}");
-        await _page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await _page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
 
         await ppEdit.CloseAndWaitForListAsync();
 

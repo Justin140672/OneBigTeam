@@ -236,6 +236,63 @@ public class WithdrawApplicationHandlerTests
         Assert.Null(savedCandidate.DeactivatedAt);
     }
 
+    [Fact]
+    public async Task HandleAsync_Withdraws_Internal_Application_And_Source_Stays_Internal()
+    {
+        // Internal recruitment Ticket 6: internal applications use the same pipeline actions.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        db.Vacancies.Add(vacancy);
+        var (_, application) = InternalApplicationTestData.AddInternal(db, companyId, vacancy.Id, stages.CvReview.Id, Guid.NewGuid(), Now);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new WithdrawApplicationRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value!.WithdrawnAt);
+
+        var saved = await db.Applications.SingleAsync();
+        Assert.NotNull(saved.WithdrawnAt);
+        Assert.Equal(stages.CvReview.Id, saved.CurrentStageId);
+        Assert.Equal(ApplicationSource.Internal, saved.Source);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Conflict_While_Internal_Appointment_Is_Pending()
+    {
+        // Internal recruitment Ticket 7: no withdrawal mid-appointment.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Engineering Manager", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        db.Vacancies.Add(vacancy);
+        var employeeId = Guid.NewGuid();
+        var (_, application) = InternalApplicationTestData.AddInternal(db, companyId, vacancy.Id, stages.Offer.Id, employeeId, Now);
+        application.BeginInternalAppointment(employeeId, Guid.NewGuid(), Now);
+        await db.SaveChangesAsync();
+        var auditPublisher = new FakeAuditPublisher();
+
+        var result = await handler(db, auditPublisher).HandleAsync(
+            new WithdrawApplicationRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+        Assert.Equal(Application.InternalAppointmentInProgressMessage, result.Error.Message);
+        Assert.Empty(auditPublisher.Published);
+
+        db.ChangeTracker.Clear();
+        var saved = await db.Applications.SingleAsync();
+        Assert.Null(saved.WithdrawnAt);
+        Assert.Equal(InternalAppointmentStatus.Pending, saved.AppointmentStatus);
+    }
+
     private static WithdrawApplicationHandler handler(
         RecruitmentDbContext db,
         FakeAuditPublisher? auditPublisher = null) =>

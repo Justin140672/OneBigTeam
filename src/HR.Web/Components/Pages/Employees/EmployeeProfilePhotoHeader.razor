@@ -1,4 +1,5 @@
 @inject ProfilePhotoService ProfilePhotoService
+@implements IDisposable
 
 <div class="d-flex align-items-start gap-3 mb-3">
     <ProfilePhotoAvatar PhotoUrl="@_currentPhotoUrl" Initials="@Initials" SizePx="72" />
@@ -119,21 +120,42 @@
     // comes back Clean (see ScanStatusAccessGuard.CheckDownloadable), so a single fetch right
     // after upload can race it and see nothing, leaving the header stuck on the initials
     // placeholder with nothing left to trigger a re-render once scanning actually finishes.
-    // Poll briefly instead of fetching once. 40 attempts / 20s total (raised from 20/10s, itself
-    // raised from 10/5s) — under a full E2E suite run, Hangfire's queue can be busy enough with
-    // other tests' background jobs that the scan doesn't come back within the previous window.
-    // This budget matters more than it looks: once it's exhausted, nothing else re-triggers a
-    // fetch — the header is left showing initials permanently even once the scan does finish late.
+    // Poll instead of fetching once. The previous fixed 20s budget was the actual bug: the scan's
+    // latency is Hangfire queue pickup (polling storage) plus whatever other background work is
+    // queued ahead of it, which has no fixed upper bound under load — and once the budget ran out
+    // nothing re-triggered a fetch, so the header showed initials PERMANENTLY even after the scan
+    // finished (the user had to reload the page). Keep polling for as long as the header is on
+    // screen (bounded at a generous 2 minutes, backing off after the first 20s so a slow scan
+    // doesn't hammer the API), and stop as soon as the component is disposed.
+    private readonly CancellationTokenSource _disposeCts = new();
+
     private async Task PollForCurrentPhotoAsync()
     {
-        for (var attempt = 0; attempt < 40; attempt++)
+        var started = DateTime.UtcNow;
+        try
         {
-            await LoadCurrentPhotoAsync();
-            if (_currentPhotoUrl is not null)
-                return;
+            while (!_disposeCts.IsCancellationRequested && DateTime.UtcNow - started < TimeSpan.FromMinutes(2))
+            {
+                await LoadCurrentPhotoAsync();
+                if (_currentPhotoUrl is not null)
+                    return;
 
-            await Task.Delay(500);
+                var delay = DateTime.UtcNow - started < TimeSpan.FromSeconds(20)
+                    ? TimeSpan.FromMilliseconds(500)
+                    : TimeSpan.FromSeconds(2);
+                await Task.Delay(delay, _disposeCts.Token);
+            }
         }
+        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+        {
+            // Navigated away — nothing left to update.
+        }
+    }
+
+    public void Dispose()
+    {
+        _disposeCts.Cancel();
+        _disposeCts.Dispose();
     }
 
     private async Task ApproveAsync()

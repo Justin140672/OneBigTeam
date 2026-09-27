@@ -39,7 +39,11 @@ public sealed record KanbanCandidateModel(
     // Resolved agency display name — server-resolved now, so this component no longer needs to look
     // it up against the employee list.
     string? AssignedRecruiterAgencyName,
-    string VacancyTitle)
+    string VacancyTitle,
+    // Internal recruitment Ticket 6: true only when the application's Source == Internal (never
+    // inferred from EmployeeId). EmployeeId is populated only for internal applications.
+    bool IsInternal = false,
+    Guid? EmployeeId = null)
 {
     public string CandidateFullName => $"{CandidateFirstName} {CandidateLastName}";
 }

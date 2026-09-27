@@ -117,6 +117,123 @@
     word-break: break-word;
 }
 
+/* ── Applied state ───────────────────────────────────── */
+
+.vacancy-card-applied-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    align-self: flex-start;
+    margin-top: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #dcfce7;
+    color: #166534;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.vacancy-applied-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: -8px 0 16px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #dcfce7;
+    color: #166534;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.vacancy-apply-success {
+    border: 1px solid #86efac;
+    border-left-width: 4px;
+    border-left-color: #16a34a;
+    background: #f0fdf4;
+    color: #14532d;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    font-size: 0.875rem;
+}
+
+.vacancy-apply-success-heading {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.vacancy-apply-success:focus,
+.vacancy-apply-server-error:focus {
+    outline: 2px solid var(--hr-color-primary);
+    outline-offset: 2px;
+}
+
+.vacancy-apply-unavailable {
+    margin: 16px 0 0;
+    font-size: 0.85rem;
+    color: #4b5563;
+}
+
+/* ── Apply form ──────────────────────────────────────── */
+
+.vacancy-apply-intro {
+    font-size: 0.875rem;
+    color: #374151;
+    margin-bottom: 16px;
+}
+
+.vacancy-apply-identity {
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+}
+
+.vacancy-apply-identity .vacancy-detail-dl {
+    margin-bottom: 8px;
+}
+
+.vacancy-apply-identity-note {
+    margin: 0;
+    font-size: 0.78rem;
+    color: #4b5563;
+}
+
+.vacancy-apply-cv {
+    margin-bottom: 12px;
+}
+
+.vacancy-apply-cv-selected {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    font-size: 0.875rem;
+    color: #111827;
+}
+
+.vacancy-apply-cv-file-name {
+    font-weight: 600;
+    word-break: break-all;
+}
+
+.vacancy-apply-cv-file-size {
+    font-size: 0.8rem;
+    color: #4b5563;
+}
+
+.vacancy-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
 /* ── Dark mode ───────────────────────────────────────── */
 
 html[data-theme="dark"] .vacancy-card {
@@ -127,12 +244,35 @@ html[data-theme="dark"] .vacancy-card {
 html[data-theme="dark"] .vacancy-card-title,
 html[data-theme="dark"] .vacancy-detail-title,
 html[data-theme="dark"] .vacancy-detail-dl dd,
-html[data-theme="dark"] .vacancy-detail-description {
+html[data-theme="dark"] .vacancy-detail-description,
+html[data-theme="dark"] .vacancy-apply-cv-selected {
     color: var(--hr-gray-50);
 }
 
 html[data-theme="dark"] .vacancy-card-meta,
 html[data-theme="dark"] .vacancy-detail-dl dt,
-html[data-theme="dark"] .vacancy-detail-description-label {
+html[data-theme="dark"] .vacancy-detail-description-label,
+html[data-theme="dark"] .vacancy-apply-intro,
+html[data-theme="dark"] .vacancy-apply-identity-note,
+html[data-theme="dark"] .vacancy-apply-cv-file-size,
+html[data-theme="dark"] .vacancy-apply-unavailable {
     color: var(--hr-gray-300);
+}
+
+html[data-theme="dark"] .vacancy-card-applied-badge,
+html[data-theme="dark"] .vacancy-applied-status {
+    background: #14532d;
+    color: #bbf7d0;
+}
+
+html[data-theme="dark"] .vacancy-apply-success {
+    background: #052e16;
+    border-color: #166534;
+    border-left-color: #22c55e;
+    color: #bbf7d0;
+}
+
+html[data-theme="dark"] .vacancy-apply-identity {
+    background: var(--hr-gray-800);
+    border-color: var(--hr-gray-700);
 }

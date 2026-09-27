@@ -116,6 +116,41 @@ internal static class CandidateCvApi
         await SetApplicationCvAsync(api, companyId, vacancyId, applicationId, cvDocumentId, app.Version);
     }
 
+    /// <summary>GET .../vacancies/{vacancyId}/applications — every application on the vacancy.</summary>
+    public static async Task<IReadOnlyList<VacancyApplicationSnapshot>> ListApplicationsForVacancyAsync(
+        HttpClient api, Guid companyId, Guid vacancyId)
+    {
+        var response = await api.GetAsync($"/api/companies/{companyId}/vacancies/{vacancyId}/applications");
+        Assert.True(response.IsSuccessStatusCode,
+            $"List applications failed with {response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
+        var list = await response.Content.ReadFromJsonAsync<VacancyApplicationListSnapshot>();
+        Assert.NotNull(list);
+        return list!.Items;
+    }
+
+    /// <summary>POST /api/companies/{companyId}/external-recruiters (active by default). Returns the new recruiter id.</summary>
+    public static async Task<Guid> CreateExternalRecruiterAsync(HttpClient api, Guid companyId, string agencyName)
+    {
+        var response = await api.PostAsJsonAsync(
+            $"/api/companies/{companyId}/external-recruiters",
+            new { CompanyId = companyId, AgencyName = agencyName });
+        Assert.True(response.IsSuccessStatusCode,
+            $"Create external recruiter failed with {response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
+        var created = await response.Content.ReadFromJsonAsync<CreatedEntity>();
+        Assert.NotNull(created);
+        return created!.Id;
+    }
+
+    /// <summary>POST .../candidates/{candidateId}/deactivate with the (required) reason.</summary>
+    public static async Task DeactivateCandidateAsync(HttpClient api, Guid companyId, Guid candidateId, string reason)
+    {
+        var response = await api.PostAsJsonAsync(
+            $"/api/companies/{companyId}/candidates/{candidateId}/deactivate",
+            new { CompanyId = companyId, CandidateId = candidateId, Reason = reason });
+        Assert.True(response.IsSuccessStatusCode,
+            $"Deactivate candidate failed with {response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
+    }
+
     /// <summary>Minimal valid-looking PDF ("%PDF-" magic + padding) — same as SelfServiceDocumentTests.</summary>
     public static byte[] BuildTestPdf()
     {
@@ -138,3 +173,13 @@ internal sealed record ApplicationCvSnapshot(
     string? CvFileName,
     Guid? CurrentCandidateCvDocumentId,
     string? CurrentCandidateCvFileName);
+
+internal sealed record VacancyApplicationListSnapshot(IReadOnlyList<VacancyApplicationSnapshot> Items);
+
+internal sealed record VacancyApplicationSnapshot(
+    Guid Id,
+    Guid CandidateId,
+    string CandidateFirstName,
+    string CandidateLastName,
+    string CandidateEmail,
+    bool IsWithdrawn);

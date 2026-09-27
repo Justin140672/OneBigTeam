@@ -24,7 +24,7 @@ internal sealed class ExportVacancyPerformanceReportHandler(
         try
         {
             var getResult = await getHandler.HandleAsync(
-                new GetVacancyPerformanceReportRequest(request.CompanyId, request.StartDate, request.EndDate),
+                new GetVacancyPerformanceReportRequest(request.CompanyId, request.StartDate, request.EndDate, request.IsInternal),
                 cancellationToken);
 
             if (getResult.IsFailure)

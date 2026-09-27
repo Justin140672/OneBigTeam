@@ -1,0 +1,6 @@
+.internal-application-badge {
+    display: inline-flex;
+    align-items: center;
+    vertical-align: middle;
+    flex: 0 0 auto;
+}

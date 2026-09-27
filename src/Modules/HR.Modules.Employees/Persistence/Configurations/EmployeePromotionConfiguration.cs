@@ -95,7 +95,32 @@ internal sealed class EmployeePromotionConfiguration : IEntityTypeConfiguration<
         builder.Property(p => p.CompletedAt)
             .HasColumnName("completed_at");
 
+        // Internal recruitment Ticket 7.
+        builder.Property(p => p.NewDepartmentId)
+            .HasColumnName("new_department_id");
+
+        builder.HasOne<Department>()
+            .WithMany()
+            .HasForeignKey(p => p.NewDepartmentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.Property(p => p.ClearsManager)
+            .HasColumnName("clears_manager")
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(p => p.SourceReference)
+            .HasColumnName("source_reference")
+            .HasMaxLength(200);
+
         builder.HasIndex(p => p.CompanyId);
         builder.HasIndex(p => new { p.CompanyId, p.EmployeeId });
+
+        // Idempotency backstop for promotions recorded by another module's workflow (internal
+        // appointment): at most one promotion per source reference per company.
+        builder.HasIndex(p => new { p.CompanyId, p.SourceReference })
+            .HasDatabaseName("ix_employee_promotions_company_id_source_reference")
+            .IsUnique()
+            .HasFilter("source_reference IS NOT NULL");
     }
 }

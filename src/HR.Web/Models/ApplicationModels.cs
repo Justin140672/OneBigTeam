@@ -18,7 +18,11 @@ public record ApplicationListItemModel(
     // "AwaitingResponse" / "Accepted" / "Declined" / "Withdrawn".
     string? OfferResponseStatus = null,
     decimal? OfferedSalary = null,
-    DateOnly? OfferedStartDate = null);
+    DateOnly? OfferedStartDate = null,
+    // Internal recruitment Ticket 6: true only when Source == Internal (authoritative — never infer
+    // from a candidate's EmployeeId). EmployeeId is populated only for internal applications.
+    bool IsInternal = false,
+    Guid? EmployeeId = null);
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 
@@ -72,7 +76,11 @@ public record GetApplicationResponse(
     // Malware-scan state ("Pending"/"Scanning"/"Clean"/"Infected"/"Failed") of the submitted CV and of
     // the candidate's current CV respectively. Only "Clean" may be viewed/downloaded.
     string? CvScanStatus = null,
-    string? CurrentCandidateCvScanStatus = null);
+    string? CurrentCandidateCvScanStatus = null,
+    // Internal recruitment Ticket 6: true only when Source == Internal. EmployeeId is populated only
+    // for internal applications.
+    bool IsInternal = false,
+    Guid? EmployeeId = null);
 
 // ── INTERNAL RECRUITMENT TICKET 1: SUBMITTED CV ──────────────────────────────
 
@@ -149,6 +157,60 @@ public record CreateApplicationResponse(
     string? Source = null,
     Guid? SourceExternalRecruiterId = null,
     Guid? CvDocumentId = null);
+
+// ── INTERNAL RECRUITMENT TICKET 3: NEW CANDIDATE + APPLICATION ───────────────
+
+// Fields of POST .../vacancies/{vacancyId}/applications/new-candidate (multipart/form-data — the
+// service maps this to form parts, omitting null optionals). The optional CV file is passed
+// separately as an IBrowserFile.
+public record CreateCandidateApplicationRequest(
+    string FirstName,
+    string LastName,
+    string Email,
+    string? Phone,
+    string? ResumeUrl,
+    string? Notes,
+    // Enum name: Unspecified|Direct|Referral|ExternalRecruiter|JobBoard|CareersSite (null = omitted).
+    string? Source,
+    // Required iff Source == "ExternalRecruiter".
+    Guid? SourceExternalRecruiterId);
+
+// 201 body.
+public record CreateCandidateApplicationResponse(
+    Guid CandidateId,
+    Guid ApplicationId,
+    Guid CompanyId,
+    Guid VacancyId,
+    string FirstName,
+    string LastName,
+    string Email,
+    Guid CurrentStageId,
+    Guid? CvDocumentId,
+    string? Source,
+    Guid? SourceExternalRecruiterId,
+    DateTimeOffset AppliedAt);
+
+// The existing candidate identified by a 409 { code: "candidate_email_exists" } body.
+public record DuplicateCandidateModel(
+    Guid CandidateId,
+    string FirstName,
+    string LastName,
+    string Email,
+    bool IsActive)
+{
+    public string FullName => $"{FirstName} {LastName}";
+}
+
+// Exactly one of Created / Duplicate / Error is set.
+public sealed record CreateCandidateApplicationResult(
+    CreateCandidateApplicationResponse? Created,
+    DuplicateCandidateModel? Duplicate,
+    string? Error)
+{
+    public static CreateCandidateApplicationResult Success(CreateCandidateApplicationResponse created) => new(created, null, null);
+    public static CreateCandidateApplicationResult DuplicateEmail(DuplicateCandidateModel duplicate) => new(null, duplicate, null);
+    public static CreateCandidateApplicationResult Failure(string error) => new(null, null, error);
+}
 
 // ── STATUS TRANSITIONS ────────────────────────────────────────────────────────
 
@@ -298,3 +360,54 @@ public record ApplicationByStatusItem(
     Guid VacancyId,
     string VacancyTitle,
     DateTimeOffset AppliedAt);
+
+// ── INTERNAL RECRUITMENT TICKET 6: APPLICATION SEARCH ─────────────────────────
+// Mirrors HR.Modules.Recruitment.Features.SearchApplications
+// (GET api/companies/{companyId}/recruitment/applications/search).
+
+public record SearchApplicationsResponse(
+    List<ApplicationSearchItemModel> Items,
+    int TotalCount,
+    int PageNumber,
+    int PageSize,
+    int TotalPages);
+
+public record ApplicationSearchItemModel(
+    Guid ApplicationId,
+    Guid CandidateId,
+    string CandidateName,
+    string CandidateEmail,
+    Guid VacancyId,
+    string VacancyTitle,
+    Guid CurrentStageId,
+    DateTimeOffset AppliedAt,
+    string? CurrentStageName = null,
+    bool IsWithdrawn = false,
+    // True only when Source == Internal. EmployeeId is populated only for internal applications.
+    bool IsInternal = false,
+    Guid? EmployeeId = null);
+
+// ── INTERNAL RECRUITMENT TICKET 6: APPLICATION TYPE FILTER ────────────────────
+// UI-side choice for the "Application type" / "Applications" dropdowns (vacancy applications tab and
+// the recruitment reports). An explicit "All" item is used instead of a clear button, and maps to
+// omitting the API's isInternal query param.
+
+public enum ApplicationTypeFilter
+{
+    All = 0,
+    Internal = 1,
+    External = 2,
+}
+
+public sealed record ApplicationTypeFilterOption(ApplicationTypeFilter Value, string Label);
+
+public static class ApplicationTypeFilterExtensions
+{
+    // null = all (omit the query param); true = internal only; false = external only.
+    public static bool? ToIsInternal(this ApplicationTypeFilter filter) => filter switch
+    {
+        ApplicationTypeFilter.Internal => true,
+        ApplicationTypeFilter.External => false,
+        _ => null,
+    };
+}

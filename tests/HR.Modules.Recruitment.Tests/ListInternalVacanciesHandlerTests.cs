@@ -160,6 +160,135 @@ public class ListInternalVacanciesHandlerTests
         Assert.Equal(new[] { "Alpha Analyst", "Mango Manager", "Zebra Handler" }, result.Value!.Items.Select(i => i.Title));
     }
 
+    // ----- Internal recruitment Ticket 4: HasApplied -----
+
+    private static Application ApplicationFor(Guid companyId, Vacancy vacancy, Candidate candidate, ApplicationSource? source = ApplicationSource.Internal) =>
+        Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now, source);
+
+    [Fact]
+    public async Task HandleAsync_HasApplied_Is_True_Only_For_Vacancies_The_Employees_Linked_Candidate_Applied_To()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var applied = OpenAdvertised(companyId, Guid.NewGuid(), "Applied Role");
+        var appliedAndWithdrawn = OpenAdvertised(companyId, Guid.NewGuid(), "Withdrawn Role");
+        var notApplied = OpenAdvertised(companyId, Guid.NewGuid(), "Other Role");
+        var linked = Candidate.CreateForEmployee(Guid.NewGuid(), companyId, employeeId, "Priya", "Shah", "priya.shah@acme.example", null, Now);
+        var withdrawn = ApplicationFor(companyId, appliedAndWithdrawn, linked);
+        withdrawn.Withdraw(Now);
+
+        db.Vacancies.AddRange(applied, appliedAndWithdrawn, notApplied);
+        db.Candidates.Add(linked);
+        db.Applications.AddRange(ApplicationFor(companyId, applied, linked), withdrawn);
+        await db.SaveChangesAsync();
+
+        var result = await new ListInternalVacanciesHandler(db, new FakePositionProfileReader()).HandleAsync(
+            new ListInternalVacanciesRequest { CompanyId = companyId }, employeeId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var items = result.Value!.Items.ToDictionary(i => i.Id);
+        Assert.Equal(3, items.Count);
+        Assert.True(items[applied.Id].HasApplied);
+        Assert.True(items[appliedAndWithdrawn.Id].HasApplied);
+        Assert.False(items[notApplied.Id].HasApplied);
+    }
+
+    [Fact]
+    public async Task HandleAsync_HasApplied_Counts_Recruiter_Entered_Application_Of_Hired_Linked_Candidate()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var vacancy = OpenAdvertised(companyId, Guid.NewGuid(), "Role");
+        var hired = Candidate.Create(Guid.NewGuid(), companyId, "Priya", "Shah", "priya.personal@example.com", null, null, Now);
+        hired.LinkToEmployee(employeeId, Now);
+
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(hired);
+        db.Applications.Add(ApplicationFor(companyId, vacancy, hired, ApplicationSource.JobBoard));
+        await db.SaveChangesAsync();
+
+        var result = await new ListInternalVacanciesHandler(db, new FakePositionProfileReader()).HandleAsync(
+            new ListInternalVacanciesRequest { CompanyId = companyId }, employeeId, CancellationToken.None);
+
+        Assert.True(Assert.Single(result.Value!.Items).HasApplied);
+    }
+
+    [Fact]
+    public async Task HandleAsync_HasApplied_Is_False_Everywhere_When_No_Current_Employee()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var vacancy = OpenAdvertised(companyId, Guid.NewGuid(), "Role");
+        var linked = Candidate.CreateForEmployee(Guid.NewGuid(), companyId, employeeId, "Priya", "Shah", "priya.shah@acme.example", null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(linked);
+        db.Applications.Add(ApplicationFor(companyId, vacancy, linked));
+        await db.SaveChangesAsync();
+
+        var handler = new ListInternalVacanciesHandler(db, new FakePositionProfileReader());
+
+        var withNull = await handler.HandleAsync(
+            new ListInternalVacanciesRequest { CompanyId = companyId }, currentEmployeeId: null, CancellationToken.None);
+        var legacyOverload = await handler.HandleAsync(
+            new ListInternalVacanciesRequest { CompanyId = companyId }, CancellationToken.None);
+
+        Assert.False(Assert.Single(withNull.Value!.Items).HasApplied);
+        Assert.False(Assert.Single(legacyOverload.Value!.Items).HasApplied);
+    }
+
+    [Fact]
+    public async Task HandleAsync_HasApplied_Does_Not_Leak_Another_Employees_Or_Unlinked_Candidates_Applications()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var colleagueId = Guid.NewGuid();
+        var colleagueVacancy = OpenAdvertised(companyId, Guid.NewGuid(), "Colleague Role");
+        var externalVacancy = OpenAdvertised(companyId, Guid.NewGuid(), "External Role");
+        var colleague = Candidate.CreateForEmployee(Guid.NewGuid(), companyId, colleagueId, "Tom", "Baker", "tom.baker@acme.example", null, Now);
+        // An unlinked external candidate that happens to share the employee's email.
+        var external = Candidate.Create(Guid.NewGuid(), companyId, "Priya", "Shah", "priya.shah@acme.example", null, null, Now);
+
+        db.Vacancies.AddRange(colleagueVacancy, externalVacancy);
+        db.Candidates.AddRange(colleague, external);
+        db.Applications.AddRange(
+            ApplicationFor(companyId, colleagueVacancy, colleague),
+            ApplicationFor(companyId, externalVacancy, external, ApplicationSource.Direct));
+        await db.SaveChangesAsync();
+
+        var result = await new ListInternalVacanciesHandler(db, new FakePositionProfileReader()).HandleAsync(
+            new ListInternalVacanciesRequest { CompanyId = companyId }, employeeId, CancellationToken.None);
+
+        Assert.Equal(2, result.Value!.Items.Count);
+        Assert.All(result.Value.Items, i => Assert.False(i.HasApplied));
+    }
+
+    [Fact]
+    public async Task HandleAsync_HasApplied_Ignores_Same_Employee_Id_Linked_In_Another_Company()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var otherCompanyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var vacancy = OpenAdvertised(companyId, Guid.NewGuid(), "Role");
+        // Pathological cross-tenant data: a candidate in another company linked to the same id, with an
+        // application pointing at this company's vacancy id. It must not count.
+        var otherCompanyCandidate = Candidate.CreateForEmployee(Guid.NewGuid(), otherCompanyId, employeeId, "Priya", "Shah", "priya.shah@acme.example", null, Now);
+
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(otherCompanyCandidate);
+        db.Applications.Add(ApplicationFor(otherCompanyId, vacancy, otherCompanyCandidate));
+        await db.SaveChangesAsync();
+
+        var result = await new ListInternalVacanciesHandler(db, new FakePositionProfileReader()).HandleAsync(
+            new ListInternalVacanciesRequest { CompanyId = companyId }, employeeId, CancellationToken.None);
+
+        Assert.False(Assert.Single(result.Value!.Items).HasApplied);
+    }
+
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))

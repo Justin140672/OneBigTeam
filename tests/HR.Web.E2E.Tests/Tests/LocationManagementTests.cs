@@ -65,7 +65,7 @@ public sealed class LocationManagementTests(HrAdminPersonaFixture fixture) : Rol
         var href = await _page.Locator(".e-rowcell a").Filter(new() { HasText = originalName }).First.GetAttributeAsync("href");
         Assert.NotNull(href);
         await _page.GotoAsync($"{_fixture.WebBaseUrl}{href}");
-        await _page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await _page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
 
         await locationEdit.FillNameAsync(updatedName);
         await locationEdit.SaveAsync();
@@ -74,11 +74,11 @@ public sealed class LocationManagementTests(HrAdminPersonaFixture fixture) : Rol
         var updatedHref = await _page.Locator(".e-rowcell a").Filter(new() { HasText = updatedName }).First.GetAttributeAsync("href");
         Assert.NotNull(updatedHref);
         await _page.GotoAsync($"{_fixture.WebBaseUrl}{updatedHref}");
-        await _page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await _page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
 
         // Reload the page directly to confirm the change persisted server-side, not just in local state.
         await _page.ReloadAsync();
-        await _page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await _page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
 
         Assert.Equal(updatedName, await locationEdit.GetNameAsync());
     }

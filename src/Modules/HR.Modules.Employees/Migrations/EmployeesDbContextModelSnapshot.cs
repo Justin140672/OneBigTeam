@@ -731,6 +731,12 @@ namespace HR.Modules.Employees.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<bool>("ClearsManager")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("clears_manager");
+
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid")
                         .HasColumnName("company_id");
@@ -759,6 +765,10 @@ namespace HR.Modules.Employees.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("employee_id");
 
+                    b.Property<Guid?>("NewDepartmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("new_department_id");
+
                     b.Property<Guid?>("NewLocationId")
                         .HasColumnType("uuid")
                         .HasColumnName("new_location_id");
@@ -786,6 +796,11 @@ namespace HR.Modules.Employees.Migrations
                         .HasColumnType("character varying(500)")
                         .HasColumnName("reason");
 
+                    b.Property<string>("SourceReference")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("source_reference");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CompanyId");
@@ -793,6 +808,8 @@ namespace HR.Modules.Employees.Migrations
                     b.HasIndex("CompensationId");
 
                     b.HasIndex("EmployeeId");
+
+                    b.HasIndex("NewDepartmentId");
 
                     b.HasIndex("NewLocationId");
 
@@ -803,6 +820,11 @@ namespace HR.Modules.Employees.Migrations
                     b.HasIndex("PreviousPositionProfileId");
 
                     b.HasIndex("CompanyId", "EmployeeId");
+
+                    b.HasIndex("CompanyId", "SourceReference")
+                        .IsUnique()
+                        .HasDatabaseName("ix_employee_promotions_company_id_source_reference")
+                        .HasFilter("source_reference IS NOT NULL");
 
                     b.ToTable("employee_promotions", "employees");
                 });
@@ -1642,6 +1664,11 @@ namespace HR.Modules.Employees.Migrations
                         .HasForeignKey("EmployeeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("HR.Modules.Employees.Domain.Department", null)
+                        .WithMany()
+                        .HasForeignKey("NewDepartmentId")
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("HR.Modules.Employees.Domain.Location", null)
                         .WithMany()

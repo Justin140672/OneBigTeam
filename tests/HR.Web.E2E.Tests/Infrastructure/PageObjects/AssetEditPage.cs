@@ -13,7 +13,7 @@ public sealed class AssetEditPage(IPage page, string baseUrl)
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/assets/new");
         // AssetEdit has an SfDropDownList for Category; span[role='combobox'] only appears
         // after Blazor's interactive render, ensuring event handlers are wired up.
-        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
     }
 
     public async Task FillAssetNumberAsync(string value)

@@ -604,4 +604,101 @@ public class PromoteEmployeeHandlerTests
         var savedEmployee = await context.Employees.SingleAsync();
         Assert.Equal(newPositionProfileId, savedEmployee.PositionProfileId);
     }
+
+    // ---- Internal recruitment Ticket 7: the department moves with the position profile ----
+
+    [Fact]
+    public async Task HandleAsync_Captures_Department_From_New_Position_Profile_And_Applies_It()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employee = CreateEmployee(companyId, Now);
+        var originalDepartmentId = employee.DepartmentId;
+        var newDepartmentId = Guid.NewGuid();
+        var newProfile = PositionProfile.Create(
+            Guid.NewGuid(), companyId, newDepartmentId, Guid.NewGuid(), "Engineering Manager",
+            null, null, null, null, null, null, null, Guid.NewGuid(), Now);
+        context.Employees.Add(employee);
+        context.PositionProfiles.Add(newProfile);
+        await context.SaveChangesAsync();
+
+        var result = await BuildHandler(context).HandleAsync(
+            BuildRequest(companyId, employee.Id, newProfile.Id), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotEqual(originalDepartmentId, newDepartmentId);
+
+        var savedPromotion = await context.EmployeePromotions.SingleAsync();
+        Assert.Equal(newDepartmentId, savedPromotion.NewDepartmentId);
+        Assert.False(savedPromotion.ClearsManager);
+        Assert.Null(savedPromotion.SourceReference);
+
+        var savedEmployee = await context.Employees.SingleAsync();
+        Assert.Equal(newDepartmentId, savedEmployee.DepartmentId);
+        Assert.Equal(newProfile.Id, savedEmployee.PositionProfileId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Captures_Department_But_Does_Not_Apply_It_Until_Future_Effective_Date()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employee = CreateEmployee(companyId, Now);
+        var originalDepartmentId = employee.DepartmentId;
+        var newDepartmentId = Guid.NewGuid();
+        var newProfile = PositionProfile.Create(
+            Guid.NewGuid(), companyId, newDepartmentId, Guid.NewGuid(), "Engineering Manager",
+            null, null, null, null, null, null, null, Guid.NewGuid(), Now);
+        context.Employees.Add(employee);
+        context.PositionProfiles.Add(newProfile);
+        await context.SaveChangesAsync();
+
+        var result = await BuildHandler(context).HandleAsync(
+            BuildRequest(companyId, employee.Id, newProfile.Id, effectiveDate: Today.AddDays(14)), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(newDepartmentId, (await context.EmployeePromotions.SingleAsync()).NewDepartmentId);
+        Assert.Equal(originalDepartmentId, (await context.Employees.SingleAsync()).DepartmentId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Leaves_Department_Unchanged_When_New_Position_Profile_Belongs_To_Another_Company()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employee = CreateEmployee(companyId, Now);
+        var originalDepartmentId = employee.DepartmentId;
+        var foreignProfile = PositionProfile.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Foreign Role",
+            null, null, null, null, null, null, null, Guid.NewGuid(), Now);
+        context.Employees.Add(employee);
+        context.PositionProfiles.Add(foreignProfile);
+        await context.SaveChangesAsync();
+
+        var result = await BuildHandler(context).HandleAsync(
+            BuildRequest(companyId, employee.Id, foreignProfile.Id), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null((await context.EmployeePromotions.SingleAsync()).NewDepartmentId);
+        Assert.Equal(originalDepartmentId, (await context.Employees.SingleAsync()).DepartmentId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Ordinary_Promotion_Timeline_Entry_Is_Still_Titled_Promoted()
+    {
+        // The "Internal appointment" wording must only apply to promotions recorded by recruitment.
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employee = CreateEmployee(companyId, Now);
+        context.Employees.Add(employee);
+        await context.SaveChangesAsync();
+        var timeline = new FakeEmployeeTimelineWriter();
+
+        var result = await BuildHandler(context, timelineWriter: timeline).HandleAsync(
+            BuildRequest(companyId, employee.Id, Guid.NewGuid(), effectiveDate: Today.AddDays(14)), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var entry = Assert.Single(timeline.Added);
+        Assert.Equal("Promoted", entry.Title);
+    }
 }

@@ -45,10 +45,17 @@ public sealed class EmployeeAuditHistoryTabTests(HrAdminPersonaFixture fixture) 
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
 
+        // This test WRITES (a compensation record) and then reads the resulting audit history, so it
+        // uses its own fresh employee rather than Tom Williams: Tom is edited concurrently by dozens
+        // of other classes (contact details, leave, documents, notice period, …) and — contrary to
+        // this class's original assumption — now has seeded compensation of his own, so neither
+        // his edit page nor his audit history is a stable, test-owned surface.
+        var employee = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "AuditComp");
+
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await empEdit.GoToAsync(AcmeId, TomWilliams);
+        await empEdit.GoToAsync(AcmeId, employee.Id);
         await empEdit.OpenCompensationTabAsync();
 
         await empEdit.ClickAddCompensationAsync();
@@ -60,9 +67,10 @@ public sealed class EmployeeAuditHistoryTabTests(HrAdminPersonaFixture fixture) 
 
         await empEdit.OpenAuditTabAsync();
 
+        // Wait for the audit grid to render the row (the tab's grid loads asynchronously after the
+        // tab switch) rather than taking a single instant IsVisibleAsync() snapshot.
         var row = empEdit.AuditHistoryRow("Compensation record created");
-        Assert.True(await row.First.IsVisibleAsync(),
-            "Expected the newly created compensation record to appear as an audit history entry");
+        await Assertions.Expect(row.First).ToBeVisibleAsync(new() { Timeout = 15_000 });
 
         await empEdit.ClickViewAuditRowAsync("Compensation record created");
 

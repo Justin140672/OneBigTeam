@@ -71,6 +71,13 @@ internal sealed class HireCandidateHandler(
             return Result.Failure<HireCandidateResponse>(
                 Error.NotFound($"Application '{request.ApplicationId}' was not found."));
 
+        // Internal recruitment Ticket 7: an internal applicant is already an employee. Hiring would
+        // provision a second Employee record, so internal applications are completed through the
+        // AppointInternalCandidate workflow instead. External applications are unaffected.
+        if (application.Source == ApplicationSource.Internal)
+            return Result.Failure<HireCandidateResponse>(
+                Error.Validation("This is an internal application from an existing employee. Complete it as an internal appointment instead of hiring."));
+
         if (application.WithdrawnAt is not null)
             return Result.Failure<HireCandidateResponse>(
                 Error.Validation("Cannot hire an application that has been withdrawn."));

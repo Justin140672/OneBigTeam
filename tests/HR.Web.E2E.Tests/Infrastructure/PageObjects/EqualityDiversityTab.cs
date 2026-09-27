@@ -50,9 +50,21 @@ public sealed class EqualityDiversityTab(IPage page)
 
     public async Task SaveAsync()
     {
+        // The success banner is one shared element for both "saved" and "cleared" outcomes. If one
+        // is already showing (e.g. straight after ClearAnswersAsync), a bare wait for the banner
+        // resolved instantly against that STALE banner, so callers moved on (navigated tabs, read
+        // values back) before this save's round-trip had landed. Dismiss any existing banner and
+        // wait for it to go, then wait specifically for this save's "…saved" banner.
+        var banner = page.Locator("[data-testid='my-profile-equality-success']");
+        if (await banner.CountAsync() > 0)
+        {
+            await banner.Locator(".ed-success-dismiss").ClickAsync();
+            await banner.WaitForAsync(new() { State = WaitForSelectorState.Detached, Timeout = 10_000 });
+        }
+
         await page.Locator("[data-testid='my-profile-equality-save']").ClickAsync();
-        await page.WaitForSelectorAsync("[data-testid='my-profile-equality-success']",
-            new() { Timeout = 15_000 });
+        await Assertions.Expect(banner.Locator(".ed-success-title"))
+            .ToContainTextAsync("saved", new() { IgnoreCase = true, Timeout = 15_000 });
     }
 
     public async Task<bool> IsSuccessBannerVisibleAsync() =>

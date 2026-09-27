@@ -52,7 +52,8 @@ internal sealed class UpdateHrSettingsValidator : AbstractValidator<UpdateHrSett
 			.GreaterThan(0);
 
 		RuleFor(request => request.NextEmployeeNumber)
-			.GreaterThan(0);
+			.GreaterThan(0)
+			.When(request => request.NextEmployeeNumber is not null);
 
 		RuleFor(request => request.EmployeeNumberMinimumLength)
 			.InclusiveBetween(1, 10);

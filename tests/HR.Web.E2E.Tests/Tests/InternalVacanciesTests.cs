@@ -8,8 +8,9 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Covers the "Internal Vacancies" self-service feature:
 /// - A Recruiter can tick "Advertise this vacancy to employees" on an Open vacancy and save.
 /// - A plain employee then sees the "Internal Vacancies" quick action on My Profile, can open the
-///   list, and sees the advertised vacancy as a card whose read-only detail dialog has no
-///   Apply/Save action.
+///   list, and sees the advertised vacancy as a card whose detail dialog offers an Apply action
+///   (or the Applied state, if already applied) and no Save action. The Apply flow itself is
+///   covered in isolation by InternalVacancyApplyTests.
 /// - The list page itself is NOT recruiter-gated (unlike /vacancies) — a plain employee reaches it
 ///   directly without an access-denied redirect.
 /// - An Open vacancy that is NOT advertised internally does not appear in the employee list.
@@ -114,7 +115,7 @@ public sealed class InternalVacanciesTests(CrossUserFixture fixture) : CrossUser
     }
 
     [Fact]
-    public async Task PlainEmployee_OpeningCard_ShowsReadOnlyDetailDialog_WithNoApplyOrSaveButton()
+    public async Task PlainEmployee_OpeningCard_ShowsDetailDialog_WithApplyActionAndNoSaveButton()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
 
@@ -129,11 +130,17 @@ public sealed class InternalVacanciesTests(CrossUserFixture fixture) : CrossUser
         await internalVacancies.OpenCardAsync(SeededVacancyTitle);
 
         Assert.True(await internalVacancies.IsDetailVisibleAsync(),
-            "Expected the read-only internal-vacancy-detail dialog to open");
+            "Expected the internal-vacancy-detail dialog to open");
         Assert.Contains(SeededVacancyTitle, await internalVacancies.GetDetailTitleAsync() ?? "");
         Assert.Contains(SeededVacancyDescriptionFragment, await internalVacancies.GetDetailDescriptionAsync() ?? "");
 
-        Assert.Equal(0, await internalVacancies.DetailButtonCountAsync("Apply"));
+        // The dialog now offers the employee an Apply action. Tom is a shared seeded persona that
+        // InternalVacancyApplyTests never applies as, but tolerate him having applied (shown as the
+        // Applied state + disabled Applied button instead of Apply). Either way there is no Save.
+        var applyOrApplied = _page.Locator(
+            "[data-testid='internal-vacancy-apply'], [data-testid='internal-vacancy-applied-state']").First;
+        Assert.True(await applyOrApplied.WaitUntilVisibleAsync(15_000),
+            "Expected either the Apply button or the Applied state in the vacancy detail dialog");
         Assert.Equal(0, await internalVacancies.DetailButtonCountAsync("Save"));
     }
 

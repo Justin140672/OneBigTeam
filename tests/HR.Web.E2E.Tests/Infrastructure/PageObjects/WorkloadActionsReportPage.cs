@@ -139,12 +139,18 @@ public sealed class WorkloadActionsReportPage(IPage page, string baseUrl)
         // grid rows Blazor is reusing from before the click, returning before the group headings
         // for the *new* grouping have actually rendered. Wait for either a heading or the
         // empty-state alert directly so this doesn't race that re-render.
-        await page.WaitForSelectorAsync("h5.mt-4, .alert-info", new() { Timeout = 15_000 });
-        var headings = await page.Locator("h5.mt-4").AllAsync();
-        var result = new List<string>();
-        foreach (var heading in headings)
-            result.Add((await heading.TextContentAsync())?.Trim() ?? "");
-        return result;
+        //
+        // Waits for a heading or specifically the report's own empty-state alert (not just any
+        // ".alert-info", which can be satisfied by an unrelated informational alert before the new
+        // grouping has rendered), then reads every heading in ONE atomic snapshot. Previously this
+        // took AllAsync() and then read each heading with TextContentAsync()'s 30s auto-wait — when
+        // the grouped view re-rendered its sections after the snapshot (each group mounts its own
+        // grid), every stale per-index read hung for 30s.
+        var emptyState = page.Locator(".alert-info", new() { HasText = "No outstanding actions. Everything is up to date." });
+        await page.Locator("h5.mt-4").Or(emptyState).First
+            .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        var headings = await page.Locator("h5.mt-4").AllTextContentsAsync();
+        return headings.Select(h => h.Trim()).ToList();
     }
 
     public async Task<IReadOnlyList<string>> GetColumnHeadersAsync()

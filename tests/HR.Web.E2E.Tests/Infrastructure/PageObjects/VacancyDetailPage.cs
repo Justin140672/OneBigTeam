@@ -816,6 +816,35 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     private ILocator ApplicationRow(string candidateNameFragment) =>
         ApplicationsTab.Locator(".e-grid .e-row").Filter(new() { HasText = candidateNameFragment });
 
+    // The row's STAGE badge specifically (data-testid="application-stage-badge" in the Status
+    // column). Not the row's first ".badge": an internal application's Candidate cell renders an
+    // "Internal" badge before it.
+    private ILocator ApplicationStageBadge(string candidateNameFragment) =>
+        ApplicationRow(candidateNameFragment).First.Locator("[data-testid='application-stage-badge'] .badge");
+
+    // Web-first grid expectations (internal recruitment Ticket 3). After a successful Add the tab
+    // re-runs LoadAsync (loading indicator, then a fresh grid, then the lazily-fetched Source
+    // details), so these retry until the post-reload DOM matches rather than reading a snapshot.
+
+    /// <summary>Waits until exactly <paramref name="expectedCount"/> application rows match <paramref name="candidateNameFragment"/>.</summary>
+    public Task ExpectApplicationRowCountAsync(string candidateNameFragment, int expectedCount) =>
+        Assertions.Expect(ApplicationRow(candidateNameFragment)).ToHaveCountAsync(expectedCount, new() { Timeout = 30_000 });
+
+    /// <summary>Waits for the row's Status badge to read <paramref name="expectedStage"/>.</summary>
+    public Task ExpectApplicationStatusAsync(string candidateNameFragment, string expectedStage) =>
+        Assertions.Expect(ApplicationStageBadge(candidateNameFragment))
+            .ToHaveTextAsync(expectedStage, new() { Timeout = 30_000 });
+
+    /// <summary>Waits for the row's Source column (index 5 — see GetApplicationSourceColumnTextAsync) to contain <paramref name="expectedText"/>.</summary>
+    public Task ExpectApplicationSourceAsync(string candidateNameFragment, string expectedText) =>
+        Assertions.Expect(ApplicationRow(candidateNameFragment).First.Locator(".e-rowcell").Nth(5))
+            .ToContainTextAsync(expectedText, new() { Timeout = 30_000 });
+
+    /// <summary>Waits for the Applications tab's success alert to contain <paramref name="expectedText"/>.</summary>
+    public Task ExpectActionSuccessMessageAsync(string expectedText) =>
+        Assertions.Expect(ApplicationsTab.Locator(".alert-success").First)
+            .ToContainTextAsync(expectedText, new() { Timeout = 30_000 });
+
     /// <summary>Returns the full trimmed text of the application row matching <paramref name="candidateNameFragment"/>, or null if not found.</summary>
     public async Task<string?> GetApplicationRowTextAsync(string candidateNameFragment)
     {
@@ -839,7 +868,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
 
     public async Task<string?> GetApplicationStatusAsync(string candidateNameFragment)
     {
-        var badge = ApplicationRow(candidateNameFragment).First.Locator(".badge").First;
+        var badge = ApplicationStageBadge(candidateNameFragment);
         try
         {
             await badge.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
@@ -861,29 +890,65 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     /// (see VacancyApplicationsTab.razor's Candidate GridColumn), so clicking it navigates away
     /// instead of just selecting the row.
     /// </summary>
+    // Hidden marker rendered by VacancyApplicationsTab (SelectedApplicationMarker.razor) carrying the
+    // SERVER-side selected application id — set only after OnRowSelected has run
+    // RefreshToolbarStateAsync, which is what actually enables Offer/Hire/etc.
+    private ILocator SelectionMarker => ApplicationsTab.Locator("[data-testid='selected-application-marker']");
+
     private async Task SelectApplicationRowAsync(string candidateNameFragment)
     {
         var row = ApplicationRow(candidateNameFragment).First;
+        await row.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
 
-        // A single click doesn't always land as a genuine row selection — the click can arrive
-        // between the grid's own re-renders under load (Blazor swaps the ".e-rowcell" DOM node out
-        // from under the click), leaving RowSelected never firing and the toolbar's "Offer"/etc.
-        // items permanently disabled with no further click to unstick them. Verify the selection
-        // actually took (Syncfusion marks the selected <tr> with "e-active") and retry the click a
-        // few times rather than trusting one click blindly.
-        for (var attempt = 1; attempt <= 5; attempt++)
+        // Every <tr> carries its application id (VacancyApplicationsTab's RowDataBound hook).
+        var applicationId = await row.GetAttributeAsync("data-application-id")
+            ?? throw new InvalidOperationException(
+                $"Application row for '{candidateNameFragment}' has no data-application-id attribute.");
+
+        // Previously this clicked unconditionally and then trusted Syncfusion's client-side
+        // "e-active" class. Two problems: (1) the grid TOGGLES selection, so clicking a row that an
+        // earlier step had already selected (e.g. IsRecordOfferResponseToolbarItemEnabledAsync right
+        // before OpenMakeOfferDialogAsync) DESELECTED it — leaving "Offer" disabled; (2) "e-active"
+        // is set in the browser before the server-side RowSelected handler has run, so it never
+        // proved the toolbar had been re-enabled. Now: only click when the server doesn't already
+        // have THIS row selected, and wait for the server-side marker to confirm it. A click that
+        // was dropped mid re-render, or toggled a stale selection off, is simply re-issued.
+        for (var attempt = 1; attempt <= 3; attempt++)
         {
-            await row.Locator(".e-rowcell").Nth(1).ClickAsync();
+            if (await SelectionMarker.GetAttributeAsync("data-selected-application-id") == applicationId)
+                return;
 
-            var deadline = DateTime.UtcNow.AddSeconds(attempt < 5 ? 1 : 5);
-            while (DateTime.UtcNow < deadline)
+            await row.Locator(".e-rowcell").Nth(1).ClickAsync();
+            try
             {
-                var cls = await row.GetAttributeAsync("class") ?? "";
-                if (cls.Contains("e-active"))
-                    return;
-                await page.WaitForTimeoutAsync(100);
+                await Assertions.Expect(SelectionMarker)
+                    .ToHaveAttributeAsync("data-selected-application-id", applicationId, new() { Timeout = 10_000 });
+                return;
+            }
+            catch (PlaywrightException) when (attempt < 3)
+            {
+                // Dropped click or toggled-off selection — the loop re-checks and clicks again.
             }
         }
+    }
+
+    /// <summary>
+    /// Deselects then reselects the row (used when Syncfusion's EnableToolbarItemsAsync interop
+    /// didn't land): clicks the currently-selected row to toggle it off, waits for the server-side
+    /// marker to clear, then selects it again via <see cref="SelectApplicationRowAsync"/>.
+    /// </summary>
+    private async Task ReselectApplicationRowAsync(string candidateNameFragment)
+    {
+        var row = ApplicationRow(candidateNameFragment).First;
+        var applicationId = await row.GetAttributeAsync("data-application-id");
+        if (applicationId is not null &&
+            await SelectionMarker.GetAttributeAsync("data-selected-application-id") == applicationId)
+        {
+            await row.Locator(".e-rowcell").Nth(1).ClickAsync(); // toggle off
+            await Assertions.Expect(SelectionMarker)
+                .ToHaveAttributeAsync("data-selected-application-id", "", new() { Timeout = 10_000 });
+        }
+        await SelectApplicationRowAsync(candidateNameFragment);
     }
 
     /// <summary>
@@ -962,9 +1027,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             if (await resolved.GetAttributeAsync("aria-disabled") != "true")
                 return resolved;
 
-            await ApplicationRow(reselectCandidateNameFragment).First.Locator(".e-rowcell").Nth(1).ClickAsync(); // deselect
-            await page.WaitForTimeoutAsync(300);
-            await SelectApplicationRowAsync(reselectCandidateNameFragment); // reselect (verified via e-active)
+            await ReselectApplicationRowAsync(reselectCandidateNameFragment); // deselect + reselect, verified server-side
 
             var reDeadline = DateTime.UtcNow.AddSeconds(3);
             while (DateTime.UtcNow < reDeadline)
@@ -1137,10 +1200,29 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         DropDownSelector.SelectAsync(page, page.Locator(".hire-candidate-dialog"), gender, index: 1);
 
     /// <summary>Fills the Employee Number field in the (currently open) Hire Candidate dialog.</summary>
+    /// <summary>
+    /// Fills the Hire dialog's Employee Number when the company is in Manual numbering mode; a
+    /// no-op in Automatic mode, where the dialog shows "An employee number will be assigned
+    /// automatically…" instead of the input (VacancyApplicationsTab.razor's _hireEmployeeNumberMode).
+    /// Waits for whichever of the two the dialog actually rendered rather than assuming a mode, so
+    /// callers don't have to flip the shared Acme numbering mode to use it (see CreateEmployeeTests'
+    /// remarks for why Acme's mode is never mutated by E2E tests).
+    /// </summary>
     public async Task FillHireEmployeeNumberAsync(string value)
     {
-        await page.Locator(".hire-candidate-dialog").GetByPlaceholder("e.g. EMP-001").FillAsync(value);
-        await page.Keyboard.PressAsync("Tab");
+        var dialog = page.Locator(".hire-candidate-dialog");
+        var field = dialog.GetByPlaceholder("e.g. EMP-001");
+        var autoAssignedMessage = dialog.Locator("p")
+            .Filter(new() { HasText = "An employee number will be assigned automatically" });
+
+        await field.Or(autoAssignedMessage).First.WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
+
+        if (await field.IsVisibleAsync())
+        {
+            await field.FillAsync(value);
+            await page.Keyboard.PressAsync("Tab");
+        }
     }
 
     /// <summary>
@@ -1511,4 +1593,70 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await input.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         return await input.InputValueAsync();
     }
+
+    // ── Internal recruitment Ticket 6: Internal badge + Application type filter ──
+    // Rows are addressed by their stable data-application-id (set in VacancyApplicationsTab.razor's
+    // OnApplicationRowDataBound), never by position or by the badge's CSS class alone. All of these
+    // are web-first expectations: the filter change re-runs LoadAsync (loading indicator, then a
+    // fresh grid), so they retry until the post-reload DOM matches.
+
+    private ILocator ApplicationRows => ApplicationsTab.Locator("tr[data-testid='application-row']");
+
+    private ILocator ApplicationRowById(Guid applicationId) =>
+        ApplicationsTab.Locator($"tr[data-testid='application-row'][data-application-id='{applicationId}']");
+
+    private ILocator ApplicationTypeFilter => ApplicationsTab.Locator("[data-testid='application-type-filter']");
+
+    /// <summary>Waits until exactly <paramref name="expectedCount"/> application rows are rendered in the grid.</summary>
+    public Task ExpectApplicationRowTotalAsync(int expectedCount) =>
+        Assertions.Expect(ApplicationRows).ToHaveCountAsync(expectedCount, new() { Timeout = 30_000 });
+
+    /// <summary>Waits for the application row with this id to be visible.</summary>
+    public Task ExpectApplicationRowVisibleAsync(Guid applicationId) =>
+        Assertions.Expect(ApplicationRowById(applicationId)).ToBeVisibleAsync(new() { Timeout = 30_000 });
+
+    /// <summary>Waits until no application row with this id is rendered.</summary>
+    public Task ExpectApplicationRowAbsentAsync(Guid applicationId) =>
+        Assertions.Expect(ApplicationRowById(applicationId)).ToHaveCountAsync(0, new() { Timeout = 30_000 });
+
+    /// <summary>
+    /// Asserts the row's data-internal flag and whether its Candidate cell carries the Internal badge.
+    /// The row is awaited visible first so the "no badge" case is never satisfied by a row that simply
+    /// hasn't rendered yet.
+    /// </summary>
+    public async Task ExpectApplicationRowInternalAsync(Guid applicationId, bool isInternal)
+    {
+        var row = ApplicationRowById(applicationId);
+        await Assertions.Expect(row).ToBeVisibleAsync(new() { Timeout = 30_000 });
+        await Assertions.Expect(row).ToHaveAttributeAsync("data-internal", isInternal ? "true" : "false", new() { Timeout = 15_000 });
+
+        var cell = row.Locator("[data-testid='application-candidate-cell']");
+        await Assertions.Expect(cell.Locator("[data-testid='application-candidate-link']")).ToBeVisibleAsync(new() { Timeout = 15_000 });
+
+        var badge = cell.Locator("[data-testid='internal-application-badge']");
+        if (isInternal)
+        {
+            await Assertions.Expect(badge).ToBeVisibleAsync(new() { Timeout = 15_000 });
+            await Assertions.Expect(badge).ToHaveTextAsync("Internal");
+            await Assertions.Expect(badge).ToHaveAttributeAsync("title", "Internal applicant (current employee)");
+        }
+        else
+        {
+            await Assertions.Expect(badge).ToHaveCountAsync(0);
+        }
+    }
+
+    /// <summary>Waits for the Application type filter's combobox to show <paramref name="label"/>.</summary>
+    public Task ExpectApplicationTypeFilterValueAsync(string label) =>
+        Assertions.Expect(ApplicationTypeFilter.Locator("span[role='combobox'] input").First)
+            .ToHaveValueAsync(label, new() { Timeout = 15_000 });
+
+    /// <summary>Selects "All" / "Internal" / "External" in the Applications tab's Application type filter.</summary>
+    public Task SelectApplicationTypeFilterAsync(string label) =>
+        DropDownSelector.SelectAsync(page, ApplicationTypeFilter, label);
+
+    /// <summary>Waits for the Applications tab empty-state message to contain <paramref name="expectedText"/>.</summary>
+    public Task ExpectApplicationsEmptyAsync(string expectedText) =>
+        Assertions.Expect(ApplicationsTab.Locator("[data-testid='applications-empty']"))
+            .ToContainTextAsync(expectedText, new() { Timeout = 30_000 });
 }

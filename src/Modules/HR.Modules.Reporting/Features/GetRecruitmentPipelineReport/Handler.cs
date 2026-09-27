@@ -12,7 +12,7 @@ internal sealed class GetRecruitmentPipelineReportHandler(IRecruitmentPipelineRe
         if (request.GroupBy == RecruitmentPipelineGroupBy.Vacancy)
         {
             var vacancyRows = await recruitmentPipelineReader.GetByVacancyAsync(
-                request.CompanyId, request.StartDate, request.EndDate, cancellationToken);
+                request.CompanyId, request.StartDate, request.EndDate, request.IsInternal, cancellationToken);
 
             var items = vacancyRows
                 .Select(r => new RecruitmentPipelineReportRow(
@@ -23,7 +23,7 @@ internal sealed class GetRecruitmentPipelineReportHandler(IRecruitmentPipelineRe
         }
 
         var recruiterRows = await recruitmentPipelineReader.GetByRecruiterAsync(
-            request.CompanyId, request.StartDate, request.EndDate, cancellationToken);
+            request.CompanyId, request.StartDate, request.EndDate, request.IsInternal, cancellationToken);
 
         var recruiterItems = recruiterRows
             .Select(r => new RecruitmentPipelineReportRow(

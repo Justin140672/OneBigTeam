@@ -126,7 +126,10 @@ public sealed class CrossTabLogoutEnforcementTests : IAsyncLifetime
         // plain server-side redirect rather than a Blazor navigation (same reasoning already
         // established for LoginPage.GoToAsync).
         await _pageA.GotoAsync($"{_app.WebBaseUrl}/logout", new() { WaitUntil = WaitUntilState.Commit });
-        await _pageA.WaitForURLAsync(new Regex("/login"), new() { Timeout = 20_000 });
+        // WaitUntil=Commit: this is a full-document redirect to /login, and the assertion is about the
+        // URL — the default "load" state waits on the host page's third-party CSS/fonts too, which can
+        // stall well past 20s under a full parallel run (see the GotoAsync remarks just above).
+        await _pageA.WaitForURLAsync(new Regex("/login"), new() { Timeout = 20_000, WaitUntil = WaitUntilState.Commit });
 
         // Context B never touched logout. Its live circuit's next authenticated action must now be
         // rejected — HR.Api's JWT bearer pipeline rejects the still-technically-unexpired bearer token
@@ -149,7 +152,7 @@ public sealed class CrossTabLogoutEnforcementTests : IAsyncLifetime
             // already forced off — fall through to the authoritative URL assertion below.
         }
 
-        await _pageB.WaitForURLAsync(new Regex("/login"), new() { Timeout = 20_000 });
+        await _pageB.WaitForURLAsync(new Regex("/login"), new() { Timeout = 20_000, WaitUntil = WaitUntilState.Commit });
         Assert.Contains("/login", _pageB.Url);
     }
 }

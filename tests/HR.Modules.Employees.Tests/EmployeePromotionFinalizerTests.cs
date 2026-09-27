@@ -239,4 +239,172 @@ public class EmployeePromotionFinalizerTests
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => finalizer.FinalizeAsync(employee, promotion, actorEmployeeId: null, Now, CancellationToken.None));
     }
+
+    // ---- Internal recruitment Ticket 7 ----
+
+    private static EmployeePromotion CreateTicket7Promotion(
+        Employee employee,
+        Guid? newManagerId = null,
+        Guid? newLocationId = null,
+        Guid? newDepartmentId = null,
+        bool clearsManager = false) =>
+        EmployeePromotion.Create(
+            Guid.NewGuid(), employee.CompanyId, employee.Id, employee.PositionProfileId, Guid.NewGuid(),
+            newManagerId, newLocationId, DateOnly.FromDateTime(FixedUtcNow), "Internal appointment: Role", notes: null,
+            compensationId: null, createdBy: Guid.NewGuid(), Now,
+            newDepartmentId: newDepartmentId, clearsManager: clearsManager);
+
+    [Fact]
+    public async Task FinalizeAsync_Applies_NewDepartmentId()
+    {
+        await using var context = BuildContext();
+        var employee = CreateEmployee(Guid.NewGuid(), Now);
+        context.Employees.Add(employee);
+        var newDepartmentId = Guid.NewGuid();
+        var promotion = CreateTicket7Promotion(employee, newDepartmentId: newDepartmentId);
+        context.EmployeePromotions.Add(promotion);
+        await context.SaveChangesAsync();
+
+        await BuildFinalizer(context).FinalizeAsync(employee, promotion, actorEmployeeId: null, Now, CancellationToken.None);
+
+        Assert.Equal(newDepartmentId, (await context.Employees.SingleAsync()).DepartmentId);
+    }
+
+    [Fact]
+    public async Task FinalizeAsync_Keeps_Department_When_NewDepartmentId_Not_Captured()
+    {
+        await using var context = BuildContext();
+        var employee = CreateEmployee(Guid.NewGuid(), Now);
+        var originalDepartmentId = employee.DepartmentId;
+        context.Employees.Add(employee);
+        var promotion = CreateTicket7Promotion(employee, newDepartmentId: null);
+        context.EmployeePromotions.Add(promotion);
+        await context.SaveChangesAsync();
+
+        await BuildFinalizer(context).FinalizeAsync(employee, promotion, actorEmployeeId: null, Now, CancellationToken.None);
+
+        Assert.Equal(originalDepartmentId, (await context.Employees.SingleAsync()).DepartmentId);
+    }
+
+    [Fact]
+    public async Task FinalizeAsync_ClearsManager_Leaves_Employee_With_No_Manager()
+    {
+        await using var context = BuildContext();
+        var originalManagerId = Guid.NewGuid();
+        var employee = CreateEmployee(Guid.NewGuid(), Now, managerId: originalManagerId);
+        context.Employees.Add(employee);
+        var promotion = CreateTicket7Promotion(employee, clearsManager: true);
+        context.EmployeePromotions.Add(promotion);
+        await context.SaveChangesAsync();
+        var events = new CapturingIntegrationEventPublisher();
+
+        await BuildFinalizer(context, integrationEventPublisher: events)
+            .FinalizeAsync(employee, promotion, actorEmployeeId: null, Now, CancellationToken.None);
+
+        Assert.Null((await context.Employees.SingleAsync()).ManagerId);
+        var changed = Assert.Single(events.Published.OfType<EmployeeManagerChangedIntegrationEvent>());
+        Assert.Equal(originalManagerId, changed.PreviousManagerId);
+        Assert.Null(changed.NewManagerId);
+        Assert.Equal(employee.Id, changed.EmployeeId);
+        Assert.Equal(employee.CompanyId, changed.CompanyId);
+    }
+
+    [Fact]
+    public async Task FinalizeAsync_Publishes_ManagerChanged_Only_When_Manager_Actually_Changes()
+    {
+        await using var context = BuildContext();
+        var originalManagerId = Guid.NewGuid();
+        var newManagerId = Guid.NewGuid();
+        var employee = CreateEmployee(Guid.NewGuid(), Now, managerId: originalManagerId);
+        context.Employees.Add(employee);
+        var promotion = CreateTicket7Promotion(employee, newManagerId: newManagerId);
+        context.EmployeePromotions.Add(promotion);
+        await context.SaveChangesAsync();
+        var events = new CapturingIntegrationEventPublisher();
+
+        await BuildFinalizer(context, integrationEventPublisher: events)
+            .FinalizeAsync(employee, promotion, actorEmployeeId: null, Now, CancellationToken.None);
+
+        var changed = Assert.Single(events.Published.OfType<EmployeeManagerChangedIntegrationEvent>());
+        Assert.Equal(originalManagerId, changed.PreviousManagerId);
+        Assert.Equal(newManagerId, changed.NewManagerId);
+        Assert.Empty(events.Published.OfType<EmployeeLocationChangedIntegrationEvent>());
+    }
+
+    [Fact]
+    public async Task FinalizeAsync_Does_Not_Publish_ManagerChanged_When_Same_Manager_Specified()
+    {
+        await using var context = BuildContext();
+        var managerId = Guid.NewGuid();
+        var employee = CreateEmployee(Guid.NewGuid(), Now, managerId: managerId);
+        context.Employees.Add(employee);
+        var promotion = CreateTicket7Promotion(employee, newManagerId: managerId);
+        context.EmployeePromotions.Add(promotion);
+        await context.SaveChangesAsync();
+        var events = new CapturingIntegrationEventPublisher();
+
+        await BuildFinalizer(context, integrationEventPublisher: events)
+            .FinalizeAsync(employee, promotion, actorEmployeeId: null, Now, CancellationToken.None);
+
+        Assert.Empty(events.Published.OfType<EmployeeManagerChangedIntegrationEvent>());
+    }
+
+    [Fact]
+    public async Task FinalizeAsync_Does_Not_Publish_ManagerChanged_When_Clearing_An_Already_Empty_Manager()
+    {
+        await using var context = BuildContext();
+        var employee = CreateEmployee(Guid.NewGuid(), Now);
+        Assert.Null(employee.ManagerId);
+        context.Employees.Add(employee);
+        var promotion = CreateTicket7Promotion(employee, clearsManager: true);
+        context.EmployeePromotions.Add(promotion);
+        await context.SaveChangesAsync();
+        var events = new CapturingIntegrationEventPublisher();
+
+        await BuildFinalizer(context, integrationEventPublisher: events)
+            .FinalizeAsync(employee, promotion, actorEmployeeId: null, Now, CancellationToken.None);
+
+        Assert.Empty(events.Published.OfType<EmployeeManagerChangedIntegrationEvent>());
+    }
+
+    [Fact]
+    public async Task FinalizeAsync_Publishes_LocationChanged_Only_When_Location_Actually_Changes()
+    {
+        await using var context = BuildContext();
+        var originalLocationId = Guid.NewGuid();
+        var newLocationId = Guid.NewGuid();
+        var employee = CreateEmployee(Guid.NewGuid(), Now, locationId: originalLocationId);
+        context.Employees.Add(employee);
+        var promotion = CreateTicket7Promotion(employee, newLocationId: newLocationId);
+        context.EmployeePromotions.Add(promotion);
+        await context.SaveChangesAsync();
+        var events = new CapturingIntegrationEventPublisher();
+
+        await BuildFinalizer(context, integrationEventPublisher: events)
+            .FinalizeAsync(employee, promotion, actorEmployeeId: null, Now, CancellationToken.None);
+
+        var changed = Assert.Single(events.Published.OfType<EmployeeLocationChangedIntegrationEvent>());
+        Assert.Equal(originalLocationId, changed.PreviousLocationId);
+        Assert.Equal(newLocationId, changed.NewLocationId);
+        Assert.Empty(events.Published.OfType<EmployeeManagerChangedIntegrationEvent>());
+    }
+
+    [Fact]
+    public async Task FinalizeAsync_Does_Not_Publish_LocationChanged_When_Same_Location_Specified()
+    {
+        await using var context = BuildContext();
+        var locationId = Guid.NewGuid();
+        var employee = CreateEmployee(Guid.NewGuid(), Now, locationId: locationId);
+        context.Employees.Add(employee);
+        var promotion = CreateTicket7Promotion(employee, newLocationId: locationId);
+        context.EmployeePromotions.Add(promotion);
+        await context.SaveChangesAsync();
+        var events = new CapturingIntegrationEventPublisher();
+
+        await BuildFinalizer(context, integrationEventPublisher: events)
+            .FinalizeAsync(employee, promotion, actorEmployeeId: null, Now, CancellationToken.None);
+
+        Assert.Empty(events.Published.OfType<EmployeeLocationChangedIntegrationEvent>());
+        Assert.Single(events.Published.OfType<EmployeePromotedIntegrationEvent>());
+    }
 }

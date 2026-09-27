@@ -34,6 +34,12 @@ public sealed class PublicHolidayListPage(IPage page, string baseUrl)
     /// </summary>
     public async Task ClickHolidayAsync(string nameFragment)
     {
+        // The grid pages client-side at 20 rows and the suite keeps adding "E2E …" holidays during
+        // a run (several on far-future dates that sort late), so the target can be past page 1 —
+        // page to it first (HasGridCellOnAnyPageAsync leaves the grid on the matching page).
+        if (!await page.HasGridCellOnAnyPageAsync(nameFragment))
+            throw new InvalidOperationException($"Public holiday '{nameFragment}' was not found on any page of the list.");
+
         await page.Locator(".e-grid a").Filter(new() { HasText = nameFragment }).First.ClickAsync();
         await page.WaitForURLAsync(
             new System.Text.RegularExpressions.Regex(@"/public-holidays/[0-9a-fA-F-]{36}$"),
@@ -41,11 +47,9 @@ public sealed class PublicHolidayListPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".e-date-wrapper", new() { Timeout = 20_000 });
     }
 
+    // Searches every grid page, not just the one currently displayed — see ClickHolidayAsync.
     public Task<bool> HasHolidayAsync(string nameFragment) =>
-        page.Locator(".e-rowcell")
-            .Filter(new() { HasText = nameFragment })
-            .First
-            .WaitUntilVisibleAsync();
+        page.HasGridCellOnAnyPageAsync(nameFragment);
 
     public async Task<IReadOnlyList<string>> GetHolidayNamesAsync()
     {

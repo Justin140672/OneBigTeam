@@ -27,15 +27,18 @@ public sealed class LocationListPage(IPage page, string baseUrl)
     public async Task<bool> HasLocationAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
-        return await page.Locator(".e-rowcell")
-            .Filter(new() { HasText = nameFragment })
-            .First
-            .WaitUntilVisibleAsync();
+        // Every grid page, not just the current one: the list pages at 20 rows and the suite keeps
+        // adding "E2E …" locations during a run, which sort ahead of/around a just-created one.
+        // HasGridCellOnAnyPageAsync leaves the grid on the page containing the match.
+        return await page.HasGridCellOnAnyPageAsync(nameFragment);
     }
 
     /// <summary>The href of the grid row link whose text contains <paramref name="nameFragment"/>.</summary>
     public async Task<string> GetRowHrefAsync(string nameFragment)
     {
+        if (!await page.HasGridCellOnAnyPageAsync(nameFragment))
+            throw new InvalidOperationException($"Location '{nameFragment}' was not found on any page of the list.");
+
         var href = await page.Locator(".e-rowcell a").Filter(new() { HasText = nameFragment }).First.GetAttributeAsync("href");
         return href ?? throw new InvalidOperationException($"No location row link found for '{nameFragment}'.");
     }

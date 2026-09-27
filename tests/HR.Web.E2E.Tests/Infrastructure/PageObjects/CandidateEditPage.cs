@@ -299,4 +299,71 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
 
     public Task CancelReactivateAsync() =>
         ReactivateDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
+
+    // ── Internal recruitment Ticket 6: Applications card + internal-applicant alert ──
+    // The applications list loads asynchronously after the form renders, so every read here is a
+    // web-first expectation. Rows are addressed by data-application-id, never by position.
+
+    private ILocator ApplicationsCard => page.Locator("[data-testid='candidate-applications-card']");
+
+    private ILocator CandidateApplicationRow(Guid applicationId) =>
+        ApplicationsCard.Locator($"li[data-testid='candidate-application-row'][data-application-id='{applicationId}']");
+
+    /// <summary>
+    /// Asserts the Applications card lists <paramref name="applicationId"/> for
+    /// <paramref name="vacancyTitle"/>, and whether that row carries the Internal badge and
+    /// data-internal flag. The row is awaited visible first so the "no badge" case is never satisfied
+    /// by a list that simply hasn't loaded yet.
+    /// </summary>
+    public async Task ExpectApplicationRowAsync(Guid applicationId, string vacancyTitle, bool isInternal)
+    {
+        var row = CandidateApplicationRow(applicationId);
+        await Assertions.Expect(row).ToBeVisibleAsync(new() { Timeout = 30_000 });
+        await Assertions.Expect(row).ToHaveAttributeAsync("data-internal", isInternal ? "true" : "false");
+        await Assertions.Expect(row.Locator("[data-testid='candidate-application-vacancy']")).ToHaveTextAsync(vacancyTitle);
+
+        var badge = row.Locator("[data-testid='internal-application-badge']");
+        if (isInternal)
+        {
+            await Assertions.Expect(badge).ToBeVisibleAsync(new() { Timeout = 15_000 });
+            await Assertions.Expect(badge).ToHaveTextAsync("Internal");
+        }
+        else
+        {
+            await Assertions.Expect(badge).ToHaveCountAsync(0);
+        }
+    }
+
+    /// <summary>Waits for the row's "Stage:" value to read <paramref name="expectedStage"/>.</summary>
+    public Task ExpectApplicationRowStageAsync(Guid applicationId, string expectedStage) =>
+        Assertions.Expect(CandidateApplicationRow(applicationId).Locator("[data-testid='candidate-application-stage']"))
+            .ToHaveTextAsync(expectedStage, new() { Timeout = 15_000 });
+
+    /// <summary>Waits until the Applications card lists exactly <paramref name="expectedCount"/> rows.</summary>
+    public Task ExpectApplicationRowCountAsync(int expectedCount) =>
+        Assertions.Expect(ApplicationsCard.Locator("li[data-testid='candidate-application-row']"))
+            .ToHaveCountAsync(expectedCount, new() { Timeout = 30_000 });
+
+    /// <summary>
+    /// Asserts whether the "This candidate is a current employee (internal applicant)." alert shows.
+    /// Call only after the Applications card has loaded (e.g. after <see cref="ExpectApplicationRowAsync"/>)
+    /// — the alert is derived from the same list, so the absent case is then meaningful.
+    /// </summary>
+    public async Task ExpectInternalApplicantAlertAsync(bool visible)
+    {
+        var alert = page.Locator("[data-testid='candidate-internal-applicant-alert']");
+        if (visible)
+        {
+            await Assertions.Expect(alert).ToBeVisibleAsync(new() { Timeout = 15_000 });
+            await Assertions.Expect(alert).ToContainTextAsync("This candidate is a current employee (internal applicant).");
+        }
+        else
+        {
+            await Assertions.Expect(alert).ToHaveCountAsync(0);
+        }
+    }
+
+    /// <summary>Asserts the "hired and linked to an employee" alert (data-testid="candidate-hired-alert") is not rendered.</summary>
+    public Task ExpectNoHiredAlertAsync() =>
+        Assertions.Expect(page.Locator("[data-testid='candidate-hired-alert']")).ToHaveCountAsync(0);
 }

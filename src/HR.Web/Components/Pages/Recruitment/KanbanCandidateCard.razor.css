@@ -43,6 +43,11 @@
     text-overflow: ellipsis;
 }
 
+.kanban-candidate-card__internal {
+    margin-top: 0.2rem;
+    line-height: 1;
+}
+
 .kanban-candidate-card__vacancy {
     font-size: 0.75rem;
     color: var(--hr-gray-400);

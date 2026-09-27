@@ -546,9 +546,13 @@ a.card:focus-visible,
     padding-bottom: clamp(60px, 8vw, 100px);
 }
 
+.hero .section-inner {
+    width: min(1540px, 100%);
+}
+
 .hero-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    grid-template-columns: minmax(420px, 0.8fr) minmax(720px, 1.45fr);
     align-items: center;
     gap: clamp(32px, 5vw, 64px);
 }
@@ -568,22 +572,15 @@ a.card:focus-visible,
 }
 
 .product-window {
-    position: relative;
+    background: none;
     overflow: hidden;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border-strong);
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
+    outline: 1px solid var(--color-border-strong);
+    box-shadow: 0 22px 56px rgba(23, 41, 77, 0.14);
 }
 
 .product-window-bar {
-    position: relative;
-    display: flex;
-    align-items: center;
-    min-height: 34px;
-    padding: 7px 12px;
-    background: var(--color-bg-muted);
-    border-bottom: 1px solid var(--color-border);
+    display: none;
 }
 
 .product-window-dots {
@@ -614,17 +611,16 @@ a.card:focus-visible,
 .hero-shot {
     display: block;
     width: 100%;
-    aspect-ratio: 1905 / 1172;
+    aspect-ratio: 16 / 10;
     overflow: hidden;
-    background: var(--color-surface);
 }
 
 .hero-shot img {
     display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: top center;
+    width: 134.5%;
+    max-width: none;
+    height: auto;
+    margin-left: -19.5%;
 }
 
 .image-placeholder:has(img) {
@@ -649,14 +645,10 @@ a.card:focus-visible,
 }
 
 .hero-shot-figure figcaption {
-    margin-top: 10px;
-    font-size: var(--text-label);
-    font-weight: 600;
-    color: var(--color-ink-soft);
-    text-align: center;
+    display: none;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1200px) {
     .hero-grid {
         grid-template-columns: 1fr;
     }
@@ -681,20 +673,12 @@ a.card:focus-visible,
        mobile, which is the layout this rule intentionally avoids. Keep the screenshot
        and figcaption together as a single <figure>. */
     .hero-shot-figure {
-        width: min(640px, 100%);
+        width: min(1080px, 100%);
         margin: 32px auto 0;
     }
 }
 
 @media (max-width: 640px) {
-    .hero-shot {
-        aspect-ratio: 4 / 3;
-    }
-
-    .hero-shot img {
-        object-position: 28% top;
-    }
-
     .product-window-address {
         max-width: 58%;
         padding-inline: 18px;
@@ -1359,6 +1343,11 @@ a.card:focus-visible,
     align-items: center;
     gap: 20px;
     margin-top: 10px;
+}
+
+.pricing-hero .hero-copy:has(.feature-title-row) > .small-note,
+.pricing-hero .hero-copy:has(.feature-title-row) > .hero-text {
+    margin-left: 76px;
 }
 
 .feature-icon-large {
@@ -2306,6 +2295,11 @@ a.card:focus-visible,
 }
 
 @media (max-width: 640px) {
+    .pricing-hero .hero-copy:has(.feature-title-row) > .small-note,
+    .pricing-hero .hero-copy:has(.feature-title-row) > .hero-text {
+        margin-left: 0;
+    }
+
     .site-header {
         min-height: 64px;
         padding: 12px 18px;

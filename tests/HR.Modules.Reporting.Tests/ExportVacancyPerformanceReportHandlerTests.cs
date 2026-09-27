@@ -45,4 +45,28 @@ public class ExportVacancyPerformanceReportHandlerTests
         var row = Assert.Single(exporter.LastData!.Rows);
         Assert.Null(row[5]);
     }
+
+    // ----- Internal recruitment Ticket 6: isInternal is passed through to the reader -----
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task HandleAsync_Passes_IsInternal_Through_To_Reader(bool? isInternal)
+    {
+        var reader = new FakeVacancyPerformanceReader([]);
+        var getHandler = new GetVacancyPerformanceReportHandler(reader);
+        var exporter = new FakeReportExporter();
+        var handler = new ExportVacancyPerformanceReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
+        var start = new DateOnly(2026, 1, 1);
+        var end = new DateOnly(2026, 1, 31);
+
+        var result = await handler.HandleAsync(
+            new ExportVacancyPerformanceReportRequest(Guid.NewGuid(), start, end, IsInternal: isInternal), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(isInternal, reader.LastIsInternal);
+        Assert.Equal(start, reader.LastStartDate);
+        Assert.Equal(end, reader.LastEndDate);
+    }
 }

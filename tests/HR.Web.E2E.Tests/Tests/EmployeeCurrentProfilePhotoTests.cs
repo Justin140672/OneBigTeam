@@ -68,7 +68,7 @@ public sealed class EmployeeCurrentProfilePhotoTests(CrossUserFixture fixture) :
 
             await empEdit.UploadProfilePhotoDirectAsync(tempFile);
 
-            Assert.True(await empEdit.HasProfilePhotoImageAsync(),
+            Assert.True(await empEdit.WaitForProfilePhotoImageAfterScanAsync(),
                 "Expected the header to show an actual photo (<img>) after HR uploaded one directly");
             Assert.False(await empEdit.HasProfilePhotoInitialsAsync(),
                 "Did not expect the initials placeholder to still be shown after a direct HR upload");
@@ -114,7 +114,7 @@ public sealed class EmployeeCurrentProfilePhotoTests(CrossUserFixture fixture) :
 
             Assert.False(await empEdit.HasPendingProfilePhotoCardAsync(),
                 "Expected the pending review card to disappear once approved");
-            Assert.True(await empEdit.HasProfilePhotoImageAsync(),
+            Assert.True(await empEdit.WaitForProfilePhotoImageAfterScanAsync(),
                 "Expected the header to show the newly-approved photo after HR approved it");
         }
         finally

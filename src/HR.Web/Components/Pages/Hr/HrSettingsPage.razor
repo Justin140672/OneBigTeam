@@ -527,6 +527,7 @@
             Model.EmployeeNumberMode = settings.EmployeeNumberMode;
             Model.EmployeeNumberPrefix = settings.EmployeeNumberPrefix;
             Model.NextEmployeeNumber = settings.NextEmployeeNumber;
+            Model.NextEmployeeNumberOriginal = settings.NextEmployeeNumber;
             Model.EmployeeNumberMinimumLength = settings.EmployeeNumberMinimumLength;
             Model.AssetNumberMode = settings.AssetNumberMode;
             Model.AssetNumberPrefix = settings.AssetNumberPrefix;
@@ -567,7 +568,7 @@
             Model.AutoDisableAccessOnLeavingDate,
             Model.EmployeeNumberMode,
             FormText.Optional(Model.EmployeeNumberPrefix),
-            Model.NextEmployeeNumber,
+            Model.NextEmployeeNumber != Model.NextEmployeeNumberOriginal ? Model.NextEmployeeNumber : null,
             Model.EmployeeNumberMinimumLength,
             Model.AssetNumberMode,
             FormText.Optional(Model.AssetNumberPrefix),
@@ -581,6 +582,8 @@
 
         // Keep the concurrency token current so a second save without leaving the page succeeds.
         Model.Version = result.Version;
+        Model.NextEmployeeNumber = result.NextEmployeeNumber;
+        Model.NextEmployeeNumberOriginal = result.NextEmployeeNumber;
         return null;
     }
 

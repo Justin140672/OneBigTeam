@@ -1292,6 +1292,9 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     public async Task<IReadOnlyList<string>> GetVersionColumnHeadersAsync()
     {
         var pane = await SelectVersionHistoryTabAsync();
+        // See GetReviewHistoryColumnHeadersAsync — wait for the grid to render before reading headers.
+        await pane.Locator(".e-row, .e-emptyrow, .doc-detail-empty-state").First
+            .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
         var headers = await pane.Locator(".e-grid .e-headercell").AllInnerTextsAsync();
         return headers.Select(h => h.Trim()).ToList();
     }
@@ -1423,6 +1426,11 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     public async Task<IReadOnlyList<string>> GetReviewHistoryColumnHeadersAsync()
     {
         var pane = await SelectReviewHistoryTabAsync();
+        // The tab reporting aria-selected only proves the tab switched — the pane's Syncfusion grid
+        // (headers included) renders on a later pass, so an instant AllInnerTextsAsync() snapshot
+        // could read no/partial headers. Wait for the grid body (a row or the empty row) first.
+        await pane.Locator(".e-row, .e-emptyrow").First
+            .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
         var headers = await pane.Locator(".e-headercell").AllInnerTextsAsync();
         return headers.Select(h => h.Trim()).ToList();
     }

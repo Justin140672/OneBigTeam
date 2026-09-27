@@ -83,4 +83,111 @@ public class EmployeePromotionTests
 
         Assert.Equal("Cannot complete a promotion that has already been completed.", ex.Message);
     }
+
+    // ---- Internal recruitment Ticket 7 ----
+
+    private static EmployeePromotion CreateWith(
+        Guid? newManagerId = null,
+        Guid? newDepartmentId = null,
+        bool clearsManager = false,
+        string? sourceReference = null) =>
+        EmployeePromotion.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            newManagerId, newLocationId: null, new DateOnly(2026, 8, 1), "Reason.", notes: null,
+            compensationId: null, Guid.NewGuid(), FixedNow,
+            newDepartmentId: newDepartmentId, clearsManager: clearsManager, sourceReference: sourceReference);
+
+    [Fact]
+    public void Create_Throws_When_Clearing_Manager_And_Assigning_New_Manager()
+    {
+        Assert.Throws<ArgumentException>(() => CreateWith(newManagerId: Guid.NewGuid(), clearsManager: true));
+    }
+
+    [Fact]
+    public void Create_Allows_ClearsManager_Without_New_Manager()
+    {
+        var promotion = CreateWith(clearsManager: true);
+
+        Assert.True(promotion.ClearsManager);
+        Assert.Null(promotion.NewManagerId);
+    }
+
+    [Fact]
+    public void Create_Defaults_New_Fields_For_Ordinary_Promotions()
+    {
+        var promotion = CreatePending(FixedNow);
+
+        Assert.Null(promotion.NewDepartmentId);
+        Assert.False(promotion.ClearsManager);
+        Assert.Null(promotion.SourceReference);
+        Assert.False(promotion.IsInternalAppointment);
+    }
+
+    [Fact]
+    public void Create_Records_NewDepartmentId()
+    {
+        var departmentId = Guid.NewGuid();
+
+        Assert.Equal(departmentId, CreateWith(newDepartmentId: departmentId).NewDepartmentId);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Create_Normalises_Blank_SourceReference_To_Null(string sourceReference)
+    {
+        var promotion = CreateWith(sourceReference: sourceReference);
+
+        Assert.Null(promotion.SourceReference);
+        Assert.False(promotion.IsInternalAppointment);
+    }
+
+    [Fact]
+    public void Create_Trims_SourceReference()
+    {
+        var applicationId = Guid.NewGuid();
+
+        var promotion = CreateWith(sourceReference: $"  recruitment:application:{applicationId}  ");
+
+        Assert.Equal($"recruitment:application:{applicationId}", promotion.SourceReference);
+    }
+
+    [Theory]
+    [InlineData("recruitment:application:0b8f6f39-8e3b-4ac3-9d53-0b3c7f1d2a11", true)]
+    [InlineData("recruitment:application:", true)]
+    [InlineData("recruitment:vacancy:0b8f6f39", false)]
+    [InlineData("Recruitment:Application:0b8f6f39", false)]
+    [InlineData("import:batch:42", false)]
+    public void IsInternalAppointment_Requires_Exact_Recruitment_Application_Prefix(string sourceReference, bool expected)
+    {
+        Assert.Equal(expected, CreateWith(sourceReference: sourceReference).IsInternalAppointment);
+    }
+
+    [Fact]
+    public void ResolveManagerId_Keeps_Current_Manager_When_None_Specified()
+    {
+        var current = Guid.NewGuid();
+
+        Assert.Equal(current, CreateWith().ResolveManagerId(current));
+    }
+
+    [Fact]
+    public void ResolveManagerId_Uses_New_Manager_When_Specified()
+    {
+        var newManager = Guid.NewGuid();
+
+        Assert.Equal(newManager, CreateWith(newManagerId: newManager).ResolveManagerId(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public void ResolveManagerId_Returns_Null_When_Clearing_Manager()
+    {
+        Assert.Null(CreateWith(clearsManager: true).ResolveManagerId(Guid.NewGuid()));
+    }
+
+    [Fact]
+    public void ResolveManagerId_Returns_Null_When_No_Current_And_None_Specified()
+    {
+        Assert.Null(CreateWith().ResolveManagerId(null));
+    }
 }

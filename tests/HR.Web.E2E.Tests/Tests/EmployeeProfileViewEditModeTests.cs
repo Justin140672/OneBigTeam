@@ -202,7 +202,7 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
 
         // OnSavedAsync's forceLoad navigation lands back on the view route with fresh data.
         await _page.WaitForURLAsync(url => url.Contains("/view", StringComparison.OrdinalIgnoreCase), new() { Timeout = 40_000 });
-        await _page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await _page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
 
         Assert.True(empEdit.IsInViewModeUrl);
         Assert.Equal(newPreferredName, await empEdit.GetTextFieldValueAsync("Preferred Name"));

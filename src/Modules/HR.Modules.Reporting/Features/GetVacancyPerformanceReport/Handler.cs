@@ -10,7 +10,7 @@ internal sealed class GetVacancyPerformanceReportHandler(IVacancyPerformanceRead
         CancellationToken cancellationToken)
     {
         var items = await vacancyPerformanceReader.GetVacancyPerformanceAsync(
-            request.CompanyId, request.StartDate, request.EndDate, cancellationToken);
+            request.CompanyId, request.StartDate, request.EndDate, request.IsInternal, cancellationToken);
 
         var rows = items
             .Select(i => new VacancyPerformanceReportRow(

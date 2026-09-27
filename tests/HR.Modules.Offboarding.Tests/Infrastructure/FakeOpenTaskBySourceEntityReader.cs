@@ -21,4 +21,10 @@ internal sealed class FakeOpenTaskBySourceEntityReader(Dictionary<Guid, Guid>? o
         TaskActionType actionType,
         CancellationToken cancellationToken) =>
         Task.FromResult(_openTaskIds.TryGetValue(sourceEntityId, out var taskId) ? taskId : (Guid?)null);
+
+    public Task<IReadOnlyDictionary<Guid, Guid?>> GetTaskAssigneesAsync(
+        Guid companyId,
+        IEnumerable<Guid> taskIds,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, Guid?>>(new Dictionary<Guid, Guid?>());
 }

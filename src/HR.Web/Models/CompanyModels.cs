@@ -127,7 +127,9 @@ public record UpdateHrSettingsRequest(
     bool AutoDisableAccessOnLeavingDate,
     EmployeeNumberMode EmployeeNumberMode,
     string? EmployeeNumberPrefix,
-    int NextEmployeeNumber,
+    // Null = not changed on this form: the API keeps the live counter (see HR.Modules.Companies'
+    // UpdateHrSettingsRequest.NextEmployeeNumber) instead of rewinding it to the loaded value.
+    int? NextEmployeeNumber,
     int EmployeeNumberMinimumLength,
     AssetNumberMode AssetNumberMode,
     string? AssetNumberPrefix,

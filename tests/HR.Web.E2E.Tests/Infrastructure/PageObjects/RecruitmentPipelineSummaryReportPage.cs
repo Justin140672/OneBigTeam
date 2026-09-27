@@ -80,4 +80,12 @@ public sealed class RecruitmentPipelineSummaryReportPage(IPage page, string base
     }
 
     public async Task<bool> HasLoadErrorAsync() => await page.Locator(".alert-danger").IsVisibleAsync();
+
+    // ── Applications type filter (internal recruitment Ticket 6) ──────────────
+
+    public Task SelectApplicationTypeAsync(string label) => ReportApplicationTypeFilter.SelectAsync(page, label);
+
+    public Task ExpectApplicationTypeAsync(string label) => ReportApplicationTypeFilter.ExpectSelectedAsync(page, label);
+
+    public Task ExpectRenderedWithoutErrorAsync() => ReportApplicationTypeFilter.ExpectGridRenderedWithoutErrorAsync(page);
 }

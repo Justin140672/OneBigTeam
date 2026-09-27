@@ -416,7 +416,11 @@
         if (Grid is null) return;
 
         var selected = await Grid.GetSelectedRecordsAsync();
-        if (selected.Count == 0) return;
+        if (selected.Count == 0)
+        {
+            _actionError = "Select at least one employee to invite.";
+            return;
+        }
 
         var recipients = new List<InvitationRecipientCandidate>();
         var excluded = new List<InvitationExclusionCandidate>();
@@ -497,18 +501,47 @@
         if (_inviteModeGrid is not null)
             await _inviteModeGrid.ClearSelectionAsync();
 
+        // The selection has now been consumed — apply any grid refresh that was deferred while it
+        // was in progress (see HandleInvitationRecipientsUpdatedAsync).
+        if (_recipientRefreshPending)
+        {
+            _recipientRefreshPending = false;
+            await LoadAsync();
+        }
+
         if (_progressPanel is not null)
             await _progressPanel.ShowBatchAsync(result.BatchId);
     }
 
+    // Set when a progress-driven refresh arrived while the administrator had rows selected in the
+    // normal grid; applied once that selection is consumed (or on the next poll with no selection).
+    private bool _recipientRefreshPending;
+
     // Fired by InvitationBatchProgressPanel when a poll observes newly-sent recipients or a
     // transition to Completed, so the "User Account" column (and invitation-mode candidate grid)
     // reflect the outcome without a full page reload.
+    //
+    // The panel tracks the company's latest batch, which can belong to ANOTHER administrator's
+    // (or a concurrent session's) invitation run, and polls it every 3s. Reloading the normal grid
+    // re-binds its rows and clears any selection the administrator is in the middle of building,
+    // so an in-progress "Invite selected"/"Update selected" silently found nothing selected
+    // (OnInviteSelectedClicked returns early on an empty selection). Never reload the grid out
+    // from under a live selection: defer it until the selection has been used or cleared. The
+    // invitation-mode grid tracks its own selection by employee id across reloads, so it can
+    // always refresh immediately.
     private async Task HandleInvitationRecipientsUpdatedAsync()
     {
-        await LoadAsync();
         if (_inviteModeGrid is not null)
             await _inviteModeGrid.ReloadAsync();
+
+        if (_hasSelection)
+        {
+            _recipientRefreshPending = true;
+            return;
+        }
+
+        _recipientRefreshPending = false;
+        await LoadAsync();
     }
 
     private async Task OnBulkUpdateClicked(EmployeeListItemModel _)
@@ -516,7 +549,13 @@
         if (Grid is null) return;
 
         var selected = await Grid.GetSelectedRecordsAsync();
-        if (selected.Count == 0) return;
+        if (selected.Count == 0)
+        {
+            // Never a silent no-op: tell the user why nothing opened (e.g. the grid was refreshed
+            // and its selection cleared since the rows were ticked).
+            _actionError = "Select at least one employee to update.";
+            return;
+        }
 
         _actionError = null;
         _actionSuccess = null;

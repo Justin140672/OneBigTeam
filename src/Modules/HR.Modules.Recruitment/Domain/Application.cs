@@ -92,6 +92,29 @@ internal sealed class Application : HR.SharedKernel.IVersionedAggregate
     // referenced; the Kind = Cv rule is enforced by AttachCv / DescribeCvDocumentViolation.
     public Guid? CvDocumentId { get; private set; }
 
+    // Internal recruitment Ticket 7: completing an internal application changes the existing
+    // employee's role (in the Employees module) instead of provisioning a new employee. Two modules
+    // commit separately, so the Recruitment side persists its progress: Pending is saved BEFORE the
+    // Employees module is called, Completed together with the move to the Hired stage. A Pending
+    // application is completed by a retry or by InternalAppointmentReconciliationJob.
+    public InternalAppointmentStatus? AppointmentStatus { get; private set; }
+    public Guid? AppointmentEmployeeId { get; private set; }
+    public Guid? AppointmentRequestedByUserId { get; private set; }
+    public DateTimeOffset? AppointmentRequestedAt { get; private set; }
+
+    // Set on completion: the Employees-module promotion holding the change, and its effective date.
+    public Guid? AppointmentPromotionId { get; private set; }
+    public DateOnly? AppointmentEffectiveDate { get; private set; }
+    public DateTimeOffset? AppointmentCompletedAt { get; private set; }
+
+    public bool HasInternalAppointmentInProgress => AppointmentStatus == InternalAppointmentStatus.Pending;
+
+    public const string InternalAppointmentInProgressMessage =
+        "An internal appointment is being completed for this application. Wait for it to finish, then reload.";
+
+    /// <summary>The Employees-module idempotency key for this application's internal appointment.</summary>
+    public string InternalAppointmentSourceReference => $"recruitment:application:{Id}";
+
     public static Application Create(
         Guid id,
         Guid companyId,
@@ -240,6 +263,62 @@ internal sealed class Application : HR.SharedKernel.IVersionedAggregate
     {
         CurrentStageId = hiredStageId;
         UpdatedAt      = now;
+    }
+
+    /// <summary>
+    /// Internal recruitment Ticket 7: records that an internal appointment for
+    /// <paramref name="employeeId"/> is being completed. Re-entrant while Pending (a retry refreshes
+    /// the requester); callers must have validated eligibility first.
+    /// </summary>
+    public void BeginInternalAppointment(Guid employeeId, Guid requestedByUserId, DateTimeOffset now)
+    {
+        if (Source != ApplicationSource.Internal)
+            throw new InvalidOperationException("Only an internal application can be completed by internal appointment.");
+
+        if (AppointmentStatus == InternalAppointmentStatus.Completed)
+            throw new InvalidOperationException("This internal appointment has already been completed.");
+
+        AppointmentStatus            = InternalAppointmentStatus.Pending;
+        AppointmentEmployeeId        = employeeId;
+        AppointmentRequestedByUserId = requestedByUserId;
+        AppointmentRequestedAt       = now;
+        UpdatedAt                    = now;
+    }
+
+    /// <summary>
+    /// Internal recruitment Ticket 7: clears a Pending appointment that the Employees module did not
+    /// record (it refused the change, or never received it). No-op unless Pending.
+    /// </summary>
+    public bool AbandonInternalAppointment(DateTimeOffset now)
+    {
+        if (AppointmentStatus != InternalAppointmentStatus.Pending)
+            return false;
+
+        AppointmentStatus            = null;
+        AppointmentEmployeeId        = null;
+        AppointmentRequestedByUserId = null;
+        AppointmentRequestedAt       = null;
+        UpdatedAt                    = now;
+        return true;
+    }
+
+    /// <summary>
+    /// Internal recruitment Ticket 7: completes a Pending appointment once the Employees module has
+    /// recorded the employee change — moves the application to the Hired stage. The application,
+    /// interviews, offer and stage history are all retained.
+    /// </summary>
+    public void CompleteInternalAppointment(
+        Guid hiredStageId, Guid promotionId, DateOnly effectiveDate, DateTimeOffset now)
+    {
+        if (AppointmentStatus != InternalAppointmentStatus.Pending)
+            throw new InvalidOperationException("Only a pending internal appointment can be completed.");
+
+        CurrentStageId           = hiredStageId;
+        AppointmentStatus        = InternalAppointmentStatus.Completed;
+        AppointmentPromotionId   = promotionId;
+        AppointmentEffectiveDate = effectiveDate;
+        AppointmentCompletedAt   = now;
+        UpdatedAt                = now;
     }
 
     /// <summary>

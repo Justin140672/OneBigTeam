@@ -27,6 +27,17 @@ public static class SeededE2eEmployees
     /// <summary>Manager the ManagerDashboard pool members report to (David Park), assigned in the seed.</summary>
     public static readonly Guid ManagerDavidParkId = Guid.Parse("30000000-0000-0000-0000-000000000008");
 
+    /// <summary>
+    /// Nina Patel — E2E-only dedicated manager persona (Employee + Manager roles, no seeded reports),
+    /// for tests that need to GROW a manager's team at runtime (ManagerTeamProfileTests) without
+    /// polluting James Okafor's single-report team (Tom Williams) or David Park's, which other
+    /// classes assert on (ManagerDashboardTests' My Team widget shows only the first 8 reports by
+    /// last name). Seeded by EmployeesModule.SeedEmployeesAsync's E2E section, DevPersonaStore and
+    /// IdentityModule.SeedDevUserAsync under this same id. Keep in sync.
+    /// </summary>
+    public static readonly Guid DedicatedManagerNinaPatelId = Guid.Parse("30000000-0000-0000-0000-000000000017");
+    public const string DedicatedManagerNinaPatelEmail = "nina.patel@acme.example";
+
     public sealed record Pooled(int Index, Guid EmployeeId, string LastName, string Email, string EmployeeNumber)
     {
         public string FullName => $"E2E {LastName}";

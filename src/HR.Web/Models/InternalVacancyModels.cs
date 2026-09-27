@@ -12,7 +12,8 @@ public record InternalVacancyListItem(
     string Title,
     string? DepartmentName,
     string? Location,
-    DateOnly? ClosingDate);
+    DateOnly? ClosingDate,
+    bool HasApplied = false);
 
 public record InternalVacancyDetail(
     Guid Id,
@@ -23,3 +24,17 @@ public record InternalVacancyDetail(
     string? EmploymentType,
     DateOnly? ClosingDate,
     DateOnly? OpenedAt);
+
+// Outcome of an employee applying for an internal vacancy (multipart CV upload only — the
+// applicant's identity is resolved server-side from the signed-in employee and never sent).
+public enum InternalVacancyApplyOutcome
+{
+    Submitted,
+    AlreadyApplied,
+    NotEligible,
+    EmailInUse,
+    VacancyUnavailable,
+    Failed
+}
+
+public sealed record InternalVacancyApplyResult(InternalVacancyApplyOutcome Outcome, string? Message);

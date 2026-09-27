@@ -32,6 +32,17 @@ internal sealed class SearchApplicationsHandler(
                 a.CurrentStageId,
                 a.AppliedAt,
                 a.SourceExternalRecruiterId,
+                // Internal recruitment Ticket 6: Source is the authoritative internal indicator. The
+                // employee link is only surfaced for Internal applications — Candidate.EmployeeId is
+                // also set on external candidates once hired and must not make them look internal.
+                a.Source,
+                IsInternal         = a.Source == Domain.ApplicationSource.Internal,
+                InternalEmployeeId = a.Source == Domain.ApplicationSource.Internal ? c.EmployeeId : null,
+                IsWithdrawn        = a.WithdrawnAt != null,
+                CurrentStageName   = dbContext.RecruitmentStages
+                    .Where(s => s.Id == a.CurrentStageId && s.CompanyId == a.CompanyId)
+                    .Select(s => s.Name)
+                    .FirstOrDefault(),
             };
 
         if (!string.IsNullOrWhiteSpace(request.Search))
@@ -51,6 +62,16 @@ internal sealed class SearchApplicationsHandler(
 
         if (request.ExternalRecruiterId is not null)
             query = query.Where(r => r.SourceExternalRecruiterId == request.ExternalRecruiterId);
+
+        if (request.CandidateId is not null)
+            query = query.Where(r => r.CandidateId == request.CandidateId);
+
+        // Filter on Source directly (not the projected flag) so legacy null-Source rows are
+        // unambiguously treated as external under SQL three-valued logic.
+        if (request.IsInternal == true)
+            query = query.Where(r => r.Source == Domain.ApplicationSource.Internal);
+        else if (request.IsInternal == false)
+            query = query.Where(r => r.Source == null || r.Source != Domain.ApplicationSource.Internal);
 
         if (request.AppliedFrom is not null)
             query = query.Where(r => r.AppliedAt >= request.AppliedFrom);
@@ -89,7 +110,11 @@ internal sealed class SearchApplicationsHandler(
                     r.VacancyId,
                     r.AdvertTitle ?? pos?.Title ?? "(untitled)",
                     r.CurrentStageId,
-                    r.AppliedAt);
+                    r.AppliedAt,
+                    r.CurrentStageName,
+                    r.IsWithdrawn,
+                    r.IsInternal,
+                    r.InternalEmployeeId);
             })
             .ToList();
 

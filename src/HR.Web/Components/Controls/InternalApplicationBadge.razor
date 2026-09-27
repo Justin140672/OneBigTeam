@@ -1,0 +1,15 @@
+@* Internal recruitment Ticket 6: the one shared "Internal" marker for an application whose
+   Source == Internal (the API's IsInternal flag). Callers must pass IsInternal from the application
+   itself — never infer it from a candidate's EmployeeId (external candidates get one once hired).
+   Renders nothing when the application is not internal, so callers can use it unconditionally. *@
+@if (IsInternal)
+{
+    <span class="internal-application-badge" data-testid="internal-application-badge"
+          title="Internal applicant (current employee)">
+        <StatusBadge Variant="StatusBadgeVariant.Info">Internal</StatusBadge>
+    </span>
+}
+
+@code {
+    [Parameter] public bool IsInternal { get; set; } = true;
+}

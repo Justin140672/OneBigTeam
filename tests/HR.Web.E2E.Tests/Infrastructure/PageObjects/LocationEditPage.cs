@@ -12,13 +12,13 @@ public sealed class LocationEditPage(IPage page, string baseUrl)
     public async Task GoToNewAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/locations/new");
-        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
     }
 
     public async Task GoToAsync(Guid companyId, Guid locationId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/locations/{locationId}");
-        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
     }
 
     public async Task FillNameAsync(string name)

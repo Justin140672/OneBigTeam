@@ -309,6 +309,20 @@ public sealed class ContactDetailsTab(IPage page)
         (await SavingStatusRegion.TextContentAsync() ?? string.Empty).Trim();
 
     /// <summary>
+    /// Waits until the "saving" render has reached the browser: the live region carries its
+    /// "Saving contact details…" text (and, from the same render batch, Save is disabled). The
+    /// test save-control hook reports "request arrived" as soon as HR.Web's server-side API call
+    /// starts, but the Blazor render that set _savingStatus/_saving is flushed to the browser
+    /// asynchronously over SignalR — an instant DOM read right after can still see the pre-render
+    /// state. The save stays held until the caller releases it, so this wait always resolves.
+    /// </summary>
+    public async Task WaitForSavingStateRenderedAsync()
+    {
+        await Assertions.Expect(SavingStatusRegion).ToContainTextAsync("Saving contact details", new() { Timeout = 15_000 });
+        await Assertions.Expect(SaveButton).ToBeDisabledAsync(new() { Timeout = 15_000 });
+    }
+
+    /// <summary>
     /// True when keyboard focus currently sits inside the saving live region specifically
     /// (<c>#cd-saving-status</c>) — used to assert focus is NOT yanked into it during a save. The
     /// success banner is also <c>role="status"</c>, so this keys off the id, not the role.

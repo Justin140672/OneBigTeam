@@ -220,7 +220,8 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
 
     public async Task<string?> GetCardStatusBadgeTextAsync(string candidateNameFragment)
     {
-        var badge = Card(candidateNameFragment).Locator(".status-badge, .badge").First;
+        // The terminal-outcome badge specifically — an "Internal" badge can render before it on the card.
+        var badge = Card(candidateNameFragment).Locator("[data-testid='kanban-card-terminal-status'] .badge");
         return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
     }
 
@@ -481,4 +482,56 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
         await page.WaitForURLAsync("**/review-cv**",
             new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
     }
+
+    // ── Internal recruitment Ticket 6: Internal badge on the card ────────────────
+    // Cards are addressed by their stable data-application-id (KanbanCandidateCard.razor), scoped to
+    // the kanban-candidate-card testid — never by the badge's CSS class alone. Columns carry
+    // data-stage-id (VacancyKanbanBoard.razor), which identifies a stage without relying on its name.
+
+    private static string CardSelector(Guid applicationId) =>
+        $".kanban-candidate-card[data-testid='kanban-candidate-card'][data-application-id='{applicationId}']";
+
+    private ILocator CardByApplicationId(Guid applicationId) => Board.Locator(CardSelector(applicationId));
+
+    /// <summary>
+    /// Asserts the card for <paramref name="applicationId"/> is on the board and whether it carries the
+    /// Internal badge. The card is awaited visible first so the "no badge" case is never satisfied by a
+    /// card that simply hasn't rendered yet.
+    /// </summary>
+    public async Task ExpectCardInternalBadgeAsync(Guid applicationId, bool isInternal)
+    {
+        var card = CardByApplicationId(applicationId);
+        await Assertions.Expect(card).ToBeVisibleAsync(new() { Timeout = 30_000 });
+
+        var badge = card.Locator("[data-testid='internal-application-badge']");
+        if (isInternal)
+        {
+            await Assertions.Expect(badge).ToBeVisibleAsync(new() { Timeout = 15_000 });
+            await Assertions.Expect(badge).ToHaveTextAsync("Internal");
+        }
+        else
+        {
+            await Assertions.Expect(badge).ToHaveCountAsync(0);
+        }
+    }
+
+    /// <summary>
+    /// Returns the data-stage-id and visible title of the single column holding the card for
+    /// <paramref name="applicationId"/> (waits until exactly one column contains it).
+    /// </summary>
+    public async Task<(string StageId, string Title)> GetColumnOfCardAsync(Guid applicationId)
+    {
+        var column = Board.Locator($"[data-testid='kanban-column']:has({CardSelector(applicationId)})");
+        await Assertions.Expect(column).ToHaveCountAsync(1, new() { Timeout = 30_000 });
+        var stageId = await column.GetAttributeAsync("data-stage-id") ?? "";
+        var title = ((await column.Locator(".vacancy-kanban-board__column-title").TextContentAsync()) ?? "").Trim();
+        return (stageId, title);
+    }
+
+    /// <summary>Waits for the card for <paramref name="applicationId"/> to sit in the column with this data-stage-id.</summary>
+    public Task ExpectCardInStageColumnAsync(Guid applicationId, string stageId) =>
+        Assertions.Expect(
+                Board.Locator($"[data-testid='kanban-column'][data-stage-id='{stageId}']")
+                    .Locator(CardSelector(applicationId)))
+            .ToBeVisibleAsync(new() { Timeout = 30_000 });
 }

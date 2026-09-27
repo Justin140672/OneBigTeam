@@ -22,6 +22,7 @@ internal sealed class FakeRecruitmentPipelineReader : IRecruitmentPipelineReader
     public Guid? LastCompanyId { get; private set; }
     public DateOnly? LastStartDate { get; private set; }
     public DateOnly? LastEndDate { get; private set; }
+    public bool? LastIsInternal { get; private set; }
     public bool ByRecruiterCalled { get; private set; }
     public bool ByVacancyCalled { get; private set; }
 
@@ -29,11 +30,13 @@ internal sealed class FakeRecruitmentPipelineReader : IRecruitmentPipelineReader
         Guid companyId,
         DateOnly? startDate,
         DateOnly? endDate,
+        bool? isInternal,
         CancellationToken cancellationToken)
     {
         LastCompanyId = companyId;
         LastStartDate = startDate;
         LastEndDate = endDate;
+        LastIsInternal = isInternal;
         ByRecruiterCalled = true;
 
         return Task.FromResult(_recruiterRows);
@@ -43,11 +46,13 @@ internal sealed class FakeRecruitmentPipelineReader : IRecruitmentPipelineReader
         Guid companyId,
         DateOnly? startDate,
         DateOnly? endDate,
+        bool? isInternal,
         CancellationToken cancellationToken)
     {
         LastCompanyId = companyId;
         LastStartDate = startDate;
         LastEndDate = endDate;
+        LastIsInternal = isInternal;
         ByVacancyCalled = true;
 
         return Task.FromResult(_vacancyRows);

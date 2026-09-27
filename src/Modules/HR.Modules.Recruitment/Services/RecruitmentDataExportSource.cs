@@ -44,16 +44,21 @@ internal sealed class RecruitmentDataExportSource(RecruitmentDbContext db) : IRe
 
         var applications = await db.Applications.AsNoTracking()
             .Where(a => a.CompanyId == companyId)
-            .Select(a => new { a.Id, a.VacancyId, a.CandidateId, a.CurrentStageId, a.InterviewOutcome, a.RejectionReason, a.WithdrawnAt, a.OfferApprovedAt, a.AppliedAt, a.CvDocumentId })
+            .Select(a => new { a.Id, a.VacancyId, a.CandidateId, a.CurrentStageId, a.InterviewOutcome, a.RejectionReason, a.WithdrawnAt, a.OfferApprovedAt, a.AppliedAt, a.Source, a.CvDocumentId })
             .ToListAsync(cancellationToken);
 
+        // Internal recruitment Ticket 6: Source and IsInternal let the export distinguish internal from
+        // external applications. IsInternal is derived solely from Source == Internal — never from the
+        // candidate's EmployeeId, which is also set on external candidates once hired. (CvDocumentId is
+        // kept as the trailing column.)
         var applicationsTable = new DataExportTable(
             "applications",
-            ["Id", "VacancyId", "CandidateId", "CurrentStageId", "InterviewOutcome", "RejectionReason", "WithdrawnAt", "OfferApprovedAt", "AppliedAt", "CvDocumentId"],
+            ["Id", "VacancyId", "CandidateId", "CurrentStageId", "InterviewOutcome", "RejectionReason", "WithdrawnAt", "OfferApprovedAt", "AppliedAt", "Source", "IsInternal", "CvDocumentId"],
             applications.Select(a => (IReadOnlyList<string?>)new string?[]
             {
                 a.Id.ToString(), a.VacancyId.ToString(), a.CandidateId.ToString(), a.CurrentStageId.ToString(),
-                a.InterviewOutcome?.ToString(), a.RejectionReason, T(a.WithdrawnAt), T(a.OfferApprovedAt), T(a.AppliedAt), a.CvDocumentId?.ToString()
+                a.InterviewOutcome?.ToString(), a.RejectionReason, T(a.WithdrawnAt), T(a.OfferApprovedAt), T(a.AppliedAt),
+                a.Source?.ToString(), a.Source == Domain.ApplicationSource.Internal ? "true" : "false", a.CvDocumentId?.ToString()
             }).ToList());
 
         var interviews = await db.Interviews.AsNoTracking()

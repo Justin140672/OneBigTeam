@@ -48,6 +48,11 @@ internal sealed class WithdrawApplicationHandler(RecruitmentDbContext db, IClock
             return Result.Failure<WithdrawApplicationResponse>(
                 Error.Validation("This application has already been withdrawn."));
 
+        // Internal recruitment Ticket 7: see RejectCandidate — no withdrawal mid-appointment.
+        if (application.HasInternalAppointmentInProgress)
+            return Result.Failure<WithdrawApplicationResponse>(
+                Error.Conflict(Domain.Application.InternalAppointmentInProgressMessage));
+
         var currentStage = await db.RecruitmentStages
             .AsNoTracking()
             .SingleOrDefaultAsync(s => s.Id == application.CurrentStageId && s.CompanyId == request.CompanyId, cancellationToken);

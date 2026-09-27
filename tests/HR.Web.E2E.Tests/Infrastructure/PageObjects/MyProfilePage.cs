@@ -23,7 +23,12 @@ public sealed class MyProfilePage(IPage page, string baseUrl)
                     window._profileReady = true;
                     clearInterval(poll);
                 } else if (!document.querySelector('.overview-skeleton')) {
-                    const err = document.querySelector('.alert-danger, .alert-warning');
+                    // Only the Overview tab's OWN error/guard states count — not any alert anywhere
+                    // on the page (e.g. MyProfilePhotoHeader's 'Pending approval' warning or a
+                    // save-conflict banner), which previously failed this wait instantly whenever
+                    // such an alert happened to render before the overview skeleton/grid.
+                    const err = Array.from(document.querySelectorAll('.alert-danger, .alert-warning'))
+                        .find(a => /You can only view your own profile|Unable to load profile details/.test(a.textContent));
                     if (err) {
                         window._profileError = err.textContent.trim();
                         clearInterval(poll);

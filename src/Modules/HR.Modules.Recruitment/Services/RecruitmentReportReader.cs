@@ -27,9 +27,10 @@ internal sealed class RecruitmentReportReader(RecruitmentDbContext dbContext, IP
         Guid companyId,
         DateOnly? startDate,
         DateOnly? endDate,
+        bool? isInternal,
         CancellationToken cancellationToken)
     {
-        var metrics = await BuildVacancyMetricsAsync(companyId, startDate, endDate, cancellationToken);
+        var metrics = await BuildVacancyMetricsAsync(companyId, startDate, endDate, isInternal, cancellationToken);
 
         var vacancies = await dbContext.Vacancies
             .AsNoTracking()
@@ -65,9 +66,10 @@ internal sealed class RecruitmentReportReader(RecruitmentDbContext dbContext, IP
         Guid companyId,
         DateOnly? startDate,
         DateOnly? endDate,
+        bool? isInternal,
         CancellationToken cancellationToken)
     {
-        var metrics = await BuildVacancyMetricsAsync(companyId, startDate, endDate, cancellationToken);
+        var metrics = await BuildVacancyMetricsAsync(companyId, startDate, endDate, isInternal, cancellationToken);
 
         var vacancyTitles = await dbContext.Vacancies
             .AsNoTracking()
@@ -90,9 +92,10 @@ internal sealed class RecruitmentReportReader(RecruitmentDbContext dbContext, IP
         Guid companyId,
         DateOnly? startDate,
         DateOnly? endDate,
+        bool? isInternal,
         CancellationToken cancellationToken)
     {
-        var metrics = await BuildVacancyMetricsAsync(companyId, startDate, endDate, cancellationToken);
+        var metrics = await BuildVacancyMetricsAsync(companyId, startDate, endDate, isInternal, cancellationToken);
 
         var vacancies = await dbContext.Vacancies
             .AsNoTracking()
@@ -128,6 +131,7 @@ internal sealed class RecruitmentReportReader(RecruitmentDbContext dbContext, IP
     public async Task<RecruitmentPipelineSummaryResult> GetSummaryAsync(
         Guid companyId,
         bool includeClosed,
+        bool? isInternal,
         CancellationToken cancellationToken)
     {
         var vacancyQuery = dbContext.Vacancies
@@ -153,9 +157,11 @@ internal sealed class RecruitmentReportReader(RecruitmentDbContext dbContext, IP
 
         var vacancyIds = vacancies.Select(v => v.Id).ToList();
 
-        var applications = await dbContext.Applications
-            .AsNoTracking()
-            .Where(a => a.CompanyId == companyId && vacancyIds.Contains(a.VacancyId))
+        var applications = await ApplyInternalFilter(
+                dbContext.Applications
+                    .AsNoTracking()
+                    .Where(a => a.CompanyId == companyId && vacancyIds.Contains(a.VacancyId)),
+                isInternal)
             .Select(a => new { a.VacancyId, a.CurrentStageId })
             .ToListAsync(cancellationToken);
 
@@ -198,6 +204,17 @@ internal sealed class RecruitmentReportReader(RecruitmentDbContext dbContext, IP
         return new RecruitmentPipelineSummaryResult(rows, stages);
     }
 
+    // Internal recruitment Ticket 6: Application.Source is the authoritative internal indicator —
+    // never Candidate.EmployeeId, which is also set on external candidates once they are hired.
+    // null = all applications; false keeps legacy null-Source rows (they are external).
+    private static IQueryable<Application> ApplyInternalFilter(IQueryable<Application> query, bool? isInternal) =>
+        isInternal switch
+        {
+            true  => query.Where(a => a.Source == ApplicationSource.Internal),
+            false => query.Where(a => a.Source == null || a.Source != ApplicationSource.Internal),
+            null  => query,
+        };
+
     private sealed record VacancyMetrics(
         Guid VacancyId, int Candidates, int Interviews, int Offers, int Hires, DateOnly? HireDate);
 
@@ -205,11 +222,14 @@ internal sealed class RecruitmentReportReader(RecruitmentDbContext dbContext, IP
         Guid companyId,
         DateOnly? startDate,
         DateOnly? endDate,
+        bool? isInternal,
         CancellationToken cancellationToken)
     {
-        var applicationsQuery = dbContext.Applications
-            .AsNoTracking()
-            .Where(a => a.CompanyId == companyId);
+        var applicationsQuery = ApplyInternalFilter(
+            dbContext.Applications
+                .AsNoTracking()
+                .Where(a => a.CompanyId == companyId),
+            isInternal);
 
         if (startDate is not null)
         {

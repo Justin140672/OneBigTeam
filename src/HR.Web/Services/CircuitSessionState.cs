@@ -76,4 +76,28 @@ public sealed class CircuitSessionState
         if (Status == CircuitAuthStatus.Authenticated)
             Status = CircuitAuthStatus.Invalidated;
     }
+
+    /// <summary>
+    /// Raised once when HR.Api has rejected this circuit's CURRENT bearer token as invalid (e.g.
+    /// the session was revoked by a logout in another tab/browser, or the token expired).
+    /// AppSessionAuthStateProvider turns it into an anonymous authentication-state change, which
+    /// AppSession answers with a forced navigation to /login.
+    /// </summary>
+    public event Action? SessionRejectedByServer;
+
+    /// <summary>
+    /// Reports that HR.Api answered a request made with <paramref name="rejectedToken"/> with a
+    /// bearer-token rejection (401 + WWW-Authenticate: Bearer error="invalid_token"). Ignored unless
+    /// that token is still this circuit's live token — a stale response for an already-replaced or
+    /// already-cleared token must not invalidate anything. Fails closed via <see cref="Clear"/>
+    /// (sticky Invalidated), so nothing on this circuit can keep sending the rejected token.
+    /// </summary>
+    public void ReportTokenRejected(string rejectedToken)
+    {
+        if (Status != CircuitAuthStatus.Authenticated || !string.Equals(AccessToken, rejectedToken, StringComparison.Ordinal))
+            return;
+
+        Clear();
+        SessionRejectedByServer?.Invoke();
+    }
 }

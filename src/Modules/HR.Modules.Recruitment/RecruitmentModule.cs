@@ -180,6 +180,10 @@ public static class RecruitmentModule
         services.AddScoped<GetInternalVacancyHandler>();
         services.AddScoped<IValidator<GetInternalVacancyRequest>, GetInternalVacancyValidator>();
 
+        services.AddScoped<Features.ApplyForInternalVacancy.ApplyForInternalVacancyHandler>();
+        services.AddScoped<IValidator<Features.ApplyForInternalVacancy.ApplyForInternalVacancyRequest>,
+            Features.ApplyForInternalVacancy.ApplyForInternalVacancyValidator>();
+
         services.AddScoped<ListVacanciesHandler>();
         services.AddScoped<IValidator<ListVacanciesRequest>, ListVacanciesValidator>();
 
@@ -274,6 +278,13 @@ public static class RecruitmentModule
 
         services.AddScoped<HireCandidateHandler>();
         services.AddScoped<IValidator<HireCandidateRequest>, HireCandidateValidator>();
+
+        // Internal recruitment Ticket 7: complete an internal application by internal appointment.
+        services.AddScoped<Features.AppointInternalCandidate.AppointInternalCandidateHandler>();
+        services.AddScoped<IValidator<Features.AppointInternalCandidate.AppointInternalCandidateRequest>,
+            Features.AppointInternalCandidate.AppointInternalCandidateValidator>();
+        services.AddScoped<InternalAppointmentCompleter>();
+        services.AddScoped<Jobs.InternalAppointmentReconciliationJob>();
 
         services.AddScoped<ScheduleInterviewHandler>();
         services.AddScoped<IValidator<ScheduleInterviewRequest>, ScheduleInterviewValidator>();
@@ -409,6 +420,12 @@ public static class RecruitmentModule
             "recruitment-candidate-document-scan-reconciliation",
             job => job.ExecuteAsync(),
             "*/5 * * * *");
+        // Internal recruitment Ticket 7: completes (or releases) internal appointments interrupted
+        // between the Employees-side change and the Recruitment-side completion.
+        jobManager.AddOrUpdate<Jobs.InternalAppointmentReconciliationJob>(
+            "recruitment-internal-appointment-reconciliation",
+            job => job.ExecuteAsync(),
+            "*/10 * * * *");
         return app;
     }
 

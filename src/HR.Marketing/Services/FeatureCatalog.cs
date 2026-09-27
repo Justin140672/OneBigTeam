@@ -62,12 +62,14 @@ public static class FeatureCatalog
             "recruitment",
             "user-plus",
             "Recruitment",
-            "Find, track and hire the right people with a simple recruitment workflow.",
-            "Give hiring activity a simple home, from open roles to candidate progress, so recruitment does not disappear into personal inboxes.",
+            "Find, track and hire the right people — inside or outside your organisation — with one simple recruitment workflow.",
+            "Give internal and external hiring activity a simple home, from published roles and employee applications to candidate progress, so recruitment does not disappear into personal inboxes.",
             new[]
             {
                 "Create and publish vacancies — get a role in front of candidates without juggling a separate job board account",
-                "Track candidates through each stage — always know where each candidate stands, instead of digging through email threads",
+                "Publish internal vacancies — give existing employees a clear place to discover opportunities across your organisation",
+                "Accept employee applications — let your people apply from their own workspace without creating a separate candidate profile",
+                "Track internal and external applicants through each stage — always know where every candidate stands, instead of digging through email threads",
                 "Manage interviews and hiring decisions — keep interview feedback in one place so decisions aren't lost between people",
                 "Convert successful candidates into employees — skip re-entering the same details once someone accepts an offer",
                 "Recruitment dashboard and pipeline — see how hiring is progressing across all your open roles at a glance",
@@ -123,6 +125,21 @@ public static class FeatureCatalog
     private static readonly Dictionary<string, FeatureInfo> BySlug =
         All.ToDictionary(f => f.Slug, StringComparer.OrdinalIgnoreCase);
 
+    private static readonly IReadOnlyDictionary<string, string[]> RelatedSlugs =
+        new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["employee-management"] = ["company-documents", "workflows-reminders", "reporting"],
+            ["leave-management"] = ["sickness-absence", "workflows-reminders", "reporting"],
+            ["sickness-absence"] = ["leave-management", "reporting", "workflows-reminders"],
+            ["recruitment"] = ["employee-management", "workflows-reminders", "reporting"],
+            ["company-documents"] = ["employee-management", "workflows-reminders", "reporting"],
+            ["workflows-reminders"] = ["employee-management", "company-documents", "leave-management"],
+            ["reporting"] = ["employee-management", "leave-management", "recruitment"]
+        };
+
     public static bool TryGet(string slug, out FeatureInfo? feature) =>
         BySlug.TryGetValue(slug, out feature);
+
+    public static IReadOnlyList<string> GetRelatedSlugs(string slug) =>
+        RelatedSlugs.TryGetValue(slug, out var related) ? related : [];
 }

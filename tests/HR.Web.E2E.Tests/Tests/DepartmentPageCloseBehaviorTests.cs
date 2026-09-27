@@ -42,7 +42,7 @@ public sealed class DepartmentPageCloseBehaviorTests(HrAdminPersonaFixture fixtu
         var cells = await _page.Locator(".e-rowcell a").Filter(new() { HasText = deptName }).First.GetAttributeAsync("href");
         Assert.NotNull(cells);
         await _page.GotoAsync($"{_fixture.WebBaseUrl}{cells}");
-        await _page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await _page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
 
         await deptEdit.CloseAndWaitForListAsync();
 

@@ -54,6 +54,29 @@ public sealed class ReviewCvPage(IPage page, string baseUrl)
     public async Task<string?> GetCandidateNameAsync() =>
         (await Root.Locator("[data-testid='review-cv-candidate-name']").TextContentAsync())?.Trim();
 
+    /// <summary>
+    /// Internal recruitment Ticket 6: asserts whether the Internal badge sits beside the candidate
+    /// name (inside dd.review-cv__candidate-name — the name span itself holds only the name). The name
+    /// is awaited visible first so the "no badge" case is never satisfied by an unrendered summary.
+    /// </summary>
+    public async Task ExpectCandidateInternalBadgeAsync(bool isInternal)
+    {
+        var nameCell = Root.Locator("dd.review-cv__candidate-name");
+        await Assertions.Expect(nameCell.Locator("[data-testid='review-cv-candidate-name']"))
+            .ToBeVisibleAsync(new() { Timeout = 30_000 });
+
+        var badge = nameCell.Locator("[data-testid='internal-application-badge']");
+        if (isInternal)
+        {
+            await Assertions.Expect(badge).ToBeVisibleAsync(new() { Timeout = 15_000 });
+            await Assertions.Expect(badge).ToHaveTextAsync("Internal");
+        }
+        else
+        {
+            await Assertions.Expect(badge).ToHaveCountAsync(0);
+        }
+    }
+
     public async Task<string?> GetPositionAsync() =>
         (await Root.Locator("[data-testid='review-cv-position']").TextContentAsync())?.Trim();
 

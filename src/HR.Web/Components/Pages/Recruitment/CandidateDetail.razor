@@ -5,6 +5,7 @@
 @rendermode InteractiveServer
 @using System.ComponentModel.DataAnnotations
 @inject CandidateService CandidateService
+@inject ApplicationService ApplicationService
 @inject AppSession Session
 @inherits EditPageBase<CandidateEditModel, Guid>
 
@@ -36,9 +37,27 @@
             <div class="alert alert-danger">@GlobalError</div>
         }
 
-        @if (_candidate?.EmployeeId is not null)
+        @* Internal recruitment Ticket 6: internal applicants are linked to their employee record at
+           apply time, so EmployeeId alone does NOT mean "hired". Internal status comes only from the
+           applications' IsInternal flag (Source == Internal). *@
+        @if (IsInternalApplicant)
         {
-            <div class="alert alert-success d-flex align-items-center gap-2">
+            <div class="alert alert-info d-flex align-items-center gap-2" data-testid="candidate-internal-applicant-alert">
+                <i class="fa-solid fa-id-badge"></i>
+                <span>This candidate is a current employee (internal applicant).</span>
+            </div>
+        }
+        else if (_candidate?.EmployeeId is not null && _applications is null)
+        {
+            @* Applications couldn't be loaded, so we can't tell hired vs internal — stay neutral. *@
+            <div class="alert alert-secondary d-flex align-items-center gap-2" data-testid="candidate-employee-linked-alert">
+                <i class="fa-solid fa-link"></i>
+                <span>This candidate is linked to an employee record.</span>
+            </div>
+        }
+        else if (_candidate?.EmployeeId is not null)
+        {
+            <div class="alert alert-success d-flex align-items-center gap-2" data-testid="candidate-hired-alert">
                 <i class="fa-solid fa-circle-check"></i>
                 <span>This candidate was hired and linked to an employee (ID: @_candidate.EmployeeId).</span>
             </div>
@@ -242,6 +261,51 @@
                             }
                         </div>
                     </div>
+
+                    @* Internal recruitment Ticket 6: the candidate's application history across every
+                       vacancy. Outside the EditForm like the CV card; read-only. *@
+                    <div class="card mb-4" data-testid="candidate-applications-card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Applications</h5>
+                        </div>
+                        <div class="card-body">
+                            @if (_applications is null)
+                            {
+                                <p class="text-muted mb-0" data-testid="candidate-applications-error">Applications could not be loaded.</p>
+                            }
+                            else if (_applications.Count == 0)
+                            {
+                                <p class="text-muted mb-0" data-testid="candidate-applications-empty">This candidate has no applications.</p>
+                            }
+                            else
+                            {
+                                <ul class="list-group">
+                                    @foreach (var application in _applications)
+                                    {
+                                        <li class="list-group-item" data-testid="candidate-application-row"
+                                            data-application-id="@application.ApplicationId"
+                                            data-internal="@(application.IsInternal ? "true" : "false")">
+                                            <div class="candidate-application__header">
+                                                <span class="candidate-application__vacancy"
+                                                      data-testid="candidate-application-vacancy">@application.VacancyTitle</span>
+                                                <InternalApplicationBadge IsInternal="@application.IsInternal" />
+                                                @if (application.IsWithdrawn)
+                                                {
+                                                    <span data-testid="candidate-application-withdrawn">
+                                                        <StatusBadge Variant="StatusBadgeVariant.Secondary">Withdrawn</StatusBadge>
+                                                    </span>
+                                                }
+                                            </div>
+                                            <div class="small text-muted">
+                                                Stage: <span data-testid="candidate-application-stage">@(application.CurrentStageName ?? "Unknown")</span>
+                                                · Applied <span data-testid="candidate-application-applied">@application.AppliedAt.LocalDateTime.ToString("d MMM yyyy")</span>
+                                            </div>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </div>
+                    </div>
                 }
             </div>
         </div>
@@ -359,7 +423,24 @@
         {
             _candidate = await CandidateService.GetCandidateAsync(CompanyId, Id!.Value);
             await LoadCvDocumentsAsync();
+            await LoadApplicationsAsync();
         }
+    }
+
+    // ── Application history (internal recruitment Ticket 6) ─────────────────────
+
+    // null = failed to load (distinct from an empty history).
+    private List<ApplicationSearchItemModel>? _applications = [];
+
+    // Authoritative only via IsInternal (Source == Internal) — never inferred from EmployeeId.
+    private bool IsInternalApplicant => _applications?.Any(a => a.IsInternal) == true;
+
+    private async Task LoadApplicationsAsync()
+    {
+        var response = await ApplicationService.SearchApplicationsForCandidateAsync(CompanyId, Id!.Value, pageSize: 200);
+        _applications = response?.Items
+            .OrderByDescending(a => a.AppliedAt)
+            .ToList();
     }
 
     // ── CV documents (internal recruitment Ticket 2) ────────────────────────────

@@ -89,6 +89,16 @@ internal sealed class PromoteEmployeeHandler(
 
         var previousPositionProfileId = employee.PositionProfileId;
 
+        // Internal recruitment Ticket 7: the department moves with the position profile. Every
+        // position profile belongs to a department, so capture it on the promotion now and let the
+        // finalizer apply it on the effective date. When the profile can't be resolved the department
+        // is left unchanged, which is the behaviour promotions had before this was added.
+        var newDepartmentId = await dbContext.PositionProfiles
+            .AsNoTracking()
+            .Where(p => p.CompanyId == request.CompanyId && p.Id == request.NewPositionProfileId)
+            .Select(p => (Guid?)p.DepartmentId)
+            .SingleOrDefaultAsync(cancellationToken);
+
         var now = clock.UtcNowOffset();
 
         var promotion = EmployeePromotion.Create(
@@ -104,7 +114,8 @@ internal sealed class PromoteEmployeeHandler(
             request.Notes,
             compensationId,
             actorEmployeeId,
-            now);
+            now,
+            newDepartmentId: newDepartmentId);
 
         dbContext.EmployeePromotions.Add(promotion);
 

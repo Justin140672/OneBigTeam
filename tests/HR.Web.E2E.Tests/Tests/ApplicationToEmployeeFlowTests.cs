@@ -29,32 +29,9 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : C
     private const string MarcusEmail = "marcus.diallo@acme.example";
     private const string LauraEmail = "laura.bennett@acme.example";
 
-    // Candidate_Applies_Interviews_IsOffered_AndHired_BecomesEmployee mutates the single shared
-    // Acme CompanySettings row (Employee Numbering mode) via HrSettingsPage — the same row that
-    // HrSettingsSerialTestBase's group mutates (e.g. HrSettingsPageTests). CrossUserVacancyTestBase's
-    // own gate only serializes this class against other vacancy/recruitment tests, not against that
-    // separate group, so without also taking HrSettingsSerialTestBase's gate the two groups can run
-    // concurrently against the same row — one test's save/reload racing the other's, leaving the
-    // HR Settings page in an inconsistent render state (e.g. the SfTab never finishing mounting,
-    // which manifested as a "Employee Numbering" tab-role timeout). Take both gates, same pattern as
-    // RecruitmentStageManagementTests joining CrossUserVacancyTestBase's gate from outside the group.
-    public override async Task InitializeAsync()
-    {
-        await HrSettingsSerialTestBase.GateInstance.WaitAsync();
-        await base.InitializeAsync();
-    }
-
-    public override async Task DisposeAsync()
-    {
-        try
-        {
-            await base.DisposeAsync();
-        }
-        finally
-        {
-            HrSettingsSerialTestBase.GateInstance.Release();
-        }
-    }
+    // No longer joins HrSettingsSerialTestBase's gate: that was only needed while
+    // Candidate_Applies_..._BecomesEmployee flipped the shared Acme numbering mode, which it no
+    // longer does (see that test's remarks).
 
     [Fact]
     public async Task Candidate_Applies_Interviews_IsOffered_AndHired_BecomesEmployee()
@@ -71,22 +48,14 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : C
         var vacancyList    = new VacancyListPage(_page, _fixture.WebBaseUrl);
         var vacancyDetail  = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
         var employeeList   = new EmployeeListPage(_page, _fixture.WebBaseUrl);
-        var hrSettings     = new HrSettingsPage(_page, _fixture.WebBaseUrl);
 
-        // The Hire dialog's Employee Number field only renders when the company's numbering mode
-        // is Manual (see HireCandidateDialog.razor) — Automatic mode (Acme's seeded default) hides
-        // it and assigns the number server-side instead, so FillHireEmployeeNumberAsync below would
-        // otherwise hang waiting for a field that doesn't exist. Set Manual for this run, same
-        // pattern (and same hardcoded-restore reasoning) as CreateEmployeeTests.
-        // EmploymentTab_EditingEmployeeNumber_PersistsNewValue: restoring to a captured "whatever
-        // it currently was" is self-perpetuating if a previous run died mid-test, so the finally
-        // below hardcodes the known-correct baseline ("Automatic") rather than reading it back.
-        // hr-settings:manage is HR-Administrator-only, so this needs Laura, not Marcus.
+        // Acme's numbering mode is left at its seeded Automatic for the whole run and never
+        // mutated here (it used to be flipped to Manual for this test, which raced every ungated
+        // class creating Acme employees — see CreateEmployeeTests' remarks). The Hire dialog then
+        // shows "assigned automatically" instead of the Employee Number input, and
+        // FillHireEmployeeNumberAsync below is mode-aware (a no-op in Automatic mode).
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
-        await hrSettings.GoToAsync(AcmeId);
-        await hrSettings.SelectEmployeeNumberModeAsync("Manual");
-        await hrSettings.SaveAsync();
 
         // A fresh Position Profile is required here rather than the seeded "Senior Software
         // Engineer" — that profile already has a permanently-open vacancy in seed data (see
@@ -95,9 +64,6 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : C
         // (HR Administrator, required for Position Profile creation) at this point.
         var profileTitle = await PositionProfileTestHelpers.CreateUniquePositionProfileAsync(
             _page, _fixture.WebBaseUrl, AcmeId, login, LauraEmail, MarcusEmail);
-
-        try
-        {
 
         // ── Step 1: Create the candidate ──────────────────────────────────────────
         await candidateList.GoToAsync(AcmeId);
@@ -208,21 +174,6 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : C
         await employeeList.GoToAsync(AcmeId);
         Assert.True(await employeeList.HasEmployeeAsync(candidateLast),
             $"Expected an employee named '{candidateLast}' to appear in the employee list after hiring");
-        }
-        finally
-        {
-            // Restore Acme's known seed default — see the comment above for why this is hardcoded
-            // rather than capture-and-restore. Don't assume Step 9 already switched to Laura: if
-            // any earlier step (1-8) throws, this finally still runs, but while still logged in as
-            // Marcus (Recruiter) — who lacks hr-settings:manage and would silently hang waiting for
-            // the "Employee Numbering" tab to render for an unauthorized page, masking whatever the
-            // real assertion/step failure was (a finally-block exception replaces the original one
-            // propagating from the try). Explicitly (re-)switch to Laura first, unconditionally.
-            await login.SwitchAccountAsync(LauraEmail);
-            await hrSettings.GoToAsync(AcmeId);
-            await hrSettings.SelectEmployeeNumberModeAsync("Automatic");
-            await hrSettings.SaveAsync();
-        }
     }
 
     [Fact]

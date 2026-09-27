@@ -67,7 +67,17 @@ internal sealed record GetApplicationResponse(
     // [P1] Malware scan state (Pending | Scanning | Clean | Infected | Failed) of the submitted CV and of
     // the current CV. Null when the corresponding CV is absent. Only "Clean" is downloadable/viewable.
     string? CvScanStatus = null,
-    string? CurrentCandidateCvScanStatus = null);
+    string? CurrentCandidateCvScanStatus = null,
+    // Internal recruitment Ticket 6: true only when Source == Internal (the authoritative indicator).
+    // EmployeeId is the applicant's linked employee and is populated ONLY for internal applications —
+    // it stays null for external candidates, including those later hired (whose Candidate.EmployeeId
+    // is set by HireCandidate), so an external application is never retroactively labelled internal.
+    bool IsInternal = false,
+    Guid? EmployeeId = null,
+    // Internal recruitment Ticket 7: internal appointment progress ("Pending" / "Completed"; null when
+    // none started) and, once completed, the effective date of the employee change.
+    string? InternalAppointmentStatus = null,
+    DateOnly? InternalAppointmentEffectiveDate = null);
 
 internal sealed record ApplicationStageHistoryItem(
     Guid Id,

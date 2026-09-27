@@ -476,6 +476,8 @@ public static class IdentityModule
             (Id: new Guid("30000000-0000-0000-0000-000000000015"), First: "Grace",  Last: "Kim",     Email: "grace.kim@betacorp.example",       Roles: new[] { SystemRoles.Employee, SystemRoles.HrAdministrator }),
             // Dedicated to CrossTabLogoutEnforcementTests only — see DevPersonaStore's remarks.
             (Id: new Guid("30000000-0000-0000-0000-000000000016"), First: "Olivia", Last: "Reyes",   Email: "olivia.reyes@acme.example",        Roles: new[] { SystemRoles.Employee, SystemRoles.HrAdministrator }),
+            // Dedicated to ManagerTeamProfileTests only — see DevPersonaStore's remarks.
+            (Id: new Guid("30000000-0000-0000-0000-000000000017"), First: "Nina",   Last: "Patel",   Email: "nina.patel@acme.example",          Roles: new[] { SystemRoles.Employee, SystemRoles.Manager }),
         };
 
         foreach (var persona in personas)

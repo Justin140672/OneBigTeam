@@ -1,0 +1,20 @@
+@* Hidden marker reflecting VacancyApplicationsTab's SERVER-side row selection (_selectedRow), which
+   is what the toolbar's enabled state is actually computed from. A separate component so it can
+   repaint itself on every selection change without re-rendering the parent — re-rendering the tab
+   re-assigns the grid's Toolbar parameter, and re-assigning grid parameters is exactly what
+   HrGrid's remarks warn re-initialises the grid and clobbers row selection. Syncfusion's
+   client-side "e-active" row class can't show whether the server-side RowSelected handler has run
+   (the E2E page object selects a row against this marker instead). *@
+<span hidden data-testid="selected-application-marker" data-selected-application-id="@_selectedId"></span>
+
+@code {
+    private string _selectedId = string.Empty;
+
+    public void Set(Guid? applicationId)
+    {
+        var next = applicationId?.ToString() ?? string.Empty;
+        if (next == _selectedId) return;
+        _selectedId = next;
+        StateHasChanged();
+    }
+}

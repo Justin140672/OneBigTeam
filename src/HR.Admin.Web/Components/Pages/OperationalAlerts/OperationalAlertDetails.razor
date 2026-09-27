@@ -88,7 +88,7 @@ else
                 <dt>Affected entity id</dt>
                 <dd>@(_alert.AffectedEntityId?.ToString() ?? "—")</dd>
                 <dt>Affected item count</dt>
-                <dd>@_alert.AffectedItemCount</dd>
+                <dd>@(_alert.AffectedItemCount?.ToString() ?? "—")</dd>
                 <dt>Read</dt>
                 <dd>@(_alert.IsRead ? "Yes" : "No")</dd>
             </dl>

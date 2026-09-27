@@ -73,6 +73,61 @@ public class EmployeePromotedHandlerTests
         Assert.Contains("a new role", entry.Summary);
     }
 
+    // ---- Internal recruitment Ticket 7 ----
+
+    [Theory]
+    [InlineData("recruitment:application:5a0c1c1e-8d0f-4b5e-9f53-1f6c0a7e2b10", "Internal appointment")]
+    [InlineData(null, "Promoted")]
+    [InlineData("import:batch:42", "Promoted")]
+    public async Task HandleAsync_Titles_Entry_By_Promotion_Source(string? sourceReference, string expectedTitle)
+    {
+        await using var context = BuildContext();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var companyId = Guid.NewGuid();
+        var previousPosition = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
+        var newPosition = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Engineering Manager", null, null, null, null, null, null, null, Guid.NewGuid(), now);
+        context.PositionProfiles.AddRange(previousPosition, newPosition);
+        var employeeId = Guid.NewGuid();
+        var effectiveDate = new DateOnly(2026, 8, 1);
+        var promotion = EmployeePromotion.Create(
+            Guid.NewGuid(), companyId, employeeId, previousPosition.Id, newPosition.Id,
+            newManagerId: null, newLocationId: null, effectiveDate, "Reason.", notes: null,
+            compensationId: null, Guid.NewGuid(), now, sourceReference: sourceReference);
+        context.EmployeePromotions.Add(promotion);
+        await context.SaveChangesAsync();
+        var timelineWriter = new FakeEmployeeTimelineWriter();
+
+        await new EmployeePromotedHandler(context, timelineWriter).HandleAsync(
+            new EmployeePromotedIntegrationEvent(companyId, employeeId, previousPosition.Id, newPosition.Id, effectiveDate, promotion.Id),
+            CancellationToken.None);
+
+        var entry = Assert.Single(timelineWriter.Added);
+        Assert.Equal(expectedTitle, entry.Title);
+        Assert.Contains("Engineer", entry.Summary);
+        Assert.Contains("Engineering Manager", entry.Summary);
+        Assert.Equal(promotion.Id, entry.SourceRecordId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Treat_Another_Companys_Internal_Appointment_As_Internal()
+    {
+        await using var context = BuildContext();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var promotion = EmployeePromotion.Create(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            newManagerId: null, newLocationId: null, new DateOnly(2026, 8, 1), "Reason.", notes: null,
+            compensationId: null, Guid.NewGuid(), now, sourceReference: $"recruitment:application:{Guid.NewGuid()}");
+        context.EmployeePromotions.Add(promotion);
+        await context.SaveChangesAsync();
+        var timelineWriter = new FakeEmployeeTimelineWriter();
+
+        await new EmployeePromotedHandler(context, timelineWriter).HandleAsync(
+            new EmployeePromotedIntegrationEvent(Guid.NewGuid(), promotion.EmployeeId, Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 8, 1), promotion.Id),
+            CancellationToken.None);
+
+        Assert.Equal("Promoted", Assert.Single(timelineWriter.Added).Title);
+    }
+
     private static EmployeesDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<EmployeesDbContext>()

@@ -48,6 +48,13 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
                 a.OfferRespondedAt,
                 a.CvDocumentId,
                 a.Version,
+                // Internal recruitment Ticket 6: Application.Source is the ONLY authoritative internal
+                // indicator. Candidate.EmployeeId alone is not — an external candidate is linked to an
+                // employee when hired — so the employee link is only surfaced for Internal applications.
+                IsInternal = a.Source == Domain.ApplicationSource.Internal,
+                InternalEmployeeId = a.Source == Domain.ApplicationSource.Internal ? c.EmployeeId : null,
+                a.AppointmentStatus,
+                a.AppointmentEffectiveDate,
             })
             .SingleOrDefaultAsync(cancellationToken);
 
@@ -144,6 +151,10 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
             currentCv?.FileSize,
             currentCv?.CreatedAt,
             cv?.ScanStatus.ToString(),
-            currentCv?.ScanStatus.ToString()));
+            currentCv?.ScanStatus.ToString(),
+            row.IsInternal,
+            row.InternalEmployeeId,
+            row.AppointmentStatus?.ToString(),
+            row.AppointmentEffectiveDate));
     }
 }

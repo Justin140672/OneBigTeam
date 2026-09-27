@@ -3,6 +3,7 @@
 @inject AppSession Session
 @inject NavigationManager Navigation
 @inject InternalVacancyService InternalVacancyService
+@inject EmployeeService EmployeeService
 
 <PageTitle>Internal Vacancies</PageTitle>
 
@@ -39,8 +40,9 @@
                 {
                     <div class="vacancy-card" role="button" tabindex="0"
                          data-testid="internal-vacancy-card"
-                         @onclick="@(() => OpenDetailAsync(vacancy.Id))"
-                         @onkeydown="@(e => OnCardKeyDown(e, vacancy.Id))">
+                         @ref="_cardRefs[vacancy.Id]"
+                         @onclick="@(() => OpenDetailAsync(vacancy))"
+                         @onkeydown="@(e => OnCardKeyDown(e, vacancy))">
                         <span class="vacancy-card-title">@vacancy.Title</span>
                         <span class="vacancy-card-meta">
                             @(vacancy.DepartmentName ?? "—") · @(vacancy.Location ?? "—")
@@ -48,6 +50,12 @@
                         @if (vacancy.ClosingDate is not null)
                         {
                             <span class="vacancy-card-closing">Closes @vacancy.ClosingDate.Value.ToString("d MMMM yyyy")</span>
+                        }
+                        @if (vacancy.HasApplied)
+                        {
+                            <span class="vacancy-card-applied-badge" data-testid="internal-vacancy-applied-badge">
+                                <i class="fa-solid fa-circle-check" aria-hidden="true"></i> Applied
+                            </span>
                         }
                     </div>
                 }
@@ -58,9 +66,9 @@
 
     <SfDialog Visible="_detailVisible" IsModal="true" Width="520px" ShowCloseIcon="true"
               CssClass="vacancy-detail-dialog">
-        <DialogEvents Closed="CloseDetail" />
+        <DialogEvents OnClose="OnDialogClosing" Closed="OnDialogClosed" />
         <DialogTemplates>
-            <Header>Vacancy</Header>
+            <Header>@(_mode == DialogMode.Apply ? "Apply for this vacancy" : "Vacancy")</Header>
             <Content>
                 @if (_detailLoading)
                 {
@@ -70,10 +78,87 @@
                 {
                     <p class="text-muted mb-0">Unable to load this vacancy.</p>
                 }
+                else if (_mode == DialogMode.Apply)
+                {
+                    <div class="vacancy-apply" data-testid="internal-apply-form">
+                        <div class="vacancy-detail-title">@_detail.Title</div>
+                        <p class="vacancy-apply-intro">Your application will be sent to the recruitment team with your CV.</p>
+
+                        <div class="vacancy-apply-identity">
+                            <dl class="vacancy-detail-dl">
+                                <dt>Name</dt>
+                                <dd data-testid="apply-applicant-name">@Session.DisplayName</dd>
+                                <dt>Work email</dt>
+                                <dd data-testid="apply-applicant-email">@(_workEmailLoading ? "Loading…" : string.IsNullOrWhiteSpace(_workEmail) ? "—" : _workEmail)</dd>
+                            </dl>
+                            <p class="vacancy-apply-identity-note">These details come from your employee record.</p>
+                        </div>
+
+                        <div class="vacancy-apply-cv">
+                            <label class="form-label" for="internal-apply-cv-input">CV <span aria-hidden="true">*</span><span class="visually-hidden">(required)</span></label>
+                            <InputFile @key="_cvInputKey" @ref="_cvInput"
+                                       id="internal-apply-cv-input" class="form-control"
+                                       accept=".pdf,.doc,.docx" OnChange="OnCvSelected" disabled="@_submitting"
+                                       data-testid="internal-apply-cv-input"
+                                       aria-required="true"
+                                       aria-invalid="@(_cvError is not null ? "true" : "false")"
+                                       aria-describedby="internal-apply-cv-help internal-apply-cv-error" />
+                            <div id="internal-apply-cv-help" class="form-text">PDF, DOC or DOCX, up to 20 MB.</div>
+                            @if (_cvFile is not null)
+                            {
+                                <div class="vacancy-apply-cv-selected" data-testid="internal-apply-cv-selected">
+                                    <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
+                                    <span class="vacancy-apply-cv-file-name" data-testid="internal-apply-cv-file-name">@_cvFile.Name</span>
+                                    <span class="vacancy-apply-cv-file-size">(@FormatFileSize(_cvFile.Size))</span>
+                                    <button type="button" class="e-btn e-flat e-small"
+                                            disabled="@_submitting"
+                                            aria-label="@($"Remove {_cvFile.Name}")"
+                                            data-testid="internal-apply-cv-remove"
+                                            @onclick="RemoveCv">
+                                        <i class="fa-solid fa-xmark me-1" aria-hidden="true"></i>Remove
+                                    </button>
+                                </div>
+                            }
+                            <div id="internal-apply-cv-error" class="text-danger small mt-1"
+                                 role="alert" aria-live="assertive" aria-atomic="true"
+                                 data-testid="internal-apply-cv-error">@_cvError</div>
+                        </div>
+
+                        <div class="vacancy-apply-server-error" tabindex="-1" aria-live="assertive" aria-atomic="true"
+                             data-testid="internal-apply-error" @ref="_serverErrorRegion">
+                            @if (_serverError is not null)
+                            {
+                                <div class="alert alert-danger mb-0">@_serverError</div>
+                            }
+                        </div>
+                    </div>
+                }
                 else
                 {
+                    @if (_notice == ApplyNotice.Submitted)
+                    {
+                        <div class="vacancy-apply-success" role="status" aria-live="polite" tabindex="-1"
+                             data-testid="internal-apply-success" @ref="_noticeRef">
+                            <div class="vacancy-apply-success-heading">
+                                <i class="fa-solid fa-circle-check" aria-hidden="true"></i> Application submitted
+                            </div>
+                            <p class="mb-0">Your application and CV have been sent to the recruitment team.</p>
+                        </div>
+                    }
+                    else if (_notice == ApplyNotice.AlreadyApplied)
+                    {
+                        <div class="alert alert-info" role="status" tabindex="-1"
+                             data-testid="internal-apply-already-applied" @ref="_noticeRef">You have already applied for this vacancy.</div>
+                    }
+
                     <div class="vacancy-detail" data-testid="internal-vacancy-detail">
                         <div class="vacancy-detail-title">@_detail.Title</div>
+                        @if (_openedHasApplied)
+                        {
+                            <div class="vacancy-applied-status" data-testid="internal-vacancy-applied-state">
+                                <i class="fa-solid fa-circle-check" aria-hidden="true"></i> Applied
+                            </div>
+                        }
                         <dl class="vacancy-detail-dl">
                             <dt>Department</dt>
                             <dd>@(_detail.DepartmentName ?? "—")</dd>
@@ -92,28 +177,107 @@
                         </dl>
                         <div class="vacancy-detail-description-label">Description</div>
                         <div class="vacancy-detail-description">@(string.IsNullOrWhiteSpace(_detail.Description) ? "—" : _detail.Description)</div>
+                        @if (!_openedHasApplied && !CanApply)
+                        {
+                            <p class="vacancy-apply-unavailable" data-testid="internal-vacancy-apply-unavailable">Only employees can apply for internal vacancies.</p>
+                        }
                     </div>
                 }
             </Content>
+            <FooterTemplate>
+                @* Footer order convention: secondary action first, primary action rightmost. *@
+                <div class="vacancy-dialog-actions">
+                    @if (_mode == DialogMode.Apply && _detail is not null)
+                    {
+                        <button type="button" class="e-btn"
+                                disabled="@_submitting"
+                                data-testid="internal-apply-cancel"
+                                @onclick="CancelApply">Cancel</button>
+                        <button type="button" class="e-btn e-primary"
+                                disabled="@_submitting"
+                                aria-busy="@(_submitting ? "true" : "false")"
+                                data-testid="internal-apply-submit"
+                                @onclick="SubmitApplicationAsync">@(_submitting ? "Submitting…" : "Apply")</button>
+                    }
+                    else
+                    {
+                        <button type="button" class="e-btn"
+                                disabled="@_submitting"
+                                data-testid="internal-vacancy-close"
+                                @onclick="CloseDetail">Close</button>
+                        @if (_detail is not null && !_detailLoading)
+                        {
+                            @if (_openedHasApplied)
+                            {
+                                <button type="button" class="e-btn e-primary"
+                                        disabled aria-disabled="true"
+                                        data-testid="internal-vacancy-applied-button">
+                                    <i class="fa-solid fa-circle-check me-1" aria-hidden="true"></i>Applied
+                                </button>
+                            }
+                            else if (CanApply)
+                            {
+                                <button type="button" class="e-btn e-primary"
+                                        data-testid="internal-vacancy-apply"
+                                        @ref="_applyButton"
+                                        @onclick="StartApplyAsync">Apply</button>
+                            }
+                        }
+                    }
+                </div>
+            </FooterTemplate>
         </DialogTemplates>
-        <DialogButtons>
-            <DialogButton Content="Close" OnClick="CloseDetail" />
-        </DialogButtons>
     </SfDialog>
 }
 
 @code {
     [Parameter] public Guid CompanyId { get; set; }
 
+    private enum DialogMode { Details, Apply }
+    private enum ApplyNotice { None, Submitted, AlreadyApplied }
+    private enum FocusTarget { None, ApplyButton, CvInput, Notice, ServerError, Card }
+
+    private static readonly HashSet<string> _allowedCvExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".pdf", ".doc", ".docx"
+    };
+
     private bool _authorized;
     private bool _loading = true;
     private string? _search;
 
     private List<InternalVacancyListItem> _items = [];
+    private readonly Dictionary<Guid, ElementReference> _cardRefs = [];
 
     private bool _detailVisible;
     private bool _detailLoading;
     private InternalVacancyDetail? _detail;
+    private Guid? _openedVacancyId;
+    private bool _openedHasApplied;
+
+    private DialogMode _mode = DialogMode.Details;
+    private ApplyNotice _notice = ApplyNotice.None;
+
+    // Read-only applicant identity — displayed only, never sent (the API resolves it server-side).
+    private bool _workEmailLoaded;
+    private bool _workEmailLoading;
+    private string? _workEmail;
+
+    private IBrowserFile? _cvFile;
+    private string? _cvError;
+    private int _cvInputKey;
+    private string? _serverError;
+    private bool _submitting;
+
+    private InputFile? _cvInput;
+    private ElementReference _applyButton;
+    private ElementReference _noticeRef;
+    private ElementReference _serverErrorRegion;
+
+    private FocusTarget _pendingFocus = FocusTarget.None;
+    private Guid? _focusCardId;
+
+    private bool CanApply => Session.EmployeeId is not null;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -130,11 +294,50 @@
         await LoadAsync();
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_pendingFocus == FocusTarget.None)
+            return;
+
+        var target = _pendingFocus;
+        _pendingFocus = FocusTarget.None;
+
+        try
+        {
+            switch (target)
+            {
+                case FocusTarget.ApplyButton:
+                    await _applyButton.FocusAsync();
+                    break;
+                case FocusTarget.CvInput:
+                    if (_cvInput?.Element is { } cvElement)
+                        await cvElement.FocusAsync();
+                    break;
+                case FocusTarget.Notice:
+                    await _noticeRef.FocusAsync();
+                    break;
+                case FocusTarget.ServerError:
+                    await _serverErrorRegion.FocusAsync();
+                    break;
+                case FocusTarget.Card:
+                    if (_focusCardId is { } cardId && _cardRefs.TryGetValue(cardId, out var card))
+                        await card.FocusAsync();
+                    _focusCardId = null;
+                    break;
+            }
+        }
+        catch
+        {
+            // Element not rendered / circuit gone — focus is best-effort.
+        }
+    }
+
     private async Task LoadAsync()
     {
         _loading = true;
         var result = await InternalVacancyService.ListAsync(CompanyId, _search);
         _items = result?.Items ?? [];
+        _cardRefs.Clear();
         _loading = false;
     }
 
@@ -144,24 +347,187 @@
         await LoadAsync();
     }
 
-    private async Task OnCardKeyDown(KeyboardEventArgs e, Guid id)
+    private async Task OnCardKeyDown(KeyboardEventArgs e, InternalVacancyListItem vacancy)
     {
         if (e.Key is "Enter" or " ")
-            await OpenDetailAsync(id);
+            await OpenDetailAsync(vacancy);
     }
 
-    private async Task OpenDetailAsync(Guid id)
+    private async Task OpenDetailAsync(InternalVacancyListItem vacancy)
     {
+        ResetApplyState();
         _detail = null;
+        _openedVacancyId = vacancy.Id;
+        _openedHasApplied = vacancy.HasApplied;
         _detailVisible = true;
         _detailLoading = true;
-        _detail = await InternalVacancyService.GetAsync(CompanyId, id);
+        _detail = await InternalVacancyService.GetAsync(CompanyId, vacancy.Id);
         _detailLoading = false;
     }
 
+    private async Task StartApplyAsync()
+    {
+        if (_detail is null || _openedHasApplied || !CanApply)
+            return;
+
+        ResetApplyState();
+        _mode = DialogMode.Apply;
+        _pendingFocus = FocusTarget.CvInput;
+
+        if (!_workEmailLoaded)
+        {
+            _workEmailLoading = true;
+            StateHasChanged();
+            var contact = await EmployeeService.GetMyContactDetailsAsync(CompanyId);
+            _workEmail = contact?.WorkEmail;
+            _workEmailLoaded = contact is not null;
+            _workEmailLoading = false;
+        }
+    }
+
+    private void OnCvSelected(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        var extension = Path.GetExtension(file.Name).ToLowerInvariant();
+
+        string? error = null;
+        if (!_allowedCvExtensions.Contains(extension))
+            error = "The CV must be a PDF, DOC or DOCX file.";
+        else if (file.Size > CandidateService.MaxCandidateDocumentBytes)
+            error = "The CV file is larger than the 20 MB limit.";
+        else if (file.Size == 0)
+            error = "The selected CV file is empty.";
+
+        if (error is not null)
+        {
+            ClearCv();
+            _cvError = error;
+            return;
+        }
+
+        _cvFile = file;
+        _cvError = null;
+        _serverError = null;
+    }
+
+    private void RemoveCv()
+    {
+        ClearCv();
+        _pendingFocus = FocusTarget.CvInput;
+    }
+
+    // Re-keys the InputFile so it is emptied (and the same file can be chosen again).
+    private void ClearCv()
+    {
+        _cvFile = null;
+        _cvError = null;
+        _cvInputKey++;
+    }
+
+    private async Task SubmitApplicationAsync()
+    {
+        if (_submitting)
+            return;
+
+        if (_detail is null || _openedVacancyId is not { } vacancyId)
+            return;
+
+        _serverError = null;
+
+        if (_cvFile is null)
+        {
+            _cvError = "Please choose a CV file to upload.";
+            _pendingFocus = FocusTarget.CvInput;
+            return;
+        }
+
+        _submitting = true;
+        InternalVacancyApplyResult result;
+        try
+        {
+            result = await InternalVacancyService.ApplyAsync(CompanyId, vacancyId, _cvFile);
+        }
+        finally
+        {
+            _submitting = false;
+        }
+
+        if (result.Outcome is InternalVacancyApplyOutcome.Submitted or InternalVacancyApplyOutcome.AlreadyApplied)
+        {
+            MarkApplied(vacancyId);
+            ResetApplyState();
+            _mode = DialogMode.Details;
+            _notice = result.Outcome == InternalVacancyApplyOutcome.Submitted
+                ? ApplyNotice.Submitted
+                : ApplyNotice.AlreadyApplied;
+            _pendingFocus = FocusTarget.Notice;
+            return;
+        }
+
+        // NotEligible / EmailInUse / VacancyUnavailable / Failed: stay on the form, keep the file.
+        _serverError = result.Message ?? "Your application could not be submitted. Please try again.";
+        _pendingFocus = FocusTarget.ServerError;
+    }
+
+    private void MarkApplied(Guid vacancyId)
+    {
+        _openedHasApplied = true;
+        var index = _items.FindIndex(i => i.Id == vacancyId);
+        if (index >= 0)
+            _items[index] = _items[index] with { HasApplied = true };
+    }
+
+    private void CancelApply()
+    {
+        if (_submitting)
+            return;
+
+        ResetApplyState();
+        _mode = DialogMode.Details;
+        _pendingFocus = FocusTarget.ApplyButton;
+    }
+
+    // Resets the apply form (discarding any selected, never-uploaded file) and any notice.
+    private void ResetApplyState()
+    {
+        _mode = DialogMode.Details;
+        _notice = ApplyNotice.None;
+        _serverError = null;
+        ClearCv();
+    }
+
+    private void OnDialogClosing(BeforeCloseEventArgs args)
+    {
+        // Don't let the close icon / Escape race an in-flight submission.
+        if (_submitting)
+            args.Cancel = true;
+    }
+
+    private void OnDialogClosed() => CloseDetail();
+
     private void CloseDetail()
     {
+        if (_submitting)
+            return;
+
+        var wasOpen = _detailVisible || _openedVacancyId is not null;
+
         _detailVisible = false;
         _detail = null;
+        ResetApplyState();
+
+        if (wasOpen && _openedVacancyId is { } id)
+        {
+            _focusCardId = id;
+            _pendingFocus = FocusTarget.Card;
+        }
+
+        _openedVacancyId = null;
+        _openedHasApplied = false;
     }
+
+    private static string FormatFileSize(long bytes) =>
+        bytes < 1024 ? $"{bytes} B"
+        : bytes < 1024 * 1024 ? $"{bytes / 1024.0:0.#} KB"
+        : $"{bytes / (1024.0 * 1024.0):0.#} MB";
 }

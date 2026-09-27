@@ -106,8 +106,17 @@ else
         {
             HttpContext.Response.StatusCode = StatusCodes.Status404NotFound;
         }
-        relatedFeatures = feature is null
-            ? []
-            : content.Features.Where(f => f.Slug != feature.Slug).Take(3).ToList();
+        if (feature is null)
+        {
+            relatedFeatures = [];
+            return;
+        }
+
+        var featuresBySlug = content.Features.ToDictionary(f => f.Slug, StringComparer.OrdinalIgnoreCase);
+        relatedFeatures = FeatureCatalog.GetRelatedSlugs(feature.Slug)
+            .Select(slug => featuresBySlug.GetValueOrDefault(slug))
+            .Where(related => related is not null)
+            .Cast<MarketingFeatureContent>()
+            .ToList();
     }
 }

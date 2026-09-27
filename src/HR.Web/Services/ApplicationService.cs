@@ -1,6 +1,11 @@
+using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text.Json;
 using HR.Web.Models;
 using HR.SharedKernel;
+using HR.SharedKernel.Http;
+using Microsoft.AspNetCore.Components.Forms;
 
 namespace HR.Web.Services;
 
@@ -8,14 +13,39 @@ public sealed class ApplicationService(HrApiHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient();
 
-    public async Task<ListApplicationsForVacancyResponse?> ListApplicationsForVacancyAsync(Guid companyId, Guid vacancyId, Guid? stageId = null)
+    // isInternal (internal recruitment Ticket 6): null = all applications (query param omitted);
+    // true = only internal (Source == Internal); false = everything else.
+    public async Task<ListApplicationsForVacancyResponse?> ListApplicationsForVacancyAsync(
+        Guid companyId, Guid vacancyId, Guid? stageId = null, bool? isInternal = null)
     {
         try
         {
+            var query = new List<string>();
+            if (stageId is not null) query.Add($"stageId={stageId}");
+            if (isInternal is not null) query.Add($"isInternal={(isInternal.Value ? "true" : "false")}");
+
             var url = $"api/companies/{companyId}/vacancies/{vacancyId}/applications";
-            if (stageId is not null) url += $"?stageId={stageId}";
+            if (query.Count > 0) url += "?" + string.Join("&", query);
 
             return await Http.GetFromJsonAsync<ListApplicationsForVacancyResponse>(url, HrApiJsonOptions.Default);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    // Internal recruitment Ticket 6: a single candidate's applications across every vacancy (the
+    // Candidate Detail "Applications" history). pageSize is capped at 200 server-side. Returns null
+    // on failure so the caller can show an error rather than a misleading empty state.
+    public async Task<SearchApplicationsResponse?> SearchApplicationsForCandidateAsync(
+        Guid companyId, Guid candidateId, int pageSize = 200, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<SearchApplicationsResponse>(
+                $"api/companies/{companyId}/recruitment/applications/search?candidateId={candidateId}&pageSize={pageSize}",
+                HrApiJsonOptions.Default, cancellationToken);
         }
         catch (HttpRequestException)
         {
@@ -47,17 +77,139 @@ public sealed class ApplicationService(HrApiHttpClientFactory httpClientFactory)
 
     public async Task<(CreateApplicationResponse? Result, string? Error)> CreateApplicationAsync(
         Guid companyId, Guid vacancyId, Guid candidateId, string? notes,
-        string? source = null, Guid? sourceExternalRecruiterId = null)
+        string? source = null, Guid? sourceExternalRecruiterId = null, Guid? cvDocumentId = null)
     {
+        // cvDocumentId (internal recruitment Ticket 3): an existing Kind=Cv document of this same
+        // candidate, recorded as the CV submitted with the application. Null = none.
         var response = await Http.PostAsJsonAsync(
             $"api/companies/{companyId}/vacancies/{vacancyId}/applications",
-            new CreateApplicationRequest(companyId, vacancyId, candidateId, FormText.Optional(notes), source, sourceExternalRecruiterId));
+            new CreateApplicationRequest(companyId, vacancyId, candidateId, FormText.Optional(notes), source, sourceExternalRecruiterId, cvDocumentId));
 
         if (response.IsSuccessStatusCode)
             return (await response.Content.ReadFromJsonAsync<CreateApplicationResponse>(), null);
 
         return (null, await ReadErrorAsync(response, "Failed to create application."));
     }
+
+    public const string CandidateEmailExistsCode = "candidate_email_exists";
+
+    // Internal recruitment Ticket 3: create a brand-new candidate and their application to the vacancy
+    // in one multipart call, optionally with a CV file. Optional fields are omitted (never sent as
+    // empty strings). Distinguishes success, a duplicate-email 409 (carrying the existing candidate)
+    // and any other failure (400/404 {error}, 422 validation problem details, network).
+    public async Task<CreateCandidateApplicationResult> CreateCandidateApplicationAsync(
+        Guid companyId, Guid vacancyId, CreateCandidateApplicationRequest request, IBrowserFile? cvFile,
+        CancellationToken cancellationToken = default)
+    {
+        // OpenReadStream throws for anything over maxAllowedSize — report it instead of faulting the circuit.
+        if (cvFile is not null && cvFile.Size > CandidateService.MaxCandidateDocumentBytes)
+            return CreateCandidateApplicationResult.Failure("The CV file is larger than the 20 MB limit.");
+
+        using var content = new MultipartFormDataContent();
+        AddFormField(content, "FirstName", FormText.Optional(request.FirstName));
+        AddFormField(content, "LastName", FormText.Optional(request.LastName));
+        AddFormField(content, "Email", FormText.Optional(request.Email));
+        AddFormField(content, "Phone", FormText.Optional(request.Phone));
+        AddFormField(content, "ResumeUrl", FormText.Optional(request.ResumeUrl));
+        AddFormField(content, "Notes", FormText.Optional(request.Notes));
+        AddFormField(content, "Source", FormText.Optional(request.Source));
+        AddFormField(content, "SourceExternalRecruiterId", request.SourceExternalRecruiterId?.ToString());
+
+        Stream? cvStream = null;
+        try
+        {
+            if (cvFile is not null)
+            {
+                cvStream = cvFile.OpenReadStream(maxAllowedSize: CandidateService.MaxCandidateDocumentBytes, cancellationToken);
+                var fileContent = new StreamContent(cvStream);
+                fileContent.Headers.ContentType = new MediaTypeHeaderValue(
+                    string.IsNullOrWhiteSpace(cvFile.ContentType) ? "application/octet-stream" : cvFile.ContentType);
+                content.Add(fileContent, "CvFile", cvFile.Name);
+            }
+
+            HttpResponseMessage response;
+            try
+            {
+                response = await Http.PostAsync(
+                    $"api/companies/{companyId}/vacancies/{vacancyId}/applications/new-candidate", content, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (HttpRequestException)
+            {
+                return CreateCandidateApplicationResult.Failure("Unable to reach the server. Please check your connection and try again.");
+            }
+            catch (OperationCanceledException)
+            {
+                return CreateCandidateApplicationResult.Failure("The request timed out. Please try again.");
+            }
+            catch (IOException)
+            {
+                return CreateCandidateApplicationResult.Failure("The selected CV file could not be read. Please choose it again.");
+            }
+
+            using (response)
+            {
+                if (response.StatusCode == HttpStatusCode.Conflict)
+                {
+                    var raw = await response.Content.ReadAsStringAsync(cancellationToken);
+                    var conflict = TryDeserialize<CandidateEmailExistsEnvelope>(raw);
+                    if (conflict is { Code: CandidateEmailExistsCode, ExistingCandidateId: Guid existingId })
+                    {
+                        return CreateCandidateApplicationResult.DuplicateEmail(new DuplicateCandidateModel(
+                            existingId,
+                            conflict.ExistingCandidateFirstName ?? string.Empty,
+                            conflict.ExistingCandidateLastName ?? string.Empty,
+                            conflict.ExistingCandidateEmail ?? request.Email,
+                            conflict.ExistingCandidateIsActive ?? true));
+                    }
+
+                    return CreateCandidateApplicationResult.Failure(conflict?.Error ?? "A conflict occurred.");
+                }
+
+                var result = await ApiResponseReader.ReadJsonAsync<CreateCandidateApplicationResponse>(
+                    response, HrApiJsonOptions.Default, cancellationToken);
+                return result.Success && result.Value is not null
+                    ? CreateCandidateApplicationResult.Success(result.Value)
+                    : CreateCandidateApplicationResult.Failure(result.DisplayMessage ?? "Failed to add the candidate.");
+            }
+        }
+        finally
+        {
+            if (cvStream is not null)
+                await cvStream.DisposeAsync();
+        }
+    }
+
+    private static void AddFormField(MultipartFormDataContent content, string name, string? value)
+    {
+        if (value is not null)
+            content.Add(new StringContent(value), name);
+    }
+
+    private static T? TryDeserialize<T>(string json) where T : class
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try
+        {
+            return JsonSerializer.Deserialize<T>(json, HrApiJsonOptions.Default);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private sealed record CandidateEmailExistsEnvelope(
+        string? Error,
+        string? Code,
+        Guid? ExistingCandidateId,
+        string? ExistingCandidateFirstName,
+        string? ExistingCandidateLastName,
+        string? ExistingCandidateEmail,
+        bool? ExistingCandidateIsActive);
 
     public async Task<GetApplicationResponse?> GetApplicationAsync(Guid companyId, Guid vacancyId, Guid applicationId)
     {

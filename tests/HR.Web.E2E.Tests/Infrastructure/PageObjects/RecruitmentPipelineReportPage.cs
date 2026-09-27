@@ -87,4 +87,60 @@ public sealed class RecruitmentPipelineReportPage(IPage page, string baseUrl)
     }
 
     public async Task<bool> HasLoadErrorAsync() => await page.Locator(".alert-danger").IsVisibleAsync();
+
+    // ── Applications type filter (internal recruitment Ticket 6) ──────────────
+    // Lives inside the same "Group by" row as the Group by dropdown, but as the SECOND combobox —
+    // SelectGroupByAsync (index 0 within that row) is unaffected.
+
+    public Task SelectApplicationTypeAsync(string label) => ReportApplicationTypeFilter.SelectAsync(page, label);
+
+    public Task ExpectApplicationTypeAsync(string label) => ReportApplicationTypeFilter.ExpectSelectedAsync(page, label);
+
+    public Task ExpectRenderedWithoutErrorAsync() => ReportApplicationTypeFilter.ExpectGridRenderedWithoutErrorAsync(page);
+
+    /// <summary>
+    /// With Group by = Vacancy, waits until the row for <paramref name="vacancyTitle"/> (a unique,
+    /// test-owned advert title) shows <paramref name="expectedCandidates"/> in its Candidates column.
+    /// The grid is client-paged over every Acme vacancy, so the row is searched for across pages
+    /// (LocatorExtensions.HasGridCellOnAnyPageAsync). Polls because a filter/group change reloads the
+    /// whole grid — callers should alternate expected values between calls so a read of the
+    /// pre-reload grid can never satisfy the expectation by accident.
+    /// </summary>
+    public async Task ExpectVacancyRowCandidatesAsync(string vacancyTitle, string expectedCandidates)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(60);
+        string? lastSeen = null;
+        while (true)
+        {
+            try
+            {
+                await ReportApplicationTypeFilter.ExpectGridRenderedWithoutErrorAsync(page);
+
+                var headers = await GetColumnHeadersAsync();
+                var candidatesIndex = headers.ToList().FindIndex(h => h.Contains("Candidates", StringComparison.OrdinalIgnoreCase));
+
+                if (candidatesIndex >= 0 && await page.HasGridCellOnAnyPageAsync(vacancyTitle))
+                {
+                    var row = page.Locator(".e-grid .e-row").Filter(new() { HasText = vacancyTitle }).First;
+                    lastSeen = (await row.Locator(".e-rowcell").Nth(candidatesIndex).TextContentAsync(new() { Timeout = 5_000 }))?.Trim();
+                    if (lastSeen == expectedCandidates)
+                        return;
+                }
+                else
+                {
+                    lastSeen = "(row not found)";
+                }
+            }
+            catch (PlaywrightException ex)
+            {
+                // The grid was swapped out mid-read by the reload — re-read on the next pass.
+                lastSeen = $"(read failed: {ex.Message.Split('\n')[0]})";
+            }
+
+            if (DateTime.UtcNow >= deadline)
+                Assert.Fail($"Expected the '{vacancyTitle}' row's Candidates to be '{expectedCandidates}', last saw '{lastSeen}'.");
+
+            await page.WaitForTimeoutAsync(500);
+        }
+    }
 }

@@ -38,6 +38,24 @@ public sealed class AppSessionAuthStateProvider(
     private static readonly AuthenticationState Anonymous =
         new(new ClaimsPrincipal(new ClaimsIdentity()));
 
+    // Cross-tab session revocation: when HR.Api rejects this circuit's live bearer token (see
+    // HrApiHttpClientFactory / CircuitSessionState.ReportTokenRejected — already cleared and
+    // Invalidated by then), publish the circuit as anonymous. AppSession reacts to that transition
+    // on a loaded session with a forced navigation to /login, so a logout in another tab/browser
+    // ejects this one on its next API call instead of leaving it stranded on failing pages.
+    private bool _subscribedToServerRejection;
+
+    private void EnsureSubscribedToServerRejection()
+    {
+        if (_subscribedToServerRejection) return;
+        _subscribedToServerRejection = true;
+        sessionState.SessionRejectedByServer += () =>
+        {
+            logger.LogInformation("HR.Api rejected this circuit's session token (revoked or expired) -> signing the circuit out");
+            NotifyAuthenticationStateChanged(Task.FromResult(Anonymous));
+        };
+    }
+
     // Called by the Blazor Server framework at circuit creation AND on every reconnect (see class
     // remarks above) with the ClaimsPrincipal from the connecting request's HttpContext.User.
     public void SetAuthenticationState(Task<AuthenticationState> authenticationStateTask)
@@ -139,6 +157,7 @@ public sealed class AppSessionAuthStateProvider(
                 "[e2e-diag] ApplyState: first seed, accepting token (tokenPrefix={TokenPrefix})",
                 token[..Math.Min(8, token.Length)]);
             sessionState.SetToken(token);
+            EnsureSubscribedToServerRejection();
             NotifyAuthenticationStateChanged(Task.FromResult(state));
             return;
         }

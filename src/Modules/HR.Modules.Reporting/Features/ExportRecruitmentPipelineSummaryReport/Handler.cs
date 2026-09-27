@@ -23,7 +23,7 @@ internal sealed class ExportRecruitmentPipelineSummaryReportHandler(
         try
         {
             var result = await recruitmentPipelineSummaryReader.GetSummaryAsync(
-                request.CompanyId, request.IncludeClosed, cancellationToken);
+                request.CompanyId, request.IncludeClosed, request.IsInternal, cancellationToken);
 
             var columnHeaders = FixedColumnHeaders
                 .Concat(result.Stages.Select(s => s.StageName))

@@ -892,4 +892,37 @@ public class UpdateHrSettingsHandlerTests
 		Assert.NotNull(secondResult.Value!.EmployeeRenumberSideEffectId);
 		Assert.NotEqual(firstOutboxMessage.Id, secondResult.Value.EmployeeRenumberSideEffectId);
 	}
+
+	[Fact]
+	public async Task HandleAsync_Omitted_NextEmployeeNumber_Preserves_The_Live_Counter()
+	{
+		// Automatic-mode employee creation advances next_employee_number concurrently (atomic UPDATE,
+		// no Version bump), so a settings save that didn't touch "Next Number" must not echo back the
+		// value the form loaded — that silently rewound the counter and re-issued taken numbers.
+		await using var context = BuildContext();
+		var now = new DateTimeOffset(new DateTime(2026, 7, 26, 10, 0, 0, DateTimeKind.Utc));
+		var company = Company.Create(Guid.NewGuid(), "Acme", now);
+		var settings = CompanySettings.CreateDefault(company.Id, now);
+		company.SetSettings(settings, now);
+		context.Companies.Add(company);
+		await context.SaveChangesAsync();
+
+		// Simulate EmployeeNumberGenerator's raw counter UPDATE having advanced the counter after the
+		// admin's form loaded — it writes next_employee_number only, never Version.
+		context.Entry(settings).Property(s => s.NextEmployeeNumber).CurrentValue = 57;
+		await context.SaveChangesAsync();
+
+		var handler = new UpdateHrSettingsHandler(
+			context,
+			new FakeClock(new DateTime(2026, 7, 26, 11, 0, 0, DateTimeKind.Utc)),
+			new NoOpAuditEventPublisher(), new NoOpBackgroundJobClient(), new FakeCurrentUser(null));
+
+		var result = await handler.HandleAsync(
+			ValidRequest(company.Id) with { NextEmployeeNumber = null, Version = settings.Version },
+			CancellationToken.None);
+
+		Assert.True(result.IsSuccess);
+		Assert.Equal(57, result.Value!.NextEmployeeNumber);
+		Assert.Equal(57, (await context.CompanySettings.SingleAsync()).NextEmployeeNumber);
+	}
 }

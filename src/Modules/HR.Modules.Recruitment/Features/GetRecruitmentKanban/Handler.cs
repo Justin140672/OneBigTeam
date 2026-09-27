@@ -69,6 +69,11 @@ internal sealed class GetRecruitmentKanbanHandler(RecruitmentDbContext db, IPosi
                 a.CurrentStageId,
                 a.WithdrawnAt,
                 a.AppliedAt,
+                // Internal recruitment Ticket 6: Source is the authoritative internal indicator; the
+                // employee link is only surfaced for Internal applications (a hired external candidate
+                // also has Candidate.EmployeeId set and must not appear as internal).
+                IsInternal = a.Source == Domain.ApplicationSource.Internal,
+                InternalEmployeeId = a.Source == Domain.ApplicationSource.Internal ? c.EmployeeId : null,
             })
             .ToListAsync(cancellationToken);
 
@@ -94,7 +99,9 @@ internal sealed class GetRecruitmentKanbanHandler(RecruitmentDbContext db, IPosi
                         a.AppliedAt,
                         vacancy.AssignedRecruiterId,
                         assignedRecruiterAgencyName,
-                        vacancyTitle))
+                        vacancyTitle,
+                        a.IsInternal,
+                        a.InternalEmployeeId))
                     .ToList();
 
                 return new KanbanColumn(stage.Id, stage.Name, stage.IsTerminal, summaries.Count, summaries);

@@ -8,10 +8,23 @@ namespace HR.Modules.Recruitment.Features.ListInternalVacancies;
 
 internal sealed class ListInternalVacanciesHandler(RecruitmentDbContext db, IPositionProfileReader positionProfileReader)
 {
+    public Task<Result<ListInternalVacanciesResponse>> HandleAsync(
+        ListInternalVacanciesRequest request,
+        CancellationToken cancellationToken) =>
+        HandleAsync(request, currentEmployeeId: null, cancellationToken);
+
+    /// <param name="currentEmployeeId">Internal recruitment Ticket 4: the signed-in employee (resolved
+    /// server-side, never from the request). When supplied, each item's HasApplied says whether that
+    /// employee's linked candidate already has an application for the vacancy.</param>
     public async Task<Result<ListInternalVacanciesResponse>> HandleAsync(
         ListInternalVacanciesRequest request,
+        Guid? currentEmployeeId,
         CancellationToken cancellationToken)
     {
+        var appliedVacancyIds = currentEmployeeId is Guid employeeId
+            ? await GetAppliedVacancyIdsAsync(request.CompanyId, employeeId, cancellationToken)
+            : [];
+
         var vacancies = await db.Vacancies
             .AsNoTracking()
             .Where(v => v.CompanyId == request.CompanyId
@@ -40,7 +53,8 @@ internal sealed class ListInternalVacanciesHandler(RecruitmentDbContext db, IPos
                     v.AdvertTitle ?? positionProfile?.Title ?? "(untitled)",
                     positionProfile?.DepartmentName,
                     positionProfile?.LocationName,
-                    null);
+                    null,
+                    appliedVacancyIds.Contains(v.Id));
             })
             .ToList();
 
@@ -56,5 +70,22 @@ internal sealed class ListInternalVacanciesHandler(RecruitmentDbContext db, IPos
         items = items.OrderBy(i => i.Title, StringComparer.OrdinalIgnoreCase).ToList();
 
         return Result.Success(new ListInternalVacanciesResponse(items));
+    }
+
+    // Same definition of "already applied" as the Apply endpoint: any application (in any state) by
+    // the employee's single linked candidate.
+    private async Task<HashSet<Guid>> GetAppliedVacancyIdsAsync(
+        Guid companyId,
+        Guid employeeId,
+        CancellationToken cancellationToken)
+    {
+        var vacancyIds = await db.Applications
+            .AsNoTracking()
+            .Where(a => a.CompanyId == companyId
+                && db.Candidates.Any(c => c.Id == a.CandidateId && c.CompanyId == companyId && c.EmployeeId == employeeId))
+            .Select(a => a.VacancyId)
+            .ToListAsync(cancellationToken);
+
+        return vacancyIds.ToHashSet();
     }
 }

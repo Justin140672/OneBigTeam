@@ -454,8 +454,11 @@ public static class EmployeesModule
         services.AddScoped<IPositionProfileAssetsReader, PositionProfileAssetsReader>();
         services.AddScoped<IPositionProfileReader, PositionProfileReader>();
         services.AddScoped<ICurrentEmployeeReader, CurrentEmployeeReader>();
+        services.AddScoped<IEmployeeApplicantReader, EmployeeApplicantReader>();
         services.AddScoped<IOnboardingTemplateReader, OnboardingTemplateReader>();
         services.AddScoped<IEmployeeProvisioningService, EmployeeProvisioningService>();
+        // Internal recruitment Ticket 7: consumed by Recruitment's AppointInternalCandidate workflow.
+        services.AddScoped<IEmployeeInternalAppointmentService, EmployeeInternalAppointmentService>();
         services.AddScoped<ICompanyDefaultDataSeeder, CompanyDefaultDataSeeder>();
         services.AddScoped<IEmployeeImportLookupReader, EmployeeImportLookupReader>();
         services.AddScoped<IImportLookupResolver, ImportLookupResolver>();
@@ -856,6 +859,29 @@ public static class EmployeesModule
                         performedByUserId: null, "Employees", sourceRecordId: null,
                         EmployeeTimelineVisibility.AuthorisedInternal, now));
                 }
+
+                // Nina Patel — the E2E-only dedicated manager persona (see HR.Api's DevPersonaStore
+                // and IdentityModule.SeedDevUserAsync, which give her the Employee + Manager roles
+                // under this same id). ManagerTeamProfileTests grows her team at runtime instead of
+                // James Okafor's, whose seeded single-report team (Tom Williams) other E2E classes
+                // assert on. Mirrored in tests/HR.Web.E2E.Tests/Infrastructure/SeededE2eEmployees.cs.
+                var ninaPatelId = Guid.Parse("30000000-0000-0000-0000-000000000017");
+                db.Employees.Add(MakeAcme(
+                    ninaPatelId, "Nina", "Patel", "nina.patel@acme.example", new DateOnly(2022, 1, 10),
+                    deptEngId, posPrincipalEngId, null,
+                    new DateOnly(1989, 9, 3), "British", "Female",
+                    null, null,
+                    "2 Test Street", null, "London", "Greater London", "EC1A 1AB",
+                    "ACME-017", etPermId));
+                db.Compensations.Add(Compensation.Create(
+                    Guid.NewGuid(), acmeId, ninaPatelId, new DateOnly(2022, 1, 10), SalaryType.Annual, 80000m, "GBP", 37.5m, 1m,
+                    "Starting salary", CompensationChangeReason.NewHire, empHrMgrId, now));
+                db.EmployeeTimelineEntries.Add(EmployeeTimelineEntry.Create(
+                    Guid.NewGuid(), acmeId, ninaPatelId, new DateOnly(2022, 1, 10),
+                    EmployeeTimelineEventType.EmployeeJoined, EmployeeTimelineCategory.Employment,
+                    "Employee joined", "Employee joined the company.",
+                    performedByUserId: null, "Employees", sourceRecordId: null,
+                    EmployeeTimelineVisibility.AuthorisedInternal, now));
 
                 await db.SaveChangesAsync();
             }

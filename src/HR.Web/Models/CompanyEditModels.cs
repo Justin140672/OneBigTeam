@@ -92,6 +92,10 @@ public sealed class HrSettingsEditModel
     public string? EmployeeNumberPrefix { get; set; }
     [Range(1, int.MaxValue, ErrorMessage = "Next employee number must be greater than 0.")]
     public int NextEmployeeNumber { get; set; } = 1;
+    // The value NextEmployeeNumber was loaded with — only a changed value is sent on save, so an
+    // unrelated settings save never rewinds the live counter (which Automatic-mode employee
+    // creation advances concurrently).
+    public int NextEmployeeNumberOriginal { get; set; } = 1;
     [Range(1, 10, ErrorMessage = "Minimum numeric length must be between 1 and 10.")]
     public int EmployeeNumberMinimumLength { get; set; } = 1;
 

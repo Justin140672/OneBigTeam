@@ -13,13 +13,13 @@ public sealed class DepartmentEditPage(IPage page, string baseUrl)
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/departments/new");
         // DepartmentEdit has an SfDropDownList for Parent Department; span[role='combobox'] only
         // appears after Blazor's interactive render, ensuring event handlers are wired up.
-        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
     }
 
     public async Task GoToAsync(Guid companyId, Guid departmentId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/departments/{departmentId}");
-        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
     }
 
     public async Task FillNameAsync(string name)

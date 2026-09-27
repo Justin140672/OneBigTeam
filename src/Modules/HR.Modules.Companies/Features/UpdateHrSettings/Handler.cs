@@ -115,7 +115,8 @@ internal sealed class UpdateHrSettingsHandler
 			request.AutoDisableAccessOnLeavingDate,
 			request.EmployeeNumberMode,
 			request.EmployeeNumberPrefix,
-			request.NextEmployeeNumber,
+			// Omitted = unchanged: keep the live counter rather than a stale echo (see Request).
+			request.NextEmployeeNumber ?? settings.NextEmployeeNumber,
 			request.EmployeeNumberMinimumLength,
 			now);
 

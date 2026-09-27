@@ -245,32 +245,22 @@ public sealed class SharedDocumentSortByReviewDateTests(HrAdminPersonaFixture fi
         // same class of "assumed-generous constant becomes insufficient later" issue this whole
         // page-walk replaced a fixed page-1-only read for in the first place). 60s comfortably
         // covers many hundreds of pages at ~200ms/page even if the dataset keeps growing further.
-        var deadline = DateTime.UtcNow.AddSeconds(60);
-        while (remaining.Count > 0 && DateTime.UtcNow < deadline)
+        //
+        // Always starts from page 1 (a previous read may have left the grid on a later page, and a
+        // re-sort doesn't necessarily rewind it), confirms each page swap actually landed before
+        // reading (previously a fixed 200ms sleep, which could re-read the stale page or skip one),
+        // and reads each page as one atomic snapshot of first-cell texts (previously per-index
+        // reads with a 30s auto-wait, which hung if the page swapped mid-loop).
+        await _page.VisitAllGridPagesAsync(async () =>
         {
-            var rows = _page.Locator(".e-row");
-            var count = await rows.CountAsync();
-            for (var i = 0; i < count; i++)
+            var firstCells = await _page.Locator(".e-grid .e-row > .e-rowcell:first-child").AllInnerTextsAsync();
+            foreach (var text in firstCells.Select(t => t.Trim()))
             {
-                var cellText = (await rows.Nth(i).Locator(".e-rowcell").First.InnerTextAsync()).Trim();
-                if (remaining.Remove(cellText))
-                    order.Add(cellText);
+                if (remaining.Remove(text))
+                    order.Add(text);
             }
-
-            if (remaining.Count == 0) break;
-
-            var nextButton = _page.Locator(".e-pagenextdiv, .e-nextpage").First;
-            if (await nextButton.CountAsync() == 0) break;
-            var isDisabled = (await nextButton.GetAttributeAsync("class"))?.Contains("e-disable") == true
-                || (await nextButton.GetAttributeAsync("aria-disabled")) == "true";
-            if (isDisabled) break;
-
-            await nextButton.ClickAsync();
-            await _page.WaitForSelectorAsync(".e-grid .e-row, .e-grid .e-emptyrow", new() { Timeout = 15_000 });
-            // Give the page's own re-render a moment to settle before reading — same
-            // "container before content" race fixed elsewhere in this suite for grid reloads.
-            await _page.WaitForTimeoutAsync(200);
-        }
+            return remaining.Count == 0;
+        }, TimeSpan.FromSeconds(60));
 
         return order;
     }

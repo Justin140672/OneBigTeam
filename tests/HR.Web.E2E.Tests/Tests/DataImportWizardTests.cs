@@ -21,7 +21,6 @@ public sealed class DataImportWizardTests(HrSettingsSerialFixture fixture) : HrS
     {
         var suffix = Guid.NewGuid().ToString("N")[..8];
         var workEmail = $"e2e.import.{suffix}@example.com";
-        var employeeNumber = $"E2E{suffix}";
 
         // Date Of Birth, Nationality, Gender, Salary Amount, Department, Location, Employment
         // Type, and Position Profile are all required by EmployeeStagingRowValidator.RequiredFields/
@@ -31,16 +30,20 @@ public sealed class DataImportWizardTests(HrSettingsSerialFixture fixture) : HrS
         // Profile are resolved by name (auto-created if they don't already exist), so using the
         // seeded "Engineering"/"London Office"/"Senior Software Engineer" values (see
         // CreateEmployeeTests) avoids an unnecessary auto-create warning.
+        //
+        // No "Employee Number" column: Acme runs in its seeded Automatic numbering mode for the
+        // whole E2E run (no test mutates it any more — see CreateEmployeeTests' remarks), where
+        // EmployeeStagingRowValidator rejects a supplied number and the import assigns one.
         string[] headers =
         [
             "First Name", "Last Name", "Work Email", "Date Of Birth", "Nationality", "Gender",
-            "Start Date", "Employee Number", "Department", "Location", "Employment Type",
+            "Start Date", "Department", "Location", "Employment Type",
             "Position Profile", "Salary Amount"
         ];
         string[][] rows =
         [
             ["Imported", "Employee", workEmail, "1990-06-15", "British", "Male", "2026-01-01",
-                employeeNumber, "Engineering", "London Office", "Permanent",
+                "Engineering", "London Office", "Permanent",
                 "Senior Software Engineer", "45000"]
         ];
 
@@ -51,24 +54,9 @@ public sealed class DataImportWizardTests(HrSettingsSerialFixture fixture) : HrS
         {
             var login      = new LoginPage(_page, _fixture.WebBaseUrl);
             var wizard     = new DataImportWizardPage(_page, _fixture.WebBaseUrl);
-            var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
 
             await login.GoToAsync();
             await login.LoginAsync(LauraEmail);
-
-            // Acme's Employee Number Mode is shared, mutable company state that other test
-            // classes (HrSettingsPageTests, etc.) flip between Manual and Automatic via the UI.
-            // This test's row supplies an explicit
-            // "Employee Number" value, which EmployeeStagingRowValidator rejects outright when
-            // the company is in Automatic mode (see ValidateEmployeeNumberField) — so set the
-            // mode deterministically rather than assuming whatever an earlier test happened to
-            // leave it as.
-            await hrSettings.GoToAsync(AcmeId);
-            if (await hrSettings.GetEmployeeNumberModeAsync() != "Manual")
-            {
-                await hrSettings.SelectEmployeeNumberModeAsync("Manual");
-                await hrSettings.SaveAsync();
-            }
 
             await wizard.GoToAsync(AcmeId);
             await wizard.UploadFileAsync(tempFile);
@@ -120,7 +108,6 @@ public sealed class DataImportWizardTests(HrSettingsSerialFixture fixture) : HrS
     {
         var suffix = Guid.NewGuid().ToString("N")[..8];
         var validEmail = $"e2e.importok.{suffix}@example.com";
-        var validEmployeeNumber = $"E2EOK{suffix}";
 
         // The second row is missing a Last Name (a required field), which should produce a row
         // error surfaced on the Preview & Confirm step. Date Of Birth/Nationality/Gender/Salary
@@ -130,16 +117,16 @@ public sealed class DataImportWizardTests(HrSettingsSerialFixture fixture) : HrS
         string[] headers =
         [
             "First Name", "Last Name", "Work Email", "Date Of Birth", "Nationality", "Gender",
-            "Start Date", "Employee Number", "Department", "Location", "Employment Type",
+            "Start Date", "Department", "Location", "Employment Type",
             "Position Profile", "Salary Amount"
         ];
         string[][] rows =
         [
             ["Valid", "Employee", validEmail, "1990-06-15", "British", "Male", "2026-01-01",
-                validEmployeeNumber, "Engineering", "London Office", "Permanent",
+                "Engineering", "London Office", "Permanent",
                 "Senior Software Engineer", "45000"],
             ["Invalid", "", $"e2e.importbad.{suffix}@example.com", "1990-06-15", "British", "Male",
-                "2026-01-01", $"E2EBAD{suffix}", "Engineering", "London Office", "Permanent",
+                "2026-01-01", "Engineering", "London Office", "Permanent",
                 "Senior Software Engineer", "45000"]
         ];
 
@@ -174,7 +161,6 @@ public sealed class DataImportWizardTests(HrSettingsSerialFixture fixture) : HrS
     {
         var suffix = Guid.NewGuid().ToString("N")[..8];
         var validEmail = $"e2e.importsalok.{suffix}@example.com";
-        var validEmployeeNumber = $"E2ESALOK{suffix}";
         var invalidEmail = $"e2e.importsalbad.{suffix}@example.com";
 
         // Same shape as Preview_WithInvalidRow_AllowsDownloadingErrorReport above, but the
@@ -184,16 +170,16 @@ public sealed class DataImportWizardTests(HrSettingsSerialFixture fixture) : HrS
         string[] headers =
         [
             "First Name", "Last Name", "Work Email", "Date Of Birth", "Nationality", "Gender",
-            "Start Date", "Employee Number", "Department", "Location", "Employment Type",
+            "Start Date", "Department", "Location", "Employment Type",
             "Position Profile", "Salary Amount"
         ];
         string[][] rows =
         [
             ["Valid", "Employee", validEmail, "1990-06-15", "British", "Male", "2026-01-01",
-                validEmployeeNumber, "Engineering", "London Office", "Permanent",
+                "Engineering", "London Office", "Permanent",
                 "Senior Software Engineer", "45000"],
             ["Invalid", "Employee", invalidEmail, "1990-06-15", "British", "Male", "2026-01-01",
-                $"E2ESALBAD{suffix}", "Engineering", "London Office", "Permanent",
+                "Engineering", "London Office", "Permanent",
                 "Senior Software Engineer", ""]
         ];
 

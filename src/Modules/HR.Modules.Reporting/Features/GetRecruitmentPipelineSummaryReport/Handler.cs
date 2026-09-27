@@ -10,7 +10,7 @@ internal sealed class GetRecruitmentPipelineSummaryReportHandler(IRecruitmentPip
         CancellationToken cancellationToken)
     {
         var result = await recruitmentPipelineSummaryReader.GetSummaryAsync(
-            request.CompanyId, request.IncludeClosed, cancellationToken);
+            request.CompanyId, request.IncludeClosed, request.IsInternal, cancellationToken);
 
         return Result.Success(new GetRecruitmentPipelineSummaryReportResponse(result.Vacancies, result.Stages));
     }

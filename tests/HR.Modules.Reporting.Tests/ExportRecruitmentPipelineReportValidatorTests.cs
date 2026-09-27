@@ -65,4 +65,17 @@ public class ExportRecruitmentPipelineReportValidatorTests
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(ExportRecruitmentPipelineReportRequest.EndDate));
     }
+
+    // Internal recruitment Ticket 6: the optional isInternal filter is unconstrained — null (all),
+    // true (internal only) and false (external only) are all valid.
+    [Theory]
+    [InlineData(null)]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Should_Not_Have_Error_For_Any_IsInternal_Value(bool? isInternal)
+    {
+        var result = _validator.Validate(ValidRequest() with { IsInternal = isInternal });
+
+        Assert.True(result.IsValid);
+    }
 }

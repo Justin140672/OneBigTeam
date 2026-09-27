@@ -24,7 +24,7 @@ internal sealed class ExportRecruitmentPipelineReportHandler(
         try
         {
             var getResult = await getHandler.HandleAsync(
-                new GetRecruitmentPipelineReportRequest(request.CompanyId, request.StartDate, request.EndDate, request.GroupBy),
+                new GetRecruitmentPipelineReportRequest(request.CompanyId, request.StartDate, request.EndDate, request.GroupBy, request.IsInternal),
                 cancellationToken);
 
             if (getResult.IsFailure)

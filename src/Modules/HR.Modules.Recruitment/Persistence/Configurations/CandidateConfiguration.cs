@@ -101,5 +101,14 @@ internal sealed class CandidateConfiguration : IEntityTypeConfiguration<Candidat
             .IsUnique()
             .HasDatabaseName(CandidateEmailUniqueness.UniqueIndexName);
         builder.HasIndex(c => new { c.CompanyId, c.IsActive });
+
+        // Internal recruitment Ticket 4: at most one Candidate per employee per company. EmployeeId is
+        // set on hire (HireCandidate → LinkToEmployee, which refuses to relink) and on employee
+        // self-apply (Candidate.CreateForEmployee), so the employee's existing linked candidate is
+        // always reused. Filtered so the many external candidates with no employee are unaffected.
+        builder.HasIndex(c => new { c.CompanyId, c.EmployeeId })
+            .IsUnique()
+            .HasDatabaseName("ix_candidates_company_id_employee_id")
+            .HasFilter("employee_id IS NOT NULL");
     }
 }

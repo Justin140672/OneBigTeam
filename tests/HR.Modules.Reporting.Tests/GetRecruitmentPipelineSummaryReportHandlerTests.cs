@@ -65,4 +65,23 @@ public class GetRecruitmentPipelineSummaryReportHandlerTests
         Assert.Equal("Engineer", row.VacancyTitle);
         Assert.Equal(3, row.CandidatesByStage[stageId]);
     }
+
+    // ----- Internal recruitment Ticket 6: isInternal is passed through to the reader -----
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task HandleAsync_Passes_IsInternal_To_Reader(bool? isInternal)
+    {
+        var reader = new FakeRecruitmentPipelineSummaryReader();
+        var handler = new GetRecruitmentPipelineSummaryReportHandler(reader);
+
+        var result = await handler.HandleAsync(
+            new GetRecruitmentPipelineSummaryReportRequest(Guid.NewGuid(), IncludeClosed: true, IsInternal: isInternal), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(isInternal, reader.LastIsInternal);
+        Assert.True(reader.LastIncludeClosed);
+    }
 }

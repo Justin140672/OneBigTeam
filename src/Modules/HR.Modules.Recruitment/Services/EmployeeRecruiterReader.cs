@@ -1,5 +1,6 @@
 using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -35,15 +36,21 @@ internal sealed class EmployeeRecruiterReader(RecruitmentDbContext dbContext, IE
 
         var candidateIds = hires.Select(h => h.CandidateId).ToHashSet();
 
+        // Internal recruitment Ticket 4: a hired candidate's linked record is reused when that employee
+        // later applies internally, so Internal-source applications are excluded — "recruited by" is
+        // about how the employee originally joined — and the earliest remaining application is taken
+        // deterministically.
         var applications = await dbContext.Applications
             .AsNoTracking()
-            .Where(a => a.CompanyId == companyId && candidateIds.Contains(a.CandidateId))
-            .Select(a => new { a.CandidateId, a.VacancyId })
+            .Where(a => a.CompanyId == companyId
+                && candidateIds.Contains(a.CandidateId)
+                && (a.Source == null || a.Source != ApplicationSource.Internal))
+            .Select(a => new { a.CandidateId, a.VacancyId, a.AppliedAt })
             .ToListAsync(cancellationToken);
 
         var vacancyByCandidateId = applications
             .GroupBy(a => a.CandidateId)
-            .ToDictionary(g => g.Key, g => g.First().VacancyId);
+            .ToDictionary(g => g.Key, g => g.OrderBy(a => a.AppliedAt).First().VacancyId);
 
         var vacancyIds = vacancyByCandidateId.Values.ToHashSet();
 

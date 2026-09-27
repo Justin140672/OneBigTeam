@@ -5,15 +5,23 @@
    stage name, so repeating both on every card was pure redundancy. The Hired/Rejected accent (border +
    badge) is still shown since that status is not otherwise visible once a card leaves the "current
    stage" column context. *@
-<div class="kanban-candidate-card @StageCssClass" @onclick="() => OnOpen.InvokeAsync(Candidate)">
+<div class="kanban-candidate-card @StageCssClass" @onclick="() => OnOpen.InvokeAsync(Candidate)"
+     data-testid="kanban-candidate-card" data-application-id="@Candidate.ApplicationId">
     <div class="kanban-candidate-card__top">
         <ProfilePhotoAvatar PhotoUrl="@Candidate.CandidatePhotoUrl" Initials="@Initials" SizePx="36" />
         <div class="kanban-candidate-card__name-block">
             <div class="kanban-candidate-card__name">@Candidate.CandidateFullName</div>
+            @if (Candidate.IsInternal)
+            {
+                <div class="kanban-candidate-card__internal">
+                    <InternalApplicationBadge />
+                </div>
+            }
         </div>
         @if (TerminalOutcome != RecruitmentStageTerminalOutcome.None)
         {
-            <StatusBadge Variant="@StatusVariant">@TerminalOutcome</StatusBadge>
+            @* Stable hook: an "Internal" badge can render before this one on the card. *@
+            <span data-testid="kanban-card-terminal-status"><StatusBadge Variant="@StatusVariant">@TerminalOutcome</StatusBadge></span>
         }
         <div class="kanban-candidate-card__actions">
             <button type="button" class="kanban-candidate-card__move-btn"

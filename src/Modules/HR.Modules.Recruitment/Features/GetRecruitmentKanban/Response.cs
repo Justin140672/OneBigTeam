@@ -38,4 +38,9 @@ internal sealed record KanbanCandidateSummary(
     // this up against the employee list anymore (it never was an employee) — null when unassigned or
     // (rare) the recruiter row can no longer be found.
     string? AssignedRecruiterAgencyName,
-    string VacancyTitle);
+    string VacancyTitle,
+    // Internal recruitment Ticket 6: true only when the application's Source == Internal. Internal
+    // applications share the same configured stage columns as external ones. EmployeeId is populated
+    // only for internal applications.
+    bool IsInternal = false,
+    Guid? EmployeeId = null);

@@ -1,6 +1,6 @@
-using System.Net.Http.Json;
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
+using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
@@ -16,29 +16,29 @@ namespace HR.Web.E2E.Tests.Tests;
 ///   - David Park (david.park@acme.example) — HrAdministrator + Manager, manages Emma Jones and
 ///     Carlos Rivera directly, NOT related to James's hierarchy — used as the "unrelated manager"
 ///     denial case.
-///   - Laura Bennett (30000000-0000-0000-0000-000000000005) — HR Administrator, used only via the
-///     dev-persona API session to seed extra reports for the "more than 8" / indirect-hierarchy
-///     tests, mirroring EmployeeNotesTabTests.SeedNotesAsync's pattern.
+///   - Nina Patel (nina.patel@acme.example, SeededE2eEmployees.DedicatedManagerNinaPatelId) — an
+///     E2E-only Manager persona with no seeded reports, used by every test here that GROWS a
+///     manager's team at runtime (the "more than 8" overflow, the searchable roster entry, the
+///     indirect-hierarchy report). Those tests previously added 10 Active direct reports to James
+///     and gave Tom a report of his own; their "E2E Team…" last names sort before "Williams", so
+///     Tom was pushed out of James's 8-card My Team preview (breaking ManagerDashboardTests'
+///     MyTeamWidget_* tests and this class's own Tom-card tests), and each new report also added
+///     overdue onboarding/probation tasks and notifications to James's shared attention queue,
+///     task list and notification bell.
+///   - Laura Bennett — HR Administrator, used only via the dev-persona API session
+///     (E2eEmployeeApi) to create those fresh reports.
 /// </summary>
 public sealed class ManagerTeamProfileTests(ManagerPersonaFixture fixture) : RoleE2ETestBase<ManagerPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-    private static readonly Guid JamesId = Guid.Parse("30000000-0000-0000-0000-000000000002");
     private static readonly Guid TomId = Guid.Parse("30000000-0000-0000-0000-000000000004");
-    private static readonly Guid LauraUserId = Guid.Parse("30000000-0000-0000-0000-000000000005");
+    private static readonly Guid NinaId = SeededE2eEmployees.DedicatedManagerNinaPatelId;
 
     private const string JamesEmail = "james.okafor@acme.example";
+    private const string NinaEmail = SeededE2eEmployees.DedicatedManagerNinaPatelEmail;
     private const string DavidEmail = "david.park@acme.example";
     private const string MarcusEmail = "marcus.diallo@acme.example";
     private const string TomEmail = "tom.williams@acme.example";
-
-    // Reference data reused by every employee this file creates via the API (see
-    // EmployeesModule.SeedEmployeesAsync — Engineering dept / London office / QA Engineer
-    // position / Permanent employment type, the same combination the E2E test pool itself uses).
-    private static readonly Guid DepartmentId = Guid.Parse("10000000-0000-0000-0000-000000000001");
-    private static readonly Guid LocationId = Guid.Parse("70000000-0000-0000-0000-000000000001");
-    private static readonly Guid PositionProfileId = Guid.Parse("20000000-0000-0000-0000-00000000000B");
-    private static readonly Guid EmploymentTypeId = Guid.Parse("40000000-0000-0000-0000-000000000001");
 
     [Fact]
     public async Task Manager_CanOpen_DirectReport_FromDashboard()
@@ -62,16 +62,19 @@ public sealed class ManagerTeamProfileTests(ManagerPersonaFixture fixture) : Rol
     [Fact]
     public async Task Manager_CanSwitchToAllReports_AndOpenIndirectReport()
     {
-        // Give Tom Williams (James's direct report) a report of his own, making that new employee
-        // an INDIRECT report of James — the scenario "All Reports" / hierarchy is meant to surface.
-        var (indirectId, indirectName) = await CreateEmployeeViaApiAsync(managerId: TomId, "IndirectA");
+        // A fresh direct report of Nina's, who in turn manages a fresh report of their own — that
+        // second employee is an INDIRECT report of Nina, the scenario "All Reports" / hierarchy is
+        // meant to surface. Both are this test's own employees (see class remarks).
+        var direct = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "TeamDirect", managerId: NinaId, activate: true);
+        var indirect = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "TeamIndirect", managerId: direct.Id, activate: true);
+        var indirectName = indirect.FullName;
 
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var dashboard = new ManagerDashboardPage(_page, _fixture.WebBaseUrl);
         var profile = new TeamMemberProfilePage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(JamesEmail);
+        await login.LoginAsync(NinaEmail);
         await dashboard.GoToAsync();
 
         // Direct-reports-only preview should NOT include the indirect report.
@@ -80,19 +83,24 @@ public sealed class ManagerTeamProfileTests(ManagerPersonaFixture fixture) : Rol
 
         // Deep-link straight to the team-view route for the indirect report — proves the API
         // authorizes indirect hierarchy, not just the dashboard preview's direct-only default.
-        await profile.GoToAsync(AcmeId, indirectId);
+        await profile.GoToAsync(AcmeId, indirect.Id);
         Assert.True(await profile.IsProfileVisibleAsync(),
-            $"Expected James (manager of Tom, who manages {indirectName}) to be authorized for this indirect report's team-view.");
+            $"Expected Nina (manager of {direct.FullName}, who manages {indirectName}) to be authorized for this indirect report's team-view.");
         Assert.Contains(indirectName, await profile.GetDisplayNameAsync());
     }
 
     [Fact]
     public async Task Manager_With_MoreThanEightReports_CanReach_NinthReport_ViaViewAllTeam()
     {
-        // 9 fresh direct reports for James — one more than the dashboard's 8-card preview cap.
+        // 9 fresh direct reports for Nina — one more than the dashboard's 8-card preview cap. (Other
+        // tests in this class may add further reports of Nina's concurrently; this test only relies
+        // on "more than 8" and on its own ninth report being reachable, both of which still hold.)
         var created = new List<(Guid Id, string Name)>();
         for (var i = 1; i <= 9; i++)
-            created.Add(await CreateEmployeeViaApiAsync(managerId: JamesId, $"Overflow{i}"));
+        {
+            var report = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, $"TeamOverflow{i}", managerId: NinaId, activate: true);
+            created.Add((report.Id, report.FullName));
+        }
 
         var ninth = created[8];
 
@@ -102,7 +110,7 @@ public sealed class ManagerTeamProfileTests(ManagerPersonaFixture fixture) : Rol
         var profile = new TeamMemberProfilePage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(JamesEmail);
+        await login.LoginAsync(NinaEmail);
         await dashboard.GoToAsync();
 
         // The preview overflow notice appears once there are more than 8 direct reports.
@@ -125,13 +133,14 @@ public sealed class ManagerTeamProfileTests(ManagerPersonaFixture fixture) : Rol
     [Fact]
     public async Task ViewAllTeam_RosterPage_ReachableDirectly_AndSearchNarrowsResults()
     {
-        var (_, uniqueName) = await CreateEmployeeViaApiAsync(managerId: JamesId, $"Searchable{Guid.NewGuid():N}"[..20]);
+        var searchable = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "TeamSearchable", managerId: NinaId, activate: true);
+        var uniqueName = searchable.FullName;
 
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var roster = new MyTeamRosterPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(JamesEmail);
+        await login.LoginAsync(NinaEmail);
         await roster.GoToAsync(AcmeId);
 
         var beforeSearch = await roster.RowCountAsync();
@@ -223,8 +232,13 @@ public sealed class ManagerTeamProfileTests(ManagerPersonaFixture fixture) : Rol
         await empEdit.GoToAsync(AcmeId, TomId);
 
         // A successful load of the full HR edit page (not a forbidden/redirect state) proves the
-        // GetEmployee endpoint and EmployeeEdit.razor page are unaffected by this feature.
-        Assert.Contains("Tom", await _page.ContentAsync());
+        // GetEmployee endpoint and EmployeeEdit.razor page are unaffected by this feature. Wait for
+        // the page's own employee header (EmployeeEdit.razor's "<h1>{FirstName} {LastName}</h1>",
+        // rendered once GetEmployee has returned) rather than snapshotting the raw HTML: that
+        // snapshot could be taken before the employee data had loaded — GoToAsync's old
+        // combobox wait was satisfied by the layout's dev persona switcher alone.
+        await Assertions.Expect(_page.Locator(".content-area h1").First)
+            .ToContainTextAsync("Tom Williams", new() { Timeout = 20_000 });
     }
 
     [Fact]
@@ -243,100 +257,4 @@ public sealed class ManagerTeamProfileTests(ManagerPersonaFixture fixture) : Rol
             "Expected the manager team-view profile to render at a narrow (mobile) viewport.");
         Assert.Contains("Tom Williams", await profile.GetDisplayNameAsync());
     }
-
-    // ── helpers ─────────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Creates a fresh employee directly via POST /api/companies/{companyId}/employees, the same
-    /// endpoint the New Employee form itself calls — used here only as fast *arrange* (this file
-    /// is testing manager team-view authorization/navigation, not employee creation), mirroring
-    /// EmployeeNotesTabTests.SeedNotesAsync's rationale for going through the API rather than the
-    /// full multi-combobox creation form. Uses Laura Bennett's (HR Administrator) dev-persona
-    /// session, the only role permitted to create employees or assign a manager directly at
-    /// creation time.
-    /// </summary>
-    private async Task<(Guid Id, string Name)> CreateEmployeeViaApiAsync(Guid managerId, string lastNameSuffix)
-    {
-        using var http = new HttpClient { BaseAddress = new Uri(_fixture.ApiBaseUrl) };
-
-        HttpResponseMessage? sessionResponse = null;
-        for (var attempt = 1; attempt <= 3; attempt++)
-        {
-            sessionResponse = await http.PostAsync($"/api/dev/persona/{LauraUserId}", content: null);
-            if (sessionResponse.IsSuccessStatusCode) break;
-            if (attempt < 3) await Task.Delay(1000 * attempt);
-        }
-        Assert.True(sessionResponse!.IsSuccessStatusCode,
-            $"Expected /api/dev/persona/{{userId}} to succeed, got {sessionResponse.StatusCode}.");
-        var session = await sessionResponse.Content.ReadFromJsonAsync<DevPersonaSessionResult>();
-        Assert.NotNull(session);
-        http.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", session!.AccessToken);
-
-        var unique = Guid.NewGuid().ToString("N")[..8];
-        var firstName = "E2E";
-        var lastName = $"Team{lastNameSuffix}{unique}";
-
-        var response = await http.PostAsJsonAsync(
-            $"/api/companies/{AcmeId}/employees",
-            new
-            {
-                companyId = AcmeId,
-                departmentId = DepartmentId,
-                locationId = LocationId,
-                positionProfileId = PositionProfileId,
-                managerId,
-                firstName,
-                lastName,
-                workEmail = $"e2e.team.{unique}@acme.example",
-                startDate = "2026-03-01",
-                dateOfBirth = "1990-06-15",
-                nationality = "British",
-                gender = "Male",
-                employeeNumber = $"E2E-TEAM-{unique}",
-                employmentTypeId = EmploymentTypeId,
-                hasSystemAccess = true,
-            });
-        response.EnsureSuccessStatusCode();
-        var created = await response.Content.ReadFromJsonAsync<IdPayload>();
-        Assert.NotNull(created);
-
-        // CreateEmployeeHandler always creates new employees as EmploymentStatus.Draft (see
-        // Employee.Create), regardless of StartDate — there is no "create as Active" option via
-        // this endpoint. GetMyTeamHandler (My Team widget / roster) only counts Status == Active
-        // employees, so a Draft employee is invisible there even with a past start date. Activate
-        // it via the same PUT .../employment endpoint the Employment tab's own Save uses.
-        // UpdateEmploymentDetailsValidator.RequireLoadedVersion() makes ExpectedVersion mandatory
-        // (Ticket 2 optimistic concurrency) despite the request record's own comment suggesting
-        // null is fine for "standalone callers" — it isn't, for this endpoint. Load the just-
-        // created record's real Version via GetEmployee first.
-        var getResponse = await http.GetAsync($"/api/companies/{AcmeId}/employees/{created!.Id}");
-        getResponse.EnsureSuccessStatusCode();
-        var currentEmployee = await getResponse.Content.ReadFromJsonAsync<VersionPayload>();
-        Assert.NotNull(currentEmployee);
-
-        var activateResponse = await http.PutAsJsonAsync(
-            $"/api/companies/{AcmeId}/employees/{created.Id}/employment",
-            new
-            {
-                companyId = AcmeId,
-                id = created.Id,
-                employeeNumber = $"E2E-TEAM-{unique}",
-                employmentTypeId = EmploymentTypeId,
-                status = "Active",
-                departmentId = DepartmentId,
-                locationId = LocationId,
-                positionProfileId = PositionProfileId,
-                managerId,
-                startDate = "2026-03-01",
-                expectedVersion = currentEmployee!.Version,
-            });
-        activateResponse.EnsureSuccessStatusCode();
-
-        return (created.Id, $"{firstName} {lastName}");
-    }
-
-    private sealed record DevPersonaSessionResult(string AccessToken, string RefreshToken, int ExpiresIn);
-    private sealed record IdPayload(Guid Id);
-    private sealed record VersionPayload(int Version);
 }

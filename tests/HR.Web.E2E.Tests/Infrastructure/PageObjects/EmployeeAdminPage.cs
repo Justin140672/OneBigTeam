@@ -14,7 +14,7 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees/{employeeId}");
         // EmployeeEdit has SfDropDownList components on the Details tab; span[role='combobox']
         // only appears after Blazor's interactive render, ensuring event handlers are wired up.
-        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
     }
 
     public async Task<string> GetActiveTabNameAsync()

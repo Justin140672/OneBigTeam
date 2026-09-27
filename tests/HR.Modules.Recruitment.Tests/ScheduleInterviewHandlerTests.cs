@@ -437,6 +437,43 @@ public class ScheduleInterviewHandlerTests
         Assert.Contains("this vacancy", prepTask.Description);
     }
 
+    [Fact]
+    public async Task HandleAsync_Schedules_Interview_For_Internal_Application_And_Source_Stays_Internal()
+    {
+        // Internal recruitment Ticket 6: internal applications use the same pipeline actions.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        db.Vacancies.Add(vacancy);
+        var (_, application) = InternalApplicationTestData.AddInternal(db, companyId, vacancy.Id, stages.Interview.Id, Guid.NewGuid(), Now);
+        await db.SaveChangesAsync();
+
+        var interviewerId = Guid.NewGuid();
+
+        var result = await handler(db).HandleAsync(
+            new ScheduleInterviewRequest
+            {
+                CompanyId             = companyId,
+                VacancyId             = vacancy.Id,
+                ApplicationId         = application.Id,
+                InterviewerEmployeeId = interviewerId,
+                ScheduledAt           = Now.AddDays(3),
+                DurationMinutes       = 45,
+                Location              = "Room 2",
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(interviewerId, result.Value!.InterviewerEmployeeId);
+        Assert.Equal(application.Id, (await db.Interviews.SingleAsync()).ApplicationId);
+
+        var saved = await db.Applications.SingleAsync();
+        Assert.Equal(InterviewOutcome.Pending, saved.InterviewOutcome);
+        Assert.Equal(ApplicationSource.Internal, saved.Source);
+    }
+
     private static ScheduleInterviewHandler handler(
         RecruitmentDbContext db,
         FakeTaskCreator? taskCreator = null,

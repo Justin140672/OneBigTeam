@@ -647,6 +647,12 @@ public class ManagerChangedHandlerTests
             Task.FromResult(_openTasks.TryGetValue((sourceEntityId, assignedEmployeeId), out var id)
                 ? (Guid?)id
                 : null);
+
+        public Task<IReadOnlyDictionary<Guid, Guid?>> GetTaskAssigneesAsync(
+            Guid companyId,
+            IEnumerable<Guid> taskIds,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyDictionary<Guid, Guid?>>(new Dictionary<Guid, Guid?>());
     }
 
     [Fact]

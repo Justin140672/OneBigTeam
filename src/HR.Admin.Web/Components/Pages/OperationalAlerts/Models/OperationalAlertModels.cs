@@ -20,7 +20,7 @@ public sealed record OperationalAlertListItem(
     DateTimeOffset? LastOccurredAt,
     string? AffectedEntityType,
     Guid? AffectedEntityId,
-    int AffectedItemCount,
+    int? AffectedItemCount,
     DateTimeOffset? ResolvedAt,
     Guid? ResolvedByUserId,
     bool IsRead);
@@ -37,7 +37,7 @@ public sealed record OperationalAlertDetailResponse(
     DateTimeOffset? LastOccurredAt,
     string? AffectedEntityType,
     Guid? AffectedEntityId,
-    int AffectedItemCount,
+    int? AffectedItemCount,
     DateTimeOffset? ResolvedAt,
     Guid? ResolvedByUserId,
     bool IsRead,

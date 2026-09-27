@@ -88,6 +88,59 @@ public class RecruitmentDataExportSourceTests
         Assert.Empty(Assert.Single(tables, t => t.Name == "applications").Rows);
     }
 
+    // ----- Internal recruitment Ticket 6: Source + IsInternal columns -----
+
+    [Fact]
+    public async Task GetTablesAsync_Applications_Table_Has_Source_And_IsInternal_Before_Trailing_CvDocumentId()
+    {
+        await using var db = BuildContext();
+
+        var tables = await new RecruitmentDataExportSource(db).GetTablesAsync(Guid.NewGuid(), CancellationToken.None);
+
+        var applications = Assert.Single(tables, t => t.Name == "applications");
+        Assert.Equal(
+            ["Id", "VacancyId", "CandidateId", "CurrentStageId", "InterviewOutcome", "RejectionReason", "WithdrawnAt", "OfferApprovedAt", "AppliedAt", "Source", "IsInternal", "CvDocumentId"],
+            applications.Columns);
+    }
+
+    [Fact]
+    public async Task GetTablesAsync_Exports_Source_And_IsInternal_For_Internal_External_HiredExternal_And_Legacy_Rows()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        db.Vacancies.Add(vacancy);
+        var (_, internalApp) = InternalApplicationTestData.AddInternal(db, companyId, vacancy.Id, stages.ApplicationReceived.Id, Guid.NewGuid(), Now);
+        var (_, directApp)   = InternalApplicationTestData.AddExternal(db, companyId, vacancy.Id, stages.ApplicationReceived.Id, ApplicationSource.Direct, Now);
+        var (_, legacyApp)   = InternalApplicationTestData.AddExternal(db, companyId, vacancy.Id, stages.CvReview.Id, null, Now, "Noah", "Patel");
+        var (_, hiredApp)    = InternalApplicationTestData.AddHiredExternal(db, companyId, vacancy.Id, stages.Hired.Id, ApplicationSource.JobBoard, Guid.NewGuid(), Now);
+        await db.SaveChangesAsync();
+
+        var tables = await new RecruitmentDataExportSource(db).GetTablesAsync(companyId, CancellationToken.None);
+
+        var applications = Assert.Single(tables, t => t.Name == "applications");
+        var idIndex = IndexOf(applications.Columns, "Id");
+        var sourceIndex = IndexOf(applications.Columns, "Source");
+        var isInternalIndex = IndexOf(applications.Columns, "IsInternal");
+        Assert.Equal(4, applications.Rows.Count);
+        Assert.All(applications.Rows, row => Assert.Equal(applications.Columns.Count, row.Count));
+        var rowsById = applications.Rows.ToDictionary(r => r[idIndex]!);
+
+        Assert.Equal("Internal", rowsById[internalApp.Id.ToString()][sourceIndex]);
+        Assert.Equal("true", rowsById[internalApp.Id.ToString()][isInternalIndex]);
+
+        Assert.Equal("Direct", rowsById[directApp.Id.ToString()][sourceIndex]);
+        Assert.Equal("false", rowsById[directApp.Id.ToString()][isInternalIndex]);
+
+        Assert.Null(rowsById[legacyApp.Id.ToString()][sourceIndex]);
+        Assert.Equal("false", rowsById[legacyApp.Id.ToString()][isInternalIndex]);
+
+        // Hired external candidate has Candidate.EmployeeId set but is still external.
+        Assert.Equal("JobBoard", rowsById[hiredApp.Id.ToString()][sourceIndex]);
+        Assert.Equal("false", rowsById[hiredApp.Id.ToString()][isInternalIndex]);
+    }
+
     private static int IndexOf(IReadOnlyList<string> columns, string name)
     {
         for (var i = 0; i < columns.Count; i++)

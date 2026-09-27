@@ -27,13 +27,13 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/position-profiles/new");
         // PositionProfileEdit has an SfDropDownList for Department; span[role='combobox'] only
         // appears after Blazor's interactive render, ensuring event handlers are wired up.
-        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
     }
 
     public async Task GoToAsync(Guid companyId, Guid positionProfileId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/position-profiles/{positionProfileId}");
-        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
     }
 
     public async Task FillTitleAsync(string title)
@@ -378,7 +378,7 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
         var editUrl = page.Url;
         await SaveAsync();
         await page.GotoAsync(editUrl);
-        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
         await OpenInheritedRolesTabAsync();
     }
 

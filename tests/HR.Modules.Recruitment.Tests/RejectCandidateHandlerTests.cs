@@ -193,6 +193,69 @@ public class RejectCandidateHandlerTests
         Assert.Equal("validation", result.Error.Code);
     }
 
+    [Fact]
+    public async Task HandleAsync_Rejects_Internal_Application_And_Source_Stays_Internal()
+    {
+        // Internal recruitment Ticket 6: internal applications use the same pipeline actions.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        db.Vacancies.Add(vacancy);
+        var (_, application) = InternalApplicationTestData.AddInternal(db, companyId, vacancy.Id, stages.CvReview.Id, Guid.NewGuid(), Now);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new RejectCandidateRequest
+            {
+                CompanyId       = companyId,
+                VacancyId       = vacancy.Id,
+                ApplicationId   = application.Id,
+                RejectionReason = "Role needs more people-management experience.",
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(stages.Rejected.Id, result.Value!.CurrentStageId);
+
+        var saved = await db.Applications.SingleAsync();
+        Assert.Equal(stages.Rejected.Id, saved.CurrentStageId);
+        Assert.Equal(ApplicationSource.Internal, saved.Source);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Conflict_While_Internal_Appointment_Is_Pending()
+    {
+        // Internal recruitment Ticket 7: the employee change may already be recorded and recovery will
+        // move the application to Hired, so it must not be rejected in the meantime.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Engineering Manager", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        db.Vacancies.Add(vacancy);
+        var employeeId = Guid.NewGuid();
+        var (_, application) = InternalApplicationTestData.AddInternal(db, companyId, vacancy.Id, stages.Offer.Id, employeeId, Now);
+        application.BeginInternalAppointment(employeeId, Guid.NewGuid(), Now);
+        await db.SaveChangesAsync();
+        var eventPublisher = new FakeIntegrationEventPublisher();
+
+        var result = await handler(db, eventPublisher).HandleAsync(
+            new RejectCandidateRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+        Assert.Equal(Application.InternalAppointmentInProgressMessage, result.Error.Message);
+        Assert.Empty(eventPublisher.PublishedEvents);
+
+        db.ChangeTracker.Clear();
+        var saved = await db.Applications.SingleAsync();
+        Assert.Equal(stages.Offer.Id, saved.CurrentStageId);
+        Assert.Equal(InternalAppointmentStatus.Pending, saved.AppointmentStatus);
+    }
+
     private static RejectCandidateHandler handler(
         RecruitmentDbContext db,
         FakeIntegrationEventPublisher? eventPublisher = null,

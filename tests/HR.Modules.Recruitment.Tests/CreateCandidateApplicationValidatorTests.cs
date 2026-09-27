@@ -362,7 +362,60 @@ public class CreateCandidateApplicationValidatorTests
             Assert.Contains(withRecruiter.Errors, e => e.PropertyName == nameof(CreateCandidateApplicationRequest.SourceExternalRecruiterId));
 
             var withoutRecruiter = _validator.Validate(Valid(source: source, recruiterId: null));
+            if (source == ApplicationSource.Internal)
+            {
+                // Internal recruitment Ticket 4: Internal is refused on its own (Source) rule, never on
+                // the recruiter-id rule — see the dedicated Internal facts below.
+                Assert.False(withoutRecruiter.IsValid, "Expected Internal to be rejected.");
+                Assert.DoesNotContain(withoutRecruiter.Errors, e => e.PropertyName == nameof(CreateCandidateApplicationRequest.SourceExternalRecruiterId));
+                continue;
+            }
+
             Assert.True(withoutRecruiter.IsValid, $"Expected success for {source} without a recruiter id.");
         }
+    }
+
+    // ----- Internal recruitment Ticket 4: Source "Internal" is never recruiter-selectable -----
+
+    [Fact]
+    public void Validate_Fails_When_Source_Is_Internal()
+    {
+        var result = _validator.Validate(Valid(source: ApplicationSource.Internal));
+
+        Assert.False(result.IsValid);
+        var error = Assert.Single(result.Errors, e => e.PropertyName == nameof(CreateCandidateApplicationRequest.Source));
+        Assert.Contains("Internal", error.ErrorMessage);
+    }
+
+    [Fact]
+    public void Validate_Fails_Only_On_Source_When_Internal_And_Every_Other_Field_Valid()
+    {
+        var result = _validator.Validate(Valid(
+            phone: "07700 900123",
+            resumeUrl: "https://example.com/cv.pdf",
+            notes: "Referred by the hiring manager.",
+            source: ApplicationSource.Internal));
+
+        Assert.False(result.IsValid);
+        var error = Assert.Single(result.Errors);
+        Assert.Equal(nameof(CreateCandidateApplicationRequest.Source), error.PropertyName);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_Source_Is_Internal_With_A_Recruiter_Id()
+    {
+        var result = _validator.Validate(Valid(source: ApplicationSource.Internal, recruiterId: Guid.NewGuid()));
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateCandidateApplicationRequest.Source));
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateCandidateApplicationRequest.SourceExternalRecruiterId));
+    }
+
+    [Fact]
+    public void Validate_Passes_When_Source_Is_Null()
+    {
+        var result = _validator.Validate(Valid(source: null));
+
+        Assert.True(result.IsValid);
     }
 }

@@ -69,7 +69,7 @@ public sealed class PositionProfileListPage(IPage page, string baseUrl)
             throw new InvalidOperationException($"Position profile '{title}' was not found on any page of the list.");
 
         await page.Locator(".e-rowcell a").Filter(new() { HasText = title }).First.ClickAsync();
-        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
     }
 
     /// <summary>

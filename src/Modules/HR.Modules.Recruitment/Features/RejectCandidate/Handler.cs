@@ -50,6 +50,12 @@ internal sealed class RejectCandidateHandler(RecruitmentDbContext db, IClock clo
             return Result.Failure<RejectCandidateResponse>(
                 Error.Validation("Cannot reject an application that has been withdrawn."));
 
+        // Internal recruitment Ticket 7: the employee change may already be recorded; recovery will
+        // move this application to Hired, so it must not be rejected in the meantime.
+        if (application.HasInternalAppointmentInProgress)
+            return Result.Failure<RejectCandidateResponse>(
+                Error.Conflict(Domain.Application.InternalAppointmentInProgressMessage));
+
         var currentStage = await db.RecruitmentStages
             .AsNoTracking()
             .SingleOrDefaultAsync(s => s.Id == application.CurrentStageId && s.CompanyId == request.CompanyId, cancellationToken);

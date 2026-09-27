@@ -43,6 +43,14 @@
                         Value="@_groupBy" ValueChanged="OnGroupByChangedAsync">
             <DropDownListFieldSettings Value="Value" Text="Label" />
         </SfDropDownList>
+        <div class="d-flex align-items-center gap-2 ms-3" data-testid="report-application-type-filter">
+            <label class="form-label mb-0" for="report-application-type-filter">Applications</label>
+            <SfDropDownList TValue="ApplicationTypeFilter" TItem="ApplicationTypeFilterOption" DataSource="@_applicationTypeOptions"
+                            ID="report-application-type-filter" Width="180px"
+                            Value="@_applicationType" ValueChanged="OnApplicationTypeChangedAsync">
+                <DropDownListFieldSettings Value="Value" Text="Label" />
+            </SfDropDownList>
+        </div>
     </div>
 
     @if (_isLoading)
@@ -116,10 +124,28 @@
         await LoadAsync();
     }
 
+    // Internal recruitment Ticket 6: Internal/External application filter (explicit "All applications"
+    // item rather than a clear button). Applied to both the view and the export.
+    private ApplicationTypeFilter _applicationType = ApplicationTypeFilter.All;
+
+    private static readonly ApplicationTypeFilterOption[] _applicationTypeOptions =
+    [
+        new(ApplicationTypeFilter.All, "All applications"),
+        new(ApplicationTypeFilter.Internal, "Internal"),
+        new(ApplicationTypeFilter.External, "External"),
+    ];
+
+    private async Task OnApplicationTypeChangedAsync(ApplicationTypeFilter value)
+    {
+        _applicationType = value;
+        await LoadAsync();
+    }
+
     private RecruitmentPipelineReportFilter BuildServiceFilter() => new(
         StartDate: _currentFilter.DateRangeStart,
         EndDate: _currentFilter.DateRangeEnd,
-        GroupBy: _groupBy);
+        GroupBy: _groupBy,
+        IsInternal: _applicationType.ToIsInternal());
 
     private async Task LoadAsync()
     {

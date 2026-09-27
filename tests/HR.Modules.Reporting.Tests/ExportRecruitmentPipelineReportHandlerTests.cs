@@ -26,4 +26,28 @@ public class ExportRecruitmentPipelineReportHandlerTests
         Assert.Equal("Bob", row[0]);
         Assert.Equal("1", row[5]);
     }
+
+    // ----- Internal recruitment Ticket 6: isInternal is passed through to the reader -----
+
+    [Theory]
+    [InlineData(null, "Recruiter")]
+    [InlineData(true, "Recruiter")]
+    [InlineData(false, "Recruiter")]
+    [InlineData(true, "Vacancy")]
+    [InlineData(false, "Vacancy")]
+    public async Task HandleAsync_Passes_IsInternal_Through_To_Reader(bool? isInternal, string groupByName)
+    {
+        var groupBy = Enum.Parse<RecruitmentPipelineGroupBy>(groupByName);
+        var reader = new FakeRecruitmentPipelineReader();
+        var getHandler = new GetRecruitmentPipelineReportHandler(reader);
+        var exporter = new FakeReportExporter();
+        var handler = new ExportRecruitmentPipelineReportHandler(getHandler, exporter, TestReportExportAuditor.Create());
+
+        var result = await handler.HandleAsync(
+            new ExportRecruitmentPipelineReportRequest(Guid.NewGuid(), GroupBy: groupBy, IsInternal: isInternal), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(isInternal, reader.LastIsInternal);
+        Assert.Equal(groupBy == RecruitmentPipelineGroupBy.Vacancy, reader.ByVacancyCalled);
+    }
 }

@@ -308,9 +308,14 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
             }
         }
 
-        await page.WaitForSelectorAsync(
-            "[role='dialog'].bulk-compensation-update-dialog",
-            new() { Timeout = 15_000 });
+        // The page now reports an empty selection instead of silently doing nothing — surface that
+        // as the failure reason rather than a bare dialog timeout.
+        var dialog = page.Locator("[role='dialog'].bulk-compensation-update-dialog");
+        var selectionError = page.Locator(".alert-danger").Filter(new() { HasText = "Select at least one employee" });
+        await dialog.Or(selectionError).First.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        if (await selectionError.IsVisibleAsync())
+            throw new InvalidOperationException(
+                "Bulk update did not open: the employee grid had no selected rows when 'Selected Employees' was clicked.");
     }
 
     /// <summary>
@@ -472,20 +477,20 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
             if (await page.Locator(".e-grid .e-emptyrow").CountAsync() > 0)
                 break;
 
-            var rows = page.Locator(".e-grid .e-row");
-            var rowCount = await rows.CountAsync();
-            var allMatch = true;
-            for (var i = 0; i < rowCount; i++)
-            {
-                var text = (await rows.Nth(i).TextContentAsync()) ?? "";
-                if (!text.Contains(query, StringComparison.OrdinalIgnoreCase))
-                {
-                    allMatch = false;
-                    break;
-                }
-            }
-
-            if (allMatch)
+            // One atomic snapshot of every rendered row's text — NOT CountAsync() followed by
+            // rows.Nth(i).TextContentAsync() per index. The debounced server-side search reload
+            // re-renders the grid at an arbitrary moment, typically shrinking it (e.g. 20 unfiltered
+            // rows -> 1 match): an index taken from the pre-reload count then points at a row that
+            // no longer exists, and TextContentAsync's default 30s auto-wait for it hung the caller
+            // ("Timeout 30000ms waiting for Locator(\".e-grid .e-row\").Nth(1)"). AllTextContentsAsync
+            // never waits for a specific index, so a mid-loop re-render just means the next poll
+            // iteration sees the new rows.
+            // Word-by-word (order-agnostic) rather than one Contains(query): a multi-word query such
+            // as "E2E SeedListUiA" matches rows whose name parts render with other text between them.
+            var queryWords = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var rowTexts = await page.Locator(".e-grid .e-row").AllTextContentsAsync();
+            if (rowTexts.Count > 0 && rowTexts.All(t =>
+                    queryWords.All(w => t.Contains(w, StringComparison.OrdinalIgnoreCase))))
                 break;
 
             if (DateTime.UtcNow >= deadline)

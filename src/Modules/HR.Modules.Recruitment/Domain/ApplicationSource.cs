@@ -12,4 +12,10 @@ internal enum ApplicationSource
     ExternalRecruiter,
     JobBoard,
     CareersSite,
+
+    // Internal recruitment Ticket 4: recorded automatically when a current employee applies for an
+    // internally advertised vacancy through the employee Apply endpoint. Never selectable by a
+    // recruiter (the CreateApplication / CreateCandidateApplication validators reject it), so an
+    // Internal application always belongs to an employee-linked Candidate. Stored as "Internal".
+    Internal,
 }

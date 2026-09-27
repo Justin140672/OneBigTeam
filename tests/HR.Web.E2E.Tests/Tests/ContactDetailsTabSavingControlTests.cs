@@ -46,6 +46,8 @@ public sealed class ContactDetailsTabSavingControlTests(EmployeePersonaFixture f
 
         await contact.ClickSaveAsync();
         await ctrl.WaitUntilRequestArrivedAsync();
+        // The request arriving server-side doesn't mean the "saving" render has reached the DOM yet.
+        await contact.WaitForSavingStateRenderedAsync();
 
         // The live region announces the in-flight save and is exposed to assistive tech.
         Assert.Contains("Saving contact details", await contact.SavingStatusTextAsync());

@@ -124,6 +124,33 @@ internal sealed class ApplicationConfiguration : IEntityTypeConfiguration<Applic
         builder.Property(a => a.CvDocumentId)
             .HasColumnName("cv_document_id");
 
+        // Internal recruitment Ticket 7: internal appointment progress (see Application remarks).
+        builder.Property(a => a.AppointmentStatus)
+            .HasColumnName("appointment_status")
+            .HasConversion<string>()
+            .HasMaxLength(20);
+
+        builder.Property(a => a.AppointmentEmployeeId)
+            .HasColumnName("appointment_employee_id");
+
+        builder.Property(a => a.AppointmentRequestedByUserId)
+            .HasColumnName("appointment_requested_by_user_id");
+
+        builder.Property(a => a.AppointmentRequestedAt)
+            .HasColumnName("appointment_requested_at");
+
+        builder.Property(a => a.AppointmentPromotionId)
+            .HasColumnName("appointment_promotion_id");
+
+        builder.Property(a => a.AppointmentEffectiveDate)
+            .HasColumnName("appointment_effective_date");
+
+        builder.Property(a => a.AppointmentCompletedAt)
+            .HasColumnName("appointment_completed_at");
+
+        builder.Ignore(a => a.InternalAppointmentSourceReference);
+        builder.Ignore(a => a.HasInternalAppointmentInProgress);
+
         // Internal recruitment Ticket 1: the submitted CV. A composite FK onto the candidate_documents
         // alternate key (id, candidate_id, company_id) makes the database itself guarantee the
         // referenced document belongs to this application's candidate and company — not just the
@@ -165,5 +192,11 @@ internal sealed class ApplicationConfiguration : IEntityTypeConfiguration<Applic
         builder.HasIndex(a => new { a.CvDocumentId, a.CandidateId, a.CompanyId })
             .HasDatabaseName("ix_applications_cv_document_id")
             .HasFilter("cv_document_id IS NOT NULL");
+
+        // Internal recruitment Ticket 7: lets InternalAppointmentReconciliationJob find interrupted
+        // (Pending) appointments without scanning every application.
+        builder.HasIndex(a => new { a.AppointmentStatus, a.AppointmentRequestedAt })
+            .HasDatabaseName("ix_applications_appointment_pending")
+            .HasFilter("appointment_status = 'Pending'");
     }
 }

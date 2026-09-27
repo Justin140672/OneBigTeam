@@ -54,4 +54,10 @@ internal sealed class FakeOpenTaskBySourceEntityReader : IOpenTaskBySourceEntity
 
         return Task.FromResult(match);
     }
+
+    public Task<IReadOnlyDictionary<Guid, Guid?>> GetTaskAssigneesAsync(
+        Guid companyId,
+        IEnumerable<Guid> taskIds,
+        CancellationToken cancellationToken) =>
+        Task.FromResult<IReadOnlyDictionary<Guid, Guid?>>(new Dictionary<Guid, Guid?>());
 }

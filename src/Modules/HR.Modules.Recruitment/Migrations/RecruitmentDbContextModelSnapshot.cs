@@ -33,6 +33,35 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("applied_at");
 
+                    b.Property<DateTimeOffset?>("AppointmentCompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("appointment_completed_at");
+
+                    b.Property<DateOnly?>("AppointmentEffectiveDate")
+                        .HasColumnType("date")
+                        .HasColumnName("appointment_effective_date");
+
+                    b.Property<Guid?>("AppointmentEmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("appointment_employee_id");
+
+                    b.Property<Guid?>("AppointmentPromotionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("appointment_promotion_id");
+
+                    b.Property<DateTimeOffset?>("AppointmentRequestedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("appointment_requested_at");
+
+                    b.Property<Guid?>("AppointmentRequestedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("appointment_requested_by_user_id");
+
+                    b.Property<string>("AppointmentStatus")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("appointment_status");
+
                     b.Property<Guid>("CandidateId")
                         .HasColumnType("uuid")
                         .HasColumnName("candidate_id");
@@ -164,6 +193,10 @@ namespace HR.Modules.Recruitment.Migrations
                     b.HasIndex("SourceExternalRecruiterId");
 
                     b.HasIndex("VacancyId");
+
+                    b.HasIndex("AppointmentStatus", "AppointmentRequestedAt")
+                        .HasDatabaseName("ix_applications_appointment_pending")
+                        .HasFilter("appointment_status = 'Pending'");
 
                     b.HasIndex("VacancyId", "CandidateId")
                         .IsUnique();
@@ -320,6 +353,11 @@ namespace HR.Modules.Recruitment.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CompanyId");
+
+                    b.HasIndex("CompanyId", "EmployeeId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_candidates_company_id_employee_id")
+                        .HasFilter("employee_id IS NOT NULL");
 
                     b.HasIndex("CompanyId", "IsActive");
 

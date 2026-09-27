@@ -48,7 +48,7 @@ public class RecruitmentReportReaderGetSummaryAsyncTests
         await db.SaveChangesAsync();
 
         var reader = new RecruitmentReportReader(db, new FakePositionProfileReader());
-        var result = await reader.GetSummaryAsync(companyId, includeClosed: false, CancellationToken.None);
+        var result = await reader.GetSummaryAsync(companyId, includeClosed: false, isInternal: null, CancellationToken.None);
 
         Assert.Equal(
             ["Application Received", "CV Review", "Interview", "Offer", "Hired", "Rejected"],
@@ -65,7 +65,7 @@ public class RecruitmentReportReaderGetSummaryAsyncTests
         await db.SaveChangesAsync();
 
         var reader = new RecruitmentReportReader(db, new FakePositionProfileReader());
-        var result = await reader.GetSummaryAsync(companyId, includeClosed: false, CancellationToken.None);
+        var result = await reader.GetSummaryAsync(companyId, includeClosed: false, isInternal: null, CancellationToken.None);
 
         Assert.DoesNotContain(result.Stages, s => s.StageName == "Offer");
     }
@@ -88,7 +88,7 @@ public class RecruitmentReportReaderGetSummaryAsyncTests
         await db.SaveChangesAsync();
 
         var reader = new RecruitmentReportReader(db, new FakePositionProfileReader());
-        var result = await reader.GetSummaryAsync(companyId, includeClosed: false, CancellationToken.None);
+        var result = await reader.GetSummaryAsync(companyId, includeClosed: false, isInternal: null, CancellationToken.None);
 
         Assert.Single(result.Vacancies);
         Assert.Equal("Open Role", result.Vacancies[0].VacancyTitle);
@@ -110,7 +110,7 @@ public class RecruitmentReportReaderGetSummaryAsyncTests
         await db.SaveChangesAsync();
 
         var reader = new RecruitmentReportReader(db, new FakePositionProfileReader());
-        var result = await reader.GetSummaryAsync(companyId, includeClosed: true, CancellationToken.None);
+        var result = await reader.GetSummaryAsync(companyId, includeClosed: true, isInternal: null, CancellationToken.None);
 
         var row = Assert.Single(result.Vacancies);
         Assert.Equal("Closed Role", row.VacancyTitle);
@@ -138,7 +138,7 @@ public class RecruitmentReportReaderGetSummaryAsyncTests
         await db.SaveChangesAsync();
 
         var reader = new RecruitmentReportReader(db, new FakePositionProfileReader());
-        var result = await reader.GetSummaryAsync(companyId, includeClosed: false, CancellationToken.None);
+        var result = await reader.GetSummaryAsync(companyId, includeClosed: false, isInternal: null, CancellationToken.None);
 
         var row = Assert.Single(result.Vacancies);
         Assert.Equal(3, row.CandidateCount);
@@ -165,7 +165,7 @@ public class RecruitmentReportReaderGetSummaryAsyncTests
         };
         var reader = new RecruitmentReportReader(db, new FakePositionProfileReader(summaries: summaries));
 
-        var result = await reader.GetSummaryAsync(companyId, includeClosed: false, CancellationToken.None);
+        var result = await reader.GetSummaryAsync(companyId, includeClosed: false, isInternal: null, CancellationToken.None);
 
         var row = Assert.Single(result.Vacancies);
         Assert.Equal("Software Engineer", row.PositionProfileTitle);
@@ -187,10 +187,101 @@ public class RecruitmentReportReaderGetSummaryAsyncTests
         await db.SaveChangesAsync();
 
         var reader = new RecruitmentReportReader(db, new FakePositionProfileReader());
-        var result = await reader.GetSummaryAsync(companyId, includeClosed: false, CancellationToken.None);
+        var result = await reader.GetSummaryAsync(companyId, includeClosed: false, isInternal: null, CancellationToken.None);
 
         var row = Assert.Single(result.Vacancies);
         Assert.Equal("Mine", row.VacancyTitle);
+    }
+
+    // ----- Internal recruitment Ticket 6: isInternal filter -----
+
+    private sealed record InternalFilterSeed(Guid CompanyId, RecruitmentStageTestData.SeededStages Stages);
+
+    // One open vacancy: 2 internal applications (ApplicationReceived, Interview), plus 3 external —
+    // Direct (ApplicationReceived), legacy null-Source (Interview) and a hired external candidate whose
+    // Candidate.EmployeeId is set (Hired, Source Direct).
+    private static async Task<InternalFilterSeed> SeedInternalAndExternalAsync(RecruitmentDbContext db)
+    {
+        var companyId = Guid.NewGuid();
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var vacancy = SeedOpenVacancy(db, companyId, Guid.NewGuid());
+
+        InternalApplicationTestData.AddInternal(db, companyId, vacancy.Id, stages.ApplicationReceived.Id, Guid.NewGuid(), Now);
+        InternalApplicationTestData.AddInternal(db, companyId, vacancy.Id, stages.Interview.Id, Guid.NewGuid(), Now, "Tom", "Baker");
+        InternalApplicationTestData.AddExternal(db, companyId, vacancy.Id, stages.ApplicationReceived.Id, ApplicationSource.Direct, Now);
+        InternalApplicationTestData.AddExternal(db, companyId, vacancy.Id, stages.Interview.Id, null, Now, "Noah", "Patel");
+        InternalApplicationTestData.AddHiredExternal(db, companyId, vacancy.Id, stages.Hired.Id, ApplicationSource.Direct, Guid.NewGuid(), Now);
+        await db.SaveChangesAsync();
+
+        return new InternalFilterSeed(companyId, stages);
+    }
+
+    [Fact]
+    public async Task GetSummaryAsync_IsInternal_Null_Counts_All_Applications()
+    {
+        await using var db = BuildContext();
+        var seed = await SeedInternalAndExternalAsync(db);
+
+        var reader = new RecruitmentReportReader(db, new FakePositionProfileReader());
+        var result = await reader.GetSummaryAsync(seed.CompanyId, includeClosed: false, isInternal: null, CancellationToken.None);
+
+        var row = Assert.Single(result.Vacancies);
+        Assert.Equal(5, row.CandidateCount);
+        Assert.Equal(2, row.CandidatesByStage[seed.Stages.ApplicationReceived.Id]);
+        Assert.Equal(2, row.CandidatesByStage[seed.Stages.Interview.Id]);
+        Assert.Equal(1, row.CandidatesByStage[seed.Stages.Hired.Id]);
+    }
+
+    [Fact]
+    public async Task GetSummaryAsync_IsInternal_True_Counts_Only_Internal_Applications()
+    {
+        await using var db = BuildContext();
+        var seed = await SeedInternalAndExternalAsync(db);
+
+        var reader = new RecruitmentReportReader(db, new FakePositionProfileReader());
+        var result = await reader.GetSummaryAsync(seed.CompanyId, includeClosed: false, isInternal: true, CancellationToken.None);
+
+        var row = Assert.Single(result.Vacancies);
+        Assert.Equal(2, row.CandidateCount);
+        Assert.Equal(1, row.CandidatesByStage[seed.Stages.ApplicationReceived.Id]);
+        Assert.Equal(1, row.CandidatesByStage[seed.Stages.Interview.Id]);
+        // The hired external candidate (Candidate.EmployeeId set) is not counted as internal.
+        Assert.False(row.CandidatesByStage.ContainsKey(seed.Stages.Hired.Id));
+    }
+
+    [Fact]
+    public async Task GetSummaryAsync_IsInternal_False_Counts_External_Including_Legacy_And_Hired_External()
+    {
+        await using var db = BuildContext();
+        var seed = await SeedInternalAndExternalAsync(db);
+
+        var reader = new RecruitmentReportReader(db, new FakePositionProfileReader());
+        var result = await reader.GetSummaryAsync(seed.CompanyId, includeClosed: false, isInternal: false, CancellationToken.None);
+
+        var row = Assert.Single(result.Vacancies);
+        Assert.Equal(3, row.CandidateCount);
+        Assert.Equal(1, row.CandidatesByStage[seed.Stages.ApplicationReceived.Id]);
+        Assert.Equal(1, row.CandidatesByStage[seed.Stages.Interview.Id]);
+        Assert.Equal(1, row.CandidatesByStage[seed.Stages.Hired.Id]);
+    }
+
+    [Fact]
+    public async Task GetSummaryAsync_IsInternal_True_Keeps_Vacancy_Row_With_Zero_Count_When_It_Has_No_Internal_Applications()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var vacancy = SeedOpenVacancy(db, companyId, Guid.NewGuid(), "External Only");
+        InternalApplicationTestData.AddExternal(db, companyId, vacancy.Id, stages.ApplicationReceived.Id, ApplicationSource.Direct, Now);
+        await db.SaveChangesAsync();
+
+        var reader = new RecruitmentReportReader(db, new FakePositionProfileReader());
+        var result = await reader.GetSummaryAsync(companyId, includeClosed: false, isInternal: true, CancellationToken.None);
+
+        var row = Assert.Single(result.Vacancies);
+        Assert.Equal("External Only", row.VacancyTitle);
+        Assert.Equal(0, row.CandidateCount);
+        Assert.Empty(row.CandidatesByStage);
     }
 
     [Fact]
@@ -202,7 +293,7 @@ public class RecruitmentReportReaderGetSummaryAsyncTests
         await db.SaveChangesAsync();
 
         var reader = new RecruitmentReportReader(db, new FakePositionProfileReader());
-        var result = await reader.GetSummaryAsync(companyId, includeClosed: false, CancellationToken.None);
+        var result = await reader.GetSummaryAsync(companyId, includeClosed: false, isInternal: null, CancellationToken.None);
 
         Assert.Empty(result.Vacancies);
         Assert.NotEmpty(result.Stages);

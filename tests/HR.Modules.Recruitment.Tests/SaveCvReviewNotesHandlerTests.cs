@@ -147,6 +147,31 @@ public class SaveCvReviewNotesHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Saves_Notes_For_Internal_Application_And_Source_Stays_Internal()
+    {
+        // Internal recruitment Ticket 6: internal applications use the same pipeline actions.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        db.Vacancies.Add(vacancy);
+        var (_, application) = InternalApplicationTestData.AddInternal(db, companyId, vacancy.Id, stages.CvReview.Id, Guid.NewGuid(), Now);
+        await db.SaveChangesAsync();
+        var performedBy = Guid.NewGuid();
+
+        var result = await Handler(db).HandleAsync(
+            Request(companyId, vacancy.Id, application.Id, "Strong internal candidate"), performedBy, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Strong internal candidate", result.Value!.CvReviewNotes);
+
+        var saved = await db.Applications.SingleAsync();
+        Assert.Equal("Strong internal candidate", saved.CvReviewNotes);
+        Assert.Equal(performedBy, saved.CvReviewedByUserId);
+        Assert.Equal(ApplicationSource.Internal, saved.Source);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_Validation_Error_When_Withdrawn()
     {
         await using var db = BuildContext();

@@ -64,6 +64,11 @@ internal sealed class MoveApplicationStageHandler(
             return Result.Failure<MoveApplicationStageResponse>(
                 Error.Validation("Cannot move a withdrawn application to a different stage."));
 
+        // Internal recruitment Ticket 7: see RejectCandidate — no stage moves mid-appointment.
+        if (application.HasInternalAppointmentInProgress)
+            return Result.Failure<MoveApplicationStageResponse>(
+                Error.Conflict(Domain.Application.InternalAppointmentInProgressMessage));
+
         var currentStage = await db.RecruitmentStages
             .AsNoTracking()
             .SingleOrDefaultAsync(s => s.Id == application.CurrentStageId && s.CompanyId == request.CompanyId, cancellationToken);

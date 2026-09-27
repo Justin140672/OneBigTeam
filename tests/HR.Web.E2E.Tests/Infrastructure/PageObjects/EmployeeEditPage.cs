@@ -145,7 +145,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees/new");
         // Wait for Syncfusion to initialise — span[role='combobox'] only appears after
         // Blazor's interactive render, ensuring the form's event handlers are wired up.
-        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
     }
 
     public async Task GoToAsync(Guid companyId, Guid employeeId)
@@ -153,7 +153,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees/{employeeId}");
         // span[role='combobox'] (SfDropDownList) only appears after Blazor's interactive
         // render, confirming the circuit is connected and event handlers are wired up.
-        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
     }
 
     /// <summary>
@@ -165,7 +165,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task GoToViewAsync(Guid companyId, Guid employeeId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees/{employeeId}/view");
-        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
     }
 
     /// <summary>
@@ -323,7 +323,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
         await button.ClickAsync();
         await page.WaitForURLAsync(url => !url.Contains("/view", StringComparison.OrdinalIgnoreCase), new() { Timeout = 40_000 });
-        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
     }
 
     public async Task<bool> IsBackToEmployeesButtonVisibleAsync()
@@ -870,26 +870,25 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task FillEmployeeNumberAsync(string value)
     {
         var field = page.GetByPlaceholder("e.g. EMP-001");
+        var autoAssignedMessage = page.Locator("p")
+            .Filter(new() { HasText = "An employee number will be assigned automatically" });
 
-        // A single instant IsVisibleAsync() snapshot can land mid-flicker — _companyEmployeeNumberMode
-        // starts as Manual (the field renders) and only flips to Automatic (the field is removed)
-        // once EmployeeEdit.razor's own async hrSettings fetch resolves, so a check that fires right
-        // as that swap happens can catch neither state reliably. Poll instead of trusting one
-        // snapshot — for Manual-mode companies (where the field is required) this avoids silently
-        // skipping the fill and failing later with "Employee number is required."; for Automatic-mode
-        // companies it just spends a little longer confirming the field really is gone. 10s matches
-        // IsEmployeeNumberInputVisibleAsync's own wait for this identical async load — a shorter
-        // budget here (previously 2s) could still lose the race under a busy/loaded run and silently
-        // skip the fill, which is exactly the failure this poll exists to prevent.
-        var deadline = DateTime.UtcNow.AddSeconds(10);
-        var visible = await field.IsVisibleAsync();
-        while (!visible && DateTime.UtcNow < deadline)
-        {
-            await page.WaitForTimeoutAsync(100);
-            visible = await field.IsVisibleAsync();
-        }
+        // Wait for whichever of the two mutually exclusive renders the form actually settled on —
+        // the input (Manual mode) or the "assigned automatically" message (Automatic mode; New
+        // Employee form only) — rather than polling the input's visibility for a fixed 10s and
+        // treating "not seen yet" as "Automatic". Filling whenever the input is present is always
+        // safe: CreateEmployeeHandler uses a supplied number in both modes. Only positively seeing
+        // the Automatic message skips the fill.
+        //
+        // NB: Acme's numbering mode is deliberately never mutated by any E2E test any more (the
+        // tests that need Manual mode use Beta Corp under the HrSettingsSerial gate — see
+        // CreateEmployeeTests) — flipping it mid-run is what made concurrent Acme employee
+        // creation fail with "Save failed: Employee number is required." (form rendered in
+        // Automatic, company switched to Manual before Save).
+        await field.Or(autoAssignedMessage).First.WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
 
-        if (visible)
+        if (await field.IsVisibleAsync())
         {
             await field.FillAsync(value);
             await page.Keyboard.PressAsync("Tab");
@@ -1735,6 +1734,27 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     /// Polls briefly (like <see cref="HasProfilePhotoInitialsAsync"/>) rather than taking a single
     /// snapshot — see that method's own comment for why.
     /// </summary>
+    /// <summary>
+    /// After an upload/approval: waits for the header to show the new photo. The photo only
+    /// becomes downloadable once the asynchronous virus-scan job (ScanUploadedFileJob, a Hangfire
+    /// job whose pickup latency depends on queue load) marks it Clean, and
+    /// EmployeeProfilePhotoHeader polls for it for up to 2 minutes — so this waits on that same
+    /// window rather than HasProfilePhotoImageAsync's short "is it already there" budget, which
+    /// was shorter than the product's own background-job latency.
+    /// </summary>
+    public async Task<bool> WaitForProfilePhotoImageAfterScanAsync()
+    {
+        try
+        {
+            await Assertions.Expect(ProfilePhotoImage).ToBeVisibleAsync(new() { Timeout = 120_000 });
+            return true;
+        }
+        catch (PlaywrightException)
+        {
+            return false;
+        }
+    }
+
     public async Task<bool> HasProfilePhotoImageAsync()
     {
         try
@@ -1772,10 +1792,10 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     /// <summary>
     /// HR uploads a photo directly via the "Upload / Replace Photo" button on the Employee Edit
     /// page header. Unlike self-service uploads, this writes straight to the approved/current
-    /// photo table — no pending-review step. Per EmployeeProfilePhotoHeader.HandleUploaded, the
-    /// dialog only closes (an EventCallback-driven re-render of the parent) after the header has
-    /// already reloaded the current photo, so callers can assert on the new state immediately
-    /// after this returns.
+    /// photo table — no pending-review step. The dialog closes immediately; the header then polls
+    /// for the new photo, which only becomes downloadable once the async virus scan marks it Clean
+    /// — callers must wait via <see cref="WaitForProfilePhotoImageAfterScanAsync"/>, not assume the
+    /// new state is already rendered when this returns.
     /// </summary>
     public async Task UploadProfilePhotoDirectAsync(string filePath)
     {

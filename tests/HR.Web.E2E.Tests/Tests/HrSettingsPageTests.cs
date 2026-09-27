@@ -208,8 +208,6 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
 
         await hrSettings.GoToAsync(BetaCorpId);
 
-        var initialMode = await hrSettings.GetEmployeeNumberModeAsync();
-
         try
         {
             await hrSettings.SelectEmployeeNumberModeAsync("Automatic");
@@ -225,8 +223,15 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
         }
         finally
         {
-            await hrSettings.SelectEmployeeNumberModeAsync(initialMode);
-            await hrSettings.SaveAsync();
+            // This test never saves — the preview is purely client-side — so there is nothing to
+            // restore: just discard the unsaved edits by reloading. It previously re-selected the
+            // initial mode and SAVED here, which persisted the preview's "EMP-"/42/4 edits along
+            // with it; in Automatic mode that prefix/minimum-length change silently triggered (and
+            // auto-confirmed) a background renumber of every Beta Corp employee that nothing
+            // waited for, so the next renumber-triggering save in this serialized class could hit
+            // "A previous employee number reformat is still processing" (409) — e.g.
+            // UpdateRepresentativeFieldsAcrossAllSections / PrefixChange_ShowsRenumberDialog.
+            await hrSettings.GoToAsync(BetaCorpId);
         }
     }
 
@@ -319,11 +324,25 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
     /// </summary>
     private async Task SaveAndWaitForRenumberToSettleAsync(HrSettingsPage hrSettings, string expectedPrefixIfRenumbered)
     {
-        await hrSettings.ClickSaveAsync();
-        var renumbered = await hrSettings.IsRenumberDialogVisibleAsync();
-        if (renumbered)
-            await hrSettings.ConfirmRenumberAsync();
-        await _page.WaitForSpinnerToClearAsync();
+        var renumbered = false;
+        for (var attempt = 1; ; attempt++)
+        {
+            await hrSettings.ClickSaveAsync();
+            renumbered = await hrSettings.IsRenumberDialogVisibleAsync();
+            if (renumbered)
+                await hrSettings.ConfirmRenumberAsync();
+            await _page.WaitForSpinnerToClearAsync();
+
+            // SET-08 rejects a format-changing save (409, nothing committed) while a previous
+            // renumber for this company is still Pending/Processing — the outbox row is only marked
+            // Processed just AFTER the renumbered employees are saved, and the Hangfire worker can
+            // pick the job up late under load, so a prior test's (already-observed) renumber can
+            // still be in flight for a moment. The form keeps its values on a rejected save, so
+            // wait and resubmit, exactly as PrefixChange_ShowsRenumberDialog_... already does.
+            if (!renumbered || attempt >= 8 || !await IsStillProcessingPreviousRenumberAsync())
+                break;
+            await _page.WaitForTimeoutAsync(10_000);
+        }
 
         if (renumbered)
         {
@@ -345,6 +364,16 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
         if (!_page.Url.Contains("/hr-settings", StringComparison.OrdinalIgnoreCase))
             await hrSettings.GoToAsync(BetaCorpId);
     }
+
+    /// <summary>
+    /// True when the just-submitted save was rejected. HrSettingsPage.razor surfaces every failed
+    /// save as the same generic ".alert-danger" ("Failed to save HR settings."), so this can't read
+    /// the reason; callers only consult it after a renumber-triggering save, where the realistic
+    /// rejection is SET-08's "previous reformat still processing" 409.
+    /// </summary>
+    private async Task<bool> IsStillProcessingPreviousRenumberAsync() =>
+        _page.Url.Contains("/hr-settings", StringComparison.OrdinalIgnoreCase) &&
+        await _page.Locator(".alert-danger").First.IsVisibleAsync();
 
     [Fact]
     public async Task PrefixChange_ShowsRenumberDialog_AndConfirming_RenumbersExistingEmployees()

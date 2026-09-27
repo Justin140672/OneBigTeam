@@ -580,4 +580,13 @@ public class UpdateHrSettingsValidatorTests
 		Assert.False(result.IsValid);
 		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateHrSettingsRequest.WeekdayPatternWindowDays));
 	}
+
+	[Fact]
+	public void Validate_Passes_When_NextEmployeeNumber_Is_Omitted()
+	{
+		// Omitted = "unchanged by the administrator" — the handler keeps the live counter.
+		var validator = new UpdateHrSettingsValidator();
+		var result = validator.Validate(ValidRequest() with { NextEmployeeNumber = null });
+		Assert.True(result.IsValid);
+	}
 }

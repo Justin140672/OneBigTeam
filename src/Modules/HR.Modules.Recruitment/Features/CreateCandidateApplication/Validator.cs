@@ -39,6 +39,12 @@ internal sealed class CreateCandidateApplicationValidator : AbstractValidator<Cr
             .MaximumLength(2000)
             .When(r => !string.IsNullOrWhiteSpace(r.Notes));
 
+        // Internal recruitment Ticket 4: Internal is recorded only by the employee Apply endpoint, for
+        // an employee-linked candidate — a recruiter cannot assign it.
+        RuleFor(r => r.Source)
+            .NotEqual(Domain.ApplicationSource.Internal)
+            .WithMessage("Source 'Internal' is recorded automatically when an employee applies for an internal vacancy and cannot be set manually.");
+
         // NotEmpty() on Guid? only rejects null (default of Guid? is null), so Guid.Empty is checked explicitly.
         RuleFor(r => r.SourceExternalRecruiterId)
             .Must(id => id.HasValue && id.Value != Guid.Empty)

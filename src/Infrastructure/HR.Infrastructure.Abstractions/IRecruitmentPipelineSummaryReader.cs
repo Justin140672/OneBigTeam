@@ -6,12 +6,16 @@ namespace HR.Infrastructure.Abstractions;
 /// funnel totals grouped by recruiter/vacancy), this reader returns one row per vacancy together with
 /// the company's configured <see cref="RecruitmentStage"/> pipeline columns and, per vacancy, the
 /// count of applications currently sitting at each stage.
+/// Internal recruitment Ticket 6: <c>isInternal</c> optionally restricts the counted applications —
+/// null = all, true = only internal applications (Application.Source == Internal), false = all
+/// other applications. Internal status is never inferred from a candidate's employee link.
 /// </summary>
 public interface IRecruitmentPipelineSummaryReader
 {
     Task<RecruitmentPipelineSummaryResult> GetSummaryAsync(
         Guid companyId,
         bool includeClosed,
+        bool? isInternal,
         CancellationToken cancellationToken);
 }
 

@@ -22,7 +22,7 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".card", new() { Timeout = 20_000 });
         // Wait for Syncfusion to initialise — span[role='combobox'] (the Leave Year Start
         // Month SfDropDownList) only appears after Blazor's interactive render completes.
-        await page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
     }
 
     // ── Working Week ─────────────────────────────────────────────────────────
@@ -510,22 +510,40 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
     public async Task SaveAsync()
     {
         await ClickSaveAsync();
-        // A prefix / minimum-length change in Automatic mode interposes the renumber confirmation
-        // before the save runs — confirm it and let the save through. Short settle (the dialog is
-        // one Blazor Server round-trip away) rather than a long wait on every save.
-        await page.WaitForTimeoutAsync(600);
-        if (await RenumberDialog.First.IsVisibleAsync())
-            await ConfirmRenumberAsync();
-        await page.WaitForSpinnerToClearAsync();
 
-        // A SUCCESSFUL save navigates away to the HR dashboard (HrSettingsPage.razor's
-        // ListUrl => "/dashboard/hr", via EditPageBase.OnSavedAsync). A FAILED save (validation
-        // error) stays put. Re-open the settings page after a successful save so post-save
-        // accessors/assertions (e.g. GetEmployeeNumberModeAsync, reload-persistence checks) keep
-        // working against the settings form rather than the dashboard.
-        await page.WaitForTimeoutAsync(300);
+        // Wait for the save's actual outcome rather than fixed sleeps. Previously this slept 600ms
+        // and then took one snapshot for the renumber confirmation — a prefix / minimum-length
+        // change in Automatic mode interposes that dialog one Blazor Server round-trip after the
+        // click, and if it rendered later than 600ms under load the dialog was never confirmed:
+        // nothing was saved, yet the caller carried on as if it had been. Outcomes:
+        //  - the renumber confirmation appears -> confirm it and keep waiting for the save;
+        //  - a SUCCESSFUL save navigates away to the HR dashboard (HrSettingsPage.razor's
+        //    ListUrl => "/dashboard/hr", via EditPageBase.OnSavedAsync);
+        //  - a FAILED save stays put and shows ".alert-danger" / ".validation-message".
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (!page.Url.Contains("/hr-settings", StringComparison.OrdinalIgnoreCase))
+                break;
+            if (await RenumberDialog.First.IsVisibleAsync())
+            {
+                await ConfirmRenumberAsync();
+                continue;
+            }
+            if (await page.Locator(".alert-danger, .validation-message").First.IsVisibleAsync())
+                break;
+            await page.WaitForTimeoutAsync(100);
+        }
+
+        // Re-open the settings page after a successful save so post-save accessors/assertions
+        // (e.g. GetEmployeeNumberModeAsync, reload-persistence checks) keep working against the
+        // settings form rather than the dashboard. Wait for the post-save navigation to actually
+        // commit first so this GoToAsync can't race (and abort) it.
         if (!page.Url.Contains("/hr-settings", StringComparison.OrdinalIgnoreCase))
+        {
+            await page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
             await GoToAsync(_companyId);
+        }
     }
 
     public Task CancelAsync() =>

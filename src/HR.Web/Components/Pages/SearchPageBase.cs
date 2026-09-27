@@ -417,6 +417,14 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
 
     protected async Task OnSearchChanged(string value)
     {
+        // A change event carrying the value that's already applied is a duplicate, not a new
+        // search — e.g. the search box commits on Enter and then raises "change" again for the same
+        // text when it later loses focus (typically because the user clicked a row checkbox).
+        // Reloading for it re-bound the grid and silently dropped the row selection the user had
+        // just made, so a following "Update selected"/"Invite selected" found nothing selected.
+        if (string.Equals((value ?? string.Empty).Trim(), (SearchTerm ?? string.Empty).Trim(), StringComparison.Ordinal))
+            return;
+
         SearchTerm = value;
         SyncFilterStateToUrl();
 

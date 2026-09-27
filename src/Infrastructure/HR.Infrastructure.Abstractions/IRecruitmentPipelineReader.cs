@@ -6,6 +6,9 @@ namespace HR.Infrastructure.Abstractions;
 /// reached the company's "Offer" named RecruitmentStage (there is no separate Offer entity in the
 /// domain — see ApplicationStageHistoryEntry/RecruitmentStageSeeder). Date range filtering is
 /// applied against Application.AppliedAt.
+/// Internal recruitment Ticket 6: <c>isInternal</c> optionally restricts the counted applications —
+/// null = all, true = only internal applications (Application.Source == Internal), false = all
+/// other applications. Internal status is never inferred from a candidate's employee link.
 /// </summary>
 public interface IRecruitmentPipelineReader
 {
@@ -13,12 +16,14 @@ public interface IRecruitmentPipelineReader
         Guid companyId,
         DateOnly? startDate,
         DateOnly? endDate,
+        bool? isInternal,
         CancellationToken cancellationToken);
 
     Task<IReadOnlyList<RecruitmentPipelineVacancyRow>> GetByVacancyAsync(
         Guid companyId,
         DateOnly? startDate,
         DateOnly? endDate,
+        bool? isInternal,
         CancellationToken cancellationToken);
 }
 

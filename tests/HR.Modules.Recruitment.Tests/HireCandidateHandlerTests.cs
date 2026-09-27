@@ -503,6 +503,39 @@ public class HireCandidateHandlerTests
         Assert.Null(provisioned.SalaryFrequency);
     }
 
+    [Fact]
+    public async Task HandleAsync_Returns_Validation_For_Internal_Application_And_Never_Provisions_An_Employee()
+    {
+        // Internal recruitment Ticket 7: an internal applicant is already an employee; hiring would
+        // create a second Employee record, so the internal appointment workflow must be used instead.
+        await using var db = BuildContext();
+        var provisioning = new FakeEmployeeProvisioningService();
+        var eventPublisher = new FakeIntegrationEventPublisher();
+        var auditPublisher = new FakeAuditPublisher();
+        var (_, companyId, vacancy, _, _, reader, stages) = SeedVacancyWithResolvableProfile(db);
+        db.Vacancies.Add(vacancy);
+        var (candidate, application) = InternalApplicationTestData.AddInternal(
+            db, companyId, vacancy.Id, stages.Offer.Id, Guid.NewGuid(), Now);
+        await db.SaveChangesAsync();
+        var linkedEmployeeId = candidate.EmployeeId;
+
+        var result = await handler(db, provisioning, eventPublisher, reader, auditPublisher).HandleAsync(
+            BuildRequest(companyId, vacancy.Id, application.Id), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Empty(provisioning.Requests);
+        Assert.Empty(eventPublisher.PublishedEvents);
+        Assert.Empty(auditPublisher.Published);
+
+        db.ChangeTracker.Clear();
+        var saved = await db.Applications.SingleAsync();
+        Assert.Equal(stages.Offer.Id, saved.CurrentStageId);
+        Assert.Null(saved.AppointmentStatus);
+        Assert.Equal(linkedEmployeeId, (await db.Candidates.SingleAsync()).EmployeeId);
+        Assert.Empty(await db.ApplicationStageHistoryEntries.ToListAsync());
+    }
+
     private static HireCandidateHandler handler(
         RecruitmentDbContext db,
         FakeEmployeeProvisioningService? provisioning = null,

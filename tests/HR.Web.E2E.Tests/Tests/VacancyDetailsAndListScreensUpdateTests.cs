@@ -129,7 +129,7 @@ public sealed class VacancyDetailsAndListScreensUpdateTests(CrossUserFixture fix
         // async load (fetching the Position Profile and populating Model.Title) has finished, so
         // reading the title input immediately after the URL wait can race an empty/default value
         // (same reasoning as VacancyListPage.ClickVacancyAsync's post-navigation wait).
-        await _page.WaitForSelectorAsync("span[role='combobox']", new() { Timeout = 20_000 });
+        await _page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
         await Assertions.Expect(_page.GetByPlaceholder("e.g. Senior Software Engineer").First)
             .ToHaveValueAsync(profileTitle, new() { Timeout = 15_000 });
 

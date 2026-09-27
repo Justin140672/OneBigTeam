@@ -65,4 +65,26 @@ internal sealed class OpenTaskBySourceEntityReader(TasksDbContext dbContext) : I
             .Select(t => (Guid?)t.Id)
             .FirstOrDefaultAsync(cancellationToken);
     }
+
+    public async Task<IReadOnlyDictionary<Guid, Guid?>> GetTaskAssigneesAsync(
+        Guid companyId,
+        IEnumerable<Guid> taskIds,
+        CancellationToken cancellationToken)
+    {
+        var ids = taskIds.Distinct().ToList();
+
+        if (ids.Count == 0)
+            return new Dictionary<Guid, Guid?>();
+
+        // Same effective-assignee resolution as GetTaskHandler's authorization check
+        // (AssignedEmployeeId ?? AssignedUserId), so callers decide actionability against exactly
+        // what GetTask will enforce.
+        var tasks = await dbContext.TaskItems
+            .AsNoTracking()
+            .Where(t => t.CompanyId == companyId && ids.Contains(t.Id))
+            .Select(t => new { t.Id, t.AssignedEmployeeId, t.AssignedUserId })
+            .ToListAsync(cancellationToken);
+
+        return tasks.ToDictionary(t => t.Id, t => t.AssignedEmployeeId ?? t.AssignedUserId);
+    }
 }

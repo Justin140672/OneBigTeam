@@ -567,6 +567,32 @@ public class OfferCandidateHandlerTests
         Assert.Null(saved.OfferMadeAt);
     }
 
+    [Fact]
+    public async Task HandleAsync_Offers_Internal_Application_And_Source_Stays_Internal()
+    {
+        // Internal recruitment Ticket 6: internal applications use the same pipeline actions.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        db.Vacancies.Add(vacancy);
+        var (_, application) = InternalApplicationTestData.AddInternal(db, companyId, vacancy.Id, stages.Interview.Id, Guid.NewGuid(), Now);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new OfferCandidateRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id, OfferedSalary = 55000m, OfferedSalaryFrequency = "Annual" },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(stages.Offer.Id, result.Value!.CurrentStageId);
+
+        var saved = await db.Applications.SingleAsync();
+        Assert.Equal(stages.Offer.Id, saved.CurrentStageId);
+        Assert.Equal(55000m, saved.OfferedSalary);
+        Assert.Equal(ApplicationSource.Internal, saved.Source);
+    }
+
     private static OfferCandidateHandler handler(
         RecruitmentDbContext db,
         FakePositionProfileReader? positionProfileReader = null,

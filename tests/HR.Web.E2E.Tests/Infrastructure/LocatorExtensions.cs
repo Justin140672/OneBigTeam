@@ -54,6 +54,31 @@ public static class LocatorExtensions
         return false;
     }
 
+    /// <summary>
+    /// Rewinds the page's (single) Syncfusion grid to page 1, then calls <paramref name="visitPage"/>
+    /// once per page in pager order until it returns true (done), the last page has been visited,
+    /// or <paramref name="budget"/> elapses. Each page swap is confirmed to have actually landed
+    /// (first row's text changed) before the next visit, so a visit never re-reads a stale page or
+    /// skips one — unlike a fixed sleep after clicking "next".
+    /// </summary>
+    public static async Task VisitAllGridPagesAsync(this IPage page, Func<Task<bool>> visitPage, TimeSpan budget)
+    {
+        await ClickGridPagerAndWaitAsync(page, ".e-grid .e-pager .e-first:not(.e-disable)");
+
+        var deadline = DateTime.UtcNow + budget;
+        while (true)
+        {
+            if (await visitPage())
+                return;
+
+            if (DateTime.UtcNow >= deadline)
+                return;
+
+            if (!await ClickGridPagerAndWaitAsync(page, ".e-grid .e-pager .e-next:not(.e-disable)"))
+                return;
+        }
+    }
+
     private static async Task<bool> ClickGridPagerAndWaitAsync(IPage page, string pagerSelector)
     {
         var control = page.Locator(pagerSelector).First;

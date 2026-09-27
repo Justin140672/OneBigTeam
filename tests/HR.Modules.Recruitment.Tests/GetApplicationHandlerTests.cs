@@ -491,6 +491,80 @@ public class GetApplicationHandlerTests
         Assert.Null(result.Value.CvUploadedAt);
     }
 
+    // ----- Internal recruitment Ticket 6: IsInternal / EmployeeId -----
+
+    [Fact]
+    public async Task HandleAsync_Internal_Application_Returns_IsInternal_True_And_Candidate_EmployeeId()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var (_, application) = InternalApplicationTestData.AddInternal(db, companyId, vacancy.Id, stages.ApplicationReceived.Id, employeeId, Now);
+        db.Vacancies.Add(vacancy);
+        await db.SaveChangesAsync();
+
+        var result = await new GetApplicationHandler(db).HandleAsync(
+            new GetApplicationRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.IsInternal);
+        Assert.Equal(employeeId, result.Value.EmployeeId);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Direct")]
+    [InlineData("Unspecified")]
+    [InlineData("Referral")]
+    public async Task HandleAsync_External_Application_Returns_IsInternal_False_And_Null_EmployeeId(string? source)
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var (_, application) = InternalApplicationTestData.AddExternal(
+            db, companyId, vacancy.Id, stages.ApplicationReceived.Id, InternalApplicationTestData.ParseSource(source), Now);
+        db.Vacancies.Add(vacancy);
+        await db.SaveChangesAsync();
+
+        var result = await new GetApplicationHandler(db).HandleAsync(
+            new GetApplicationRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.IsInternal);
+        Assert.Null(result.Value.EmployeeId);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Direct")]
+    public async Task HandleAsync_Hired_External_Candidate_Linked_To_Employee_Is_Not_Internal_And_EmployeeId_Is_Null(string? source)
+    {
+        // Candidate.EmployeeId is set by HireCandidate on external candidates — it must never make the
+        // application look internal. Only Application.Source == Internal does.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var (candidate, application) = InternalApplicationTestData.AddHiredExternal(
+            db, companyId, vacancy.Id, stages.Hired.Id, InternalApplicationTestData.ParseSource(source), Guid.NewGuid(), Now);
+        db.Vacancies.Add(vacancy);
+        await db.SaveChangesAsync();
+        Assert.NotNull(candidate.EmployeeId);
+
+        var result = await new GetApplicationHandler(db).HandleAsync(
+            new GetApplicationRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.IsInternal);
+        Assert.Null(result.Value.EmployeeId);
+    }
+
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))

@@ -101,6 +101,114 @@ internal sealed class Candidate : HR.SharedKernel.IVersionedAggregate
         UpdatedAt  = now;
     }
 
+    // Column limits (see CandidateConfiguration) — employee-sourced identity must fit them.
+    public const int FirstNameMaxLength = 100;
+    public const int LastNameMaxLength  = 100;
+    public const int EmailMaxLength     = 256;
+    public const int PhoneMaxLength     = 30;
+
+    /// <summary>
+    /// Internal recruitment Ticket 4: returns a reason why an employee's authoritative identity cannot
+    /// be stored on an employee-linked candidate, or null when it can. Shared by
+    /// <see cref="CreateForEmployee"/> and <see cref="SyncEmployeeIdentity"/> so callers can surface a
+    /// validation failure before the domain throws.
+    /// </summary>
+    public static string? DescribeEmployeeIdentityViolation(string firstName, string lastName, string workEmail)
+    {
+        if (string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(lastName))
+            return "Your employee record has no name. Ask HR to update it before applying.";
+
+        if (firstName.Trim().Length > FirstNameMaxLength || lastName.Trim().Length > LastNameMaxLength)
+            return "Your name on your employee record is too long to be used for an application. Ask HR for help.";
+
+        if (string.IsNullOrWhiteSpace(workEmail))
+            return "Your employee record has no work email address. Ask HR to add one before applying.";
+
+        if (workEmail.Trim().Length > EmailMaxLength)
+            return "Your work email address is too long to be used for an application. Ask HR for help.";
+
+        return null;
+    }
+
+    /// <summary>
+    /// Internal recruitment Ticket 4: creates the Candidate that represents a current employee in
+    /// recruitment. Identity comes only from the authoritative Employee record (never from the
+    /// request), and the candidate is linked to the employee from the start. The database allows at
+    /// most one candidate per (company, employee) — see CandidateConfiguration.
+    /// </summary>
+    public static Candidate CreateForEmployee(
+        Guid id,
+        Guid companyId,
+        Guid employeeId,
+        string firstName,
+        string lastName,
+        string workEmail,
+        string? phone,
+        DateTimeOffset now)
+    {
+        if (employeeId == Guid.Empty)
+            throw new ArgumentException("An employee-linked candidate requires an employee id.", nameof(employeeId));
+
+        var violation = DescribeEmployeeIdentityViolation(firstName, lastName, workEmail);
+        if (violation is not null)
+            throw new InvalidOperationException(violation);
+
+        var candidate = Create(id, companyId, firstName, lastName, workEmail, NormalisePhone(phone), null, now);
+        candidate.EmployeeId = employeeId;
+        return candidate;
+    }
+
+    /// <summary>
+    /// Internal recruitment Ticket 4: refreshes an employee-linked candidate's name, email and phone
+    /// from the authoritative Employee record when the employee applies again. Returns true when
+    /// anything changed. Never repurposes a candidate: throws if it is not linked to
+    /// <paramref name="employeeId"/> or has been purged. The CV/resume link is left untouched.
+    /// </summary>
+    public bool SyncEmployeeIdentity(
+        Guid employeeId,
+        string firstName,
+        string lastName,
+        string workEmail,
+        string? phone,
+        DateTimeOffset now)
+    {
+        if (EmployeeId != employeeId)
+            throw new InvalidOperationException("Candidate is not linked to this employee.");
+
+        if (PurgedAt is not null)
+            throw new InvalidOperationException("A purged candidate's personal data cannot be restored.");
+
+        var violation = DescribeEmployeeIdentityViolation(firstName, lastName, workEmail);
+        if (violation is not null)
+            throw new InvalidOperationException(violation);
+
+        var newFirst = firstName.Trim();
+        var newLast  = lastName.Trim();
+        var newEmail = workEmail.Trim();
+        var newPhone = NormalisePhone(phone);
+
+        if (FirstName == newFirst && LastName == newLast && Email == newEmail && Phone == newPhone)
+            return false;
+
+        FirstName = newFirst;
+        LastName  = newLast;
+        Email     = newEmail;
+        Phone     = newPhone;
+        UpdatedAt = now;
+        return true;
+    }
+
+    // An employee's phone number is optional on the candidate; one that does not fit the candidate
+    // column is dropped rather than failing the application.
+    private static string? NormalisePhone(string? phone)
+    {
+        if (string.IsNullOrWhiteSpace(phone))
+            return null;
+
+        var trimmed = phone.Trim();
+        return trimmed.Length > PhoneMaxLength ? null : trimmed;
+    }
+
     /// <summary>
     /// Soft-deactivates the candidate. This is a status flag only — it never deletes or anonymises
     /// any candidate data (applications, notes, documents, communications, consent records, audit
