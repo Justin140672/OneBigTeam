@@ -88,10 +88,12 @@ internal sealed class PostmarkInvitationEmailSender : IInvitationEmailSender
 
             if (!response.IsSuccessStatusCode)
             {
-                // Log status code but not the action URL (invitation token) or the recipient email.
+                // Stable diagnostics only — never the action URL (invitation token), the recipient
+                // email/name, or Postmark's free-form Message (it can echo the recipient address).
+                var failure = await PostmarkFailure.FromResponseAsync(response, ct);
                 _logger.LogWarning(
-                    "Postmark invitation email send failed. StatusCode={StatusCode}",
-                    (int)response.StatusCode);
+                    "Postmark invitation email send failed. StatusCode={StatusCode} PostmarkErrorCode={PostmarkErrorCode} FailureCategory={FailureCategory}",
+                    failure.StatusCode, failure.ErrorCode, failure.Category);
                 return false;
             }
 

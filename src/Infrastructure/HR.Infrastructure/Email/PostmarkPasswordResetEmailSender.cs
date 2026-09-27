@@ -79,11 +79,12 @@ internal sealed class PostmarkPasswordResetEmailSender : IPasswordResetEmailSend
 
             if (!response.IsSuccessStatusCode)
             {
-                // Log status code but never the action URL — it carries the single-use recovery token —
-                // and never the recipient email address.
+                // Stable diagnostics only — never the action URL (single-use recovery token), the
+                // recipient email/name, or Postmark's free-form Message (it can echo the recipient).
+                var failure = await PostmarkFailure.FromResponseAsync(response, ct);
                 _logger.LogWarning(
-                    "Postmark password-reset email send failed. StatusCode={StatusCode}",
-                    (int)response.StatusCode);
+                    "Postmark password-reset email send failed. StatusCode={StatusCode} PostmarkErrorCode={PostmarkErrorCode} FailureCategory={FailureCategory}",
+                    failure.StatusCode, failure.ErrorCode, failure.Category);
                 return false;
             }
 

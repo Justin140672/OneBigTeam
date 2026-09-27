@@ -36,8 +36,7 @@ internal sealed class PostmarkEmailSender : IEmailSender
             // or mark a spurious hard failure. See PostmarkRecipientGuard.
             _logger.LogWarning(
                 "Postmark send skipped: recipient domain is a reserved / undeliverable address. " +
-                "A live Postmark token is likely configured in a non-production environment. Subject={Subject}",
-                subject);
+                "A live Postmark token is likely configured in a non-production environment.");
             return;
         }
 
@@ -54,37 +53,22 @@ internal sealed class PostmarkEmailSender : IEmailSender
 
         if (!response.IsSuccessStatusCode)
         {
-            // Log only Postmark's own error code/message, never the full response body or the
-            // htmlBody we sent — transactional email bodies carry single-use tokens and secure
-            // action links.
-            var (errorCode, message) = await ReadPostmarkErrorAsync(response, ct);
+            // Log and throw only stable diagnostics: HTTP status, Postmark's numeric ErrorCode and a
+            // bounded failure category. Never the response body, Postmark's free-form Message (it can
+            // echo the rejected recipient address, e.g. "Inactive recipient user@example.com"), the
+            // caller-controlled subject (it can carry names or company names), the recipient, or the
+            // htmlBody (single-use tokens and secure action links).
+            var failure = await PostmarkFailure.FromResponseAsync(response, ct);
             _logger.LogWarning(
-                "Postmark email send failed. Subject={Subject} StatusCode={StatusCode} PostmarkErrorCode={PostmarkErrorCode} PostmarkMessage={PostmarkMessage}",
-                subject, (int)response.StatusCode, errorCode, message);
-            response.EnsureSuccessStatusCode();
-        }
-    }
+                "Postmark email send failed. StatusCode={StatusCode} PostmarkErrorCode={PostmarkErrorCode} FailureCategory={FailureCategory}",
+                failure.StatusCode, failure.ErrorCode, failure.Category);
 
-    private static async Task<(int? ErrorCode, string Message)> ReadPostmarkErrorAsync(
-        HttpResponseMessage response, CancellationToken ct)
-    {
-        try
-        {
-            var raw = await response.Content.ReadAsStringAsync(ct);
-            if (string.IsNullOrWhiteSpace(raw))
-                return (null, "(no response body)");
-
-            using var doc = System.Text.Json.JsonDocument.Parse(raw);
-            var root = doc.RootElement;
-            int? code = root.TryGetProperty("ErrorCode", out var c) && c.TryGetInt32(out var ci) ? ci : null;
-            var msg = root.TryGetProperty("Message", out var m) && m.ValueKind == System.Text.Json.JsonValueKind.String
-                ? SensitiveDataScrubber.ScrubText(m.GetString())
-                : "(no message)";
-            return (code, msg);
-        }
-        catch (System.Text.Json.JsonException)
-        {
-            return (null, "(unparseable response body)");
+            // A fixed-shape exception instead of EnsureSuccessStatusCode, so the exception text that
+            // EmailDeliveryJob / SendOperationalAlertEmailJob log is fully under our control (no
+            // provider-supplied reason phrase). StatusCode is preserved so callers can still tell a
+            // terminal 4xx from a retryable 5xx.
+            throw new HttpRequestException(
+                failure.ToExceptionMessage("Postmark email send"), inner: null, response.StatusCode);
         }
     }
 }

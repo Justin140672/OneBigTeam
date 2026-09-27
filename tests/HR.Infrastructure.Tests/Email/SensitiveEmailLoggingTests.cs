@@ -82,7 +82,69 @@ public class SensitiveEmailLoggingTests
         Assert.DoesNotContain(RecoveryUrlWithToken, logger.Text);
         Assert.DoesNotContain("pkce_1122334455", logger.Text);
         Assert.DoesNotContain("ada@example.com", logger.Text);
-        Assert.Contains("Reset your password", logger.Text); // subject is safe to log
+        Assert.DoesNotContain("Reset your password", logger.Text); // subject is caller-controlled — not logged
+        Assert.Contains("EMAIL (stub)", logger.Text);
+    }
+
+    [Fact]
+    public async Task LoggingEmailSender_Does_Not_Log_Subject_Containing_Personal_Data()
+    {
+        var logger = new ListLogger<LoggingEmailSender>();
+        var sender = new LoggingEmailSender(logger);
+
+        await sender.SendAsync("ada@example.com", "Payslip for Jane Doe (jane.doe@acme.co.uk)", "<p>hi</p>");
+
+        Assert.DoesNotContain("Jane Doe", logger.Text);
+        Assert.DoesNotContain("jane.doe", logger.Text);
+    }
+
+    private const string EchoingProviderBody =
+        """{"ErrorCode":406,"Message":"Inactive recipient New.Hire@Customer-Mail.co"}""";
+
+    [Fact]
+    public async Task PostmarkInvitationEmailSender_Failure_Logs_Stable_Diagnostics_Only()
+    {
+        var logger = new ListLogger<PostmarkInvitationEmailSender>();
+        var http = new HttpClient(new StubHttpMessageHandler(HttpStatusCode.UnprocessableEntity, EchoingProviderBody));
+        var sender = new PostmarkInvitationEmailSender(
+            http,
+            Options.Create(new PostmarkOptions { ServerToken = "tok", FromEmail = "no-reply@example.com", InvitationTemplateAlias = "user-invitation" }),
+            Options.Create(new EmailBrandingOptions()),
+            new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(),
+            logger);
+
+        var sent = await sender.SendAsync("new.hire@customer-mail.co", "New Hire", InviteUrlWithToken);
+
+        Assert.False(sent);
+        Assert.DoesNotContain("new.hire", logger.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Inactive recipient", logger.Text);
+        Assert.DoesNotContain("inv_9f8e7d6c5b4a3210deadbeef", logger.Text);
+        Assert.Contains("StatusCode=422", logger.Text);
+        Assert.Contains("PostmarkErrorCode=406", logger.Text);
+        Assert.Contains("FailureCategory=InactiveRecipient", logger.Text);
+    }
+
+    [Fact]
+    public async Task PostmarkPasswordResetEmailSender_Failure_Logs_Stable_Diagnostics_Only()
+    {
+        var logger = new ListLogger<PostmarkPasswordResetEmailSender>();
+        var http = new HttpClient(new StubHttpMessageHandler(HttpStatusCode.UnprocessableEntity, EchoingProviderBody));
+        var sender = new PostmarkPasswordResetEmailSender(
+            http,
+            Options.Create(new PostmarkOptions { ServerToken = "tok", FromEmail = "no-reply@example.com", PasswordResetTemplateAlias = "password-reset" }),
+            Options.Create(new EmailBrandingOptions()),
+            new Microsoft.Extensions.Configuration.ConfigurationBuilder().Build(),
+            logger);
+
+        var sent = await sender.SendAsync("new.hire@customer-mail.co", "New Hire", RecoveryUrlWithToken, "Mozilla/5.0");
+
+        Assert.False(sent);
+        Assert.DoesNotContain("new.hire", logger.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Inactive recipient", logger.Text);
+        Assert.DoesNotContain("pkce_1122334455", logger.Text);
+        Assert.Contains("StatusCode=422", logger.Text);
+        Assert.Contains("PostmarkErrorCode=406", logger.Text);
+        Assert.Contains("FailureCategory=InactiveRecipient", logger.Text);
     }
 
     [Fact]
@@ -108,8 +170,10 @@ public class SensitiveEmailLoggingTests
         Assert.DoesNotContain("eyJhbGciOiJIUzI1NiJ9", logger.Text);
         Assert.DoesNotContain("leaked_token", logger.Text);
         Assert.DoesNotContain("ada@customer-mail.co", logger.Text);
-        // still useful for diagnosis: Postmark's own error code/message survive
+        // still useful for diagnosis: Postmark's error code and a bounded category survive; the
+        // free-form message does not (it can echo the recipient address)
         Assert.Contains("406", logger.Text);
-        Assert.Contains("Inactive recipient", logger.Text);
+        Assert.Contains("InactiveRecipient", logger.Text);
+        Assert.DoesNotContain("Inactive recipient", logger.Text);
     }
 }

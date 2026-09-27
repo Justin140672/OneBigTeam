@@ -15,9 +15,12 @@ internal sealed class LoggingEmailSender(ILogger<LoggingEmailSender> logger) : I
         // Never logs the recipient email or htmlBody — transactional emails (invites, resets,
         // support links) carry single-use tokens and secure action links in their body, and the
         // recipient address is personal data that does not belong in routine operational logs.
+        // The subject is caller-controlled and can carry names or company names, so only its
+        // length is recorded.
         logger.LogInformation(
-            "EMAIL (stub) Subject={Subject}",
-            subject);
+            "EMAIL (stub) SubjectLength={SubjectLength} BodyLength={BodyLength}",
+            subject?.Length ?? 0,
+            htmlBody?.Length ?? 0);
 
         return Task.CompletedTask;
     }
