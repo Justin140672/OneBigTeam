@@ -112,7 +112,7 @@ public class CandidateDocumentStorageKeyLogSafetyTests
     {
         var companyId = Guid.NewGuid();
         var candidateId = Guid.NewGuid();
-        var sut = new LocalCandidateDocumentStorageService(new Microsoft.AspNetCore.Http.HttpContextAccessor());
+        var sut = new LocalCandidateDocumentStorageService(new Microsoft.AspNetCore.Http.HttpContextAccessor(), new HR.Infrastructure.Abstractions.LocalStorageUrlSigner(TimeProvider.System));
 
         var key = sut.GenerateStorageKey($"{companyId}/{candidateId}", "cv.pdf");
 

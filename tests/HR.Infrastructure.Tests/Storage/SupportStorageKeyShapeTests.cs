@@ -16,7 +16,7 @@ public sealed class SupportStorageKeyShapeTests
     [Fact]
     public async Task UploadAsync_Key_Is_Folder_Plus_Server_Guid_Plus_Extension_Only()
     {
-        var sut = new LocalSupportAttachmentStorageService(new HttpContextAccessor());
+        var sut = new LocalSupportAttachmentStorageService(new HttpContextAccessor(), new HR.Infrastructure.Abstractions.LocalStorageUrlSigner(TimeProvider.System));
         var companyId = Guid.NewGuid();
         var requestId = Guid.NewGuid();
         using var upload = new MemoryStream([0x25, 0x50, 0x44, 0x46]);

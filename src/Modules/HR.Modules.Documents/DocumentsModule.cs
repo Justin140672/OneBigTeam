@@ -182,6 +182,8 @@ public static class DocumentsModule
             // restart/redeploy and serves downloads through a dev-only route — only acceptable in the
             // same Development/explicit-test environments as the no-op virus scanner above.
             services.AddScoped<IDocumentStorageService, LocalDocumentStorageService>();
+            Microsoft.Extensions.DependencyInjection.Extensions.ServiceCollectionDescriptorExtensions.TryAddSingleton<ILocalStorageUrlSigner>(
+                services, _ => new LocalStorageUrlSigner(TimeProvider.System));
         }
         else
         {
@@ -190,6 +192,16 @@ public static class DocumentsModule
                 + "'Documents:Supabase:SupabaseUrl' (and ServiceRoleKey/BucketName) must be set in "
                 + "Staging/Production — the local temp-directory fallback is only permitted in "
                 + "Development or an explicit automated-test environment.");
+        }
+
+        // Dev-only local delivery route re-checks (see ILocalStorageObjectResolver). This module owns
+        // the Documents and profile-photo tables, so it is authoritative for both buckets. They are
+        // only consumed by the Development-only route in HR.Api, so they are not registered outside
+        // the Development/explicit-test environments.
+        if (isNoOpAllowedEnvironment)
+        {
+            services.AddScoped<ILocalStorageObjectResolver, DocumentsLocalStorageObjectResolver>();
+            services.AddScoped<ILocalStorageObjectResolver, ProfilePhotoLocalStorageObjectResolver>();
         }
     }
 

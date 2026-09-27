@@ -151,6 +151,7 @@ public static class InfrastructureModule
         else if (IsLocalStorageAllowedEnvironment(environment))
         {
             services.AddScoped<IProfilePhotoStorageService, LocalProfilePhotoStorageService>();
+            services.TryAddSingleton<ILocalStorageUrlSigner>(_ => new LocalStorageUrlSigner(TimeProvider.System));
         }
         else
         {
@@ -180,6 +181,7 @@ public static class InfrastructureModule
         else if (IsLocalStorageAllowedEnvironment(environment))
         {
             services.AddScoped<ISupportAttachmentStorageService, LocalSupportAttachmentStorageService>();
+            services.TryAddSingleton<ILocalStorageUrlSigner>(_ => new LocalStorageUrlSigner(TimeProvider.System));
         }
         else
         {

@@ -148,6 +148,7 @@ public static class RecruitmentModule
         else if (IsLocalStorageAllowedEnvironment(environment))
         {
             services.AddScoped<ICandidateDocumentStorageService, LocalCandidateDocumentStorageService>();
+            services.TryAddSingleton<ILocalStorageUrlSigner>(_ => new LocalStorageUrlSigner(TimeProvider.System));
         }
         else
         {
@@ -157,6 +158,12 @@ public static class RecruitmentModule
                 + "must be set in Staging/Production — the local temp-directory fallback is only "
                 + "permitted in Development or an explicit automated-test environment.");
         }
+
+        // Dev-only local delivery route re-check (see ILocalStorageObjectResolver): a candidate
+        // document key is only served while its row exists and is Clean. Only the Development-only
+        // route in HR.Api consumes it, so it is not registered outside Development/explicit tests.
+        if (IsLocalStorageAllowedEnvironment(environment))
+            services.AddScoped<ILocalStorageObjectResolver, CandidateDocumentLocalStorageObjectResolver>();
     }
 
     private static bool IsLocalStorageAllowedEnvironment(IHostEnvironment environment) =>

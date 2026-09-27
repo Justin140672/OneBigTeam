@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Recruitment.Services;
@@ -6,11 +7,12 @@ namespace HR.Modules.Recruitment.Services;
 /// Development implementation that stores files on the local file system.
 /// Replace with a cloud implementation (Azure Blob, S3, etc.) for production.
 /// </summary>
-internal sealed class LocalCandidateDocumentStorageService(IHttpContextAccessor httpContextAccessor)
+internal sealed class LocalCandidateDocumentStorageService(
+    IHttpContextAccessor httpContextAccessor,
+    ILocalStorageUrlSigner urlSigner)
     : ICandidateDocumentStorageService
 {
-    private readonly string _basePath =
-        Path.Combine(Path.GetTempPath(), "onebigteam", "recruitment", "candidate-documents");
+    private readonly string _basePath = LocalStorageBuckets.GetRootPath(LocalStorageBuckets.CandidateDocuments);
 
     // The original file name is untrusted; the physical storage key never incorporates it, so
     // it cannot be used to escape the storage root via ".." or rooted path segments.
@@ -65,8 +67,10 @@ internal sealed class LocalCandidateDocumentStorageService(IHttpContextAccessor 
             ? $"{request.Scheme}://{request.Host}"
             : "http://localhost";
 
-        var encodedKey = string.Join('/', storageKey.Split('/').Select(Uri.EscapeDataString));
-        return Task.FromResult(new Uri($"{baseUrl}/api/dev/local-storage/candidate-documents/{encodedKey}"));
+        // Only DownloadCandidateDocumentHandler reaches this (after its tenant + Clean checks). The URL
+        // is short-lived and HMAC-signed, and the route re-checks the CandidateDocument row is still
+        // present and Clean via CandidateDocumentLocalStorageObjectResolver.
+        return Task.FromResult(urlSigner.CreateSignedUrl(baseUrl, LocalStorageBuckets.CandidateDocuments, storageKey));
     }
 
     public Task DeleteAsync(

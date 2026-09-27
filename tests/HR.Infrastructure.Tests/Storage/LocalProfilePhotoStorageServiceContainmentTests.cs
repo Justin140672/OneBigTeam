@@ -12,7 +12,7 @@ namespace HR.Infrastructure.Tests.Storage;
 public sealed class LocalProfilePhotoStorageServiceContainmentTests
 {
     private static LocalProfilePhotoStorageService CreateSut() =>
-        new(new HttpContextAccessor(), new ServiceCollection().BuildServiceProvider());
+        new(new HttpContextAccessor(), new ServiceCollection().BuildServiceProvider(), new HR.Infrastructure.Abstractions.LocalStorageUrlSigner(TimeProvider.System));
 
     [Fact]
     public async Task UploadAsync_NeverIncludesOriginalFileNameInStorageKey()

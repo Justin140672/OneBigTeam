@@ -8,11 +8,12 @@ namespace HR.Infrastructure.Storage;
 /// system. Replace with a cloud implementation (Supabase Storage) for production — see
 /// <see cref="SupabaseSupportAttachmentStorageService"/>.
 /// </summary>
-internal sealed class LocalSupportAttachmentStorageService(IHttpContextAccessor httpContextAccessor)
+internal sealed class LocalSupportAttachmentStorageService(
+    IHttpContextAccessor httpContextAccessor,
+    ILocalStorageUrlSigner urlSigner)
     : ISupportAttachmentStorageService
 {
-    private readonly string _basePath =
-        Path.Combine(Path.GetTempPath(), "onebigteam", "support-attachments");
+    private readonly string _basePath = LocalStorageBuckets.GetRootPath(LocalStorageBuckets.SupportAttachments);
 
     public async Task<string> UploadAsync(
         Stream content,
@@ -46,8 +47,10 @@ internal sealed class LocalSupportAttachmentStorageService(IHttpContextAccessor 
             ? $"{request.Scheme}://{request.Host}"
             : "http://localhost";
 
-        var encodedKey = string.Join('/', storageKey.Split('/').Select(Uri.EscapeDataString));
-        return Task.FromResult(new Uri($"{baseUrl}/api/dev/local-storage/support-attachments/{encodedKey}"));
+        // Signed like every other local bucket, but no ILocalStorageObjectResolver is registered for
+        // support attachments (nothing downloads them yet), so the dev delivery route refuses these
+        // URLs: fail closed until an authorised download flow and its resolver exist.
+        return Task.FromResult(urlSigner.CreateSignedUrl(baseUrl, LocalStorageBuckets.SupportAttachments, storageKey));
     }
 
     public Task DeleteAsync(

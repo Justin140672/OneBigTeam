@@ -12,11 +12,11 @@ namespace HR.Infrastructure.Storage;
 /// </summary>
 internal sealed class LocalProfilePhotoStorageService(
     IHttpContextAccessor httpContextAccessor,
-    IServiceProvider serviceProvider)
-    : IProfilePhotoStorageService
+    IServiceProvider serviceProvider,
+    ILocalStorageUrlSigner urlSigner)
+    : IProfilePhotoStorageService, ILocalStorageFileReader
 {
-    private readonly string _basePath =
-        Path.Combine(Path.GetTempPath(), "onebigteam", "profile-photos");
+    private readonly string _basePath = LocalStorageBuckets.GetRootPath(LocalStorageBuckets.ProfilePhotos);
 
     public async Task<string> UploadAsync(
         Stream content,
@@ -44,6 +44,11 @@ internal sealed class LocalProfilePhotoStorageService(
     // A raw file:// path here is not loadable by a browser <img> tag (or a redirect-based
     // download endpoint) once served from an http(s):// page — route through the dev-only
     // streaming endpoint in Program.cs instead, which serves the same local file over HTTP.
+    // The URL is short-lived and HMAC-signed (ILocalStorageUrlSigner), and the route re-checks the
+    // photo record is still present and Clean (the Documents module's profile-photo resolver); this
+    // method is only reached after the calling handler has authorised the caller and checked Clean.
+    // (ScanUploadedFileJob reads via ILocalStorageFileReader instead, because the route refuses
+    // files that are not yet Clean.)
     //
     // Called from two very different contexts: (1) inline during a request, where
     // IHttpContextAccessor.HttpContext gives us the real scheme/host the browser is using, and
@@ -64,8 +69,13 @@ internal sealed class LocalProfilePhotoStorageService(
             ? $"{request.Scheme}://{request.Host}"
             : GetServerBaseUrl();
 
-        var encodedKey = string.Join('/', storageKey.Split('/').Select(Uri.EscapeDataString));
-        return Task.FromResult(new Uri($"{baseUrl}/api/dev/local-storage/profile-photos/{encodedKey}"));
+        return Task.FromResult(urlSigner.CreateSignedUrl(baseUrl, LocalStorageBuckets.ProfilePhotos, storageKey));
+    }
+
+    public Task<Stream?> OpenLocalReadStreamAsync(string storageKey, CancellationToken cancellationToken)
+    {
+        var fullPath = ToFullPath(storageKey);
+        return Task.FromResult<Stream?>(File.Exists(fullPath) ? File.OpenRead(fullPath) : null);
     }
 
     // Resolved lazily via IServiceProvider (rather than taking IServer as a constructor

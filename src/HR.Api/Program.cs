@@ -471,57 +471,10 @@ if (app.Environment.IsDevelopment())
 		});
 	}).AllowAnonymous();
 
-	// Every Local*StorageService (used whenever the corresponding Supabase config section is
-	// absent — the default in this dev environment) writes under one of these folders and used
-	// to hand back a raw file:// path, which a browser refuses to load in an <img> tag or follow
-	// via a redirect-based download endpoint. This streams the same local files back over HTTP
-	// instead. "bucket" identifies which Local*StorageService's root to serve from.
-	var localStorageBuckets = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-	{
-		["profile-photos"]      = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "onebigteam", "profile-photos")),
-		["documents"]            = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "onebigteam", "documents")),
-		["candidate-documents"] = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "onebigteam", "recruitment", "candidate-documents")),
-		["support-attachments"] = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "onebigteam", "support-attachments")),
-	};
-	var contentTypeProvider = new Microsoft.AspNetCore.StaticFiles.FileExtensionContentTypeProvider();
-
-	app.MapGet("/api/dev/local-storage/{bucket}/{*key}", (string bucket, string key) =>
-	{
-		if (!localStorageBuckets.TryGetValue(bucket, out var basePath))
-			return Results.NotFound();
-
-		var segments = key.Split('/').Select(Uri.UnescapeDataString).ToArray();
-		foreach (var segment in segments)
-		{
-			if (segment.Length == 0 || segment is "." or ".." || segment.Contains(':'))
-				return Results.NotFound();
-		}
-
-		if (Path.IsPathRooted(key))
-			return Results.NotFound();
-
-		var relativePath = string.Join(Path.DirectorySeparatorChar, segments);
-		var fullPath = Path.GetFullPath(Path.Combine(basePath, relativePath));
-
-		var basePathWithSeparator = basePath.EndsWith(Path.DirectorySeparatorChar)
-			? basePath
-			: basePath + Path.DirectorySeparatorChar;
-
-		// Guard against the resolved path escaping the storage root (path traversal via "..").
-		// Ordinal (not OrdinalIgnoreCase): on a case-sensitive filesystem (Linux) a
-		// case-insensitive prefix check would let a differently-cased sibling directory pass as
-		// "contained" even though it resolves elsewhere.
-		if (!fullPath.StartsWith(basePathWithSeparator, StringComparison.Ordinal)
-			|| !File.Exists(fullPath))
-		{
-			return Results.NotFound();
-		}
-
-		if (!contentTypeProvider.TryGetContentType(fullPath, out var contentType))
-			contentType = "application/octet-stream";
-
-		return Results.File(fullPath, contentType);
-	}).AllowAnonymous();
+	// Dev-only delivery for the Local*StorageService temp-directory fallbacks. Serves a file only for a
+	// short-lived HMAC-signed URL minted after the normal authorised download handler ran, and only
+	// while the owning module re-confirms the record is live and Clean. See DevLocalStorageDeliveryEndpoint.
+	app.MapDevLocalStorageDelivery();
 }
 
 app.UseHangfireBackgroundJobs();

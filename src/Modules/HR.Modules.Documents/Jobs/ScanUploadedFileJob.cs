@@ -74,6 +74,16 @@ internal sealed class ScanUploadedFileJob(
             {
                 scanResult = await virusScanner.ScanAsync(System.IO.Stream.Null, target.FileName, CancellationToken.None);
             }
+            else if (GetStorage(targetType) is ILocalStorageFileReader localReader)
+            {
+                // Development/test local storage only: the dev delivery route refuses anything that
+                // is not yet Clean (which a file being scanned never is), so read it from disk
+                // directly. Production (Supabase) storage never implements ILocalStorageFileReader,
+                // so it keeps the signed-URL download below unchanged.
+                await using var content = await localReader.OpenLocalReadStreamAsync(target.StorageKey, CancellationToken.None)
+                    ?? throw new FileNotFoundException("The uploaded file to scan was not found in local storage.");
+                scanResult = await virusScanner.ScanAsync(content, target.FileName, CancellationToken.None);
+            }
             else
             {
                 var httpClient = httpClientFactory.CreateClient();
@@ -186,6 +196,11 @@ internal sealed class ScanUploadedFileJob(
         var entity = await set.FindAsync([id], cancellationToken);
         return entity as IScannableFile;
     }
+
+    private object GetStorage(FileScanTargetType targetType) =>
+        targetType is FileScanTargetType.EmployeeProfilePhoto or FileScanTargetType.PendingProfilePhoto
+            ? profilePhotoStorage
+            : documentStorage;
 
     private Task<Uri> GetDownloadUrlAsync(FileScanTargetType targetType, string storageKey, CancellationToken ct) =>
         targetType is FileScanTargetType.EmployeeProfilePhoto or FileScanTargetType.PendingProfilePhoto

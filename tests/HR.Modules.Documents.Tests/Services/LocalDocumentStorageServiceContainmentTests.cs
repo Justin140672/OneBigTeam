@@ -10,7 +10,7 @@ namespace HR.Modules.Documents.Tests.Services;
 /// </summary>
 public sealed class LocalDocumentStorageServiceContainmentTests
 {
-    private static LocalDocumentStorageService CreateSut() => new(new HttpContextAccessor());
+    private static LocalDocumentStorageService CreateSut() => new(new HttpContextAccessor(), new HR.Infrastructure.Abstractions.LocalStorageUrlSigner(TimeProvider.System));
 
     [Fact]
     public async Task UploadAsync_NeverIncludesOriginalFileNameInStorageKey()

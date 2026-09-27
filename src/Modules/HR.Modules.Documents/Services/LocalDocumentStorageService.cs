@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Documents.Services;
@@ -6,11 +7,12 @@ namespace HR.Modules.Documents.Services;
 /// Development implementation that stores files on the local file system.
 /// Replace with a cloud implementation (Azure Blob, S3, etc.) for production.
 /// </summary>
-internal sealed class LocalDocumentStorageService(IHttpContextAccessor httpContextAccessor)
-    : IDocumentStorageService
+internal sealed class LocalDocumentStorageService(
+    IHttpContextAccessor httpContextAccessor,
+    ILocalStorageUrlSigner urlSigner)
+    : IDocumentStorageService, ILocalStorageFileReader
 {
-    private readonly string _basePath =
-        Path.Combine(Path.GetTempPath(), "onebigteam", "documents");
+    private readonly string _basePath = LocalStorageBuckets.GetRootPath(LocalStorageBuckets.Documents);
 
     public async Task<string> UploadAsync(
         Stream content,
@@ -48,9 +50,13 @@ internal sealed class LocalDocumentStorageService(IHttpContextAccessor httpConte
             ? $"{request.Scheme}://{request.Host}"
             : "http://localhost";
 
-        var encodedKey = string.Join('/', storageKey.Split('/').Select(Uri.EscapeDataString));
-        return Task.FromResult(new Uri($"{baseUrl}/api/dev/local-storage/documents/{encodedKey}"));
+        // Short-lived HMAC-signed URL; the route re-checks the record is live and Clean via
+        // DocumentsLocalStorageObjectResolver. Only authorised download handlers reach this method.
+        return Task.FromResult(urlSigner.CreateSignedUrl(baseUrl, LocalStorageBuckets.Documents, storageKey));
     }
+
+    Task<Stream?> ILocalStorageFileReader.OpenLocalReadStreamAsync(string storageKey, CancellationToken cancellationToken) =>
+        OpenReadStreamAsync(storageKey, cancellationToken);
 
     public Task<Stream?> OpenReadStreamAsync(
         string storageKey,

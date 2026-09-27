@@ -5,7 +5,7 @@ namespace HR.Modules.Documents.Tests.Services;
 
 public sealed class LocalDocumentStorageServiceTests
 {
-    private static LocalDocumentStorageService CreateSut() => new(new HttpContextAccessor());
+    private static LocalDocumentStorageService CreateSut() => new(new HttpContextAccessor(), new HR.Infrastructure.Abstractions.LocalStorageUrlSigner(TimeProvider.System));
 
     [Fact]
     public async Task OpenReadStreamAsync_ReturnsBytes_ForAnUploadedFile()
