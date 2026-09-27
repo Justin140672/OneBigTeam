@@ -1433,11 +1433,37 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     /// <summary>Retypes the "Offered Salary" numeric field — SfNumericTextBox needs a real click/select-all/type/Tab, a bare Fill bypasses its interop.</summary>
     public async Task SetOfferedSalaryAsync(string value)
     {
-        await OfferSalaryInput.ClickAsync();
-        await page.Keyboard.PressAsync("Control+A");
-        await page.Keyboard.PressAsync("Delete");
-        await OfferSalaryInput.PressSequentiallyAsync(value);
-        await page.Keyboard.PressAsync("Tab");
+        // The field is pre-populated as currency text ("£50,000", Format="c0"). A single
+        // Ctrl+A/Delete/type/Tab was fire-and-forget: when the clear hadn't fully landed before
+        // typing (same corruption documented on EmployeeEditPage.TypeIntoNumericInputAsync), the
+        // result was unparseable, SfNumericTextBox committed NULL, and OfferCandidateHandler then
+        // fell back to the profile's SalaryMin (request.OfferedSalary ?? SalaryMin) — the offer was
+        // saved at £50,000 instead of the typed value. Clear, confirm it's empty, type, blur, and
+        // confirm the committed (reformatted) value is exactly the one typed; retry the entry if not.
+        var expectedDigits = new string(value.Where(char.IsDigit).ToArray());
+        await Assertions.Expect(OfferSalaryInput).ToBeEnabledAsync(new() { Timeout = 30_000 });
+
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            await OfferSalaryInput.ClickAsync();
+            await page.Keyboard.PressAsync("Control+A");
+            await page.Keyboard.PressAsync("Delete");
+            await Assertions.Expect(OfferSalaryInput).ToHaveValueAsync("", new() { Timeout = 5_000 });
+
+            await OfferSalaryInput.PressSequentiallyAsync(value, new() { Delay = 30 });
+            await page.Keyboard.PressAsync("Tab");
+
+            // After blur Syncfusion re-formats its committed value (e.g. "£65,000"); an unparsed
+            // entry instead leaves the field empty/unchanged.
+            var committed = await OfferSalaryInput.InputValueAsync();
+            if (new string(committed.Where(char.IsDigit).ToArray()) == expectedDigits)
+                return;
+
+            await page.WaitForTimeoutAsync(250);
+        }
+
+        throw new PlaywrightException(
+            $"Offered Salary did not commit '{value}' after 3 attempts (field shows '{await OfferSalaryInput.InputValueAsync()}').");
     }
 
     public Task SelectOfferSalaryFrequencyAsync(string frequency) =>
@@ -1659,4 +1685,63 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public Task ExpectApplicationsEmptyAsync(string expectedText) =>
         Assertions.Expect(ApplicationsTab.Locator("[data-testid='applications-empty']"))
             .ToContainTextAsync(expectedText, new() { Timeout = 30_000 });
+
+    // ── Internal recruitment Ticket 7: Appoint (internal) vs Hire (external) ──────
+    // Toolbar items "app-appoint" ("Appoint") and "app-hire" ("Hire"). Enabled state is read from
+    // Syncfusion's own "e-overlay" class on the .e-toolbar-item (the same signal
+    // IsRecordOfferResponseToolbarItemEnabledAsync uses) — never from a Blazor bool-bound aria
+    // attribute. Items are matched by their exact text so "Hire"/"Appoint" can't collide with any
+    // other item.
+
+    private ILocator ApplicationsToolbarItem(string itemText) =>
+        ApplicationsTab.Locator(".e-toolbar-item")
+            .Filter(new() { HasTextRegex = new Regex($"^\\s*{Regex.Escape(itemText)}\\s*$") });
+
+    private static readonly Regex ToolbarItemDisabledClass = new(@"(^|\s)e-overlay(\s|$)");
+
+    /// <summary>
+    /// Selects the row matching <paramref name="candidateNameFragment"/> (server-confirmed, see
+    /// SelectApplicationRowAsync) and waits for the toolbar item <paramref name="itemText"/> to be
+    /// enabled for it.
+    /// </summary>
+    public async Task ExpectToolbarItemEnabledForRowAsync(string candidateNameFragment, string itemText)
+    {
+        await SelectApplicationRowAsync(candidateNameFragment);
+        await ApplicationsToolbarButtonAsync(itemText, exact: true, reselectCandidateNameFragment: candidateNameFragment);
+        await Assertions.Expect(ApplicationsToolbarItem(itemText))
+            .Not.ToHaveClassAsync(ToolbarItemDisabledClass, new() { Timeout = 15_000 });
+    }
+
+    /// <summary>Waits for the toolbar item <paramref name="itemText"/> to be disabled for the currently selected row.</summary>
+    public Task ExpectToolbarItemDisabledAsync(string itemText) =>
+        Assertions.Expect(ApplicationsToolbarItem(itemText))
+            .ToHaveClassAsync(ToolbarItemDisabledClass, new() { Timeout = 15_000 });
+
+    /// <summary>Waits for a toolbar element carrying the given tooltip (title) text to exist.</summary>
+    public Task ExpectToolbarTooltipAsync(string tooltipText) =>
+        Assertions.Expect(ApplicationsTab.Locator($".e-toolbar [title='{tooltipText}']").First)
+            .ToBeAttachedAsync(new() { Timeout = 15_000 });
+
+    /// <summary>Selects the application row and clicks the toolbar's "Appoint" item (opens the Complete internal appointment dialog).</summary>
+    public async Task ClickAppointForAsync(string candidateNameFragment)
+    {
+        await SelectApplicationRowAsync(candidateNameFragment);
+        await (await ApplicationsToolbarButtonAsync("Appoint", exact: true, reselectCandidateNameFragment: candidateNameFragment)).ClickAsync();
+    }
+
+    /// <summary>
+    /// Asserts the row with this id shows (or doesn't show) the "Appointment in progress" hint
+    /// (data-testid="appointment-pending-hint"). The row is awaited visible first so the "absent"
+    /// case can't be satisfied by a row that simply hasn't rendered yet.
+    /// </summary>
+    public async Task ExpectAppointmentPendingHintAsync(Guid applicationId, bool visible)
+    {
+        var row = ApplicationRowById(applicationId);
+        await Assertions.Expect(row).ToBeVisibleAsync(new() { Timeout = 30_000 });
+        var hint = row.Locator("[data-testid='appointment-pending-hint']");
+        if (visible)
+            await Assertions.Expect(hint).ToBeVisibleAsync(new() { Timeout = 15_000 });
+        else
+            await Assertions.Expect(hint).ToHaveCountAsync(0, new() { Timeout = 15_000 });
+    }
 }

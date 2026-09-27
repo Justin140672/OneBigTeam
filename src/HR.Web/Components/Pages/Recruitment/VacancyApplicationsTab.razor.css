@@ -32,3 +32,11 @@
     align-items: center;
     gap: 0.375rem;
 }
+
+/* Internal recruitment Ticket 7: "Internal appointment completed" banner with the profile link. */
+.appoint-success {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}

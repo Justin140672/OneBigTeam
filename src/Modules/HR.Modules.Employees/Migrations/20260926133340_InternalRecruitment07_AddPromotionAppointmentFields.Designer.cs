@@ -749,6 +749,7 @@ namespace HR.Modules.Employees.Migrations
                         .HasColumnName("compensation_id");
 
                     b.Property<DateTimeOffset?>("CompletedAt")
+                        .IsConcurrencyToken()
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("completed_at");
 

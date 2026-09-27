@@ -172,7 +172,10 @@ internal sealed record ApplicationCvSnapshot(
     Guid? CvDocumentId,
     string? CvFileName,
     Guid? CurrentCandidateCvDocumentId,
-    string? CurrentCandidateCvFileName);
+    string? CurrentCandidateCvFileName,
+    // Internal recruitment Ticket 8 (journey/security tests): stage + internal flag from the same GET.
+    string? CurrentStageName = null,
+    bool IsInternal = false);
 
 internal sealed record VacancyApplicationListSnapshot(IReadOnlyList<VacancyApplicationSnapshot> Items);
 

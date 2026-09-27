@@ -12,6 +12,7 @@
 @inject RecruitmentStageService RecruitmentStageService
 @inject PositionProfileService PositionProfileService
 @inject CompanyService CompanyService
+@inject DepartmentService DepartmentService
 @inject IJSRuntime JS
 
 <div data-testid="vacancy-applications-tab">
@@ -33,6 +34,18 @@
     @if (!string.IsNullOrEmpty(_actionSuccess))
     {
         <div class="alert alert-success">@_actionSuccess</div>
+    }
+    @if (_appointSuccess is not null)
+    {
+        @* Internal recruitment Ticket 7: an internal appointment updates the EXISTING employee record,
+           so link to that profile rather than reporting a new employee id. *@
+        <div class="alert alert-success alert-dismissible appoint-success" data-testid="appoint-success">
+            <span>
+                Internal appointment completed@(_appointSuccess.IsApplied ? "" : $" — the change takes effect on {FormatUkDate(_appointSuccess.EffectiveDate)}").
+            </span>
+            <a href="/companies/@CompanyId/employees/@_appointSuccess.EmployeeId" data-testid="appoint-employee-link">View employee profile</a>
+            <button type="button" class="btn-close" aria-label="Dismiss" @onclick="() => _appointSuccess = null"></button>
+        </div>
     }
 
     @* Internal recruitment Ticket 6: server-side Internal/External filter. Explicit "All" item rather
@@ -106,6 +119,14 @@
                         {
                             <span class="ms-1" data-testid="offer-response-badge">
                                 <StatusBadge Variant="@OfferResponseVariant(row.OfferResponseStatus)">Offer: @OfferResponseLabel(row.OfferResponseStatus)</StatusBadge>
+                            </span>
+                        }
+                        @if (row.IsInternal && row.InternalAppointmentStatus == "Pending")
+                        {
+                            @* Internal recruitment Ticket 7: an earlier Appoint didn't finish; Appoint stays
+                               enabled so a retry can complete it. *@
+                            <span class="ms-1" data-testid="appointment-pending-hint">
+                                <StatusBadge Variant="StatusBadgeVariant.Warning">Appointment in progress</StatusBadge>
                             </span>
                         }
                     </Template>
@@ -566,6 +587,131 @@
     </DialogButtons>
 </SfDialog>
 
+@* Internal recruitment Ticket 7: an INTERNAL application is completed by appointing the existing
+   employee (the backend rejects Hire for internal applications). Position profile, department and
+   location are derived server-side from the vacancy and only shown here for confirmation. *@
+<SfDialog Width="560px" IsModal="true" @bind-Visible="_showAppointDialog" Header="Complete internal appointment" CssClass="appoint-candidate-dialog">
+    <DialogTemplates>
+        <Content>
+            <div data-testid="appoint-candidate-dialog">
+                <EditForm EditContext="_appointEditContext">
+                    <DataAnnotationsValidator />
+                    <div class="alert alert-info py-2" data-testid="appoint-existing-employee-notice">
+                        @_appointCandidateName is an existing employee. Their existing employee record will be updated — no new employee will be created. Employee number, start date, continuous service and system access stay the same.
+                    </div>
+                    @if (_appointPending)
+                    {
+                        <div class="alert alert-warning py-2" data-testid="appoint-pending-notice">
+                            Appointment in progress — a previous attempt did not finish. Appointing again will complete it.
+                        </div>
+                    }
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Position Profile</label>
+                            <div class="p-2 rounded border bg-light" data-testid="appoint-derived-position-profile">@_derivedPositionProfileName</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Department</label>
+                            <div class="p-2 rounded border bg-light" data-testid="appoint-derived-department">@_derivedDepartmentName</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Location</label>
+                            <div class="p-2 rounded border bg-light" data-testid="appoint-derived-location">@_derivedLocationName</div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-text mt-0">Derived from the vacancy's position profile — the employee is moved to this profile, department and location.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Effective Date <span class="text-danger">*</span></label>
+                            <SfDatePicker TValue="DateOnly?" @bind-Value="_appointModel.EffectiveDate" Format="dd/MM/yyyy" data-testid="appoint-effective-date" />
+                            <ValidationMessage For="@(() => _appointModel.EffectiveDate)" />
+                            @if (_appointModel.IsFutureDated)
+                            {
+                                <div class="form-text" data-testid="appoint-future-date-hint">The change will be applied automatically on this date.</div>
+                            }
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Manager <span class="text-danger">*</span></label>
+                            <SfDropDownList @ref="_appointManagerDropdown"
+                                            TValue="Guid?"
+                                            TItem="ManagerOption"
+                                            DataSource="@_appointManagerOptions"
+                                            @bind-Value="_appointModel.ManagerId"
+                                            Placeholder="Select a manager"
+                                            AllowFiltering="true"
+                                            data-testid="appoint-manager">
+                                <DropDownListFieldSettings Value="Id" Text="Name" />
+                                <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnAppointManagerFilteringAsync" />
+                            </SfDropDownList>
+                            <ValidationMessage For="@(() => _appointModel.ManagerId)" />
+                        </div>
+                        @if (_appointModel.IsBackdated)
+                        {
+                            <div class="col-12" data-testid="appoint-confirm-backdated">
+                                <SfCheckBox TChecked="bool" @bind-Checked="_appointModel.ConfirmBackdated"
+                                            Label="I confirm this backdated appointment should apply immediately" />
+                                <ValidationMessage For="@(() => _appointModel.ConfirmBackdated)" />
+                            </div>
+                        }
+                        <div class="col-12" data-testid="appoint-change-compensation">
+                            <SfCheckBox TChecked="bool" @bind-Checked="_appointModel.ChangeCompensation" Label="Change compensation" />
+                        </div>
+                        @if (_appointModel.ChangeCompensation)
+                        {
+                            <div class="col-md-4">
+                                <label class="form-label">Salary Type <span class="text-danger">*</span></label>
+                                <SfDropDownList TValue="string" TItem="string" DataSource="@_appointSalaryTypeOptions"
+                                                @bind-Value="_appointModel.SalaryType" data-testid="appoint-salary-type" />
+                                <ValidationMessage For="@(() => _appointModel.SalaryType)" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Salary <span class="text-danger">*</span></label>
+                                <SfNumericTextBox TValue="decimal?" @bind-Value="_appointModel.Salary" Format="n2" Min="0" ShowSpinButton="false" data-testid="appoint-salary" />
+                                <ValidationMessage For="@(() => _appointModel.Salary)" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Currency <span class="text-danger">*</span></label>
+                                <HrTextBox @bind-Value="_appointModel.Currency" Placeholder="e.g. GBP" data-testid="appoint-currency" />
+                                <ValidationMessage For="@(() => _appointModel.Currency)" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Hours per Week</label>
+                                <SfNumericTextBox TValue="decimal?" @bind-Value="_appointModel.HoursPerWeek" Format="n2" Min="0" ShowSpinButton="false" data-testid="appoint-hours-per-week" />
+                                <ValidationMessage For="@(() => _appointModel.HoursPerWeek)" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">FTE</label>
+                                <SfNumericTextBox TValue="decimal?" @bind-Value="_appointModel.Fte" Format="n2" Min="0" Max="1" Step="0.1m" ShowSpinButton="false" data-testid="appoint-fte" />
+                                <ValidationMessage For="@(() => _appointModel.Fte)" />
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Compensation Notes</label>
+                                <HrTextBox @bind-Value="_appointModel.CompensationNotes" Multiline="true" Rows="2" data-testid="appoint-compensation-notes" />
+                                <ValidationMessage For="@(() => _appointModel.CompensationNotes)" />
+                            </div>
+                        }
+                    </div>
+                    @if (_dialogError is not null)
+                    {
+                        <div class="alert alert-danger py-2 mt-3" role="alert" data-testid="appoint-error">@_dialogError</div>
+                    }
+                </EditForm>
+            </div>
+        </Content>
+        <FooterTemplate>
+            @* Disabled while in flight so a double click can't submit twice. *@
+            <SfButton IsPrimary="true" Disabled="_appointing" OnClick="ConfirmAppointAsync" data-testid="appoint-confirm">
+                @if (_appointing)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Appoint
+            </SfButton>
+            <SfButton Disabled="_appointing" OnClick="() => _showAppointDialog = false" data-testid="appoint-cancel">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
 <SfDialog Width="520px" IsModal="true" @bind-Visible="_showOfferDialog" Header="Make an Offer" CssClass="offer-candidate-dialog">
     <DialogTemplates>
         <Content>
@@ -742,6 +888,7 @@
         _scheduleEditContext = new EditContext(_scheduleModel);
         _addEditContext = new EditContext(_addModel);
         _hireEditContext = new EditContext(_hireModel);
+        _appointEditContext = new EditContext(_appointModel);
         _offerEditContext = new EditContext(_offerModel);
         _offerResponseEditContext = new EditContext(_offerResponseModel);
     }
@@ -1008,6 +1155,79 @@
                 yield return new ValidationResult(
                     "Please select a start date.",
                     [nameof(StartDate)]);
+        }
+    }
+
+    // ── Internal recruitment Ticket 7: Appoint internal candidate ─────────────
+    private bool _showAppointDialog;
+    private bool _appointing;
+    private bool _appointPending;
+    private string _appointCandidateName = string.Empty;
+    private string _derivedDepartmentName = string.Empty;
+    private readonly AppointFormModel _appointModel = new();
+    private EditContext _appointEditContext = default!;
+    private SfDropDownList<Guid?, ManagerOption> _appointManagerDropdown = default!;
+    private List<ManagerOption> _appointManagerOptions = [];
+    // The appointee — excluded from their own manager options (the server rejects self-management).
+    private Guid? _appointEmployeeId;
+    private AppointSuccessInfo? _appointSuccess;
+    private static readonly string[] _appointSalaryTypeOptions = ["Annual", "Hourly", "Daily"];
+
+    // Guid.Empty is the explicit "No manager" item (mapped to NoManager=true); null = nothing chosen yet.
+    private static readonly ManagerOption NoManagerOption = new(Guid.Empty, "No manager");
+
+    private sealed record AppointSuccessInfo(Guid EmployeeId, bool IsApplied, DateOnly EffectiveDate);
+
+    private static string FormatUkDate(DateOnly date) =>
+        date.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
+
+    public sealed class AppointFormModel : IValidatableObject
+    {
+        [Required(ErrorMessage = "Please select an effective date.")]
+        public DateOnly? EffectiveDate { get; set; }
+
+        public bool ConfirmBackdated { get; set; }
+
+        // Guid.Empty = "No manager"; null = not yet selected (required).
+        [Required(ErrorMessage = "Please select a manager, or choose \"No manager\".")]
+        public Guid? ManagerId { get; set; }
+
+        public bool ChangeCompensation { get; set; }
+        public string? SalaryType { get; set; } = "Annual";
+        public decimal? Salary { get; set; }
+        public string? Currency { get; set; } = "GBP";
+        public decimal? HoursPerWeek { get; set; }
+        public decimal? Fte { get; set; }
+        [MaxLength(4000, ErrorMessage = "Compensation notes cannot exceed 4000 characters.")]
+        public string? CompensationNotes { get; set; }
+
+        public bool IsBackdated => EffectiveDate is { } d && d < DateOnly.FromDateTime(DateTime.Today);
+        public bool IsFutureDated => EffectiveDate is { } d && d > DateOnly.FromDateTime(DateTime.Today);
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (IsBackdated && !ConfirmBackdated)
+                yield return new ValidationResult(
+                    "The effective date is in the past — confirm the backdated appointment to continue.",
+                    [nameof(ConfirmBackdated)]);
+
+            if (!ChangeCompensation)
+                yield break;
+
+            if (SalaryType is not ("Annual" or "Hourly" or "Daily"))
+                yield return new ValidationResult("Please select a salary type.", [nameof(SalaryType)]);
+
+            if (Salary is null or <= 0)
+                yield return new ValidationResult("Please enter a salary greater than zero.", [nameof(Salary)]);
+
+            if (string.IsNullOrWhiteSpace(Currency) || Currency.Trim().Length != 3)
+                yield return new ValidationResult("Please enter a 3-letter currency code, e.g. GBP.", [nameof(Currency)]);
+
+            if (HoursPerWeek is <= 0)
+                yield return new ValidationResult("Hours per week must be greater than zero.", [nameof(HoursPerWeek)]);
+
+            if (Fte is < 0 or > 1)
+                yield return new ValidationResult("FTE must be between 0 and 1.", [nameof(Fte)]);
         }
     }
 
@@ -1604,6 +1824,143 @@
         _showHireDialog = true;
     }
 
+    // Internal recruitment Ticket 7: internal applications are completed by appointing the existing
+    // employee. Mirrors OpenHireDialog's vacancy-derived display fields and manager option source.
+    private async Task OpenAppointDialog(ApplicationListItemModel row)
+    {
+        _dialogError = null;
+        _appointing = false;
+        _activeApplication = row;
+        _appointEmployeeId = row.EmployeeId;
+        _appointPending = row.InternalAppointmentStatus == "Pending";
+        _appointCandidateName = $"{row.CandidateFirstName} {row.CandidateLastName}".Trim();
+
+        _appointModel.EffectiveDate = row.OfferedStartDate ?? DateOnly.FromDateTime(DateTime.Today);
+        _appointModel.ConfirmBackdated = false;
+        _appointModel.ManagerId = null;
+        _appointModel.ChangeCompensation = false;
+        _appointModel.SalaryType = "Annual";
+        _appointModel.Salary = row.OfferedSalary;
+        _appointModel.Currency = "GBP";
+        _appointModel.HoursPerWeek = null;
+        _appointModel.Fte = null;
+        _appointModel.CompensationNotes = null;
+        _appointEditContext = new EditContext(_appointModel);
+
+        _derivedPositionProfileName = string.Empty;
+        _derivedDepartmentName = string.Empty;
+        _derivedLocationName = string.Empty;
+
+        var vacancyTask = VacancyService.GetVacancyAsync(CompanyId, VacancyId);
+        var managerTask = EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
+        await Task.WhenAll(vacancyTask, managerTask);
+
+        var vacancy = await vacancyTask;
+        _derivedPositionProfileName = vacancy?.PositionProfileTitle ?? vacancy?.EffectiveTitle ?? "(unknown)";
+        _derivedLocationName = vacancy?.EffectiveLocation ?? "(none set)";
+        _derivedDepartmentName = "(none set)";
+        if (vacancy?.PositionProfileDepartmentId is Guid departmentId)
+        {
+            var department = await DepartmentService.GetDepartmentAsync(CompanyId, departmentId);
+            _derivedDepartmentName = department?.Name ?? "(unknown)";
+        }
+
+        _appointManagerOptions = BuildAppointManagerOptions((await managerTask)?.Items);
+
+        // Prefill with the vacancy's hiring manager when they're a valid choice (not the appointee,
+        // and an active employee); otherwise default to the explicit "No manager" item.
+        _appointModel.ManagerId = NoManagerOption.Id;
+        if (vacancy is not null && vacancy.HiringManagerId != Guid.Empty && vacancy.HiringManagerId != _appointEmployeeId)
+        {
+            if (_appointManagerOptions.Any(o => o.Id == vacancy.HiringManagerId))
+            {
+                _appointModel.ManagerId = vacancy.HiringManagerId;
+            }
+            else
+            {
+                // Outside the first page of selectable employees — resolve the name so it can be shown.
+                var hiringManager = await EmployeeService.GetEmployeeAsync(CompanyId, vacancy.HiringManagerId);
+                if (hiringManager is not null && hiringManager.Status != "Draft" && hiringManager.Status != "FormerEmployee")
+                {
+                    _appointManagerOptions.Insert(1, new ManagerOption(hiringManager.Id, $"{hiringManager.FirstName} {hiringManager.LastName}"));
+                    _appointModel.ManagerId = hiringManager.Id;
+                }
+            }
+        }
+
+        _showAppointDialog = true;
+    }
+
+    private List<ManagerOption> BuildAppointManagerOptions(IEnumerable<EmployeeListItemModel>? employees) =>
+        (employees ?? [])
+            .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")
+            .Where(e => e.Id != _appointEmployeeId)
+            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .OrderBy(e => e.Name)
+            .Prepend(NoManagerOption)
+            .ToList();
+
+    private async Task OnAppointManagerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
+    {
+        args.PreventDefaultAction = true;
+        var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        _appointManagerOptions = BuildAppointManagerOptions(result?.Items);
+        await _appointManagerDropdown.FilterAsync(_appointManagerOptions, new Query());
+    }
+
+    private async Task ConfirmAppointAsync()
+    {
+        if (_activeApplication is null || _appointing)
+            return;
+
+        _dialogError = null;
+        if (!_appointEditContext.Validate())
+        {
+            _dialogError = _appointEditContext.GetValidationMessages().FirstOrDefault()
+                ?? "Please correct the highlighted fields below.";
+            return;
+        }
+
+        var noManager = _appointModel.ManagerId == NoManagerOption.Id;
+        var changeComp = _appointModel.ChangeCompensation;
+        var request = new AppointInternalCandidateRequest(
+            EffectiveDate: _appointModel.EffectiveDate,
+            ConfirmBackdatedEffectiveDate: _appointModel.IsBackdated && _appointModel.ConfirmBackdated,
+            ManagerId: noManager ? null : _appointModel.ManagerId,
+            NoManager: noManager,
+            CreateCompensationChange: changeComp,
+            CompensationSalaryType: changeComp ? _appointModel.SalaryType : null,
+            CompensationSalary: changeComp ? _appointModel.Salary : null,
+            CompensationCurrency: changeComp ? _appointModel.Currency?.Trim().ToUpperInvariant() : null,
+            CompensationHoursPerWeek: changeComp ? _appointModel.HoursPerWeek : null,
+            CompensationFte: changeComp ? _appointModel.Fte : null,
+            CompensationNotes: changeComp ? FormText.Optional(_appointModel.CompensationNotes) : null);
+
+        _appointing = true;
+        try
+        {
+            var (result, error) = await ApplicationService.AppointInternalCandidateAsync(
+                CompanyId, VacancyId, _activeApplication.Id, request);
+
+            if (result is null)
+            {
+                _dialogError = error;
+                return;
+            }
+
+            _showAppointDialog = false;
+            _actionSuccess = null;
+            _actionError = null;
+            _appointSuccess = new AppointSuccessInfo(result.EmployeeId, result.IsApplied, result.EffectiveDate);
+        }
+        finally
+        {
+            _appointing = false;
+        }
+
+        await LoadAsync();
+    }
+
     // Row-level actions (Schedule Interview/Offer/Hire/Reject/Withdraw) moved into the grid toolbar
     // rather than a dedicated Actions column, matching the toolbar pattern used elsewhere in the app
     // (see SearchPageBase's selection-dependent toolbar buttons). Enabled state tracks the current
@@ -1627,12 +1984,24 @@
                 new ItemModel { Id = "app-schedule", Text = "Schedule Interview", PrefixIcon = "fa-solid fa-calendar-plus", Disabled = !enabledPreOffer, TooltipText = "Schedule an interview for the selected application" },
                 new ItemModel { Id = "app-offer",     Text = "Offer",              PrefixIcon = "fa-solid fa-file-signature", Disabled = !enabledPreOffer, TooltipText = "Make an offer to the selected candidate" },
                 new ItemModel { Id = "app-offer-response", Text = "Record Offer Response", PrefixIcon = "fa-solid fa-reply", Disabled = !canRecordOfferResponse, TooltipText = "Record the candidate's response to the standing offer" },
-                new ItemModel { Id = "app-hire",      Text = "Hire",               PrefixIcon = "fa-solid fa-user-check", Disabled = !enabled, TooltipText = "Hire the selected candidate" },
+                new ItemModel { Id = "app-hire",      Text = "Hire",               PrefixIcon = "fa-solid fa-user-check", Disabled = !CanHire(_selectedRow), TooltipText = "Hire the selected candidate" },
+                new ItemModel { Id = "app-appoint",   Text = "Appoint",            PrefixIcon = "fa-solid fa-user-tie", Disabled = !CanAppoint(_selectedRow), TooltipText = "Complete internal appointment" },
                 new ItemModel { Id = "app-reject",    Text = "Reject",             PrefixIcon = "fa-solid fa-user-xmark", Disabled = !enabledPreOffer, TooltipText = "Reject the selected candidate" },
                 new ItemModel { Id = "app-withdraw",  Text = "Withdraw",           PrefixIcon = "fa-solid fa-arrow-rotate-left", Disabled = _selectedRow is null, TooltipText = "Withdraw the selected application" },
             };
         }
     }
+
+    // Internal recruitment Ticket 7: Hire is for EXTERNAL applications only; INTERNAL applications
+    // are completed via Appoint instead. Both share Hire's eligibility (active, no pending interview).
+    // A "Pending" appointment (an earlier attempt that didn't finish) keeps Appoint enabled so a
+    // retry can complete it; a "Completed" one disables it.
+    private bool CanHire(ApplicationListItemModel? row) =>
+        row is not null && !row.IsInternal && IsActive(row) && !HasPendingInterview(row);
+
+    private bool CanAppoint(ApplicationListItemModel? row) =>
+        row is not null && row.IsInternal && row.InternalAppointmentStatus != "Completed" && !row.IsWithdrawn &&
+        (row.InternalAppointmentStatus == "Pending" || (IsActive(row) && !HasPendingInterview(row)));
 
     // Hidden marker (see SelectedApplicationMarker.razor) mirroring _selectedRow into the DOM once
     // RefreshToolbarStateAsync has run for it — updated via the child's own repaint, not by
@@ -1667,7 +2036,8 @@
         var enabledPreOffer = enabled && !onOfferStage;
 
         await _grid.EnableToolbarItemsAsync(["app-schedule", "app-offer", "app-reject"], enabledPreOffer);
-        await _grid.EnableToolbarItemsAsync(["app-hire"], enabled);
+        await _grid.EnableToolbarItemsAsync(["app-hire"], CanHire(_selectedRow));
+        await _grid.EnableToolbarItemsAsync(["app-appoint"], CanAppoint(_selectedRow));
         await _grid.EnableToolbarItemsAsync(["app-withdraw"], _selectedRow is not null);
         await _grid.EnableToolbarItemsAsync(["app-offer-response"], _selectedRow?.OfferResponseStatus == "AwaitingResponse");
     }
@@ -1689,7 +2059,11 @@
                 OpenOfferResponseDialog(row);
                 break;
             case "app-hire":
-                await OpenHireDialog(row);
+                // Internal applications can't be hired (the API rejects it) — they are appointed.
+                if (CanHire(row)) await OpenHireDialog(row);
+                break;
+            case "app-appoint":
+                if (CanAppoint(row)) await OpenAppointDialog(row);
                 break;
             case "app-reject":
                 OpenRejectDialog(row);

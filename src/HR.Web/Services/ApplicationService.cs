@@ -290,6 +290,25 @@ public sealed class ApplicationService(HrApiHttpClientFactory httpClientFactory)
         return (null, await ReadErrorAsync(response, "Failed to hire candidate."));
     }
 
+    // Internal recruitment Ticket 7: complete an INTERNAL application by updating the existing
+    // employee's role (Hire is rejected server-side for internal applications). A past effective date
+    // returns 409 unless ConfirmBackdatedEffectiveDate is true.
+    public async Task<(AppointInternalCandidateResponse? Result, string? Error)> AppointInternalCandidateAsync(
+        Guid companyId, Guid vacancyId, Guid applicationId, AppointInternalCandidateRequest request)
+    {
+        // ApiResponseReader surfaces both the {error, code} business-error envelope and FastEndpoints'
+        // validation {errors} envelope, so validator messages (e.g. "manager required") reach the dialog.
+        var result = await ApiResponseReader.ExecuteAsync<AppointInternalCandidateResponse>(
+            ct => Http.PostAsJsonAsync(
+                $"api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/appoint",
+                request, HrApiJsonOptions.Default, ct),
+            HrApiJsonOptions.Default);
+
+        return result.Success
+            ? (result.Value, null)
+            : (null, result.DisplayMessage ?? "Failed to complete the internal appointment.");
+    }
+
     // Ticket #1: save the CV review notes only — no stage change. 400 if the application is withdrawn.
     public async Task<(SaveCvReviewNotesResponse? Result, string? Error)> SaveCvReviewNotesAsync(
         Guid companyId, Guid vacancyId, Guid applicationId, string? cvReviewNotes)

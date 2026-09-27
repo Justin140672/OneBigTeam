@@ -128,6 +128,18 @@ independent commit (often across module DbContexts) with no distributed transact
 | Residual risk | Orphaned storage blobs after a partial purge. Low cost; a re-run of the purge re-attempts blob deletion for rows still present, but a blob whose DB row was already deleted is never revisited. |
 | Status | **Documented only** — recommended follow-up: a storage-orphan sweep, or delete the blob first then the row. |
 
+### 9. Internal appointment (`AppointInternalCandidate`) — internal recruitment Ticket 7
+
+| | |
+|---|---|
+| Handler | `HR.Modules.Recruitment.Features.AppointInternalCandidate.Handler` → `IEmployeeInternalAppointmentService` (Employees) → `InternalAppointmentCompleter` (Recruitment) |
+| Step 1 | Recruitment saves `applications.appointment_status = 'Pending'` (optimistic concurrency on `version`) |
+| Step 2 | Employees records an `employee_promotions` row (+ optional compensation, same TX) keyed by `source_reference = "recruitment:application:{id}"`, then finalises it if due (future-dated: `ProcessPromotionsJob`) |
+| Step 3 | Recruitment moves the application to the Hired stage, `appointment_status = 'Completed'`, stage history; publishes `InternalCandidateAppointedIntegrationEvent` (never `CandidateHired`, never `EmployeeCreated`) |
+| Boundary | `multi-TX` |
+| Duplication risk | None for the employee change: filtered unique index `ix_employee_promotions_company_id_source_reference`; `employee_promotions.completed_at` is a concurrency token so a promotion is finalised once. Recruitment completion is version-guarded. |
+| Recovery | A retry of the command resumes the recorded change (`ResumeBySourceReferenceAsync`) and completes the application. `InternalAppointmentReconciliationJob` (every 10 min) completes applications Pending > 10 min whose change was recorded, and releases those whose change never committed. Reject/Withdraw/MoveStage are refused while Pending. |
+
 ---
 
 ## Intentional eventual-consistency register

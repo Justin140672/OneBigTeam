@@ -92,8 +92,13 @@ internal sealed class EmployeePromotionConfiguration : IEntityTypeConfiguration<
             .HasColumnName("created_date")
             .IsRequired();
 
+        // Internal recruitment Ticket 7: optimistic-concurrency token so a promotion can only be
+        // finalised once — the completing UPDATE is conditional on completed_at still being NULL, so a
+        // racing second finalisation (a retried appointment, the promotions job) fails instead of
+        // re-applying the change and re-publishing its events.
         builder.Property(p => p.CompletedAt)
-            .HasColumnName("completed_at");
+            .HasColumnName("completed_at")
+            .IsConcurrencyToken();
 
         // Internal recruitment Ticket 7.
         builder.Property(p => p.NewDepartmentId)

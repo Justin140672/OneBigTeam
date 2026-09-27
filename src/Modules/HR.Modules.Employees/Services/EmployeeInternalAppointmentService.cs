@@ -82,8 +82,10 @@ internal sealed class EmployeeInternalAppointmentService(
                 Error.Conflict("EffectiveDate is in the past. Confirm to backdate and apply the appointment immediately."));
 
         SalaryType salaryType = default;
+        // Names only: Enum.TryParse alone would also accept numeric strings such as "7".
         if (request.Compensation is { } compensation &&
-            !Enum.TryParse(compensation.SalaryType, ignoreCase: true, out salaryType))
+            (!Enum.GetNames<SalaryType>().Contains(compensation.SalaryType?.Trim(), StringComparer.OrdinalIgnoreCase) ||
+             !Enum.TryParse(compensation.SalaryType!.Trim(), ignoreCase: true, out salaryType)))
             return Result.Failure<InternalAppointmentResult>(
                 Error.Validation($"'{compensation.SalaryType}' is not a valid salary type."));
 
@@ -190,7 +192,7 @@ internal sealed class EmployeeInternalAppointmentService(
             cancellationToken);
 
         if (promotion.EffectiveDate <= today)
-            await promotionFinalizer.FinalizeAsync(employee, promotion, request.PerformedByUserId, now, cancellationToken);
+            promotion = await FinalizeOnceAsync(employee, promotion, request.PerformedByUserId, now, cancellationToken);
         else
             await WriteScheduledTimelineEntryAsync(promotion, now, cancellationToken);
 
@@ -240,7 +242,7 @@ internal sealed class EmployeeInternalAppointmentService(
                 var employee = await dbContext.Employees
                     .SingleAsync(e => e.Id == promotion.EmployeeId && e.CompanyId == promotion.CompanyId, cancellationToken);
 
-                await promotionFinalizer.FinalizeAsync(employee, promotion, performedByUserId, now, cancellationToken);
+                promotion = await FinalizeOnceAsync(employee, promotion, performedByUserId, now, cancellationToken);
             }
             else
             {
@@ -249,6 +251,42 @@ internal sealed class EmployeeInternalAppointmentService(
         }
 
         return Map(promotion, wasAlreadyRecorded: true);
+    }
+
+    // completed_at is a concurrency token, so when two callers race to finalise the same promotion
+    // (a concurrent retry, or ProcessPromotionsJob) exactly one save wins. The loser — or a save that
+    // lost to a concurrent edit of the employee — re-reads the promotion: if it is now completed the
+    // change was applied exactly once and that is success; otherwise the failure is genuine and is
+    // rethrown (the promotion stays pending and is applied by a retry or ProcessPromotionsJob).
+    private async Task<EmployeePromotion> FinalizeOnceAsync(
+        Employee employee,
+        EmployeePromotion promotion,
+        Guid performedByUserId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await promotionFinalizer.FinalizeAsync(employee, promotion, performedByUserId, now, cancellationToken);
+            return promotion;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            dbContext.ChangeTracker.Clear();
+
+            var current = await dbContext.EmployeePromotions
+                .AsNoTracking()
+                .SingleAsync(p => p.Id == promotion.Id, cancellationToken);
+
+            if (current.CompletedAt is null)
+                throw;
+
+            logger.LogInformation(
+                "Promotion {PromotionId} for employee {EmployeeId} in company {CompanyId} was finalised concurrently; not applying it again.",
+                current.Id, current.EmployeeId, current.CompanyId);
+
+            return current;
+        }
     }
 
     private async Task<Error?> ValidateManagerAsync(

@@ -565,6 +565,36 @@ public class GetApplicationHandlerTests
         Assert.Null(result.Value.EmployeeId);
     }
 
+    // ----- Internal recruitment Ticket 7: internal appointment status -----
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("Pending")]
+    [InlineData("Completed")]
+    public async Task HandleAsync_Returns_Internal_Appointment_Status_And_Effective_Date(string? status)
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Engineering Manager", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var (_, application) = InternalApplicationTestData.AddInternal(db, companyId, vacancy.Id, stages.Offer.Id, employeeId, Now);
+        if (status is not null)
+            application.BeginInternalAppointment(employeeId, Guid.NewGuid(), Now);
+        if (status == "Completed")
+            application.CompleteInternalAppointment(stages.Hired.Id, Guid.NewGuid(), new DateOnly(2026, 8, 3), Now);
+        db.Vacancies.Add(vacancy);
+        await db.SaveChangesAsync();
+
+        var result = await new GetApplicationHandler(db).HandleAsync(
+            new GetApplicationRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(status, result.Value!.InternalAppointmentStatus);
+        Assert.Equal(status == "Completed" ? new DateOnly(2026, 8, 3) : null, result.Value.InternalAppointmentEffectiveDate);
+    }
+
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))

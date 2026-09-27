@@ -17,8 +17,9 @@ internal sealed class AppointInternalCandidateValidator : AbstractValidator<Appo
             .When(r => r.EffectiveDate.HasValue)
             .WithMessage("Effective date is invalid.");
 
+        // Must, not NotEmpty: NotEmpty on a Guid? accepts Guid.Empty.
         RuleFor(r => r.ManagerId)
-            .NotEmpty()
+            .Must(id => id is { } managerId && managerId != Guid.Empty)
             .When(r => !r.NoManager)
             .WithMessage("Select a manager, or choose 'No manager'.");
 

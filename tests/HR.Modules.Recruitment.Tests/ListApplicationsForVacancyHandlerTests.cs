@@ -252,6 +252,39 @@ public class ListApplicationsForVacancyHandlerTests
         Assert.Null(item.EmployeeId);
     }
 
+    [Fact]
+    public async Task HandleAsync_Returns_Internal_Appointment_Status_And_Effective_Date()
+    {
+        // Internal recruitment Ticket 7.
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Engineering Manager", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        db.Vacancies.Add(vacancy);
+        var completedEmployee = Guid.NewGuid();
+        var (_, completed) = InternalApplicationTestData.AddInternal(db, companyId, vacancy.Id, stages.Offer.Id, completedEmployee, Now, "Aisha", "Khan");
+        completed.BeginInternalAppointment(completedEmployee, Guid.NewGuid(), Now);
+        completed.CompleteInternalAppointment(stages.Hired.Id, Guid.NewGuid(), new DateOnly(2026, 8, 3), Now);
+        var pendingEmployee = Guid.NewGuid();
+        var (_, pending) = InternalApplicationTestData.AddInternal(db, companyId, vacancy.Id, stages.Offer.Id, pendingEmployee, Now, "Ben", "Cole");
+        pending.BeginInternalAppointment(pendingEmployee, Guid.NewGuid(), Now);
+        var (_, untouched) = InternalApplicationTestData.AddExternal(db, companyId, vacancy.Id, stages.CvReview.Id, ApplicationSource.Direct, Now);
+        await db.SaveChangesAsync();
+
+        var result = await new ListApplicationsForVacancyHandler(db).HandleAsync(
+            new ListApplicationsForVacancyRequest { CompanyId = companyId, VacancyId = vacancy.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var items = result.Value!.Items.ToDictionary(i => i.Id);
+        Assert.Equal("Completed", items[completed.Id].InternalAppointmentStatus);
+        Assert.Equal(new DateOnly(2026, 8, 3), items[completed.Id].InternalAppointmentEffectiveDate);
+        Assert.Equal("Pending", items[pending.Id].InternalAppointmentStatus);
+        Assert.Null(items[pending.Id].InternalAppointmentEffectiveDate);
+        Assert.Null(items[untouched.Id].InternalAppointmentStatus);
+        Assert.Null(items[untouched.Id].InternalAppointmentEffectiveDate);
+    }
+
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))

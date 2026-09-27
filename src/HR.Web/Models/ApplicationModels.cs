@@ -22,7 +22,10 @@ public record ApplicationListItemModel(
     // Internal recruitment Ticket 6: true only when Source == Internal (authoritative — never infer
     // from a candidate's EmployeeId). EmployeeId is populated only for internal applications.
     bool IsInternal = false,
-    Guid? EmployeeId = null);
+    Guid? EmployeeId = null,
+    // Internal recruitment Ticket 7: "Pending" | "Completed" | null (no appointment attempted yet).
+    string? InternalAppointmentStatus = null,
+    DateOnly? InternalAppointmentEffectiveDate = null);
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 
@@ -80,7 +83,10 @@ public record GetApplicationResponse(
     // Internal recruitment Ticket 6: true only when Source == Internal. EmployeeId is populated only
     // for internal applications.
     bool IsInternal = false,
-    Guid? EmployeeId = null);
+    Guid? EmployeeId = null,
+    // Internal recruitment Ticket 7: "Pending" | "Completed" | null (no appointment attempted yet).
+    string? InternalAppointmentStatus = null,
+    DateOnly? InternalAppointmentEffectiveDate = null);
 
 // ── INTERNAL RECRUITMENT TICKET 1: SUBMITTED CV ──────────────────────────────
 
@@ -347,6 +353,41 @@ public record HireCandidateResponse(
     DateTimeOffset AppliedAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
+
+// ── INTERNAL RECRUITMENT TICKET 7: APPOINT INTERNAL CANDIDATE ─────────────────
+// Mirrors HR.Modules.Recruitment.Features.AppointInternalCandidate
+// (POST .../applications/{applicationId}/appoint). Position profile, department and location are
+// never sent — the server derives them from the vacancy. Exactly one of ManagerId / NoManager is set.
+
+public record AppointInternalCandidateRequest(
+    DateOnly? EffectiveDate,
+    bool ConfirmBackdatedEffectiveDate,
+    Guid? ManagerId,
+    bool NoManager,
+    bool CreateCompensationChange,
+    string? CompensationSalaryType = null,
+    decimal? CompensationSalary = null,
+    string? CompensationCurrency = null,
+    decimal? CompensationHoursPerWeek = null,
+    decimal? CompensationFte = null,
+    string? CompensationNotes = null);
+
+public record AppointInternalCandidateResponse(
+    Guid ApplicationId,
+    Guid VacancyId,
+    Guid CandidateId,
+    Guid EmployeeId,
+    Guid PromotionId,
+    Guid CurrentStageId,
+    Guid PositionProfileId,
+    Guid DepartmentId,
+    Guid LocationId,
+    Guid? ManagerId,
+    DateOnly EffectiveDate,
+    // False when the effective date is in the future: the change is scheduled and applied on that date.
+    bool IsApplied,
+    Guid? CompensationId,
+    string AppointmentStatus);
 
 // ── DASHBOARD: APPLICATIONS BY STATUS ───────────────────────────────────────────
 
