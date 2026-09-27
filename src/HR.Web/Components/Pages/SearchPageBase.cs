@@ -270,8 +270,26 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
     // query string on a direct hit, so a breadcrumb/back link into the exact filtered view works.
     private bool _filterStateRestored;
 
+    // Set by SyncFilterStateToUrl just before it rewrites this same page's URL in place (query string
+    // only). That navigation makes the router re-set this component's parameters, which used to run
+    // a full LoadAsync here — on top of the (debounced) load the search/filter change itself already
+    // performs. Every search therefore loaded the grid TWICE, ~300ms apart: a caller could see the
+    // first load's rows, tick a row, and have the second load re-bind the grid and silently drop that
+    // selection (a following "Update selected"/"Invite selected" then acted on fewer rows than were
+    // ticked, or none). The parameter pass caused by our own URL sync is now recognised and skipped.
+    private string? _pendingSelfNavigationTarget;
+
     protected override async Task OnParametersSetAsync()
     {
+        if (_pendingSelfNavigationTarget is not null)
+        {
+            var current = Navigation.ToAbsoluteUri(Navigation.Uri).PathAndQuery;
+            var isOwnSync = string.Equals(current, _pendingSelfNavigationTarget, StringComparison.Ordinal);
+            _pendingSelfNavigationTarget = null;
+            if (isOwnSync)
+                return;
+        }
+
         if (!_filterStateRestored)
         {
             _filterStateRestored = true;
@@ -310,7 +328,12 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
         var current = Navigation.ToAbsoluteUri(Navigation.Uri).PathAndQuery;
 
         if (!string.Equals(target, current, StringComparison.Ordinal))
+        {
+            // The caller performs its own (debounced) load for this state change — see
+            // OnParametersSetAsync's _pendingSelfNavigationTarget remarks.
+            _pendingSelfNavigationTarget = target;
             Navigation.NavigateTo(target, replace: true);
+        }
     }
 
     // The current list URL (path + query), app-relative with a leading slash — passed as

@@ -549,6 +549,13 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
     public Task CancelAsync() =>
         page.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
 
+    /// <summary>Text of the first visible error/validation message on the page, or null — for assertion messages.</summary>
+    public async Task<string?> GetErrorTextAsync()
+    {
+        var error = page.Locator(".alert-danger, .validation-message").First;
+        return await error.IsVisibleAsync() ? (await error.InnerTextAsync()).Trim() : null;
+    }
+
     public async Task<bool> HasErrorAsync()
     {
         try

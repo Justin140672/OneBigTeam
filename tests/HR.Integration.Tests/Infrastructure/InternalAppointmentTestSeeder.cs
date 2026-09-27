@@ -67,9 +67,11 @@ internal static class InternalAppointmentTestSeeder
         $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/hire";
 
     /// <summary>
-    /// A client for a fresh user holding Recruiter (recruitment:manage) AND HR Administrator
-    /// (employee:manage) — both are required by the appoint endpoint — plus Employee (role:employee,
-    /// needed to read the employee timeline).
+    /// A client for a fresh user holding Recruiter (recruitment:manage — the only permission the
+    /// appoint endpoint requires) plus HR Administrator (employee:manage) and Employee
+    /// (role:employee) so the same caller can also read the employee's promotion history and
+    /// timeline. Use <see cref="ClientWithRolesAsync"/> with Recruiter alone to test the
+    /// least-privileged appointer.
     /// </summary>
     public static Task<HttpClient> RecruiterHrClientAsync(ApiWebApplicationFactory factory, Guid companyId) =>
         ClientWithRolesAsync(factory, companyId, SystemRoles.Recruiter, SystemRoles.HrAdministrator, SystemRoles.Employee);

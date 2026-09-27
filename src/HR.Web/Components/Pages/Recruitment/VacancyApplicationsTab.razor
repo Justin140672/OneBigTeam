@@ -13,6 +13,9 @@
 @inject PositionProfileService PositionProfileService
 @inject CompanyService CompanyService
 @inject DepartmentService DepartmentService
+@inject EmployeeDirectoryService EmployeeDirectoryService
+@inject UserService UserService
+@inject AppSession Session
 @inject IJSRuntime JS
 
 <div data-testid="vacancy-applications-tab">
@@ -43,7 +46,17 @@
             <span>
                 Internal appointment completed@(_appointSuccess.IsApplied ? "" : $" — the change takes effect on {FormatUkDate(_appointSuccess.EffectiveDate)}").
             </span>
-            <a href="/companies/@CompanyId/employees/@_appointSuccess.EmployeeId" data-testid="appoint-employee-link">View employee profile</a>
+            @* Only link to the full employee record when the user can open it (HR Administrator via
+               employee:manage, or the appointee themself) — a Recruiter-only appointer would otherwise
+               land on an access-denied page, so they see the employee's name instead. *@
+            @if (_canViewEmployeeProfile || _appointSuccess.EmployeeId == Session.EmployeeId)
+            {
+                <a href="/companies/@CompanyId/employees/@_appointSuccess.EmployeeId" data-testid="appoint-employee-link">View employee profile</a>
+            }
+            else
+            {
+                <span class="fw-semibold" data-testid="appoint-employee-name">@_appointSuccess.EmployeeName</span>
+            }
             <button type="button" class="btn-close" aria-label="Dismiss" @onclick="() => _appointSuccess = null"></button>
         </div>
     }
@@ -1176,7 +1189,13 @@
     // Guid.Empty is the explicit "No manager" item (mapped to NoManager=true); null = nothing chosen yet.
     private static readonly ManagerOption NoManagerOption = new(Guid.Empty, "No manager");
 
-    private sealed record AppointSuccessInfo(Guid EmployeeId, bool IsApplied, DateOnly EffectiveDate);
+    private sealed record AppointSuccessInfo(Guid EmployeeId, string EmployeeName, bool IsApplied, DateOnly EffectiveDate);
+
+    // Appoint requires "recruitment:manage" only (AppointInternalCandidate endpoint), so the toolbar
+    // action is shown only to holders of it. Linking to the appointee's full employee record needs
+    // HR-administrator access (employee:manage), which a Recruiter does not have.
+    private bool _canAppoint;
+    private bool _canViewEmployeeProfile;
 
     private static string FormatUkDate(DateOnly date) =>
         date.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
@@ -1262,6 +1281,13 @@
     private List<ManagerOption> _hireManagerOptions = [];
 
     private static readonly string[] _genderOptions = ["Male", "Female", "Non-binary", "Prefer not to say", "Other"];
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Resolved before the first LoadAsync so the grid toolbar is built with the right items.
+        _canAppoint = await UserService.HasPermissionAsync(SystemPermissions.RecruitmentManage);
+        _canViewEmployeeProfile = await UserService.HasPermissionAsync(SystemPermissions.EmployeeEdit);
+    }
 
     protected override async Task OnParametersSetAsync()
     {
@@ -1879,8 +1905,10 @@
             else
             {
                 // Outside the first page of selectable employees — resolve the name so it can be shown.
-                var hiringManager = await EmployeeService.GetEmployeeAsync(CompanyId, vacancy.HiringManagerId);
-                if (hiringManager is not null && hiringManager.Status != "Draft" && hiringManager.Status != "FormerEmployee")
+                // Uses the directory lookup (any authenticated employee; Active employees only) rather
+                // than the full HR record, which a Recruiter-only appointer is not allowed to read.
+                var hiringManager = await EmployeeDirectoryService.GetAsync(CompanyId, vacancy.HiringManagerId);
+                if (hiringManager is not null)
                 {
                     _appointManagerOptions.Insert(1, new ManagerOption(hiringManager.Id, $"{hiringManager.FirstName} {hiringManager.LastName}"));
                     _appointModel.ManagerId = hiringManager.Id;
@@ -1951,7 +1979,7 @@
             _showAppointDialog = false;
             _actionSuccess = null;
             _actionError = null;
-            _appointSuccess = new AppointSuccessInfo(result.EmployeeId, result.IsApplied, result.EffectiveDate);
+            _appointSuccess = new AppointSuccessInfo(result.EmployeeId, _appointCandidateName, result.IsApplied, result.EffectiveDate);
         }
         finally
         {
@@ -1979,16 +2007,24 @@
             var enabledPreOffer = enabled && !onOfferStage;
             var canRecordOfferResponse = _selectedRow?.OfferResponseStatus == "AwaitingResponse";
 
-            return new List<object>
+            var items = new List<object>
             {
                 new ItemModel { Id = "app-schedule", Text = "Schedule Interview", PrefixIcon = "fa-solid fa-calendar-plus", Disabled = !enabledPreOffer, TooltipText = "Schedule an interview for the selected application" },
                 new ItemModel { Id = "app-offer",     Text = "Offer",              PrefixIcon = "fa-solid fa-file-signature", Disabled = !enabledPreOffer, TooltipText = "Make an offer to the selected candidate" },
                 new ItemModel { Id = "app-offer-response", Text = "Record Offer Response", PrefixIcon = "fa-solid fa-reply", Disabled = !canRecordOfferResponse, TooltipText = "Record the candidate's response to the standing offer" },
                 new ItemModel { Id = "app-hire",      Text = "Hire",               PrefixIcon = "fa-solid fa-user-check", Disabled = !CanHire(_selectedRow), TooltipText = "Hire the selected candidate" },
-                new ItemModel { Id = "app-appoint",   Text = "Appoint",            PrefixIcon = "fa-solid fa-user-tie", Disabled = !CanAppoint(_selectedRow), TooltipText = "Complete internal appointment" },
                 new ItemModel { Id = "app-reject",    Text = "Reject",             PrefixIcon = "fa-solid fa-user-xmark", Disabled = !enabledPreOffer, TooltipText = "Reject the selected candidate" },
                 new ItemModel { Id = "app-withdraw",  Text = "Withdraw",           PrefixIcon = "fa-solid fa-arrow-rotate-left", Disabled = _selectedRow is null, TooltipText = "Withdraw the selected application" },
             };
+
+            // Only offered to users who can call the appoint endpoint (recruitment:manage); inserted
+            // straight after Hire to keep the existing toolbar order.
+            if (_canAppoint)
+            {
+                items.Insert(4, new ItemModel { Id = "app-appoint", Text = "Appoint", PrefixIcon = "fa-solid fa-user-tie", Disabled = !CanAppoint(_selectedRow), TooltipText = "Complete internal appointment" });
+            }
+
+            return items;
         }
     }
 
@@ -2000,7 +2036,7 @@
         row is not null && !row.IsInternal && IsActive(row) && !HasPendingInterview(row);
 
     private bool CanAppoint(ApplicationListItemModel? row) =>
-        row is not null && row.IsInternal && row.InternalAppointmentStatus != "Completed" && !row.IsWithdrawn &&
+        _canAppoint && row is not null && row.IsInternal && row.InternalAppointmentStatus != "Completed" && !row.IsWithdrawn &&
         (row.InternalAppointmentStatus == "Pending" || (IsActive(row) && !HasPendingInterview(row)));
 
     // Hidden marker (see SelectedApplicationMarker.razor) mirroring _selectedRow into the DOM once
@@ -2037,7 +2073,7 @@
 
         await _grid.EnableToolbarItemsAsync(["app-schedule", "app-offer", "app-reject"], enabledPreOffer);
         await _grid.EnableToolbarItemsAsync(["app-hire"], CanHire(_selectedRow));
-        await _grid.EnableToolbarItemsAsync(["app-appoint"], CanAppoint(_selectedRow));
+        if (_canAppoint) await _grid.EnableToolbarItemsAsync(["app-appoint"], CanAppoint(_selectedRow));
         await _grid.EnableToolbarItemsAsync(["app-withdraw"], _selectedRow is not null);
         await _grid.EnableToolbarItemsAsync(["app-offer-response"], _selectedRow?.OfferResponseStatus == "AwaitingResponse");
     }

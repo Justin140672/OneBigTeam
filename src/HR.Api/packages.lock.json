@@ -34,9 +34,9 @@
       },
       "Newtonsoft.Json": {
         "type": "Direct",
-        "requested": "[13.0.3, )",
-        "resolved": "13.0.3",
-        "contentHash": "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ=="
+        "requested": "[13.0.4, )",
+        "resolved": "13.0.4",
+        "contentHash": "pdgNNMai3zv51W5aq268sujXUyx7SNdE2bj1wZcWjAQrKMFZV260lbqYop1d2GM67JI1huLRwxo9ZqnfF/lC6A=="
       },
       "AngleSharp": {
         "type": "Transitive",
@@ -147,10 +147,10 @@
       },
       "Hangfire.NetCore": {
         "type": "Transitive",
-        "resolved": "1.8.24",
-        "contentHash": "iKRSO7gzMq4KhI+px98OtRubI5FaDHJgHvhLqlILvsuCPVFraTdVWdRgwjIS4bIyahl/3RaiGhFOqlpwgU724Q==",
+        "resolved": "1.8.25",
+        "contentHash": "ZfI7gwr7n70r635VS9aKsWSzOodY6U0bSIG0jDrqd5ODRLKvc+e5aXXGCnWHWzjvagvlwtUcRGG/lD0/3C7chA==",
         "dependencies": {
-          "Hangfire.Core": "[1.8.24]"
+          "Hangfire.Core": "[1.8.25]"
         }
       },
       "Microsoft.Bcl.Cryptography": {
@@ -289,23 +289,23 @@
       },
       "OpenTelemetry": {
         "type": "Transitive",
-        "resolved": "1.18.0",
-        "contentHash": "13AKxycK+olOLe061MjliPTNBR/DUkjyRr0b9zwUhKyMjFS8lXS7G31R85rkbM55up2YFmdykWdAw2giBDJpiQ==",
+        "resolved": "1.19.1",
+        "contentHash": "6ywhc3upf+dq8EsOohj7I7zS3l4yX9vfbtFkvyEC8xIUY4Z9iDIOVuke356eCAzIZaWtmwmmyl2UXYCp5n7I3Q==",
         "dependencies": {
-          "OpenTelemetry.Api.ProviderBuilderExtensions": "1.18.0"
+          "OpenTelemetry.Api.ProviderBuilderExtensions": "1.19.1"
         }
       },
       "OpenTelemetry.Api": {
         "type": "Transitive",
-        "resolved": "1.18.0",
-        "contentHash": "Dhzm5oughIY9EWckt2J1yXcEbXpki5WCL2q7prJoYxzH6C7jdkfGtPMTkUVZZ4AhjJKzQnlC+kLSIlmIVwC4Vw=="
+        "resolved": "1.19.1",
+        "contentHash": "9JKIH+xrV0HNTFjQC8zrx9gZpDOMEljN5Htg/U0VE2IvO3N+7bKALCCsGy5tp09marX5dd8UkrgQFoLaulIBRw=="
       },
       "OpenTelemetry.Api.ProviderBuilderExtensions": {
         "type": "Transitive",
-        "resolved": "1.18.0",
-        "contentHash": "io6A6PJFp3vIObRGf6oPjdHsdglkinXt/0SpTDJHrVnsLxUtOzwh/QwTsnhBJ43wJ6QcGMkyNzsSSY8XEB1Q5Q==",
+        "resolved": "1.19.1",
+        "contentHash": "HtGe72B/IhzKqdU0a3fNE5osax/Cegwxd+p4u6lOFy20nsgmeaFuP2NRyFs1WvrOv/bpkII3IvvBkKoZXG8BLg==",
         "dependencies": {
-          "OpenTelemetry.Api": "1.18.0"
+          "OpenTelemetry.Api": "1.19.1"
         }
       },
       "Polly.Core": {
@@ -436,12 +436,12 @@
           "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
           "HR.ServiceDefaults": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
-          "Hangfire.AspNetCore": "[1.8.24, )",
+          "Hangfire.AspNetCore": "[1.8.25, )",
           "Hangfire.PostgreSql": "[1.21.1, )",
           "Microsoft.AspNetCore.Authentication.JwtBearer": "[10.0.12, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )",
-          "QuestPDF": "[2026.7.3, )",
+          "QuestPDF": "[2026.9.1, )",
           "Serilog.AspNetCore": "[10.0.0, )",
           "Serilog.Enrichers.Environment": "[3.0.1, )",
           "Serilog.Sinks.OpenTelemetry": "[4.2.0, )"
@@ -466,7 +466,7 @@
           "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
           "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
-          "Hangfire.Core": "[1.8.24, )",
+          "Hangfire.Core": "[1.8.25, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -480,10 +480,10 @@
           "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
           "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
-          "Hangfire.Core": "[1.8.24, )",
+          "Hangfire.Core": "[1.8.25, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )",
-          "Stripe.net": "[52.3.0, )"
+          "Stripe.net": "[52.4.2, )"
         }
       },
       "hr.modules.companies.contracts": {
@@ -499,7 +499,7 @@
           "FluentValidation": "[12.1.1, )",
           "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
-          "Hangfire.Core": "[1.8.24, )",
+          "Hangfire.Core": "[1.8.25, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -514,7 +514,7 @@
           "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
           "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
-          "Hangfire.Core": "[1.8.24, )",
+          "Hangfire.Core": "[1.8.25, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -529,7 +529,7 @@
           "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
           "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
-          "Hangfire.Core": "[1.8.24, )",
+          "Hangfire.Core": "[1.8.25, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -545,7 +545,7 @@
           "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
           "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
-          "Hangfire.Core": "[1.8.24, )",
+          "Hangfire.Core": "[1.8.25, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -565,7 +565,7 @@
           "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
           "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
-          "Hangfire.Core": "[1.8.24, )",
+          "Hangfire.Core": "[1.8.25, )",
           "Microsoft.AspNetCore.Authentication.JwtBearer": "[10.0.12, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
@@ -581,7 +581,7 @@
           "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
           "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
-          "Hangfire.Core": "[1.8.24, )",
+          "Hangfire.Core": "[1.8.25, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -593,7 +593,7 @@
           "FluentValidation": "[12.1.1, )",
           "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
-          "Hangfire.Core": "[1.8.24, )",
+          "Hangfire.Core": "[1.8.25, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -607,7 +607,7 @@
           "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
           "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
-          "Hangfire.Core": "[1.8.24, )",
+          "Hangfire.Core": "[1.8.25, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -622,7 +622,7 @@
           "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
           "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
-          "Hangfire.Core": "[1.8.24, )",
+          "Hangfire.Core": "[1.8.25, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -637,7 +637,7 @@
           "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
           "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
-          "Hangfire.Core": "[1.8.24, )",
+          "Hangfire.Core": "[1.8.25, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -652,7 +652,7 @@
           "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
           "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
-          "Hangfire.Core": "[1.8.24, )",
+          "Hangfire.Core": "[1.8.25, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -666,7 +666,7 @@
           "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
           "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
-          "Hangfire.Core": "[1.8.24, )",
+          "Hangfire.Core": "[1.8.25, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -680,7 +680,7 @@
           "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
           "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
-          "Hangfire.Core": "[1.8.24, )",
+          "Hangfire.Core": "[1.8.25, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -695,7 +695,7 @@
           "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
           "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
-          "Hangfire.Core": "[1.8.24, )",
+          "Hangfire.Core": "[1.8.25, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -707,7 +707,7 @@
           "FluentValidation": "[12.1.1, )",
           "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
-          "Hangfire.Core": "[1.8.24, )",
+          "Hangfire.Core": "[1.8.25, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -721,7 +721,7 @@
           "HR.Modules.Employees.Contracts": "[0.1.0-dev, )",
           "HR.Modules.Tasks.Contracts": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
-          "Hangfire.Core": "[1.8.24, )",
+          "Hangfire.Core": "[1.8.25, )",
           "Microsoft.EntityFrameworkCore": "[10.0.12, )",
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
@@ -738,11 +738,11 @@
           "HR.SharedKernel": "[0.1.0-dev, )",
           "Microsoft.Extensions.Http.Resilience": "[10.10.0, )",
           "Microsoft.Extensions.ServiceDiscovery": "[10.10.0, )",
-          "OpenTelemetry.Exporter.OpenTelemetryProtocol": "[1.18.0, )",
-          "OpenTelemetry.Extensions.Hosting": "[1.18.0, )",
-          "OpenTelemetry.Instrumentation.AspNetCore": "[1.18.0, )",
-          "OpenTelemetry.Instrumentation.Http": "[1.18.0, )",
-          "OpenTelemetry.Instrumentation.Runtime": "[1.18.0, )"
+          "OpenTelemetry.Exporter.OpenTelemetryProtocol": "[1.19.1, )",
+          "OpenTelemetry.Extensions.Hosting": "[1.19.1, )",
+          "OpenTelemetry.Instrumentation.AspNetCore": "[1.19.0, )",
+          "OpenTelemetry.Instrumentation.Http": "[1.19.0, )",
+          "OpenTelemetry.Instrumentation.Runtime": "[1.19.0, )"
         }
       },
       "hr.sharedkernel": {
@@ -776,18 +776,18 @@
       },
       "Hangfire.AspNetCore": {
         "type": "CentralTransitive",
-        "requested": "[1.8.24, )",
-        "resolved": "1.8.24",
-        "contentHash": "K7eugZIFcBgGI+lI6Z3H9a7Ax6ZkauWjOUJxE5xawu5UQmH+WS7gXBlar1zGUqLTWqWxNAMj+K95OE0zvAtHNg==",
+        "requested": "[1.8.25, )",
+        "resolved": "1.8.25",
+        "contentHash": "IqklPyZDacfrCM6I9vpoTd9n14AvP5tepgR/IfKTUlPzGihLzey9jpL7PTKguJ3CPAA12qz3WCDUfIJ9IsCLQw==",
         "dependencies": {
-          "Hangfire.NetCore": "[1.8.24]"
+          "Hangfire.NetCore": "[1.8.25]"
         }
       },
       "Hangfire.Core": {
         "type": "CentralTransitive",
-        "requested": "[1.8.24, )",
-        "resolved": "1.8.24",
-        "contentHash": "XhiE55abcXXw4jEe0EClnU1fainkfi7ZVINbcCB+Se6ZatfVAglLsvNc6wtTMq5aZz0tv2DuW+U5lx1R0DcWOg==",
+        "requested": "[1.8.25, )",
+        "resolved": "1.8.25",
+        "contentHash": "BxzXlHwXNrGPHJ7YfAVfeiXC+BHd6uPoyyfV+9bCJVPPGs4z0EQCW1X44Og/IUFM81ENCqAFP1r2rOkQhm4ydA==",
         "dependencies": {
           "Newtonsoft.Json": "11.0.1"
         }
@@ -856,54 +856,54 @@
       },
       "OpenTelemetry.Exporter.OpenTelemetryProtocol": {
         "type": "CentralTransitive",
-        "requested": "[1.18.0, )",
-        "resolved": "1.18.0",
-        "contentHash": "Et3WAviooKGObZjUZN8d6eTsdJs1YM3ZoN+KlWSAHksTmHG1nyGi9XGo2wb0fkFMWK0g80FOPdR1njg52Dm+aw==",
+        "requested": "[1.19.1, )",
+        "resolved": "1.19.1",
+        "contentHash": "vsYYOBf/KxNubnuoja8pjJ9LG0zCC9HAYPay+R6N5ZKZMbhNdKWbaq6JZqJqTvK+55rudiqErJySekf9ql8okA==",
         "dependencies": {
-          "OpenTelemetry": "1.18.0"
+          "OpenTelemetry": "1.19.1"
         }
       },
       "OpenTelemetry.Extensions.Hosting": {
         "type": "CentralTransitive",
-        "requested": "[1.18.0, )",
-        "resolved": "1.18.0",
-        "contentHash": "u+JMA82H65MKwMvd2qUpL8C2qE4Jux2nvX9hmy036UK/Apv2YyIRYCttF/vlX6nMPcAKI8BXkscmL4QG3C69fw==",
+        "requested": "[1.19.1, )",
+        "resolved": "1.19.1",
+        "contentHash": "3qqZfVmW8mKA2/fRwI83o8z+yZd33KbEqRlXrlX0+3e/U7i+z0MQiCr0L3Axxa0jGdiylIrpWX4DIT9nAbJ00A==",
         "dependencies": {
-          "OpenTelemetry": "1.18.0"
+          "OpenTelemetry": "1.19.1"
         }
       },
       "OpenTelemetry.Instrumentation.AspNetCore": {
         "type": "CentralTransitive",
-        "requested": "[1.18.0, )",
-        "resolved": "1.18.0",
-        "contentHash": "hBiMXE/CGIAHUOpi0gScNkjHB0L9XbCin5lZObL+dMBl4OmpndnHgxP3JZDnnGtU6qOzdeh8TYUV9f6Jgmmhlw==",
+        "requested": "[1.19.0, )",
+        "resolved": "1.19.0",
+        "contentHash": "reypo7g0Nzyssg1EkbfWU6W58CVFgtgkSEGrFXtbpA+bNit7HUs7587DOkOdPCgqWr3IL4f6X9B2yhnU6POrFA==",
         "dependencies": {
-          "OpenTelemetry.Api.ProviderBuilderExtensions": "[1.18.0, 2.0.0)"
+          "OpenTelemetry.Api.ProviderBuilderExtensions": "[1.19.0, 2.0.0)"
         }
       },
       "OpenTelemetry.Instrumentation.Http": {
         "type": "CentralTransitive",
-        "requested": "[1.18.0, )",
-        "resolved": "1.18.0",
-        "contentHash": "/X57peOOa4a+9V4DSVXbuIWdsAxmU5gsxw8lu+gJU0zuewsYhC9f6qdm8GEW0VvqG9e+gxn0HdVR5G3YHcWDTw==",
+        "requested": "[1.19.0, )",
+        "resolved": "1.19.0",
+        "contentHash": "+egJpWBRfYP3ldfexV2bmJyzOWkkOPVYikw/vUEtbUvf2exJfY3RGInXrYlubhBIH6rmNEn6sI/FmqenZJwkjw==",
         "dependencies": {
-          "OpenTelemetry.Api.ProviderBuilderExtensions": "[1.18.0, 2.0.0)"
+          "OpenTelemetry.Api.ProviderBuilderExtensions": "[1.19.0, 2.0.0)"
         }
       },
       "OpenTelemetry.Instrumentation.Runtime": {
         "type": "CentralTransitive",
-        "requested": "[1.18.0, )",
-        "resolved": "1.18.0",
-        "contentHash": "McuXGjBJDL/Cown2PxfUQysK98MZG7ZDjO/IKUtaAx8t1m0PB0d+QtJC79RFTVipMhRIwjJiULNOp0OGfZbvwg==",
+        "requested": "[1.19.0, )",
+        "resolved": "1.19.0",
+        "contentHash": "VIH2tQ2h31j4wQyZ9Utk8ZXIyj7Z1j0xIiyPRGjYu1MmZjJtpxRh0Y/NnB6fEBimNg/WrX0jDyfMeEjPQqmaMA==",
         "dependencies": {
-          "OpenTelemetry.Api": "[1.18.0, 2.0.0)"
+          "OpenTelemetry.Api": "[1.19.0, 2.0.0)"
         }
       },
       "QuestPDF": {
         "type": "CentralTransitive",
-        "requested": "[2026.7.3, )",
-        "resolved": "2026.7.3",
-        "contentHash": "MYpJrSLwUkgaX/POQj+9GY8QreFoLXjHCiUPCNl0XrHF+nLDT9KeUFZbeaUNu1P5spt5QeYzCbf2tDF0z5idHg=="
+        "requested": "[2026.9.1, )",
+        "resolved": "2026.9.1",
+        "contentHash": "i2BT/v+Ui6Hg9+BZbOci/VfsyvmtY8nlQqAOmFt8iOZ4Hm9aKZZRgZZ+LfrKWYXAHRb3l1EjDcMVfjRaZTt+Cw=="
       },
       "Serilog.AspNetCore": {
         "type": "CentralTransitive",
@@ -942,9 +942,9 @@
       },
       "Stripe.net": {
         "type": "CentralTransitive",
-        "requested": "[52.3.0, )",
-        "resolved": "52.3.0",
-        "contentHash": "zqaHgeEITTvRGLk9QlxG4GoJ8aQlM17pJeqea6z4uge4cddTgJ5HyTd3znKqfJARxu1rR2pcHFjFbSBlQbYsnQ==",
+        "requested": "[52.4.2, )",
+        "resolved": "52.4.2",
+        "contentHash": "cap6WfPXE1WBoCVle151RLGpF5cQoOx+6sitBG8wuoDJaVVhscJjX3c3F6ldvwFUelqo0GxtM9odaq8Rn7sKmA==",
         "dependencies": {
           "Newtonsoft.Json": "13.0.3",
           "System.Configuration.ConfigurationManager": "9.0.0"

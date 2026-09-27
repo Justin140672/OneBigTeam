@@ -114,7 +114,7 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
 
             await SaveAndWaitForRenumberToSettleAsync(hrSettings, "STF-");
             Assert.False(await hrSettings.HasErrorAsync(),
-                "Expected no error after saving representative HR settings fields");
+                $"Expected no error after saving representative HR settings fields, got: {await hrSettings.GetErrorTextAsync()}");
 
             // Reload the page for real (re-navigate) to exercise the settings-hydration path
             // server-side, not just in-memory Blazor state.
@@ -140,7 +140,7 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
             await hrSettings.SetNextEmployeeNumberAsync(15);
             await hrSettings.SaveAsync();
             Assert.False(await hrSettings.HasErrorAsync(),
-                "Expected no error after saving the next employee number on its own");
+                $"Expected no error after saving the next employee number on its own, got: {await hrSettings.GetErrorTextAsync()}");
 
             await hrSettings.GoToAsync(BetaCorpId);
             Assert.Equal(15, await hrSettings.GetNextEmployeeNumberAsync());
@@ -493,7 +493,7 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
         {
             await hrSettings.SelectEmployeeNumberModeAsync("Manual");
             await hrSettings.SaveAsync();
-            Assert.False(await hrSettings.HasErrorAsync());
+            Assert.False(await hrSettings.HasErrorAsync(), $"Save failed: {await hrSettings.GetErrorTextAsync()}");
 
             await hrSettings.GoToAsync(BetaCorpId);
             await hrSettings.SelectEmployeeNumberModeAsync("Automatic");
@@ -504,7 +504,7 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
                 "Manual -> Automatic must not trigger the renumber confirmation — existing numbers are left as-is");
 
             await _page.WaitForSpinnerToClearAsync();
-            Assert.False(await hrSettings.HasErrorAsync());
+            Assert.False(await hrSettings.HasErrorAsync(), $"Save failed: {await hrSettings.GetErrorTextAsync()}");
 
             await hrSettings.GoToAsync(BetaCorpId);
             Assert.Equal("Automatic", await hrSettings.GetEmployeeNumberModeAsync());

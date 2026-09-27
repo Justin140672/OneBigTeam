@@ -55,6 +55,39 @@ public static class LocatorExtensions
     }
 
     /// <summary>
+    /// Clicks a list page's grid-toolbar "Add" button and waits for the create route. The toolbar's
+    /// click handling is wired on a separate render pass AFTER the grid rows first paint, so a click
+    /// fired right after a list page's readiness wait can be silently dropped (documented on
+    /// ExternalRecruiterListPage.ClickNewAsync). Re-clicks only while the URL provably hasn't
+    /// changed — the navigation itself happens at most once — and on final failure reports where
+    /// the page actually is.
+    /// </summary>
+    public static async Task ClickGridAddAndWaitForCreateRouteAsync(this IPage page, string createUrlGlob)
+    {
+        var addButton = page.GetByRole(AriaRole.Button, new() { Name = "Add" });
+        await addButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
+
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            await addButton.ClickAsync();
+            try
+            {
+                await page.WaitForURLAsync(createUrlGlob, new() { Timeout = 10_000, WaitUntil = WaitUntilState.Commit });
+                return;
+            }
+            catch (TimeoutException) when (attempt < 3)
+            {
+                // Toolbar handler not attached yet when clicked — the URL is unchanged, click again.
+            }
+            catch (TimeoutException ex)
+            {
+                throw new TimeoutException(
+                    $"Clicking 'Add' did not navigate to '{createUrlGlob}' after 3 attempts (page is at {page.Url}).", ex);
+            }
+        }
+    }
+
+    /// <summary>
     /// Rewinds the page's (single) Syncfusion grid to page 1, then calls <paramref name="visitPage"/>
     /// once per page in pager order until it returns true (done), the last page has been visited,
     /// or <paramref name="budget"/> elapses. Each page swap is confirmed to have actually landed

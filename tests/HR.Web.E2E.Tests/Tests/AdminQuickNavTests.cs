@@ -94,11 +94,15 @@ public sealed class AdminQuickNavTests(HrAdminPersonaFixture fixture) : RoleE2ET
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Turn a dedicated pool employee (unused by EmployeeLeavingProcessTests, which only takes
-        // slots 0-6) into a leaver by driving the real Start Leaving Process wizard — there is no
-        // seed data or API shortcut for this, mirroring EmployeeLeavingProcessTests.
-        var leaver = SeededE2eEmployees.LeavingProcess[7];
-        await empEdit.GoToAsync(AcmeId, leaver.EmployeeId);
+        // Turn this test's OWN fresh, active employee into a leaver by driving the real Start
+        // Leaving Process wizard — there is no seed data or API shortcut for this, mirroring
+        // EmployeeLeavingProcessTests. It previously used the seeded pool member
+        // SeededE2eEmployees.LeavingProcess[7] on the assumption EmployeeLeavingProcessTests only
+        // took slots 0-6 — but its CancelLeavingProcess test takes slot 7, so whichever of the two
+        // ran second found the employee already had a leaving process and "Start offboarding" was
+        // no longer offered (#start-offboarding never appeared).
+        var leaver = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "QuickNavLeaver", activate: true);
+        await empEdit.GoToAsync(AcmeId, leaver.Id);
         await MakeLeaverViaWizardAsync(dialog);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees");

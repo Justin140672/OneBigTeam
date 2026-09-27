@@ -169,6 +169,18 @@ builder.Services.AddSyncfusionBlazor();
 
 var app = builder.Build();
 
+// [P2] Content Security Policy — see HrWebContentSecurityPolicy for the source inventory. Resolved
+// once at startup: the development allowances are derived from the host environment only, and
+// invalid/non-https/localhost image origins outside Development fail startup rather than silently
+// widening the policy.
+var cspSettings = HrWebCspSettings.Create(app.Environment, app.Configuration);
+if (!app.Environment.IsDevelopment() && cspSettings.ImageOrigins.Count == 0)
+{
+    app.Logger.LogWarning(
+        "ContentSecurityPolicy:ImageOrigins is empty — profile photos and company logos served from " +
+        "Supabase Storage signed URLs will be blocked by img-src. Set it to the Supabase project origin.");
+}
+
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
@@ -177,6 +189,10 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+// After the exception-handler/status-code-page middleware (re-executed error and 404 pages pass
+// through it again and get their own header + nonce) and before anything that can short-circuit
+// (HTTPS redirect, static assets, endpoints).
+app.UseHrWebContentSecurityPolicy(cspSettings);
 app.UseHttpsRedirection();
 
 // Required: any endpoint carrying authorization metadata — [Authorize] (Components/Pages/
@@ -239,7 +255,7 @@ app.Use(async (context, next) =>
 // (#access_token=...), which is browser-only and never sent to the server. This tiny page moves
 // that token to the server via a POST body (a hidden form field) — never a query string — so it
 // cannot leak through browser history, referrer headers, proxy logs or a screenshot.
-app.MapGet("/verify-email", () => Results.Content("""
+app.MapGet("/verify-email", (HttpContext context) => Results.Content($$"""
     <!DOCTYPE html>
     <html>
     <head><title>Confirming your account…</title></head>
@@ -247,7 +263,7 @@ app.MapGet("/verify-email", () => Results.Content("""
     <form id="f" method="post" action="/verify-email-complete">
         <input type="hidden" name="access_token" id="access_token" />
     </form>
-    <script>
+    <script nonce="{{HrWebContentSecurityPolicy.GetNonce(context)}}">
         var params = new URLSearchParams(window.location.hash.slice(1));
         var accessToken = params.get('access_token');
         if (accessToken) {
@@ -317,7 +333,7 @@ app.MapPost("/verify-email-complete", async (
 //     mechanism — see CreatePlatformAdministratorHandler's remarks on why silent email-match
 //     linking is never acceptable).
 // Same implicit/fragment hand-off pattern as /verify-email above — see that endpoint's remarks.
-app.MapGet("/platform-admin/activate", () => Results.Content("""
+app.MapGet("/platform-admin/activate", (HttpContext context) => Results.Content($$"""
     <!DOCTYPE html>
     <html>
     <head><title>Activating your administrator account…</title></head>
@@ -325,7 +341,7 @@ app.MapGet("/platform-admin/activate", () => Results.Content("""
     <form id="f" method="post" action="/platform-admin/activate-complete">
         <input type="hidden" name="access_token" id="access_token" />
     </form>
-    <script>
+    <script nonce="{{HrWebContentSecurityPolicy.GetNonce(context)}}">
         var params = new URLSearchParams(window.location.hash.slice(1));
         var accessToken = params.get('access_token');
         if (accessToken) {
@@ -387,7 +403,7 @@ app.MapPost("/platform-admin/activate-complete", async (
 // recovery access token arrives in the URL fragment; this page POSTs it to the server (never a
 // query string), where /reset-password-begin swaps it for an opaque single-use handoff code and
 // redirects to the reset form carrying only that code.
-app.MapGet("/reset-password", () => Results.Content("""
+app.MapGet("/reset-password", (HttpContext context) => Results.Content($$"""
     <!DOCTYPE html>
     <html>
     <head><title>Confirming your request…</title></head>
@@ -395,7 +411,7 @@ app.MapGet("/reset-password", () => Results.Content("""
     <form id="f" method="post" action="/reset-password-begin">
         <input type="hidden" name="access_token" id="access_token" />
     </form>
-    <script>
+    <script nonce="{{HrWebContentSecurityPolicy.GetNonce(context)}}">
         var params = new URLSearchParams(window.location.hash.slice(1));
         document.getElementById('access_token').value = params.get('access_token') || '';
         history.replaceState(null, '', '/reset-password');
@@ -711,11 +727,18 @@ app.MapGet("/companies/{companyId:guid}/candidates/{candidateId:guid}/cv/{docume
 
     // No download file name → the browser renders it inline (Content-Disposition: inline).
     return Results.File(bytes, contentType);
-}).RequireAuthorization();
+}).RequireAuthorization()
+    // ReviewCv embeds this response in <object>; its CSP says frame-ancestors 'self' instead of 'none'.
+    .AllowSameOriginFraming();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+    // Blazor Server otherwise appends its own second "Content-Security-Policy: frame-ancestors 'self'"
+    // header to component responses. HrWebContentSecurityPolicy already sends the stricter
+    // frame-ancestors 'none' on every response, so keep a single policy — except in report-only mode,
+    // where Blazor's enforced frame-ancestors is kept so clickjacking protection never lapses.
+    .AddInteractiveServerRenderMode(options =>
+        options.ContentSecurityFrameAncestorsPolicy = cspSettings.ReportOnly ? "'self'" : null);
 app.MapDefaultEndpoints();
 
 app.Run();

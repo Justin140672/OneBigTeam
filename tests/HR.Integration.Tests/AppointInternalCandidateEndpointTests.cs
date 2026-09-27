@@ -385,17 +385,57 @@ public class AppointInternalCandidateEndpointTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    // Only "recruitment:manage" is required to appoint — "employee:manage" is neither required nor
+    // sufficient. The Recruiter role holds recruitment:manage but not employee:manage.
     [Fact]
-    public async Task Post_Appoint_Returns_Forbidden_For_Recruiter_Without_Employee_Manage()
+    public async Task Post_Appoint_Succeeds_For_Recruiter_Without_Employee_Manage()
     {
         var companyId = Guid.NewGuid();
-        using var client = await ClientWithRolesAsync(_factory, companyId, SystemRoles.Recruiter, SystemRoles.Employee);
+        using var client = await ClientWithRolesAsync(_factory, companyId, SystemRoles.Recruiter);
         var s = await SeedAsync(_factory, companyId);
 
         var response = await client.PostAsJsonAsync(AppointUrl(s), AppointBody(s));
 
-        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
-        await AssertUntouchedAsync(s);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await ReadAppointResponseAsync(response);
+        Assert.Equal(s.EmployeeId, body.EmployeeId);
+        Assert.Equal(s.HiredStageId, body.CurrentStageId);
+        Assert.Equal("Completed", body.AppointmentStatus);
+        Assert.True(body.IsApplied);
+
+        var employee = await GetEmployeeAsync(_factory, s.EmployeeId);
+        Assert.Equal(s.World.Target.PositionProfileId, employee.PositionProfileId);
+        Assert.Equal(s.World.NewManagerId, employee.ManagerId);
+        Assert.Equal(s.SourceReference, Assert.Single(await GetPromotionsAsync(_factory, s.EmployeeId)).SourceReference);
+    }
+
+    [Fact]
+    public async Task Post_Appoint_With_Compensation_Succeeds_For_Recruiter_Without_Employee_Manage()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await ClientWithRolesAsync(_factory, companyId, SystemRoles.Recruiter);
+        var s = await SeedAsync(_factory, companyId);
+
+        var response = await client.PostAsJsonAsync(AppointUrl(s), new
+        {
+            effectiveDate = Today.ToString("yyyy-MM-dd"),
+            noManager = true,
+            createCompensationChange = true,
+            compensationSalaryType = "Annual",
+            compensationSalary = 64000m,
+            compensationCurrency = "GBP",
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await ReadAppointResponseAsync(response);
+        Assert.NotNull(body.CompensationId);
+        Assert.Null(body.ManagerId);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Employees.Persistence.EmployeesDbContext>();
+        var compensation = await db.Compensations.AsNoTracking().SingleAsync(c => c.EmployeeId == s.EmployeeId);
+        Assert.Equal(body.CompensationId, compensation.Id);
+        Assert.Equal(64000m, compensation.Salary);
     }
 
     [Fact]

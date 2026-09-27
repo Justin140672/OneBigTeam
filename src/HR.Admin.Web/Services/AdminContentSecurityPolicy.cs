@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+using HR.SharedKernel.Http;
 
 namespace HR.Admin.Web.Services;
 
@@ -37,7 +37,7 @@ public static class AdminContentSecurityPolicy
     /// <summary><see cref="HttpContext.Items"/> key holding this request's script nonce.</summary>
     public const string NonceItemKey = "HR.Admin.Web.CspNonce";
 
-    public static string CreateNonce() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(16));
+    public static string CreateNonce() => ContentSecurityPolicyBuilder.CreateNonce();
 
     public static string? GetNonce(HttpContext? context) =>
         context?.Items.TryGetValue(NonceItemKey, out var value) == true ? value as string : null;
@@ -46,21 +46,26 @@ public static class AdminContentSecurityPolicy
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(nonce);
 
-        var devSources = isDevelopment ? " http://localhost:* https://localhost:*" : string.Empty;
-        var devConnect = isDevelopment ? " ws://localhost:* wss://localhost:* http://localhost:* https://localhost:*" : string.Empty;
+        string[] devSources = isDevelopment ? ["http://localhost:*", "https://localhost:*"] : [];
+        string[] devConnect = isDevelopment
+            ? ["ws://localhost:*", "wss://localhost:*", "http://localhost:*", "https://localhost:*"]
+            : [];
 
-        return string.Join("; ",
-            "default-src 'self'",
-            $"script-src 'self' 'nonce-{nonce}' 'unsafe-eval'{devSources}",
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
-            "font-src 'self' data: https://fonts.gstatic.com",
-            "img-src 'self' data:",
-            $"connect-src 'self'{devConnect}",
-            "object-src 'none'",
-            "frame-src 'none'",
-            "frame-ancestors 'none'",
-            "base-uri 'self'",
-            "form-action 'self'");
+        // Serialised by the shared HR.SharedKernel.Http.ContentSecurityPolicyBuilder (validation and
+        // nonce mechanics only); the directive list itself stays explicit and Admin-specific here.
+        return new ContentSecurityPolicyBuilder()
+            .Add("default-src", "'self'")
+            .Add("script-src", ["'self'", ContentSecurityPolicyBuilder.NonceSource(nonce), "'unsafe-eval'", .. devSources])
+            .Add("style-src", "'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net")
+            .Add("font-src", "'self'", "data:", "https://fonts.gstatic.com")
+            .Add("img-src", "'self'", "data:")
+            .Add("connect-src", ["'self'", .. devConnect])
+            .Add("object-src", "'none'")
+            .Add("frame-src", "'none'")
+            .Add("frame-ancestors", "'none'")
+            .Add("base-uri", "'self'")
+            .Add("form-action", "'self'")
+            .Build();
     }
 
     /// <summary>

@@ -37,7 +37,7 @@ public sealed class BulkEmployeeInvitationManualSelectionTests(HrAdminPersonaFix
 
         await empList.CheckEmployeeRowAsync(name);
 
-        Assert.False(await empList.IsInviteSelectedToolbarButtonDisabledAsync(),
+        Assert.True(await empList.WaitForInviteSelectedToolbarButtonEnabledAsync(),
             "Expected 'Invite selected' to be enabled once a row is selected");
 
         await empList.ClickInviteSelectedToolbarButtonAsync();

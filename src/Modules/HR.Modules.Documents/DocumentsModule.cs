@@ -137,7 +137,14 @@ public static class DocumentsModule
         // modules via the shared HR.Infrastructure.Abstractions.IUploadedFileScanner contract.
         services.AddScoped<HR.Infrastructure.Abstractions.IUploadedFileScanner, UploadedFileScannerAdapter>();
 
-        if (hasClamAvConfig)
+        // E2E_TESTING must win over the ClamAv config: HR.AppHost injects Documents__ClamAv__Host
+        // unconditionally, so without this guard the E2E run wired the real scanner, whose job has to
+        // download the upload from the E2E document storage (not a reachable HTTP endpoint) and so
+        // failed every attempt — uploads stayed Pending/Failed and never became downloadable (e.g.
+        // an HR-uploaded profile photo never replaced the initials). This guard existed before the
+        // fail-closed change (93eaf9dc) and was dropped by it; E2E_TESTING itself is refused outside
+        // Development, so Staging/Production still always get ClamAV (or fail closed below).
+        if (!isE2ETestingForVirusScan && hasClamAvConfig)
         {
             services.AddOptions<ClamAvOptions>().Bind(clamAvSection).ValidateOnStart();
             services.AddSingleton<Microsoft.Extensions.Options.IValidateOptions<ClamAvOptions>, ClamAvOptionsValidator>();

@@ -22,11 +22,12 @@ namespace HR.Web.E2E.Tests.Tests;
 /// employee starts on, James as the vacancy's hiring manager, the recruitment stage names).
 /// Every grid assertion is scoped to this test's own unique names/ids.
 ///
-/// Who drives the UI: the appoint endpoint requires recruitment:manage AND employee:manage, which
-/// no seeded persona holds together (Recruiter vs HR Administrator). The UI session is therefore a
-/// dedicated "appointer" user created once per process by InternalAppointmentApi.EnsureAppointerAsync
-/// (Employee + HR Administrator + Recruiter, verified to hold both permissions) — it is never
-/// mutated by any test, only used to sign in.
+/// Who drives the UI: the appoint endpoint requires recruitment:manage only, so by default the UI
+/// session is this class's seeded Recruiter persona (Marcus — recruitment:manage, no employee:manage),
+/// for whom the success banner names the employee instead of linking to their full HR record. The
+/// tests that go on to FOLLOW the profile link sign in instead as the dedicated HR Administrator +
+/// Recruiter "appointer" (InternalAppointmentApi.EnsureAppointerAsync, created once per process and
+/// never mutated). Employee-record checks always go through the HR Administrator API client.
 ///
 /// Serialization (two gates, always acquired in this order — the same order
 /// InternalApplicationIdentificationTests/InternalVacancyApplyTests use, so they can't deadlock):
@@ -107,9 +108,12 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
 
     /// <summary>
     /// Creates this test's own vacancy + internal application (and optionally an external one), then
-    /// signs the browser in as the appointer user and opens the vacancy's Applications tab.
+    /// signs the browser in and opens the vacancy's Applications tab. The browser user is the seeded
+    /// Recruiter (recruitment:manage only) unless <paramref name="withEmployeeProfileAccess"/> asks for
+    /// the HR Administrator + Recruiter appointer, needed only to follow the banner's profile link.
     /// </summary>
-    private async Task<(Arranged Arranged, VacancyDetailPage VacancyDetail)> ArrangeAsync(bool withExternalApplication = false)
+    private async Task<(Arranged Arranged, VacancyDetailPage VacancyDetail)> ArrangeAsync(
+        bool withExternalApplication = false, bool withEmployeeProfileAccess = false)
     {
         var hrAdminApi = await InternalVacancyApplyApi.CreateHrAdminApiClientAsync(_fixture.ApiBaseUrl);
         var recruiterApi = await CandidateCvApi.CreateRecruiterApiClientAsync(_fixture.ApiBaseUrl);
@@ -117,13 +121,14 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
         var vacancy = await InternalVacancyApplyApi.CreateOpenInternalVacancyAsync(hrAdminApi, recruiterApi);
         var vacancyDetail = await InternalAppointmentApi.GetVacancyAsync(recruiterApi, vacancy.Id);
 
-        InternalAppointmentApi.Appointer appointer;
         InternalVacancyApplyApi.FreshEmployee applicant;
         InternalVacancyApplyApi.InternalApplication internalApplication;
         await SupabaseAuthGate.Instance.WaitAsync();
         try
         {
-            appointer = await InternalAppointmentApi.EnsureAppointerAsync(hrAdminApi, _fixture.ApiBaseUrl);
+            var browserUserEmail = withEmployeeProfileAccess
+                ? (await InternalAppointmentApi.EnsureAppointerAsync(hrAdminApi, _fixture.ApiBaseUrl)).WorkEmail
+                : InternalAppointmentApi.RecruiterEmail;
 
             applicant = await InternalVacancyApplyApi.CreateActiveEmployeeWithLoginAsync(hrAdminApi, _fixture.ApiBaseUrl);
             using (var employeeApi = await InternalVacancyApplyApi.CreateEmployeeApiClientAsync(_fixture.ApiBaseUrl, applicant.WorkEmail))
@@ -134,7 +139,7 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
 
             var login = new LoginPage(_page, _fixture.WebBaseUrl);
             await login.GoToAsync();
-            await login.LoginAsync(appointer.WorkEmail);
+            await login.LoginAsync(browserUserEmail);
         }
         finally
         {
@@ -269,7 +274,7 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
         // This test's own new manager — never a shared seeded persona.
         var newManager = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "AppointMgr", activate: true);
 
-        var (arranged, vacancyDetail) = await ArrangeAsync();
+        var (arranged, vacancyDetail) = await ArrangeAsync(withEmployeeProfileAccess: true);
         using var _ = arranged;
         var applicant = arranged.Applicant;
 
@@ -304,7 +309,7 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
     [Fact]
     public async Task Appoint_WithNoManager_CompletesAndProfileShowsNoManager()
     {
-        var (arranged, vacancyDetail) = await ArrangeAsync();
+        var (arranged, vacancyDetail) = await ArrangeAsync(withEmployeeProfileAccess: true);
         using var _ = arranged;
         var applicant = arranged.Applicant;
 
@@ -350,7 +355,8 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
 
         await dialog.SubmitExpectingSuccessAsync();
         await dialog.ExpectScheduledSuccessBannerAsync(effectiveDate);
-        await dialog.ExpectEmployeeLinkAsync(AcmeId, applicant.Id);
+        // The Recruiter cannot open the full employee record: the banner names the employee, no link.
+        await dialog.ExpectEmployeeNameWithoutLinkAsync(applicant.FullName);
 
         // Scheduled, not applied: the employee keeps their current position and manager until then.
         var after = await InternalAppointmentApi.GetEmployeeAsync(arranged.HrAdminApi, applicant.Id);

@@ -260,6 +260,17 @@ public sealed class InternalAppointmentDialog(IPage page)
     public Task ExpectNoSuccessBannerAsync() =>
         Assertions.Expect(SuccessBanner).ToHaveCountAsync(0, new() { Timeout = 10_000 });
 
+    /// <summary>
+    /// For an appointer who cannot open the full employee record (e.g. a Recruiter without
+    /// employee:manage): the banner names the employee instead of linking to their profile.
+    /// </summary>
+    public async Task ExpectEmployeeNameWithoutLinkAsync(string employeeFullName)
+    {
+        await Assertions.Expect(SuccessBanner.Locator("[data-testid='appoint-employee-name']"))
+            .ToHaveTextAsync(employeeFullName, new() { Timeout = 10_000 });
+        await Assertions.Expect(EmployeeLink).ToHaveCountAsync(0);
+    }
+
     public Task ExpectEmployeeLinkAsync(Guid companyId, Guid employeeId) =>
         Assertions.Expect(EmployeeLink).ToHaveAttributeAsync(
             "href", $"/companies/{companyId}/employees/{employeeId}", new() { Timeout = 10_000 });

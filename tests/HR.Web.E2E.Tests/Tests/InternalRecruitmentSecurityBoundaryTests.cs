@@ -13,7 +13,9 @@ namespace HR.Web.E2E.Tests.Tests;
 ///   • cross-company vacancy, candidate, application and employee identifiers are rejected by the
 ///     apply, new-candidate / add-candidate, set-CV and appoint endpoints (and a foreign company in the
 ///     route is refused outright by TenantRouteAuthorizationMiddleware);
-///   • another candidate's CV document can't be recorded against an internal application.
+///   • another candidate's CV document can't be recorded against an internal application;
+///   • appointing requires recruitment:manage only: the seeded Recruiter (Marcus, no employee:manage)
+///     appoints, while an HR Administrator without recruitment:manage (Laura) is refused.
 ///
 /// Cross-company identifiers are Beta Corp's SEEDED ids (a second tenant that exists in every E2E
 /// environment — see InternalRecruitmentJourneyApi): its company, Alice (employee), the Backend
@@ -80,20 +82,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
             var employee = await InternalVacancyApplyApi.CreateActiveEmployeeWithLoginAsync(hrAdminApi, _fixture.ApiBaseUrl);
             var api = await InternalVacancyApplyApi.CreateEmployeeApiClientAsync(_fixture.ApiBaseUrl, employee.WorkEmail);
             return new SignedInEmployee(employee, api);
-        }
-        finally
-        {
-            SupabaseAuthGate.Instance.Release();
-        }
-    }
-
-    private async Task<HttpClient> CreateAppointerApiAsync(HttpClient hrAdminApi)
-    {
-        await SupabaseAuthGate.Instance.WaitAsync();
-        try
-        {
-            var appointer = await InternalAppointmentApi.EnsureAppointerAsync(hrAdminApi, _fixture.ApiBaseUrl);
-            return await InternalVacancyApplyApi.CreateEmployeeApiClientAsync(_fixture.ApiBaseUrl, appointer.WorkEmail);
         }
         finally
         {
@@ -342,7 +330,9 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
         var application = await InternalVacancyApplyApi.ApplyAsEmployeeAsync(
             applicant.Api, vacancy.Id, $"cv-{applicant.Employee.LastName}.pdf");
 
-        using var appointerApi = await CreateAppointerApiAsync(hrAdminApi);
+        // Appointing needs recruitment:manage only, so the seeded Recruiter (Marcus — no
+        // employee:manage) is the appointer; the employee record is read back as the HR Administrator.
+        var appointerApi = recruiterApi;
 
         var before = await InternalRecruitmentJourneyApi.GetEmployeeRecordAsync(hrAdminApi, applicant.Employee.Id);
         Assert.NotEqual(vacancyInfo.PositionProfileId, before.PositionProfileId);
@@ -405,5 +395,48 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
 
         var hired = await InternalRecruitmentJourneyApi.GetApplicationAsync(recruiterApi, vacancy.Id, application.ApplicationId);
         Assert.Equal(HiredStage, hired.CurrentStageName);
+    }
+
+    // ── 7. Appointing needs recruitment:manage — employee:manage alone is not enough ─────────
+
+    [Fact]
+    public async Task Appoint_ByHrAdministratorWithoutRecruitmentManage_IsForbidden_ThenRecruiterAppointSucceeds()
+    {
+        using var hrAdminApi = await InternalVacancyApplyApi.CreateHrAdminApiClientAsync(_fixture.ApiBaseUrl);
+        using var recruiterApi = await CandidateCvApi.CreateRecruiterApiClientAsync(_fixture.ApiBaseUrl);
+        var vacancy = await InternalVacancyApplyApi.CreateOpenInternalVacancyAsync(hrAdminApi, recruiterApi);
+        var vacancyInfo = await InternalAppointmentApi.GetVacancyAsync(recruiterApi, vacancy.Id);
+
+        using var applicant = await CreateSignedInEmployeeAsync(hrAdminApi);
+        var application = await InternalVacancyApplyApi.ApplyAsEmployeeAsync(
+            applicant.Api, vacancy.Id, $"cv-{applicant.Employee.LastName}.pdf");
+
+        var before = await InternalRecruitmentJourneyApi.GetEmployeeRecordAsync(hrAdminApi, applicant.Employee.Id);
+
+        // Laura (HR Administrator: employee:manage, no recruitment:manage) → 403, nothing changes.
+        using (var forbidden = await InternalRecruitmentJourneyApi.PostAppointAsync(
+                   hrAdminApi, AcmeId, vacancy.Id, application.ApplicationId, managerId: null))
+        {
+            await InternalRecruitmentJourneyApi.AssertStatusAsync(forbidden, HttpStatusCode.Forbidden,
+                "employee:manage without recruitment:manage must not be able to appoint");
+        }
+
+        var unchanged = await InternalRecruitmentJourneyApi.GetEmployeeRecordAsync(hrAdminApi, applicant.Employee.Id);
+        Assert.Equal(before.PositionProfileId, unchanged.PositionProfileId);
+        Assert.Equal(before.ManagerId, unchanged.ManagerId);
+        var stillOpen = await InternalRecruitmentJourneyApi.GetApplicationAsync(recruiterApi, vacancy.Id, application.ApplicationId);
+        Assert.Equal(InitialStage, stillOpen.CurrentStageName);
+
+        // Marcus (Recruiter: recruitment:manage, no employee:manage) → appoints successfully.
+        using (var appointed = await InternalRecruitmentJourneyApi.PostAppointAsync(
+                   recruiterApi, AcmeId, vacancy.Id, application.ApplicationId, managerId: null))
+        {
+            await InternalRecruitmentJourneyApi.AssertStatusAsync(appointed, HttpStatusCode.OK,
+                "recruitment:manage alone is sufficient to appoint");
+        }
+
+        var after = await InternalRecruitmentJourneyApi.GetEmployeeRecordAsync(hrAdminApi, applicant.Employee.Id);
+        Assert.Equal(vacancyInfo.PositionProfileId, after.PositionProfileId);
+        Assert.Null(after.ManagerId);
     }
 }

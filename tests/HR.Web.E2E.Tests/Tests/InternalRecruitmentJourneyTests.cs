@@ -29,11 +29,11 @@ namespace HR.Web.E2E.Tests.Tests;
 /// manager. Only seeded REFERENCE data is read (Acme, its departments/locations, James as hiring
 /// manager and interviewer, the recruitment stage names).
 ///
-/// Who drives the recruiter side: the process-wide "appointer" user from
-/// InternalAppointmentApi.EnsureAppointerAsync (Employee + HR Administrator + Recruiter). The appoint
-/// endpoint needs recruitment:manage AND employee:manage, which no seeded persona holds together, and
-/// using one account for every recruiter step avoids an extra real-login switch mid-journey. The
-/// appointer is never mutated by any test.
+/// Who drives the recruiter side: the seeded Recruiter persona (Marcus — this class's
+/// RecruiterPersonaFixture). The appoint endpoint needs recruitment:manage only, so the recruiter
+/// completes every recruiter step including Appoint. Marcus has no employee:manage, so the success
+/// banner names the employee instead of linking to their full HR record, and the employee record is
+/// verified through the HR Administrator API client (Laura) instead of through the UI.
 ///
 /// Serialization (same order as every other internal-recruitment class, so no deadlock):
 ///   1. CrossUserVacancyTestBase.GateInstance for the whole test — stage assertions read Acme's shared
@@ -121,12 +121,10 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
 
         var newManager = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "JourneyMgr", activate: true);
 
-        InternalAppointmentApi.Appointer appointer;
         InternalVacancyApplyApi.FreshEmployee applicant;
         await SupabaseAuthGate.Instance.WaitAsync();
         try
         {
-            appointer = await InternalAppointmentApi.EnsureAppointerAsync(hrAdminApi, _fixture.ApiBaseUrl);
             applicant = await InternalVacancyApplyApi.CreateActiveEmployeeWithLoginAsync(hrAdminApi, _fixture.ApiBaseUrl);
         }
         finally
@@ -146,7 +144,7 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
         var advertiseCheckbox = _page.Locator("#isAdvertisedInternally");
 
         // ── 1. Recruiter advertises the Open vacancy internally ────────────────────────────────
-        await SignInAsAsync(login, appointer.WorkEmail, switchAccount: false);
+        await SignInAsAsync(login, InternalAppointmentApi.RecruiterEmail, switchAccount: false);
 
         await vacancyDetail.GoToAsync(AcmeId, vacancy.Id);
         await Assertions.Expect(advertiseCheckbox).Not.ToBeCheckedAsync(new() { Timeout = 15_000 });
@@ -226,7 +224,7 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
         Assert.Equal(submittedCvId, applied.CurrentCandidateCvDocumentId);
 
         // ── 4. Recruiter sees the Internal badge in the Applications list and on the Kanban board ──
-        await SignInAsAsync(login, appointer.WorkEmail, switchAccount: true);
+        await SignInAsAsync(login, InternalAppointmentApi.RecruiterEmail, switchAccount: true);
 
         await vacancyDetail.GoToAsync(AcmeId, vacancy.Id);
         await vacancyDetail.OpenApplicationsTabAsync();
@@ -324,7 +322,9 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
         await dialog.SubmitExpectingSuccessAsync();
 
         await dialog.ExpectAppliedSuccessBannerAsync();
-        await dialog.ExpectEmployeeLinkAsync(AcmeId, applicant.Id);
+        // The recruiter cannot open the full employee record, so the banner names the employee
+        // rather than linking to a page that would deny access.
+        await dialog.ExpectEmployeeNameWithoutLinkAsync(applicant.FullName);
 
         // ── 9. Application reaches Hired ──────────────────────────────────────────────────────
         await vacancyDetail.ExpectApplicationStatusAsync(applicant.LastName, HiredStage);
@@ -354,12 +354,7 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
 
         var candidateAfter = await InternalRecruitmentJourneyApi.GetCandidateAsync(recruiterApi, candidateId);
         Assert.Equal(applicant.Id, candidateAfter.EmployeeId);
-
-        // The success banner links to that same employee's profile, showing the new manager and role.
-        await dialog.FollowEmployeeLinkAsync(applicant.Id);
-        await Assertions.Expect(_page.Locator("h1").Filter(new() { HasText = applicant.FullName }).First)
-            .ToBeVisibleAsync(new() { Timeout = 30_000 });
-        await Assertions.Expect(_page.Locator("p").Filter(new() { HasText = "Reports To:" }).First)
-            .ToContainTextAsync(newManager.FullName, new() { Timeout = 15_000 });
+        // Following the banner's profile link (HR Administrator + Recruiter appointer) is covered by
+        // InternalAppointmentTests.Appoint_WithSelectedManagerToday_...
     }
 }

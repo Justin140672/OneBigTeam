@@ -175,4 +175,29 @@ public class DocumentsModuleVirusScanRegistrationTests
         var descriptor = services.Single(d => d.ServiceType == typeof(IVirusScanService));
         Assert.Equal(typeof(ClamAvVirusScanService), descriptor.ImplementationType);
     }
+
+    [Fact]
+    public void E2eTesting_With_ClamAv_Config_Still_Registers_NoOp_Scanner()
+    {
+        // HR.AppHost injects Documents__ClamAv__Host unconditionally, so an E2E run always has
+        // ClamAv config — E2E_TESTING must still force the no-op scanner (the real scanner's job
+        // can't download uploads from E2E storage and failed every scan, so nothing uploaded in an
+        // E2E run ever became downloadable).
+        var previous = System.Environment.GetEnvironmentVariable("E2E_TESTING");
+        System.Environment.SetEnvironmentVariable("E2E_TESTING", "true");
+        try
+        {
+            var services = new ServiceCollection();
+            var environment = new HostingEnvironment { EnvironmentName = Environments.Development };
+
+            services.AddDocumentsModule(ConnectionString, ConfigurationWithClamAv(), environment);
+
+            var descriptor = services.Single(d => d.ServiceType == typeof(IVirusScanService));
+            Assert.Equal(typeof(NoOpVirusScanService), descriptor.ImplementationType);
+        }
+        finally
+        {
+            System.Environment.SetEnvironmentVariable("E2E_TESTING", previous);
+        }
+    }
 }

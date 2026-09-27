@@ -14,12 +14,19 @@ public sealed class DocumentTypeListPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".e-grid, .spinner-border, .alert-danger",
             new() { Timeout = 20_000 });
         await page.WaitForSpinnerToClearAsync();
+        // ".e-grid" existing only means the component mounted — Syncfusion renders rows (and wires
+        // the toolbar's click handling) on a later JS pass, so an "Add" click fired right after that
+        // could be silently dropped and never navigate. Wait for the rendered grid body, as
+        // PositionProfileListPage.GoToAsync already does.
+        await page.WaitForSelectorAsync(".e-grid .e-row, .e-grid .e-emptyrow, .alert-danger",
+            new() { Timeout = 30_000 });
     }
 
     public async Task ClickNewAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
-        await page.WaitForURLAsync("**/document-types/new**", new() { Timeout = 15_000 });
+        // See LocatorExtensions.ClickGridAddAndWaitForCreateRouteAsync: the toolbar's click handling
+        // is wired after the rows paint, so a first click can be dropped.
+        await page.ClickGridAddAndWaitForCreateRouteAsync("**/document-types/new**");
     }
 
     /// <summary>The href of the grid row link whose text contains <paramref name="nameFragment"/> (e.g. "/companies/{id}/document-types/{id}").</summary>

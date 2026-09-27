@@ -19,7 +19,9 @@
          overrides win the cascade instead of being clobbered by the theme defaults. -->
     <link rel="stylesheet" href="@Assets["app.css"]" />
     <link rel="stylesheet" href="@Assets["HR.Web.styles.css"]" />
-    <script>
+    @* CSP: the only two inline scripts (this pre-paint theme script and the import map below) are
+       authorised by this response's nonce — see HrWebContentSecurityPolicy. *@
+    <script nonce="@HrWebContentSecurityPolicy.GetNonce(HttpContext)">
         (function () {
             try {
                 var t = localStorage.getItem('theme');
@@ -38,7 +40,7 @@
             } catch {}
         })();
     </script>
-    <ImportMap />
+    <ImportMap nonce="@HrWebContentSecurityPolicy.GetNonce(HttpContext)" />
     <link rel="icon" type="image/png" href="favicon.png" media="(prefers-color-scheme: light)" />
     <link rel="icon" type="image/png" href="favicon-dark.png" media="(prefers-color-scheme: dark)" />
     <HeadOutlet />
@@ -59,3 +61,8 @@
 </body>
 
 </html>
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+}

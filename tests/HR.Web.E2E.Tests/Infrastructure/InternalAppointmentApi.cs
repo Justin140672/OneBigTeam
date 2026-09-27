@@ -6,21 +6,30 @@ namespace HR.Web.E2E.Tests.Infrastructure;
 /// API arrange/verify helpers for InternalAppointmentTests (internal recruitment Ticket 7 — the
 /// vacancy Applications tab's "Appoint" action, POST .../applications/{id}/appoint).
 ///
-/// Why a dedicated "appointer" user: the appoint endpoint requires BOTH recruitment:manage and
-/// employee:manage (AppointInternalCandidate.Endpoint: Policies("recruitment:manage",
-/// "employee:manage")). No seeded dev persona holds both — recruitment:manage is Recruiter-only
-/// (Marcus) and employee:manage is HR-Administrator-only (Laura/David), see
-/// RolePermissionConfiguration. Rather than mutate a shared seeded persona's roles, this creates ONE
-/// brand-new Active Acme employee with its own login (the same InternalVacancyApplyApi building
-/// block the internal-apply tests use) and grants it Employee + HR Administrator + Recruiter through
-/// the real PUT .../users/{userId}/roles endpoint, as Laura (users:manage; an HR Administrator may
-/// administer both roles — RoleAdministrationPolicy). The user is created lazily once per test
-/// process and only ever READ from afterwards (it logs in and performs appointments on other,
-/// per-test employees), so sharing it across tests adds no cross-test coupling.
+/// Who appoints: the appoint endpoint requires recruitment:manage ONLY
+/// (AppointInternalCandidate.Endpoint: Policies("recruitment:manage")), so the seeded Recruiter
+/// persona (Marcus, <see cref="RecruiterEmail"/> — recruitment:manage, no employee:manage) is the
+/// default appointer. Because Marcus cannot open the full employee record, the success banner shows
+/// the employee's name rather than a "View employee profile" link for him.
+///
+/// Why a dedicated HR Administrator + Recruiter "appointer" user as well: tests that go on to FOLLOW
+/// the banner's profile link need a user who can both appoint and open the full employee record. No
+/// seeded dev persona holds both — recruitment:manage is Recruiter-only (Marcus) and employee:manage is
+/// HR-Administrator-only (Laura/David), see RolePermissionConfiguration. Rather than mutate a shared
+/// seeded persona's roles, <see cref="EnsureAppointerAsync"/> creates ONE brand-new Active Acme
+/// employee with its own login (the same InternalVacancyApplyApi building block the internal-apply
+/// tests use) and grants it Employee + HR Administrator + Recruiter through the real
+/// PUT .../users/{userId}/roles endpoint, as Laura (users:manage; an HR Administrator may administer
+/// both roles — RoleAdministrationPolicy). The user is created lazily once per test process and only
+/// ever READ from afterwards (it logs in and performs appointments on other, per-test employees), so
+/// sharing it across tests adds no cross-test coupling.
 /// </summary>
 internal static class InternalAppointmentApi
 {
     private static readonly Guid AcmeId = InternalVacancyApplyApi.AcmeId;
+
+    /// <summary>The seeded Recruiter persona (Marcus — RecruiterPersonaFixture): recruitment:manage, no employee:manage.</summary>
+    public const string RecruiterEmail = "marcus.diallo@acme.example";
 
     // SystemRoles (HR.Modules.Identity.Domain.SystemRoles) — internal to the module, so mirrored here.
     private static readonly Guid EmployeeRoleId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -33,7 +42,8 @@ internal static class InternalAppointmentApi
     private static Appointer? _appointer;
 
     /// <summary>
-    /// Returns the process-wide appointer user (see class remarks), creating it on first use.
+    /// Returns the process-wide HR Administrator + Recruiter appointer user (see class remarks),
+    /// creating it on first use. Only needed when a test must also open the appointee's full profile.
     /// Makes real Supabase calls on first use (ensure-employee-login + /api/login) — callers must
     /// hold <see cref="SupabaseAuthGate"/>.
     /// </summary>
@@ -59,8 +69,9 @@ internal static class InternalAppointmentApi
             Assert.True(rolesResponse.IsSuccessStatusCode,
                 $"Granting HR Administrator + Recruiter to the appointer failed with {rolesResponse.StatusCode}: {await rolesResponse.Content.ReadAsStringAsync()}");
 
-            // Prove the appointer really holds both permissions the appoint endpoint demands, so a
-            // role/permission drift surfaces here with a clear message instead of as a UI 403 later.
+            // Prove the appointer really holds both permissions (recruitment:manage to appoint,
+            // employee:manage to open the appointee's full profile), so a role/permission drift
+            // surfaces here with a clear message instead of as a UI 403 later.
             using (var appointerApi = await InternalVacancyApplyApi.CreateEmployeeApiClientAsync(apiBaseUrl, employee.WorkEmail))
             {
                 var employeeManage = await appointerApi.GetAsync($"/api/companies/{AcmeId}/employees?pageSize=1");

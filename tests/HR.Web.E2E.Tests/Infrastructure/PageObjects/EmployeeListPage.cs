@@ -863,6 +863,25 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
 
     public Task<bool> IsInviteSelectedToolbarButtonDisabledAsync() => InviteSelectedToolbarButton.IsDisabledAsync();
 
+    /// <summary>
+    /// Waits for "Invite selected" to become enabled after a row is ticked. Enablement is applied by
+    /// SearchPageBase.OnRowSelected (server round-trip) + EnableToolbarItemsAsync interop, which lands
+    /// after the checkbox has already flipped client-side — an instant IsDisabledAsync() check there
+    /// can read the pre-round-trip state.
+    /// </summary>
+    public async Task<bool> WaitForInviteSelectedToolbarButtonEnabledAsync()
+    {
+        try
+        {
+            await Assertions.Expect(InviteSelectedToolbarButton).ToBeEnabledAsync(new() { Timeout = 10_000 });
+            return true;
+        }
+        catch (PlaywrightException)
+        {
+            return false;
+        }
+    }
+
     public Task ClickInviteSelectedToolbarButtonAsync() => InviteSelectedToolbarButton.ClickAsync();
 
     /// <summary>

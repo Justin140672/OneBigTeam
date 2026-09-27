@@ -173,8 +173,8 @@ else
         if (!_hasFocusedChecklist && FocusChecklist && !_loading && _leavingLookup?.Process is not null)
         {
             _hasFocusedChecklist = true;
-            await JsRuntime.InvokeVoidAsync("eval",
-                "document.getElementById('leaving-checklist-section')?.scrollIntoView({behavior:'smooth', block:'start'})");
+            // Named app.js function, not "eval": the CSP has no 'unsafe-eval'.
+            await JsRuntime.InvokeVoidAsync("hrScrollIntoView", "leaving-checklist-section");
         }
     }
 

@@ -251,3 +251,12 @@ function downloadFileFromBase64(fileName, contentType, base64Content) {
 function openInNewTab(url) {
     window.open(url, '_blank');
 }
+
+// Smoothly scrolls an element into view by id. Replaces a JS-interop "eval" call: HR.Web's Content
+// Security Policy has no 'unsafe-eval' (see HrWebContentSecurityPolicy), so interop must always call
+// a named function like this one rather than evaluating a code string.
+function hrScrollIntoView(id) {
+    try {
+        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch { }
+}

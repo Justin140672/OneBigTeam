@@ -26,11 +26,11 @@ public sealed class PositionProfileListPage(IPage page, string baseUrl)
 
     public async Task ClickNewPositionProfileAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
-        // WaitUntil=Commit, not the default Load: a Blazor interactive navigation may never
-        // re-fire the target document's "load" event.
-        await page.WaitForURLAsync("**/position-profiles/new**",
-            new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
+        // See LocatorExtensions.ClickGridAddAndWaitForCreateRouteAsync: the toolbar's click handling
+        // is wired after the rows paint, so a first click can be dropped (the long-undiagnosed
+        // "waiting for navigation to **/position-profiles/new**" timeouts). Waits on Commit, and on
+        // failure reports the page's actual URL.
+        await page.ClickGridAddAndWaitForCreateRouteAsync("**/position-profiles/new**");
     }
 
     /// <summary>
