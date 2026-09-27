@@ -37,4 +37,9 @@
     <UserSecretsId>b8956337-8148-443a-a35d-733f394a39af</UserSecretsId>
   </PropertyGroup>
 
+  <ItemGroup>
+    <!-- CodeQL #60/#68: lets log-forging regression tests exercise the internal rejection-logging helpers directly. -->
+    <InternalsVisibleTo Include="HR.Integration.Tests" />
+  </ItemGroup>
+
 </Project>

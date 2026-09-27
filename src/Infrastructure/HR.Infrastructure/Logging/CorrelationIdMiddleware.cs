@@ -43,8 +43,10 @@ public sealed class CorrelationIdMiddleware(RequestDelegate next)
     /// <summary>Documented character policy: ASCII alphanumerics plus '-', '_', '.', ':' — enough for
     /// GUIDs, ULIDs, and common "prefix-id" conventions, while excluding anything that could enable
     /// log/header injection (newlines, control characters, delimiters) or be otherwise unsafe to
-    /// echo back verbatim into an HTTP header and structured logs.</summary>
-    private static readonly Regex AllowedCharacters = new(@"^[A-Za-z0-9._:-]+$", RegexOptions.Compiled);
+    /// echo back verbatim into an HTTP header and structured logs.
+    /// Anchored with <c>\z</c>, not <c>$</c>: in .NET <c>$</c> also matches immediately before a
+    /// trailing newline, which would let a value such as "abc" + LF through the allow-list.</summary>
+    private static readonly Regex AllowedCharacters = new(@"^[A-Za-z0-9._:-]+\z", RegexOptions.Compiled);
 
     public async Task InvokeAsync(HttpContext context, IExecutionContextAccessor executionContextAccessor)
     {
@@ -86,7 +88,8 @@ public sealed class CorrelationIdMiddleware(RequestDelegate next)
         }
     }
 
-    private static bool IsAcceptable(string? supplied) =>
+    /// <summary>Length + character allow-list applied to a caller-supplied correlation id (CodeQL #63-#65, #67).</summary>
+    internal static bool IsAcceptable(string? supplied) =>
         !string.IsNullOrWhiteSpace(supplied)
         && supplied.Length <= MaxHeaderLength
         && AllowedCharacters.IsMatch(supplied);

@@ -124,12 +124,21 @@ internal sealed class CandidateDocumentUploadStaging(
     }
 
     /// <summary>Storage keys are prefixed with "{companyId}/{candidateId}/..." — never log the full
-    /// key. Only the trailing filename/extension segment is retained for diagnostic value.</summary>
+    /// key. Only the trailing filename/extension segment is retained for diagnostic value. Keys are
+    /// always "{companyId}/{candidateId}/{server GUID}{allow-listed extension}" (ValidateFile runs
+    /// before GenerateStorageKey on every upload path), so the retained tail is already safe; as
+    /// defence in depth (CodeQL #66) any character outside [A-Za-z0-9._-] is still replaced with '?',
+    /// so no control character can reach a log.</summary>
     internal static string RedactStorageKey(string storageKey)
     {
         var lastSlash = storageKey.LastIndexOf('/');
         var tail = lastSlash >= 0 ? storageKey[(lastSlash + 1)..] : storageKey;
-        return tail.Length <= 12 ? $"***{tail}" : $"***{tail[^12..]}";
+        var retained = tail.Length <= 12 ? tail : tail[^12..];
+        return "***" + string.Create(retained.Length, retained, static (span, source) =>
+        {
+            for (var i = 0; i < source.Length; i++)
+                span[i] = char.IsAsciiLetterOrDigit(source[i]) || source[i] is '.' or '-' or '_' ? source[i] : '?';
+        });
     }
 
     /// <summary>Size, extension and content-type rules for any candidate document upload.</summary>

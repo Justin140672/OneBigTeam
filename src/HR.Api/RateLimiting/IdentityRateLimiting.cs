@@ -140,7 +140,8 @@ internal static class IdentityRateLimiting
 
         // Safe error contract + Retry-After on 429: never leaks the identity/policy internals a
         // caller could use to fingerprint which specific dimension (IP vs identity) tripped.
-        // Metrics/log line reports policy name and outcome only — never the request's identity value.
+        // Metrics/log line reports policy name and outcome only — never the request's identity value
+        // and never the raw request path/query (CodeQL #60, see RateLimitRejectionLogging).
         options.OnRejected = async (context, cancellationToken) =>
         {
             context.HttpContext.Response.Headers.RetryAfter =
@@ -155,8 +156,7 @@ internal static class IdentityRateLimiting
 
             var logger = context.HttpContext.RequestServices
                 .GetRequiredService<ILoggerFactory>().CreateLogger("IdentityRateLimiting");
-            logger.LogWarning(
-                "Rate limit rejected request. Path={Path}", context.HttpContext.Request.Path);
+            RateLimitRejectionLogging.LogRejected(logger, context.HttpContext);
         };
     }
 

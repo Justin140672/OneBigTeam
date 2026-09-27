@@ -128,16 +128,38 @@ public static class SupabaseJwtBearerConfiguration
 
                 if (isRevoked)
                 {
-                    context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
-                        .CreateLogger("SupabaseJwtBearer")
-                        .LogInformation(
-                            "[e2e-diag] Session revoked for sub={Sub} tokenIssuedAt={TokenIssuedAt} path={Path}",
-                            supabaseAuthUserId, tokenIssuedAt, context.HttpContext.Request.Path);
+                    LogRevokedSessionRejected(
+                        context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+                            .CreateLogger("SupabaseJwtBearer"),
+                        context.HttpContext, supabaseAuthUserId, tokenIssuedAt);
                     context.Fail("Session has been revoked.");
                 }
             },
         };
     }
+
+    /// <summary>Fixed, server-defined auth event name for a request rejected because its session was revoked.</summary>
+    internal const string SessionRevokedAuthEvent = "session_revoked";
+
+    /// <summary>Reported instead of a route template when no endpoint was matched for the request.</summary>
+    internal const string UnmatchedRoute = "(unmatched)";
+
+    /// <summary>
+    /// CodeQL #68 (log forging): the rejection log line used to include
+    /// <c>HttpContext.Request.Path</c> — caller-controlled request-target text. It now carries only a
+    /// fixed auth event name, the typed subject id / issued-at, and the matched endpoint's
+    /// server-defined route template (e.g. <c>api/companies/{companyId}/employees</c>), never the
+    /// raw path, query string or any other request-target text.
+    /// </summary>
+    internal static void LogRevokedSessionRejected(
+        ILogger logger, HttpContext httpContext, Guid supabaseAuthUserId, DateTimeOffset tokenIssuedAt) =>
+        logger.LogInformation(
+            "Rejected request for a revoked session. AuthEvent={AuthEvent} Sub={Sub} TokenIssuedAt={TokenIssuedAt} RouteTemplate={RouteTemplate}",
+            SessionRevokedAuthEvent, supabaseAuthUserId, tokenIssuedAt, ResolveRouteTemplate(httpContext));
+
+    /// <summary>The matched endpoint's route template (defined in code, not by the caller), or <see cref="UnmatchedRoute"/>.</summary>
+    internal static string ResolveRouteTemplate(HttpContext httpContext) =>
+        (httpContext.GetEndpoint() as RouteEndpoint)?.RoutePattern.RawText ?? UnmatchedRoute;
 
     /// <summary>
     /// Attaches an async <see cref="ConfigurationManager{T}"/> for the real Supabase JWKS endpoint,

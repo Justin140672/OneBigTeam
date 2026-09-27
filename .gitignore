@@ -493,3 +493,7 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 *.playlist
+
+# Scratch output from local architecture-doc tooling. Never commit it: a stray .py file here
+# re-activates CodeQL Python analysis (see specifications/security/codeql-dispositions.md).
+.tmp_architecture/

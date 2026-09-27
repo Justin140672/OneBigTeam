@@ -119,7 +119,7 @@ builder.Services.AddRateLimiter(options =>
 	// TestServer, all sharing a single per-IP partition; production defaults are unchanged.
 	var contactFormRateLimitWindowMinutes = builder.Configuration.GetValue("Marketing:ContactForm:RateLimit:WindowMinutes", 5);
 	var contactFormRateLimitPermitLimit = builder.Configuration.GetValue("Marketing:ContactForm:RateLimit:PermitLimit", 5);
-	options.AddPolicy("contact-form", context =>
+	options.AddPolicy(RateLimitRejectionLogging.ContactFormPolicy, context =>
 		RateLimitPartition.GetFixedWindowLimiter(
 			partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
 			factory: _ => new FixedWindowRateLimiterOptions
@@ -621,7 +621,7 @@ app.MapPost("/api/contact", async (
 
 	logger.LogInformation("Contact form submission succeeded");
 	return Results.Ok();
-}).AllowAnonymous().RequireRateLimiting("contact-form");
+}).AllowAnonymous().RequireRateLimiting(RateLimitRejectionLogging.ContactFormPolicy);
 
 static Dictionary<string, string[]> ValidateContactRequest(ContactRequest request)
 {

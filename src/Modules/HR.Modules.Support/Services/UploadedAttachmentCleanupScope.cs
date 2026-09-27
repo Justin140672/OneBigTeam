@@ -137,11 +137,18 @@ internal sealed class UploadedAttachmentCleanupScope(
 
     /// <summary>Storage keys are prefixed with "support/{companyId}/{requestId}/..." — never log
     /// the full key. Only the trailing filename/extension segment is retained for diagnostic
-    /// value.</summary>
+    /// value. Keys are always "{server GUID}{allow-listed extension}" (see SupportAttachmentPolicy),
+    /// so the retained tail is already safe; as defence in depth (CodeQL #63-#65) any character
+    /// outside [A-Za-z0-9._-] is still replaced with '?', so no control character can reach a log.</summary>
     internal static string RedactStorageKey(string storageKey)
     {
         var lastSlash = storageKey.LastIndexOf('/');
         var tail = lastSlash >= 0 ? storageKey[(lastSlash + 1)..] : storageKey;
-        return tail.Length <= 12 ? $"***{tail}" : $"***{tail[^12..]}";
+        var retained = tail.Length <= 12 ? tail : tail[^12..];
+        return "***" + string.Create(retained.Length, retained, static (span, source) =>
+        {
+            for (var i = 0; i < source.Length; i++)
+                span[i] = char.IsAsciiLetterOrDigit(source[i]) || source[i] is '.' or '-' or '_' ? source[i] : '?';
+        });
     }
 }
