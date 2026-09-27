@@ -546,13 +546,13 @@ public class EmployeeInternalAppointmentServiceTests
     // ------------------------------------------------------------------ validation failures
 
     [Theory]
-    [InlineData(EmploymentStatus.Draft)]
-    [InlineData(EmploymentStatus.Suspended)]
-    [InlineData(EmploymentStatus.Leaving)]
-    [InlineData(EmploymentStatus.FormerEmployee)]
-    public async Task AppointAsync_Returns_Validation_When_Employee_Not_Active(EmploymentStatus status)
+    [InlineData("Draft")]
+    [InlineData("Suspended")]
+    [InlineData("Leaving")]
+    [InlineData("FormerEmployee")]
+    public async Task AppointAsync_Returns_Validation_When_Employee_Not_Active(string status)
     {
-        var h = await SeedAsync(harness => harness.Employee.SetStatusForTesting(status, Now));
+        var h = await SeedAsync(harness => harness.Employee.SetStatusForTesting(Enum.Parse<EmploymentStatus>(status), Now));
 
         var result = await h.Service().AppointAsync(h.Request(), CancellationToken.None);
 
@@ -640,10 +640,10 @@ public class EmployeeInternalAppointmentServiceTests
     // ------------------------------------------------------------------ compensation
 
     [Theory]
-    [InlineData("Annual", SalaryType.Annual)]
-    [InlineData("hourly", SalaryType.Hourly)]
-    [InlineData("DAILY", SalaryType.Daily)]
-    public async Task AppointAsync_Records_Role_Change_Compensation_From_Effective_Date(string salaryTypeName, SalaryType expected)
+    [InlineData("Annual", "Annual")]
+    [InlineData("hourly", "Hourly")]
+    [InlineData("DAILY", "Daily")]
+    public async Task AppointAsync_Records_Role_Change_Compensation_From_Effective_Date(string salaryTypeName, string expected)
     {
         var h = await SeedAsync();
         var effective = Today.AddDays(7);
@@ -656,7 +656,7 @@ public class EmployeeInternalAppointmentServiceTests
         Assert.Equal(result.Value!.CompensationId, compensation.Id);
         Assert.Equal(CompensationChangeReason.RoleChange, compensation.Reason);
         Assert.Equal(effective, compensation.EffectiveFrom);
-        Assert.Equal(expected, compensation.SalaryType);
+        Assert.Equal(Enum.Parse<SalaryType>(expected), compensation.SalaryType);
         Assert.Equal(72000m, compensation.Salary);
         Assert.Equal("GBP", compensation.Currency);
         Assert.Equal(37.5m, compensation.HoursPerWeek);
