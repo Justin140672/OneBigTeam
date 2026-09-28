@@ -77,32 +77,54 @@ internal sealed class DepartureFinaliserTestEndpoint(
             return;
         }
 
-        // Check the leaving process status: InProgress (ready to finalize) or Completed (idempotent success)
-        var process = await db.EmployeeLeavingProcesses
-            .FirstOrDefaultAsync(
-                p => p.EmployeeId == employeeId && p.CompanyId == companyId,
-                ct);
+        // Check the leaving process status: InProgress (ready to finalize) or Completed (idempotent success).
+        // Query explicitly for InProgress first, using deterministic ordering (StartedAt DESC, Id DESC)
+        // to ensure consistent results when multiple processes exist (e.g., cancelled then in-progress).
+        var inProgressProcess = await db.EmployeeLeavingProcesses
+            .Where(p => p.EmployeeId == employeeId && p.CompanyId == companyId &&
+                        p.Status == LeavingProcessStatus.InProgress)
+            .OrderByDescending(p => p.StartedAt)
+            .ThenByDescending(p => p.Id)
+            .FirstOrDefaultAsync(ct);
 
-        if (process is null)
+        if (inProgressProcess is not null)
         {
-            await Send.ResultAsync(TypedResults.BadRequest("Employee has no leaving process to finalize"));
+            // InProgress process found — ready to finalize
+            // (execution phase continues below after this validation phase)
+        }
+        else
+        {
+            // No in-progress process. Check idempotency: Completed + Former Employee = idempotent success.
+            // This allows E2E tests to call finalization twice after a process has completed.
+            var completedProcess = await db.EmployeeLeavingProcesses
+                .Where(p => p.EmployeeId == employeeId && p.CompanyId == companyId &&
+                            p.Status == LeavingProcessStatus.Completed)
+                .OrderByDescending(p => p.StartedAt)
+                .ThenByDescending(p => p.Id)
+                .FirstOrDefaultAsync(ct);
+
+            if (completedProcess is not null && employee!.Status == EmploymentStatus.FormerEmployee)
+            {
+                // Idempotent success: process is already completed and employee is former employee
+                await Send.ResultAsync(TypedResults.Ok());
+                return;
+            }
+
+            // No in-progress process and either no completed process or employee not former employee
+            if (completedProcess is null)
+            {
+                await Send.ResultAsync(TypedResults.BadRequest("Employee has no leaving process to finalize"));
+            }
+            else
+            {
+                // Completed process exists but employee is not yet Former Employee (data inconsistency)
+                await Send.ResultAsync(TypedResults.BadRequest("Process is completed but employee status is not FormerEmployee"));
+            }
             return;
         }
 
-        // Idempotency: if the process is already Completed, return success (not an error).
-        // This allows E2E tests to call finalization twice without assertion failure.
-        if (process.Status == LeavingProcessStatus.Completed)
-        {
-            await Send.ResultAsync(TypedResults.Ok());
-            return;
-        }
-
-        // Only InProgress processes can be finalized
-        if (process.Status != LeavingProcessStatus.InProgress)
-        {
-            await Send.ResultAsync(TypedResults.BadRequest($"Only InProgress processes can be finalized; current status is {process.Status}"));
-            return;
-        }
+        // Use the in-progress process for finalization
+        var process = inProgressProcess;
 
         // ── Execution Phase ───────────────────────────────────────────────────────────
         // All validation passed. Execute the departure finaliser job, scoped to this company
