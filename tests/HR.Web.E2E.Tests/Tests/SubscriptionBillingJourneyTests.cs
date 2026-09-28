@@ -66,8 +66,8 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     private const string AcmePlainEmployeeEmail = "tom.williams@acme.example";
 
     // Beta Corp admin — for isolated active subscription tests.
-    // For Beta Corp tests, we use a seeded admin persona or fall back to a standard pattern.
-    private const string BetaCompanyAdminEmail = "company.admin@beta.example";
+    // Charlie Wilson is seeded as Beta Corp's Company Administrator.
+    private const string BetaCompanyAdminEmail = "charlie.wilson@betacorp.example";
 
     // ── Access Control Tests ───────────────────────────────────────────────────
 
@@ -396,29 +396,17 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
-        // Step 1: Login as a company admin for Beta Corp (using the dev persona system for this test)
+        // Step 1: Login as Charlie Wilson, Beta Corp's Company Administrator
+        // Beta Corp is seeded with an active subscription to avoid trial state
         await login.GoToAsync();
-        // For this test, we use a special test persona tied to Beta Corp; in a real scenario,
-        // this would be a dedicated user. For E2E purposes, we use the dev auth system.
-        // Note: This test demonstrates that an Active subscription shows the Manage Billing button.
-        // In the actual flow, Priya Shah is Acme's admin, so we're testing with a dev persona
-        // or would need to set up a separate test company admin. For simplicity, we'll use
-        // the existing Acme Company Administrator and transition Acme's subscription as needed,
-        // OR use a test helper to create an isolated company.
-        //
-        // For now, we'll document this as testing Active state behavior and assume subscription
-        // is in Active state. Real implementation would use a test company setup helper.
-
-        // Proceed with the actual test using Acme as proxy (acknowledging this shares state).
-        // A production-quality approach would create an isolated test company per test.
-        await login.LoginAsync(AcmeCompanyAdminEmail);
+        await login.LoginAsync(BetaCompanyAdminEmail);
 
         await subscription.GoToAsync();
 
         // Step 2: Verify the subscription is Active
         var status = await subscription.GetSubscriptionStatusAsync();
         Assert.NotNull(status);
-        // Note: Acme seeds with Active subscription, so this should pass
+        // Note: Beta Corp is seeded with an Active subscription
         Assert.True(
             status.Equals("Active", StringComparison.OrdinalIgnoreCase),
             $"Expected subscription status to be 'Active', but got '{status}'");
@@ -465,11 +453,12 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     [Fact]
     public async Task ActiveSubscription_Cancel_ShowsConfirmation_AndSchedulesCancellation()
     {
+        // Use Beta Corp (isolated active subscription) for this mutation test
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(AcmeCompanyAdminEmail);
+        await login.LoginAsync(BetaCompanyAdminEmail);
 
         await subscription.GoToAsync();
 
@@ -535,11 +524,12 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     [Fact]
     public async Task CancelledSubscription_Resume_RestoresActiveState()
     {
+        // Use Beta Corp (isolated active subscription) for this mutation test
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(AcmeCompanyAdminEmail);
+        await login.LoginAsync(BetaCompanyAdminEmail);
 
         await subscription.GoToAsync();
 
