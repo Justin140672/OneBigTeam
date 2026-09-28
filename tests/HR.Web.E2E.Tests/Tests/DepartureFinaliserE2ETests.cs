@@ -427,8 +427,7 @@ public sealed class DepartureFinaliserE2ETests(HrAdminPersonaFixture fixture) : 
         foreach (var employeeId in new[] { emp1, emp2, emp3 })
         {
             await empEdit.GoToAsync(AcmeId, employeeId);
-            Assert.Equal("Former Employee", await empEdit.GetEmployeeStatusBadgeTextAsync(),
-                $"Expected employee {employeeId} to be Former Employee after batch finalization");
+            Assert.Equal("Former Employee", await empEdit.GetEmployeeStatusBadgeTextAsync());
         }
     }
 
@@ -655,12 +654,10 @@ public sealed class DepartureFinaliserE2ETests(HrAdminPersonaFixture fixture) : 
         foreach (var empId in empIds)
         {
             await empEdit.GoToAsync(AcmeId, empId);
-            Assert.Equal("Former Employee", await empEdit.GetEmployeeStatusBadgeTextAsync(),
-                $"Employee {empId} should be Former Employee after batch processing");
+            Assert.Equal("Former Employee", await empEdit.GetEmployeeStatusBadgeTextAsync());
 
             await leavingTab.OpenAsync();
-            Assert.Equal("Completed", await leavingTab.GetStatusBadgeTextAsync(),
-                $"Leaving process for {empId} should be Completed after batch processing");
+            Assert.Equal("Completed", await leavingTab.GetStatusBadgeTextAsync());
         }
     }
 }
