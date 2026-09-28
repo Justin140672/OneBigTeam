@@ -1024,6 +1024,7 @@
         "dependencies": {
           "ClosedXML": "[0.105.1, )",
           "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
+          "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
           "HR.ServiceDefaults": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
           "Hangfire.AspNetCore": "[1.8.25, )",

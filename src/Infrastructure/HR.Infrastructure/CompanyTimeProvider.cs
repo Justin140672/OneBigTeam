@@ -1,6 +1,7 @@
 using HR.Modules.Companies.Contracts;
+using HR.SharedKernel;
 
-namespace HR.SharedKernel;
+namespace HR.Infrastructure;
 
 internal sealed class CompanyTimeProvider(
     ICurrentUser currentUser,

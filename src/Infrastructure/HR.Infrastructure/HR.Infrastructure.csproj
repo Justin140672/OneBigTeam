@@ -8,6 +8,8 @@
          /health/background-jobs endpoint mapped below. HR.ServiceDefaults is shared cross-cutting
          infrastructure (not a business module), so this is not a module boundary violation. -->
     <ProjectReference Include="..\..\HR.ServiceDefaults\HR.ServiceDefaults.csproj" />
+    <!-- CompanyTimeProvider needs ICompanyTimeZoneReader from Companies module -->
+    <ProjectReference Include="..\..\Modules\HR.Modules.Companies.Contracts\HR.Modules.Companies.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>

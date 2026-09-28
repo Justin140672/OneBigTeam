@@ -12,7 +12,8 @@ internal sealed class Endpoint(GetAssetHandler handler, ICurrentUser currentUser
         Get("/api/companies/{companyId:guid}/assets/{id:guid}");
         Policies("asset:view");
         // Note: Resource-level authorization (ownership checks) is performed in the handler using inline checks.
-        // Endpoint-level policy only verifies the caller has the "asset:view" permission.
+        // Endpoint-level policy only verifies the caller has the "asset:view" permission; the handler further
+        // restricts access to assigned employees (and HR admins/managers via future integration of AssetResourceAuthorizer).
     }
 
     public override async Task HandleAsync(GetAssetRequest request, CancellationToken cancellationToken)
@@ -21,7 +22,10 @@ internal sealed class Endpoint(GetAssetHandler handler, ICurrentUser currentUser
 
         if (result.IsFailure)
         {
-            await Send.ResultAsync(Results.Json(new { error = result.Error.Message }, statusCode: StatusCodes.Status404NotFound));
+            var statusCode = result.Error.Code == "forbidden"
+                ? StatusCodes.Status403Forbidden
+                : StatusCodes.Status404NotFound;
+            await Send.ResultAsync(Results.Json(new { error = result.Error.Message }, statusCode: statusCode));
             return;
         }
 

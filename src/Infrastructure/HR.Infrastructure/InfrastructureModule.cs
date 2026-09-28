@@ -73,6 +73,10 @@ public static class InfrastructureModule
             .AddCheck<PostmarkHealthCheck>("email", tags: ["degraded"])
             .AddCheck<SupabaseStorageHealthCheck>("storage", tags: ["degraded"]);
 
+        // Time services for company-local date resolution and testing
+        services.AddScoped<IClockProvider, SystemClockProvider>();
+        services.AddScoped<ICompanyTimeProvider, CompanyTimeProvider>();
+
         return services;
     }
 
