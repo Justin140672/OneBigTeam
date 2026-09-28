@@ -17,8 +17,9 @@ internal enum AccountCreationPath
 /// Ticket 9: authoritative, server-side enforcement point for the account-creation email-domain
 /// policy. Every account-creation handler calls this BEFORE persisting anything, calling Supabase or
 /// sending any email, so the rule holds even when a handler is invoked directly (bypassing the
-/// FastEndpoints validator pipeline). On rejection it logs the domain only (never the address) and
-/// records an <see cref="AccountCreationEmailRejectedAuditEvent"/>.
+/// FastEndpoints validator pipeline). On rejection it logs non-personal diagnostic information (path,
+/// count) and records an <see cref="AccountCreationEmailRejectedAuditEvent"/> — the restricted audit
+/// store is where business-required domain data belongs.
 ///
 /// The rejection response never reveals whether an account already exists for the address — the
 /// policy is evaluated before any account lookup in every path.
@@ -71,7 +72,7 @@ internal sealed class AccountCreationEmailGuard(
     }
 
     /// <summary>
-    /// Records one audit event (and one domain-only warning log) for a set of rejected addresses —
+    /// Records one audit event (and one privacy-safe warning log) for a set of rejected addresses —
     /// used directly by the bulk-invitation paths so a large batch produces a single audit row.
     /// </summary>
     public async Task RecordRejectionsAsync(
@@ -98,8 +99,8 @@ internal sealed class AccountCreationEmailGuard(
             .ToList();
 
         logger.LogWarning(
-            "Account creation rejected on {AccountCreationPath}: {RejectedCount} address(es) with a non-permitted email domain ({EmailDomains})",
-            path, rejections.Count, string.Join(", ", domains));
+            "Account creation rejected on {AccountCreationPath}: {RejectedCount} address(es)",
+            path, rejections.Count);
 
         var resolvedActorType = actorType
             ?? (actorUserId.HasValue ? AuditActorType.Human : AuditActorType.Anonymous);

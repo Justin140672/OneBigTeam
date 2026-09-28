@@ -99,17 +99,25 @@ public class AccountCreationEmailGuardTests
     }
 
     [Fact]
-    public async Task Rejection_Log_Contains_The_Domain_But_Never_The_Address()
+    public async Task Rejection_Log_Contains_Path_And_Count_But_Never_Personal_Data()
     {
         var (guard, _, logger) = Build();
 
         await guard.EnsureAllowedAsync(
             $"{LocalPart}@gmail.com", AccountCreationPath.PublicSignup, Guid.Empty, null, null, CancellationToken.None);
 
-        Assert.NotEmpty(logger.Messages);
-        Assert.Contains("gmail.com", logger.Text);
-        Assert.DoesNotContain("@", logger.Text);
-        Assert.DoesNotContain(LocalPart, logger.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.Single(logger.Messages);
+        var logText = logger.Text;
+
+        // Retains useful diagnostic info: path and count
+        Assert.Contains("PublicSignup", logText);
+        Assert.Contains("1", logText);
+        Assert.Contains("address", logText);
+
+        // Never contains personal data: no domain, email, or local part
+        Assert.DoesNotContain("gmail.com", logText);
+        Assert.DoesNotContain("@", logText);
+        Assert.DoesNotContain(LocalPart, logText, StringComparison.OrdinalIgnoreCase);
     }
 
     // ── Actor attribution ───────────────────────────────────────────────────────

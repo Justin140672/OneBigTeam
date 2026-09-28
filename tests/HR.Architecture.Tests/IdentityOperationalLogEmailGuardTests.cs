@@ -24,10 +24,10 @@ namespace HR.Architecture.Tests;
 /// parameter names of the partial method it decorates).</para>
 ///
 /// <para><b>Rules (all case-insensitive).</b> A name is "email-like" when it is exactly
-/// <c>To</c>, <c>Recipient(s)</c>, <c>Email(s)</c> or <c>EmailAddress(es)</c>, or ends with
-/// <c>Email</c>, <c>Emails</c> or <c>EmailAddress(es)</c> (e.g. <c>ToEmail</c>,
-/// <c>RecipientEmail</c>, <c>normalizedEmail</c>). Non-address names such as <c>EmailSent</c> or
-/// <c>EmailDomains</c> are allowed. A log call is a violation when:
+/// <c>To</c>, <c>Recipient(s)</c>, <c>Email(s)</c>, <c>EmailAddress(es)</c>, <c>Domain(s)</c>,
+/// <c>EmailDomain(s)</c>, or ends with <c>Email</c>, <c>Emails</c>, <c>EmailAddress(es)</c>,
+/// <c>Domain</c>, or <c>Domains</c> (e.g. <c>ToEmail</c>, <c>RecipientEmail</c>, <c>rejectedDomain</c>,
+/// <c>emailDomains</c>). Non-address names such as <c>EmailSent</c> are allowed. A log call is a violation when:
 /// <list type="number">
 /// <item><description>a message-template placeholder is email-like (<c>{Email}</c>, <c>{@To}</c>,
 /// <c>{recipient:l}</c>, ...);</description></item>
@@ -106,6 +106,9 @@ public class IdentityOperationalLogEmailGuardTests
     [InlineData("using var s = logger.BeginScope(new Dictionary<string, object> { [\"Id\"] = administrator.Email });")]
     [InlineData("[LoggerMessage(EventId = 1, Level = LogLevel.Warning, Message = \"Failed {UserEmail}\")]\nstatic partial void Failed(ILogger logger, string userEmail);")]
     [InlineData("[LoggerMessage(Level = LogLevel.Warning, Message = \"Failed {UserId}\")]\nstatic partial void Failed(ILogger logger, Guid userId, string email);")]
+    [InlineData("logger.LogWarning(\"Rejected {EmailDomains}\", domains);")]
+    [InlineData("logger.LogWarning(\"Rejected {RejectedCount} ({Domain})\", n, domain);")]
+    [InlineData("logger.LogWarning(\"Failed for {Id}\", rejectedDomains);")]
     public void Scanner_Flags_Email_Like_Log_Usage(string source)
     {
         var result = LogCallScanner.Scan(source);
@@ -114,7 +117,7 @@ public class IdentityOperationalLogEmailGuardTests
 
     [Theory]
     [InlineData("logger.LogInformation(\"Dispatch attempted. EmailSent={EmailSent}\", emailSent);")]
-    [InlineData("logger.LogWarning(\"Rejected {RejectedCount} ({EmailDomains})\", n, string.Join(\", \", domains));")]
+    [InlineData("logger.LogWarning(\"Rejected {RejectedCount} address(es)\", rejectedCount);")]
     [InlineData("logger.LogWarning(\"Invite failed. EmployeeId={EmployeeId} InviteId={InviteId}\", req.EmployeeId, invite.Id);")]
     [InlineData("logger.LogError(ex, \"Failed recipient {EmployeeId} in batch {BatchId}\", recipient.EmployeeId, batchId);")]
     [InlineData("// logger.LogWarning(\"old {Email}\", req.Email);\nlogger.LogWarning(\"ok {Id}\", id);")]
@@ -174,10 +177,13 @@ internal static class LogCallScanner
     {
         var n = name.ToLowerInvariant();
         return n is "to" or "recipient" or "recipients" or "email" or "emails" or "emailaddress" or "emailaddresses"
+            or "domain" or "domains" or "emaildomain" or "emaildomains"
             || n.EndsWith("email", StringComparison.Ordinal)
             || n.EndsWith("emails", StringComparison.Ordinal)
             || n.EndsWith("emailaddress", StringComparison.Ordinal)
-            || n.EndsWith("emailaddresses", StringComparison.Ordinal);
+            || n.EndsWith("emailaddresses", StringComparison.Ordinal)
+            || n.EndsWith("domain", StringComparison.Ordinal)
+            || n.EndsWith("domains", StringComparison.Ordinal);
     }
 
     public static ScanResult Scan(string source)
