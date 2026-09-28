@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using HR.Web.Components;
 using HR.Web.Services;
 using HR.Web.Testing;

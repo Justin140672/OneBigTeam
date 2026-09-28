@@ -4,13 +4,14 @@ namespace HR.Modules.Leave.Tests;
 
 public class AwardToilValidatorTests
 {
-    private static AwardToilRequest ValidRequest() => new()
+    private static AwardToilRequest ValidRequest() => new(
+        Guid.NewGuid(),
+        Guid.NewGuid(),
+        1.0m,
+        new DateOnly(2026, 6, 1),
+        null)
     {
-        CompanyId = Guid.NewGuid(),
-        EmployeeId = Guid.NewGuid(),
-        AwardedByEmployeeId = Guid.NewGuid(),
-        Days = 1.0m,
-        OccurredOn = new DateOnly(2026, 6, 1)
+        AwardedByEmployeeId = Guid.NewGuid()
     };
 
     [Fact]
@@ -29,15 +30,6 @@ public class AwardToilValidatorTests
         var result = v.Validate(ValidRequest() with { EmployeeId = Guid.Empty });
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(AwardToilRequest.EmployeeId));
-    }
-
-    [Fact]
-    public void Validate_Fails_When_AwardedByEmployeeId_Is_Empty()
-    {
-        var v = new AwardToilValidator();
-        var result = v.Validate(ValidRequest() with { AwardedByEmployeeId = Guid.Empty });
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(AwardToilRequest.AwardedByEmployeeId));
     }
 
     [Fact]

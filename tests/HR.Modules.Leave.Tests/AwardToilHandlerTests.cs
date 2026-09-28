@@ -26,14 +26,14 @@ public class AwardToilHandlerTests
         EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, Guid.NewGuid(), DateOnly.FromDateTime(now.DateTime), now);
 
     private static AwardToilRequest BuildRequest(Guid companyId, Guid employeeId, decimal days = 1m, DateOnly? occurredOn = null) =>
-        new()
+        new(
+            companyId,
+            employeeId,
+            days,
+            occurredOn ?? new DateOnly(2026, 6, 10),
+            "Worked late on project deadline")
         {
-            CompanyId = companyId,
-            EmployeeId = employeeId,
-            AwardedByEmployeeId = Guid.NewGuid(),
-            Days = days,
-            OccurredOn = occurredOn ?? new DateOnly(2026, 6, 10),
-            Notes = "Worked late on project deadline"
+            AwardedByEmployeeId = Guid.NewGuid()
         };
 
     [Fact]
@@ -192,13 +192,14 @@ public class AwardToilHandlerTests
 
         var handler = new AwardToilHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var result = await handler.HandleAsync(
-            new AwardToilRequest
+            new AwardToilRequest(
+                companyId,
+                employeeId,
+                1m,
+                new DateOnly(2026, 6, 10),
+                null)
             {
-                CompanyId = companyId,
-                EmployeeId = employeeId,
-                AwardedByEmployeeId = awardedById,
-                Days = 1m,
-                OccurredOn = new DateOnly(2026, 6, 10)
+                AwardedByEmployeeId = awardedById
             },
             CancellationToken.None);
 
@@ -249,14 +250,14 @@ public class AwardToilHandlerTests
         var auditPublisher = new CapturingAuditEventPublisher();
         var handler = new AwardToilHandler(context, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), auditPublisher);
         var result = await handler.HandleAsync(
-            new AwardToilRequest
+            new AwardToilRequest(
+                companyId,
+                employeeId,
+                2m,
+                occurredOn,
+                "Overtime on release")
             {
-                CompanyId = companyId,
-                EmployeeId = employeeId,
-                AwardedByEmployeeId = awardedById,
-                Days = 2m,
-                OccurredOn = occurredOn,
-                Notes = "Overtime on release"
+                AwardedByEmployeeId = awardedById
             },
             CancellationToken.None);
 

@@ -1,6 +1,8 @@
+@using HR.SharedKernel
 @inject DocumentService DocumentService
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
+@inject ICompanyTimeProvider CompanyTimeProvider
 
 @* Combines the employee's personal documents (uploads/requests) and published company-wide
    documents into a single list — previously two separate tabs ("Documents" and "Company

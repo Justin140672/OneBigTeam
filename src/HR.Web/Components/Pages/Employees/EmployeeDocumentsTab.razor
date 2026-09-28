@@ -1,4 +1,6 @@
+@using HR.SharedKernel
 @inject DocumentService DocumentService
+@inject ICompanyTimeProvider CompanyTimeProvider
 
 @if (!_requestsLoading && _requests.Count > 0)
 {
@@ -324,9 +326,11 @@ else
         await LoadAsync();
     }
 
-    private static (string Css, string Label) GetRequestBadge(DocumentRequestListItem r)
+    private (string Css, string Label) GetRequestBadge(DocumentRequestListItem r)
     {
-        if (r.Status == "Requested" && r.DueDate.HasValue && r.DueDate.Value < DateOnly.FromDateTime(DateTime.UtcNow))
+        // Use company-local date for business-calendar document request due-date comparisons.
+        var today = CompanyTimeProvider.Today;
+        if (r.Status == "Requested" && r.DueDate.HasValue && r.DueDate.Value < today)
             return ("text-bg-danger",    "Overdue");
 
         return r.Status switch
@@ -339,11 +343,12 @@ else
         };
     }
 
-    private static (string Css, string Label) GetStatusBadge(EmployeeDocumentListItem doc)
+    private (string Css, string Label) GetStatusBadge(EmployeeDocumentListItem doc)
     {
         if (doc.ExpiryDate.HasValue)
         {
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            // Use company-local date for business-calendar document expiry status checks.
+            var today = CompanyTimeProvider.Today;
             if (doc.ExpiryDate < today)
                 return ("text-bg-danger",  "Expired");
             if (doc.ExpiryDate <= today.AddDays(30))

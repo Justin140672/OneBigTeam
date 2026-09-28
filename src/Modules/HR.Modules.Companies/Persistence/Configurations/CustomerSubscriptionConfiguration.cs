@@ -76,6 +76,11 @@ internal sealed class CustomerSubscriptionConfiguration : IEntityTypeConfigurati
             .HasColumnName("legal_hold_reason")
             .HasMaxLength(1000);
 
+        builder.Property(s => s.IsOriginalCustomer)
+            .HasColumnName("is_original_customer")
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Ignore(s => s.HasPendingDeletion);
         builder.Ignore(s => s.IsUnderLegalHold);
 

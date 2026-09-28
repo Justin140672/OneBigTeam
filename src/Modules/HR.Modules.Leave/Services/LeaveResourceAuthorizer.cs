@@ -71,4 +71,14 @@ internal sealed class LeaveResourceAuthorizer
         Guid companyId, Guid callerEmployeeId, Guid targetEmployeeId, CancellationToken cancellationToken)
         => _resourceAuthorizer.CanAccessAsync(
             companyId, companyId, callerEmployeeId, targetEmployeeId, cancellationToken, allowSelf: false);
+
+    /// <summary>
+    /// Award TOIL actions: HR Administrator, or a manager anywhere above the target employee in
+    /// the reporting hierarchy (direct or indirect). Self-award is not a supported path here
+    /// (per Ticket 4, Scope TOIL awards to reports and derive actor from authenticated user).
+    /// </summary>
+    public Task<bool> CanAwardToilAsync(
+        Guid companyId, Guid callerEmployeeId, Guid targetEmployeeId, CancellationToken cancellationToken)
+        => _resourceAuthorizer.CanAccessAsync(
+            companyId, companyId, callerEmployeeId, targetEmployeeId, cancellationToken, allowSelf: false);
 }

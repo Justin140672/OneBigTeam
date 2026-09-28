@@ -1,11 +1,14 @@
 using FastEndpoints;
+using HR.Modules.Leave.Services;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Leave.Features.AwardToil;
 
 internal sealed class Endpoint(
-    AwardToilHandler handler) : Endpoint<AwardToilRequest, AwardToilResponse>
+    AwardToilHandler handler,
+    ICurrentUser currentUser,
+    LeaveResourceAuthorizer authorizer) : Endpoint<AwardToilRequest, AwardToilResponse>
 {
     public override void Configure()
     {
@@ -17,11 +20,31 @@ internal sealed class Endpoint(
         AwardToilRequest request,
         CancellationToken cancellationToken)
     {
-        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+        if (currentUser.UserId is not { } awarderId)
+        {
+            await Send.ResultAsync(TypedResults.Unauthorized());
+            return;
+        }
 
-        var result = await handler.HandleAsync(
-            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
-            cancellationToken);
+        // SEC: Ticket 4 - the acting awarder must always be the authenticated caller, never
+        // trusted from request data. Any client-supplied AwardedByEmployeeId is discarded here
+        // and replaced with the server-resolved identity before authorization or persistence.
+        var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
+        request = request with
+        {
+            AwardedByEmployeeId = awarderId,
+            IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey,
+        };
+
+        // Ticket 4: only HR Administrators or a manager anywhere above the target employee in
+        // the reporting hierarchy may award TOIL.
+        if (!await authorizer.CanAwardToilAsync(request.CompanyId, awarderId, request.EmployeeId, cancellationToken))
+        {
+            await Send.ResultAsync(TypedResults.Forbid());
+            return;
+        }
+
+        var result = await handler.HandleAsync(request, cancellationToken);
 
         if (result.IsFailure)
         {

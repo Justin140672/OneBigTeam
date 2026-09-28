@@ -80,6 +80,14 @@ internal sealed class CustomerSubscription
     public Guid? LegalHoldPlacedBy { get; private set; }
     public string? LegalHoldReason { get; private set; }
 
+    /// <summary>
+    /// Ticket 2: indicates whether this customer is an original customer from before a specific
+    /// product launch date. Used to filter communication for new-product updates — original
+    /// customers may not have access to new products yet, so they should not receive product
+    /// update communications intended for new signups or upsell audiences.
+    /// </summary>
+    public bool IsOriginalCustomer { get; private set; }
+
     public bool IsUnderLegalHold => LegalHoldPlacedAt is not null;
 
     /// <summary>
@@ -99,6 +107,7 @@ internal sealed class CustomerSubscription
             TrialStartedAt = now,
             TrialExpiresAt = now.AddDays(trialLengthDays),
             CancelAtPeriodEnd = false,
+            IsOriginalCustomer = false,
             CreatedAt = now,
             UpdatedAt = now,
             Version = 1,
@@ -423,6 +432,22 @@ internal sealed class CustomerSubscription
         LegalHoldPlacedAt = null;
         LegalHoldPlacedBy = null;
         LegalHoldReason = null;
+        Version++;
+        UpdatedAt = now;
+        return Result.Success();
+    }
+
+    /// <summary>
+    /// Ticket 2: updates the original customer classification status. Platform-administrator action
+    /// to tag or untag a customer as an original customer (one who existed before a product launch).
+    /// Used for filtering product update communications.
+    /// </summary>
+    public Result SetOriginalCustomerStatus(bool isOriginal, Guid? updatedByUserId, DateTimeOffset now)
+    {
+        if (updatedByUserId is null)
+            return Result.Failure(Error.Validation("The user ID must be provided."));
+
+        IsOriginalCustomer = isOriginal;
         Version++;
         UpdatedAt = now;
         return Result.Success();

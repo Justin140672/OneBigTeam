@@ -43,6 +43,7 @@ using HR.Modules.Companies.Features.ResumeCustomerService;
 using HR.Modules.Companies.Features.ScheduleCustomerDeletion;
 using HR.Modules.Companies.Features.ResumeSubscription;
 using HR.Modules.Companies.Features.RevokeSupportSession;
+using HR.Modules.Companies.Features.SetCustomerOriginalStatus;
 using HR.Modules.Companies.Features.StripeWebhook;
 using HR.Modules.Companies.Features.UpdateCompany;
 using HR.Modules.Companies.Features.UpdateCompanySettings;
@@ -361,6 +362,10 @@ public static class CompaniesModule
         services.AddScoped<IValidator<ForceCustomerReadOnlyRequest>, ForceCustomerReadOnlyValidator>();
         services.AddScoped<ResumeCustomerServiceHandler>();
         services.AddScoped<IValidator<ResumeCustomerServiceRequest>, ResumeCustomerServiceValidator>();
+
+        // Ticket 2: customer classification (original vs. new) — filters product update communications.
+        services.AddScoped<SetCustomerOriginalStatusHandler>();
+        services.AddScoped<IValidator<SetCustomerOriginalStatusRequest>, SetCustomerOriginalStatusValidator>();
 
         // Admin Portal Permanent Deletion Queue (Customer Lifecycle epic) — schedule/cancel/execute
         // support interventions, each audited via IAuditEventPublisher, plus the platform-wide

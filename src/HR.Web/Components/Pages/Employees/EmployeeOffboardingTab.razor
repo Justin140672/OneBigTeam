@@ -3,7 +3,9 @@
    unified EmployeeLeavingTab.razor "Leaving & Offboarding" workspace. *@
 @using HR.Web.Models
 @using HR.Web.Components.Pages.Tasks
+@using HR.SharedKernel
 @inject OffboardingService OffboardingService
+@inject ICompanyTimeProvider CompanyTimeProvider
 
 @if (_loading)
 {
@@ -176,7 +178,8 @@ else
     {
         get
         {
-            var today = DateOnly.FromDateTime(DateTime.UtcNow); // TODO: no company-local-today helper is exposed to HR.Web yet — see report.
+            // Use company-local date for business-calendar task sorting (overdue/upcoming status).
+            var today = CompanyTimeProvider.Today;
             return (Overview?.Tasks ?? []).OrderBy(t => Rank(t, today)).ThenBy(t => t.DueDate ?? DateOnly.MaxValue);
 
             static int Rank(OffboardingTaskOverviewItem t, DateOnly today)
@@ -245,9 +248,10 @@ else
         _ => "bg-primary"
     };
 
-    private static (string Css, string Label) GetTaskBadge(OffboardingTaskOverviewItem t)
+    private (string Css, string Label) GetTaskBadge(OffboardingTaskOverviewItem t)
     {
-        var today = DateOnly.FromDateTime(DateTime.UtcNow); // TODO: see SortedTasks note above.
+        // Use company-local date for business-calendar overdue status.
+        var today = CompanyTimeProvider.Today;
         if (t.Status is "Pending" or "InProgress" && t.DueDate.HasValue && t.DueDate.Value < today)
             return ("text-bg-danger", "Overdue");
 
