@@ -31,12 +31,18 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Note: This suite uses isolated test companies per test to avoid parallel execution
 /// conflicts (tests run at maxParallelThreads=15). Each test that mutates subscription
 /// state creates or reuses a dedicated company fixture with a predictable state.
-/// Acme tests (access control) use Acme Corporation (seeded with active subscription).
-/// Beta Corp tests (active subscription lifecycle) use Beta Corp (seeded with active subscription).
-/// For tests requiring trial state, a dedicated trial company is created via the signup flow.
+///
+/// Seed state (authoritative):
+/// - Acme Corporation: Trial subscription (14 days remaining). Tests trial state, "Start subscription"
+///   button, trial days display, and page access/loading. Acme is NOT transitioned to Active —
+///   tests requiring Active state use Beta Corp instead.
+/// - Beta Corp: Active subscription (activated immediately in seed). Tests active state, "Manage Billing"
+///   button, cancel/resume workflows, and subscription lifecycle mutations with idempotent restoration.
+///
 /// Stripe navigation is tested via URL verification only — no actual Stripe integration.
 /// Each state-mutating test must establish and restore its own subscription state to avoid
-/// interfering with parallel tests or subsequent tests in sequence.
+/// interfering with parallel tests or subsequent tests in sequence. The EnsureBetaCorpActiveSubscriptionAsync
+/// helper restores Beta Corp to Active state at test start if a prior test left it cancelled.
 /// </summary>
 public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixture)
     : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
@@ -610,6 +616,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     /// Tests cancel dialog dismissal:
     /// - Clicking "Keep subscription" dismisses dialog without changing state
     /// - Subscription remains Active
+    /// Note: Uses Beta Corp (Active subscription) since Trial subscriptions cannot be cancelled.
     /// </summary>
     [Fact]
     public async Task CancelDialog_DismissBySaying_KeepSubscription_DoesNotChange()
@@ -617,10 +624,14 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
+        // Use Beta Corp (Active subscription) for this test, not Acme (Trial)
         await login.GoToAsync();
-        await login.LoginAsync(AcmeCompanyAdminEmail);
+        await login.LoginAsync(BetaCompanyAdminEmail);
 
         await subscription.GoToAsync();
+
+        // Ensure Beta Corp is in Active state
+        await EnsureBetaCorpActiveSubscriptionAsync();
 
         // Verify starting state
         var initialStatus = await subscription.GetSubscriptionStatusAsync();

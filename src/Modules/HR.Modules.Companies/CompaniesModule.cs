@@ -192,22 +192,27 @@ public static class CompaniesModule
 
         await db.SaveChangesAsync();
 
-        // Seeded dev companies get an already-active subscription (rather than a trial) so dev
-        // personas are never read-only-gated — real trials only start via the self-service SignUp
-        // flow (Identity's SignUp feature, via ICompanyProvisioner).
-        foreach (var seededCompanyId in new[] { acmeId, betaCorpId })
+        // Seeded dev companies: Acme stays Trial to support trial-state E2E tests; Beta Corp is
+        // activated to support subscription lifecycle/mutation tests. Real trials only start via the
+        // self-service SignUp flow (Identity's SignUp feature, via ICompanyProvisioner).
+        // Acme: Trial state (tests trial display, "Start subscription" button, trial days remaining)
+        if (!await db.CustomerSubscriptions.AnyAsync(s => s.CompanyId == acmeId))
         {
-            if (!await db.CustomerSubscriptions.AnyAsync(s => s.CompanyId == seededCompanyId))
-            {
-                var subscription = CustomerSubscription.StartTrial(seededCompanyId, now, trialLengthDays: 14);
-                subscription.ActivateSubscription(
-                    stripeCustomerId: "dev-stub-customer",
-                    stripeSubscriptionId: "dev-stub-subscription",
-                    priceId: "dev-stub-price",
-                    currentPeriodEnd: now.AddYears(1),
-                    now);
-                db.CustomerSubscriptions.Add(subscription);
-            }
+            var acmeSubscription = CustomerSubscription.StartTrial(acmeId, now, trialLengthDays: 14);
+            db.CustomerSubscriptions.Add(acmeSubscription);
+        }
+
+        // Beta Corp: Active state (tests manage billing, cancel/resume workflows, active subscription)
+        if (!await db.CustomerSubscriptions.AnyAsync(s => s.CompanyId == betaCorpId))
+        {
+            var betaSubscription = CustomerSubscription.StartTrial(betaCorpId, now, trialLengthDays: 14);
+            betaSubscription.ActivateSubscription(
+                stripeCustomerId: "dev-stub-customer",
+                stripeSubscriptionId: "dev-stub-subscription",
+                priceId: "dev-stub-price",
+                currentPeriodEnd: now.AddYears(1),
+                now);
+            db.CustomerSubscriptions.Add(betaSubscription);
         }
 
         await db.SaveChangesAsync();
