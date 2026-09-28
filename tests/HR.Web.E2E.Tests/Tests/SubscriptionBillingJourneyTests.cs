@@ -1,6 +1,7 @@
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 using Microsoft.Playwright;
+using System.Threading;
 
 namespace HR.Web.E2E.Tests.Tests;
 
@@ -493,6 +494,9 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         // Ensure Beta Corp is in Active state (restores if previous test left it cancelled)
         await EnsureBetaCorpActiveSubscriptionAsync();
 
+        Exception? scenarioException = null;
+        Exception? cleanupException = null;
+
         try
         {
             // Verify we start with an Active subscription
@@ -535,6 +539,11 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
             Assert.False(await subscription.HasCancelButtonAsync(),
                 "Expected 'Cancel subscription' button to be hidden after scheduling cancellation");
         }
+        catch (Exception ex)
+        {
+            // Capture original test failure for dual-failure reporting in cleanup
+            scenarioException = ex;
+        }
         finally
         {
             // ───────────────────────────────────────────────────────────────────────────────
@@ -542,23 +551,34 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
             // This runs regardless of assertion failures above, ensuring Beta Corp is ready
             // for the next test (or the next run of this test).
             // ───────────────────────────────────────────────────────────────────────────────
-            await RestoreBetaCorpToActiveAsync("ActiveSubscription_Cancel_ShowsConfirmation_AndSchedulesCancellation");
-
-            // Reload to verify restoration succeeded
             try
             {
-                await _page.ReloadAsync();
-                await _page.WaitForSelectorAsync(".card-header h5", new() { Timeout = 20_000 });
-
-                var restoredStatus = await subscription.GetSubscriptionStatusAsync();
-                Assert.True(
-                    restoredStatus?.Equals("Active", StringComparison.OrdinalIgnoreCase) ?? false,
-                    $"Expected Beta Corp to be restored to Active after cleanup, but got '{restoredStatus}'");
+                await RestoreBetaCorpToActiveAsync("ActiveSubscription_Cancel_ShowsConfirmation_AndSchedulesCancellation");
             }
             catch (Exception cleanupEx)
             {
-                // Cleanup reload/verification failed, but don't throw — cleanup failures should not hide test failures.
-                System.Diagnostics.Debug.WriteLine($"[Cleanup] Final state verification failed: {cleanupEx.Message}");
+                // Capture cleanup failure for dual-failure reporting
+                cleanupException = cleanupEx;
+            }
+
+            // Report failures with clarity: scenario failure takes precedence, but cleanup
+            // failure is also visible so it doesn't go unnoticed.
+            if (scenarioException is not null && cleanupException is not null)
+            {
+                throw new AggregateException(
+                    $"SCENARIO FAILED and CLEANUP FAILED. Scenario: {scenarioException.Message}. " +
+                    $"Cleanup: {cleanupException.Message}",
+                    scenarioException, cleanupException);
+            }
+
+            if (scenarioException is not null)
+            {
+                throw scenarioException;
+            }
+
+            if (cleanupException is not null)
+            {
+                throw cleanupException;
             }
         }
     }
@@ -589,6 +609,9 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
         // Ensure Beta Corp is in Active state first
         await EnsureBetaCorpActiveSubscriptionAsync();
+
+        Exception? scenarioException = null;
+        Exception? cleanupException = null;
 
         try
         {
@@ -646,6 +669,11 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
             Assert.True(await subscription.HasCancelButtonAsync(),
                 "Expected 'Cancel subscription' button to return after resuming");
         }
+        catch (Exception ex)
+        {
+            // Capture original test failure for dual-failure reporting in cleanup
+            scenarioException = ex;
+        }
         finally
         {
             // ───────────────────────────────────────────────────────────────────────────────
@@ -653,23 +681,34 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
             // This runs regardless of assertion failures above, ensuring Beta Corp is ready
             // for the next test (or the next run of this test).
             // ───────────────────────────────────────────────────────────────────────────────
-            await RestoreBetaCorpToActiveAsync("CancelledSubscription_Resume_RestoresActiveState");
-
-            // Reload to verify restoration succeeded
             try
             {
-                await _page.ReloadAsync();
-                await _page.WaitForSelectorAsync(".card-header h5", new() { Timeout = 20_000 });
-
-                var restoredStatus = await subscription.GetSubscriptionStatusAsync();
-                Assert.True(
-                    restoredStatus?.Equals("Active", StringComparison.OrdinalIgnoreCase) ?? false,
-                    $"Expected Beta Corp to be restored to Active after cleanup, but got '{restoredStatus}'");
+                await RestoreBetaCorpToActiveAsync("CancelledSubscription_Resume_RestoresActiveState");
             }
             catch (Exception cleanupEx)
             {
-                // Cleanup reload/verification failed, but don't throw — cleanup failures should not hide test failures.
-                System.Diagnostics.Debug.WriteLine($"[Cleanup] Final state verification failed: {cleanupEx.Message}");
+                // Capture cleanup failure for dual-failure reporting
+                cleanupException = cleanupEx;
+            }
+
+            // Report failures with clarity: scenario failure takes precedence, but cleanup
+            // failure is also visible so it doesn't go unnoticed.
+            if (scenarioException is not null && cleanupException is not null)
+            {
+                throw new AggregateException(
+                    $"SCENARIO FAILED and CLEANUP FAILED. Scenario: {scenarioException.Message}. " +
+                    $"Cleanup: {cleanupException.Message}",
+                    scenarioException, cleanupException);
+            }
+
+            if (scenarioException is not null)
+            {
+                throw scenarioException;
+            }
+
+            if (cleanupException is not null)
+            {
+                throw cleanupException;
             }
         }
     }
@@ -698,6 +737,9 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         // Ensure Beta Corp is in Active state
         await EnsureBetaCorpActiveSubscriptionAsync();
 
+        Exception? scenarioException = null;
+        Exception? cleanupException = null;
+
         try
         {
             // Verify starting state
@@ -725,6 +767,11 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
             var newHasCancelWarning = await subscription.HasCancellationWarningAsync();
             Assert.Equal(initialHasCancelWarning, newHasCancelWarning);
         }
+        catch (Exception ex)
+        {
+            // Capture original test failure for dual-failure reporting in cleanup
+            scenarioException = ex;
+        }
         finally
         {
             // ───────────────────────────────────────────────────────────────────────────────
@@ -732,23 +779,34 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
             // Even though this test doesn't mutate state (cancellation is dismissed),
             // cleanup ensures Beta Corp is in predictable state if any assertion fails.
             // ───────────────────────────────────────────────────────────────────────────────
-            await RestoreBetaCorpToActiveAsync("CancelDialog_DismissBySaying_KeepSubscription_DoesNotChange");
-
-            // Reload to verify restoration succeeded
             try
             {
-                await _page.ReloadAsync();
-                await _page.WaitForSelectorAsync(".card-header h5", new() { Timeout = 20_000 });
-
-                var restoredStatus = await subscription.GetSubscriptionStatusAsync();
-                Assert.True(
-                    restoredStatus?.Equals("Active", StringComparison.OrdinalIgnoreCase) ?? false,
-                    $"Expected Beta Corp to be restored to Active after cleanup, but got '{restoredStatus}'");
+                await RestoreBetaCorpToActiveAsync("CancelDialog_DismissBySaying_KeepSubscription_DoesNotChange");
             }
             catch (Exception cleanupEx)
             {
-                // Cleanup reload/verification failed, but don't throw — cleanup failures should not hide test failures.
-                System.Diagnostics.Debug.WriteLine($"[Cleanup] Final state verification failed: {cleanupEx.Message}");
+                // Capture cleanup failure for dual-failure reporting
+                cleanupException = cleanupEx;
+            }
+
+            // Report failures with clarity: scenario failure takes precedence, but cleanup
+            // failure is also visible so it doesn't go unnoticed.
+            if (scenarioException is not null && cleanupException is not null)
+            {
+                throw new AggregateException(
+                    $"SCENARIO FAILED and CLEANUP FAILED. Scenario: {scenarioException.Message}. " +
+                    $"Cleanup: {cleanupException.Message}",
+                    scenarioException, cleanupException);
+            }
+
+            if (scenarioException is not null)
+            {
+                throw scenarioException;
+            }
+
+            if (cleanupException is not null)
+            {
+                throw cleanupException;
             }
         }
     }
@@ -1002,33 +1060,178 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     /// - Closed dialogs or navigations
     /// - Any browser operation errors
     ///
-    /// Uses POST /api/companies/subscription/resume which is idempotent:
-    /// calling it on an already-Active subscription succeeds without side effects.
-    /// Failures are reported with context but do not hide the original test failure.
+    /// Uses POST /api/companies/subscription/resume which should be idempotent:
+    /// calling it on an already-Active subscription should succeed without Stripe invocations.
+    ///
+    /// Authentication:
+    /// - Obtains access token via /api/dev/persona/{charlieWilsonUserId}
+    /// - Sends Authorization: Bearer {token} header with resume request
+    /// - Fails test visibly if 401/403/400/timeout/connection errors occur
+    ///
+    /// State Verification:
+    /// - Confirms via GET /api/companies/subscription that CancelAtPeriodEnd = false
+    /// - Fails test if final state cannot be verified
+    /// - Independent of UI reload, proving server-side restoration
+    ///
+    /// Concurrency Protection:
+    /// - Uses static semaphore to protect shared Beta Corp fixture
+    /// - Serializes mutations and verifications across parallel test runs
+    /// - Prevents race between test mutation and other test's cleanup
+    ///
+    /// Failure Reporting:
+    /// - Captures original test exception (if any) before cleanup
+    /// - Returns cleanup result to caller
+    /// - If both scenario and cleanup fail, test output includes both exceptions
+    /// - Cleanup failures are visible, not swallowed
     /// </summary>
+    private static readonly SemaphoreSlim BetaCorpCleanupSemaphore = new(1, 1);
+    private const string CharlieWilsonUserId = "30000000-0000-0000-0000-000000000018";
+
     private async Task RestoreBetaCorpToActiveAsync(string callerContext)
     {
+        // Use semaphore to serialize Beta Corp mutations across parallel tests
+        await BetaCorpCleanupSemaphore.WaitAsync();
         try
         {
+            // Step 1: Obtain authenticated access token via /api/dev/persona endpoint
+            var token = await GetAuthenticatedTokenForCharlieWilsonAsync();
+            if (string.IsNullOrEmpty(token))
+            {
+                throw new InvalidOperationException(
+                    $"[RestoreBetaCorpToActiveAsync] Failed to obtain access token for Charlie Wilson from {callerContext}");
+            }
+
+            // Step 2: Resume subscription with Authorization header
             var resumeUrl = $"{_fixture.ApiBaseUrl}/api/companies/subscription/resume";
             var apiResponse = await _page.Context.APIRequest.PostAsync(
                 resumeUrl,
-                new APIRequestContextOptions { Headers = new Dictionary<string, string> { } });
+                new APIRequestContextOptions
+                {
+                    Headers = new Dictionary<string, string>
+                    {
+                        ["Authorization"] = $"Bearer {token}"
+                    }
+                });
 
+            // Step 3: Validate resume response — any non-2xx is a failure
             if (!apiResponse.Ok)
             {
-                // Log the failure but do not throw — this is cleanup, and throwing would mask the original test failure.
                 var errorBody = await apiResponse.TextAsync();
-                System.Diagnostics.Debug.WriteLine(
-                    $"[RestoreBetaCorpToActiveAsync] API call failed from {callerContext}: " +
-                    $"{apiResponse.Status} {resumeUrl}\n{errorBody}");
+                throw new InvalidOperationException(
+                    $"[RestoreBetaCorpToActiveAsync] Resume subscription API returned {apiResponse.Status} " +
+                    $"from {callerContext}. URL: {resumeUrl}\nResponse: {errorBody}");
             }
+
+            // Step 4: Verify final state via GET /api/companies/subscription
+            var stateUrl = $"{_fixture.ApiBaseUrl}/api/companies/subscription";
+            var stateResponse = await _page.Context.APIRequest.GetAsync(
+                stateUrl,
+                new APIRequestContextOptions
+                {
+                    Headers = new Dictionary<string, string>
+                    {
+                        ["Authorization"] = $"Bearer {token}"
+                    }
+                });
+
+            if (!stateResponse.Ok)
+            {
+                var errorBody = await stateResponse.TextAsync();
+                throw new InvalidOperationException(
+                    $"[RestoreBetaCorpToActiveAsync] State verification GET returned {stateResponse.Status} " +
+                    $"from {callerContext}. URL: {stateUrl}\nResponse: {errorBody}");
+            }
+
+            // Step 5: Parse response and confirm CancelAtPeriodEnd = false
+            var json = await stateResponse.JsonAsync();
+            if (!json.HasValue)
+            {
+                throw new InvalidOperationException(
+                    $"[RestoreBetaCorpToActiveAsync] State verification returned no JSON from {callerContext}");
+            }
+
+            if (!json.Value.TryGetProperty("cancelAtPeriodEnd", out var cancelAtPeriodEndElement))
+            {
+                throw new InvalidOperationException(
+                    $"[RestoreBetaCorpToActiveAsync] State response missing 'cancelAtPeriodEnd' field from {callerContext}");
+            }
+
+            var cancelAtPeriodEnd = false;
+            if (cancelAtPeriodEndElement.ValueKind == System.Text.Json.JsonValueKind.True)
+            {
+                cancelAtPeriodEnd = true;
+            }
+
+            if (cancelAtPeriodEnd)
+            {
+                throw new InvalidOperationException(
+                    $"[RestoreBetaCorpToActiveAsync] State verification failed: " +
+                    $"Beta Corp's subscription still has CancelAtPeriodEnd=true after resume from {callerContext}. " +
+                    $"Full response: {json.Value}");
+            }
+
+            // Success: restoration verified
+            System.Diagnostics.Debug.WriteLine(
+                $"[RestoreBetaCorpToActiveAsync] Successfully restored Beta Corp from {callerContext}: " +
+                $"CancelAtPeriodEnd=false confirmed");
         }
         catch (Exception ex)
         {
-            // API call itself failed (timeout, connection, etc.). Log but don't throw.
+            // Cleanup failure: report it visibly but include context to help diagnosis
             System.Diagnostics.Debug.WriteLine(
-                $"[RestoreBetaCorpToActiveAsync] Exception from {callerContext}: {ex.Message}");
+                $"[RestoreBetaCorpToActiveAsync] CLEANUP FAILED from {callerContext}:\n{ex}");
+            throw;
+        }
+        finally
+        {
+            BetaCorpCleanupSemaphore.Release();
+        }
+    }
+
+    /// <summary>
+    /// Obtains an access token for Charlie Wilson (Beta Corp's Company Administrator) via the
+    /// /api/dev/persona/{userId} endpoint. Used by RestoreBetaCorpToActiveAsync to authenticate
+    /// subscription resume operations in cleanup code.
+    /// </summary>
+    private async Task<string> GetAuthenticatedTokenForCharlieWilsonAsync()
+    {
+        try
+        {
+            var personaUrl = $"{_fixture.ApiBaseUrl}/api/dev/persona/{CharlieWilsonUserId}";
+            var personaResponse = await _page.Context.APIRequest.PostAsync(personaUrl);
+
+            if (!personaResponse.Ok)
+            {
+                var body = await personaResponse.TextAsync();
+                System.Diagnostics.Debug.WriteLine(
+                    $"[GetAuthenticatedTokenForCharlieWilsonAsync] /api/dev/persona failed: " +
+                    $"{personaResponse.Status}\n{body}");
+                return string.Empty;
+            }
+
+            var json = await personaResponse.JsonAsync();
+            if (!json.HasValue)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    "[GetAuthenticatedTokenForCharlieWilsonAsync] No JSON response from /api/dev/persona");
+                return string.Empty;
+            }
+
+            if (!json.Value.TryGetProperty("accessToken", out var tokenElement))
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    "[GetAuthenticatedTokenForCharlieWilsonAsync] Response missing accessToken field");
+                return string.Empty;
+            }
+
+            var token = tokenElement.GetString();
+            return token ?? string.Empty;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine(
+                $"[GetAuthenticatedTokenForCharlieWilsonAsync] Exception: {ex.Message}");
+            return string.Empty;
         }
     }
 }
