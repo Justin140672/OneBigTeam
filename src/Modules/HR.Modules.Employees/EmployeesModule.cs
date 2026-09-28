@@ -85,6 +85,7 @@ using HR.Modules.Employees.Features.StartLeavingProcess;
 using HR.Modules.Employees.Features.GetLeavingProcess;
 using HR.Modules.Employees.Features.AmendLeavingProcess;
 using HR.Modules.Employees.Features.CancelLeavingProcess;
+using HR.Modules.Employees.Features.GetLeavingProcessHistory;
 using HR.Modules.Employees.Features.PromoteEmployee;
 using HR.Modules.Employees.Features.GetEmployeePromotionHistory;
 using HR.Modules.Employees.Features.GetEmployeeTimeline;
@@ -393,6 +394,8 @@ public static class EmployeesModule
 
         services.AddScoped<CancelLeavingProcessHandler>();
         services.AddScoped<IValidator<CancelLeavingProcessRequest>, CancelLeavingProcessValidator>();
+
+        services.AddScoped<GetLeavingProcessHistoryHandler>();
 
         services.AddScoped<ProcessLeavingEmployeesJob>();
 

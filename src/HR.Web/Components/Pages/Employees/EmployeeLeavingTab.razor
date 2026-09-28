@@ -61,8 +61,7 @@ else
                 {
                     <div class="alert alert-secondary py-2 mb-3">
                         Historical — this is this employee's latest leaving attempt and is not currently
-                        active. <!-- TODO(SPEC-OFF-01): there is no endpoint yet to list earlier leaving-process
-                        attempts for this employee; add a "past attempts" view once one exists. -->
+                        active.
                     </div>
                 }
                 <p class="text-muted small">
@@ -107,6 +106,89 @@ else
                                      OnRetry="ReloadOffboardingAsync"
                                      OnRefreshRequested="ReloadOffboardingAsync" />
         </div>
+
+        @if (Session.CanManageEmployees && (_leavingHistory?.Items.Count ?? 0) > 0)
+        {
+            <div class="card mt-4" id="leaving-history-section">
+                <div class="card-header">
+                    <button class="btn btn-link text-start p-0 w-100 text-decoration-none d-flex align-items-center gap-2"
+                            style="color: inherit;"
+                            @onclick="@(() => _historyExpanded = !_historyExpanded)">
+                        <i class="fa-solid @(_historyExpanded ? "fa-chevron-down" : "fa-chevron-right")"></i>
+                        <h5 class="mb-0">Past Leaving Attempts</h5>
+                    </button>
+                </div>
+                @if (_historyExpanded)
+                {
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Status</th>
+                                        <th>Resignation Date</th>
+                                        <th>Leaving Date</th>
+                                        <th>Last Working Day</th>
+                                        <th>Leaving Reason</th>
+                                        <th>Started</th>
+                                        <th>Ended</th>
+                                        <th>Replacement Manager</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var item in _leavingHistory!.Items)
+                                    {
+                                        <tr class="text-muted">
+                                            <td>
+                                                <span class="badge fs-6 px-2 py-1 @LeavingStatusBadgeClass(item.Status)">
+                                                    @LeavingStatusLabel(item.Status)
+                                                </span>
+                                            </td>
+                                            <td>@item.ResignationReceivedDate.ToString("dd MMM yyyy")</td>
+                                            <td>@item.LeavingDate.ToString("dd MMM yyyy")</td>
+                                            <td>@item.LastWorkingDay.ToString("dd MMM yyyy")</td>
+                                            <td>@LeavingReasonLabel(item.LeavingReason)</td>
+                                            <td>@item.StartedAt.ToString("dd MMM yyyy")</td>
+                                            <td>
+                                                @if (item.CancelledAt.HasValue)
+                                                {
+                                                    @item.CancelledAt.Value.ToString("dd MMM yyyy")
+                                                }
+                                                else if (item.FinalisationCompletedAt.HasValue)
+                                                {
+                                                    @item.FinalisationCompletedAt.Value.ToString("dd MMM yyyy")
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">—</span>
+                                                }
+                                            </td>
+                                            <td>@(item.ReplacementManagerName ?? "—")</td>
+                                        </tr>
+                                        @if (!string.IsNullOrWhiteSpace(item.Notes))
+                                        {
+                                            <tr class="text-muted small">
+                                                <td colspan="8">
+                                                    <strong>Notes:</strong> @item.Notes
+                                                </td>
+                                            </tr>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(item.CancellationReason))
+                                        {
+                                            <tr class="text-muted small">
+                                                <td colspan="8">
+                                                    <strong>Cancellation Reason:</strong> @item.CancellationReason
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
     }
 }
 
@@ -126,8 +208,10 @@ else
     private bool _loading = true;
     private LeavingProcessLookupResult? _leavingLookup;
     private OffboardingOverviewLookupResult? _offboardingLookup;
+    private GetLeavingProcessHistoryResponse? _leavingHistory;
     private bool _showOffboardingAlreadyStartedWarning;
     private bool _hasFocusedChecklist;
+    private bool _historyExpanded = false;
 
     protected override async Task OnParametersSetAsync()
     {
@@ -149,9 +233,14 @@ else
     {
         var leavingTask = EmployeeService.GetLeavingProcessAsync(CompanyId, EmployeeId);
         var offboardingTask = OffboardingService.GetOverviewAsync(CompanyId, EmployeeId);
-        await Task.WhenAll(leavingTask, offboardingTask);
+        var historyTask = Session.CanManageEmployees
+            ? EmployeeService.GetLeavingProcessHistoryAsync(CompanyId, EmployeeId)
+            : Task.FromResult<GetLeavingProcessHistoryResponse?>(null);
+
+        await Task.WhenAll(leavingTask, offboardingTask, historyTask);
         _leavingLookup = leavingTask.Result;
         _offboardingLookup = offboardingTask.Result;
+        _leavingHistory = await historyTask;
     }
 
     private async Task ReloadAsync()

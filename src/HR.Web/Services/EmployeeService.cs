@@ -478,6 +478,19 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to cancel leaving process."));
     }
 
+    public async Task<GetLeavingProcessHistoryResponse?> GetLeavingProcessHistoryAsync(Guid companyId, Guid employeeId)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetLeavingProcessHistoryResponse>(
+                $"api/companies/{companyId}/employees/{employeeId}/leaving-process-history", HrApiJsonOptions.Default);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     // ── EQUALITY & DIVERSITY (self-service) ───────────────────────────────────
 
     public async Task<GetMyEqualityDataResponse?> GetMyEqualityRecordAsync(

@@ -556,6 +556,25 @@ public sealed record CancelLeavingProcessResponse(
     string Status,
     bool OffboardingTasksCancelled);
 
+// ── LEAVING PROCESS HISTORY ───────────────────────────────────────────────────
+
+public sealed record GetLeavingProcessHistoryResponse(IReadOnlyList<LeavingProcessHistoryItem> Items);
+
+public sealed record LeavingProcessHistoryItem(
+    Guid Id,
+    string Status,
+    DateOnly ResignationReceivedDate,
+    DateOnly LeavingDate,
+    DateOnly LastWorkingDay,
+    string LeavingReason,
+    string? Notes,
+    string? ReplacementManagerName,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? CancelledAt,
+    string? CancellationReason,
+    DateTimeOffset? FinalisationCompletedAt,
+    DateTimeOffset UpdatedAt);
+
 // ── NATIONALITIES ─────────────────────────────────────────────────────────────
 
 // ── COMPLETE INITIAL EMPLOYEE SETUP ─────────────────────────────────────────────
