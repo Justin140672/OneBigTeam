@@ -66,6 +66,7 @@ internal sealed class GetSupportRequestHandler(SupportDbContext db)
             entity.CreatedAt,
             entity.UpdatedAt,
             entity.Version,
+            entity.SubmittedByUserId,
             attachments,
             responseDtos));
     }

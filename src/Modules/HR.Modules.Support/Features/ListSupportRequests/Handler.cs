@@ -13,6 +13,10 @@ internal sealed class ListSupportRequestsHandler(SupportDbContext db)
             .AsNoTracking()
             .Where(r => r.CompanyId == request.CompanyId);
 
+        // Ticket 6: self-service filter to requestor's own requests (set by self-service Endpoint)
+        if (request.RequestorUserId is not null)
+            query = query.Where(r => r.SubmittedByUserId == request.RequestorUserId);
+
         if (request.Status is not null)
             query = query.Where(r => r.Status == request.Status);
 

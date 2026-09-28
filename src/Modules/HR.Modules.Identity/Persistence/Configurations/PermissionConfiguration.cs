@@ -102,6 +102,7 @@ internal sealed class PermissionConfiguration : IEntityTypeConfiguration<Permiss
             Permission.Create(SystemPermissions.ReportingViewEquality,       "reporting.view-equality",         seedDate),
 
             Permission.Create(SystemPermissions.SupportManage, "support.manage", seedDate),
+            Permission.Create(SystemPermissions.SupportRequest, "support.request", seedDate),
 
             // ADM-02: consolidated Compliance Centre.
             Permission.Create(SystemPermissions.ComplianceView, "compliance.view", seedDate)

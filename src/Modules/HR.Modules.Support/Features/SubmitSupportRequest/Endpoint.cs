@@ -10,7 +10,7 @@ internal sealed class Endpoint(SubmitSupportRequestHandler handler, ICurrentUser
     public override void Configure()
     {
         Post("/api/companies/{companyId:guid}/support/requests");
-        Policies("support:manage");
+        Policies("support:request");
         AllowFileUploads();
     }
 

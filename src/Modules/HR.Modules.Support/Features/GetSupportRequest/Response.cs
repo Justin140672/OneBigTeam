@@ -17,6 +17,7 @@ internal sealed record GetSupportRequestResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     int Version,
+    Guid SubmittedByUserId,
     List<GetSupportRequestAttachmentDto> Attachments,
     List<GetSupportRequestResponseDto> Responses);
 

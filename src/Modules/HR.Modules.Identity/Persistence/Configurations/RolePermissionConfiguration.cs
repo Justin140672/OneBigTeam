@@ -29,10 +29,11 @@ internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<Rol
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasData(
-            // Employee: self.read, self.edit, leave.request, document.read
+            // Employee: self.read, self.edit, leave.request, support.request, document.read
             RolePermission.Create(SystemRoles.Employee, SystemPermissions.SelfRead),
             RolePermission.Create(SystemRoles.Employee, SystemPermissions.SelfEdit),
             RolePermission.Create(SystemRoles.Employee, SystemPermissions.LeaveRequest),
+            RolePermission.Create(SystemRoles.Employee, SystemPermissions.SupportRequest),
             RolePermission.Create(SystemRoles.Employee, SystemPermissions.DocumentRead),
 
             // Manager: self.read, self.edit, employee.read, leave.request, leave.approve, document.read, sickness.read
@@ -49,18 +50,21 @@ internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<Rol
             RolePermission.Create(SystemRoles.Recruiter, SystemPermissions.EmployeeCreate),
             RolePermission.Create(SystemRoles.Recruiter, SystemPermissions.DocumentRead),
 
-            // HR Administrator: employee.read/edit/create/delete, leave.request/approve, document.manage,
-            // company.read, sickness.read/manage.
+            // HR Administrator: employee.read/edit/create/delete, leave.request/approve, support.request/manage,
+            // document.manage, company.read, sickness.read/manage.
             // IAM-06: leave.request added here — HrAdministrator has always held the "leave:request"
             // authorization policy (an HR Administrator can submit their own leave requests, same as
             // any employee) but the permission catalogue never reflected that grant; corrected so the
             // catalogue now matches actual endpoint behaviour instead of drifting from it.
+            // Ticket 6: support.request added here — HR Administrator can submit their own support requests
+            // (self-service) as well as manage the support queue (support.manage).
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.EmployeeRead),
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.EmployeeEdit),
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.EmployeeCreate),
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.EmployeeDelete),
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.LeaveRequest),
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.LeaveApprove),
+            RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.SupportRequest),
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.DocumentManage),
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.CompanyRead),
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.SicknessRead),
