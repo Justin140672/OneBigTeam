@@ -135,6 +135,25 @@ public static class CompaniesModule
         await db.Database.MigrateAsync();
     }
 
+    /// <summary>
+    /// Orchestrates the required startup sequence: Companies migration and seeding, followed by Platform migration.
+    /// This method is the single source of truth for the production startup order — used by both Program.cs
+    /// (via migrationRunner.RunAsync) and integration tests to ensure ordering consistency.
+    ///
+    /// The ordering is mandatory: Platform migration has a foreign key to companies.companies and copies data
+    /// from companies.platform_settings and companies.platform_metrics_snapshots, so it must run after
+    /// Companies schema, tables, and seed data exist.
+    /// </summary>
+    public static async Task MigrateAndSeedCoreApplicationAsync(this IServiceProvider services)
+    {
+        // Step 1: Companies migration + seed (required before Platform)
+        await services.MigrateCompaniesAsync();
+        await services.SeedCompaniesAsync();
+
+        // Step 2: Platform migration (depends on companies schema + data from step 1)
+        await services.MigratePlatformAsync();
+    }
+
     public static async Task SeedCompaniesAsync(this IServiceProvider services)
     {
         using var scope = services.CreateScope();

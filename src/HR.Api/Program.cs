@@ -236,17 +236,16 @@ var migrationRunner = app.Services.GetRequiredService<StartupMigrationRunner>();
 // Required migrations + seeding, run in dependency order. Each step is awaited in sequence; a
 // failure records the affected module and (below) prevents the normal request pipeline and the
 // Hangfire recurring job registration from being wired up.
+// The core application startup (Companies migration + seed + Platform migration) is orchestrated by
+// CompaniesModule.MigrateAndSeedCoreApplicationAsync(), which enforces the mandatory ordering:
 // Companies must run before Platform (Platform migration has FK to companies.companies and
 // copies data from companies.platform_settings and companies.platform_metrics_snapshots).
-await migrationRunner.RunAsync("companies", app.Services, async sp =>
+// Integration tests call the same orchestration method to ensure consistency.
+// The orchestration is the single source of truth: changing the order inside it will be reflected
+// in both Program.cs and integration tests automatically.
+await migrationRunner.RunAsync("companies-and-platform", app.Services, async sp =>
 {
-	await sp.MigrateCompaniesAsync();
-	await sp.SeedCompaniesAsync();
-});
-
-await migrationRunner.RunAsync("platform", app.Services, async sp =>
-{
-	await sp.MigratePlatformAsync();
+	await sp.MigrateAndSeedCoreApplicationAsync();
 });
 
 await migrationRunner.RunAsync("companyOnboarding", app.Services, async sp =>
