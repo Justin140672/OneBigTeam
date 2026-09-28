@@ -211,7 +211,7 @@ internal static class PersonaLoginCache
     public static async Task PublishAsync(string personaEmail, IPage page)
     {
         var storageState = await page.Context.StorageStateAsync();
-        var options = new BrowserNewContextOptions { StorageState = storageState };
+        var options = E2eBrowserContextOptions.Create(storageState);
         _cache[personaEmail] = new Lazy<Task<BrowserNewContextOptions>>(
             () => Task.FromResult(options), LazyThreadSafetyMode.ExecutionAndPublication);
     }
@@ -360,7 +360,7 @@ internal static class PersonaLoginCache
                 using var attemptTimer = E2eDiag.Time("PersonaLoginCache", $"{personaEmail}: real login attempt {attempt}/{maxAttempts}");
                 try
                 {
-                    await using var bootstrapContext = await browser.NewContextAsync();
+                    await using var bootstrapContext = await browser.NewContextAsync(E2eBrowserContextOptions.Create());
                     var page = await bootstrapContext.NewPageAsync();
                     var login = new PageObjects.LoginPage(page, baseUrl);
                     await login.GoToAsync();
@@ -373,7 +373,7 @@ internal static class PersonaLoginCache
                     var storageState = await bootstrapContext.StorageStateAsync();
                     await page.CloseAsync();
 
-                    return new BrowserNewContextOptions { StorageState = storageState };
+                    return E2eBrowserContextOptions.Create(storageState);
                 }
                 catch (Exception ex)
                 {

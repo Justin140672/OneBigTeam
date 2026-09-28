@@ -48,13 +48,14 @@ public sealed class VacancyListPage(IPage page, string baseUrl)
 
     public async Task ClickNewVacancyAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
         // Trailing "**" so the glob still matches when the list page appends "?returnUrl=..." to
-        // the create route (SearchPageBase.AppendReturnUrl). WaitUntil=Commit, not the default
-        // Load: a Blazor interactive navigation may never re-fire the document "load" event. Then
-        // wait for the create form itself before callers start filling fields.
-        await page.WaitForURLAsync("**/vacancies/new**",
-            new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
+        // the create route (SearchPageBase.AppendReturnUrl). The shared helper waits on Commit,
+        // re-clicks only while the URL is unchanged (the toolbar's click wiring lands after the
+        // rows paint), and on failure reports the page's actual URL — e.g. /access-denied, which is
+        // where VacancyList.OnBeforeLoadAsync sends a non-recruiter session (the grid can still
+        // paint first, so GoToAsync's rows wait passes and the "Add" button then disappears).
+        // Then wait for the create form itself before callers start filling fields.
+        await page.ClickGridAddAndWaitForCreateRouteAsync("**/vacancies/new**");
         await page.GetByPlaceholder("e.g. Senior Software Engineer")
             .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
     }

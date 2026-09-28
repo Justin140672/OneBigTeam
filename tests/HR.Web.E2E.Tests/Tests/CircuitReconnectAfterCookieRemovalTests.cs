@@ -47,7 +47,7 @@ public sealed class CircuitReconnectAfterCookieRemovalTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         _app = await SharedAppFixture.AcquireAsync();
-        _context = await _app.Browser.NewContextAsync();
+        _context = await _app.Browser.NewContextAsync(E2eBrowserContextOptions.Create());
         // Track every WebSocket the page opens so the test can sever Blazor's SignalR socket on
         // demand (see the "Force the existing SignalR connection to drop" step). Plain page-level JS
         // on this test's OWN context only — no Playwright routing, so nothing touches Playwright's

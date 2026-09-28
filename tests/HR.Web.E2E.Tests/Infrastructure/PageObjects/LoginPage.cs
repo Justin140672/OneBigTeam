@@ -212,6 +212,12 @@ public sealed class LoginPage(IPage page, string baseUrl)
         }
     }
 
+    private static bool IsPersonaShapedEmail(string email)
+    {
+        var parts = email.Split('@')[0].Split('.', StringSplitOptions.RemoveEmptyEntries);
+        return parts.Length == 2 && parts.All(p => p.All(char.IsLetter));
+    }
+
     private static string DerivePersonaDisplayName(string email)
     {
         var local = email.Split('@')[0];
@@ -225,6 +231,27 @@ public sealed class LoginPage(IPage page, string baseUrl)
         // userId mapping from an email here, so this always falls back to cookie-based login.
         await page.GotoAsync($"{baseUrl}/login", new() { WaitUntil = WaitUntilState.Commit, Timeout = 60_000 });
         await LoginAsync(email, password);
+
+        // A switch that silently leaves the PREVIOUS persona signed in surfaces much later as an
+        // unrelated-looking failure (e.g. a recruiter-only list redirecting to /access-denied and
+        // its "Add" button never appearing). LoginAsync decides whether to drop the old session from
+        // an instant ".app-shell" check right after a Commit-level navigation, which can run before
+        // /login has rendered. Verify the switch actually took; if not, clear the old session
+        // explicitly and log in once more, then fail loudly at the switch itself.
+        // Only for persona-shaped addresses ("first.last@…" — every DevPersonaStore persona), whose
+        // top-bar display name IsAuthenticatedAsAsync can derive from the email. Generated users
+        // (e.g. "e2e.apply.<id>@acme.example") display a different name, so they're not checked.
+        if (IsPersonaShapedEmail(email) && !await IsAuthenticatedAsAsync(email))
+        {
+            await page.Context.ClearCookiesAsync();
+            await page.GotoAsync($"{baseUrl}/login", new() { WaitUntil = WaitUntilState.Commit, Timeout = 60_000 });
+            await page.WaitForSelectorAsync("[placeholder='you@example.com']", new() { Timeout = 30_000 });
+            await LoginAsync(email, password);
+
+            if (!await IsAuthenticatedAsAsync(email))
+                throw new InvalidOperationException(
+                    $"Switching account to '{email}' did not take effect (page is at {page.Url}).");
+        }
     }
 
     /// <summary>

@@ -51,7 +51,7 @@ public sealed class RealSupabaseLoginFlowTests : IAsyncLifetime
     public async Task InitializeAsync()
     {
         _app = await SharedAppFixture.AcquireAsync();
-        _context = await _app.Browser.NewContextAsync();
+        _context = await _app.Browser.NewContextAsync(E2eBrowserContextOptions.Create());
         _page = await _context.NewPageAsync();
         _page.SetDefaultTimeout(30_000);
         _page.SetDefaultNavigationTimeout(30_000);

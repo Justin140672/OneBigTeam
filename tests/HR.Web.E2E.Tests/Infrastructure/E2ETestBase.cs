@@ -25,7 +25,7 @@ public abstract class E2ETestBase(IPersonaFixture fixture) : IAsyncLifetime
     {
         _context = _fixture.AuthenticatedContextOptions is { } options
             ? await _fixture.Browser.NewContextAsync(options)
-            : await _fixture.Browser.NewContextAsync();
+            : await _fixture.Browser.NewContextAsync(E2eBrowserContextOptions.Create());
         _page = await _context.NewPageAsync();
 
         _page.Console += (_, msg) =>

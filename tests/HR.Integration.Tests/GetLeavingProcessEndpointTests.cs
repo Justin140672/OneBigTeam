@@ -137,12 +137,85 @@ public class GetLeavingProcessEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // Unlike StartLeavingProcess/AmendLeavingProcess/CancelLeavingProcess (all gated by the
-    // employee:manage policy — HrAdministrator only), GetLeavingProcess is gated by the broader
-    // "role:employee" policy (see IdentityModule.AddRolePolicies) — every real user always carries
-    // the Employee role (AcceptInvite always assigns it), so this is still broad read access, just
-    // no longer satisfied by an authenticated-but-completely-role-less caller. This test locks in
-    // that a caller with zero assigned roles at all must now get 403, not 200.
+    // ADM-05: authorization change — GetLeavingProcess now requires "employee:manage" policy
+    // (HrAdministrator only), not "employee:read". Offboarding administration is not visible
+    // to a plain Employee, Manager, Recruiter, or Company-Administrator-only user.
+
+    [Fact]
+    public async Task Get_LeavingProcess_Returns_Forbidden_For_Manager_Accessing_Another_Employee()
+    {
+        using var hrAdminClient = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        hrAdminClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
+        hrAdminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User1, SystemRoles.HrAdministrator, companyId);
+
+        var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
+        await StartLeavingProcessAsync(hrAdminClient, companyId, employeeId);
+
+        // A different user with Manager role
+        using var managerClient = _factory.CreateClient();
+        var managerId = Guid.NewGuid();
+        managerClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, managerId.ToString());
+        managerClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager, companyId);
+
+        var response = await managerClient.GetAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leaving-process");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_LeavingProcess_Returns_Forbidden_For_Recruiter()
+    {
+        using var hrAdminClient = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        hrAdminClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
+        hrAdminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User2, SystemRoles.HrAdministrator, companyId);
+
+        var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
+        await StartLeavingProcessAsync(hrAdminClient, companyId, employeeId);
+
+        // A different user with Recruiter role
+        using var recruiterClient = _factory.CreateClient();
+        var recruiterId = Guid.NewGuid();
+        recruiterClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, recruiterId.ToString());
+        recruiterClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, recruiterId, SystemRoles.Recruiter, companyId);
+
+        var response = await recruiterClient.GetAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leaving-process");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_LeavingProcess_Returns_Forbidden_For_Employee_Accessing_Another_Employee()
+    {
+        using var hrAdminClient = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        hrAdminClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User3.ToString());
+        hrAdminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User3, SystemRoles.HrAdministrator, companyId);
+
+        var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
+        await StartLeavingProcessAsync(hrAdminClient, companyId, employeeId);
+
+        // A different user with Employee role only
+        using var employeeClient = _factory.CreateClient();
+        var otherEmployeeId = Guid.NewGuid();
+        employeeClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, otherEmployeeId.ToString());
+        employeeClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, otherEmployeeId, SystemRoles.Employee, companyId);
+
+        var response = await employeeClient.GetAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leaving-process");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     [Fact]
     public async Task Get_LeavingProcess_Returns_Forbidden_For_User_With_No_Roles()
     {

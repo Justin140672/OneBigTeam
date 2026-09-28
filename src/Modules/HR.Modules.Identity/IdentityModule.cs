@@ -649,6 +649,22 @@ public static class IdentityModule
             db.UserRoles.Add(UserRole.Create(id, SystemRoles.Employee, DateTimeOffset.UtcNow));
             await db.SaveChangesAsync(cancellationToken);
         }
+
+        // The ApplicationUser row too — exactly as SeedDevUserAsync creates it for the seeded
+        // personas. Without it the provisioned user could sign in (UserProfile + Supabase user) but
+        // every user-administration endpoint that loads db.Users (UpdateUserRoles, Enable/Disable
+        // user, role overrides) answered "User was not found." — e.g. an E2E arrange granting extra
+        // roles to a freshly provisioned employee. Same id as the employee/UserProfile.
+        var normalizedEmail = email.Trim().ToUpperInvariant();
+        var userExists = await db.Users.AnyAsync(
+            u => u.Id == id || u.NormalizedEmail == normalizedEmail, cancellationToken);
+        if (!userExists)
+        {
+            db.Users.Add(ApplicationUser.Create(
+                id, email, passwordHash: "dev-only-not-used",
+                firstName: firstName, lastName: lastName, DateTimeOffset.UtcNow));
+            await db.SaveChangesAsync(cancellationToken);
+        }
     }
 
     /// <summary>
