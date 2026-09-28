@@ -57,7 +57,7 @@ public class MigrationSeparationTests
 
     /// <summary>
     /// Verifies that expected tables exist in the platform schema after migrations.
-    /// Platform tables include system-level objects like subscriptions, audit events, and roles.
+    /// Platform tables include system-level objects like subscriptions and customer database assignments.
     /// </summary>
     [Fact]
     public async Task Platform_Schema_Contains_Expected_Tables()
@@ -86,7 +86,8 @@ public class MigrationSeparationTests
             }
 
             // Verify essential platform tables exist
-            Assert.Contains("settings", tables);  // Platform settings
+            Assert.Contains("platform_settings", tables);  // Platform settings (correct name)
+            Assert.Contains("customer_database_assignments", tables);  // Database assignments
             Assert.NotEmpty(tables);  // At least some tables should exist
         }
 
@@ -95,7 +96,7 @@ public class MigrationSeparationTests
 
     /// <summary>
     /// Verifies that expected tables exist in the companies schema after migrations.
-    /// Companies tables are tenant-scoped and include employees, leaves, and other business entities.
+    /// Companies schema contains company and subscription records. Employees are in a separate schema.
     /// </summary>
     [Fact]
     public async Task Companies_Schema_Contains_Expected_Tables()
@@ -123,9 +124,10 @@ public class MigrationSeparationTests
                 }
             }
 
-            // Verify essential companies tables exist
+            // Verify essential companies tables exist (NOT employees — they're in employees schema)
             Assert.Contains("companies", tables);
-            Assert.Contains("employees", tables);
+            Assert.Contains("customer_subscriptions", tables);
+            Assert.Contains("company_addresses", tables);
             Assert.NotEmpty(tables);  // At least some tables should exist
         }
 
@@ -134,8 +136,8 @@ public class MigrationSeparationTests
 
     /// <summary>
     /// Verifies that migrations are idempotent: running them multiple times produces the same result.
-    /// This test verifies that both schemas have their expected tables without duplication by
-    /// checking that table counts match expectations and the factory initialization succeeds.
+    /// This test actually invokes the migrations twice and verifies table counts remain consistent.
+    /// No tables should be duplicated or recreated, and both runs should complete successfully.
     /// </summary>
     [Fact]
     public async Task Migrations_Are_Idempotent_And_Can_Rerun()
@@ -143,34 +145,64 @@ public class MigrationSeparationTests
         var connectionString = Environment.GetEnvironmentVariable("ConnectionStrings__hr");
         Assert.NotNull(connectionString);
 
-        // Verify schema table counts are consistent
+        // First, count the tables after initial migrations
         using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync();
 
         const string platformCountQuery = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'platform'";
-        int platformTableCount = 0;
+        long platformTableCountFirstRun = 0;
         using (var cmd = new NpgsqlCommand(platformCountQuery, connection))
         {
-            platformTableCount = (int)(await cmd.ExecuteScalarAsync() ?? 0);
+            platformTableCountFirstRun = (long)(await cmd.ExecuteScalarAsync() ?? 0);
         }
 
         const string companiesCountQuery = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'companies'";
-        int companiesTableCount = 0;
+        long companiesTableCountFirstRun = 0;
         using (var cmd = new NpgsqlCommand(companiesCountQuery, connection))
         {
-            companiesTableCount = (int)(await cmd.ExecuteScalarAsync() ?? 0);
+            companiesTableCountFirstRun = (long)(await cmd.ExecuteScalarAsync() ?? 0);
         }
 
-        // Both schemas should have tables (no duplicate table creation)
-        Assert.True(platformTableCount > 0, "Platform schema should contain tables");
-        Assert.True(companiesTableCount > 0, "Companies schema should contain tables");
-
         await connection.CloseAsync();
+
+        // Both schemas should have tables after first run
+        Assert.True(platformTableCountFirstRun > 0, "Platform schema should contain tables after first migration");
+        Assert.True(companiesTableCountFirstRun > 0, "Companies schema should contain tables after first migration");
+
+        // Now re-run migrations and verify the table counts don't change
+        // (migrations are idempotent, so running again shouldn't create duplicates)
+        await _factory.Services.MigrateCompaniesAsync();
+        await _factory.Services.MigratePlatformAsync();
+
+        using var connectionSecond = new NpgsqlConnection(connectionString);
+        await connectionSecond.OpenAsync();
+
+        long platformTableCountSecondRun = 0;
+        using (var cmd = new NpgsqlCommand(platformCountQuery, connectionSecond))
+        {
+            platformTableCountSecondRun = (long)(await cmd.ExecuteScalarAsync() ?? 0);
+        }
+
+        long companiesTableCountSecondRun = 0;
+        using (var cmd = new NpgsqlCommand(companiesCountQuery, connectionSecond))
+        {
+            companiesTableCountSecondRun = (long)(await cmd.ExecuteScalarAsync() ?? 0);
+        }
+
+        await connectionSecond.CloseAsync();
+
+        // Idempotency check: counts should be identical after re-running
+        Assert.Equal(platformTableCountFirstRun, platformTableCountSecondRun,
+            "Platform table count should not change when migrations are re-run (idempotency)");
+        Assert.Equal(companiesTableCountFirstRun, companiesTableCountSecondRun,
+            "Companies table count should not change when migrations are re-run (idempotency)");
     }
 
     /// <summary>
     /// Verifies that migration history is recorded for both platform and companies migrations.
-    /// EF Core's migration history table tracks which migrations have been applied.
+    /// Each context stores its migrations in a schema-specific history table:
+    /// - companies.__ef_migrations_history
+    /// - platform.__ef_migrations_history
     /// </summary>
     [Fact]
     public async Task Migration_History_Recorded_For_Both_Schemas()
@@ -181,13 +213,22 @@ public class MigrationSeparationTests
         using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync();
 
-        // Query the __EFMigrationsHistory table (EF Core's standard migration history table)
-        const string historyQuery = "SELECT COUNT(*) FROM \"__EFMigrationsHistory\"";
+        // Query the companies schema migration history
+        const string companiesHistoryQuery = "SELECT COUNT(*) FROM companies.\"__ef_migrations_history\"";
 
-        using (var cmd = new NpgsqlCommand(historyQuery, connection))
+        using (var cmd = new NpgsqlCommand(companiesHistoryQuery, connection))
         {
-            int migrationCount = (int)(await cmd.ExecuteScalarAsync() ?? 0);
-            Assert.True(migrationCount > 0, "Expected migration history to contain at least one migration entry");
+            long companiesMigrationCount = (long)(await cmd.ExecuteScalarAsync() ?? 0);
+            Assert.True(companiesMigrationCount > 0, "Expected companies migration history to contain at least one migration entry");
+        }
+
+        // Query the platform schema migration history
+        const string platformHistoryQuery = "SELECT COUNT(*) FROM platform.\"__ef_migrations_history\"";
+
+        using (var cmd = new NpgsqlCommand(platformHistoryQuery, connection))
+        {
+            long platformMigrationCount = (long)(await cmd.ExecuteScalarAsync() ?? 0);
+            Assert.True(platformMigrationCount > 0, "Expected platform migration history to contain at least one migration entry");
         }
 
         await connection.CloseAsync();
