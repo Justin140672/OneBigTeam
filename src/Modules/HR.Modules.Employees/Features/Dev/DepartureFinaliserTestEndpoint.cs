@@ -6,6 +6,8 @@ using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Employees.Features.Dev;
 
@@ -54,47 +56,76 @@ internal sealed class DepartureFinaliserTestEndpoint(
         var companyId = Route<Guid>("companyId");
         var employeeId = Route<Guid>("employeeId");
 
+        // ── Validation Phase ──────────────────────────────────────────────────────────
+        // Separate validation from execution so we can report whether the target is already
+        // complete (idempotency: second calls for finished targets return success, not error).
+
+        // Verify current tenant matches the route company
+        if (!Guid.TryParse(currentTenant.TenantId, out var userCompanyId) || userCompanyId != companyId)
+        {
+            await Send.ResultAsync(TypedResults.Forbid());
+            return;
+        }
+
+        // Validate that the employee exists and belongs to this company
+        var employee = await db.Employees
+            .FirstOrDefaultAsync(e => e.Id == employeeId && e.CompanyId == companyId, ct);
+
+        if (employee is null)
+        {
+            await Send.ResultAsync(TypedResults.NotFound());
+            return;
+        }
+
+        // Check the leaving process status: InProgress (ready to finalize) or Completed (idempotent success)
+        var process = await db.EmployeeLeavingProcesses
+            .FirstOrDefaultAsync(
+                p => p.EmployeeId == employeeId && p.CompanyId == companyId,
+                ct);
+
+        if (process is null)
+        {
+            await Send.ResultAsync(TypedResults.BadRequest("Employee has no leaving process to finalize"));
+            return;
+        }
+
+        // Idempotency: if the process is already Completed, return success (not an error).
+        // This allows E2E tests to call finalization twice without assertion failure.
+        if (process.Status == LeavingProcessStatus.Completed)
+        {
+            await Send.ResultAsync(TypedResults.Ok());
+            return;
+        }
+
+        // Only InProgress processes can be finalized
+        if (process.Status != LeavingProcessStatus.InProgress)
+        {
+            await Send.ResultAsync(TypedResults.BadRequest($"Only InProgress processes can be finalized; current status is {process.Status}"));
+            return;
+        }
+
+        // ── Execution Phase ───────────────────────────────────────────────────────────
+        // All validation passed. Execute the departure finaliser job, scoped to this company
+        // to ensure we don't accidentally finalize employees in other companies.
+
         try
         {
-            // Verify current tenant matches the route company
-            if (!Guid.TryParse(currentTenant.TenantId, out var userCompanyId) || userCompanyId != companyId)
-            {
-                await Send.ResultAsync(TypedResults.Forbid());
-                return;
-            }
-
-            // Validate that the employee exists and belongs to this company
-            var employee = await db.Employees
-                .FirstOrDefaultAsync(e => e.Id == employeeId && e.CompanyId == companyId, ct);
-
-            if (employee is null)
-            {
-                await Send.ResultAsync(TypedResults.NotFound());
-                return;
-            }
-
-            // Verify there's an in-progress leaving process (validation, not a hard requirement for the job to run)
-            var process = await db.EmployeeLeavingProcesses
-                .FirstOrDefaultAsync(
-                    p => p.EmployeeId == employeeId && p.CompanyId == companyId && p.Status == LeavingProcessStatus.InProgress,
-                    ct);
-
-            if (process is null)
-            {
-                await Send.ResultAsync(TypedResults.BadRequest("Employee has no in-progress leaving process to finalize"));
-                return;
-            }
-
-            // All validation passed. Execute the departure finaliser job.
-            // The job processes all employees with Status == Leaving and LeavingDate <= today across
-            // all companies. This invocation will process the targeted employee (if due) plus any
-            // other due employees, exercising the batch-processing logic.
-            await departureFinaliserJob.ExecuteAsync();
+            // Execute the job scoped to the requested company so it only processes employees
+            // in that company with Status == Leaving and LeavingDate <= today. This prevents
+            // the cross-company mutation that was happening before.
+            await departureFinaliserJob.ExecuteAsync(companyId);
 
             await Send.ResultAsync(TypedResults.Ok());
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            // Log the exception before returning 500 so failures are visible in logs
+            var logger = HttpContext.RequestServices.GetService<ILogger<DepartureFinaliserTestEndpoint>>();
+            if (logger is not null)
+            {
+                logger.LogError(ex, "DepartureFinaliserTestEndpoint failed for employee {EmployeeId} in company {CompanyId}", employeeId, companyId);
+            }
+
             await Send.ResultAsync(TypedResults.StatusCode(StatusCodes.Status500InternalServerError));
         }
     }

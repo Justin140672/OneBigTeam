@@ -22,19 +22,28 @@ internal sealed class ProcessLeavingEmployeesJob(
     IEmployeeDepartureFinalizer departureFinalizer,
     ILogger<ProcessLeavingEmployeesJob> logger)
 {
-    public async Task ExecuteAsync()
+    /// <summary>
+    /// Executes the departure finalisation job across all companies (normal Hangfire invocation)
+    /// or for a specific company when <paramref name="companyIdFilter"/> is provided (E2E test seam).
+    /// </summary>
+    public async Task ExecuteAsync(Guid? companyIdFilter = null)
     {
         var now = clock.UtcNowOffset();
 
-        await ProcessDueLeaversAsync(now);
-        await ReconcileStrandedDeparturesAsync(now);
+        await ProcessDueLeaversAsync(now, companyIdFilter);
+        await ReconcileStrandedDeparturesAsync(now, companyIdFilter);
     }
 
-    private async Task ProcessDueLeaversAsync(DateTimeOffset now)
+    private async Task ProcessDueLeaversAsync(DateTimeOffset now, Guid? companyIdFilter = null)
     {
-        var leavingEmployees = await dbContext.Employees
-            .Where(e => e.Status == EmploymentStatus.Leaving)
-            .ToListAsync();
+        var query = dbContext.Employees
+            .Where(e => e.Status == EmploymentStatus.Leaving);
+
+        // If a company filter is specified (E2E test seam), limit to that company only
+        if (companyIdFilter.HasValue)
+            query = query.Where(e => e.CompanyId == companyIdFilter.Value);
+
+        var leavingEmployees = await query.ToListAsync();
 
         if (leavingEmployees.Count == 0)
             return;
@@ -117,11 +126,16 @@ internal sealed class ProcessLeavingEmployeesJob(
     // this state (Status == Completed but FinalisationCompletedAt still null) and resumes from the
     // downstream steps only, so calling it again here is safe and does not repeat the terminal-state
     // mutation.
-    private async Task ReconcileStrandedDeparturesAsync(DateTimeOffset now)
+    private async Task ReconcileStrandedDeparturesAsync(DateTimeOffset now, Guid? companyIdFilter = null)
     {
-        var strandedProcesses = await dbContext.EmployeeLeavingProcesses
-            .Where(p => p.Status == LeavingProcessStatus.Completed && p.FinalisationCompletedAt == null)
-            .ToListAsync();
+        var query = dbContext.EmployeeLeavingProcesses
+            .Where(p => p.Status == LeavingProcessStatus.Completed && p.FinalisationCompletedAt == null);
+
+        // If a company filter is specified (E2E test seam), limit to that company only
+        if (companyIdFilter.HasValue)
+            query = query.Where(p => p.CompanyId == companyIdFilter.Value);
+
+        var strandedProcesses = await query.ToListAsync();
 
         if (strandedProcesses.Count == 0)
             return;
