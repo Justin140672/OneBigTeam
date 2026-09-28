@@ -4,6 +4,7 @@ using FastEndpoints;
 using HR.Api.Authentication;
 using HR.Api.RateLimiting;
 using HR.Api.Startup;
+using HR.Infrastructure.Abstractions;
 using HR.Infrastructure;
 using HR.Infrastructure.Logging;
 using HR.Modules.Companies;
@@ -535,6 +536,12 @@ app.Use(async (context, next) =>
 // must run before routing/rate limiting so RemoteIpAddress is already the real client IP by the
 // time the identity rate-limit policies partition on it.
 app.UseForwardedHeaders();
+// Security: enforce loopback-only access to /api/dev/* endpoints when DevTools is enabled.
+// Must run after ForwardedHeaders (so RemoteIpAddress is correct) but before routing.
+if (app.Environment.IsDevelopment() && devToolsOptions.Enabled)
+{
+	app.UseLoopbackOnlyForDevTools();
+}
 app.UseRouting();
 // Buffers+parses the (small, already-to-be-validated) request body for exactly the six identity
 // POST routes to extract a normalized email/token for the keyed rate-limit partition — must run

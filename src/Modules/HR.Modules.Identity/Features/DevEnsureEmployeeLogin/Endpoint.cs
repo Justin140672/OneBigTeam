@@ -1,7 +1,9 @@
 using FastEndpoints;
+using HR.Infrastructure.Abstractions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Identity.Features.DevEnsureEmployeeLogin;
 
@@ -23,11 +25,12 @@ namespace HR.Modules.Identity.Features.DevEnsureEmployeeLogin;
 //
 // Idempotent (delegates entirely to EnsureDevSupabaseUserAsync, whose own remarks establish this),
 // and self-heals a stale SupabaseAuthUserId the same way the signup path does, so calling this more
-// than once for the same employee (e.g. a retried test) is safe. 404s outside Development, mirroring
-// every other /api/dev/* endpoint (see DevActivateCompany.Endpoint).
+// than once for the same employee (e.g. a retried test) is safe. 404s outside Development or when
+// DevTools not explicitly enabled, mirroring every other /api/dev/* endpoint (see DevActivateCompany.Endpoint).
 internal sealed class Endpoint(
     IServiceProvider serviceProvider,
-    IWebHostEnvironment environment) : Endpoint<DevEnsureEmployeeLoginRequest>
+    IWebHostEnvironment environment,
+    IOptions<DevToolsOptions> devToolsOptions) : Endpoint<DevEnsureEmployeeLoginRequest>
 {
     public override void Configure()
     {
@@ -37,7 +40,7 @@ internal sealed class Endpoint(
 
     public override async Task HandleAsync(DevEnsureEmployeeLoginRequest request, CancellationToken cancellationToken)
     {
-        if (!environment.IsDevelopment())
+        if (!environment.IsDevelopment() || !devToolsOptions.Value.Enabled)
         {
             await Send.ResultAsync(TypedResults.NotFound());
             return;

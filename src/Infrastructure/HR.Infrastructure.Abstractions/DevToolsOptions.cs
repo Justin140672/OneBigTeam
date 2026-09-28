@@ -1,14 +1,15 @@
-namespace HR.Api.Startup;
+namespace HR.Infrastructure.Abstractions;
 
 /// <summary>
 /// Configuration for development-only tools and endpoints.
 ///
 /// DevTools provides minting access tokens, creating development users, and switching personas
-/// for local development. These capabilities are:
-/// 1. Only available when explicitly enabled via configuration
-/// 2. Only available in Development environment (enforced at startup)
-/// 3. Restricted to loopback addresses when running in production-like environments
-/// 4. Logged for audit purposes with restricted detail (tokens are never logged)
+/// for local development. These capabilities require three conditions:
+/// 1. Development environment (enforced at startup)
+/// 2. Explicit DevTools.Enabled=true opt-in (not enabled by default)
+/// 3. Loopback/local request (127.0.0.1, ::1; enforced by LoopbackOnlyMiddleware)
+///
+/// Endpoints are logged for audit purposes with restricted detail (tokens are never logged).
 /// </summary>
 public class DevToolsOptions
 {

@@ -4,6 +4,7 @@ using HR.Modules.Companies.Contracts;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Identity.Features.DevActivateCompany;
 
@@ -13,10 +14,12 @@ namespace HR.Modules.Identity.Features.DevActivateCompany;
 // HR.Api) already provides a usable local session separately, untouched by this whole epic. This
 // endpoint just needs to flip the target company's status directly via the same sanctioned
 // ICompanyProvisioner cross-module contract VerifyEmail uses, without any Supabase/identity
-// interaction. 404s outside Development, mirroring every other /api/dev/* endpoint.
+// interaction. 404s outside Development or when DevTools not explicitly enabled,
+// mirroring every other /api/dev/* endpoint.
 internal sealed class Endpoint(
     ICompanyProvisioner companyProvisioner,
-    IWebHostEnvironment environment) : Endpoint<DevActivateCompanyRequest>
+    IWebHostEnvironment environment,
+    IOptions<DevToolsOptions> devToolsOptions) : Endpoint<DevActivateCompanyRequest>
 {
     public override void Configure()
     {
@@ -26,7 +29,7 @@ internal sealed class Endpoint(
 
     public override async Task HandleAsync(DevActivateCompanyRequest request, CancellationToken cancellationToken)
     {
-        if (!environment.IsDevelopment())
+        if (!environment.IsDevelopment() || !devToolsOptions.Value.Enabled)
         {
             await Send.ResultAsync(TypedResults.NotFound());
             return;
