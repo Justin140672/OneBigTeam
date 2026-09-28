@@ -107,7 +107,7 @@ else
                                      OnRefreshRequested="ReloadOffboardingAsync" />
         </div>
 
-        @if (Session.CanManageEmployees && (_leavingHistory?.Items.Count ?? 0) > 0)
+        @if (Session.CanManageEmployees && GetPastAttempts().Count > 0)
         {
             <div class="card mt-4" id="leaving-history-section">
                 <div class="card-header">
@@ -136,7 +136,7 @@ else
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach (var item in _leavingHistory!.Items)
+                                    @foreach (var item in GetPastAttempts())
                                     {
                                         <tr class="text-muted">
                                             <td>
@@ -352,4 +352,10 @@ else
         "Completed"  => "bg-success",
         _            => "bg-secondary"
     };
+
+    /// <summary>
+    /// Returns only past (non-current) leaving attempts, filtering out the current in-progress process.
+    /// </summary>
+    private List<LeavingProcessHistoryItem> GetPastAttempts() =>
+        _leavingHistory?.Items.Where(item => !item.IsCurrent).ToList() ?? new List<LeavingProcessHistoryItem>();
 }

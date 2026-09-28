@@ -573,7 +573,8 @@ public sealed record LeavingProcessHistoryItem(
     DateTimeOffset? CancelledAt,
     string? CancellationReason,
     DateTimeOffset? FinalisationCompletedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    bool IsCurrent);
 
 // ── NATIONALITIES ─────────────────────────────────────────────────────────────
 

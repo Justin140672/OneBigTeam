@@ -24,6 +24,7 @@ internal sealed class GetLeavingProcessHistoryHandler(
             .AsNoTracking()
             .Where(p => p.CompanyId == companyId && p.EmployeeId == employeeId)
             .OrderByDescending(p => p.StartedAt)
+            .ThenByDescending(p => p.Id)
             .Select(p => new
             {
                 p.Id,
@@ -75,7 +76,8 @@ internal sealed class GetLeavingProcessHistoryHandler(
                 p.CancelledAt,
                 p.CancellationReason,
                 p.FinalisationCompletedAt,
-                p.UpdatedAt))
+                p.UpdatedAt,
+                p.Status.ToString() == "InProgress"))
             .ToList();
 
         return Result.Success(new GetLeavingProcessHistoryResponse(items));

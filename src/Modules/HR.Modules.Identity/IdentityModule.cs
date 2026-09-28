@@ -83,10 +83,20 @@ public static class IdentityModule
         // System Health Dashboard (Platform Monitoring epic) — "auth" named health check, live
         // reachability probe against Supabase Auth's public settings endpoint (see
         // SupabaseAuthHealthCheck remarks).
-        services.AddHealthChecks()
-            // NFR-03: authentication (Supabase Auth) is a critical dependency — if it is Unhealthy
-            // no user can sign in, so the service is "not ready" (503 on /health/ready).
-            .AddCheck<SupabaseAuthHealthCheck>("auth", tags: ["ready", "critical"]);
+        if (isE2ETesting)
+        {
+            // In E2E mode, skip the Supabase Auth health check to avoid blocking startup when
+            // test credentials are unavailable or the test environment can't reach Supabase.
+            // E2E tests use a fake Supabase gateway and don't depend on real Auth connectivity.
+            services.AddHealthChecks();
+        }
+        else
+        {
+            services.AddHealthChecks()
+                // NFR-03: authentication (Supabase Auth) is a critical dependency — if it is Unhealthy
+                // no user can sign in, so the service is "not ready" (503 on /health/ready).
+                .AddCheck<SupabaseAuthHealthCheck>("auth", tags: ["ready", "critical"]);
+        }
 
         // Ticket 9: shared account-creation email-domain policy (public/disposable denylist). The
         // options validator re-loads the embedded denylist and validates every embedded and

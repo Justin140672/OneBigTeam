@@ -13,6 +13,7 @@ internal sealed record LeavingProcessHistoryItem(
     DateTimeOffset? CancelledAt,
     string? CancellationReason,
     DateTimeOffset? FinalisationCompletedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    bool IsCurrent);
 
 internal sealed record GetLeavingProcessHistoryResponse(IReadOnlyList<LeavingProcessHistoryItem> Items);
