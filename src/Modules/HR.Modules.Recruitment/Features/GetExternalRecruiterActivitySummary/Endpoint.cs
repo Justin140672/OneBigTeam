@@ -9,7 +9,7 @@ internal sealed class Endpoint(GetExternalRecruiterActivitySummaryHandler handle
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/external-recruiters/{externalRecruiterId:guid}/activity-summary");
-        Policies("recruitment:view");
+        Policies("recruitment:manage");
     }
 
     public override async Task HandleAsync(

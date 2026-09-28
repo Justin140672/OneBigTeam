@@ -39,8 +39,11 @@ public class RecruitmentAuthorizationTests
             await TestRoleSeeder.AssignRoleAsync(factory, PlainEmployeeUser, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, ManagerUser, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, ManagerUser, SystemRoles.Manager);
+            await TestRoleSeeder.AssignRoleAsync(factory, RecruiterUser, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, RecruiterUser, SystemRoles.Recruiter);
+            await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUser, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUser, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, CompanyAdministratorUser, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, CompanyAdministratorUser, SystemRoles.CompanyAdministrator);
         }).GetAwaiter().GetResult();
     }
@@ -94,54 +97,98 @@ public class RecruitmentAuthorizationTests
         return (vacancy.Id, candidate.Id, application!.Id);
     }
 
-    // ── recruitment:view — GetVacancy / ListVacancies remain broadly visible ──────
+    // ── recruitment:manage — Vacancy reads are now Recruiter-only ──────
+    // Ticket 2: Vacancies shifted from recruitment:view (broadly visible) to recruitment:manage
+    // (Recruiter-only). HR Administrator no longer has access to vacancy lists/reads.
 
     [Fact]
-    public async Task PlainEmployee_Gets_Ok_Listing_Vacancies()
+    public async Task Recruiter_Gets_Ok_Listing_Vacancies()
     {
         var companyId = Guid.NewGuid();
         using var recruiterClient = await ClientAs(RecruiterUser, companyId);
         await SeedApplicationAsync(recruiterClient, companyId);
 
-        using var client = await ClientAs(PlainEmployeeUser, companyId);
-        var response = await client.GetAsync($"/api/companies/{companyId}/vacancies");
+        var response = await recruiterClient.GetAsync($"/api/companies/{companyId}/vacancies");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
-    public async Task PlainEmployee_Gets_Ok_Getting_A_Vacancy()
+    public async Task Recruiter_Gets_Ok_Getting_A_Vacancy()
     {
         var companyId = Guid.NewGuid();
         using var recruiterClient = await ClientAs(RecruiterUser, companyId);
         var (vacancyId, _, _) = await SeedApplicationAsync(recruiterClient, companyId);
 
-        using var client = await ClientAs(PlainEmployeeUser, companyId);
-        var response = await client.GetAsync($"/api/companies/{companyId}/vacancies/{vacancyId}");
+        var response = await recruiterClient.GetAsync($"/api/companies/{companyId}/vacancies/{vacancyId}");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
     [Fact]
-    public async Task Manager_Gets_Ok_Listing_Vacancies()
+    public async Task PlainEmployee_Gets_Forbidden_Listing_Vacancies()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/vacancies");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PlainEmployee_Gets_Forbidden_Getting_A_Vacancy()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await ClientAs(PlainEmployeeUser, companyId);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/vacancies/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Manager_Gets_Forbidden_Listing_Vacancies()
     {
         var companyId = Guid.NewGuid();
         using var client = await ClientAs(ManagerUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/vacancies");
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
-    public async Task HrAdministrator_Gets_Ok_Listing_Vacancies()
+    public async Task Manager_Gets_Forbidden_Getting_A_Vacancy()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await ClientAs(ManagerUser, companyId);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/vacancies/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task HrAdministrator_Gets_Forbidden_Listing_Vacancies()
     {
         var companyId = Guid.NewGuid();
         using var client = await ClientAs(HrAdminUser, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/vacancies");
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task HrAdministrator_Gets_Forbidden_Getting_A_Vacancy()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await ClientAs(HrAdminUser, companyId);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/vacancies/{Guid.NewGuid()}");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]

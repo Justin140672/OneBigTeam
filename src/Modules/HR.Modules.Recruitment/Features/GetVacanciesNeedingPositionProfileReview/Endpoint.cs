@@ -9,7 +9,7 @@ internal sealed class Endpoint(GetVacanciesNeedingPositionProfileReviewHandler h
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/vacancies/position-profile-matches/review");
-        Policies("recruitment:view");
+        Policies("recruitment:manage");
     }
 
     public override async Task HandleAsync(
