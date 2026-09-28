@@ -548,18 +548,52 @@ public class MigrationSeparationTests
             {
                 // Attempt to run Platform migration before Companies — this should fail.
                 // Platform's migration has FK(company_id) -> companies.companies, which doesn't exist yet.
-                try
+                // Use Record.ExceptionAsync to capture the actual exception (not catch assertion exceptions).
+                var exception = await Record.ExceptionAsync(async () =>
+                    await serviceProvider.MigratePlatformAsync()
+                );
+
+                // Assert that an exception was actually thrown (not swallowed by assertion catches)
+                Assert.NotNull(exception);
+
+                // Verify the exception is related to the missing Companies schema/table dependency.
+                // The exception could be wrapped by EF Core (DbUpdateException, OperationException)
+                // or could be a direct PostgresException. Walk up the inner exceptions to find
+                // the underlying PostgreSQL error.
+                var postgresException = FindPostgresException(exception);
+
+                if (postgresException != null)
                 {
-                    await serviceProvider.MigratePlatformAsync();
-                    // If no exception was thrown, the test fails — Platform should not be able to migrate first.
-                    Assert.Fail("Platform migration should have failed without Companies schema existing");
+                    // Validate that the error is about missing objects (companies schema/table/FK)
+                    // Expected SqlState codes:
+                    // - "42P01" = undefined_table (FK references non-existent table)
+                    // - "42P02" = undefined_object
+                    // - "3F000" = invalid_schema_name (schema doesn't exist)
+                    var expectedSqlStates = new[] { "42P01", "42P02", "3F000" };
+                    Assert.True(
+                        expectedSqlStates.Contains(postgresException.SqlState),
+                        $"Expected FK/schema violation (SqlState in {string.Join(", ", expectedSqlStates)}), " +
+                        $"but got SqlState '{postgresException.SqlState}': {postgresException.Message}"
+                    );
+
+                    // Verify the error message mentions companies or the FK constraint
+                    var errorMessage = postgresException.Message.ToLowerInvariant();
+                    Assert.True(
+                        errorMessage.Contains("companies") || errorMessage.Contains("company_id"),
+                        $"Expected error to mention 'companies' or 'company_id' dependency, " +
+                        $"but got: {postgresException.Message}"
+                    );
                 }
-                catch (Exception ex)
+                else
                 {
-                    // Platform migration should have failed due to FK constraint violation.
-                    // The exception type could be Npgsql.PostgresException, InvalidOperationException, or another database error.
-                    // We just verify that it failed, not the specific exception type.
-                    Assert.NotNull(ex);
+                    // If no PostgresException found in the inner exception chain,
+                    // at least verify the exception message mentions the missing dependency
+                    var exceptionMessage = exception.ToString().ToLowerInvariant();
+                    Assert.True(
+                        exceptionMessage.Contains("companies") || exceptionMessage.Contains("constraint"),
+                        $"Expected exception to mention 'companies' or 'constraint' dependency, " +
+                        $"but got: {exception.Message}"
+                    );
                 }
             }
             finally
@@ -574,5 +608,25 @@ public class MigrationSeparationTests
             await tempPostgres.StopAsync();
             await tempPostgres.DisposeAsync();
         }
+    }
+
+    /// <summary>
+    /// Walks up the exception chain to find an underlying PostgresException.
+    /// EF Core often wraps database errors (DbUpdateException, OperationException), so we need to
+    /// unwrap them to get the actual PostgreSQL error code and message.
+    /// </summary>
+    private static PostgresException? FindPostgresException(Exception? exception)
+    {
+        while (exception != null)
+        {
+            if (exception is PostgresException postgresEx)
+            {
+                return postgresEx;
+            }
+
+            exception = exception.InnerException;
+        }
+
+        return null;
     }
 }
