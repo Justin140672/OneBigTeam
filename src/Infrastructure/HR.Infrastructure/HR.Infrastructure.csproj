@@ -21,6 +21,7 @@
     <InternalsVisibleTo Include="HR.Infrastructure.Tests" />
     <InternalsVisibleTo Include="HR.Modules.Reporting.Tests" />
     <InternalsVisibleTo Include="HR.Architecture.Tests" />
+    <InternalsVisibleTo Include="HR.SharedKernel.Tests" />
   </ItemGroup>
 
   <ItemGroup>
