@@ -127,6 +127,14 @@ public static class CompaniesModule
         await db.Database.MigrateAsync();
     }
 
+    public static async Task MigratePlatformAsync(this IServiceProvider services)
+    {
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        await db.Database.ExecuteSqlRawAsync("CREATE SCHEMA IF NOT EXISTS platform");
+        await db.Database.MigrateAsync();
+    }
+
     public static async Task SeedCompaniesAsync(this IServiceProvider services)
     {
         using var scope = services.CreateScope();
