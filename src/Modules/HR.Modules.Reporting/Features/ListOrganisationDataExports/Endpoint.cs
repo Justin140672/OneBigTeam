@@ -17,7 +17,7 @@ internal sealed class Endpoint(
 
     public override async Task HandleAsync(ListOrganisationDataExportsRequest request, CancellationToken cancellationToken)
     {
-        if (currentUser.UserId is not Guid)
+        if (currentUser.UserId is not Guid userId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
             return;
@@ -29,7 +29,15 @@ internal sealed class Endpoint(
             return;
         }
 
-        var result = await handler.HandleAsync(request, cancellationToken);
+        var result = await handler.HandleAsync(request, userId, cancellationToken);
+        if (result.IsFailure)
+        {
+            await Send.ResultAsync(result.Error.Code == "forbidden"
+                ? TypedResults.Forbid()
+                : TypedResults.BadRequest(new { error = result.Error.Message }));
+            return;
+        }
+
         await Send.ResultAsync(TypedResults.Ok(result.Value!));
     }
 }

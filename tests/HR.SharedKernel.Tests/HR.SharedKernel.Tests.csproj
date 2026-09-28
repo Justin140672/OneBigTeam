@@ -36,6 +36,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Infrastructure\HR.Infrastructure\HR.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\Shared\HR.SharedKernel\HR.SharedKernel.csproj" />
   </ItemGroup>
 

@@ -47,7 +47,9 @@ internal sealed class Endpoint(
             var businessError = new { error = result.Error.Message };
             await Send.ResultAsync(result.Error.Code == "conflict"
                 ? TypedResults.Conflict(businessError)
-                : TypedResults.BadRequest(businessError));
+                : result.Error.Code == "forbidden"
+                    ? TypedResults.Forbid()
+                    : TypedResults.BadRequest(businessError));
             return;
         }
 
