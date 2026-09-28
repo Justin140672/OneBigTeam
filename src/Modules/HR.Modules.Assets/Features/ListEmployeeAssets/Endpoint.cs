@@ -21,10 +21,7 @@ internal sealed class Endpoint(ListEmployeeAssetsHandler handler, ICurrentUser c
 
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code == "forbidden"
-                ? StatusCodes.Status403Forbidden
-                : StatusCodes.Status400BadRequest;
-            await Send.ResultAsync(Results.Json(new { error = result.Error.Message }, statusCode: statusCode));
+            await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }
 

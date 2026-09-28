@@ -1162,6 +1162,16 @@
           "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
         }
       },
+      "hr.modules.identity.tests": {
+        "type": "Project",
+        "dependencies": {
+          "HR.Modules.Identity": "[0.1.0-dev, )",
+          "Microsoft.EntityFrameworkCore.InMemory": "[10.0.12, )",
+          "Microsoft.NET.Test.Sdk": "[18.10.1, )",
+          "Testcontainers.PostgreSql": "[4.15.0, )",
+          "xunit": "[2.9.3, )"
+        }
+      },
       "hr.modules.leave": {
         "type": "Project",
         "dependencies": {
@@ -1421,6 +1431,17 @@
         "dependencies": {
           "Microsoft.EntityFrameworkCore.Abstractions": "10.0.12",
           "Microsoft.EntityFrameworkCore.Analyzers": "10.0.12",
+          "Microsoft.Extensions.Caching.Memory": "10.0.12",
+          "Microsoft.Extensions.Logging": "10.0.12"
+        }
+      },
+      "Microsoft.EntityFrameworkCore.InMemory": {
+        "type": "CentralTransitive",
+        "requested": "[10.0.12, )",
+        "resolved": "10.0.12",
+        "contentHash": "zpyIER4WRE4wslktQWBi6aD2DbX6AwOVmMar5yO0tbswQ/vh772Ot2j+1f0/1Nxk98WSRmssLQhRpxWZPk7g+w==",
+        "dependencies": {
+          "Microsoft.EntityFrameworkCore": "10.0.12",
           "Microsoft.Extensions.Caching.Memory": "10.0.12",
           "Microsoft.Extensions.Logging": "10.0.12"
         }

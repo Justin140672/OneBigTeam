@@ -3,7 +3,6 @@ using System;
 using HR.Modules.Companies.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,11 +11,9 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HR.Modules.Companies.Migrations
 {
     [DbContext(typeof(PlatformDbContext))]
-    [Migration("20260928000000_CreatePlatformContext")]
-    partial class CreatePlatformContext
+    partial class PlatformDbContextModelSnapshot : ModelSnapshot
     {
-        /// <inheritdoc />
-        protected override void BuildTargetModel(ModelBuilder modelBuilder)
+        protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -71,6 +68,55 @@ namespace HR.Modules.Companies.Migrations
                         .HasDatabaseName("ix_customer_database_assignments_status_company_id");
 
                     b.ToTable("customer_database_assignments", "platform");
+                });
+
+            modelBuilder.Entity("HR.Modules.Companies.Persistence.IdempotencyRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("expires_at");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("idempotency_key");
+
+                    b.Property<string>("RequestHash")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("request_hash");
+
+                    b.Property<string>("ResponseJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("response_json");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("scope");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt")
+                        .HasDatabaseName("ix_idempotency_records_expires_at");
+
+                    b.HasIndex("Scope", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_idempotency_records_scope_idempotency_key");
+
+                    b.ToTable("idempotency_records", "platform");
                 });
 
             modelBuilder.Entity("HR.Modules.Companies.Domain.PlatformMetricsSnapshot", b =>
@@ -175,65 +221,6 @@ namespace HR.Modules.Companies.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("platform_settings", "platform");
-                });
-
-            modelBuilder.Entity("HR.SharedKernel.Idempotency.IdempotencyRecord", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
-                        .HasColumnName("id");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("created_at");
-
-                    b.Property<DateTimeOffset>("ExpiresAt")
-                        .HasColumnType("timestamp with time zone")
-                        .HasColumnName("expires_at");
-
-                    b.Property<string>("IdempotencyKey")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("idempotency_key");
-
-                    b.Property<string>("RequestHash")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("request_hash");
-
-                    b.Property<string>("ResponseJson")
-                        .IsRequired()
-                        .HasColumnType("jsonb")
-                        .HasColumnName("response_json");
-
-                    b.Property<string>("Scope")
-                        .IsRequired()
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)")
-                        .HasColumnName("scope");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ExpiresAt")
-                        .HasDatabaseName("ix_idempotency_records_expires_at");
-
-                    b.HasIndex("Scope", "IdempotencyKey")
-                        .IsUnique()
-                        .HasDatabaseName("ix_idempotency_records_scope_idempotency_key");
-
-                    b.ToTable("idempotency_records", "platform");
-                });
-
-            modelBuilder.Entity("HR.Modules.Companies.Domain.CustomerDatabaseAssignment", b =>
-                {
-                    b.HasOne("HR.Modules.Companies.Domain.Company")
-                        .WithMany()
-                        .HasForeignKey("CompanyId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("FK_customer_database_assignments_companies_company_id");
                 });
 
 #pragma warning restore 612, 618

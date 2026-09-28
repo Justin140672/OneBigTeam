@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace HR.Modules.Companies.Migrations
 {
     /// <inheritdoc />
-    public partial class CreatePlatformContext : Migration
+    public partial class CreatePlatformSchema : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -31,13 +31,6 @@ namespace HR.Modules.Companies.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_customer_database_assignments", x => x.id);
-                    table.ForeignKey(
-                        name: "FK_customer_database_assignments_companies_company_id",
-                        column: x => x.company_id,
-                        principalSchema: "companies",
-                        principalTable: "companies",
-                        principalColumn: "id",
-                        onDelete: ReferentialAction.Restrict);
                     table.CheckConstraint(
                         name: "CK_customer_database_assignments_status",
                         sql: "status IN ('Pending', 'Active', 'Inactive')");
@@ -62,7 +55,7 @@ namespace HR.Modules.Companies.Migrations
                 table: "customer_database_assignments",
                 columns: new[] { "status", "company_id" });
 
-            // Migrate platform_settings from companies schema to platform schema
+            // Create platform_settings table in platform schema
             migrationBuilder.CreateTable(
                 name: "platform_settings",
                 schema: "platform",
@@ -85,24 +78,7 @@ namespace HR.Modules.Companies.Migrations
                     table.PrimaryKey("PK_platform_settings", x => x.id);
                 });
 
-            // Copy existing platform_settings from companies schema if any exist
-            migrationBuilder.Sql(
-                @"DO $$
-                BEGIN
-                  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'companies' AND table_name = 'platform_settings') THEN
-                    INSERT INTO platform.platform_settings
-                      (id, trial_length_days, default_monthly_price_gbp, support_email,
-                       maintenance_mode_enabled, maintenance_mode_message, feature_flags_json,
-                       pricing_bands_json, minimum_monthly_charge_gbp, updated_at, updated_by_user_id)
-                    SELECT id, trial_length_days, default_monthly_price_gbp, support_email,
-                           maintenance_mode_enabled, maintenance_mode_message, feature_flags_json,
-                           COALESCE(pricing_bands_json, '[]'), minimum_monthly_charge_gbp, updated_at, updated_by_user_id
-                    FROM companies.platform_settings
-                    ON CONFLICT DO NOTHING;
-                  END IF;
-                END $$;");
-
-            // Migrate platform_metrics_snapshots from companies schema to platform schema
+            // Create platform_metrics_snapshots table in platform schema
             migrationBuilder.CreateTable(
                 name: "platform_metrics_snapshots",
                 schema: "platform",
@@ -121,21 +97,6 @@ namespace HR.Modules.Companies.Migrations
                     table.PrimaryKey("PK_platform_metrics_snapshots", x => x.id);
                 });
 
-            // Copy existing platform_metrics_snapshots from companies schema if any exist
-            migrationBuilder.Sql(
-                @"DO $$
-                BEGIN
-                  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'companies' AND table_name = 'platform_metrics_snapshots') THEN
-                    INSERT INTO platform.platform_metrics_snapshots
-                      (id, snapshot_date, computed_at, active_companies, active_users,
-                       storage_consumed_bytes, background_jobs_succeeded_total)
-                    SELECT id, snapshot_date, computed_at, active_companies, active_users,
-                           storage_consumed_bytes, background_jobs_succeeded_total
-                    FROM companies.platform_metrics_snapshots
-                    ON CONFLICT DO NOTHING;
-                  END IF;
-                END $$;");
-
             migrationBuilder.CreateIndex(
                 name: "ix_platform_metrics_snapshots_snapshot_date",
                 schema: "platform",
@@ -143,7 +104,7 @@ namespace HR.Modules.Companies.Migrations
                 column: "snapshot_date",
                 unique: true);
 
-            // Create idempotency_records table in platform schema (mirroring companies schema)
+            // Create idempotency_records table in platform schema
             migrationBuilder.CreateTable(
                 name: "idempotency_records",
                 schema: "platform",

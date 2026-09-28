@@ -3,7 +3,7 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Identity.Tests.Infrastructure;
 
-internal sealed class FakePasswordResetEmailSender : IPasswordResetEmailSender
+public sealed class FakePasswordResetEmailSender : IPasswordResetEmailSender
 {
     private readonly ConcurrentBag<SentReset> _sent = new();
     private readonly bool _succeeds;

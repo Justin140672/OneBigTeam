@@ -15,7 +15,8 @@ namespace HR.Modules.Companies.Services;
 /// transaction, keeping Identity free of any direct reference to HR.Modules.Companies.
 /// </summary>
 internal sealed class CompanyProvisioner(
-    CompaniesDbContext dbContext,
+    CompaniesDbContext companiesDbContext,
+    PlatformDbContext platformDbContext,
     IClock clock,
     IConfiguration configuration) : ICompanyProvisioner
 {
@@ -40,17 +41,17 @@ internal sealed class CompanyProvisioner(
 
         var subscription = CustomerSubscription.StartTrial(company.Id, now, trialLengthDays);
 
-        dbContext.Companies.Add(company);
-        dbContext.CustomerSubscriptions.Add(subscription);
+        companiesDbContext.Companies.Add(company);
+        companiesDbContext.CustomerSubscriptions.Add(subscription);
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await companiesDbContext.SaveChangesAsync(cancellationToken);
 
         return company.Id;
     }
 
     public async Task DeactivateCompanyAsync(Guid companyId, CancellationToken cancellationToken)
     {
-        var company = await dbContext.Companies
+        var company = await companiesDbContext.Companies
             .SingleOrDefaultAsync(c => c.Id == companyId, cancellationToken);
 
         if (company is null)
@@ -59,7 +60,7 @@ internal sealed class CompanyProvisioner(
         }
 
         company.Deactivate(clock.UtcNowOffset());
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await companiesDbContext.SaveChangesAsync(cancellationToken);
     }
 
     /// <summary>
@@ -74,7 +75,7 @@ internal sealed class CompanyProvisioner(
     {
         try
         {
-            var settings = await dbContext.PlatformSettings
+            var settings = await platformDbContext.PlatformSettings
                 .AsNoTracking()
                 .SingleOrDefaultAsync(s => s.Id == PlatformSettings.SingletonId, cancellationToken);
 
@@ -84,8 +85,8 @@ internal sealed class CompanyProvisioner(
             }
 
             var defaults = PlatformSettings.CreateDefault(now);
-            dbContext.PlatformSettings.Add(defaults);
-            await dbContext.SaveChangesAsync(cancellationToken);
+            platformDbContext.PlatformSettings.Add(defaults);
+            await platformDbContext.SaveChangesAsync(cancellationToken);
             return defaults.TrialLengthDays;
         }
         catch (Exception)
@@ -98,7 +99,7 @@ internal sealed class CompanyProvisioner(
 
     public async Task<bool> IsCompanyActiveAsync(Guid companyId, CancellationToken cancellationToken)
     {
-        return await dbContext.Companies
+        return await companiesDbContext.Companies
             .AsNoTracking()
             .Where(c => c.Id == companyId)
             .Select(c => c.Status == CompanyStatus.Active)
@@ -107,7 +108,7 @@ internal sealed class CompanyProvisioner(
 
     public async Task ActivateCompanyAsync(Guid companyId, CancellationToken cancellationToken)
     {
-        var company = await dbContext.Companies
+        var company = await companiesDbContext.Companies
             .SingleOrDefaultAsync(c => c.Id == companyId, cancellationToken);
 
         if (company is null)
@@ -116,6 +117,6 @@ internal sealed class CompanyProvisioner(
         }
 
         company.Activate(clock.UtcNowOffset());
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await companiesDbContext.SaveChangesAsync(cancellationToken);
     }
 }

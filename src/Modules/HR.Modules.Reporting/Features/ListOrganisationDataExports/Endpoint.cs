@@ -32,9 +32,7 @@ internal sealed class Endpoint(
         var result = await handler.HandleAsync(request, userId, cancellationToken);
         if (result.IsFailure)
         {
-            await Send.ResultAsync(result.Error.Code == "forbidden"
-                ? TypedResults.Forbid()
-                : TypedResults.BadRequest(new { error = result.Error.Message }));
+            await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }
 

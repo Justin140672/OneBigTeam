@@ -51,7 +51,6 @@ public class PolicyMatrixTests(IdentityDatabaseFixture fixture)
         ["asset:view"] = [SystemRoles.Employee, SystemRoles.Manager, SystemRoles.HrAdministrator],
         ["recruitment:manage"] = [SystemRoles.Recruiter],
         ["recruitment:view"] = [SystemRoles.Employee, SystemRoles.Manager, SystemRoles.Recruiter, SystemRoles.HrAdministrator],
-        ["candidate:view"] = [SystemRoles.Recruiter],
         ["shared-document:view-published"] = [SystemRoles.Employee, SystemRoles.Manager, SystemRoles.Recruiter, SystemRoles.HrAdministrator],
         ["shared-document:manage"] = [SystemRoles.HrAdministrator],
         ["shared-document:publish"] = [SystemRoles.HrAdministrator],

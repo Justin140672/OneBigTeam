@@ -17,14 +17,16 @@ namespace HR.Modules.Companies.Features.GetCustomerBillingBreakdown;
 /// configuration allow-list.
 /// </summary>
 internal sealed class GetCustomerBillingBreakdownHandler(
-    CompaniesDbContext dbContext,
+    CompaniesDbContext companiesDbContext,
+    PlatformDbContext platformDbContext,
     ICurrentUser currentUser,
     IConfiguration configuration,
     IEmployeeDirectoryReader employeeDirectoryReader,
     IEmployeeStarterReader employeeStarterReader,
     IClock clock)
 {
-    private readonly CompaniesDbContext _dbContext = dbContext;
+    private readonly CompaniesDbContext _dbContext = companiesDbContext;
+    private readonly PlatformDbContext _platformDbContext = platformDbContext;
 
     public async Task<Result<GetCustomerBillingBreakdownResponse>> HandleAsync(
         GetCustomerBillingBreakdownRequest request,
@@ -87,7 +89,7 @@ internal sealed class GetCustomerBillingBreakdownHandler(
         // Story 4 — the monthly charge now comes from the single authoritative configurable
         // progressive pricing model (PlatformSettings singleton), not a flat per-employee rate.
         // Falls back to the built-in default when the singleton has never been seeded (e.g. tests).
-        var platformSettings = await _dbContext.PlatformSettings
+        var platformSettings = await _platformDbContext.PlatformSettings
             .AsNoTracking()
             .SingleOrDefaultAsync(s => s.Id == PlatformSettings.SingletonId, cancellationToken);
         var pricingConfig = platformSettings?.GetPricingConfig() ?? SubscriptionPricingConfig.Default;

@@ -22,10 +22,7 @@ internal sealed class Endpoint(GetAssetHandler handler, ICurrentUser currentUser
 
         if (result.IsFailure)
         {
-            var statusCode = result.Error.Code == "forbidden"
-                ? StatusCodes.Status403Forbidden
-                : StatusCodes.Status404NotFound;
-            await Send.ResultAsync(Results.Json(new { error = result.Error.Message }, statusCode: statusCode));
+            await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }
 

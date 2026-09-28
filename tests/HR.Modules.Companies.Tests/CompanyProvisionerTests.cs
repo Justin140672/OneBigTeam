@@ -12,15 +12,17 @@ public class CompanyProvisionerTests
     [Fact]
     public async Task ProvisionCompanyAsync_Creates_Company_With_Blank_RegisteredOffice_Address()
     {
-        await using var context = BuildContext();
+        await using var companiesContext = BuildContext();
+        await using var platformContext = BuildPlatformContext();
         var provisioner = new CompanyProvisioner(
-            context,
+            companiesContext,
+            platformContext,
             new FakeClock(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc)),
             new ConfigurationBuilder().Build());
 
         var companyId = await provisioner.ProvisionCompanyAsync("Acme Corporation", CancellationToken.None);
 
-        var company = await context.Companies
+        var company = await companiesContext.Companies
             .Include(c => c.Addresses)
             .SingleAsync(c => c.Id == companyId);
 
@@ -45,5 +47,14 @@ public class CompanyProvisionerTests
             .Options;
 
         return new CompaniesDbContext(options);
+    }
+
+    private static PlatformDbContext BuildPlatformContext()
+    {
+        var options = new DbContextOptionsBuilder<PlatformDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+
+        return new PlatformDbContext(options);
     }
 }

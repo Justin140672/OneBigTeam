@@ -136,22 +136,26 @@ public static class CompaniesModule
     }
 
     /// <summary>
-    /// Orchestrates the required startup sequence: Companies migration and seeding, followed by Platform migration.
+    /// Orchestrates the required startup sequence: Platform migration, Companies migration and seeding.
     /// This method is the single source of truth for the production startup order — used by both Program.cs
     /// (via migrationRunner.RunAsync) and integration tests to ensure ordering consistency.
     ///
-    /// The ordering is mandatory: Platform migration has a foreign key to companies.companies and copies data
-    /// from companies.platform_settings and companies.platform_metrics_snapshots, so it must run after
-    /// Companies schema, tables, and seed data exist.
+    /// Platform migration runs first to create the platform schema and tables (empty). Then Companies
+    /// migration runs, which includes RemovePlatformTablesFromCompanies — this migration copies data
+    /// from the old companies.platform_* tables to the new platform.platform_* tables, then drops the old ones.
+    /// This ordering ensures existing data is preserved during schema migration. Platform foreign key
+    /// to companies.companies is safe because the companies table is created by early Companies migrations.
     /// </summary>
     public static async Task MigrateAndSeedCoreApplicationAsync(this IServiceProvider services)
     {
-        // Step 1: Companies migration + seed (required before Platform)
-        await services.MigrateCompaniesAsync();
-        await services.SeedCompaniesAsync();
-
-        // Step 2: Platform migration (depends on companies schema + data from step 1)
+        // Step 1: Platform migration (creates empty platform tables first)
         await services.MigratePlatformAsync();
+
+        // Step 2: Companies migration (includes RemovePlatformTablesFromCompanies which copies data before drop)
+        await services.MigrateCompaniesAsync();
+
+        // Step 3: Seed companies data
+        await services.SeedCompaniesAsync();
     }
 
     public static async Task SeedCompaniesAsync(this IServiceProvider services)

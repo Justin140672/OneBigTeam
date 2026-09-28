@@ -10,6 +10,42 @@ namespace HR.Modules.Companies.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            // Copy existing platform_settings from companies schema to platform schema (if it exists and platform schema is ready)
+            migrationBuilder.Sql(
+                @"DO $$
+                BEGIN
+                  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'companies' AND table_name = 'platform_settings') THEN
+                    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'platform' AND table_name = 'platform_settings') THEN
+                      INSERT INTO platform.platform_settings
+                        (id, trial_length_days, default_monthly_price_gbp, support_email,
+                         maintenance_mode_enabled, maintenance_mode_message, feature_flags_json,
+                         pricing_bands_json, minimum_monthly_charge_gbp, updated_at, updated_by_user_id)
+                      SELECT id, trial_length_days, default_monthly_price_gbp, support_email,
+                             maintenance_mode_enabled, maintenance_mode_message, feature_flags_json,
+                             COALESCE(pricing_bands_json, '[]'), minimum_monthly_charge_gbp, updated_at, updated_by_user_id
+                      FROM companies.platform_settings
+                      ON CONFLICT DO NOTHING;
+                    END IF;
+                  END IF;
+                END $$;");
+
+            // Copy existing platform_metrics_snapshots from companies schema to platform schema (if it exists and platform schema is ready)
+            migrationBuilder.Sql(
+                @"DO $$
+                BEGIN
+                  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'companies' AND table_name = 'platform_metrics_snapshots') THEN
+                    IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'platform' AND table_name = 'platform_metrics_snapshots') THEN
+                      INSERT INTO platform.platform_metrics_snapshots
+                        (id, snapshot_date, computed_at, active_companies, active_users,
+                         storage_consumed_bytes, background_jobs_succeeded_total)
+                      SELECT id, snapshot_date, computed_at, active_companies, active_users,
+                             storage_consumed_bytes, background_jobs_succeeded_total
+                      FROM companies.platform_metrics_snapshots
+                      ON CONFLICT DO NOTHING;
+                    END IF;
+                  END IF;
+                END $$;");
+
             // Drop platform_metrics_snapshots from companies schema
             migrationBuilder.DropIndex(
                 name: "ix_platform_metrics_snapshots_snapshot_date",

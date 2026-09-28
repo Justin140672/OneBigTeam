@@ -2,7 +2,7 @@ using HR.Modules.Companies.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
-namespace HR.Modules.Companies.Persistence.Configurations;
+namespace HR.Modules.Companies.Persistence.Configurations.Platform;
 
 internal sealed class PlatformSettingsConfiguration : IEntityTypeConfiguration<PlatformSettings>
 {

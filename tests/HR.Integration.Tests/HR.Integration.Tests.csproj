@@ -43,6 +43,7 @@
     <ProjectReference Include="..\..\src\Modules\HR.Modules.Recruitment\HR.Modules.Recruitment.csproj" />
     <ProjectReference Include="..\..\src\Modules\HR.Modules.Reporting\HR.Modules.Reporting.csproj" />
     <ProjectReference Include="..\..\src\Modules\HR.Modules.Tasks\HR.Modules.Tasks.csproj" />
+    <ProjectReference Include="..\HR.Modules.Identity.Tests\HR.Modules.Identity.Tests.csproj" />
   </ItemGroup>
 
 </Project>

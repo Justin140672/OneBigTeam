@@ -33,9 +33,7 @@ internal sealed class Endpoint(
 
         if (result.IsFailure)
         {
-            await Send.ResultAsync(result.Error.Code == "forbidden"
-                ? TypedResults.Forbid()
-                : TypedResults.NotFound(new { error = result.Error.Message }));
+            await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }
 

@@ -174,17 +174,19 @@ public class GetCustomerBillingBreakdownHandlerTests
     }
 
     private static GetCustomerBillingBreakdownHandler BuildHandler(
-        CompaniesDbContext context,
-        HR.SharedKernel.ICurrentUser currentUser,
-        IConfiguration configuration,
+        CompaniesDbContext companiesContext,
+        HR.SharedKernel.ICurrentUser? currentUser = null,
+        IConfiguration? configuration = null,
         FakeEmployeeDirectoryReader? employeeDirectoryReader = null,
         FakeEmployeeStarterReader? employeeStarterReader = null,
-        FakeClock? clock = null)
+        FakeClock? clock = null,
+        PlatformDbContext? platformContext = null)
     {
         return new GetCustomerBillingBreakdownHandler(
-            context,
-            currentUser,
-            configuration,
+            companiesContext,
+            platformContext ?? BuildPlatformContext(),
+            currentUser ?? new FakeCurrentUser(Guid.NewGuid()),
+            configuration ?? new ConfigurationBuilder().Build(),
             employeeDirectoryReader ?? new FakeEmployeeDirectoryReader(),
             employeeStarterReader ?? new FakeEmployeeStarterReader(),
             clock ?? new FakeClock(Now));
@@ -216,5 +218,14 @@ public class GetCustomerBillingBreakdownHandlerTests
             .Options;
 
         return new CompaniesDbContext(options);
+    }
+
+    private static PlatformDbContext BuildPlatformContext()
+    {
+        var options = new DbContextOptionsBuilder<PlatformDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+
+        return new PlatformDbContext(options);
     }
 }

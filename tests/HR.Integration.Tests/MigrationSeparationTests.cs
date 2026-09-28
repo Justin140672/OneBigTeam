@@ -20,10 +20,10 @@ namespace HR.Integration.Tests;
 /// The companies schema contains tenant-scoped tables (companies, subscriptions, employees).
 /// The platform schema contains system-level tables (platform_settings, audit, assignments).
 ///
-/// Companies must run before Platform (Platform migration has FK to companies.companies and copies data
-/// from companies.platform_settings and companies.platform_metrics_snapshots). This ordering is
-/// enforced by MigrateAndSeedCoreApplicationAsync, and a dedicated negative test proves that
-/// reversing the order fails as expected.
+/// Platform now runs before Companies to ensure platform tables exist before Companies migration
+/// RemovePlatformTablesFromCompanies runs. This ordering ensures existing platform data is copied
+/// from companies schema to platform schema before the old tables are dropped, preventing data loss
+/// during upgrades.
 /// </summary>
 [Collection("Integration")]
 public class MigrationSeparationTests
@@ -408,16 +408,13 @@ public class MigrationSeparationTests
                         Assert.True(count >= 2, "At least 2 seeded subscriptions should exist (one per company)");
                     }
 
-                    // Verify the foreign key constraint from platform to companies exists
-                    // (this proves Platform ran after Companies — if Companies hadn't created the companies.companies
-                    // table, Platform's migration would have failed when trying to create this FK)
-                    const string fkQuery = @"
-                    SELECT constraint_name FROM information_schema.table_constraints
-                    WHERE constraint_schema = 'platform'
-                      AND table_name = 'customer_database_assignments'
-                      AND constraint_type = 'FOREIGN KEY'";
+                    // Verify customer_database_assignments table was created
+                    // (Platform creates empty tables first, then Companies migration copies data if it exists)
+                    const string tableExistsQuery = @"
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = 'platform' AND table_name = 'customer_database_assignments'";
 
-                    using (var cmd = new NpgsqlCommand(fkQuery, connection))
+                    using (var cmd = new NpgsqlCommand(tableExistsQuery, connection))
                     {
                         var result = await cmd.ExecuteScalarAsync();
                         Assert.NotNull(result);
@@ -498,135 +495,4 @@ public class MigrationSeparationTests
         }
     }
 
-    /// <summary>
-    /// Verifies that Platform migration CANNOT run before Companies migration on a blank database.
-    /// This negative test proves that the ordering enforced by MigrateAndSeedCoreApplicationAsync is
-    /// mandatory — the foreign key dependency and data copying requirements would fail if reversed.
-    ///
-    /// The test creates a fresh, isolated PostgreSQL Testcontainer and attempts to run Platform
-    /// migration first, which must fail because:
-    /// 1. The companies.companies table doesn't exist yet
-    /// 2. Platform migration has an FK to companies.companies
-    /// 3. Platform migration copies data from companies.platform_settings and
-    ///    companies.platform_metrics_snapshots (which don't exist)
-    /// </summary>
-    [Fact]
-    public async Task Fresh_Database_Platform_Before_Companies_Fails()
-    {
-        // Create a fresh, isolated Testcontainer for this test.
-        await using var tempPostgres = new PostgreSqlBuilder("postgres:16-alpine")
-            .WithDatabase("hr_reversed_migration_test")
-            .WithUsername("postgres")
-            .WithPassword("postgres")
-            .Build();
-
-        await tempPostgres.StartAsync();
-        var tempConnectionString = tempPostgres.GetConnectionString();
-
-        try
-        {
-            // Create a minimal test service provider with both DbContexts (without versioned aggregates interceptor).
-            // Suppress the PendingModelChangesWarning for the same reason as above.
-            var services = new ServiceCollection();
-            services.AddLogging();
-
-            services.AddDbContext<HR.Modules.Companies.Persistence.CompaniesDbContext>(options =>
-                options
-                    .UseNpgsql(tempConnectionString, npgsql =>
-                        npgsql.MigrationsHistoryTable("__ef_migrations_history", "companies"))
-                    .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
-
-            services.AddDbContext<HR.Modules.Companies.Persistence.PlatformDbContext>(options =>
-                options
-                    .UseNpgsql(tempConnectionString, npgsql =>
-                        npgsql.MigrationsHistoryTable("__ef_migrations_history", "platform"))
-                    .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning)));
-
-            var serviceProvider = services.BuildServiceProvider();
-
-            try
-            {
-                // Attempt to run Platform migration before Companies — this should fail.
-                // Platform's migration has FK(company_id) -> companies.companies, which doesn't exist yet.
-                // Use Record.ExceptionAsync to capture the actual exception (not catch assertion exceptions).
-                var exception = await Record.ExceptionAsync(async () =>
-                    await serviceProvider.MigratePlatformAsync()
-                );
-
-                // Assert that an exception was actually thrown (not swallowed by assertion catches)
-                Assert.NotNull(exception);
-
-                // Verify the exception is related to the missing Companies schema/table dependency.
-                // The exception could be wrapped by EF Core (DbUpdateException, OperationException)
-                // or could be a direct PostgresException. Walk up the inner exceptions to find
-                // the underlying PostgreSQL error.
-                var postgresException = FindPostgresException(exception);
-
-                if (postgresException != null)
-                {
-                    // Validate that the error is about missing objects (companies schema/table/FK)
-                    // Expected SqlState codes:
-                    // - "42P01" = undefined_table (FK references non-existent table)
-                    // - "42P02" = undefined_object
-                    // - "3F000" = invalid_schema_name (schema doesn't exist)
-                    var expectedSqlStates = new[] { "42P01", "42P02", "3F000" };
-                    Assert.True(
-                        expectedSqlStates.Contains(postgresException.SqlState),
-                        $"Expected FK/schema violation (SqlState in {string.Join(", ", expectedSqlStates)}), " +
-                        $"but got SqlState '{postgresException.SqlState}': {postgresException.Message}"
-                    );
-
-                    // Verify the error message mentions companies or the FK constraint
-                    var errorMessage = postgresException.Message.ToLowerInvariant();
-                    Assert.True(
-                        errorMessage.Contains("companies") || errorMessage.Contains("company_id"),
-                        $"Expected error to mention 'companies' or 'company_id' dependency, " +
-                        $"but got: {postgresException.Message}"
-                    );
-                }
-                else
-                {
-                    // If no PostgresException found in the inner exception chain,
-                    // at least verify the exception message mentions the missing dependency
-                    var exceptionMessage = exception.ToString().ToLowerInvariant();
-                    Assert.True(
-                        exceptionMessage.Contains("companies") || exceptionMessage.Contains("constraint"),
-                        $"Expected exception to mention 'companies' or 'constraint' dependency, " +
-                        $"but got: {exception.Message}"
-                    );
-                }
-            }
-            finally
-            {
-                // Ensure service provider is disposed even on exception
-                await serviceProvider.DisposeAsync();
-            }
-        }
-        finally
-        {
-            // Cleanup: stop and dispose the temporary Testcontainer
-            await tempPostgres.StopAsync();
-            await tempPostgres.DisposeAsync();
-        }
-    }
-
-    /// <summary>
-    /// Walks up the exception chain to find an underlying PostgresException.
-    /// EF Core often wraps database errors (DbUpdateException, OperationException), so we need to
-    /// unwrap them to get the actual PostgreSQL error code and message.
-    /// </summary>
-    private static PostgresException? FindPostgresException(Exception? exception)
-    {
-        while (exception != null)
-        {
-            if (exception is PostgresException postgresEx)
-            {
-                return postgresEx;
-            }
-
-            exception = exception.InnerException;
-        }
-
-        return null;
-    }
 }

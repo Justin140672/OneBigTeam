@@ -1,4 +1,5 @@
 using HR.Modules.Companies.Domain;
+using HR.Modules.Companies.Persistence.Configurations;
 using HR.SharedKernel.Idempotency;
 using Microsoft.EntityFrameworkCore;
 
@@ -21,14 +22,23 @@ internal sealed class CompaniesDbContext : DbContext
     public DbSet<ProcessedStripeEvent> ProcessedStripeEvents => Set<ProcessedStripeEvent>();
     public DbSet<CustomerBillingSnapshot> CustomerBillingSnapshots => Set<CustomerBillingSnapshot>();
     public DbSet<SupportSession> SupportSessions => Set<SupportSession>();
-    public DbSet<PlatformMetricsSnapshot> PlatformMetricsSnapshots => Set<PlatformMetricsSnapshot>();
-    public DbSet<PlatformSettings> PlatformSettings => Set<PlatformSettings>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("companies");
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(CompaniesDbContext).Assembly);
+
+        // Apply Companies-owned entity configurations explicitly
+        modelBuilder.ApplyConfiguration(new CompanyConfiguration());
+        modelBuilder.ApplyConfiguration(new CompanyAddressConfiguration());
+        modelBuilder.ApplyConfiguration(new CompanySettingsConfiguration());
+        modelBuilder.ApplyConfiguration(new CompanyBrandingConfiguration());
+        modelBuilder.ApplyConfiguration(new OutboxMessageConfiguration());
+        modelBuilder.ApplyConfiguration(new PublicHolidayConfiguration());
+        modelBuilder.ApplyConfiguration(new CustomerSubscriptionConfiguration());
+        modelBuilder.ApplyConfiguration(new ProcessedStripeEventConfiguration());
+        modelBuilder.ApplyConfiguration(new CustomerBillingSnapshotConfiguration());
+        modelBuilder.ApplyConfiguration(new SupportSessionConfiguration());
         modelBuilder.ApplyConfiguration(new IdempotencyRecordConfiguration<IdempotencyRecord>());
     }
 }

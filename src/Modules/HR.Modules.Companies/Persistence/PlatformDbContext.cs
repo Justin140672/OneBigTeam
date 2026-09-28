@@ -1,4 +1,5 @@
 using HR.Modules.Companies.Domain;
+using HR.Modules.Companies.Persistence.Configurations.Platform;
 using HR.SharedKernel.Idempotency;
 using Microsoft.EntityFrameworkCore;
 
@@ -30,7 +31,11 @@ internal sealed class PlatformDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.HasDefaultSchema("platform");
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(PlatformDbContext).Assembly);
+
+        // Apply Platform-owned entity configurations explicitly
+        modelBuilder.ApplyConfiguration(new CustomerDatabaseAssignmentConfiguration());
+        modelBuilder.ApplyConfiguration(new PlatformSettingsConfiguration());
+        modelBuilder.ApplyConfiguration(new PlatformMetricsSnapshotConfiguration());
         modelBuilder.ApplyConfiguration(new IdempotencyRecordConfiguration<IdempotencyRecord>());
     }
 }
