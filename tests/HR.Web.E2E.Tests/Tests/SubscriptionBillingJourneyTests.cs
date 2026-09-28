@@ -6,7 +6,7 @@ namespace HR.Web.E2E.Tests.Tests;
 
 /// <summary>
 /// Verifies the Company Administrator subscription and billing journey:
-/// - Company-Administrator-only user can access Subscription & Billing
+/// - Only Company-Administrator-only user can access Subscription & Billing
 /// - Subscription state (plan, status, dates, employee count) displays correctly
 /// - Correct action buttons are available based on subscription status:
 ///   * "Start subscription" for trial/expired trial
@@ -14,13 +14,20 @@ namespace HR.Web.E2E.Tests.Tests;
 ///   * "Resume subscription" for cancelled-at-period-end subscriptions
 /// - Click handlers for checkout and billing portal initiate navigation to Stripe URLs
 /// - In-page operations (resume, cancel) update subscription state
-/// - Role separation: non-administrators cannot access the page
+/// - Role separation: non-administrators (HR Admin, Manager, Recruiter, Employee) cannot access the page
 ///
 /// Subscription state lifecycle in E2E:
 /// - New companies seed with a trial subscription (14 days)
 /// - Trial page shows "Start subscription" button
 /// - Active subscriptions show "Manage billing" button
 /// - Cancelled-at-period-end subscriptions show "Resume subscription" button
+///
+/// Access Control (guarded by Session.CanManageCompany):
+/// - CompanyAdministrator: CAN access
+/// - HrAdministrator: CANNOT access (subscription:manage policy removed from this role)
+/// - Manager: CANNOT access
+/// - Recruiter: CANNOT access
+/// - Employee: CANNOT access
 ///
 /// Note: Stripe navigation (checkout and billing portal) is tested via URL verification
 /// only — we do not simulate completing the Stripe flow, as that's covered by integration
@@ -30,19 +37,29 @@ namespace HR.Web.E2E.Tests.Tests;
 public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixture)
     : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
+    // ── Personas ───────────────────────────────────────────────────────────────
+
     // Priya Shah — seeded Company Administrator persona for Acme Corporation.
     // See CompanyAdministratorAccessTests for context on her role setup.
     private const string CompanyAdminEmail = "priya.shah@acme.example";
 
-    // Laura Bennett — seeded HR Administrator persona, used for role-separation tests
-    // to confirm she CAN still access the subscription page (she has the subscription:view permission).
+    // Laura Bennett — seeded HR Administrator persona.
+    // She has HR permissions but NOT company administration (CanManageCompany = false).
     private const string HrAdminEmail = "laura.bennett@acme.example";
+
+    // James Okafor — seeded Manager persona with no company admin role.
+    private const string ManagerEmail = "james.okafor@acme.example";
+
+    // Marcus Diallo — seeded Recruiter persona with no company admin role.
+    private const string RecruiterEmail = "marcus.diallo@acme.example";
 
     // Tom Williams — seeded plain Employee persona with no admin roles.
     private const string PlainEmployeeEmail = "tom.williams@acme.example";
 
     // Acme Corporation — the seeded dev/E2E tenant. It has a trial subscription by default.
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+    // ── Access Control Tests ───────────────────────────────────────────────────
 
     [Fact]
     public async Task CompanyAdministrator_CanAccess_SubscriptionBillingPage()
@@ -65,6 +82,88 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         Assert.False(string.IsNullOrWhiteSpace(status),
             "Expected subscription status to be displayed");
     }
+
+    [Fact]
+    public async Task HrAdministrator_CannotAccess_SubscriptionBillingPage()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        // ── Step 1: Login as Laura (HrAdministrator, CanManageCompany = false) ──
+        await login.GoToAsync();
+        await login.LoginAsync(HrAdminEmail);
+
+        // ── Step 2: Attempt to navigate directly to /subscription ───────────────
+        // The page guard (Session.CanManageCompany) should redirect away because
+        // Laura is HrAdministrator-only, not CompanyAdministrator. The subscription:manage
+        // API policy no longer grants HR Administrator access (see
+        // 30-administrative-role-separation-matrix.md).
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/subscription");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+
+        // ── Step 3: Must be redirected away from /subscription ─────────────────
+        var finalUrl = _page.Url;
+        Assert.False(finalUrl.TrimEnd('/').EndsWith("/subscription", StringComparison.OrdinalIgnoreCase),
+            $"Expected HR Administrator to be redirected away from /subscription, but ended up at: {finalUrl}");
+    }
+
+    [Fact]
+    public async Task Manager_CannotAccess_SubscriptionBillingPage()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        // ── Step 1: Login as James (Manager, CanManageCompany = false) ─────────
+        await login.GoToAsync();
+        await login.LoginAsync(ManagerEmail);
+
+        // ── Step 2: Attempt to navigate directly to /subscription ───────────────
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/subscription");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+
+        // ── Step 3: Must be redirected away from /subscription ─────────────────
+        var finalUrl = _page.Url;
+        Assert.False(finalUrl.TrimEnd('/').EndsWith("/subscription", StringComparison.OrdinalIgnoreCase),
+            $"Expected Manager to be redirected away from /subscription, but ended up at: {finalUrl}");
+    }
+
+    [Fact]
+    public async Task Recruiter_CannotAccess_SubscriptionBillingPage()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        // ── Step 1: Login as Marcus (Recruiter, CanManageCompany = false) ──────
+        await login.GoToAsync();
+        await login.LoginAsync(RecruiterEmail);
+
+        // ── Step 2: Attempt to navigate directly to /subscription ───────────────
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/subscription");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+
+        // ── Step 3: Must be redirected away from /subscription ─────────────────
+        var finalUrl = _page.Url;
+        Assert.False(finalUrl.TrimEnd('/').EndsWith("/subscription", StringComparison.OrdinalIgnoreCase),
+            $"Expected Recruiter to be redirected away from /subscription, but ended up at: {finalUrl}");
+    }
+
+    [Fact]
+    public async Task PlainEmployee_CannotAccess_SubscriptionBillingPage()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(PlainEmployeeEmail);
+
+        // Attempt to navigate directly to /subscription.
+        // The page guard (Session.CanManageCompany) should redirect to a permitted page.
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/subscription");
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+
+        // Verify we were redirected away (AppSession.GuardAccess redirects via NavigateTo).
+        var finalUrl = _page.Url;
+        Assert.False(finalUrl.TrimEnd('/').EndsWith("/subscription", StringComparison.OrdinalIgnoreCase),
+            $"Expected plain employee to be redirected away from /subscription, but ended up at: {finalUrl}");
+    }
+
+    // ── Subscription State Display Tests ──────────────────────────────────────
 
     [Fact]
     public async Task TrialSubscription_DisplaysCorrectState()
@@ -121,6 +220,8 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
             "Expected 'Manage billing' button to be disabled for trial subscription");
     }
 
+    // ── Subscription Workflow Tests ────────────────────────────────────────────
+
     [Fact]
     public async Task StartSubscriptionButton_InitiatesCheckout()
     {
@@ -151,45 +252,32 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     }
 
     [Fact]
-    public async Task PlainEmployee_CannotAccess_SubscriptionBillingPage()
-    {
-        var login = new LoginPage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(PlainEmployeeEmail);
-
-        // Attempt to navigate directly to /subscription.
-        // The page guard (Session.CanManageCompany) should redirect to a permitted page.
-        await _page.GotoAsync($"{_fixture.WebBaseUrl}/subscription");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
-
-        // Verify we were redirected away (AppSession.GuardAccess redirects via NavigateTo).
-        var finalUrl = _page.Url;
-        Assert.False(finalUrl.TrimEnd('/').EndsWith("/subscription", StringComparison.OrdinalIgnoreCase),
-            $"Expected plain employee to be redirected away from /subscription, but ended up at: {finalUrl}");
-    }
-
-    [Fact]
-    public async Task HrAdministrator_CanAccess_SubscriptionBillingPage()
+    public async Task TrialSubscription_DoesNotShowManageBillingOrCancelButtons()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(HrAdminEmail);
+        await login.LoginAsync(CompanyAdminEmail);
 
-        // Laura has subscription:view permission even as HR Admin, so she should also be able
-        // to access the page (though she may see different UI or restrictions than Company Admin).
-        // The key here is that she's NOT redirected away.
         await subscription.GoToAsync();
 
-        Assert.False(await subscription.IsLoadingAsync(),
-            "Expected subscription page to load for HR Administrator");
+        // During trial, only "Start subscription" is shown.
+        Assert.True(await subscription.HasStartSubscriptionButtonAsync(),
+            "Expected 'Start subscription' button for trial");
 
-        var status = await subscription.GetSubscriptionStatusAsync();
-        Assert.False(string.IsNullOrWhiteSpace(status),
-            "Expected HR Administrator to see subscription status");
+        // Cancel button should not be available (trial subscriptions cannot be cancelled).
+        var hasCancelButton = await subscription.HasCancelButtonAsync();
+        Assert.False(hasCancelButton,
+            "Expected 'Cancel subscription' button to be unavailable during trial");
+
+        // Resume button should not be shown (only shown when CancelAtPeriodEnd = true).
+        var hasResumeButton = await subscription.HasResumeButtonAsync();
+        Assert.False(hasResumeButton,
+            "Expected 'Resume subscription' button to not be visible during trial");
     }
+
+    // ── Subscription State Persistence Tests ───────────────────────────────────
 
     [Fact]
     public async Task SubscriptionPage_ReloadsAndPersistsState()
@@ -219,5 +307,66 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         Assert.Equal(initialStatus ?? "", reloadedStatus ?? "");
         Assert.Equal(initialPlan ?? "", reloadedPlan ?? "");
         Assert.Equal(initialEmpCount ?? "", reloadedEmpCount ?? "");
+    }
+
+    [Fact]
+    public async Task SubscriptionPage_DisplaysActiveEmployeeCount()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(CompanyAdminEmail);
+
+        await subscription.GoToAsync();
+
+        // Active employee count should be a numeric value, not null or empty.
+        var empCount = await subscription.GetActiveEmployeeCountAsync();
+        Assert.False(string.IsNullOrWhiteSpace(empCount),
+            "Expected active employee count to be displayed");
+
+        // It should be parseable as a number (zero or positive).
+        Assert.True(int.TryParse(empCount, out var count) && count >= 0,
+            $"Expected active employee count to be a non-negative integer, but got '{empCount}'");
+    }
+
+    [Fact]
+    public async Task SubscriptionPage_DisplaysNextBillingDate()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(CompanyAdminEmail);
+
+        await subscription.GoToAsync();
+
+        // Next billing date should be readable (either a date or "Not yet billed").
+        var billingDate = await subscription.GetNextBillingDateAsync();
+        Assert.False(string.IsNullOrWhiteSpace(billingDate),
+            "Expected next billing date to be displayed");
+    }
+
+    // ── Page Navigation Tests ──────────────────────────────────────────────────
+
+    [Fact]
+    public async Task CompanyAdministrator_CanReachSubscriptionPageFromNavigation()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(CompanyAdminEmail);
+
+        // The subscription page should be reachable via direct navigation.
+        await subscription.GoToAsync();
+
+        // Verify we're on the subscription page by checking for the page-specific content.
+        Assert.True(await _page.Locator("h1:has-text('Subscription')").IsVisibleAsync(),
+            "Expected 'Subscription' heading to be visible on the subscription page");
+
+        // The subscription details card should also be visible.
+        Assert.True(await _page.Locator(".card-header h5:has-text('Subscription Details')").IsVisibleAsync(),
+            "Expected 'Subscription Details' card heading to be visible");
     }
 }
