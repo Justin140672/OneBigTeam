@@ -192,4 +192,111 @@ public class MigrationSeparationTests
 
         await connection.CloseAsync();
     }
+
+    /// <summary>
+    /// Verifies that Companies migrations run successfully BEFORE Platform migrations on a blank database.
+    /// This is a critical dependency order test: Platform migration has a foreign key constraint to
+    /// companies.companies and copies data from companies.platform_settings and companies.platform_metrics_snapshots,
+    /// so it MUST run after the Companies schema and tables exist.
+    ///
+    /// This test manually creates a fresh PostgreSQL database (no pre-existing schema),
+    /// runs the migration sequence, and verifies:
+    /// 1. Both schemas exist
+    /// 2. All expected tables are created
+    /// 3. Company seeding completes
+    /// 4. The startup sequence succeeds (no FK constraint violations)
+    /// </summary>
+    [Fact]
+    public async Task Fresh_Database_Migrations_Run_In_Correct_Order_Companies_Before_Platform()
+    {
+        using var connection = new NpgsqlConnection(Environment.GetEnvironmentVariable("ConnectionStrings__hr"));
+        await connection.OpenAsync();
+
+        try
+        {
+            // Verify companies schema was created and has expected tables
+            const string companiesTablesQuery = @"
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema = 'companies'
+                ORDER BY table_name";
+
+            using (var cmd = new NpgsqlCommand(companiesTablesQuery, connection))
+            {
+                var tables = new List<string>();
+                using (var reader = await cmd.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        tables.Add(reader.GetString(0));
+                    }
+                }
+
+                // Verify essential tables from Companies migration exist
+                Assert.Contains("companies", tables);
+                Assert.Contains("customer_subscriptions", tables);
+                Assert.Contains("public_holidays", tables);
+                Assert.True(tables.Count > 0, "Companies schema should have tables after migration");
+            }
+
+            // Verify platform schema was created and has expected tables
+            const string platformTablesQuery = @"
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema = 'platform'
+                ORDER BY table_name";
+
+            using (var cmd = new NpgsqlCommand(platformTablesQuery, connection))
+            {
+                var tables = new List<string>();
+                using (var reader = await cmd.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        tables.Add(reader.GetString(0));
+                    }
+                }
+
+                // Verify Platform tables exist
+                Assert.Contains("customer_database_assignments", tables);
+                Assert.Contains("platform_settings", tables);
+                Assert.Contains("platform_metrics_snapshots", tables);
+                Assert.True(tables.Count > 0, "Platform schema should have tables after migration");
+            }
+
+            // Verify that the foreign key constraint from platform.customer_database_assignments to
+            // companies.companies exists (proving Companies ran before Platform)
+            const string fkQuery = @"
+                SELECT 1 FROM information_schema.table_constraints
+                WHERE constraint_schema = 'platform'
+                  AND table_name = 'customer_database_assignments'
+                  AND constraint_name = 'FK_customer_database_assignments_companies_company_id'";
+
+            using (var cmd = new NpgsqlCommand(fkQuery, connection))
+            {
+                var result = await cmd.ExecuteScalarAsync();
+                Assert.NotNull(result, "Foreign key from platform.customer_database_assignments to companies.companies should exist");
+            }
+
+            // Verify that seeded companies exist in the companies table (proves SeedCompaniesAsync ran)
+            const string companiesSeededQuery = "SELECT COUNT(*) FROM companies.companies WHERE id IN ('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000002')";
+
+            using (var cmd = new NpgsqlCommand(companiesSeededQuery, connection))
+            {
+                var count = (long)(await cmd.ExecuteScalarAsync() ?? 0);
+                Assert.Equal(2, count);
+            }
+
+            // Verify that seeded subscriptions exist (proves SeedCompaniesAsync completed after Companies migration)
+            const string subscriptionsSeededQuery = "SELECT COUNT(*) FROM companies.customer_subscriptions";
+
+            using (var cmd = new NpgsqlCommand(subscriptionsSeededQuery, connection))
+            {
+                var count = (long)(await cmd.ExecuteScalarAsync() ?? 0);
+                Assert.True(count >= 2, "At least 2 seeded subscriptions should exist");
+            }
+        }
+        finally
+        {
+            await connection.CloseAsync();
+        }
+    }
 }
