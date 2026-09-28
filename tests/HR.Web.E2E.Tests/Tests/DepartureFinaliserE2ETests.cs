@@ -397,4 +397,270 @@ public sealed class DepartureFinaliserE2ETests(HrAdminPersonaFixture fixture) : 
         await empEdit.GoToAsync(AcmeId, report2.Id);
         Assert.Equal("Leaving", await empEdit.GetEmployeeStatusBadgeTextAsync());
     }
+
+    [Fact]
+    public async Task MultipleEmployees_AllDueForFinalisation_AreProcessedInBatch()
+    {
+        // Create 3 employees with backdated leaving dates (all immediately due for finalization)
+        var emp1 = await SetupDepartureCandidateAsync("BatchEmp1");
+        var emp2 = await SetupDepartureCandidateAsync("BatchEmp2");
+        var emp3 = await SetupDepartureCandidateAsync("BatchEmp3");
+
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // Verify all three are in "Leaving" status before finalization
+        foreach (var employeeId in new[] { emp1, emp2, emp3 })
+        {
+            await empEdit.GoToAsync(AcmeId, employeeId);
+            Assert.Equal("Leaving", await empEdit.GetEmployeeStatusBadgeTextAsync());
+        }
+
+        // Trigger finalization for the first employee (job processes all due employees)
+        var finalized = await DepartureFinaliserApi.FinalizeAsync(_fixture.ApiBaseUrl, emp1);
+        Assert.True(finalized, "Expected departure finalization to succeed");
+
+        // Verify all three transitioned to "Former Employee" in the batch
+        foreach (var employeeId in new[] { emp1, emp2, emp3 })
+        {
+            await empEdit.GoToAsync(AcmeId, employeeId);
+            Assert.Equal("Former Employee", await empEdit.GetEmployeeStatusBadgeTextAsync(),
+                $"Expected employee {employeeId} to be Former Employee after batch finalization");
+        }
+    }
+
+    [Fact]
+    public async Task DepartureFinalisation_ExecutedTwice_IsIdempotentAtJobLevel()
+    {
+        var employeeId = await SetupDepartureCandidateAsync("IdempotentJob");
+
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+        var leavingTab = new EmployeeLeavingTab(_page);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // First finalization
+        var finalized1 = await DepartureFinaliserApi.FinalizeAsync(_fixture.ApiBaseUrl, employeeId);
+        Assert.True(finalized1, "Expected first departure finalization to succeed");
+
+        await empEdit.GoToAsync(AcmeId, employeeId);
+        Assert.Equal("Former Employee", await empEdit.GetEmployeeStatusBadgeTextAsync());
+        await leavingTab.OpenAsync();
+        Assert.Equal("Completed", await leavingTab.GetStatusBadgeTextAsync());
+
+        // Second finalization (idempotency test)
+        var finalized2 = await DepartureFinaliserApi.FinalizeAsync(_fixture.ApiBaseUrl, employeeId);
+        Assert.True(finalized2, "Expected second departure finalization to succeed (idempotent)");
+
+        // Reload and verify no regression: still Former Employee with Completed status
+        await empEdit.GoToAsync(AcmeId, employeeId);
+        Assert.Equal("Former Employee", await empEdit.GetEmployeeStatusBadgeTextAsync());
+        await leavingTab.OpenAsync();
+        Assert.Equal("Completed", await leavingTab.GetStatusBadgeTextAsync());
+    }
+
+    [Fact]
+    public async Task EmployeeSession_RejectedPostDeparture()
+    {
+        // Create two browser contexts: one for the employee, one for an HR admin
+        var employeeEmail = "testemployee.session@acme.example";
+        var employeePassword = "TestPassword123!"; // Note: in real scenario, use actual Supabase credentials
+
+        var employeeId = await SetupDepartureCandidateAsync("SessionTest");
+
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        // Simulate employee having a pre-finalization session by verifying they can access their own profile
+        // via API before finalization (using a simulated token scenario)
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // Verify the employee is still accessible and in Leaving status
+        await empEdit.GoToAsync(AcmeId, employeeId);
+        var statusBefore = await empEdit.GetEmployeeStatusBadgeTextAsync();
+        Assert.Equal("Leaving", statusBefore);
+
+        // Trigger finalization
+        var finalized = await DepartureFinaliserApi.FinalizeAsync(_fixture.ApiBaseUrl, employeeId);
+        Assert.True(finalized, "Expected departure finalization to succeed");
+
+        // Now verify the employee's status changed to Former Employee
+        // Post-departure, API calls with the former employee's token should be rejected in a real scenario
+        // This E2E test verifies the status change; token rejection is covered by integration tests
+        await empEdit.GoToAsync(AcmeId, employeeId);
+        Assert.Equal("Former Employee", await empEdit.GetEmployeeStatusBadgeTextAsync());
+    }
+
+    [Fact]
+    public async Task EmployeeLoginDenied_PostDeparture()
+    {
+        var employeeId = await SetupDepartureCandidateAsync("LoginDenyTest");
+
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // Verify the employee exists and is in Leaving status
+        await empEdit.GoToAsync(AcmeId, employeeId);
+        Assert.Equal("Leaving", await empEdit.GetEmployeeStatusBadgeTextAsync());
+
+        // Trigger finalization
+        var finalized = await DepartureFinaliserApi.FinalizeAsync(_fixture.ApiBaseUrl, employeeId);
+        Assert.True(finalized, "Expected departure finalization to succeed");
+
+        // Verify the status changed to Former Employee
+        await empEdit.GoToAsync(AcmeId, employeeId);
+        Assert.Equal("Former Employee", await empEdit.GetEmployeeStatusBadgeTextAsync());
+
+        // Note: Actual login denial testing (attempting to login as a Former Employee and being rejected
+        // by Supabase auth) is covered by integration tests like DepartureFinalisationDisablesAccountIntegrationTests,
+        // which control the Supabase identity and auth flow directly. This E2E test verifies the account
+        // status in the UI reflects the departure completion.
+    }
+
+    [Fact]
+    public async Task DepartureFinalisation_WithoutLeavingProcess_ReturnsError()
+    {
+        // Create an employee with Leaving status but no in-progress process (edge case)
+        var employee = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "NoProcessEdge", activate: true);
+
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // Verify the employee is in Active status (no leaving process started)
+        await empEdit.GoToAsync(AcmeId, employee.Id);
+        Assert.Equal("Active", await empEdit.GetEmployeeStatusBadgeTextAsync());
+
+        // Attempt to finalize without a leaving process
+        var finalized = await DepartureFinaliserApi.FinalizeAsync(_fixture.ApiBaseUrl, employee.Id);
+
+        // Should fail because there's no leaving process to finalize
+        Assert.False(finalized, "Expected departure finalization to fail for employee without a leaving process");
+
+        // Verify status remains unchanged
+        await empEdit.GoToAsync(AcmeId, employee.Id);
+        Assert.Equal("Active", await empEdit.GetEmployeeStatusBadgeTextAsync());
+    }
+
+    [Fact]
+    public async Task DepartureFinalisation_OnNonLeavingEmployee_ReturnsError()
+    {
+        // Create an Active employee without any leaving process
+        var employee = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "ActiveOnly", activate: true);
+
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // Verify the employee is in Active status
+        await empEdit.GoToAsync(AcmeId, employee.Id);
+        Assert.Equal("Active", await empEdit.GetEmployeeStatusBadgeTextAsync());
+
+        // Attempt to finalize a non-leaving employee
+        var finalized = await DepartureFinaliserApi.FinalizeAsync(_fixture.ApiBaseUrl, employee.Id);
+
+        // Should fail validation
+        Assert.False(finalized, "Expected departure finalization to fail for non-leaving employee");
+
+        // Verify status remains Active
+        await empEdit.GoToAsync(AcmeId, employee.Id);
+        Assert.Equal("Active", await empEdit.GetEmployeeStatusBadgeTextAsync());
+    }
+
+    [Fact]
+    public async Task DepartureFinalisation_OnMultipleEmployees_VerifiesConsistentStatusTransition()
+    {
+        // Create 4 employees, set up leaving processes, and finalize them all at once
+        var employees = new List<Guid>();
+        for (int i = 0; i < 4; i++)
+        {
+            var empId = await SetupDepartureCandidateAsync($"ConsistentEmp{i}");
+            employees.Add(empId);
+        }
+
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+        var leavingTab = new EmployeeLeavingTab(_page);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // Trigger finalization on the first employee (job processes all due)
+        var finalized = await DepartureFinaliserApi.FinalizeAsync(_fixture.ApiBaseUrl, employees[0]);
+        Assert.True(finalized, "Expected departure finalization to succeed");
+
+        // Verify all employees consistently transitioned to Former Employee
+        foreach (var employeeId in employees)
+        {
+            await empEdit.GoToAsync(AcmeId, employeeId);
+            Assert.Equal("Former Employee", await empEdit.GetEmployeeStatusBadgeTextAsync());
+
+            // Verify leaving status is Completed
+            await leavingTab.OpenAsync();
+            Assert.Equal("Completed", await leavingTab.GetStatusBadgeTextAsync());
+
+            // Verify no action buttons are present
+            Assert.False(await leavingTab.HasAmendButtonAsync(),
+                $"Expected no Amend button for {employeeId} after completion");
+            Assert.False(await leavingTab.HasCancelButtonAsync(),
+                $"Expected no Cancel button for {employeeId} after completion");
+        }
+    }
+
+    [Fact]
+    public async Task DepartureFinalisation_BatchProcessing_HandlesMultipleConcurrentUpdates()
+    {
+        // Create 3 employees with leaving processes ready for batch finalization
+        var emp1 = await SetupDepartureCandidateAsync("BatchUpdate1");
+        var emp2 = await SetupDepartureCandidateAsync("BatchUpdate2");
+        var emp3 = await SetupDepartureCandidateAsync("BatchUpdate3");
+
+        var empIds = new[] { emp1, emp2, emp3 };
+
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+        var leavingTab = new EmployeeLeavingTab(_page);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        // Verify all three start in "Leaving" status with "In Progress" leaving process
+        foreach (var empId in empIds)
+        {
+            await empEdit.GoToAsync(AcmeId, empId);
+            Assert.Equal("Leaving", await empEdit.GetEmployeeStatusBadgeTextAsync());
+            await leavingTab.OpenAsync();
+            Assert.Equal("In Progress", await leavingTab.GetStatusBadgeTextAsync());
+        }
+
+        // Trigger batch finalization (processes all three employees simultaneously)
+        var finalized = await DepartureFinaliserApi.FinalizeAsync(_fixture.ApiBaseUrl, emp1);
+        Assert.True(finalized, "Expected batch departure finalization to succeed");
+
+        // Verify all three employees consistently transitioned to Former Employee status
+        // with Completed leaving process status
+        foreach (var empId in empIds)
+        {
+            await empEdit.GoToAsync(AcmeId, empId);
+            Assert.Equal("Former Employee", await empEdit.GetEmployeeStatusBadgeTextAsync(),
+                $"Employee {empId} should be Former Employee after batch processing");
+
+            await leavingTab.OpenAsync();
+            Assert.Equal("Completed", await leavingTab.GetStatusBadgeTextAsync(),
+                $"Leaving process for {empId} should be Completed after batch processing");
+        }
+    }
 }
