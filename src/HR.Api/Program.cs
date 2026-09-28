@@ -236,10 +236,15 @@ var migrationRunner = app.Services.GetRequiredService<StartupMigrationRunner>();
 // Required migrations + seeding, run in dependency order. Each step is awaited in sequence; a
 // failure records the affected module and (below) prevents the normal request pipeline and the
 // Hangfire recurring job registration from being wired up.
+// Platform must run before Companies (schema creation order dependency).
+await migrationRunner.RunAsync("platform", app.Services, async sp =>
+{
+	await sp.MigratePlatformAsync();
+});
+
 await migrationRunner.RunAsync("companies", app.Services, async sp =>
 {
 	await sp.MigrateCompaniesAsync();
-	await sp.MigratePlatformAsync();
 	await sp.SeedCompaniesAsync();
 });
 
