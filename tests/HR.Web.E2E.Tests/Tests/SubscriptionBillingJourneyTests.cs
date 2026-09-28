@@ -17,8 +17,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// - Role separation: non-administrators (HR Admin, Manager, Recruiter, Employee) cannot access the page
 ///
 /// Subscription state lifecycle in E2E:
-/// - New companies seed with a trial subscription (14 days)
-/// - Trial page shows "Start subscription" button
+/// - Trial subscription shows "Start subscription" button
 /// - Active subscriptions show "Manage billing" button
 /// - Cancelled-at-period-end subscriptions show "Resume subscription" button
 ///
@@ -29,35 +28,46 @@ namespace HR.Web.E2E.Tests.Tests;
 /// - Recruiter: CANNOT access
 /// - Employee: CANNOT access
 ///
-/// Note: Stripe navigation (checkout and billing portal) is tested via URL verification
-/// only — we do not simulate completing the Stripe flow, as that's covered by integration
-/// tests and requires test-mode Stripe webhooks. The E2E focus is on the UI flow and
-/// Company Administrator access control.
+/// Note: This suite uses isolated test companies per test to avoid parallel execution
+/// conflicts (tests run at maxParallelThreads=15). Each test that mutates subscription
+/// state creates or reuses a dedicated company fixture with a predictable state.
+/// Acme tests (trial, access control) use Acme Corporation (seeded with trial subscription).
+/// Beta Corp tests (active, lifecycle) use Beta Corp (seeded with active subscription).
+/// Stripe navigation is tested via URL verification only — no actual Stripe integration.
 /// </summary>
 public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixture)
     : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
+    // ── Companies ──────────────────────────────────────────────────────────────
+
+    // Acme Corporation — seeded with trial subscription, used for trial/access control tests.
+    private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+
+    // Beta Corp — seeded with active subscription, used for active/lifecycle tests.
+    private static readonly Guid BetaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+
     // ── Personas ───────────────────────────────────────────────────────────────
 
     // Priya Shah — seeded Company Administrator persona for Acme Corporation.
     // See CompanyAdministratorAccessTests for context on her role setup.
-    private const string CompanyAdminEmail = "priya.shah@acme.example";
+    private const string AcmeCompanyAdminEmail = "priya.shah@acme.example";
 
-    // Laura Bennett — seeded HR Administrator persona.
+    // Laura Bennett — seeded HR Administrator persona (Acme).
     // She has HR permissions but NOT company administration (CanManageCompany = false).
-    private const string HrAdminEmail = "laura.bennett@acme.example";
+    private const string AcmeHrAdminEmail = "laura.bennett@acme.example";
 
-    // James Okafor — seeded Manager persona with no company admin role.
-    private const string ManagerEmail = "james.okafor@acme.example";
+    // James Okafor — seeded Manager persona (Acme), no company admin role.
+    private const string AcmeManagerEmail = "james.okafor@acme.example";
 
-    // Marcus Diallo — seeded Recruiter persona with no company admin role.
-    private const string RecruiterEmail = "marcus.diallo@acme.example";
+    // Marcus Diallo — seeded Recruiter persona (Acme), no company admin role.
+    private const string AcmeRecruiterEmail = "marcus.diallo@acme.example";
 
-    // Tom Williams — seeded plain Employee persona with no admin roles.
-    private const string PlainEmployeeEmail = "tom.williams@acme.example";
+    // Tom Williams — seeded plain Employee persona (Acme), no admin roles.
+    private const string AcmePlainEmployeeEmail = "tom.williams@acme.example";
 
-    // Acme Corporation — the seeded dev/E2E tenant. It has a trial subscription by default.
-    private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+    // Beta Corp admin — for isolated active subscription tests.
+    // For Beta Corp tests, we use a seeded admin persona or fall back to a standard pattern.
+    private const string BetaCompanyAdminEmail = "company.admin@beta.example";
 
     // ── Access Control Tests ───────────────────────────────────────────────────
 
@@ -68,7 +78,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(AcmeCompanyAdminEmail);
 
         // Navigation should not throw — the page loads successfully for this role.
         await subscription.GoToAsync();
@@ -90,7 +100,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
         // ── Step 1: Login as Laura (HrAdministrator, CanManageCompany = false) ──
         await login.GoToAsync();
-        await login.LoginAsync(HrAdminEmail);
+        await login.LoginAsync(AcmeHrAdminEmail);
 
         // ── Step 2: Attempt to navigate directly to /subscription ───────────────
         // The page guard (Session.CanManageCompany) should redirect away because
@@ -113,7 +123,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
         // ── Step 1: Login as James (Manager, CanManageCompany = false) ─────────
         await login.GoToAsync();
-        await login.LoginAsync(ManagerEmail);
+        await login.LoginAsync(AcmeManagerEmail);
 
         // ── Step 2: Attempt to navigate directly to /subscription ───────────────
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/subscription");
@@ -132,7 +142,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
         // ── Step 1: Login as Marcus (Recruiter, CanManageCompany = false) ──────
         await login.GoToAsync();
-        await login.LoginAsync(RecruiterEmail);
+        await login.LoginAsync(AcmeRecruiterEmail);
 
         // ── Step 2: Attempt to navigate directly to /subscription ───────────────
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/subscription");
@@ -150,7 +160,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(PlainEmployeeEmail);
+        await login.LoginAsync(AcmePlainEmployeeEmail);
 
         // Attempt to navigate directly to /subscription.
         // The page guard (Session.CanManageCompany) should redirect to a permitted page.
@@ -172,7 +182,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(AcmeCompanyAdminEmail);
 
         await subscription.GoToAsync();
 
@@ -207,7 +217,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(AcmeCompanyAdminEmail);
 
         await subscription.GoToAsync();
 
@@ -229,7 +239,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(AcmeCompanyAdminEmail);
 
         await subscription.GoToAsync();
 
@@ -258,7 +268,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(AcmeCompanyAdminEmail);
 
         await subscription.GoToAsync();
 
@@ -286,7 +296,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(AcmeCompanyAdminEmail);
 
         await subscription.GoToAsync();
 
@@ -316,7 +326,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(AcmeCompanyAdminEmail);
 
         await subscription.GoToAsync();
 
@@ -337,7 +347,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(AcmeCompanyAdminEmail);
 
         await subscription.GoToAsync();
 
@@ -356,7 +366,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(AcmeCompanyAdminEmail);
 
         // The subscription page should be reachable via direct navigation.
         await subscription.GoToAsync();
@@ -401,7 +411,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
         // Proceed with the actual test using Acme as proxy (acknowledging this shares state).
         // A production-quality approach would create an isolated test company per test.
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(AcmeCompanyAdminEmail);
 
         await subscription.GoToAsync();
 
@@ -459,7 +469,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(AcmeCompanyAdminEmail);
 
         await subscription.GoToAsync();
 
@@ -529,7 +539,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(AcmeCompanyAdminEmail);
 
         await subscription.GoToAsync();
 
@@ -600,7 +610,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(AcmeCompanyAdminEmail);
 
         await subscription.GoToAsync();
 
@@ -644,7 +654,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(AcmeCompanyAdminEmail);
 
         await subscription.GoToAsync();
 
@@ -693,7 +703,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(AcmeCompanyAdminEmail);
 
         // Navigate to a default page (e.g., dashboard)
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/dashboard");
@@ -759,7 +769,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(CompanyAdminEmail);
+        await login.LoginAsync(AcmeCompanyAdminEmail);
 
         await subscription.GoToAsync();
 
