@@ -31,19 +31,22 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Note: This suite uses isolated test companies per test to avoid parallel execution
 /// conflicts (tests run at maxParallelThreads=15). Each test that mutates subscription
 /// state creates or reuses a dedicated company fixture with a predictable state.
-/// Acme tests (trial, access control) use Acme Corporation (seeded with trial subscription).
-/// Beta Corp tests (active, lifecycle) use Beta Corp (seeded with active subscription).
+/// Acme tests (access control) use Acme Corporation (seeded with active subscription).
+/// Beta Corp tests (active subscription lifecycle) use Beta Corp (seeded with active subscription).
+/// For tests requiring trial state, a dedicated trial company is created via the signup flow.
 /// Stripe navigation is tested via URL verification only — no actual Stripe integration.
+/// Each state-mutating test must establish and restore its own subscription state to avoid
+/// interfering with parallel tests or subsequent tests in sequence.
 /// </summary>
 public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixture)
     : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     // ── Companies ──────────────────────────────────────────────────────────────
 
-    // Acme Corporation — seeded with trial subscription, used for trial/access control tests.
+    // Acme Corporation — seeded with active subscription, used for access control tests.
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    // Beta Corp — seeded with active subscription, used for active/lifecycle tests.
+    // Beta Corp — seeded with active subscription, used for subscription lifecycle tests.
     private static readonly Guid BetaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
 
     // ── Personas ───────────────────────────────────────────────────────────────
@@ -79,6 +82,9 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
         await login.GoToAsync();
         await login.LoginAsync(AcmeCompanyAdminEmail);
+
+        // Verify company ID matches expected tenant to catch persona errors early
+        await VerifyCompanyIdAfterLoginAsync(AcmeId, AcmeCompanyAdminEmail);
 
         // Navigation should not throw — the page loads successfully for this role.
         await subscription.GoToAsync();
@@ -460,7 +466,13 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         await login.GoToAsync();
         await login.LoginAsync(BetaCompanyAdminEmail);
 
+        // Verify company ID matches expected tenant to catch persona errors early
+        await VerifyCompanyIdAfterLoginAsync(BetaCorpId, BetaCompanyAdminEmail);
+
         await subscription.GoToAsync();
+
+        // Ensure Beta Corp is in Active state (restores if previous test left it cancelled)
+        await EnsureBetaCorpActiveSubscriptionAsync();
 
         // Verify we start with an Active subscription
         var initialStatus = await subscription.GetSubscriptionStatusAsync();
@@ -531,9 +543,15 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         await login.GoToAsync();
         await login.LoginAsync(BetaCompanyAdminEmail);
 
+        // Verify company ID matches expected tenant to catch persona errors early
+        await VerifyCompanyIdAfterLoginAsync(BetaCorpId, BetaCompanyAdminEmail);
+
         await subscription.GoToAsync();
 
-        // First, get subscription to Active state if needed, then cancel it
+        // Ensure Beta Corp is in Active state first
+        await EnsureBetaCorpActiveSubscriptionAsync();
+
+        // Now cancel it to establish the "Scheduled for cancellation" state needed for this test
         var status = await subscription.GetSubscriptionStatusAsync();
         if (!(status?.Equals("Scheduled for cancellation", StringComparison.OrdinalIgnoreCase) ?? false))
         {
@@ -808,5 +826,68 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
         // All methods executed without throwing
         Assert.True(true, "All SubscriptionBillingPage methods exercised successfully");
+    }
+
+    /// <summary>
+    /// Verifies that the logged-in user's company ID matches the expected company.
+    /// Catches persona/company mismatch errors early by validating the /api/me response.
+    /// </summary>
+    private async Task VerifyCompanyIdAfterLoginAsync(Guid expectedCompanyId, string email)
+    {
+        try
+        {
+            // The api/me endpoint returns the current user's profile, including companyId
+            var apiResponse = await _page.Context.APIRequest.GetAsync($"{_fixture.ApiBaseUrl}/api/me");
+            Assert.True(apiResponse.Ok, $"Expected /api/me to return 200, but got {apiResponse.Status} for {email}");
+
+            var json = await apiResponse.JsonAsync();
+            if (json is not null && json.TryGetProperty("companyId", out var companyIdElement))
+            {
+                if (companyIdElement.ValueKind == System.Text.Json.JsonValueKind.String)
+                {
+                    var returnedCompanyId = Guid.Parse(companyIdElement.GetString() ?? "");
+                    Assert.Equal(expectedCompanyId, returnedCompanyId,
+                        $"Company ID mismatch for {email}: expected {expectedCompanyId} but got {returnedCompanyId}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Assert.Fail($"Failed to verify company ID for {email}: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Ensures Beta Corp's subscription is in Active state, idempotently restoring it
+    /// if a previous test left it in Cancelled state. Called at the start of each
+    /// state-mutating subscription test to establish a predictable starting state.
+    /// </summary>
+    private async Task EnsureBetaCorpActiveSubscriptionAsync()
+    {
+        var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
+
+        // Already on subscription page from test setup
+        var currentStatus = await subscription.GetSubscriptionStatusAsync();
+
+        if (currentStatus?.Equals("Scheduled for cancellation", StringComparison.OrdinalIgnoreCase) ?? false)
+        {
+            // Subscription is cancelled — resume it to get back to Active
+            if (await subscription.HasResumeButtonAsync())
+            {
+                await subscription.ClickResumeAsync();
+                await subscription.GetSuccessMessageAsync(); // Wait for success message
+                await _page.WaitForTimeoutAsync(500);
+
+                // Reload to ensure fresh state
+                await _page.ReloadAsync();
+                await _page.WaitForSelectorAsync(".card-header h5", new() { Timeout = 20_000 });
+            }
+        }
+
+        // Verify we're now in Active state
+        var finalStatus = await subscription.GetSubscriptionStatusAsync();
+        Assert.True(
+            finalStatus?.Equals("Active", StringComparison.OrdinalIgnoreCase) ?? false,
+            $"Expected Beta Corp subscription to be Active, but got '{finalStatus}'");
     }
 }
