@@ -475,6 +475,8 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     ///
     /// Uses try/finally to guarantee cleanup: Beta Corp is restored to Active state
     /// regardless of assertion failures, ensuring subsequent tests receive a predictable state.
+    ///
+    /// Concurrency protection: semaphore covers entire test (arrange → act → verify → cleanup).
     /// </summary>
     [Fact]
     public async Task ActiveSubscription_Cancel_ShowsConfirmation_AndSchedulesCancellation()
@@ -491,95 +493,106 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
         await subscription.GoToAsync();
 
-        // Ensure Beta Corp is in Active state (restores if previous test left it cancelled)
-        await EnsureBetaCorpActiveSubscriptionAsync();
-
-        Exception? scenarioException = null;
-        Exception? cleanupException = null;
-
+        // ── ACQUIRE SEMAPHORE: Protect entire test from arrange through cleanup ──
+        await BetaCorpCleanupSemaphore.WaitAsync();
         try
         {
-            // Verify we start with an Active subscription
-            var initialStatus = await subscription.GetSubscriptionStatusAsync();
-            Assert.True(
-                initialStatus?.Equals("Active", StringComparison.OrdinalIgnoreCase) ?? false,
-                $"Expected initial status to be 'Active', but got '{initialStatus}'");
+            // ── ARRANGE: Ensure Beta Corp is in Active state ──
+            await EnsureBetaCorpActiveSubscriptionAsync();
 
-            // Step 1: Click "Cancel subscription" button
-            await subscription.ClickCancelAsync();
+            Exception? scenarioException = null;
+            Exception? cleanupException = null;
 
-            // Step 2: Verify confirmation dialog appears
-            Assert.True(await subscription.IsCancelConfirmDialogVisibleAsync(),
-                "Expected cancel confirmation dialog to be visible");
+            try
+            {
+                // ── ACT & ASSERT ──
+                // Verify we start with an Active subscription
+                var initialStatus = await subscription.GetSubscriptionStatusAsync();
+                Assert.True(
+                    initialStatus?.Equals("Active", StringComparison.OrdinalIgnoreCase) ?? false,
+                    $"Expected initial status to be 'Active', but got '{initialStatus}'");
 
-            // Step 3: Confirm the cancellation
-            await subscription.ConfirmCancelAsync();
+                // Step 1: Click "Cancel subscription" button
+                await subscription.ClickCancelAsync();
 
-            // Step 4: Verify success message appears
-            var successMessage = await subscription.GetSuccessMessageAsync();
-            Assert.False(string.IsNullOrWhiteSpace(successMessage),
-                "Expected success message after cancellation");
+                // Step 2: Verify confirmation dialog appears
+                Assert.True(await subscription.IsCancelConfirmDialogVisibleAsync(),
+                    "Expected cancel confirmation dialog to be visible");
 
-            // Step 5: Verify status changed (should now show as "Scheduled for cancellation" or similar)
-            // Wait a moment for state to update
-            await _page.WaitForTimeoutAsync(500);
+                // Step 3: Confirm the cancellation
+                await subscription.ConfirmCancelAsync();
 
-            var newStatus = await subscription.GetSubscriptionStatusAsync();
-            Assert.NotEqual(initialStatus ?? "", newStatus ?? "");
+                // Step 4: Verify success message appears
+                var successMessage = await subscription.GetSuccessMessageAsync();
+                Assert.False(string.IsNullOrWhiteSpace(successMessage),
+                    "Expected success message after cancellation");
 
-            // Step 6: Verify cancellation warning is now visible
-            Assert.True(await subscription.HasCancellationWarningAsync(),
-                "Expected cancellation warning to appear after scheduling cancellation");
+                // Step 5: Verify status changed (should now show as "Scheduled for cancellation" or similar)
+                // Wait a moment for state to update
+                await _page.WaitForTimeoutAsync(500);
 
-            // Step 7: Verify that "Resume" button is now visible (only after CancelAtPeriodEnd = true)
-            Assert.True(await subscription.HasResumeButtonAsync(),
-                "Expected 'Resume subscription' button to be visible after scheduling cancellation");
+                var newStatus = await subscription.GetSubscriptionStatusAsync();
+                Assert.NotEqual(initialStatus ?? "", newStatus ?? "");
 
-            // Verify "Cancel" button is now hidden (cannot cancel an already-cancelled subscription)
-            Assert.False(await subscription.HasCancelButtonAsync(),
-                "Expected 'Cancel subscription' button to be hidden after scheduling cancellation");
-        }
-        catch (Exception ex)
-        {
-            // Capture original test failure for dual-failure reporting in cleanup
-            scenarioException = ex;
+                // Step 6: Verify cancellation warning is now visible
+                Assert.True(await subscription.HasCancellationWarningAsync(),
+                    "Expected cancellation warning to appear after scheduling cancellation");
+
+                // Step 7: Verify that "Resume" button is now visible (only after CancelAtPeriodEnd = true)
+                Assert.True(await subscription.HasResumeButtonAsync(),
+                    "Expected 'Resume subscription' button to be visible after scheduling cancellation");
+
+                // Verify "Cancel" button is now hidden (cannot cancel an already-cancelled subscription)
+                Assert.False(await subscription.HasCancelButtonAsync(),
+                    "Expected 'Cancel subscription' button to be hidden after scheduling cancellation");
+            }
+            catch (Exception ex)
+            {
+                // Capture original test failure for dual-failure reporting in cleanup
+                scenarioException = ex;
+            }
+            finally
+            {
+                // ───────────────────────────────────────────────────────────────────────────────
+                // CLEANUP: Restore subscription to Active state for parallel test safety.
+                // This runs regardless of assertion failures above, ensuring Beta Corp is ready
+                // for the next test (or the next run of this test).
+                // ───────────────────────────────────────────────────────────────────────────────
+                try
+                {
+                    await RestoreBetaCorpToActiveInternalAsync("ActiveSubscription_Cancel_ShowsConfirmation_AndSchedulesCancellation");
+                }
+                catch (Exception cleanupEx)
+                {
+                    // Capture cleanup failure for dual-failure reporting
+                    cleanupException = cleanupEx;
+                }
+
+                // Report failures with clarity: scenario failure takes precedence, but cleanup
+                // failure is also visible so it doesn't go unnoticed.
+                if (scenarioException is not null && cleanupException is not null)
+                {
+                    throw new AggregateException(
+                        $"SCENARIO FAILED and CLEANUP FAILED. Scenario: {scenarioException.Message}. " +
+                        $"Cleanup: {cleanupException.Message}",
+                        scenarioException, cleanupException);
+                }
+
+                if (scenarioException is not null)
+                {
+                    throw scenarioException;
+                }
+
+                if (cleanupException is not null)
+                {
+                    throw cleanupException;
+                }
+            }
         }
         finally
         {
-            // ───────────────────────────────────────────────────────────────────────────────
-            // CLEANUP: Restore subscription to Active state for parallel test safety.
-            // This runs regardless of assertion failures above, ensuring Beta Corp is ready
-            // for the next test (or the next run of this test).
-            // ───────────────────────────────────────────────────────────────────────────────
-            try
-            {
-                await RestoreBetaCorpToActiveAsync("ActiveSubscription_Cancel_ShowsConfirmation_AndSchedulesCancellation");
-            }
-            catch (Exception cleanupEx)
-            {
-                // Capture cleanup failure for dual-failure reporting
-                cleanupException = cleanupEx;
-            }
-
-            // Report failures with clarity: scenario failure takes precedence, but cleanup
-            // failure is also visible so it doesn't go unnoticed.
-            if (scenarioException is not null && cleanupException is not null)
-            {
-                throw new AggregateException(
-                    $"SCENARIO FAILED and CLEANUP FAILED. Scenario: {scenarioException.Message}. " +
-                    $"Cleanup: {cleanupException.Message}",
-                    scenarioException, cleanupException);
-            }
-
-            if (scenarioException is not null)
-            {
-                throw scenarioException;
-            }
-
-            if (cleanupException is not null)
-            {
-                throw cleanupException;
-            }
+            // ── RELEASE SEMAPHORE ──
+            BetaCorpCleanupSemaphore.Release();
         }
     }
 
@@ -591,6 +604,8 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     ///
     /// Uses try/finally to guarantee cleanup: Beta Corp is restored to Active state
     /// regardless of assertion failures, ensuring subsequent tests receive a predictable state.
+    ///
+    /// Concurrency protection: semaphore covers entire test (arrange → act → verify → cleanup).
     /// </summary>
     [Fact]
     public async Task CancelledSubscription_Resume_RestoresActiveState()
@@ -607,109 +622,120 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
         await subscription.GoToAsync();
 
-        // Ensure Beta Corp is in Active state first
-        await EnsureBetaCorpActiveSubscriptionAsync();
-
-        Exception? scenarioException = null;
-        Exception? cleanupException = null;
-
+        // ── ACQUIRE SEMAPHORE: Protect entire test from arrange through cleanup ──
+        await BetaCorpCleanupSemaphore.WaitAsync();
         try
         {
-            // Now cancel it to establish the "Scheduled for cancellation" state needed for this test
-            var status = await subscription.GetSubscriptionStatusAsync();
-            if (!(status?.Equals("Scheduled for cancellation", StringComparison.OrdinalIgnoreCase) ?? false))
+            // ── ARRANGE: Ensure Beta Corp is in Active state ──
+            await EnsureBetaCorpActiveSubscriptionAsync();
+
+            Exception? scenarioException = null;
+            Exception? cleanupException = null;
+
+            try
             {
-                // If not already cancelled, cancel it first
-                if (await subscription.HasCancelButtonAsync())
+                // ── ACT & ASSERT ──
+                // Now cancel it to establish the "Scheduled for cancellation" state needed for this test
+                var status = await subscription.GetSubscriptionStatusAsync();
+                if (!(status?.Equals("Scheduled for cancellation", StringComparison.OrdinalIgnoreCase) ?? false))
                 {
-                    await subscription.ClickCancelAsync();
-                    if (await subscription.IsCancelConfirmDialogVisibleAsync())
+                    // If not already cancelled, cancel it first
+                    if (await subscription.HasCancelButtonAsync())
                     {
-                        await subscription.ConfirmCancelAsync();
+                        await subscription.ClickCancelAsync();
+                        if (await subscription.IsCancelConfirmDialogVisibleAsync())
+                        {
+                            await subscription.ConfirmCancelAsync();
+                        }
                     }
+                    // Wait for state to update
+                    await _page.WaitForTimeoutAsync(1000);
+                    await _page.ReloadAsync();
+                    await _page.WaitForSelectorAsync(".card-header h5", new() { Timeout = 20_000 });
                 }
-                // Wait for state to update
-                await _page.WaitForTimeoutAsync(1000);
-                await _page.ReloadAsync();
-                await _page.WaitForSelectorAsync(".card-header h5", new() { Timeout = 20_000 });
+
+                // Now we should be in cancelled-at-period-end state
+                var cancelledStatus = await subscription.GetSubscriptionStatusAsync();
+
+                // Verify we have the Resume button
+                Assert.True(await subscription.HasResumeButtonAsync(),
+                    "Expected 'Resume subscription' button to be visible for cancelled subscription");
+
+                // Verify cancellation warning is shown
+                Assert.True(await subscription.HasCancellationWarningAsync(),
+                    "Expected cancellation warning for cancelled subscription");
+
+                // Step 1: Click "Resume subscription"
+                await subscription.ClickResumeAsync();
+
+                // Step 2: Verify success message appears
+                var successMessage = await subscription.GetSuccessMessageAsync();
+                Assert.False(string.IsNullOrWhiteSpace(successMessage),
+                    "Expected success message after resuming subscription");
+
+                // Step 3: Verify status returned to Active (or equivalent)
+                var resumedStatus = await subscription.GetSubscriptionStatusAsync();
+                Assert.NotEqual(cancelledStatus ?? "", resumedStatus ?? "");
+
+                // Step 4: Verify cancellation warning is gone
+                Assert.False(await subscription.HasCancellationWarningAsync(),
+                    "Expected cancellation warning to disappear after resuming");
+
+                // Step 5: Verify "Resume" button is hidden again
+                Assert.False(await subscription.HasResumeButtonAsync(),
+                    "Expected 'Resume subscription' button to be hidden after resuming");
+
+                // Verify "Cancel" button is visible again
+                Assert.True(await subscription.HasCancelButtonAsync(),
+                    "Expected 'Cancel subscription' button to return after resuming");
             }
+            catch (Exception ex)
+            {
+                // Capture original test failure for dual-failure reporting in cleanup
+                scenarioException = ex;
+            }
+            finally
+            {
+                // ───────────────────────────────────────────────────────────────────────────────
+                // CLEANUP: Restore subscription to Active state for parallel test safety.
+                // This runs regardless of assertion failures above, ensuring Beta Corp is ready
+                // for the next test (or the next run of this test).
+                // ───────────────────────────────────────────────────────────────────────────────
+                try
+                {
+                    await RestoreBetaCorpToActiveInternalAsync("CancelledSubscription_Resume_RestoresActiveState");
+                }
+                catch (Exception cleanupEx)
+                {
+                    // Capture cleanup failure for dual-failure reporting
+                    cleanupException = cleanupEx;
+                }
 
-            // Now we should be in cancelled-at-period-end state
-            var cancelledStatus = await subscription.GetSubscriptionStatusAsync();
+                // Report failures with clarity: scenario failure takes precedence, but cleanup
+                // failure is also visible so it doesn't go unnoticed.
+                if (scenarioException is not null && cleanupException is not null)
+                {
+                    throw new AggregateException(
+                        $"SCENARIO FAILED and CLEANUP FAILED. Scenario: {scenarioException.Message}. " +
+                        $"Cleanup: {cleanupException.Message}",
+                        scenarioException, cleanupException);
+                }
 
-            // Verify we have the Resume button
-            Assert.True(await subscription.HasResumeButtonAsync(),
-                "Expected 'Resume subscription' button to be visible for cancelled subscription");
+                if (scenarioException is not null)
+                {
+                    throw scenarioException;
+                }
 
-            // Verify cancellation warning is shown
-            Assert.True(await subscription.HasCancellationWarningAsync(),
-                "Expected cancellation warning for cancelled subscription");
-
-            // Step 1: Click "Resume subscription"
-            await subscription.ClickResumeAsync();
-
-            // Step 2: Verify success message appears
-            var successMessage = await subscription.GetSuccessMessageAsync();
-            Assert.False(string.IsNullOrWhiteSpace(successMessage),
-                "Expected success message after resuming subscription");
-
-            // Step 3: Verify status returned to Active (or equivalent)
-            var resumedStatus = await subscription.GetSubscriptionStatusAsync();
-            Assert.NotEqual(cancelledStatus ?? "", resumedStatus ?? "");
-
-            // Step 4: Verify cancellation warning is gone
-            Assert.False(await subscription.HasCancellationWarningAsync(),
-                "Expected cancellation warning to disappear after resuming");
-
-            // Step 5: Verify "Resume" button is hidden again
-            Assert.False(await subscription.HasResumeButtonAsync(),
-                "Expected 'Resume subscription' button to be hidden after resuming");
-
-            // Verify "Cancel" button is visible again
-            Assert.True(await subscription.HasCancelButtonAsync(),
-                "Expected 'Cancel subscription' button to return after resuming");
-        }
-        catch (Exception ex)
-        {
-            // Capture original test failure for dual-failure reporting in cleanup
-            scenarioException = ex;
+                if (cleanupException is not null)
+                {
+                    throw cleanupException;
+                }
+            }
         }
         finally
         {
-            // ───────────────────────────────────────────────────────────────────────────────
-            // CLEANUP: Restore subscription to Active state for parallel test safety.
-            // This runs regardless of assertion failures above, ensuring Beta Corp is ready
-            // for the next test (or the next run of this test).
-            // ───────────────────────────────────────────────────────────────────────────────
-            try
-            {
-                await RestoreBetaCorpToActiveAsync("CancelledSubscription_Resume_RestoresActiveState");
-            }
-            catch (Exception cleanupEx)
-            {
-                // Capture cleanup failure for dual-failure reporting
-                cleanupException = cleanupEx;
-            }
-
-            // Report failures with clarity: scenario failure takes precedence, but cleanup
-            // failure is also visible so it doesn't go unnoticed.
-            if (scenarioException is not null && cleanupException is not null)
-            {
-                throw new AggregateException(
-                    $"SCENARIO FAILED and CLEANUP FAILED. Scenario: {scenarioException.Message}. " +
-                    $"Cleanup: {cleanupException.Message}",
-                    scenarioException, cleanupException);
-            }
-
-            if (scenarioException is not null)
-            {
-                throw scenarioException;
-            }
-
-            if (cleanupException is not null)
-            {
-                throw cleanupException;
-            }
+            // ── RELEASE SEMAPHORE ──
+            BetaCorpCleanupSemaphore.Release();
         }
     }
 
@@ -721,6 +747,8 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     ///
     /// Uses try/finally for consistency: even though this test doesn't mutate state,
     /// the finally block ensures cleanup if any assertion fails before the dialog is dismissed.
+    ///
+    /// Concurrency protection: semaphore covers entire test (arrange → act → verify → cleanup).
     /// </summary>
     [Fact]
     public async Task CancelDialog_DismissBySaying_KeepSubscription_DoesNotChange()
@@ -734,80 +762,91 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
         await subscription.GoToAsync();
 
-        // Ensure Beta Corp is in Active state
-        await EnsureBetaCorpActiveSubscriptionAsync();
-
-        Exception? scenarioException = null;
-        Exception? cleanupException = null;
-
+        // ── ACQUIRE SEMAPHORE: Protect entire test from arrange through cleanup ──
+        await BetaCorpCleanupSemaphore.WaitAsync();
         try
         {
-            // Verify starting state
-            var initialStatus = await subscription.GetSubscriptionStatusAsync();
-            var initialHasCancelWarning = await subscription.HasCancellationWarningAsync();
+            // ── ARRANGE: Ensure Beta Corp is in Active state ──
+            await EnsureBetaCorpActiveSubscriptionAsync();
 
-            // Step 1: Click "Cancel subscription"
-            await subscription.ClickCancelAsync();
+            Exception? scenarioException = null;
+            Exception? cleanupException = null;
 
-            // Step 2: Verify dialog is visible
-            Assert.True(await subscription.IsCancelConfirmDialogVisibleAsync(),
-                "Expected cancel confirmation dialog to be visible");
+            try
+            {
+                // ── ACT & ASSERT ──
+                // Verify starting state
+                var initialStatus = await subscription.GetSubscriptionStatusAsync();
+                var initialHasCancelWarning = await subscription.HasCancellationWarningAsync();
 
-            // Step 3: Click "Keep subscription" (dismissal)
-            await subscription.CancelCancelAsync();
+                // Step 1: Click "Cancel subscription"
+                await subscription.ClickCancelAsync();
 
-            // Step 4: Verify dialog is dismissed
-            Assert.False(await subscription.IsCancelConfirmDialogVisibleAsync(),
-                "Expected cancel dialog to be dismissed");
+                // Step 2: Verify dialog is visible
+                Assert.True(await subscription.IsCancelConfirmDialogVisibleAsync(),
+                    "Expected cancel confirmation dialog to be visible");
 
-            // Step 5: Verify state unchanged
-            var newStatus = await subscription.GetSubscriptionStatusAsync();
-            Assert.Equal(initialStatus ?? "", newStatus ?? "");
+                // Step 3: Click "Keep subscription" (dismissal)
+                await subscription.CancelCancelAsync();
 
-            var newHasCancelWarning = await subscription.HasCancellationWarningAsync();
-            Assert.Equal(initialHasCancelWarning, newHasCancelWarning);
-        }
-        catch (Exception ex)
-        {
-            // Capture original test failure for dual-failure reporting in cleanup
-            scenarioException = ex;
+                // Step 4: Verify dialog is dismissed
+                Assert.False(await subscription.IsCancelConfirmDialogVisibleAsync(),
+                    "Expected cancel dialog to be dismissed");
+
+                // Step 5: Verify state unchanged
+                var newStatus = await subscription.GetSubscriptionStatusAsync();
+                Assert.Equal(initialStatus ?? "", newStatus ?? "");
+
+                var newHasCancelWarning = await subscription.HasCancellationWarningAsync();
+                Assert.Equal(initialHasCancelWarning, newHasCancelWarning);
+            }
+            catch (Exception ex)
+            {
+                // Capture original test failure for dual-failure reporting in cleanup
+                scenarioException = ex;
+            }
+            finally
+            {
+                // ───────────────────────────────────────────────────────────────────────────────
+                // CLEANUP: Restore subscription to Active state for consistency.
+                // Even though this test doesn't mutate state (cancellation is dismissed),
+                // cleanup ensures Beta Corp is in predictable state if any assertion fails.
+                // ───────────────────────────────────────────────────────────────────────────────
+                try
+                {
+                    await RestoreBetaCorpToActiveInternalAsync("CancelDialog_DismissBySaying_KeepSubscription_DoesNotChange");
+                }
+                catch (Exception cleanupEx)
+                {
+                    // Capture cleanup failure for dual-failure reporting
+                    cleanupException = cleanupEx;
+                }
+
+                // Report failures with clarity: scenario failure takes precedence, but cleanup
+                // failure is also visible so it doesn't go unnoticed.
+                if (scenarioException is not null && cleanupException is not null)
+                {
+                    throw new AggregateException(
+                        $"SCENARIO FAILED and CLEANUP FAILED. Scenario: {scenarioException.Message}. " +
+                        $"Cleanup: {cleanupException.Message}",
+                        scenarioException, cleanupException);
+                }
+
+                if (scenarioException is not null)
+                {
+                    throw scenarioException;
+                }
+
+                if (cleanupException is not null)
+                {
+                    throw cleanupException;
+                }
+            }
         }
         finally
         {
-            // ───────────────────────────────────────────────────────────────────────────────
-            // CLEANUP: Restore subscription to Active state for consistency.
-            // Even though this test doesn't mutate state (cancellation is dismissed),
-            // cleanup ensures Beta Corp is in predictable state if any assertion fails.
-            // ───────────────────────────────────────────────────────────────────────────────
-            try
-            {
-                await RestoreBetaCorpToActiveAsync("CancelDialog_DismissBySaying_KeepSubscription_DoesNotChange");
-            }
-            catch (Exception cleanupEx)
-            {
-                // Capture cleanup failure for dual-failure reporting
-                cleanupException = cleanupEx;
-            }
-
-            // Report failures with clarity: scenario failure takes precedence, but cleanup
-            // failure is also visible so it doesn't go unnoticed.
-            if (scenarioException is not null && cleanupException is not null)
-            {
-                throw new AggregateException(
-                    $"SCENARIO FAILED and CLEANUP FAILED. Scenario: {scenarioException.Message}. " +
-                    $"Cleanup: {cleanupException.Message}",
-                    scenarioException, cleanupException);
-            }
-
-            if (scenarioException is not null)
-            {
-                throw scenarioException;
-            }
-
-            if (cleanupException is not null)
-            {
-                throw cleanupException;
-            }
+            // ── RELEASE SEMAPHORE ──
+            BetaCorpCleanupSemaphore.Release();
         }
     }
 
@@ -1028,6 +1067,8 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     ///
     /// Uses the REST API (not browser UI) to resume subscription for reliability —
     /// works regardless of UI state and defers browser navigation to the test itself.
+    ///
+    /// Assumes semaphore already acquired by the test method.
     /// </summary>
     private async Task EnsureBetaCorpActiveSubscriptionAsync()
     {
@@ -1039,7 +1080,8 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         if (currentStatus?.Equals("Scheduled for cancellation", StringComparison.OrdinalIgnoreCase) ?? false)
         {
             // Subscription is cancelled — use API to resume it for reliability
-            await RestoreBetaCorpToActiveAsync("EnsureBetaCorpActiveSubscriptionAsync");
+            // Use internal method (assumes semaphore already acquired by test)
+            await RestoreBetaCorpToActiveInternalAsync("EnsureBetaCorpActiveSubscriptionAsync");
 
             // Reload to see fresh state
             await _page.ReloadAsync();
@@ -1055,6 +1097,34 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
     /// <summary>
     /// Restores Beta Corp's subscription to Active state via authenticated API call.
+    /// This is the public method that acquires the semaphore. Use this for cleanup
+    /// operations that need to serialize across parallel tests.
+    ///
+    /// For operations within a test method that already holds the semaphore,
+    /// use RestoreBetaCorpToActiveInternalAsync instead.
+    /// </summary>
+    private static readonly SemaphoreSlim BetaCorpCleanupSemaphore = new(1, 1);
+    private const string CharlieWilsonUserId = "30000000-0000-0000-0000-000000000018";
+
+    private async Task RestoreBetaCorpToActiveAsync(string callerContext)
+    {
+        // Public method: acquire semaphore for exclusive access
+        await BetaCorpCleanupSemaphore.WaitAsync();
+        try
+        {
+            await RestoreBetaCorpToActiveInternalAsync(callerContext);
+        }
+        finally
+        {
+            BetaCorpCleanupSemaphore.Release();
+        }
+    }
+
+    /// <summary>
+    /// Internal restoration method that assumes the semaphore is already acquired.
+    /// Used by test methods that wrap their entire test logic (arrange → act/assert → cleanup)
+    /// inside a semaphore guard to ensure exclusive access to Beta Corp's subscription state.
+    ///
     /// Safe to invoke after:
     /// - Failed assertions (UI state may be partial or corrupted)
     /// - Closed dialogs or navigations
@@ -1069,14 +1139,9 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     /// - Fails test visibly if 401/403/400/timeout/connection errors occur
     ///
     /// State Verification:
-    /// - Confirms via GET /api/companies/subscription that CancelAtPeriodEnd = false
+    /// - Confirms via GET /api/companies/subscription-details that Status=Active, CancelAtPeriodEnd=false
     /// - Fails test if final state cannot be verified
     /// - Independent of UI reload, proving server-side restoration
-    ///
-    /// Concurrency Protection:
-    /// - Uses static semaphore to protect shared Beta Corp fixture
-    /// - Serializes mutations and verifications across parallel test runs
-    /// - Prevents race between test mutation and other test's cleanup
     ///
     /// Failure Reporting:
     /// - Captures original test exception (if any) before cleanup
@@ -1084,108 +1149,110 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     /// - If both scenario and cleanup fail, test output includes both exceptions
     /// - Cleanup failures are visible, not swallowed
     /// </summary>
-    private static readonly SemaphoreSlim BetaCorpCleanupSemaphore = new(1, 1);
-    private const string CharlieWilsonUserId = "30000000-0000-0000-0000-000000000018";
-
-    private async Task RestoreBetaCorpToActiveAsync(string callerContext)
+    private async Task RestoreBetaCorpToActiveInternalAsync(string callerContext)
     {
-        // Use semaphore to serialize Beta Corp mutations across parallel tests
-        await BetaCorpCleanupSemaphore.WaitAsync();
-        try
-        {
-            // Step 1: Obtain authenticated access token via /api/dev/persona endpoint
-            var token = await GetAuthenticatedTokenForCharlieWilsonAsync();
-            if (string.IsNullOrEmpty(token))
-            {
-                throw new InvalidOperationException(
-                    $"[RestoreBetaCorpToActiveAsync] Failed to obtain access token for Charlie Wilson from {callerContext}");
-            }
+        // Assumes semaphore already acquired by caller
 
-            // Step 2: Resume subscription with Authorization header
-            var resumeUrl = $"{_fixture.ApiBaseUrl}/api/companies/subscription/resume";
-            var apiResponse = await _page.Context.APIRequest.PostAsync(
-                resumeUrl,
-                new APIRequestContextOptions
+        // Step 1: Obtain authenticated access token via /api/dev/persona endpoint
+        var token = await GetAuthenticatedTokenForCharlieWilsonAsync();
+        if (string.IsNullOrEmpty(token))
+        {
+            throw new InvalidOperationException(
+                $"[RestoreBetaCorpToActiveInternalAsync] Failed to obtain access token for Charlie Wilson from {callerContext}");
+        }
+
+        // Step 2: Resume subscription with Authorization header
+        var resumeUrl = $"{_fixture.ApiBaseUrl}/api/companies/subscription/resume";
+        var apiResponse = await _page.Context.APIRequest.PostAsync(
+            resumeUrl,
+            new APIRequestContextOptions
+            {
+                Headers = new Dictionary<string, string>
                 {
-                    Headers = new Dictionary<string, string>
-                    {
-                        ["Authorization"] = $"Bearer {token}"
-                    }
-                });
+                    ["Authorization"] = $"Bearer {token}"
+                }
+            });
 
-            // Step 3: Validate resume response — any non-2xx is a failure
-            if (!apiResponse.Ok)
+        // Step 3: Validate resume response — any non-2xx is a failure
+        if (!apiResponse.Ok)
+        {
+            var errorBody = await apiResponse.TextAsync();
+            throw new InvalidOperationException(
+                $"[RestoreBetaCorpToActiveInternalAsync] Resume subscription API returned {apiResponse.Status} " +
+                $"from {callerContext}. URL: {resumeUrl}\nResponse: {errorBody}");
+        }
+
+        // Step 4: Verify final state via GET /api/companies/subscription-details (correct endpoint)
+        var stateUrl = $"{_fixture.ApiBaseUrl}/api/companies/subscription-details";
+        var stateResponse = await _page.Context.APIRequest.GetAsync(
+            stateUrl,
+            new APIRequestContextOptions
             {
-                var errorBody = await apiResponse.TextAsync();
-                throw new InvalidOperationException(
-                    $"[RestoreBetaCorpToActiveAsync] Resume subscription API returned {apiResponse.Status} " +
-                    $"from {callerContext}. URL: {resumeUrl}\nResponse: {errorBody}");
-            }
-
-            // Step 4: Verify final state via GET /api/companies/subscription
-            var stateUrl = $"{_fixture.ApiBaseUrl}/api/companies/subscription";
-            var stateResponse = await _page.Context.APIRequest.GetAsync(
-                stateUrl,
-                new APIRequestContextOptions
+                Headers = new Dictionary<string, string>
                 {
-                    Headers = new Dictionary<string, string>
-                    {
-                        ["Authorization"] = $"Bearer {token}"
-                    }
-                });
+                    ["Authorization"] = $"Bearer {token}"
+                }
+            });
 
-            if (!stateResponse.Ok)
-            {
-                var errorBody = await stateResponse.TextAsync();
-                throw new InvalidOperationException(
-                    $"[RestoreBetaCorpToActiveAsync] State verification GET returned {stateResponse.Status} " +
-                    $"from {callerContext}. URL: {stateUrl}\nResponse: {errorBody}");
-            }
-
-            // Step 5: Parse response and confirm CancelAtPeriodEnd = false
-            var json = await stateResponse.JsonAsync();
-            if (!json.HasValue)
-            {
-                throw new InvalidOperationException(
-                    $"[RestoreBetaCorpToActiveAsync] State verification returned no JSON from {callerContext}");
-            }
-
-            if (!json.Value.TryGetProperty("cancelAtPeriodEnd", out var cancelAtPeriodEndElement))
-            {
-                throw new InvalidOperationException(
-                    $"[RestoreBetaCorpToActiveAsync] State response missing 'cancelAtPeriodEnd' field from {callerContext}");
-            }
-
-            var cancelAtPeriodEnd = false;
-            if (cancelAtPeriodEndElement.ValueKind == System.Text.Json.JsonValueKind.True)
-            {
-                cancelAtPeriodEnd = true;
-            }
-
-            if (cancelAtPeriodEnd)
-            {
-                throw new InvalidOperationException(
-                    $"[RestoreBetaCorpToActiveAsync] State verification failed: " +
-                    $"Beta Corp's subscription still has CancelAtPeriodEnd=true after resume from {callerContext}. " +
-                    $"Full response: {json.Value}");
-            }
-
-            // Success: restoration verified
-            System.Diagnostics.Debug.WriteLine(
-                $"[RestoreBetaCorpToActiveAsync] Successfully restored Beta Corp from {callerContext}: " +
-                $"CancelAtPeriodEnd=false confirmed");
-        }
-        catch (Exception ex)
+        if (!stateResponse.Ok)
         {
-            // Cleanup failure: report it visibly but include context to help diagnosis
-            System.Diagnostics.Debug.WriteLine(
-                $"[RestoreBetaCorpToActiveAsync] CLEANUP FAILED from {callerContext}:\n{ex}");
-            throw;
+            var errorBody = await stateResponse.TextAsync();
+            throw new InvalidOperationException(
+                $"[RestoreBetaCorpToActiveInternalAsync] State verification GET returned {stateResponse.Status} " +
+                $"from {callerContext}. URL: {stateUrl}\nResponse: {errorBody}");
         }
-        finally
+
+        // Step 5: Parse response and confirm Status=Active and CancelAtPeriodEnd=false
+        var json = await stateResponse.JsonAsync();
+        if (!json.HasValue)
         {
-            BetaCorpCleanupSemaphore.Release();
+            throw new InvalidOperationException(
+                $"[RestoreBetaCorpToActiveInternalAsync] State verification returned no JSON from {callerContext}");
         }
+
+        // Validate Status field
+        if (!json.Value.TryGetProperty("status", out var statusElement))
+        {
+            throw new InvalidOperationException(
+                $"[RestoreBetaCorpToActiveInternalAsync] State response missing 'status' field from {callerContext}. " +
+                $"Full response: {json.Value}");
+        }
+
+        var status = statusElement.GetString() ?? "";
+        if (!status.Equals("Active", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"[RestoreBetaCorpToActiveInternalAsync] Status verification failed: " +
+                $"Beta Corp's subscription status is '{status}' (expected 'Active') from {callerContext}. " +
+                $"Full response: {json.Value}");
+        }
+
+        // Validate CancelAtPeriodEnd field
+        if (!json.Value.TryGetProperty("cancelAtPeriodEnd", out var cancelAtPeriodEndElement))
+        {
+            throw new InvalidOperationException(
+                $"[RestoreBetaCorpToActiveInternalAsync] State response missing 'cancelAtPeriodEnd' field from {callerContext}. " +
+                $"Full response: {json.Value}");
+        }
+
+        var cancelAtPeriodEnd = false;
+        if (cancelAtPeriodEndElement.ValueKind == System.Text.Json.JsonValueKind.True)
+        {
+            cancelAtPeriodEnd = true;
+        }
+
+        if (cancelAtPeriodEnd)
+        {
+            throw new InvalidOperationException(
+                $"[RestoreBetaCorpToActiveInternalAsync] State verification failed: " +
+                $"Beta Corp's subscription still has CancelAtPeriodEnd=true after resume from {callerContext}. " +
+                $"Full response: {json.Value}");
+        }
+
+        // Success: restoration verified
+        System.Diagnostics.Debug.WriteLine(
+            $"[RestoreBetaCorpToActiveInternalAsync] Successfully restored Beta Corp from {callerContext}: " +
+            $"Status=Active, CancelAtPeriodEnd=false confirmed");
     }
 
     /// <summary>
