@@ -108,7 +108,7 @@ public class UpdatePlatformSettingsHandlerTests
     }
 
     private static UpdatePlatformSettingsHandler BuildHandler(
-        CompaniesDbContext context,
+        PlatformDbContext context,
         Guid actorId,
         HR.SharedKernel.IAuditEventPublisher publisher,
         DateTimeOffset now)
@@ -120,12 +120,12 @@ public class UpdatePlatformSettingsHandlerTests
             publisher);
     }
 
-    private static CompaniesDbContext BuildContext()
+    private static PlatformDbContext BuildContext()
     {
-        var options = new DbContextOptionsBuilder<CompaniesDbContext>()
+        var options = new DbContextOptionsBuilder<PlatformDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
 
-        return new CompaniesDbContext(options);
+        return new PlatformDbContext(options);
     }
 }

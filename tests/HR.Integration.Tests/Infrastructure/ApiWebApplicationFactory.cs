@@ -74,6 +74,10 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
                 ["Identity:RateLimits:identity-resend-verification:PermitLimit"] = "1000",
                 ["Identity:RateLimits:identity-accept-invite:PermitLimit"] = "1000",
                 ["Identity:RateLimits:identity-reset-password:PermitLimit"] = "1000",
+                // Ticket 1: Customer database assignments — test configuration for the resolver's
+                // database_key lookup path. "cust-test-db1" is a valid configured key; other keys
+                // are intentionally not configured to test the missing-config exception path.
+                ["CustomerDatabases:cust-test-db1:ConnectionString"] = "Host=localhost;Port=5432;Database=cust_test_db1;Username=postgres;Password=postgres",
             });
         });
 

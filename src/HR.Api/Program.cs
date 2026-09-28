@@ -99,6 +99,8 @@ builder.Services.AddFastEndpoints(o => o.IncludeAbstractValidators = true);
 builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
     o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddSingleton<IClock, SystemClock>();
+builder.Services.AddScoped<IClockProvider, SystemClockProvider>();
+builder.Services.AddScoped<ICompanyTimeProvider, CompanyTimeProvider>();
 // Ticket 3 (P1) final gap item 5: production default is a no-op. An integration test overrides this
 // registration (WebApplicationFactory ConfigureTestServices) with a fault-injecting double to
 // reproduce "committed, then the response failed" without any production code depending on test
@@ -239,6 +241,7 @@ var migrationRunner = app.Services.GetRequiredService<StartupMigrationRunner>();
 await migrationRunner.RunAsync("companies", app.Services, async sp =>
 {
 	await sp.MigrateCompaniesAsync();
+	await sp.MigratePlatformAsync();
 	await sp.SeedCompaniesAsync();
 });
 
@@ -497,6 +500,23 @@ app.UseCompaniesRecurringJobs();
 app.UseCompanyOnboardingRecurringJobs();
 app.UseDataImportRecurringJobs();
 app.UseLoggingMiddleware();
+
+// Ticket 1 Phase 3: middleware to catch CustomerDatabaseUnavailableException and return 503.
+app.Use(async (context, next) =>
+{
+	try
+	{
+		await next();
+	}
+	catch (HR.SharedKernel.CustomerDatabaseUnavailableException)
+	{
+		context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+		context.Response.ContentType = "application/json";
+		var response = new { error = "The assigned database is temporarily unavailable. Please try again later.", code = "database_unavailable" };
+		await context.Response.WriteAsJsonAsync(response);
+	}
+});
+
 // Trusted-proxy-only forwarded-header resolution (see IdentityRateLimiting.ConfigureTrustedProxies)
 // must run before routing/rate limiting so RemoteIpAddress is already the real client IP by the
 // time the identity rate-limit policies partition on it.

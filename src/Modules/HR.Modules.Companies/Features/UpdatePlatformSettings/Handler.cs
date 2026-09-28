@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore;
 namespace HR.Modules.Companies.Features.UpdatePlatformSettings;
 
 internal sealed class UpdatePlatformSettingsHandler(
-    CompaniesDbContext dbContext,
+    PlatformDbContext dbContext,
     ICurrentUser currentUser,
     IClock clock,
     IAuditEventPublisher auditEventPublisher)

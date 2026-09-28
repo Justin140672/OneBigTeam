@@ -1,14 +1,23 @@
 using HR.Modules.Assets.Persistence;
+using HR.SharedKernel;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Assets.Features.ListEmployeeAssets;
 
 internal sealed class ListEmployeeAssetsHandler(AssetsDbContext db)
 {
-    public async Task<List<ListEmployeeAssetsResponse>> HandleAsync(
+    public async Task<Result<List<ListEmployeeAssetsResponse>>> HandleAsync(
         ListEmployeeAssetsRequest request,
+        Guid? callerUserId,
         CancellationToken cancellationToken)
     {
+        // Inline authorization: only the employee themselves can view their own assets
+        // (HR admin check is handled by endpoint policy)
+        if (callerUserId != request.EmployeeId)
+            return Result.Failure<List<ListEmployeeAssetsResponse>>(
+                Error.Forbidden("You can only view your own assets."));
+
         var assignments = await db.AssetAssignments
             .AsNoTracking()
             .Where(aa => aa.CompanyId == request.CompanyId
@@ -18,7 +27,7 @@ internal sealed class ListEmployeeAssetsHandler(AssetsDbContext db)
             .ToListAsync(cancellationToken);
 
         if (assignments.Count == 0)
-            return [];
+            return Result.Success(new List<ListEmployeeAssetsResponse>());
 
         var assetIds = assignments.Select(aa => aa.AssetId).ToList();
 
@@ -33,7 +42,7 @@ internal sealed class ListEmployeeAssetsHandler(AssetsDbContext db)
             .Where(c => categoryIds.Contains(c.Id))
             .ToDictionaryAsync(c => c.Id, c => c.Name, cancellationToken);
 
-        return assignments
+        var result = assignments
             .Where(aa => assets.ContainsKey(aa.AssetId))
             .Select(aa =>
             {
@@ -55,5 +64,7 @@ internal sealed class ListEmployeeAssetsHandler(AssetsDbContext db)
                     aa.AcknowledgedAt is not null);
             })
             .ToList();
+
+        return Result.Success(result);
     }
 }

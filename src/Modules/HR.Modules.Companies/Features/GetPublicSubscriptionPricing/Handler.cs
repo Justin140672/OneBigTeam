@@ -12,7 +12,7 @@ namespace HR.Modules.Companies.Features.GetPublicSubscriptionPricing;
 /// persisted PlatformSettings pricing config, or <see cref="SubscriptionPricingConfig.Default"/>
 /// when the singleton has never been seeded. Never lazy-seeds (read-only, unauthenticated).
 /// </summary>
-internal sealed class GetPublicSubscriptionPricingHandler(CompaniesDbContext dbContext)
+internal sealed class GetPublicSubscriptionPricingHandler(PlatformDbContext dbContext)
 {
     public async Task<Result<GetPublicSubscriptionPricingResponse>> HandleAsync(
         GetPublicSubscriptionPricingRequest request,

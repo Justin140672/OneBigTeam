@@ -140,12 +140,12 @@ public class SubscriptionPricingConfigHandlerTests
         Assert.True(result.IsFailure);
     }
 
-    private static CompaniesDbContext BuildContext()
+    private static PlatformDbContext BuildContext()
     {
-        var options = new DbContextOptionsBuilder<CompaniesDbContext>()
+        var options = new DbContextOptionsBuilder<PlatformDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
 
-        return new CompaniesDbContext(options);
+        return new PlatformDbContext(options);
     }
 }

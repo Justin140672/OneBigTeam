@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 namespace HR.Modules.Companies.Features.UpdateSubscriptionPricingConfig;
 
 internal sealed class UpdateSubscriptionPricingConfigHandler(
-    CompaniesDbContext dbContext,
+    PlatformDbContext dbContext,
     ICurrentUser currentUser,
     IClock clock,
     IAuditEventPublisher auditEventPublisher)

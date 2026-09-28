@@ -21,7 +21,8 @@ namespace HR.Modules.Companies.Features.GetApplicationMetrics;
 /// dashboard that day.
 /// </summary>
 internal sealed class GetApplicationMetricsHandler(
-    CompaniesDbContext dbContext,
+    CompaniesDbContext companiesDbContext,
+    PlatformDbContext platformDbContext,
     ICurrentUser currentUser,
     IConfiguration configuration,
     IPlatformDocumentActivityReader documentActivityReader,
@@ -43,7 +44,7 @@ internal sealed class GetApplicationMetricsHandler(
 
         var fromDateTimeOffset = new DateTimeOffset(fromDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
 
-        var companies = await dbContext.Companies
+        var companies = await companiesDbContext.Companies
             .AsNoTracking()
             .Where(c => c.CreatedAt >= fromDateTimeOffset)
             .Select(c => c.CreatedAt)
@@ -65,7 +66,7 @@ internal sealed class GetApplicationMetricsHandler(
 
         var dailyDocumentsUploaded = FillGaps(uploadsByDate, fromDate, today);
 
-        var activeCompanies = await dbContext.CustomerSubscriptions
+        var activeCompanies = await companiesDbContext.CustomerSubscriptions
             .AsNoTracking()
             .CountAsync(s => s.Status != SubscriptionStatus.Canceled, cancellationToken);
 
@@ -75,19 +76,19 @@ internal sealed class GetApplicationMetricsHandler(
 
         var backgroundJobsSucceededTotal = backgroundJobStatusReader.GetStatus().Succeeded;
 
-        var existingSnapshot = await dbContext.PlatformMetricsSnapshots
+        var existingSnapshot = await platformDbContext.PlatformMetricsSnapshots
             .FirstOrDefaultAsync(s => s.SnapshotDate == today, cancellationToken);
 
         if (existingSnapshot is null)
         {
-            dbContext.PlatformMetricsSnapshots.Add(PlatformMetricsSnapshot.Create(
+            platformDbContext.PlatformMetricsSnapshots.Add(PlatformMetricsSnapshot.Create(
                 Guid.NewGuid(), today, DateTimeOffset.UtcNow,
                 activeCompanies, activeUsers, storageConsumedBytes, backgroundJobsSucceededTotal));
 
-            await dbContext.SaveChangesAsync(cancellationToken);
+            await platformDbContext.SaveChangesAsync(cancellationToken);
         }
 
-        var activeCompaniesTrend = await dbContext.PlatformMetricsSnapshots
+        var activeCompaniesTrend = await platformDbContext.PlatformMetricsSnapshots
             .AsNoTracking()
             .Where(s => s.SnapshotDate >= fromDate)
             .OrderBy(s => s.SnapshotDate)

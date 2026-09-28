@@ -49,10 +49,12 @@ public class ListEmployeeAssetsHandlerTests
         var handler = new ListEmployeeAssetsHandler(db);
         var result = await handler.HandleAsync(
             new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
+            callerUserId: employeeId,
             CancellationToken.None);
 
-        Assert.Single(result);
-        Assert.Equal(employeeId, result[0].EmployeeId);
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value);
+        Assert.Equal(employeeId, result.Value[0].EmployeeId);
     }
 
     [Fact]
@@ -69,9 +71,11 @@ public class ListEmployeeAssetsHandlerTests
         var handler = new ListEmployeeAssetsHandler(db);
         var result = await handler.HandleAsync(
             new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
+            callerUserId: employeeId,
             CancellationToken.None);
 
-        Assert.Empty(result);
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value);
     }
 
     [Fact]
@@ -89,9 +93,11 @@ public class ListEmployeeAssetsHandlerTests
         var handler = new ListEmployeeAssetsHandler(db);
         var result = await handler.HandleAsync(
             new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
+            callerUserId: employeeId,
             CancellationToken.None);
 
-        Assert.Empty(result);
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value);
     }
 
     [Fact]
@@ -109,9 +115,11 @@ public class ListEmployeeAssetsHandlerTests
         var handler = new ListEmployeeAssetsHandler(db);
         var result = await handler.HandleAsync(
             new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
+            callerUserId: employeeId,
             CancellationToken.None);
 
-        Assert.Empty(result);
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value);
     }
 
     [Fact]
@@ -134,11 +142,13 @@ public class ListEmployeeAssetsHandlerTests
         var handler = new ListEmployeeAssetsHandler(db);
         var result = await handler.HandleAsync(
             new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
+            callerUserId: employeeId,
             CancellationToken.None);
 
-        Assert.Equal(2, result.Count);
-        Assert.Equal(later, result[0].AssignedAt);
-        Assert.Equal(earlier, result[1].AssignedAt);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.Value.Count);
+        Assert.Equal(later, result.Value[0].AssignedAt);
+        Assert.Equal(earlier, result.Value[1].AssignedAt);
     }
 
     [Fact]
@@ -159,10 +169,12 @@ public class ListEmployeeAssetsHandlerTests
         var handler = new ListEmployeeAssetsHandler(db);
         var result = await handler.HandleAsync(
             new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
+            callerUserId: employeeId,
             CancellationToken.None);
 
-        Assert.Single(result);
-        var item = result[0];
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value);
+        var item = result.Value[0];
         Assert.Equal(assignment.Id, item.Id);
         Assert.Equal(asset.Id, item.AssetId);
         Assert.Equal(employeeId, item.EmployeeId);
@@ -189,10 +201,12 @@ public class ListEmployeeAssetsHandlerTests
         var handler = new ListEmployeeAssetsHandler(db);
         var result = await handler.HandleAsync(
             new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
+            callerUserId: employeeId,
             CancellationToken.None);
 
-        Assert.Single(result);
-        Assert.Equal(category.Name, result[0].CategoryName);
+        Assert.True(result.IsSuccess);
+        Assert.Single(result.Value);
+        Assert.Equal(category.Name, result.Value[0].CategoryName);
     }
 
     [Fact]
@@ -209,9 +223,11 @@ public class ListEmployeeAssetsHandlerTests
         var handler = new ListEmployeeAssetsHandler(db);
         var result = await handler.HandleAsync(
             new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
+            callerUserId: employeeId,
             CancellationToken.None);
 
-        Assert.False(result[0].IsAcknowledged);
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value[0].IsAcknowledged);
     }
 
     [Fact]
@@ -229,9 +245,11 @@ public class ListEmployeeAssetsHandlerTests
         var handler = new ListEmployeeAssetsHandler(db);
         var result = await handler.HandleAsync(
             new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
+            callerUserId: employeeId,
             CancellationToken.None);
 
-        Assert.True(result[0].IsAcknowledged);
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value[0].IsAcknowledged);
     }
 
     [Fact]
@@ -244,8 +262,10 @@ public class ListEmployeeAssetsHandlerTests
         var handler = new ListEmployeeAssetsHandler(db);
         var result = await handler.HandleAsync(
             new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
+            callerUserId: employeeId,
             CancellationToken.None);
 
-        Assert.Empty(result);
+        Assert.True(result.IsSuccess);
+        Assert.Empty(result.Value);
     }
 }

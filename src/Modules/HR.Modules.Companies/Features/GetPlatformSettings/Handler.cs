@@ -14,7 +14,7 @@ namespace HR.Modules.Companies.Features.GetPlatformSettings;
 /// first read, so the Admin Portal settings screen always has a row to display even before any
 /// administrator has ever saved a change.
 /// </summary>
-internal sealed class GetPlatformSettingsHandler(CompaniesDbContext dbContext, IClock clock)
+internal sealed class GetPlatformSettingsHandler(PlatformDbContext dbContext, IClock clock)
 {
     public async Task<Result<GetPlatformSettingsResponse>> HandleAsync(
         GetPlatformSettingsRequest request,

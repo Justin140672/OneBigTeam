@@ -30,7 +30,7 @@ public class GetPublicSubscriptionPricingEndpointTests
     {
         using (var scope = _factory.Services.CreateScope())
         {
-            var db = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+            var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
             await db.PlatformSettings.ExecuteDeleteAsync();
         }
 

@@ -57,7 +57,7 @@ public class GetAssetHandlerTests
         {
             CompanyId = companyId,
             Id = assetId
-        }, CancellationToken.None);
+        }, callerUserId: null, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(assetId, result.Value!.Id);
@@ -78,7 +78,7 @@ public class GetAssetHandlerTests
         {
             CompanyId = Guid.NewGuid(),
             Id = Guid.NewGuid()
-        }, CancellationToken.None);
+        }, callerUserId: null, CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
@@ -95,7 +95,7 @@ public class GetAssetHandlerTests
         {
             CompanyId = Guid.NewGuid(), // different company
             Id = assetId
-        }, CancellationToken.None);
+        }, callerUserId: null, CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
@@ -133,7 +133,7 @@ public class GetAssetHandlerTests
         {
             CompanyId = companyId,
             Id = assetResult.Value!.Id
-        }, CancellationToken.None);
+        }, callerUserId: null, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Apple", result.Value!.Manufacturer);
@@ -155,7 +155,7 @@ public class GetAssetHandlerTests
         {
             CompanyId = companyId,
             Id = assetId
-        }, CancellationToken.None);
+        }, callerUserId: null, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Electronics", result.Value!.CategoryName);

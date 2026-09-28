@@ -19,7 +19,9 @@ using HR.Modules.Companies.Features.GetHrSettingsHistory;
 using HR.Modules.Companies.Features.GetCustomerBillingBreakdown;
 using HR.Modules.Companies.Features.GetCustomerBillingHistory;
 using HR.Modules.Companies.Features.GetCustomerDashboard;
+using HR.Modules.Companies.Features.GetCustomerDatabaseAssignment;
 using HR.Modules.Companies.Features.GetCustomerDetails;
+using HR.Modules.Companies.CustomerDatabase;
 using HR.Modules.Companies.Features.GetDeletionQueue;
 using HR.Modules.Companies.Features.PlaceCompanyLegalHold;
 using HR.Modules.Companies.Features.LiftCompanyLegalHold;
@@ -98,6 +100,10 @@ public static class CompaniesModule
         services.AddDbContext<CompaniesDbContext>(options =>
             options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "companies")));
+
+        services.AddDbContext<PlatformDbContext>(options =>
+            options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
+                npgsql.MigrationsHistoryTable("__ef_migrations_history", "platform")));
 
         // System Health Dashboard (Platform Monitoring epic) — "database" proxies overall Postgres
         // connectivity (see CompaniesDatabaseHealthCheck remarks), "stripe" is a live account-balance
@@ -408,6 +414,11 @@ public static class CompaniesModule
         // than a new audit table.
         services.AddScoped<GetAuditLogHandler>();
         services.AddScoped<IValidator<GetAuditLogRequest>, GetAuditLogValidator>();
+
+        // Ticket 1 Phase 3 — Customer Database Assignment (dedicated per-customer database assignment
+        // tracking). Platform-admin endpoint for viewing a customer's database assignment status.
+        services.AddScoped<GetCustomerDatabaseAssignmentHandler>();
+        services.AddScoped<CustomerDatabaseConnection>();
 
         // Admin Portal Platform Settings (Platform Monitoring/Admin epic) — platform-wide singleton
         // row (trial length, default pricing display, support contact, maintenance mode, feature
