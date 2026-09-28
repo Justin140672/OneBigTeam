@@ -75,6 +75,17 @@ connectionString += isE2ETestingRun
 	? ";Maximum Pool Size=400;Minimum Pool Size=30"
 	: ";Maximum Pool Size=300;Minimum Pool Size=10";
 
+// Security: DevTools provides anonymous minting of access tokens and persona switching for
+// local development. Fail fast if attempted to enable in non-Development environments.
+var devToolsOptions = new DevToolsOptions();
+builder.Configuration.GetSection(DevToolsOptions.SectionName).Bind(devToolsOptions);
+if (devToolsOptions.Enabled && !builder.Environment.IsDevelopment())
+{
+	throw new InvalidOperationException(
+		$"DevTools.Enabled=true is not permitted in the '{builder.Environment.EnvironmentName}' environment. "
+		+ "Development tools are only allowed under Development. Refusing to start.");
+}
+
 builder.Services.AddCompaniesModule(connectionString, builder.Configuration);
 builder.Services.AddCompanyOnboardingModule(connectionString);
 builder.Services.AddDataImportModule(connectionString, builder.Configuration, builder.Environment);
@@ -414,7 +425,7 @@ if (!app.Environment.IsDevelopment())
 	app.Services.ValidateSensitiveDataProtectionOrThrow();
 }
 
-if (app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment() && devToolsOptions.Enabled)
 {
 	// AllPersonas (seeded catalog + runtime-registered self-service signups), not the static
 	// Personas field alone — the login form's persona lookup (Login.razor) needs to find a
