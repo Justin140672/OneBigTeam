@@ -22,14 +22,14 @@ namespace HR.Modules.Identity.Migrations
             migrationBuilder.InsertData(
                 table: "role_permissions",
                 columns: new[] { "role_id", "permission_id" },
-                values: new object[] { new Guid("40000000-0000-0000-0000-000000000001"), new Guid("00000000-0000-0000-0001-000000000047") },
+                values: new object[] { new Guid("00000000-0000-0000-0000-000000000001"), new Guid("00000000-0000-0000-0001-000000000047") },
                 schema: "identity");
 
             // Grant support:request to HR Administrator role (so admins can submit their own support requests)
             migrationBuilder.InsertData(
                 table: "role_permissions",
                 columns: new[] { "role_id", "permission_id" },
-                values: new object[] { new Guid("40000000-0000-0000-0000-000000000003"), new Guid("00000000-0000-0000-0001-000000000047") },
+                values: new object[] { new Guid("00000000-0000-0000-0000-000000000004"), new Guid("00000000-0000-0000-0001-000000000047") },
                 schema: "identity");
         }
 
@@ -40,13 +40,13 @@ namespace HR.Modules.Identity.Migrations
             migrationBuilder.DeleteData(
                 table: "role_permissions",
                 keyColumns: new[] { "role_id", "permission_id" },
-                keyValues: new object[] { new Guid("40000000-0000-0000-0000-000000000001"), new Guid("00000000-0000-0000-0001-000000000047") },
+                keyValues: new object[] { new Guid("00000000-0000-0000-0000-000000000001"), new Guid("00000000-0000-0000-0001-000000000047") },
                 schema: "identity");
 
             migrationBuilder.DeleteData(
                 table: "role_permissions",
                 keyColumns: new[] { "role_id", "permission_id" },
-                keyValues: new object[] { new Guid("40000000-0000-0000-0000-000000000003"), new Guid("00000000-0000-0000-0001-000000000047") },
+                keyValues: new object[] { new Guid("00000000-0000-0000-0000-000000000004"), new Guid("00000000-0000-0000-0001-000000000047") },
                 schema: "identity");
 
             // Remove the permission

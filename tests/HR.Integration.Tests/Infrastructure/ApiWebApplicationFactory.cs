@@ -1,6 +1,7 @@
 using Hangfire;
 using HR.Modules.Companies.Services;
 using HR.Modules.Identity.Services;
+using HR.Modules.Identity.Tests.Infrastructure;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
@@ -103,6 +104,10 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
             // raw IEmailSender — capture those sends into the same FakeEmailSender.Sent surface.
             InvitationEmailSender = new FakeInvitationEmailSender(EmailSender);
             services.AddSingleton<IInvitationEmailSender>(InvitationEmailSender);
+
+            // Password reset also gets a fake to prevent real Postmark calls from test addresses
+            services.AddSingleton<IPasswordResetEmailSender>(
+                new FakePasswordResetEmailSender());
 
             // Replace the real Stripe gateway so no test ever calls out to Stripe's network API.
             services.AddScoped<IStripeGateway>(_ => StripeGateway);

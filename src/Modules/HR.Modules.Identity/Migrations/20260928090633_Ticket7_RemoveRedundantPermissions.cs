@@ -19,7 +19,7 @@ namespace HR.Modules.Identity.Migrations
             migrationBuilder.DeleteData(
                 table: "role_permissions",
                 keyColumns: new[] { "role_id", "permission_id" },
-                keyValues: new object[] { new Guid("40000000-0000-0000-0000-000000000004"), new Guid("00000000-0000-0000-0001-000000000028") },
+                keyValues: new object[] { new Guid("00000000-0000-0000-0000-000000000003"), new Guid("00000000-0000-0000-0001-000000000028") },
                 schema: "identity");
 
             // Remove the permission itself
@@ -44,7 +44,7 @@ namespace HR.Modules.Identity.Migrations
             migrationBuilder.InsertData(
                 table: "role_permissions",
                 columns: new[] { "role_id", "permission_id" },
-                values: new object[] { new Guid("40000000-0000-0000-0000-000000000004"), new Guid("00000000-0000-0000-0001-000000000028") },
+                values: new object[] { new Guid("00000000-0000-0000-0000-000000000003"), new Guid("00000000-0000-0000-0001-000000000028") },
                 schema: "identity");
         }
     }
