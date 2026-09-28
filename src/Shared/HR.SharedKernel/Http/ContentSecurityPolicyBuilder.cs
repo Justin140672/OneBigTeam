@@ -26,10 +26,13 @@ public sealed partial class ContentSecurityPolicyBuilder
         ArgumentException.ThrowIfNullOrWhiteSpace(directive);
         ArgumentNullException.ThrowIfNull(sources);
 
+        // Normalize to lowercase for consistent storage and comparison (CSP directives are case-insensitive).
+        directive = directive.ToLowerInvariant();
+
         if (!DirectiveName().IsMatch(directive))
             throw new ArgumentException($"'{directive}' is not a valid CSP directive name.", nameof(directive));
 
-        if (_directives.Any(d => string.Equals(d.Key, directive, StringComparison.OrdinalIgnoreCase)))
+        if (_directives.Any(d => d.Key == directive))
             throw new InvalidOperationException($"CSP directive '{directive}' has already been added.");
 
         var list = sources.ToArray();

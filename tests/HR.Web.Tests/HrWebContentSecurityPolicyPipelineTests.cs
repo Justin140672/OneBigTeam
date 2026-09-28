@@ -147,7 +147,13 @@ public sealed partial class HrWebContentSecurityPolicyPipelineTests : IDisposabl
             .ToList();
 
         Assert.NotEmpty(inlineScripts);
-        Assert.All(inlineScripts, attrs => Assert.Equal(nonce, NonceAttribute().Match(attrs).Groups["nonce"].Value));
+        Assert.All(inlineScripts, attrs =>
+        {
+            var attrNonce = NonceAttribute().Match(attrs).Groups["nonce"].Value;
+            // Blazor HTML-encodes '+' as &#x2B; in attribute values; unescape it.
+            attrNonce = System.Net.WebUtility.HtmlDecode(attrNonce);
+            Assert.Equal(nonce, attrNonce);
+        });
     }
 
     [Theory]
@@ -162,12 +168,14 @@ public sealed partial class HrWebContentSecurityPolicyPipelineTests : IDisposabl
         var themeScript = Assert.Single(
             ScriptBlock().Matches(html),
             m => m.Groups["body"].Value.Contains("localStorage.getItem('theme')", StringComparison.Ordinal));
-        Assert.Equal(nonce, NonceAttribute().Match(themeScript.Groups["attrs"].Value).Groups["nonce"].Value);
+        var themeNonce = System.Net.WebUtility.HtmlDecode(NonceAttribute().Match(themeScript.Groups["attrs"].Value).Groups["nonce"].Value);
+        Assert.Equal(nonce, themeNonce);
 
         var importMap = Assert.Single(
             ScriptTag().Matches(html),
             m => m.Groups["attrs"].Value.Contains("importmap", StringComparison.OrdinalIgnoreCase));
-        Assert.Equal(nonce, NonceAttribute().Match(importMap.Groups["attrs"].Value).Groups["nonce"].Value);
+        var importNonce = System.Net.WebUtility.HtmlDecode(NonceAttribute().Match(importMap.Groups["attrs"].Value).Groups["nonce"].Value);
+        Assert.Equal(nonce, importNonce);
     }
 
     [Fact]

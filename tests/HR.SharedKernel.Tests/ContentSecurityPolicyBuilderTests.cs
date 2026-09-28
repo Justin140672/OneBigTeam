@@ -30,7 +30,9 @@ public class ContentSecurityPolicyBuilderTests
     {
         var builder = new ContentSecurityPolicyBuilder().Add("script-src", "'self'");
 
-        Assert.Throws<InvalidOperationException>(() => builder.Add("SCRIPT-SRC", "'none'"));
+        // Directive names are case-insensitive in CSP; the builder rejects duplicates regardless of case.
+        Assert.Throws<InvalidOperationException>(() => builder.Add("script-src", "'none'"));
+        Assert.Throws<InvalidOperationException>(() => builder.Add("Script-Src", "'none'"));
     }
 
     [Theory]
@@ -45,9 +47,9 @@ public class ContentSecurityPolicyBuilderTests
     }
 
     [Theory]
-    [InlineData("Script-Src")]
     [InlineData("script src")]
     [InlineData("script-src;")]
+    [InlineData("Script-SRC123")]
     public void Add_Rejects_Invalid_Directive_Names(string directive)
     {
         Assert.Throws<ArgumentException>(() => new ContentSecurityPolicyBuilder().Add(directive, "'self'"));
