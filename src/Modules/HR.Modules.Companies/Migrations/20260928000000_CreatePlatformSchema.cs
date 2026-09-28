@@ -14,12 +14,6 @@ namespace HR.Modules.Companies.Migrations
             migrationBuilder.EnsureSchema(
                 name: "platform");
 
-            // Drop existing tables if they exist (handles case where old migration created them)
-            migrationBuilder.Sql("DROP TABLE IF EXISTS platform.customer_database_assignments CASCADE;");
-            migrationBuilder.Sql("DROP TABLE IF EXISTS platform.idempotency_keys CASCADE;");
-            migrationBuilder.Sql("DROP TABLE IF EXISTS platform.platform_metrics_snapshots CASCADE;");
-            migrationBuilder.Sql("DROP TABLE IF EXISTS platform.platform_settings CASCADE;");
-
             migrationBuilder.CreateTable(
                 name: "customer_database_assignments",
                 schema: "platform",
