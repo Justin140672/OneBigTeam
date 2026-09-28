@@ -9,7 +9,7 @@ internal sealed class Endpoint(GetInterviewsRequiringActionMetricHandler handler
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/recruitment/metrics/interviews-requiring-action");
-        Policies("candidate:view");
+        Policies("recruitment:manage");
     }
 
     public override async Task HandleAsync(

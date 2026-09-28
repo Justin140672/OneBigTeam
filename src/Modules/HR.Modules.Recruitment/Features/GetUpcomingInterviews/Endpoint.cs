@@ -11,7 +11,7 @@ internal sealed class Endpoint(GetUpcomingInterviewsHandler handler)
         Get("/api/companies/{companyId:guid}/interviews/upcoming");
         // Matches GetInterviewsTodayCount's policy — Recruiter + HrAdministrator can see
         // candidate/interview scheduling detail; a plain Employee/Manager cannot.
-        Policies("candidate:view");
+        Policies("recruitment:manage");
     }
 
     public override async Task HandleAsync(

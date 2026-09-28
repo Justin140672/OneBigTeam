@@ -9,7 +9,7 @@ internal sealed class Endpoint(GetApplicationHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/vacancies/{vacancyId:guid}/applications/{applicationId:guid}");
-        Policies("candidate:view");
+        Policies("recruitment:manage");
     }
 
     public override async Task HandleAsync(

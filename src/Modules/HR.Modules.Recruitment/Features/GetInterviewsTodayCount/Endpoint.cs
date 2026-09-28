@@ -9,7 +9,7 @@ internal sealed class Endpoint(GetInterviewsTodayCountHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/interviews/today-count");
-        Policies("candidate:view");
+        Policies("recruitment:manage");
     }
 
     public override async Task HandleAsync(

@@ -68,7 +68,6 @@ internal static class SystemPermissions
     // recruitment
     public static readonly Guid RecruitmentManage = new("00000000-0000-0000-0001-000000000026");
     public static readonly Guid RecruitmentView   = new("00000000-0000-0000-0001-000000000027");
-    public static readonly Guid CandidateView     = new("00000000-0000-0000-0001-000000000028");
 
     // shared-document (company-wide documents, e.g. policies/handbooks)
     public static readonly Guid SharedDocumentViewPublished           = new("00000000-0000-0000-0001-000000000029");
@@ -102,8 +101,11 @@ internal static class SystemPermissions
     // src/Modules/HR.Modules.Employees/Docs).
     public static readonly Guid ReportingViewEquality = new("00000000-0000-0000-0001-000000000046");
 
-    // NOTE: ids ...044 (admin-alerts.view) and ...045 (reporting.view-governance) were removed
-    // when the customer-facing "Audit and security" area (Administrative Alerts inbox + Governance
-    // Reports) was deleted. Their permission and role_permission rows are dropped by migration
+    // NOTE: ids ...028 (candidate.view), ...044 (admin-alerts.view) and ...045
+    // (reporting.view-governance) were removed. candidate.view was replaced with recruitment:manage
+    // (Ticket 7) and its permission/role_permission rows are dropped by migration
+    // 20260928_RemoveRedundantPermissions. admin-alerts.view and reporting.view-governance were
+    // removed when the customer-facing "Audit and security" area (Administrative Alerts inbox +
+    // Governance Reports) was deleted, and their rows are dropped by migration
     // 20260903070841_RemoveAuditAndSecurityPermissions. Do not reuse these ids.
 }

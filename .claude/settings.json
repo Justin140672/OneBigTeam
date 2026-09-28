@@ -3,7 +3,8 @@
     "allow": [
       "PowerShell(cd *)",
       "PowerShell(dotnet ef *)",
-      "PowerShell(dotnet restore *)"
+      "PowerShell(dotnet restore *)",
+      "Bash(tasklist *)"
     ]
   }
 }

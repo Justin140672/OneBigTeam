@@ -9,7 +9,7 @@ internal sealed class Endpoint(GetOffersAwaitingResponseMetricHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/recruitment/metrics/offers-awaiting-response");
-        Policies("candidate:view");
+        Policies("recruitment:manage");
     }
 
     public override async Task HandleAsync(

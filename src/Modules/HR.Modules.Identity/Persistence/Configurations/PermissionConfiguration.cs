@@ -83,7 +83,6 @@ internal sealed class PermissionConfiguration : IEntityTypeConfiguration<Permiss
 
             Permission.Create(SystemPermissions.RecruitmentManage, "recruitment.manage", seedDate),
             Permission.Create(SystemPermissions.RecruitmentView,   "recruitment.view",   seedDate),
-            Permission.Create(SystemPermissions.CandidateView,     "candidate.view",     seedDate),
 
             Permission.Create(SystemPermissions.SharedDocumentViewPublished, "shared-document.view-published", seedDate),
             Permission.Create(SystemPermissions.SharedDocumentManage, "shared-document.manage", seedDate),

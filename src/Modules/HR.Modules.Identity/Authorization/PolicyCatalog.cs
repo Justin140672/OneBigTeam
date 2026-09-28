@@ -46,7 +46,6 @@ internal static class PolicyCatalog
         ["asset:view"] = SystemPermissions.AssetView,
         ["recruitment:manage"] = SystemPermissions.RecruitmentManage,
         ["recruitment:view"] = SystemPermissions.RecruitmentView,
-        ["candidate:view"] = SystemPermissions.CandidateView,
         ["shared-document:view-published"] = SystemPermissions.SharedDocumentViewPublished,
         ["shared-document:manage"] = SystemPermissions.SharedDocumentManage,
         ["shared-document:publish"] = SystemPermissions.SharedDocumentPublish,

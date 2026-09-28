@@ -119,10 +119,11 @@ internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<Rol
             RolePermission.Create(SystemRoles.Manager, SystemPermissions.AssetView),
             RolePermission.Create(SystemRoles.HrAdministrator, SystemPermissions.AssetView),
 
-            // recruitment:manage / candidate:view — Recruiter only (deliberately not automatically
-            // granted to HR Administrator — recruitment is a distinct function with its own role).
+            // recruitment:manage — Recruiter only (deliberately not automatically granted to
+            // HR Administrator — recruitment is a distinct function with its own role). Ticket 7:
+            // candidate.view permission removed as redundant; recruitment:manage is the sole
+            // authoritative permission for all recruiter candidate operations.
             RolePermission.Create(SystemRoles.Recruiter, SystemPermissions.RecruitmentManage),
-            RolePermission.Create(SystemRoles.Recruiter, SystemPermissions.CandidateView),
 
             // recruitment:view — broad, general vacancy-board visibility.
             RolePermission.Create(SystemRoles.Employee, SystemPermissions.RecruitmentView),

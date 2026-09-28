@@ -9,7 +9,7 @@ internal sealed class Endpoint(GetCandidatesInProgressMetricHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/recruitment/metrics/candidates-in-progress");
-        Policies("candidate:view");
+        Policies("recruitment:manage");
     }
 
     public override async Task HandleAsync(
