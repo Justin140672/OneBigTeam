@@ -1,7 +1,9 @@
 using FastEndpoints;
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
+using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,31 +15,53 @@ namespace HR.Modules.Employees.Features.Dev;
 /// from "Leaving" to "FormerEmployee" status and invokes all downstream handlers (leave-policy
 /// deactivation, audit logging, etc.).
 ///
-/// This endpoint is only registered in development mode and is protected by the dev-persona
-/// authentication gate (AllowAnonymous, but callers must be authenticated via /api/dev/persona).
+/// This endpoint is only accessible when:
+/// - Environment is Development
+/// - E2E_TESTING environment variable is "true"
+/// - Caller is authenticated as an HR Administrator
+/// - Caller belongs to the specified company
+///
 /// Used by DepartureFinaliserE2ETests to deterministically test the complete departure journey
 /// without timing dependencies or wall-clock progression.
 /// </summary>
 internal sealed class DepartureFinaliserTestEndpoint(
     IEmployeeDepartureFinalizer finalizer,
-    EmployeesDbContext db) : EndpointWithoutRequest
+    EmployeesDbContext db,
+    ICurrentTenant currentTenant,
+    IClock clock) : EndpointWithoutRequest
 {
     public override void Configure()
     {
-        Post("/api/dev/departure-finaliser/{employeeId:guid}");
-        AllowAnonymous();
-        // Development-only — callers must already be authenticated via /api/dev/persona/{userId}
-        // session cookie. This just confirms the test seam is available and doesn't bypass auth.
+        Post("/api/dev/departure-finaliser/{companyId:guid}/{employeeId:guid}");
+        Policies("role:hr-administrator");
     }
 
     public override async Task HandleAsync(CancellationToken ct)
     {
+        // Environment gate: only accessible in Development with E2E_TESTING=true
+        var isE2ETesting = string.Equals(
+            Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
+
+        if (!isE2ETesting)
+        {
+            await Send.ResultAsync(TypedResults.NotFound());
+            return;
+        }
+
+        var companyId = Route<Guid>("companyId");
         var employeeId = Route<Guid>("employeeId");
 
         try
         {
+            // Verify current tenant matches the route company
+            if (!Guid.TryParse(currentTenant.TenantId, out var userCompanyId) || userCompanyId != companyId)
+            {
+                await Send.ResultAsync(TypedResults.Forbid());
+                return;
+            }
+
             var employee = await db.Employees
-                .FirstOrDefaultAsync(e => e.Id == employeeId, ct);
+                .FirstOrDefaultAsync(e => e.Id == employeeId && e.CompanyId == companyId, ct);
 
             if (employee is null)
             {
@@ -45,12 +69,15 @@ internal sealed class DepartureFinaliserTestEndpoint(
                 return;
             }
 
+            // Select only in-progress processes, not historical/cancelled ones
             var process = await db.EmployeeLeavingProcesses
-                .FirstOrDefaultAsync(p => p.EmployeeId == employeeId, ct);
+                .FirstOrDefaultAsync(
+                    p => p.EmployeeId == employeeId && p.CompanyId == companyId && p.Status == LeavingProcessStatus.InProgress,
+                    ct);
 
             if (process is null)
             {
-                await Send.ResultAsync(TypedResults.BadRequest("Employee has no leaving process to finalize"));
+                await Send.ResultAsync(TypedResults.BadRequest("Employee has no in-progress leaving process to finalize"));
                 return;
             }
 
@@ -60,13 +87,13 @@ internal sealed class DepartureFinaliserTestEndpoint(
                 return;
             }
 
-            var now = DateTimeOffset.UtcNow;
+            var now = clock.UtcNow;
             await finalizer.FinalizeAsync(employee, process, now, ct);
             await db.SaveChangesAsync(ct);
 
             await Send.ResultAsync(TypedResults.Ok());
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             await Send.ResultAsync(TypedResults.StatusCode(StatusCodes.Status500InternalServerError));
         }

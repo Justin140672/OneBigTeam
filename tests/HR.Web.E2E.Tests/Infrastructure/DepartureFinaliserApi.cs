@@ -27,7 +27,7 @@ public static class DepartureFinaliserApi
     public static async Task<bool> FinalizeAsync(string apiBaseUrl, Guid employeeId)
     {
         using var http = await CreateHrAdminClientAsync(apiBaseUrl);
-        var response = await http.PostAsync($"/api/dev/departure-finaliser/{employeeId:N}", content: null);
+        var response = await http.PostAsync($"/api/dev/departure-finaliser/{AcmeId:N}/{employeeId:N}", content: null);
         return response.IsSuccessStatusCode;
     }
 
