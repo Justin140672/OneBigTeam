@@ -258,7 +258,10 @@ public class LeaveConcurrencyHandlerTests
             // balance already exists for the policy year.
             var seedHandler = new AwardToilHandler(seed, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
             var seedResult = await seedHandler.HandleAsync(
-                new AwardToilRequest { CompanyId = companyId, EmployeeId = employeeId, AwardedByEmployeeId = Guid.NewGuid(), Days = 1m, OccurredOn = new DateOnly(2026, 5, 1) },
+                new AwardToilRequest(companyId, employeeId, 1m, new DateOnly(2026, 5, 1), null)
+                {
+                    AwardedByEmployeeId = Guid.NewGuid()
+                },
                 CancellationToken.None);
             Assert.True(seedResult.IsSuccess);
         }
@@ -272,13 +275,15 @@ public class LeaveConcurrencyHandlerTests
         var handlerA = new AwardToilHandler(ctxA, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
         var handlerB = new AwardToilHandler(ctxB, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
 
-        var requestA = new AwardToilRequest
+        var awardedById = Guid.NewGuid();
+        var requestA = new AwardToilRequest(
+            companyId,
+            employeeId,
+            2m,
+            new DateOnly(2026, 6, 1),
+            null)
         {
-            CompanyId = companyId,
-            EmployeeId = employeeId,
-            AwardedByEmployeeId = Guid.NewGuid(),
-            Days = 2m,
-            OccurredOn = new DateOnly(2026, 6, 1),
+            AwardedByEmployeeId = awardedById
         };
         var requestB = requestA with { Days = 3m, OccurredOn = new DateOnly(2026, 6, 2) };
 

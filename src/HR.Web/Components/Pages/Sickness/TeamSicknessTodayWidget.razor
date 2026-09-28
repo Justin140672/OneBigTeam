@@ -1,6 +1,8 @@
+@using HR.SharedKernel
 @inject SicknessService SicknessService
 @inject NavigationManager Navigation
 @inject AppSession Session
+@inject ICompanyTimeProvider CompanyTimeProvider
 
 @if (Session.EmployeeId.HasValue)
 {
@@ -72,7 +74,8 @@
             return;
         }
 
-        _today = DateOnly.FromDateTime(DateTime.UtcNow);
+        // Use company-local date for business-calendar team sickness reporting (days-off calculations).
+        _today = CompanyTimeProvider.Today;
 
         var teamTask       = SicknessService.GetTeamSicknessTodayAsync(Session.CompanyId, Session.EmployeeId.Value);
         var employeesTask  = Session.GetEmployeeNamesAsync();

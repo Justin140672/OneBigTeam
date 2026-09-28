@@ -1,4 +1,6 @@
 @using HR.Web.Models
+@using HR.SharedKernel
+@inject ICompanyTimeProvider CompanyTimeProvider
 
 <div class="card mb-4">
     <div class="card-body">
@@ -52,7 +54,8 @@
 
     private int TotalDays     => Math.Max(1, Record.ExpectedEndDate.DayNumber - Record.StartDate.DayNumber);
     private int TotalMonths   => (Record.ExpectedEndDate.Year - Record.StartDate.Year) * 12 + (Record.ExpectedEndDate.Month - Record.StartDate.Month);
-    private int ElapsedDays   => Math.Clamp(DateOnly.FromDateTime(DateTime.Today).DayNumber - Record.StartDate.DayNumber, 0, TotalDays);
+    // Use company-local date for business-calendar probation progress tracking.
+    private int ElapsedDays   => Math.Clamp(CompanyTimeProvider.Today.DayNumber - Record.StartDate.DayNumber, 0, TotalDays);
     private int DaysRemaining => Math.Max(0, TotalDays - ElapsedDays);
     private int ProgressPercent => (int)Math.Round(ElapsedDays * 100.0 / TotalDays);
 

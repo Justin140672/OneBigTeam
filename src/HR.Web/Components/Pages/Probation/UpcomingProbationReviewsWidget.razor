@@ -1,8 +1,10 @@
 @using HR.Web.Components.Pages.Dashboards
+@using HR.SharedKernel
 @inject ProbationService ProbationService
 @inject WidgetSourceLoader SourceLoader
 @inject NavigationManager Navigation
 @inject AppSession Session
+@inject ICompanyTimeProvider CompanyTimeProvider
 
 @if (Session.CanManageEmployees || Session.IsManager)
 {
@@ -110,7 +112,8 @@
             return;
         }
 
-        _today = DateOnly.FromDateTime(DateTime.UtcNow);
+        // Use company-local date for business-calendar probation review due-date tracking (overdue, due-soon).
+        _today = CompanyTimeProvider.Today;
 
         var employeesTask = Session.GetEmployeeNamesAsync();
         await LoadAsync();

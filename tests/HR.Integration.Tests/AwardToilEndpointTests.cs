@@ -51,7 +51,6 @@ public class AwardToilEndpointTests
             {
                 companyId,
                 employeeId,
-                awardedByEmployeeId = EmployeeUserId,
                 days = 1.0,
                 occurredOn = "2026-06-10"
             });
@@ -72,7 +71,6 @@ public class AwardToilEndpointTests
             {
                 companyId,
                 employeeId,
-                awardedByEmployeeId = HrAdminUserId,
                 days = 0.5,
                 occurredOn = "2026-06-10",
                 notes = "Worked late"
@@ -89,9 +87,17 @@ public class AwardToilEndpointTests
     [Fact]
     public async Task Post_AwardToil_Returns_Created_For_Manager()
     {
+        // Ticket 4: manager must be set up as a manager of the target employee to award TOIL
         var (client, companyId, employeeId) = await SetupAsync(ManagerUserId);
         await SeedToilLeaveTypeAsync(companyId);
         await SeedPolicyAssignmentAsync(companyId, employeeId);
+
+        // Set up manager relationship
+        var setupClient = _factory.CreateClient();
+        setupClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, HrAdminUserId.ToString());
+        setupClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        await UpdateManagerAsync(setupClient, companyId, employeeId, ManagerUserId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/toil",
@@ -99,12 +105,34 @@ public class AwardToilEndpointTests
             {
                 companyId,
                 employeeId,
-                awardedByEmployeeId = ManagerUserId,
                 days = 1.0,
                 occurredOn = "2026-06-11"
             });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Post_AwardToil_Returns_Forbidden_For_Manager_Without_Report_Relationship()
+    {
+        // Ticket 4: authorization check: manager can only award TOIL to their reports
+        var (client, companyId, employeeId) = await SetupAsync(ManagerUserId);
+        await SeedToilLeaveTypeAsync(companyId);
+        await SeedPolicyAssignmentAsync(companyId, employeeId);
+
+        // Do NOT set up manager relationship — ManagerUserId is not a manager of employeeId
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/toil",
+            new
+            {
+                companyId,
+                employeeId,
+                days = 1.0,
+                occurredOn = "2026-06-11"
+            });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     private async Task<(HttpClient Client, Guid CompanyId, Guid EmployeeId)> SetupAsync(Guid userId)
@@ -221,6 +249,15 @@ public class AwardToilEndpointTests
         db.EmployeeLeavePolicyAssignments.Add(EmployeeLeavePolicyAssignment.Create(
             Guid.NewGuid(), companyId, employeeId, policyId, new DateOnly(2026, 1, 1), DateTimeOffset.UtcNow));
         await db.SaveChangesAsync();
+    }
+
+    private async Task UpdateManagerAsync(HttpClient client, Guid companyId, Guid employeeId, Guid managerId)
+    {
+        // Ticket 4: set up manager-employee relationship for authorization testing
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/manager",
+            new { companyId, id = employeeId, managerId });
+        response.EnsureSuccessStatusCode();
     }
 
     private sealed record CompanyPayload(Guid Id);
