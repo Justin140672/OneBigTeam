@@ -38,7 +38,7 @@ internal sealed class DepartureFinaliserTestEndpoint(
     public override void Configure()
     {
         Post("/api/dev/departure-finaliser/{companyId:guid}/{employeeId:guid}");
-        Policies("role:hr-administrator");
+        AllowAnonymous();
     }
 
     public override async Task HandleAsync(CancellationToken ct)
@@ -50,6 +50,20 @@ internal sealed class DepartureFinaliserTestEndpoint(
         if (!isE2ETesting)
         {
             await Send.ResultAsync(TypedResults.NotFound());
+            return;
+        }
+
+        // Authentication gate: must be authenticated
+        if (!HttpContext.User.Identity?.IsAuthenticated ?? true)
+        {
+            await Send.ResultAsync(TypedResults.Unauthorized());
+            return;
+        }
+
+        // Authorization gate: must have hr-administrator role
+        if (!HttpContext.User.HasClaim("role", "hr-administrator"))
+        {
+            await Send.ResultAsync(TypedResults.Forbid());
             return;
         }
 
