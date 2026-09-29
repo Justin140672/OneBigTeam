@@ -32,6 +32,9 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         const int maxAttempts = 12;
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
+            if (page.Url.Contains("/employees/new"))
+                return;
+
             var isLateAttempt = attempt > maxAttempts - 3;
             try
             {
@@ -439,6 +442,7 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     {
         await OpenFiltersPanelAsync();
         await page.Locator("#employee-filter-department").SelectOptionAsync(new SelectOptionValue { Label = departmentName });
+        await WaitForActiveFilterBadgeAsync();
         await page.WaitForTimeoutAsync(300);
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
@@ -447,9 +451,14 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     {
         await OpenFiltersPanelAsync();
         await page.Locator("#employee-filter-status").SelectOptionAsync(new SelectOptionValue { Value = status });
+        if (!string.IsNullOrEmpty(status))
+            await WaitForActiveFilterBadgeAsync();
         await page.WaitForTimeoutAsync(300);
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
+
+    private Task WaitForActiveFilterBadgeAsync() =>
+        page.Locator(".employee-filters-count").First.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
 
     public async Task<int> GetActiveFilterCountAsync()
     {
@@ -469,6 +478,7 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     public async Task RemoveFilterChipAsync(string label)
     {
         await FilterChip(label).Locator(".employee-filter-chip-remove").ClickAsync();
+        await FilterChip(label).WaitForAsync(new() { State = WaitForSelectorState.Detached, Timeout = 15_000 });
         await page.WaitForTimeoutAsync(300);
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }

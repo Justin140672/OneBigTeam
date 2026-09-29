@@ -101,6 +101,7 @@ public sealed class EmployeePromotionTabTests(HrAdminPersonaFixture fixture) : R
     [Fact]
     public async Task PromoteEmployee_WithPositionStepOnly_AppearsInHistoryGrid()
     {
+        var targetProfile = await E2eEmployeeApi.CreateVacantPositionProfileAsync(_fixture.ApiBaseUrl, "E2E Promo Target");
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
         var wizard = new PromoteEmployeeDialog(_page);
@@ -118,7 +119,7 @@ public sealed class EmployeePromotionTabTests(HrAdminPersonaFixture fixture) : R
         Assert.Equal("1. Position", await wizard.GetActiveStepLabelAsync());
         Assert.Contains("Software Engineer", await wizard.GetCurrentPositionTextAsync());
 
-        await wizard.SelectNewPositionProfileAsync("QA Engineer");
+        await wizard.SelectNewPositionProfileAsync(targetProfile);
         await wizard.FillEffectiveDateAsync("01/08/2026");
         await wizard.FillReasonAsync("Annual review promotion");
         await wizard.FillNotesAsync("Consistently exceeded expectations this cycle.");
@@ -132,19 +133,19 @@ public sealed class EmployeePromotionTabTests(HrAdminPersonaFixture fixture) : R
         await wizard.ClickNextAsync();
         Assert.Equal("4. Confirm", await wizard.GetActiveStepLabelAsync());
 
-        Assert.Equal("QA Engineer", await wizard.GetConfirmationValueAsync("New Position"));
+        Assert.Equal(targetProfile, await wizard.GetConfirmationValueAsync("New Position"));
         Assert.Equal("Annual review promotion", await wizard.GetConfirmationValueAsync("Reason"));
 
         await wizard.SubmitAsync();
 
         Assert.False(await wizard.IsVisibleAsync(), "Expected the wizard dialog to close after a successful promotion");
 
-        var row = empEdit.PromotionHistoryRow("QA Engineer");
-        Assert.True(await row.First.IsVisibleAsync(), "Expected the newly created promotion to appear in the history grid");
+        var row = empEdit.PromotionHistoryRow(targetProfile);
+        Assert.True(await row.First.WaitUntilVisibleAsync(30_000), "Expected the newly created promotion to appear in the history grid");
 
         var rowText = await row.First.TextContentAsync();
         Assert.Contains("Software Engineer", rowText);
-        Assert.Contains("QA Engineer", rowText);
+        Assert.Contains(targetProfile, rowText);
         Assert.Contains("Annual review promotion", rowText);
         Assert.Contains("Laura Bennett", rowText);
     }
@@ -198,6 +199,7 @@ public sealed class EmployeePromotionTabTests(HrAdminPersonaFixture fixture) : R
     [Fact]
     public async Task PromoteEmployee_CompensationStepChecked_RequiresSalaryFields()
     {
+        var targetProfile = await E2eEmployeeApi.CreateVacantPositionProfileAsync(_fixture.ApiBaseUrl, "E2E Comp Target");
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
         var wizard = new PromoteEmployeeDialog(_page);
@@ -209,7 +211,7 @@ public sealed class EmployeePromotionTabTests(HrAdminPersonaFixture fixture) : R
         await empEdit.OpenPromotionHistoryTabAsync();
         await wizard.OpenAsync();
 
-        await wizard.SelectNewPositionProfileAsync("Chief Technology Officer");
+        await wizard.SelectNewPositionProfileAsync(targetProfile);
         await wizard.FillEffectiveDateAsync("01/10/2026");
         await wizard.FillReasonAsync("Succession planning");
         await wizard.ClickNextAsync();

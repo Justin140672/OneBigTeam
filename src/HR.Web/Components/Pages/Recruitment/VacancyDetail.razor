@@ -169,6 +169,18 @@
     private GetVacancyResponse? _vacancy;
     private List<DepartmentListItemModel> _departments = [];
     private List<EmployeeListItemModel> _employees = [];
+    private int _employeeTotalPages;
+    private SfDropDownList<Guid?, EmployeeListItemModel> _hiringManagerDropdown = default!;
+    private int _hiringManagerFilterRequestId;
+
+    private async Task OnHiringManagerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
+    {
+        args.PreventDefaultAction = true;
+        var requestId = ++_hiringManagerFilterRequestId;
+        var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        if (requestId != _hiringManagerFilterRequestId) return;
+        await _hiringManagerDropdown.FilterAsync(result?.Items.ToList() ?? [], new Syncfusion.Blazor.Data.Query());
+    }
     private List<LocationListItemModel> _locations = [];
     private List<PositionProfileListItemModel> _positionProfiles = [];
     private List<ExternalRecruiterListItemModel> _externalRecruiters = [];
@@ -209,6 +221,7 @@
 
         var empResult = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 200);
         _employees = empResult?.Items.ToList() ?? [];
+        _employeeTotalPages = empResult?.TotalPages ?? 0;
 
         var locationResult = await LocationService.ListLocationsAsync(CompanyId);
         _locations = locationResult?.Items ?? [];
@@ -243,6 +256,19 @@
         if (!IsNew)
         {
             _vacancy = await VacancyService.GetVacancyAsync(CompanyId, Id!.Value);
+
+            if (_vacancy is { } loadedVacancy)
+            {
+                for (var employeePage = 2;
+                     employeePage <= _employeeTotalPages && _employees.All(e => e.Id != loadedVacancy.HiringManagerId);
+                     employeePage++)
+                {
+                    var nextPage = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageNumber: employeePage, pageSize: 200);
+                    if (nextPage is null)
+                        break;
+                    _employees.AddRange(nextPage.Items);
+                }
+            }
 
             if (_vacancy?.PositionProfileId is { } profileId && _positionProfiles.All(p => p.Id != profileId))
             {
@@ -502,13 +528,15 @@
                         </div>
                         <div class="col-md-4">
                             <label class="form-label">Hiring Manager <span class="text-danger">*</span></label>
-                            <SfDropDownList TValue="Guid?"
+                            <SfDropDownList @ref="_hiringManagerDropdown"
+                                            TValue="Guid?"
                                             TItem="EmployeeListItemModel"
                                             DataSource="@_employees"
                                             @bind-Value="Model.HiringManagerId"
                                             Placeholder="Select hiring manager"
                                             AllowFiltering="true">
                                 <DropDownListFieldSettings Value="Id" Text="FullName" />
+                                <DropDownListEvents TValue="Guid?" TItem="EmployeeListItemModel" Filtering="OnHiringManagerFilteringAsync" />
                                 <DropDownListTemplates TItem="EmployeeListItemModel">
                                     <ItemTemplate>
                                         @{

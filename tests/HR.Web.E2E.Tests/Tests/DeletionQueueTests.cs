@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
@@ -5,7 +6,29 @@ namespace HR.Web.E2E.Tests.Tests;
 
 public sealed class DeletionQueueTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
-    private static readonly Guid BetaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+    private async Task<(Guid CompanyId, string CompanyName)> CreateDisposableCompanyAsync()
+    {
+        using var http = new HttpClient { BaseAddress = new Uri(_fixture.ApiBaseUrl) };
+
+        var companyName = $"E2E Deletion Co {Guid.NewGuid():N}"[..40];
+        var email = $"e2e-deletion-{Guid.NewGuid():N}@example.com";
+
+        var response = await http.PostAsJsonAsync("/api/signup", new
+        {
+            CompanyName = companyName,
+            AdminFirstName = "Ada",
+            AdminLastName = "Lovelace",
+            AdminEmail = email,
+            Password = "P@ssw0rd123",
+        });
+        response.EnsureSuccessStatusCode();
+
+        var signUp = await response.Content.ReadFromJsonAsync<SignUpResult>();
+        Assert.NotNull(signUp);
+        return (signUp!.CompanyId, companyName);
+    }
+
+    private sealed record SignUpResult(Guid UserId, Guid CompanyId);
 
     private const string AllowListedAdminEmail = "priya.shah@acme.example";
 
@@ -39,7 +62,9 @@ public sealed class DeletionQueueTests(CrossUserFixture fixture) : RoleE2ETestBa
         await login.GoToAsync();
         await login.LoginAsync(AllowListedAdminEmail);
 
-        await details.GoToAsync(BetaCorpId);
+        var (companyId, companyName) = await CreateDisposableCompanyAsync();
+
+        await details.GoToAsync(companyId);
         Assert.False(await details.IsErrorBannerVisibleAsync(),
             "Expected the allow-listed admin to see Beta Corp's details, not the error banner");
 
@@ -56,12 +81,12 @@ public sealed class DeletionQueueTests(CrossUserFixture fixture) : RoleE2ETestBa
 
         await queue.GoToAsync();
 
-        Assert.True(await queue.HasCompanyAsync("Beta Corp"),
+        Assert.True(await queue.HasCompanyAsync(companyName),
             "Expected Beta Corp to appear in the deletion queue after scheduling its deletion");
-        Assert.True(await queue.IsPendingAsync("Beta Corp"),
+        Assert.True(await queue.IsPendingAsync(companyName),
             "Expected Beta Corp's deletion queue row to show a Pending status");
 
-        var countdown = await queue.GetCountdownTextAsync("Beta Corp") ?? "";
+        var countdown = await queue.GetCountdownTextAsync(companyName) ?? "";
         Assert.False(string.IsNullOrWhiteSpace(countdown));
         Assert.DoesNotContain("Overdue", countdown, StringComparison.OrdinalIgnoreCase);
     }
@@ -75,7 +100,9 @@ public sealed class DeletionQueueTests(CrossUserFixture fixture) : RoleE2ETestBa
         await login.GoToAsync();
         await login.LoginAsync(AllowListedAdminEmail);
 
-        await details.GoToAsync(BetaCorpId);
+        var (companyId, companyName) = await CreateDisposableCompanyAsync();
+
+        await details.GoToAsync(companyId);
 
         await details.ClickScheduleDeletionAsync();
         await details.ClickScheduleDeletionConfirmAsync();
@@ -96,16 +123,18 @@ public sealed class DeletionQueueTests(CrossUserFixture fixture) : RoleE2ETestBa
         await login.GoToAsync();
         await login.LoginAsync(AllowListedAdminEmail);
 
-        await details.GoToAsync(BetaCorpId);
+        var (companyId, companyName) = await CreateDisposableCompanyAsync();
+
+        await details.GoToAsync(companyId);
         await details.ClickScheduleDeletionAsync();
         await details.FillScheduleDeletionReasonAsync("E2E: ensuring a pending deletion exists to cancel");
         await details.ClickScheduleDeletionConfirmAsync();
         await _page.WaitForSelectorAsync(".admin-action-success", new() { Timeout = 15_000 });
 
         await queue.GoToAsync();
-        Assert.True(await queue.HasCompanyAsync("Beta Corp"));
+        Assert.True(await queue.HasCompanyAsync(companyName));
 
-        await queue.ClickCancelDeletionAsync("Beta Corp");
+        await queue.ClickCancelDeletionAsync(companyName);
         Assert.True(await queue.IsCancelDeletionDialogVisibleAsync(),
             "Expected the Cancel deletion confirmation dialog to open");
 
@@ -113,7 +142,7 @@ public sealed class DeletionQueueTests(CrossUserFixture fixture) : RoleE2ETestBa
         await queue.ClickCancelDeletionConfirmAsync();
 
         await _page.WaitForSelectorAsync(".admin-action-success", new() { Timeout = 15_000 });
-        Assert.True(await queue.IsCancelledAsync("Beta Corp"),
+        Assert.True(await queue.IsCancelledAsync(companyName),
             "Expected Beta Corp's deletion queue row to show a Cancelled status after cancelling");
     }
 
@@ -127,16 +156,18 @@ public sealed class DeletionQueueTests(CrossUserFixture fixture) : RoleE2ETestBa
         await login.GoToAsync();
         await login.LoginAsync(AllowListedAdminEmail);
 
-        await details.GoToAsync(BetaCorpId);
+        var (companyId, companyName) = await CreateDisposableCompanyAsync();
+
+        await details.GoToAsync(companyId);
         await details.ClickScheduleDeletionAsync();
         await details.FillScheduleDeletionReasonAsync("E2E: ensuring a pending deletion exists for validation check");
         await details.ClickScheduleDeletionConfirmAsync();
         await _page.WaitForSelectorAsync(".admin-action-success", new() { Timeout = 15_000 });
 
         await queue.GoToAsync();
-        Assert.True(await queue.HasCompanyAsync("Beta Corp"));
+        Assert.True(await queue.HasCompanyAsync(companyName));
 
-        await queue.ClickCancelDeletionAsync("Beta Corp");
+        await queue.ClickCancelDeletionAsync(companyName);
         await queue.ClickCancelDeletionConfirmAsync();
 
         Assert.True(await queue.IsCancelDeletionDialogVisibleAsync(),
@@ -155,16 +186,18 @@ public sealed class DeletionQueueTests(CrossUserFixture fixture) : RoleE2ETestBa
         await login.GoToAsync();
         await login.LoginAsync(AllowListedAdminEmail);
 
-        await details.GoToAsync(BetaCorpId);
+        var (companyId, companyName) = await CreateDisposableCompanyAsync();
+
+        await details.GoToAsync(companyId);
         await details.ClickScheduleDeletionAsync();
         await details.FillScheduleDeletionReasonAsync("E2E: ensuring a pending deletion exists to execute");
         await details.ClickScheduleDeletionConfirmAsync();
         await _page.WaitForSelectorAsync(".admin-action-success", new() { Timeout = 15_000 });
 
         await queue.GoToAsync();
-        Assert.True(await queue.HasCompanyAsync("Beta Corp"));
+        Assert.True(await queue.HasCompanyAsync(companyName));
 
-        await queue.ClickExecuteNowAsync("Beta Corp");
+        await queue.ClickExecuteNowAsync(companyName);
         Assert.True(await queue.IsExecuteDeletionDialogVisibleAsync(),
             "Expected the Begin controlled deletion confirmation dialog to open");
 
@@ -181,7 +214,7 @@ public sealed class DeletionQueueTests(CrossUserFixture fixture) : RoleE2ETestBa
         await queue.ClickExecuteDeletionConfirmAsync();
 
         await _page.WaitForSelectorAsync(".admin-action-success", new() { Timeout = 15_000 });
-        Assert.True(await queue.IsExecutedAsync("Beta Corp"),
+        Assert.True(await queue.IsExecutedAsync(companyName),
             "Expected Beta Corp's deletion queue row to show an Executed status after executing now");
     }
 
@@ -195,16 +228,18 @@ public sealed class DeletionQueueTests(CrossUserFixture fixture) : RoleE2ETestBa
         await login.GoToAsync();
         await login.LoginAsync(AllowListedAdminEmail);
 
-        await details.GoToAsync(BetaCorpId);
+        var (companyId, companyName) = await CreateDisposableCompanyAsync();
+
+        await details.GoToAsync(companyId);
         await details.ClickScheduleDeletionAsync();
         await details.FillScheduleDeletionReasonAsync("E2E: ensuring a pending deletion exists for validation check");
         await details.ClickScheduleDeletionConfirmAsync();
         await _page.WaitForSelectorAsync(".admin-action-success", new() { Timeout = 15_000 });
 
         await queue.GoToAsync();
-        Assert.True(await queue.HasCompanyAsync("Beta Corp"));
+        Assert.True(await queue.HasCompanyAsync(companyName));
 
-        await queue.ClickExecuteNowAsync("Beta Corp");
+        await queue.ClickExecuteNowAsync(companyName);
         await queue.ClickExecuteDeletionConfirmAsync();
 
         Assert.True(await queue.IsExecuteDeletionDialogVisibleAsync(),

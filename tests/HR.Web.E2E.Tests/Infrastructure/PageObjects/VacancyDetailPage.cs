@@ -986,7 +986,12 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         page.Locator(".offer-candidate-dialog .col-md-6").Filter(new() { HasText = "Offered Salary" })
             .Locator("input.e-numerictextbox, input.e-input").First;
 
-    public Task<string> GetOfferedSalaryValueAsync() => OfferSalaryInput.InputValueAsync();
+    public async Task<string> GetOfferedSalaryValueAsync()
+    {
+        await Assertions.Expect(OfferSalaryInput).ToHaveValueAsync(
+            new System.Text.RegularExpressions.Regex(@"\d,\d{3}"), new() { Timeout = 15_000 });
+        return await OfferSalaryInput.InputValueAsync();
+    }
 
     public async Task SetOfferedSalaryAsync(string value)
     {

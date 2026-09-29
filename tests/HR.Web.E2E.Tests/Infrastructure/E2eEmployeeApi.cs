@@ -11,10 +11,35 @@ public static class E2eEmployeeApi
     private static readonly Guid LocationId = Guid.Parse("70000000-0000-0000-0000-000000000001");
     private static readonly Guid PositionProfileId = Guid.Parse("20000000-0000-0000-0000-00000000000B");
     private static readonly Guid EmploymentTypeId = Guid.Parse("40000000-0000-0000-0000-000000000001");
+    private static readonly Guid DefaultLeavePolicyId = Guid.Parse("C0000000-0000-0000-0000-000000000001");
 
     public sealed record CreatedEmployee(Guid Id, string FirstName, string LastName)
     {
         public string FullName => $"{FirstName} {LastName}";
+    }
+
+    private static readonly SemaphoreSlim FillerManagerGate = new(1, 1);
+    private static Guid? _fillerManagerId;
+
+    public static async Task<Guid> GetSharedFillerManagerIdAsync(string apiBaseUrl)
+    {
+        if (_fillerManagerId is { } existing)
+            return existing;
+
+        await FillerManagerGate.WaitAsync();
+        try
+        {
+            if (_fillerManagerId is { } created)
+                return created;
+
+            var manager = await CreateAcmeEmployeeAsync(apiBaseUrl, "FillerMgr", activate: true);
+            _fillerManagerId = manager.Id;
+            return manager.Id;
+        }
+        finally
+        {
+            FillerManagerGate.Release();
+        }
     }
 
     public static async Task<CreatedEmployee> CreateAcmeEmployeeAsync(
@@ -80,6 +105,45 @@ public static class E2eEmployeeApi
         }
 
         return new CreatedEmployee(created!.Id, firstName, lastName);
+    }
+
+    public static async Task<string> CreateVacantPositionProfileAsync(string apiBaseUrl, string titlePrefix)
+    {
+        using var http = await CreateHrAdminClientAsync(apiBaseUrl);
+
+        var title = $"{titlePrefix} {Guid.NewGuid():N}"[..Math.Min(60, titlePrefix.Length + 9)];
+        var response = await http.PostAsJsonAsync(
+            $"/api/companies/{AcmeId}/position-profiles",
+            new
+            {
+                companyId = AcmeId,
+                departmentId = DepartmentId,
+                locationId = LocationId,
+                title,
+                defaultLeavePolicyId = DefaultLeavePolicyId,
+            });
+        Assert.True(response.IsSuccessStatusCode,
+            $"Expected position profile creation to succeed, got {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
+        return title;
+    }
+
+    public static async Task WaitForProbationRecordAsync(string apiBaseUrl, Guid employeeId)
+    {
+        using var http = await CreateHrAdminClientAsync(apiBaseUrl);
+
+        var deadline = DateTime.UtcNow.AddSeconds(45);
+        HttpResponseMessage? last = null;
+        while (DateTime.UtcNow < deadline)
+        {
+            last = await http.GetAsync($"/api/companies/{AcmeId}/employees/{employeeId}/probation-record");
+            if (last.IsSuccessStatusCode)
+                return;
+
+            await Task.Delay(500);
+        }
+
+        Assert.Fail(
+            $"Expected a probation record to be created for employee {employeeId}, last status was {(int?)last?.StatusCode}.");
     }
 
     public static async Task StartLeavingProcessAsync(

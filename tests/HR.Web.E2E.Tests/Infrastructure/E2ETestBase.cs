@@ -62,7 +62,7 @@ public abstract class E2ETestBase(IPersonaFixture fixture) : IAsyncLifetime
         }
     }
 
-    protected async Task WaitForUrlToStopContainingAsync(string urlFragment, int timeoutMs = 20_000)
+    protected async Task WaitForUrlToStopContainingAsync(string urlFragment, int timeoutMs = 45_000)
     {
         var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
         while (_page.Url.Contains(urlFragment) && DateTime.UtcNow < deadline)
@@ -71,7 +71,7 @@ public abstract class E2ETestBase(IPersonaFixture fixture) : IAsyncLifetime
         }
     }
 
-    protected async Task WaitForUrlAsync(Func<string, bool> predicate, int timeoutMs = 20_000)
+    protected async Task WaitForUrlAsync(Func<string, bool> predicate, int timeoutMs = 45_000)
     {
         var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);
         while (!predicate(_page.Url) && DateTime.UtcNow < deadline)

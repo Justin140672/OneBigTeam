@@ -33,6 +33,10 @@ public static class ApiResponseReader
                 // Non-JSON content type (e.g. an HTML page from an intermediary) on a 2xx response.
                 return ApiResult<T>.Fail(ApiFailureKind.InvalidResponse, "The server returned an unreadable response.");
             }
+            catch (Exception ex) when (ex is HttpRequestException or IOException or ObjectDisposedException)
+            {
+                return ApiResult<T>.Fail(ApiFailureKind.Network, "Unable to reach the server. Please check your connection and try again.");
+            }
         }
 
         return await ReadFailureAsync<T>(response, cancellationToken);
@@ -70,6 +74,10 @@ public static class ApiResponseReader
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or ObjectDisposedException)
+        {
+            return ApiResult<T>.Fail(ApiFailureKind.Network, "Unable to reach the server. Please check your connection and try again.");
         }
 
         var errorEnvelope = TryDeserialize<ApiErrorEnvelope>(raw);

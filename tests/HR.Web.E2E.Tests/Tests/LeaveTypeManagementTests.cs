@@ -117,7 +117,7 @@ public sealed class LeaveTypeManagementTests(HrAdminPersonaFixture fixture) : Ro
         await login.LoginAsync(TomEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/leave-types");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        await WaitForUrlToStopContainingAsync("/leave-types");
 
         var finalUrl = _page.Url;
         Assert.False(finalUrl.Contains("/leave-types"),

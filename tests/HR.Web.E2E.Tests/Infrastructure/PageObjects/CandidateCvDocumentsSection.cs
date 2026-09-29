@@ -108,14 +108,27 @@ public sealed class CandidateCvDocumentsSection(IPage page)
 
     public async Task UploadCvAsync(string fileName, byte[] content)
     {
-        await FileInput.SetInputFilesAsync(new FilePayload
+        const int maxAttempts = 6;
+        for (var attempt = 1; ; attempt++)
         {
-            Name     = fileName,
-            MimeType = "application/pdf",
-            Buffer   = content,
-        });
+            await FileInput.SetInputFilesAsync(new FilePayload
+            {
+                Name     = fileName,
+                MimeType = "application/pdf",
+                Buffer   = content,
+            });
 
-        await Assertions.Expect(UploadButton).ToBeEnabledAsync(new() { Timeout = 15_000 });
+            try
+            {
+                await Assertions.Expect(UploadButton).ToBeEnabledAsync(new() { Timeout = 5_000 });
+                break;
+            }
+            catch (PlaywrightException) when (attempt < maxAttempts)
+            {
+                await FileInput.SetInputFilesAsync(Array.Empty<FilePayload>());
+            }
+        }
+
         await UploadButton.ClickAsync();
 
         await Assertions.Expect(SuccessAlert)

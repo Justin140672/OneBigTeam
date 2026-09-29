@@ -52,6 +52,7 @@ api
 if (isE2ETesting)
 {
 	api.WithEnvironment("Identity__RateLimits__identity-login__PermitLimit", "100");
+	api.WithEnvironment("Identity__RateLimits__identity-signup__PermitLimit", "100");
 }
 
 var web = isE2ETesting

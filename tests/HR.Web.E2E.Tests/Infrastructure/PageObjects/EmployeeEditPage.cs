@@ -148,8 +148,16 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await page.Keyboard.PressAsync("Tab");
     }
 
-    public Task SelectDropdownAsync(string labelText, string optionText) =>
-        DropDownSelector.SelectAsync(page, page.Locator(".col-md-6, .col-md-4").Filter(new() { HasText = labelText }).First, optionText);
+    public async Task SelectDropdownAsync(string labelText, string optionText)
+    {
+        await DropDownSelector.SelectAsync(page, page.Locator(".col-md-6, .col-md-4").Filter(new() { HasText = labelText }).First, optionText);
+
+        if (labelText == "Position Profile")
+        {
+            await WaitForDropdownPopulatedAsync("Department");
+            await WaitForDropdownPopulatedAsync("Location");
+        }
+    }
 
     public async Task WaitForDropdownPopulatedAsync(string labelText)
     {

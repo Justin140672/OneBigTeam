@@ -124,10 +124,18 @@ public sealed class GettingStartedAndExploreTests(HrAdminPersonaFixture fixture)
         await login.GoToAsync();
         await login.LoginAsync(HrAdminEmail);
 
-        await hrSettings.GoToAsync(AcmeId);
-        var currentHours = await hrSettings.GetHoursPerDayAsync();
-        await hrSettings.SetHoursPerDayAsync(currentHours);
-        await hrSettings.SaveAsync();
+        await HrSettingsSerialTestBase.GateInstance.WaitAsync();
+        try
+        {
+            await hrSettings.GoToAsync(AcmeId);
+            var currentHours = await hrSettings.GetHoursPerDayAsync();
+            await hrSettings.SetHoursPerDayAsync(currentHours);
+            await hrSettings.SaveAsync();
+        }
+        finally
+        {
+            HrSettingsSerialTestBase.GateInstance.Release();
+        }
 
         await gettingStarted.GoToAsync();
 

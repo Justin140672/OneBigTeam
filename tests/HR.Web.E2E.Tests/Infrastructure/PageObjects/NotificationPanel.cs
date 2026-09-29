@@ -52,18 +52,20 @@ public sealed class NotificationPanel(IPage page)
             .Filter(new() { HasText = titleFragment })
             .First;
 
-        // Retry the click, same as EmployeeListPage.ClickNewEmployeeAsync — a single unretried
-        // click racing the dialog's own open animation (or a momentarily non-actionable item) can
-        // fail even though the underlying action is correct. ClickAsync gets its own explicit
-        // timeout so a transient actionability failure feeds the retry loop instead of escaping
-        // it via Playwright's default 30s wait.
+        var dialog = page.Locator(".task-view-dialog");
         const int maxAttempts = 5;
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
             try
             {
+                if (!await item.IsVisibleAsync())
+                {
+                    await dialog.First.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = attempt < maxAttempts ? 8_000 : 30_000 });
+                    return;
+                }
+
                 await item.ClickAsync(new() { Timeout = attempt < maxAttempts ? 5_000 : 30_000 });
-                await page.WaitForSelectorAsync(".task-view-dialog", new() { Timeout = attempt < maxAttempts ? 3_000 : 15_000 });
+                await dialog.First.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = attempt < maxAttempts ? 8_000 : 30_000 });
                 return;
             }
             catch (TimeoutException) when (attempt < maxAttempts)

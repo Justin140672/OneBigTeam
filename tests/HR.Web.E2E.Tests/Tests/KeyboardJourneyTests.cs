@@ -29,9 +29,8 @@ public sealed class KeyboardJourneyTests(EmployeePersonaFixture fixture)
         var profile = await OpenLeaveTabAsync();
         await profile.ClickRequestLeaveAsync();
 
-        // Unique, weekday-only dates per run: this persona's requests persist between runs, so a fixed
-        // "today + 2 months" range would overlap an earlier run's request and be rejected by the API.
-        var start = DateTime.Today.AddMonths(2).AddDays(Random.Shared.Next(0, 100));
+        var daysLeftInYear = new DateTime(DateTime.Today.Year, 12, 31).Subtract(DateTime.Today).Days;
+        var start = DateTime.Today.AddDays(1 + Random.Shared.Next(0, Math.Max(1, Math.Min(60, daysLeftInYear - 4))));
         while (start.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) start = start.AddDays(1);
         var end   = start;
         var reason = $"NFR-05 keyboard {Guid.NewGuid():N}".Substring(0, 24);

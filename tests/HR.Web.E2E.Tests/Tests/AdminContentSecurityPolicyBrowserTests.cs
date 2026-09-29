@@ -66,7 +66,7 @@ public sealed class AdminContentSecurityPolicyBrowserTests(HrAdminPersonaFixture
         foreach (var route in Routes)
         {
             await page.GotoAsync($"{_fixture.AdminWebBaseUrl}{route}", new() { WaitUntil = WaitUntilState.Load });
-            await Assertions.Expect(page.Locator(".app-shell")).ToBeVisibleAsync();
+            await Assertions.Expect(page.Locator(".admin-shell")).ToBeVisibleAsync();
             await page.WaitForTimeoutAsync(1_000);
             await CollectViolationsAsync(page, route, problems);
         }

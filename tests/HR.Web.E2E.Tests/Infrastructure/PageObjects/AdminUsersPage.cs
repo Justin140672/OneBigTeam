@@ -53,10 +53,21 @@ public sealed class AdminUsersPage(IPage page, string baseUrl)
         }
     }
 
-    public Task<string?> GetRoleTextAsync(string emailFragment)
+    public async Task<string?> GetRoleTextAsync(string emailFragment, string? expectedRole = null)
     {
         var cell = RowByEmail(emailFragment).Locator("td").Nth(1);
-        return cell.TextContentAsync();
+        if (expectedRole is not null)
+        {
+            try
+            {
+                await Assertions.Expect(cell).ToContainTextAsync(expectedRole, new() { Timeout = 20_000 });
+            }
+            catch (PlaywrightException)
+            {
+            }
+        }
+
+        return await cell.TextContentAsync();
     }
 
 

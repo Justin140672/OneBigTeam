@@ -44,6 +44,9 @@ public sealed class PositionProfileListPage(IPage page, string baseUrl)
 
     public async Task DeactivateAsync(string title)
     {
+        if (!await page.HasGridCellOnAnyPageAsync(title))
+            throw new InvalidOperationException($"Position profile '{title}' was not found on any page of the list.");
+
         var row = page.Locator(".e-row")
             .Filter(new() { HasText = title })
             .First;
@@ -59,6 +62,9 @@ public sealed class PositionProfileListPage(IPage page, string baseUrl)
 
     public async Task<bool> IsActiveAsync(string title)
     {
+        if (!await page.HasGridCellOnAnyPageAsync(title))
+            return false;
+
         var row = page.Locator(".e-row")
             .Filter(new() { HasText = title })
             .First;

@@ -21,13 +21,16 @@ public sealed class CandidateListPage(IPage page, string baseUrl)
         const int maxAttempts = 8;
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            await button.ClickAsync();
+            if (page.Url.Contains("/candidates/new"))
+                return;
+
             try
             {
+                await button.ClickAsync(new() { Timeout = attempt < maxAttempts ? 5_000 : 30_000 });
                 await page.WaitForURLAsync("**/candidates/new**",
                     new()
                     {
-                        Timeout = attempt < maxAttempts ? 3_000 : 30_000,
+                        Timeout = attempt < maxAttempts ? 5_000 : 30_000,
                         WaitUntil = WaitUntilState.Commit,
                     });
                 return;

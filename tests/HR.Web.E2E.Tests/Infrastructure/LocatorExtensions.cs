@@ -4,7 +4,7 @@ namespace HR.Web.E2E.Tests.Infrastructure;
 
 public static class LocatorExtensions
 {
-    public static async Task<bool> WaitUntilVisibleAsync(this ILocator locator, int timeoutMs = 5_000)
+    public static async Task<bool> WaitUntilVisibleAsync(this ILocator locator, int timeoutMs = 10_000)
     {
         try
         {
@@ -15,6 +15,12 @@ public static class LocatorExtensions
         {
             return false;
         }
+    }
+
+    public static async Task RevealGridRowAsync(this IPage page, string text)
+    {
+        if (!await page.HasGridCellOnAnyPageAsync(text))
+            throw new InvalidOperationException($"Grid row containing '{text}' was not found on any page.");
     }
 
     public static async Task<bool> HasGridCellOnAnyPageAsync(this IPage page, string text)
@@ -42,11 +48,15 @@ public static class LocatorExtensions
         var addButton = page.GetByRole(AriaRole.Button, new() { Name = "Add" });
         await addButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
 
+        var listUrl = page.Url;
         for (var attempt = 1; attempt <= 3; attempt++)
         {
-            await addButton.ClickAsync();
+            if (page.Url != listUrl)
+                return;
+
             try
             {
+                await addButton.ClickAsync(new() { Timeout = 10_000 });
                 await page.WaitForURLAsync(createUrlGlob, new() { Timeout = 10_000, WaitUntil = WaitUntilState.Commit });
                 return;
             }

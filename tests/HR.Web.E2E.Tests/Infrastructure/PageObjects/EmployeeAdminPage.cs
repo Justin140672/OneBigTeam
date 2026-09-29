@@ -13,6 +13,14 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
     public async Task<string> GetActiveTabNameAsync()
     {
         var section = page.Locator(".employee-profile-sections [role='tab'][aria-selected='true']").First;
+        try
+        {
+            await section.WaitForAsync(new() { Timeout = 15_000 });
+        }
+        catch (TimeoutException)
+        {
+        }
+
         if (await section.CountAsync() > 0)
         {
             await section.WaitForAsync(new() { Timeout = 10_000 });

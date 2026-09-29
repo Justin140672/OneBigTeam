@@ -62,12 +62,14 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
         // the same bg-success styling as the Active status badge when the outcome itself is
         // "positive" — scope to .First (the Active status badge, which always renders before the
         // Terminal Outcome cell) to avoid a strict-mode violation on rows with both.
+        await page.RevealGridRowAsync(nameFragment);
         return await Row(nameFragment).Locator(".badge.bg-success").First.IsVisibleAsync();
     }
 
     public async Task<string?> GetTerminalOutcomeAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await page.RevealGridRowAsync(nameFragment);
         var cells = Row(nameFragment).Locator(".e-rowcell");
         var count = await cells.CountAsync();
         for (var i = count - 1; i >= 0; i--)
@@ -82,6 +84,7 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
     public async Task<string?> GetPurposeAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await page.RevealGridRowAsync(nameFragment);
         var cells = Row(nameFragment).Locator(".e-rowcell");
         var count = await cells.CountAsync();
         for (var i = count - 1; i >= 0; i--)
@@ -98,6 +101,7 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
     public async Task<int?> GetDisplayOrderAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await page.RevealGridRowAsync(nameFragment);
         var firstCell = Row(nameFragment).Locator(".e-rowcell").First;
         var text = (await firstCell.TextContentAsync())?.Trim();
         return int.TryParse(text, out var value) ? value : null;
@@ -147,6 +151,7 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
     public async Task DeactivateAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await page.RevealGridRowAsync(nameFragment);
 
         await Row(nameFragment).ClickAsync();
         var btn = page.GetByRole(AriaRole.Button, new() { Name = "Deactivate" });
@@ -161,6 +166,7 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
     public async Task ActivateAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await page.RevealGridRowAsync(nameFragment);
 
         await Row(nameFragment).ClickAsync();
         var btn = page.GetByRole(AriaRole.Button, new() { Name = "Activate", Exact = true });

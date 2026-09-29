@@ -121,6 +121,11 @@ public sealed class OrganisationChartTests(HrAdminPersonaFixture fixture) : Role
 
         var zoomedText = await zoomLevel.InnerTextAsync();
 
+        await _page.WaitForFunctionAsync(
+            "expected => { const s = localStorage.getItem('orgChartZoom'); return s !== null && Math.round(parseFloat(s) * 100) + '%' === expected; }",
+            zoomedText,
+            new PageWaitForFunctionOptions { Timeout = 15_000 });
+
         await _page.ReloadAsync();
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
 

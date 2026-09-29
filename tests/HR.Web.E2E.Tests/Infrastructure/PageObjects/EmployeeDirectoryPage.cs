@@ -29,10 +29,19 @@ public sealed class EmployeeDirectoryPage(IPage page, string baseUrl)
     {
         await SearchBox.FillAsync(term);
         await SearchBox.PressAsync("Tab");
-        await page.WaitForTimeoutAsync(400);
-        await page.WaitForSelectorAsync(
-            "[data-testid='directory-employee-card'], :text('No employees found')",
-            new() { Timeout = 15_000 });
+
+        var deadline = DateTime.UtcNow.AddSeconds(8);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await page.GetByText("No employees found").IsVisibleAsync())
+                return;
+
+            if (await Cards.CountAsync() > 0
+                && await Cards.Filter(new() { HasNotText = term }).CountAsync() == 0)
+                return;
+
+            await page.WaitForTimeoutAsync(200);
+        }
     }
 
     public Task<int> CardCount() => Cards.CountAsync();

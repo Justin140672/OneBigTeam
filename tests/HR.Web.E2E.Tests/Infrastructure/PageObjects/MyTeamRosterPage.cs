@@ -44,6 +44,9 @@ public sealed class MyTeamRosterPage(IPage page, string baseUrl)
         await WaitForLoadedAsync();
     }
 
+    public Task ExpectRowCountAsync(int expected) =>
+        Assertions.Expect(Rows).ToHaveCountAsync(expected, new() { Timeout = 15_000 });
+
     public async Task SearchAsync(string term)
     {
         await SearchBox.FillAsync(term);

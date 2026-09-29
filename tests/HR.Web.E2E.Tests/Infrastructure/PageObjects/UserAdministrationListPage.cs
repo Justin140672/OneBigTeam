@@ -32,16 +32,30 @@ public sealed class UserAdministrationListPage(IPage page, string baseUrl)
             .WaitUntilVisibleAsync();
     }
 
-    public async Task<string?> GetInvitationStatusAsync(string nameOrEmailFragment)
+    public async Task<string?> GetInvitationStatusAsync(string nameOrEmailFragment, string? expectedStatus = null)
     {
         await SearchAsync(nameOrEmailFragment);
 
         var row = page.Locator(".e-row")
             .Filter(new() { HasText = nameOrEmailFragment })
             .First;
-
         var badge = row.Locator(".e-rowcell .badge").Last;
-        return await badge.IsVisibleAsync() ? await badge.InnerTextAsync() : null;
+
+        string? current = null;
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (await badge.IsVisibleAsync())
+            {
+                current = (await badge.InnerTextAsync()).Trim();
+                if (expectedStatus is null || string.Equals(current, expectedStatus, StringComparison.Ordinal))
+                    return current;
+            }
+
+            await page.WaitForTimeoutAsync(250);
+        }
+
+        return current;
     }
 
     public async Task OpenUserDetailAsync(string nameOrEmailFragment)

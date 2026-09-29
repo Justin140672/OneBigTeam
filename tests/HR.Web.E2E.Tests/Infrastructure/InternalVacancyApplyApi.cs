@@ -58,6 +58,7 @@ internal static class InternalVacancyApplyApi
         var lastName = $"Applicant{unique}";
         var workEmail = $"e2e.apply.{unique}@acme.example";
         var employeeNumber = $"E2E-APPLY-{unique}";
+        var applicantManagerId = await E2eEmployeeApi.GetSharedFillerManagerIdAsync(apiBaseUrl);
 
         var createResponse = await hrAdminApi.PostAsJsonAsync(
             $"/api/companies/{AcmeId}/employees",
@@ -67,7 +68,7 @@ internal static class InternalVacancyApplyApi
                 departmentId = DepartmentId,
                 locationId = LocationId,
                 positionProfileId = PositionProfileId,
-                managerId = JamesId,
+                managerId = applicantManagerId,
                 firstName,
                 lastName,
                 workEmail,
@@ -102,7 +103,7 @@ internal static class InternalVacancyApplyApi
                 departmentId = DepartmentId,
                 locationId = LocationId,
                 positionProfileId = PositionProfileId,
-                managerId = JamesId,
+                managerId = applicantManagerId,
                 startDate = "2026-03-01",
                 expectedVersion = current!.Version,
             });

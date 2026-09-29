@@ -20,9 +20,12 @@ public sealed class ExternalRecruiterListPage(IPage page, string baseUrl)
 
         for (var attempt = 0; attempt < 3; attempt++)
         {
-            await addButton.ClickAsync();
+            if (page.Url.Contains("/external-recruiters/new"))
+                return;
+
             try
             {
+                await addButton.ClickAsync(new() { Timeout = 10_000 });
                 await page.WaitForURLAsync("**/external-recruiters/new**", new() { Timeout = 10_000 });
                 return;
             }
@@ -50,12 +53,14 @@ public sealed class ExternalRecruiterListPage(IPage page, string baseUrl)
     public async Task<bool> IsActiveAsync(string agencyNameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await page.RevealGridRowAsync(agencyNameFragment);
         return await Row(agencyNameFragment).Locator(".badge.bg-success").IsVisibleAsync();
     }
 
     public async Task DeactivateAsync(string agencyNameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await page.RevealGridRowAsync(agencyNameFragment);
 
         await Row(agencyNameFragment).ClickAsync();
         var btn = page.GetByRole(AriaRole.Button, new() { Name = "Deactivate" });
@@ -70,6 +75,7 @@ public sealed class ExternalRecruiterListPage(IPage page, string baseUrl)
     public async Task ActivateAsync(string agencyNameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await page.RevealGridRowAsync(agencyNameFragment);
 
         await Row(agencyNameFragment).ClickAsync();
         var btn = page.GetByRole(AriaRole.Button, new() { Name = "Activate", Exact = true });
@@ -88,6 +94,7 @@ public sealed class ExternalRecruiterListPage(IPage page, string baseUrl)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
+        await page.RevealGridRowAsync(agencyNameFragment);
         var link = page.Locator(".e-rowcell a").Filter(new() { HasText = agencyNameFragment }).First;
         await link.ClickAsync();
         await page.WaitForSelectorAsync("button:has-text('Save'), button:has-text('Close')", new() { Timeout = 20_000 });

@@ -158,14 +158,17 @@
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label">Position Profile <span class="text-danger">*</span></label>
-                                    <SfDropDownList TValue="Guid?"
+                                    <SfDropDownList @ref="_positionProfileDropdown"
+                                                    TValue="Guid?"
                                                     TItem="PositionProfileListItemModel"
                                                     DataSource="@_positionProfiles"
                                                     @bind-Value="Model.PositionProfileId"
                                                     Placeholder="None"
                                                     AllowFiltering="true">
                                         <DropDownListFieldSettings Value="Id" Text="Title" />
-                                        <DropDownListEvents TItem="PositionProfileListItemModel" TValue="Guid?" ValueChange="OnPositionProfileChanged" />
+                                        <DropDownListEvents TItem="PositionProfileListItemModel" TValue="Guid?"
+                                                            ValueChange="OnPositionProfileChanged"
+                                                            Filtering="OnPositionProfileFilteringAsync" />
                                     </SfDropDownList>
                                     <ValidationMessage For="@(() => Model.PositionProfileId)" />
                                 </div>
@@ -936,6 +939,7 @@
     private List<EmploymentTypeListItemModel> _employmentTypes = [];
     private List<NationalityListItem> _nationalities = [];
     private SfDropDownList<Guid?, ManagerOption> _managerDropdown = default!;
+    private SfDropDownList<Guid?, PositionProfileListItemModel> _positionProfileDropdown = default!;
     private List<ManagerOption> _managerOptions = [];
 
     private GetPositionProfileResponse? _selectedProfileDefaults;
@@ -1070,6 +1074,20 @@
             _employee = await EmployeeService.GetEmployeeAsync(CompanyId, Id!.Value);
             if (_employee is not null)
                 PopulateFromEmployee(_employee);
+
+            if (_employee?.PositionProfileId is { } currentProfileId &&
+                _positionProfiles.All(p => p.Id != currentProfileId))
+            {
+                var currentProfile = await PositionProfileService.GetPositionProfileAsync(CompanyId, currentProfileId);
+                if (currentProfile is not null)
+                {
+                    _positionProfiles.Add(new PositionProfileListItemModel(
+                        currentProfile.Id, DepartmentName: null, currentProfile.Title, currentProfile.Description,
+                        currentProfile.IsActive, currentProfile.SalaryMin, currentProfile.SalaryMax,
+                        currentProfile.SalaryType, currentProfile.NoticePeriodUnitOverride,
+                        currentProfile.NoticePeriodLengthOverride));
+                }
+            }
 
             var uri = new Uri(Navigation.Uri);
             if (uri.Query.Contains("invited=true") && _employee is not null)
@@ -1256,6 +1274,18 @@
     }
 
     private sealed record ManagerOption(Guid Id, string Name);
+
+    private int _profileFilterRequestId;
+
+    private async Task OnPositionProfileFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
+    {
+        args.PreventDefaultAction = true;
+        var requestId = ++_profileFilterRequestId;
+        var result = await PositionProfileService.ListPositionProfilesAsync(CompanyId, search: args.Text, pageSize: 100);
+        if (requestId != _profileFilterRequestId) return;
+        var options = (result?.Items ?? []).ToList();
+        await _positionProfileDropdown.FilterAsync(options, new Query());
+    }
 
     private async Task OnPositionProfileChanged(ChangeEventArgs<Guid?, PositionProfileListItemModel> args)
     {

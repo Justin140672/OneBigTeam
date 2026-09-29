@@ -113,6 +113,7 @@ public sealed class ManagerTeamProfileTests(ManagerPersonaFixture fixture) : Rol
         Assert.True(beforeSearch > 0, "Expected at least one direct report in the roster.");
 
         await roster.SearchAsync(uniqueName);
+        await roster.ExpectRowCountAsync(1);
         var afterSearch = await roster.GetRowNamesAsync();
 
         Assert.All(afterSearch, n => Assert.Contains(uniqueName, n, StringComparison.OrdinalIgnoreCase));

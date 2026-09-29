@@ -122,19 +122,19 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
         await employees.CompleteQuickInviteAsync([]);
 
         await list.GoToAsync(AcmeId);
-        Assert.Equal("Pending", await list.GetInvitationStatusAsync(targetName));
+        Assert.Equal("Pending", await list.GetInvitationStatusAsync(targetName, "Pending"));
 
         await list.SelectRowAsync(targetName);
         await list.ClickResendInvitationAsync();
 
         Assert.Null(await list.GetActionErrorAsync());
-        Assert.Equal("Pending", await list.GetInvitationStatusAsync(targetName));
+        Assert.Equal("Pending", await list.GetInvitationStatusAsync(targetName, "Pending"));
 
         await list.SelectRowAsync(targetName);
         await list.ClickCancelInvitationAsync();
 
         Assert.Null(await list.GetActionErrorAsync());
-        Assert.Equal("Cancelled", await list.GetInvitationStatusAsync(targetName));
+        Assert.Equal("Cancelled", await list.GetInvitationStatusAsync(targetName, "Cancelled"));
     }
 
     [Theory]

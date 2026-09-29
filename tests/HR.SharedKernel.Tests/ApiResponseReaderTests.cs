@@ -294,6 +294,34 @@ public class ApiResponseReaderTests
     }
 
 
+    private sealed class BrokenBodyContent(Exception toThrow) : HttpContent
+    {
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) => Task.FromException(toThrow);
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = -1;
+            return false;
+        }
+
+        protected override Task<Stream> CreateContentReadStreamAsync() => Task.FromException<Stream>(toThrow);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.OK)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task ReadJsonAsync_Returns_Network_When_Body_Stream_Breaks_Mid_Read(HttpStatusCode status)
+    {
+        var content = new BrokenBodyContent(new IOException("The response ended prematurely."));
+        content.Headers.ContentType = new("application/json");
+        using var response = new HttpResponseMessage(status) { Content = content };
+
+        var result = await ApiResponseReader.ReadJsonAsync<Sample>(response);
+
+        Assert.False(result.Success);
+        Assert.Equal(ApiFailureKind.Network, result.FailureKind);
+    }
+
     [Fact]
     public async Task ExecuteAsync_Returns_Network_When_Send_Throws_HttpRequestException()
     {

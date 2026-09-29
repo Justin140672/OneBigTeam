@@ -151,7 +151,7 @@ public sealed class AdminUsersManagementTests(ParallelBlankPersonaFixture fixtur
 
         await _page.WaitForSelectorAsync(".admin-action-success", new() { Timeout = 15_000 });
 
-        var roleText = await adminUsers.GetRoleTextAsync(email) ?? "";
+        var roleText = await adminUsers.GetRoleTextAsync(email, "PlatformOwner") ?? "";
         Assert.Contains("PlatformOwner", roleText);
     }
 

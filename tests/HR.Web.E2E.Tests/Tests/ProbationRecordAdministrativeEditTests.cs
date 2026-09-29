@@ -23,6 +23,15 @@ public sealed class ProbationRecordAdministrativeEditTests(HrAdminPersonaFixture
 
     private const string LauraEmail = "laura.bennett@acme.example";
 
+    private async Task<Guid> ArrangeEditableRecordEmployeeAsync()
+    {
+        var fillerManagerId = await E2eEmployeeApi.GetSharedFillerManagerIdAsync(_fixture.ApiBaseUrl);
+        var employee = await E2eEmployeeApi.CreateAcmeEmployeeAsync(
+            _fixture.ApiBaseUrl, "ProbEdit", managerId: fillerManagerId, activate: true);
+        await E2eEmployeeApi.WaitForProbationRecordAsync(_fixture.ApiBaseUrl, employee.Id);
+        return employee.Id;
+    }
+
     [Fact]
     public async Task ProbationTab_ShowsReadOnlySummary_AndEditButton_ForEditableRecord()
     {
@@ -52,7 +61,8 @@ public sealed class ProbationRecordAdministrativeEditTests(HrAdminPersonaFixture
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await empEdit.GoToAsync(AcmeId, CarlosRivera);
+        var subject = await ArrangeEditableRecordEmployeeAsync();
+        await empEdit.GoToAsync(AcmeId, subject);
         await empEdit.OpenProbationTabAsync();
         await panel.ClickEditAsync();
 
@@ -67,7 +77,7 @@ public sealed class ProbationRecordAdministrativeEditTests(HrAdminPersonaFixture
 
         Assert.False(await panel.IsConflictBannerVisibleAsync());
 
-        await empEdit.GoToAsync(AcmeId, CarlosRivera);
+        await empEdit.GoToAsync(AcmeId, subject);
         await empEdit.OpenProbationTabAsync();
 
         Assert.Contains("James Okafor", await panel.GetManagerSummaryTextAsync());
@@ -85,7 +95,8 @@ public sealed class ProbationRecordAdministrativeEditTests(HrAdminPersonaFixture
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await empEdit.GoToAsync(AcmeId, CarlosRivera);
+        var subject = await ArrangeEditableRecordEmployeeAsync();
+        await empEdit.GoToAsync(AcmeId, subject);
         await empEdit.OpenProbationTabAsync();
         await panel.ClickEditAsync();
 
@@ -102,7 +113,7 @@ public sealed class ProbationRecordAdministrativeEditTests(HrAdminPersonaFixture
             await otherLogin.GoToAsync();
             await otherLogin.LoginAsync(LauraEmail);
 
-            await otherEmpEdit.GoToAsync(AcmeId, CarlosRivera);
+            await otherEmpEdit.GoToAsync(AcmeId, subject);
             await otherEmpEdit.OpenProbationTabAsync();
             await otherPanel.ClickEditAsync();
 
@@ -134,7 +145,7 @@ public sealed class ProbationRecordAdministrativeEditTests(HrAdminPersonaFixture
 
         Assert.False(await panel.IsConflictBannerVisibleAsync());
 
-        await empEdit.GoToAsync(AcmeId, CarlosRivera);
+        await empEdit.GoToAsync(AcmeId, subject);
         await empEdit.OpenProbationTabAsync();
         Assert.Equal(finalNotes, await panel.GetNotesSummaryTextAsync());
     }
@@ -154,7 +165,8 @@ public sealed class ProbationRecordAdministrativeEditTests(HrAdminPersonaFixture
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await empEdit.GoToAsync(AcmeId, CarlosRivera);
+        var subject = await ArrangeEditableRecordEmployeeAsync();
+        await empEdit.GoToAsync(AcmeId, subject);
         await empEdit.OpenProbationTabAsync();
         await panel.ClickEditAsync();
 
@@ -174,7 +186,7 @@ public sealed class ProbationRecordAdministrativeEditTests(HrAdminPersonaFixture
             await otherLogin.GoToAsync();
             await otherLogin.LoginAsync(LauraEmail);
 
-            await otherEmpEdit.GoToAsync(AcmeId, CarlosRivera);
+            await otherEmpEdit.GoToAsync(AcmeId, subject);
             await otherEmpEdit.OpenProbationTabAsync();
             await otherPanel.ClickEditAsync();
             await otherPanel.SetExpectedEndDateAsync(winningEndDateText);

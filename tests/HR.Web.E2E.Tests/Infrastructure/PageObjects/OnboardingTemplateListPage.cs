@@ -21,6 +21,7 @@ public sealed class OnboardingTemplateListPage(IPage page, string baseUrl)
 
     public async Task<string> GetRowHrefAsync(string nameFragment)
     {
+        await page.RevealGridRowAsync(nameFragment);
         var href = await page.Locator(".e-rowcell a").Filter(new() { HasText = nameFragment }).First.GetAttributeAsync("href");
         return href ?? throw new InvalidOperationException($"No onboarding-template row link found for '{nameFragment}'.");
     }
@@ -38,6 +39,7 @@ public sealed class OnboardingTemplateListPage(IPage page, string baseUrl)
     public async Task DeactivateAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await page.RevealGridRowAsync(nameFragment);
 
         var row = page.Locator(".e-row")
             .Filter(new() { HasText = nameFragment })
@@ -55,6 +57,7 @@ public sealed class OnboardingTemplateListPage(IPage page, string baseUrl)
     public async Task<bool> IsActiveAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await page.RevealGridRowAsync(nameFragment);
 
         var row = page.Locator(".e-row")
             .Filter(new() { HasText = nameFragment })
