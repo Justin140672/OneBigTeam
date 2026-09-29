@@ -19,6 +19,15 @@ builder.AddServiceDefaults();
 
 var isE2E = string.Equals(Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
 
+// Same fail-fast rule as HR.Api/Program.cs: the /_e2e/* test endpoints and E2E handlers below must
+// never be reachable outside Development.
+if (isE2E && !builder.Environment.IsDevelopment())
+{
+    throw new InvalidOperationException(
+        $"E2E_TESTING=true is not permitted in the '{builder.Environment.EnvironmentName}' environment. "
+        + "Test endpoints are only allowed under Development. Refusing to start.");
+}
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(options => options.DetailedErrors = builder.Environment.IsDevelopment());
 
@@ -424,8 +433,8 @@ app.MapGet("/logout", async (
 // user's real cookie jar — a POST issued from an HttpClient inside the Blazor Server process would
 // only set a cookie on that throwaway HttpClient, never on the user's browser.
 // TEST-ONLY (E2E_TESTING-gated): endpoints for a Playwright test to drive the server-side outbound
-// contact-details save. Only mapped when E2E_TESTING=true, which is forbidden outside
-// Development/test environments.
+// contact-details save. Only mapped when E2E_TESTING=true, and startup fails (see top of this file)
+// if E2E_TESTING=true outside Development.
 if (isE2E)
 {
     app.MapPost("/_e2e/contact-save-control/{email}", (string email, E2eContactSaveControlStore store) =>

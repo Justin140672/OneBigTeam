@@ -1,16 +1,13 @@
 using FastEndpoints;
-using HR.Infrastructure.Abstractions;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
+using HR.SharedKernel.DevEndpoints;
 
 namespace HR.Modules.Identity.Features.DevEnsureEmployeeLogin;
 
+// Gate: Development environment AND DevTools:Enabled=true, enforced by the shared [DevOnlyEndpoint]
+// discovery filter + 404 pre-processor (HR.SharedKernel.DevEndpoints). Anonymous by design (dev tooling).
+[DevOnlyEndpoint(DevEndpointKind.DevTools)]
 internal sealed class Endpoint(
-    IServiceProvider serviceProvider,
-    IWebHostEnvironment environment,
-    IOptions<DevToolsOptions> devToolsOptions) : Endpoint<DevEnsureEmployeeLoginRequest>
+    IServiceProvider serviceProvider) : Endpoint<DevEnsureEmployeeLoginRequest>
 {
     public override void Configure()
     {
@@ -20,12 +17,6 @@ internal sealed class Endpoint(
 
     public override async Task HandleAsync(DevEnsureEmployeeLoginRequest request, CancellationToken cancellationToken)
     {
-        if (!environment.IsDevelopment() || !devToolsOptions.Value.Enabled)
-        {
-            await Send.ResultAsync(TypedResults.NotFound());
-            return;
-        }
-
         await serviceProvider.EnsureDevSupabaseUserAsync(
             request.EmployeeId, request.CompanyId, request.Email,
             request.FirstName, request.LastName, cancellationToken);

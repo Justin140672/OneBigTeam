@@ -34,8 +34,9 @@ public class DepartureFinaliserEndpointDisabledModeTests
 /// Enabled-mode security tests for the DepartureFinaliserTestEndpoint when E2E_TESTING=true.
 /// These tests verify all authorization boundaries and validation logic in test mode.
 ///
-/// The endpoint's security boundaries are enforced at the handler level:
-/// - E2E_TESTING gate: returns 404 when the environment variable is not "true" (production mode)
+/// The endpoint's security boundaries (see DevEndpointGateMatrixTests for the environment matrix):
+/// - Development-only: route not registered outside Development; shared [DevOnlyEndpoint] gate also 404s
+/// - E2E_TESTING gate: shared gate returns 404 when the environment variable is not "true"
 /// - Authentication: requires valid X-Test-User header (401 Unauthorized if missing)
 /// - Authorization: requires "role:hr-administrator" policy (403 Forbidden if wrong role)
 /// - Company isolation: currentTenant.TenantId must match route companyId (403 Forbidden if mismatch)

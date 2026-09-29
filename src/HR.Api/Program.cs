@@ -94,7 +94,14 @@ builder.Services.AddSupportModule(connectionString);
 builder.Services.AddReportingModule(connectionString);
 builder.Services.AddInfrastructure(connectionString, builder.Configuration, builder.Environment);
 builder.Services.AddHangfireBackgroundJobs(connectionString);
-builder.Services.AddFastEndpoints(o => o.IncludeAbstractValidators = true);
+builder.Services.AddFastEndpoints(o =>
+{
+	o.IncludeAbstractValidators = true;
+
+	// Dev/E2E-only endpoints ([DevOnlyEndpoint]) are not even discovered outside Development, so their
+	// routes do not exist in Production/Staging (404). The per-request gate is the second layer.
+	o.Filter = type => HR.SharedKernel.DevEndpoints.DevEndpointGate.ShouldDiscover(type, builder.Environment);
+});
 builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(o =>
     o.SerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter()));
 builder.Services.AddSingleton<IClock, SystemClock>();
@@ -577,7 +584,13 @@ app.UseFastEndpoints(c =>
 
 	// Ticket 3 (P1) follow-up item 4: validate the "Idempotency-Key" header, if present, before any
 	// endpoint's own handler runs.
-	c.Endpoints.Configurator = ep => ep.PreProcessors(Order.Before, new HR.SharedKernel.Idempotency.IdempotencyKeyHeaderValidator());
+	c.Endpoints.Configurator = ep =>
+	{
+		// Dev/E2E endpoints: the gate pre-processor goes first (404 before anything else runs), and an
+		// unmarked route under /api/dev fails startup. See HR.SharedKernel.DevEndpoints.
+		HR.SharedKernel.DevEndpoints.DevEndpointGate.Configure(ep);
+		ep.PreProcessors(Order.Before, new HR.SharedKernel.Idempotency.IdempotencyKeyHeaderValidator());
+	};
 });
 app.MapDefaultEndpoints();
 

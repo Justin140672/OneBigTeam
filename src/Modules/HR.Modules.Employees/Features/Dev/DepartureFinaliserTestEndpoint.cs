@@ -4,6 +4,7 @@ using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Jobs;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
+using HR.SharedKernel.DevEndpoints;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,18 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Employees.Features.Dev;
 
+/// <summary>
+/// E2E-only trigger for the departure finaliser. Gates, in order:
+///  1. Development environment: the route is not registered otherwise, and the shared per-request gate
+///     returns 404 as a second layer ([DevOnlyEndpoint], HR.SharedKernel.DevEndpoints).
+///  2. E2E_TESTING=true (same gate; 404 when off, even in Development).
+///  3. Authenticated user (401), HR-administrator policy "role:hr-administrator" (403).
+///  4. Caller's tenant equals the route company (403).
+///  5. Target employee belongs to that company (404 otherwise, nothing mutated).
+/// AllowAnonymous is only so the gate can answer 404 (not 401) when the endpoint is unavailable;
+/// steps 3-5 are enforced explicitly below.
+/// </summary>
+[DevOnlyEndpoint(DevEndpointKind.E2E)]
 internal sealed class DepartureFinaliserTestEndpoint(
     ProcessLeavingEmployeesJob departureFinaliserJob,
     EmployeesDbContext db,
@@ -26,15 +39,6 @@ internal sealed class DepartureFinaliserTestEndpoint(
 
     public override async Task HandleAsync(CancellationToken ct)
     {
-        var isE2ETesting = string.Equals(
-            Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
-
-        if (!isE2ETesting)
-        {
-            await Send.ResultAsync(TypedResults.NotFound());
-            return;
-        }
-
         if (!HttpContext.User.Identity?.IsAuthenticated ?? true)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
