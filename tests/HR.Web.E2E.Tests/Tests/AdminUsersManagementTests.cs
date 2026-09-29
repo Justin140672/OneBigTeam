@@ -73,7 +73,7 @@ public sealed class AdminUsersManagementTests(ParallelBlankPersonaFixture fixtur
         await adminUsers.GoToAsync();
 
         var email = NewAdminEmail();
-        await adminUsers.CreateAdministratorAsync(email, "SupportStaff");
+        await adminUsers.CreateAdministratorAsync(email, "Support Staff");
 
         Assert.True(await adminUsers.HasAdministratorAsync(email),
             "Expected the newly-created administrator to appear in the list");
@@ -81,7 +81,7 @@ public sealed class AdminUsersManagementTests(ParallelBlankPersonaFixture fixtur
             "Expected a newly-created administrator to be Enabled");
 
         var roleText = await adminUsers.GetRoleTextAsync(email) ?? "";
-        Assert.Contains("SupportStaff", roleText);
+        Assert.Contains("Support Staff", roleText);
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public sealed class AdminUsersManagementTests(ParallelBlankPersonaFixture fixtur
         await adminUsers.GoToAsync();
 
         var email = NewAdminEmail();
-        await adminUsers.CreateAdministratorAsync(email, "SupportStaff");
+        await adminUsers.CreateAdministratorAsync(email, "Support Staff");
         Assert.True(await adminUsers.HasAdministratorAsync(email));
 
         await adminUsers.ClickDisableAsync(email);
@@ -134,14 +134,14 @@ public sealed class AdminUsersManagementTests(ParallelBlankPersonaFixture fixtur
         await adminUsers.GoToAsync();
 
         var email = NewAdminEmail();
-        await adminUsers.CreateAdministratorAsync(email, "SupportStaff");
+        await adminUsers.CreateAdministratorAsync(email, "Support Staff");
         Assert.True(await adminUsers.HasAdministratorAsync(email));
 
         await adminUsers.ClickAssignRoleAsync(email);
         Assert.True(await adminUsers.IsAssignRolePanelVisibleAsync(),
             "Expected the inline role picker panel to open");
 
-        await adminUsers.SelectNewRoleAndContinueAsync("PlatformOwner");
+        await adminUsers.SelectNewRoleAndContinueAsync("Platform Owner");
 
         Assert.True(await adminUsers.AssignRoleDialog.IsVisibleAsync(),
             "Expected the Assign role confirmation dialog to open after continuing from the role picker");
@@ -151,8 +151,8 @@ public sealed class AdminUsersManagementTests(ParallelBlankPersonaFixture fixtur
 
         await _page.WaitForSelectorAsync(".admin-action-success", new() { Timeout = 15_000 });
 
-        var roleText = await adminUsers.GetRoleTextAsync(email, "PlatformOwner") ?? "";
-        Assert.Contains("PlatformOwner", roleText);
+        var roleText = await adminUsers.GetRoleTextAsync(email, "Platform Owner") ?? "";
+        Assert.Contains("Platform Owner", roleText);
     }
 
     [Fact]
@@ -167,7 +167,7 @@ public sealed class AdminUsersManagementTests(ParallelBlankPersonaFixture fixtur
         await adminUsers.GoToAsync();
 
         var email = NewAdminEmail();
-        await adminUsers.CreateAdministratorAsync(email, "SupportStaff");
+        await adminUsers.CreateAdministratorAsync(email, "Support Staff");
         Assert.True(await adminUsers.HasAdministratorAsync(email));
 
         await adminUsers.ClickResetMfaAsync(email);

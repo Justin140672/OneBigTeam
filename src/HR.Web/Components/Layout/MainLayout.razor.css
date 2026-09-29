@@ -162,6 +162,28 @@
     color: var(--hr-gray-900);
 }
 
+.topbar-logout {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: var(--hr-gray-500);
+    font-size: 18px;
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: var(--hr-radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s;
+}
+
+.topbar-logout:hover {
+    background: var(--hr-gray-100);
+    color: var(--hr-gray-900);
+}
+
 .page-title {
     font-size: 1.1rem;
     font-weight: 600;

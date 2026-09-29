@@ -54,7 +54,7 @@ internal sealed class ExportEmployeeDirectoryReportHandler(
                     item.Manager,
                     item.EmploymentType,
                     item.StartDate.ToString("yyyy-MM-dd"),
-                    item.Status,
+                    EnumText.Humanize(item.Status),
                     item.WorkLocation,
                     item.Email,
                 })

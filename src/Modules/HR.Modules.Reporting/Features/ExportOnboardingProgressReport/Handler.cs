@@ -45,7 +45,7 @@ internal sealed class ExportOnboardingProgressReportHandler(
                 .Select(item => (IReadOnlyList<string?>)new List<string?>
                 {
                     item.EmployeeName,
-                    item.PlanStatus,
+                    EnumText.Humanize(item.PlanStatus),
                     item.ProgressPercent.ToString(),
                     string.Join("; ", item.OutstandingTasks.Select(t => t.Title)),
                     item.HasOverdueTasks.ToString(),

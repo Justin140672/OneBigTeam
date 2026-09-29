@@ -83,7 +83,7 @@
                                                     <span class="task-title-text">@titleText</span>
                                                     <span class="task-meta">@DueLabel(task)</span>
                                                     <span class="task-meta">@AssigneeLabel(task.AssignTo)</span>
-                                                    <span class="task-meta task-priority">@task.Priority</span>
+                                                    <span class="task-meta task-priority">@EnumDisplay.Humanize(task.Priority)</span>
                                                 </button>
                                                 @if (!IsViewMode)
                                                 {

@@ -21,7 +21,7 @@
                     {
                         <li class="mb-3">
                             <div class="d-flex justify-content-between">
-                                <span class="fw-semibold">@entry.EventType</span>
+                                <span class="fw-semibold">@EnumDisplay.Humanize(entry.EventType)</span>
                                 <span class="text-muted small">@entry.OccurredAt.ToString("dd MMM yyyy HH:mm")</span>
                             </div>
                             <div>@entry.Summary</div>

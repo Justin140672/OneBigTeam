@@ -45,11 +45,11 @@
                 var t = item;
                 var (dueCss, dueLabel) = DueBadge(t.DueDate);
                 <div @key="t.Id" class="inbox-card @(_claiming == t.Id ? "inbox-card--claiming" : "")">
-                    <span class="priority-pip priority-pip--@DuePip(t.DueDate)" title="@t.Priority priority"></span>
+                    <span class="priority-pip priority-pip--@DuePip(t.DueDate)" title="@EnumDisplay.Humanize(t.Priority) priority"></span>
                     <div class="inbox-card-body">
                         <div class="inbox-card-top">
                             <span class="inbox-card-title">@t.Title</span>
-                            <span class="inbox-source-badge inbox-source-badge--@t.Source.ToLowerInvariant()">@t.Source</span>
+                            <span class="inbox-source-badge inbox-source-badge--@t.Source.ToLowerInvariant()">@EnumDisplay.Humanize(t.Source)</span>
                         </div>
                         @if (t.Description is not null)
                         {

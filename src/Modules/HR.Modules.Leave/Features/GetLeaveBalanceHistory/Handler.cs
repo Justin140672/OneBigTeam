@@ -123,7 +123,7 @@ internal sealed class GetLeaveBalanceHistoryHandler(
             Date: a.AdjustedAt,
             Change: a.AdjustmentDays * workingPattern.HoursPerDay,
             Reason: a.Reason.ToString(),
-            Description: a.Reason.ToString() + (a.Comments is null ? "" : $": {a.Comments}"),
+            Description: EnumText.Humanize(a.Reason) + (a.Comments is null ? "" : $": {a.Comments}"),
             ActorId: a.AdjustedByEmployeeId)));
 
         raw.AddRange(adjustments.Where(a => a.Reason == LeaveBalanceAdjustmentReason.CarryOver).Select(a => (

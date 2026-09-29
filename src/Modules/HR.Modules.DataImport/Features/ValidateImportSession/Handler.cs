@@ -34,7 +34,7 @@ internal sealed class ValidateImportSessionHandler(
         if (session.Status != ImportStatus.Pending)
         {
             return Result.Failure<ValidateImportSessionResponse>(
-                Error.Conflict($"Import session '{request.ImportSessionId}' has already been processed (status: {session.Status})."));
+                Error.Conflict($"Import session '{request.ImportSessionId}' has already been processed (status: {EnumText.Humanize(session.Status)})."));
         }
 
         var now = clock.UtcNowOffset();

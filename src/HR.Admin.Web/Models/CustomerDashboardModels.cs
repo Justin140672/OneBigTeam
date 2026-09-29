@@ -20,4 +20,7 @@ public sealed record CustomerDashboardSubscriptionChange(
     Guid CompanyId,
     string CompanyName,
     string Status,
-    DateTimeOffset ChangedAt);
+    DateTimeOffset ChangedAt)
+{
+    public string StatusText => HR.SharedKernel.EnumText.Humanize(Status);
+}

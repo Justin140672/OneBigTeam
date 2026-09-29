@@ -116,11 +116,7 @@
 
     private void OnSearchChanged(string value) => _searchTerm = value;
 
-    private static string CategoryLabel(string category) => category switch
-    {
-        "Hr" => "HR",
-        _ => EnumDisplay.Humanize(category),
-    };
+    private static string CategoryLabel(string category) => EnumDisplay.Humanize(category);
 
     private static bool IsClickable(ReportCatalogItemModel item) => ReportRoutes.IsClickable(item.Id);
 

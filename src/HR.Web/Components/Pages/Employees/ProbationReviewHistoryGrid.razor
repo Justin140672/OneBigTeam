@@ -33,7 +33,7 @@
                 @{ var r = (context as ProbationReviewModel)!; }
                 @if (r.Outcome is not null)
                 {
-                    <span class="badge @OutcomeBadgeClass(r.Outcome)">@r.Outcome</span>
+                    <span class="badge @OutcomeBadgeClass(r.Outcome)">@EnumDisplay.Humanize(r.Outcome)</span>
                 }
             </Template>
         </GridColumn>

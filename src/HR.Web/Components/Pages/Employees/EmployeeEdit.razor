@@ -1525,12 +1525,5 @@
         _                => "bg-light text-dark"
     };
 
-    private static string StatusDisplayName(string status) => status switch
-    {
-        "Active"         => "Active",
-        "Suspended"      => "Suspended",
-        "Leaving"        => "Leaving",
-        "FormerEmployee" => "Former Employee",
-        _                => status
-    };
+    private static string StatusDisplayName(string status) => EnumDisplay.Humanize(status);
 }

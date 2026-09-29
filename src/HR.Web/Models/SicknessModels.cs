@@ -22,7 +22,12 @@ public sealed record SicknessRecordListItemModel(
     decimal? TotalDays,
     string EvidenceStatus,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt)
+{
+    public string StatusText => HR.SharedKernel.EnumText.Humanize(Status);
+
+    public string EvidenceStatusText => HR.SharedKernel.EnumText.Humanize(EvidenceStatus);
+}
 
 public sealed record ListEmployeeSicknessRecordsResponseModel(List<SicknessRecordListItemModel> Records);
 

@@ -114,7 +114,7 @@
                     <option value="">All statuses</option>
                     @foreach (var status in StatusOptions)
                     {
-                        <option value="@status">@status</option>
+                        <option value="@status">@EnumDisplay.Humanize(status)</option>
                     }
                 </select>
             </div>
@@ -136,8 +136,8 @@
             @if (!string.IsNullOrEmpty(_filterStatus))
             {
                 <span class="employee-filter-chip">
-                    Status: @_filterStatus
-                    <button type="button" class="employee-filter-chip-remove" aria-label="@($"Remove status filter: {_filterStatus}")" @onclick="RemoveStatusFilterAsync">
+                    Status: @EnumDisplay.Humanize(_filterStatus)
+                    <button type="button" class="employee-filter-chip-remove" aria-label="@($"Remove status filter: {EnumDisplay.Humanize(_filterStatus)}")" @onclick="RemoveStatusFilterAsync">
                         <i class="fa-solid fa-xmark" aria-hidden="true"></i>
                     </button>
                 </span>

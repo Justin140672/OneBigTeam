@@ -54,7 +54,7 @@ else
                 <dt>Type</dt>
                 <dd>@SupportRequestAdminOptions.TypeLabel(_detail.Type)</dd>
                 <dt>Priority</dt>
-                <dd>@_detail.Priority</dd>
+                <dd>@EnumText.Humanize(_detail.Priority)</dd>
                 <dt>Created</dt>
                 <dd>@_detail.CreatedAt.ToString("dd MMM yyyy HH:mm")</dd>
                 <dt>Last updated</dt>
@@ -97,9 +97,11 @@ else
             </p>
             <div class="admin-action-field">
                 <label for="support-request-status">Status</label>
-                <SfDropDownList TValue="string" TItem="string" @bind-Value="_selectedStatus" DataSource="@SupportRequestAdminOptions.Statuses"
+                <SfDropDownList TValue="string" TItem="SupportRequestAdminOptions.StatusOption" @bind-Value="_selectedStatus" DataSource="@SupportRequestAdminOptions.StatusOptions"
                                  AllowFiltering="true" Enabled="@(!_saving)"
-                                 HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "support-request-status" })" />
+                                 HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "support-request-status" })">
+                    <DropDownListFieldSettings Text="Text" Value="Value" />
+                </SfDropDownList>
             </div>
 
             @if (_globalError is not null)

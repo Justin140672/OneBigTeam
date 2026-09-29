@@ -88,7 +88,7 @@
                         <Template>
                             @{
                                 var row = (context as SharedCompanyDocumentAcknowledgementProgressItem)!;
-                                <span class="badge @StatusBadgeClass(row.Status)">@row.Status</span>
+                                <span class="badge @StatusBadgeClass(row.Status)">@EnumDisplay.Humanize(row.Status)</span>
                             }
                         </Template>
                     </GridColumn>

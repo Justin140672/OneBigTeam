@@ -48,9 +48,9 @@ internal sealed class ExportEmployeeLeaverReportHandler(
                     item.LastWorkingDay?.ToString("yyyy-MM-dd"),
                     item.Department,
                     item.Position,
-                    item.Reason,
-                    item.OffboardingStatus,
-                    item.AccountStatus,
+                    EnumText.Humanize(item.Reason),
+                    EnumText.Humanize(item.OffboardingStatus),
+                    EnumText.Humanize(item.AccountStatus),
                 })
                 .ToList();
 

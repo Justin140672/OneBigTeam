@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Unicode;
@@ -35,8 +36,8 @@ internal static class SupportEmailRenderer
             <body style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
               <h1>New Support Request</h1>
               <p><strong>Reference:</strong> {Encode(referenceNumber)}</p>
-              <p><strong>Type:</strong> {Encode(type.ToString())}</p>
-              <p><strong>Priority:</strong> {Encode(priority.ToString())}</p>
+              <p><strong>Type:</strong> {Encode(EnumText.Humanize(type))}</p>
+              <p><strong>Priority:</strong> {Encode(EnumText.Humanize(priority))}</p>
               <p><strong>Title:</strong> {Encode(title)}</p>
               {linkHtml}
             </body>

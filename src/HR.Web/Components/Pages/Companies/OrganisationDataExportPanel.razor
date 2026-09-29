@@ -108,7 +108,7 @@
                     <GridPageSettings PageSize="5" />
                     <GridColumns>
                         <GridColumn Field="@nameof(OrganisationDataExportHistoryItem.RequestedAt)" HeaderText="Requested" Format="g" Width="160" />
-                        <GridColumn Field="@nameof(OrganisationDataExportHistoryItem.Status)" HeaderText="Status" Width="110" />
+                        <GridColumn Field="@nameof(OrganisationDataExportHistoryItem.StatusText)" HeaderText="Status" Width="110" />
                         <GridColumn Field="@nameof(OrganisationDataExportHistoryItem.CompletedAt)" HeaderText="Completed" Format="g" Width="160" />
                         <GridColumn Field="@nameof(OrganisationDataExportHistoryItem.ExpiresAt)" HeaderText="Expires" Format="d" Width="120" />
                         <GridColumn Field="@nameof(OrganisationDataExportHistoryItem.DownloadCount)" HeaderText="Downloads" Width="100" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
@@ -198,8 +198,7 @@
     private static string StatusDisplay(string? status) => status switch
     {
         null => "—",
-        "InProgress" => "In progress",
-        _ => status,
+        _ => EnumDisplay.Humanize(status),
     };
 
     private static string LocalDisplay(DateTimeOffset? value) =>

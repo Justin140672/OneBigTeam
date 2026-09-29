@@ -62,7 +62,7 @@
                         @{
                             var row = (context as RecruitmentStageListItem)!;
                         }
-                        <StatusBadge Variant="@TerminalOutcomeVariant(row.TerminalOutcome)">@row.TerminalOutcome</StatusBadge>
+                        <StatusBadge Variant="@TerminalOutcomeVariant(row.TerminalOutcome)">@EnumDisplay.Humanize(row.TerminalOutcome)</StatusBadge>
                     </Template>
                 </GridColumn>
                 <GridColumn HeaderText="Purpose" Width="140">
@@ -206,7 +206,7 @@
         RecruitmentStagePurpose.NewApplication => "New application",
         RecruitmentStagePurpose.Interview => "Interview",
         RecruitmentStagePurpose.Offer => "Offer",
-        _ => purpose.ToString(),
+        _ => EnumDisplay.Humanize(purpose),
     };
 
     private static StatusBadgeVariant TerminalOutcomeVariant(RecruitmentStageTerminalOutcome outcome) => outcome switch

@@ -49,8 +49,8 @@ internal sealed class ExportEmployeeStarterReportHandler(
                     item.Recruiter,
                     item.Department,
                     item.Position,
-                    item.OnboardingStatus,
-                    item.ProbationStatus,
+                    EnumText.Humanize(item.OnboardingStatus),
+                    EnumText.Humanize(item.ProbationStatus),
                 })
                 .ToList();
 

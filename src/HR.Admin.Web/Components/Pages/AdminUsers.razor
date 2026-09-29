@@ -20,9 +20,11 @@
     </div>
     <div class="admin-action-field">
         <label for="new-admin-role">Role</label>
-        <SfDropDownList TValue="string" TItem="string" @bind-Value="_newRole" DataSource="@_roleOptions"
+        <SfDropDownList TValue="string" TItem="RoleOption" @bind-Value="_newRole" DataSource="@_roleOptions"
                          AllowFiltering="true"
-                         HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "new-admin-role" })" />
+                         HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "new-admin-role" })">
+            <DropDownListFieldSettings Text="Text" Value="Value" />
+        </SfDropDownList>
     </div>
     @if (_createError is not null)
     {
@@ -71,7 +73,7 @@ else
             {
                 <tr>
                     <td>@admin.Email</td>
-                    <td>@admin.Role</td>
+                    <td>@EnumText.Humanize(admin.Role)</td>
                     <td>@FormatStatus(admin)</td>
                     <td>@admin.CreatedAt.ToString("dd MMM yyyy HH:mm")</td>
                     <td>
@@ -108,9 +110,11 @@ else
         <h2>Assign role for @_activeAdmin?.Email</h2>
         <div class="admin-action-field">
             <label for="assign-role-select">New role</label>
-            <SfDropDownList TValue="string" TItem="string" @bind-Value="_assignRoleValue" DataSource="@_roleOptions"
+            <SfDropDownList TValue="string" TItem="RoleOption" @bind-Value="_assignRoleValue" DataSource="@_roleOptions"
                              AllowFiltering="true"
-                             HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "assign-role-select" })" />
+                             HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "assign-role-select" })">
+                <DropDownListFieldSettings Text="Text" Value="Value" />
+            </SfDropDownList>
         </div>
         <div class="admin-actions-buttons">
             <SfButton IsPrimary="true" OnClick="ConfirmAssignRoleSelection">Continue</SfButton>
@@ -133,7 +137,10 @@ else
     private IReadOnlyList<PlatformAdministratorSummary>? _administrators => _listResponse?.Administrators;
     private bool _loading = true;
 
-    private readonly List<string> _roleOptions = ["SupportStaff", "PlatformOwner"];
+    private sealed record RoleOption(string Value, string Text);
+
+    private readonly List<RoleOption> _roleOptions =
+        [.. new[] { "SupportStaff", "PlatformOwner" }.Select(r => new RoleOption(r, EnumText.Humanize(r)))];
 
     private string _newEmail = string.Empty;
     private string _newRole = "SupportStaff";
@@ -177,7 +184,7 @@ else
         AdminUserAction.Enable =>
             $"This will re-enable {_activeAdmin?.Email}'s administrator account, restoring their Admin Portal access.",
         AdminUserAction.AssignRole =>
-            $"This will change {_activeAdmin?.Email}'s role to {_pendingAssignRole}. This is a security-sensitive permission change.",
+            $"This will change {_activeAdmin?.Email}'s role to {EnumText.Humanize(_pendingAssignRole)}. This is a security-sensitive permission change.",
         AdminUserAction.ResetMfa =>
             $"This immediately removes every multi-factor authentication factor for {_activeAdmin?.Email} " +
             $"from the identity provider. They will be prompted to set up MFA again on their next sign-in " +

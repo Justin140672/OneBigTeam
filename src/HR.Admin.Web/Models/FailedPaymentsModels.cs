@@ -16,4 +16,9 @@ public sealed record FailedPaymentItem(
     DateTimeOffset? RetryScheduledAt,
     DateTimeOffset? LastSuccessfulPaymentAt,
     decimal? LastSuccessfulPaymentAmount,
-    string? HostedInvoiceUrl);
+    string? HostedInvoiceUrl)
+{
+    public string SubscriptionStatusText => HR.SharedKernel.EnumText.Humanize(SubscriptionStatus);
+
+    public string InvoiceStatusText => HR.SharedKernel.EnumText.Humanize(InvoiceStatus);
+}

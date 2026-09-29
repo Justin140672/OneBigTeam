@@ -16,4 +16,7 @@ public sealed record AuditLogItem(
     string? CompanyName,
     Guid? ActorUserId,
     string? AdministratorEmail,
-    string? Summary);
+    string? Summary)
+{
+    public string EventTypeText => HR.SharedKernel.EnumText.Humanize(EventType);
+}

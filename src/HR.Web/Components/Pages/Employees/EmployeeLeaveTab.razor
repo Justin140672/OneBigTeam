@@ -232,7 +232,7 @@ else
                                         <span class="@(h.Change >= 0 ? "text-success" : "text-danger")">@FormatSignedHours(h.Change)</span>
                                     </Template>
                                 </GridColumn>
-                                <GridColumn Field="@nameof(LeaveBalanceHistoryItemModel.Reason)" HeaderText="Reason" Width="160" />
+                                <GridColumn Field="@nameof(LeaveBalanceHistoryItemModel.ReasonText)" HeaderText="Reason" Width="160" />
                                 <GridColumn HeaderText="Balance After" Width="130" AllowSorting="false" AllowFiltering="false">
                                     <Template>
                                         @{ var h = (context as LeaveBalanceHistoryItemModel)!; }
@@ -371,5 +371,5 @@ else
         $"{(hours >= 0 ? "+" : "")}{hours:0.#}h";
 
     private static string FormatDate(DateOnly date, string part) =>
-        part == "FullDay" ? date.ToString("dd MMM yyyy") : $"{date:dd MMM yyyy} ({part})";
+        part == "FullDay" ? date.ToString("dd MMM yyyy") : $"{date:dd MMM yyyy} ({EnumDisplay.Humanize(part)})";
 }

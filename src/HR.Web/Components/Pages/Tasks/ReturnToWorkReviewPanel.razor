@@ -23,7 +23,7 @@
                     <dd class="col-sm-8">@_review.DueDate.ToString("d MMM yyyy")</dd>
 
                     <dt class="col-sm-4 text-muted fw-normal">Status</dt>
-                    <dd class="col-sm-8">@_review.Status</dd>
+                    <dd class="col-sm-8">@EnumDisplay.Humanize(_review.Status)</dd>
                 </dl>
                 <hr class="my-3" />
             }

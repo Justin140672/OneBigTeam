@@ -38,7 +38,7 @@ public class ExportOnboardingProgressReportHandlerTests
             ["Employee", "Plan Status", "Progress %", "Outstanding Tasks", "Has Overdue"],
             exporter.LastData.ColumnHeaders);
         var row = Assert.Single(exporter.LastData.Rows);
-        Assert.Equal("InProgress", row[1]);
+        Assert.Equal("In Progress", row[1]);
         Assert.Equal("50", row[2]);
     }
 

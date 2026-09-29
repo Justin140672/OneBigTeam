@@ -150,15 +150,6 @@ internal sealed class GetEqualityDiversityReportHandler(
         if (string.IsNullOrWhiteSpace(enumMemberName))
             return NotStated;
 
-        var chars = new List<char>(enumMemberName.Length + 4);
-        for (var i = 0; i < enumMemberName.Length; i++)
-        {
-            var c = enumMemberName[i];
-            if (i > 0 && char.IsUpper(c) && !char.IsUpper(enumMemberName[i - 1]))
-                chars.Add(' ');
-            chars.Add(c);
-        }
-
-        return new string(chars.ToArray());
+        return EnumText.Humanize(enumMemberName);
     }
 }

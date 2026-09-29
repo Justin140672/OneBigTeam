@@ -53,7 +53,7 @@ internal sealed class GetPermissionHistoryHandler(
             .Select(e => new PermissionHistoryItem(
                 e.OccurredAt,
                 e.EventType,
-                string.IsNullOrEmpty(e.Summary) ? e.EventType : e.Summary,
+                string.IsNullOrEmpty(e.Summary) ? EnumText.Humanize(e.EventType) : e.Summary,
                 e.ActorUserId.HasValue ? names.GetValueOrDefault(e.ActorUserId.Value, "Unknown") : "System",
                 e.EmployeeId,
                 e.BeforeJson,

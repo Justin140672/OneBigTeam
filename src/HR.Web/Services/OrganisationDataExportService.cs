@@ -106,4 +106,7 @@ public sealed record OrganisationDataExportHistoryItem(
     DateTimeOffset? ExpiresAt,
     long? FileSizeBytes,
     int DownloadCount,
-    bool Downloadable);
+    bool Downloadable)
+{
+    public string StatusText => HR.SharedKernel.EnumText.Humanize(Status);
+}

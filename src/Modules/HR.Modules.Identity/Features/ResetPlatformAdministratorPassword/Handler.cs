@@ -36,7 +36,7 @@ internal sealed class ResetPlatformAdministratorPasswordHandler(
 
         if (administrator.ProvisioningStatus != Domain.PlatformAdministratorProvisioningStatus.Active)
             return Result.Failure<ResetPlatformAdministratorPasswordResponse>(Error.Conflict(
-                $"This administrator has not completed activation yet (status: {administrator.ProvisioningStatus}). " +
+                $"This administrator has not completed activation yet (status: {EnumText.Humanize(administrator.ProvisioningStatus)}). " +
                 "Resend or retry the activation invitation instead of resetting a password."));
 
         var webBaseUrl =

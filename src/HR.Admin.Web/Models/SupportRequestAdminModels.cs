@@ -11,7 +11,14 @@ public sealed record SupportRequestListItem(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     int Version,
-    string? LatestResponseSnippet);
+    string? LatestResponseSnippet)
+{
+    public string TypeText => SupportRequestAdminOptions.TypeLabel(Type);
+
+    public string PriorityText => HR.SharedKernel.EnumText.Humanize(Priority);
+
+    public string StatusText => HR.SharedKernel.EnumText.Humanize(Status);
+}
 
 public sealed record SupportRequestAttachment(
     Guid Id,
@@ -107,6 +114,11 @@ public static class SupportRequestAdminOptions
 {
     public static readonly IReadOnlyList<string> Statuses =
         ["Submitted", "UnderReview", "Planned", "WaitingForCustomer", "Resolved", "Closed"];
+
+    public sealed record StatusOption(string Value, string Text);
+
+    public static readonly IReadOnlyList<StatusOption> StatusOptions =
+        [.. Statuses.Select(status => new StatusOption(status, HR.SharedKernel.EnumText.Humanize(status)))];
 
     public static string TypeLabel(string type) => type switch
     {

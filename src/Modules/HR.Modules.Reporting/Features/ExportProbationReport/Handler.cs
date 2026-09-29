@@ -45,7 +45,7 @@ internal sealed class ExportProbationReportHandler(
                 .Select(item => (IReadOnlyList<string?>)new List<string?>
                 {
                     item.EmployeeName,
-                    item.Status,
+                    EnumText.Humanize(item.Status),
                     item.StartDate.ToString("yyyy-MM-dd"),
                     item.ExpectedEndDate.ToString("yyyy-MM-dd"),
                     item.DueReviews.ToString(),

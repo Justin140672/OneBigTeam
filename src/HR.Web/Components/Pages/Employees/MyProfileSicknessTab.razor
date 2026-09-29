@@ -43,8 +43,8 @@ else
                                 @(r.TotalDays is not null ? $"{r.TotalDays:0.##}" : "—")
                             </Template>
                         </GridColumn>
-                        <GridColumn Field="@nameof(SicknessRecordListItemModel.Status)" HeaderText="Status" Width="120" />
-                        <GridColumn Field="@nameof(SicknessRecordListItemModel.EvidenceStatus)" HeaderText="Evidence" Width="140" />
+                        <GridColumn Field="@nameof(SicknessRecordListItemModel.StatusText)" HeaderText="Status" Width="120" />
+                        <GridColumn Field="@nameof(SicknessRecordListItemModel.EvidenceStatusText)" HeaderText="Evidence" Width="140" />
                     </GridColumns>
                 </HrGrid>
             }
@@ -97,5 +97,5 @@ else
     }
 
     private static string FormatDate(DateOnly date, string part) =>
-        part == "FullDay" ? date.ToString("dd MMM yyyy") : $"{date:dd MMM yyyy} ({part})";
+        part == "FullDay" ? date.ToString("dd MMM yyyy") : $"{date:dd MMM yyyy} ({EnumDisplay.Humanize(part)})";
 }

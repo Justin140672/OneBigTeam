@@ -45,7 +45,7 @@ public class GetSharedCompanyDocumentAuditHistoryHandlerTests
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
-        Assert.Equal("shared_company_document.archived", item.Action);
+        Assert.Equal("Shared Company Document Archived", item.Action);
     }
 
     [Fact]

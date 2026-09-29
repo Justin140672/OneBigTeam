@@ -191,6 +191,6 @@ public class GetPermissionHistoryHandlerTests
         var result = await handler.HandleAsync(
             new GetPermissionHistoryRequest { CompanyId = CompanyId }, CancellationToken.None);
 
-        Assert.Equal("user.roles-changed", result.Items[0].Summary);
+        Assert.Equal("User Roles Changed", result.Items[0].Summary);
     }
 }

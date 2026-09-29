@@ -274,6 +274,12 @@ else
                             </span>
                         </a>
                     }
+                    @if (Session.IsLoaded)
+                    {
+                        <button type="button" class="topbar-logout" @onclick="LogoutAsync" title="Log out" aria-label="Log out" data-testid="topbar-logout">
+                            <i class="fa-solid fa-right-from-bracket"></i>
+                        </button>
+                    }
                     @if (Env.IsDevelopment())
                     {
                         <div class="dev-persona-switcher">
@@ -658,6 +664,8 @@ else
     protected override void OnParametersSet() => _errorBoundary?.Recover();
 
     private void ToggleSidebar() => SidebarOpen = !SidebarOpen;
+
+    private async Task LogoutAsync() => await JS.InvokeVoidAsync("hardNavigate", "/logout");
 
     private async Task OnPersonaSwitchAsync(string? userId)
     {

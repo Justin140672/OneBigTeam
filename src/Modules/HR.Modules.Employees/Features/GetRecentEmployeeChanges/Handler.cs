@@ -25,7 +25,7 @@ internal sealed class GetRecentEmployeeChangesHandler(
             .Select(e => new RecentEmployeeChangeItem(
                 e.OccurredAt,
                 ResolveName(e.EmployeeId, names),
-                string.IsNullOrEmpty(e.Summary) ? Humanize(e.EventType) : e.Summary,
+                string.IsNullOrEmpty(e.Summary) ? EnumText.Humanize(e.EventType) : e.Summary,
                 e.ActorEmployeeId.HasValue ? ResolveName(e.ActorEmployeeId, names) : "System"))
             .ToList();
 
@@ -35,6 +35,4 @@ internal sealed class GetRecentEmployeeChangesHandler(
     private static string ResolveName(Guid? employeeId, IReadOnlyDictionary<Guid, string> names) =>
         employeeId.HasValue && names.TryGetValue(employeeId.Value, out var name) ? name : "Unknown";
 
-    private static string Humanize(string eventType) =>
-        System.Text.RegularExpressions.Regex.Replace(eventType, "(?<!^)([A-Z])", " $1");
 }

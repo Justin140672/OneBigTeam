@@ -115,7 +115,7 @@ public sealed class AdminSupportRequestStatusConcurrencyTests(HrAdminPersonaFixt
         await queue.OpenRequestAsync(title);
         var id = UrlIdParser.LastGuid(_page.Url);
 
-        await detail.SelectStatusAsync("UnderReview");
+        await detail.SelectStatusAsync("Under Review");
         await detail.SaveAsync();
 
         Assert.True(await detail.IsSuccessMessageVisibleAsync(),
@@ -123,7 +123,7 @@ public sealed class AdminSupportRequestStatusConcurrencyTests(HrAdminPersonaFixt
         Assert.False(await detail.IsConflictBannerVisibleAsync());
 
         await detail.GoToAsync(AcmeId, id);
-        Assert.Equal("UnderReview", await detail.GetSelectedStatusAsync());
+        Assert.Equal("Under Review", await detail.GetSelectedStatusAsync());
     }
 
     [Fact]
@@ -149,7 +149,7 @@ public sealed class AdminSupportRequestStatusConcurrencyTests(HrAdminPersonaFixt
         {
             var otherDetail = new AdminSupportRequestDetailPage(otherPage, _fixture.AdminWebBaseUrl);
             await otherDetail.GoToAsync(AcmeId, id);
-            await otherDetail.SelectStatusAsync("WaitingForCustomer");
+            await otherDetail.SelectStatusAsync("Waiting for Customer");
             await otherDetail.SaveAsync();
             Assert.True(await otherDetail.IsSuccessMessageVisibleAsync(),
                 "Expected the second tab's save to succeed and bump the request's Version");
@@ -170,7 +170,7 @@ public sealed class AdminSupportRequestStatusConcurrencyTests(HrAdminPersonaFixt
 
         Assert.False(await detail.IsConflictBannerVisibleAsync(),
             "Expected the conflict banner to clear after reloading latest values");
-        Assert.Equal("WaitingForCustomer", await detail.GetSelectedStatusAsync());
+        Assert.Equal("Waiting for Customer", await detail.GetSelectedStatusAsync());
 
         await detail.SelectStatusAsync("Resolved");
         await detail.SaveAsync();

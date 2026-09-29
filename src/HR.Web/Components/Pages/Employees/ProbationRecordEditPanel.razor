@@ -185,7 +185,7 @@ else
                 if (IsTerminalStatus(latest.Status))
                 {
                     await OnBecameTerminal.InvokeAsync((latest,
-                        $"This probation record has reached the terminal status '{latest.Status}' and can no longer be edited."));
+                        $"This probation record has reached the terminal status '{EnumDisplay.Humanize(latest.Status)}' and can no longer be edited."));
                     return;
                 }
 

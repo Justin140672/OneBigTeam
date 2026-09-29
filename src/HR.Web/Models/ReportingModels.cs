@@ -74,7 +74,10 @@ public record EmployeeDirectoryReportItemModel(
     DateOnly StartDate,
     string Status,
     string? WorkLocation,
-    string Email);
+    string Email)
+{
+    public string StatusText => HR.SharedKernel.EnumText.Humanize(Status);
+}
 
 
 public record ReportFilterCriteriaModel(
@@ -112,7 +115,11 @@ public record EmployeeStarterReportItemModel(
     string? Department,
     string? Position,
     string? OnboardingStatus,
-    string? ProbationStatus);
+    string? ProbationStatus)
+{
+    public string OnboardingStatusText => HR.SharedKernel.EnumText.Humanize(OnboardingStatus);
+    public string ProbationStatusText => HR.SharedKernel.EnumText.Humanize(ProbationStatus);
+}
 
 
 public record EmployeeLeaverReportFilter(
@@ -140,7 +147,13 @@ public record EmployeeLeaverReportItemModel(
     string? Position,
     string? Reason,
     string? OffboardingStatus,
-    string AccountStatus);
+    string AccountStatus)
+{
+    public string ReasonText => HR.SharedKernel.EnumText.Humanize(Reason);
+
+    public string OffboardingStatusText => HR.SharedKernel.EnumText.Humanize(OffboardingStatus);
+    public string AccountStatusText => HR.SharedKernel.EnumText.Humanize(AccountStatus);
+}
 
 
 public enum LeaveSummaryGroupBy
@@ -183,7 +196,10 @@ public record LeaveCalendarReportRowModel(
     DateOnly LeaveEnd,
     string LeaveTypeName,
     decimal DurationDays,
-    string ApprovalStatus);
+    string ApprovalStatus)
+{
+    public string ApprovalStatusText => HR.SharedKernel.EnumText.Humanize(ApprovalStatus);
+}
 
 
 public enum SicknessReportGroupBy
@@ -265,7 +281,10 @@ public record ProbationReportRowModel(
     DateOnly StartDate,
     DateOnly ExpectedEndDate,
     int DueReviews,
-    int OverdueReviews);
+    int OverdueReviews)
+{
+    public string StatusText => HR.SharedKernel.EnumText.Humanize(Status);
+}
 
 
 public record OnboardingProgressReportFilter(bool OverdueOnly = false);
@@ -282,7 +301,10 @@ public record OnboardingProgressReportRowModel(
     string PlanStatus,
     int ProgressPercent,
     List<OnboardingReportTaskItemModel> OutstandingTasks,
-    bool HasOverdueTasks);
+    bool HasOverdueTasks)
+{
+    public string PlanStatusText => HR.SharedKernel.EnumText.Humanize(PlanStatus);
+}
 
 public record OnboardingReportTaskItemModel(
     string Title,
@@ -306,7 +328,10 @@ public record OffboardingProgressReportRowModel(
     List<string> CompletedTasks,
     bool AccessDisabled,
     bool DocumentsReturned,
-    bool AssetsReturned);
+    bool AssetsReturned)
+{
+    public string StatusText => HR.SharedKernel.EnumText.Humanize(Status);
+}
 
 
 public record DocumentComplianceReportFilter(Guid? PositionProfileId = null);
@@ -425,7 +450,10 @@ public record RecruitmentPipelineSummaryRowModel(
     string Status,
     DateOnly? OpenedAt,
     int CandidateCount,
-    Dictionary<Guid, int> CandidatesByStage);
+    Dictionary<Guid, int> CandidatesByStage)
+{
+    public string StatusText => HR.SharedKernel.EnumText.Humanize(Status);
+}
 
 
 public record HrHeadcountSummaryReportFilter(
@@ -452,7 +480,10 @@ public record HrHeadcountSummaryReportItemModel(
     string Status,
     DateOnly StartDate,
     DateOnly? LeavingDate,
-    decimal? Fte);
+    decimal? Fte)
+{
+    public string StatusText => HR.SharedKernel.EnumText.Humanize(Status);
+}
 
 
 public record GovernanceAuditReportFilter(

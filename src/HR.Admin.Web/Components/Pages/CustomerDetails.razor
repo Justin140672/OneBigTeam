@@ -101,7 +101,7 @@ else
                 <dt>Company name</dt>
                 <dd>@_details.CompanyName</dd>
                 <dt>Status</dt>
-                <dd>@_details.Status</dd>
+                <dd>@EnumText.Humanize(_details.Status)</dd>
                 <dt>Created</dt>
                 <dd>@_details.CreatedAt.ToString("dd MMM yyyy HH:mm")</dd>
                 <dt>Updated</dt>
@@ -113,7 +113,7 @@ else
             <h2>Subscription</h2>
             <dl class="details-kv">
                 <dt>Status</dt>
-                <dd>@_details.SubscriptionStatus</dd>
+                <dd>@EnumText.Humanize(_details.SubscriptionStatus)</dd>
                 <dt>Trial started</dt>
                 <dd>@FormatDate(_details.TrialStartedAt)</dd>
                 <dt>Trial expires</dt>
@@ -149,7 +149,7 @@ else
                     <dt>Locale</dt>
                     <dd>@_details.Settings.Locale</dd>
                     <dt>Working days</dt>
-                    <dd>@_details.Settings.WorkingDays</dd>
+                    <dd>@EnumText.Humanize(_details.Settings.WorkingDays)</dd>
                     <dt>Hours per day</dt>
                     <dd>@_details.Settings.HoursPerDay</dd>
                     <dt>Leave year start month</dt>
@@ -159,7 +159,7 @@ else
                     <dt>Probation months</dt>
                     <dd>@_details.Settings.ProbationMonths</dd>
                     <dt>Employee number mode</dt>
-                    <dd>@_details.Settings.EmployeeNumberMode</dd>
+                    <dd>@EnumText.Humanize(_details.Settings.EmployeeNumberMode)</dd>
                     <dt>Employee number prefix</dt>
                     <dd>@(_details.Settings.EmployeeNumberPrefix ?? "—")</dd>
                     <dt>Next employee number</dt>
@@ -304,7 +304,7 @@ else
                                 <td>@invoice.InvoiceDate.ToString("dd MMM yyyy HH:mm")</td>
                                 <td>@invoice.Amount.ToString("C2") @invoice.Currency.ToUpperInvariant()</td>
                                 <td>@(invoice.EstimatedEmployeeCount?.ToString() ?? "—")</td>
-                                <td>@invoice.PaymentStatus</td>
+                                <td>@EnumText.Humanize(invoice.PaymentStatus)</td>
                                 <td>@(invoice.PaymentDate is { } paidAt ? paidAt.ToString("dd MMM yyyy HH:mm") : "—")</td>
                                 <td>@invoice.StripeInvoiceId</td>
                                 <td>

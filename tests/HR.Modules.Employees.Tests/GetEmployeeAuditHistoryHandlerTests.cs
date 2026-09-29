@@ -151,7 +151,7 @@ public class GetEmployeeAuditHistoryHandlerTests
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
-        Assert.Equal("employee.compensation.created", item.Action);
+        Assert.Equal("Employee Compensation Created", item.Action);
     }
 
     [Fact]
@@ -475,6 +475,30 @@ public class GetEmployeeAuditHistoryHandlerTests
         var item = Assert.Single(result.Value!.Items);
         var change = Assert.Single(item.Changes);
         Assert.Equal("Reason", change.Field);
+        Assert.Equal(expectedLabel, change.After);
+    }
+
+    [Theory]
+    [InlineData("Status", "FormerEmployee", "Former Employee")]
+    [InlineData("NoticeSource", "EmployeeResignation", "Employee Resignation")]
+    [InlineData("Status", "Active", "Active")]
+    public async Task HandleAsync_Humanizes_Enum_Valued_Field_Values(string field, string rawValue, string expectedLabel)
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var reader = new FakeAuditHistoryReader([
+            new AuditHistoryEntry(
+                Now, "employee.updated", "Employee", null, null, "Employee updated",
+                null, $$"""{"{{field}}":"{{rawValue}}"}""")
+        ]);
+        var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
+
+        var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var change = Assert.Single(Assert.Single(result.Value!.Items).Changes);
         Assert.Equal(expectedLabel, change.After);
     }
 

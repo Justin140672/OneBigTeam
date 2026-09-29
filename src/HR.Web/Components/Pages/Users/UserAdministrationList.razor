@@ -94,7 +94,7 @@
                         <Template>
                             @{
                                 var row = (context as UserListItemModel)!;
-                                <span class="badge @AccountStatusBadgeClass(row.AccountStatus)">@row.AccountStatus</span>
+                                <span class="badge @AccountStatusBadgeClass(row.AccountStatus)">@EnumDisplay.Humanize(row.AccountStatus)</span>
                             }
                         </Template>
                     </GridColumn>
@@ -109,7 +109,7 @@
                             }
                             else
                             {
-                                <span class="badge @InvitationStatusBadgeClass(row.InvitationStatus)">@row.InvitationStatus</span>
+                                <span class="badge @InvitationStatusBadgeClass(row.InvitationStatus)">@EnumDisplay.Humanize(row.InvitationStatus)</span>
                             }
                         </Template>
                     </GridColumn>

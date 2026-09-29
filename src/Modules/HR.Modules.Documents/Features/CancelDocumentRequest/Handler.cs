@@ -61,7 +61,7 @@ internal sealed class CancelDocumentRequestHandler(
 
         if (documentRequest.Status != DocumentRequestStatus.Requested)
             return Result.Failure(Error.Conflict(
-                $"Document request cannot be cancelled (status: {documentRequest.Status})."));
+                $"Document request cannot be cancelled (status: {EnumText.Humanize(documentRequest.Status)})."));
 
         var documentType = await db.DocumentTypes
             .FirstOrDefaultAsync(dt => dt.Id == documentRequest.DocumentTypeId, cancellationToken);

@@ -73,7 +73,7 @@ public sealed class AdminUsersPage(IPage page, string baseUrl)
 
     private ILocator CreatePanel => page.Locator(".admin-actions-panel").Filter(new() { HasText = "Create administrator" });
 
-    public async Task CreateAdministratorAsync(string email, string role = "SupportStaff")
+    public async Task CreateAdministratorAsync(string email, string role = "Support Staff")
     {
         await page.Locator("#new-admin-email").FillAsync(email);
         await page.Keyboard.PressAsync("Tab");

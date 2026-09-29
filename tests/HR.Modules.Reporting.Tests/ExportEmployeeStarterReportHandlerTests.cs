@@ -20,7 +20,7 @@ public class ExportEmployeeStarterReportHandlerTests
             "Jamie Recruiter",
             "Engineering",
             "Junior Developer",
-            "In Progress",
+            "InProgress",
             "Ongoing");
 
     private static ExportEmployeeStarterReportRequest BuildRequest(

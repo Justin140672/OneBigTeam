@@ -102,7 +102,7 @@ public sealed class OperationalAlertsManagementTests(EmployeePersonaFixture fixt
         await list.SetCategoryFilterAsync("ReportGeneration");
         var reportCategories = await list.ColumnValuesAsync("Category");
         Assert.NotEmpty(reportCategories);
-        Assert.All(reportCategories, c => Assert.Equal("ReportGeneration", c));
+        Assert.All(reportCategories, c => Assert.Equal("Report Generation", c));
 
         await list.SetCategoryFilterAsync("");
         await list.SetStatusFilterAsync("resolved");

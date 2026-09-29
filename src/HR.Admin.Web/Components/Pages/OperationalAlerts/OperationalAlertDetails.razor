@@ -49,11 +49,11 @@ else
             <h2>Alert</h2>
             <dl class="details-kv">
                 <dt>Severity</dt>
-                <dd>@_alert.Severity</dd>
+                <dd>@EnumText.Humanize(_alert.Severity)</dd>
                 <dt>Category</dt>
-                <dd>@_alert.Category</dd>
+                <dd>@EnumText.Humanize(_alert.Category)</dd>
                 <dt>Status</dt>
-                <dd>@_alert.Status</dd>
+                <dd>@EnumText.Humanize(_alert.Status)</dd>
                 <dt>Summary</dt>
                 <dd>@(_alert.Summary ?? "—")</dd>
                 <dt>Detail</dt>
@@ -84,7 +84,7 @@ else
                 <dt>Occurrence count</dt>
                 <dd>@_alert.OccurrenceCount</dd>
                 <dt>Affected entity type</dt>
-                <dd>@(_alert.AffectedEntityType ?? "—")</dd>
+                <dd>@(_alert.AffectedEntityType is { } entityType ? EnumText.Humanize(entityType) : "—")</dd>
                 <dt>Affected entity id</dt>
                 <dd>@(_alert.AffectedEntityId?.ToString() ?? "—")</dd>
                 <dt>Affected item count</dt>

@@ -243,5 +243,5 @@ else
         $"{(hours ?? 0):0.#}h";
 
     private static string FormatDate(DateOnly date, string part) =>
-        part == "FullDay" ? date.ToString("dd MMM yyyy") : $"{date:dd MMM yyyy} ({part})";
+        part == "FullDay" ? date.ToString("dd MMM yyyy") : $"{date:dd MMM yyyy} ({EnumDisplay.Humanize(part)})";
 }

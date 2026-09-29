@@ -1483,6 +1483,15 @@ html[data-theme="dark"] .theme-toggle:hover {
     color: var(--hr-gray-50);
 }
 
+html[data-theme="dark"] .topbar-logout {
+    color: var(--hr-gray-400);
+}
+
+html[data-theme="dark"] .topbar-logout:hover {
+    background: var(--hr-gray-700);
+    color: var(--hr-gray-50);
+}
+
 /* ── Notification bell ───────────────────────────────── */
 
 html[data-theme="dark"] .notif-btn {

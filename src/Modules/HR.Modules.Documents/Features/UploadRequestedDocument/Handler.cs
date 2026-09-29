@@ -41,7 +41,7 @@ internal sealed class UploadRequestedDocumentHandler(
 
         if (documentRequest.Status != DocumentRequestStatus.Requested)
             return Result.Failure<UploadRequestedDocumentResponse>(
-                Error.Conflict($"Document request is not open (status: {documentRequest.Status})."));
+                Error.Conflict($"Document request is not open (status: {EnumText.Humanize(documentRequest.Status)})."));
 
         var documentType = await db.DocumentTypes
             .FirstOrDefaultAsync(

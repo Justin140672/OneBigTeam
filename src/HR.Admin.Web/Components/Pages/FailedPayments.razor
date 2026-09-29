@@ -52,8 +52,8 @@ else
         <GridPageSettings PageSize="20" />
         <GridColumns>
             <GridColumn Field="@nameof(FailedPaymentItem.CompanyName)" HeaderText="Company" Width="200" />
-            <GridColumn Field="@nameof(FailedPaymentItem.SubscriptionStatus)" HeaderText="Customer Status" Width="150" />
-            <GridColumn Field="@nameof(FailedPaymentItem.InvoiceStatus)" HeaderText="Payment Status" Width="140" />
+            <GridColumn Field="@nameof(FailedPaymentItem.SubscriptionStatusText)" HeaderText="Customer Status" Width="150" />
+            <GridColumn Field="@nameof(FailedPaymentItem.InvoiceStatusText)" HeaderText="Payment Status" Width="140" />
             <GridColumn Field="@nameof(FailedPaymentItem.OutstandingAmount)" HeaderText="Outstanding Amount" Width="160" Format="C2" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
             <GridColumn Field="@nameof(FailedPaymentItem.InvoiceDate)" HeaderText="Invoice Date" Width="140" Format="dd MMM yyyy" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />
             <GridColumn Field="@nameof(FailedPaymentItem.RetryScheduledAt)" HeaderText="Retry Scheduled" Width="150" Format="dd MMM yyyy" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />

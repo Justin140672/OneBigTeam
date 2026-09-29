@@ -251,7 +251,7 @@
                                             ? "badge bg-danger"
                                             : "badge bg-warning text-dark";
                                     }
-                                    <span class="@cls">@row.Severity</span>
+                                    <span class="@cls">@EnumDisplay.Humanize(row.Severity)</span>
                                 </Template>
                             </GridColumn>
                             <GridColumn Field="@nameof(ImportPreviewRowError.Message)" HeaderText="Message" Width="300" />

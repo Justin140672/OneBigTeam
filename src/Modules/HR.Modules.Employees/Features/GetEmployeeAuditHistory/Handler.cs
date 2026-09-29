@@ -21,6 +21,9 @@ internal sealed class GetEmployeeAuditHistoryHandler(
 
     private const string ReasonField = "Reason";
 
+    private static readonly HashSet<string> EnumValueFields =
+        new(["Status", "NoticeSource", "LeavingReason", "SalaryType"], StringComparer.Ordinal);
+
     private static readonly IReadOnlyDictionary<string, string> ModuleMap = new Dictionary<string, string>
     {
         ["Employee"] = "Employees",
@@ -137,7 +140,7 @@ internal sealed class GetEmployeeAuditHistoryHandler(
                 Entry: p.Entry,
                 Item: new AuditHistoryItem(
                     p.Entry.OccurredAt,
-                    string.IsNullOrEmpty(p.Entry.Summary) ? p.Entry.EventType : p.Entry.Summary,
+                    string.IsNullOrEmpty(p.Entry.Summary) ? EnumText.Humanize(p.Entry.EventType) : p.Entry.Summary,
                     ModuleMap.TryGetValue(p.Entry.EntityType, out var module) ? module : p.Entry.EntityType,
                     ResolveUser(p.Entry.ActorEmployeeId, names),
                     BuildChanges(p.Before, p.After, departmentNames, positionProfileNames, locationNames, managerNames))))
@@ -273,6 +276,9 @@ internal sealed class GetEmployeeAuditHistoryHandler(
 
         if (fieldName == ReasonField && element.ValueKind == JsonValueKind.String)
             return Humanize(element.GetString()!);
+
+        if (EnumValueFields.Contains(fieldName) && element.ValueKind == JsonValueKind.String)
+            return EnumText.Humanize(element.GetString());
 
         return element.ToString();
     }

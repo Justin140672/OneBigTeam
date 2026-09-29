@@ -46,10 +46,10 @@
                         }
                         <dl class="row mb-0">
                             <dt class="col-sm-4 text-muted fw-normal">Source</dt>
-                            <dd class="col-sm-8">@_task.Source</dd>
+                            <dd class="col-sm-8">@EnumDisplay.Humanize(_task.Source)</dd>
 
                             <dt class="col-sm-4 text-muted fw-normal">Priority</dt>
-                            <dd class="col-sm-8">@_task.Priority</dd>
+                            <dd class="col-sm-8">@EnumDisplay.Humanize(_task.Priority)</dd>
 
                             <dt class="col-sm-4 text-muted fw-normal">Due Date</dt>
                             <dd class="col-sm-8">@(_task.DueDate?.ToString("d MMM yyyy") ?? "—")</dd>

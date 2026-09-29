@@ -21,7 +21,14 @@ public sealed record OperationalAlertListItem(
     int? AffectedItemCount,
     DateTimeOffset? ResolvedAt,
     Guid? ResolvedByUserId,
-    bool IsRead);
+    bool IsRead)
+{
+    public string SeverityText => HR.SharedKernel.EnumText.Humanize(Severity);
+
+    public string CategoryText => HR.SharedKernel.EnumText.Humanize(Category);
+
+    public string StatusText => HR.SharedKernel.EnumText.Humanize(Status);
+}
 
 public sealed record OperationalAlertDetailResponse(
     Guid Id,

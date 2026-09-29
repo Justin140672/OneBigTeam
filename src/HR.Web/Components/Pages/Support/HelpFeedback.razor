@@ -116,10 +116,11 @@
                 <div class="card-header d-flex align-items-center justify-content-between">
                     <h5 class="mb-0">My Submissions</h5>
                     <div class="support-status-filter">
-                        <SfDropDownList TValue="string" TItem="string"
+                        <SfDropDownList TValue="string" TItem="TypeOption"
                                         DataSource="@_statusFilterOptions"
                                         Value="@_statusFilter"
                                         ValueChanged="OnStatusFilterChangedAsync">
+                            <DropDownListFieldSettings Value="Value" Text="Label" />
                         </SfDropDownList>
                     </div>
                 </div>
@@ -175,7 +176,8 @@
     private bool _submitting;
     private string? _globalError;
 
-    private readonly List<string> _statusFilterOptions = [AllStatusesOption, .. SupportRequestOptions.Statuses];
+    private readonly List<TypeOption> _statusFilterOptions =
+        [new(AllStatusesOption, AllStatusesOption), .. SupportRequestOptions.Statuses.Select(s => new TypeOption(s, EnumDisplay.Humanize(s)))];
     private string _statusFilter = AllStatusesOption;
 
     private static readonly List<TypeOption> _typeOptions =

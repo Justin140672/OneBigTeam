@@ -45,7 +45,7 @@ internal sealed class CreateAssetAssignmentHandler(AssetsDbContext db, IClock cl
 
         if (asset.Status != AssetStatus.Available)
             return Result.Failure<CreateAssetAssignmentResponse>(
-                Error.Conflict($"Asset is not available for assignment (current status: {asset.Status})."));
+                Error.Conflict($"Asset is not available for assignment (current status: {EnumText.Humanize(asset.Status)})."));
 
         var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
         var assignment = AssetAssignment.Create(

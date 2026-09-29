@@ -341,7 +341,7 @@ internal sealed record EmployeeRoleOverrideCreatedAuditEvent(
     Guid?  IAuditEvent.ActorUserId     => ActorUserId;
     Guid?  IAuditEvent.ActorEmployeeId => null;
     Guid?  IAuditEvent.CorrelationId   => null;
-    string? IAuditEvent.Summary        => $"Created {OverrideType} override for role {RoleId}: {Reason}";
+    string? IAuditEvent.Summary        => $"Created {EnumText.Humanize(OverrideType)} override for role {RoleId}: {Reason}";
     object? IAuditEvent.Before         => null;
     object? IAuditEvent.After          => new { RoleId, OverrideType, ExpiresAt };
     object? IAuditEvent.Metadata       => null;
@@ -363,7 +363,7 @@ internal sealed record EmployeeRoleOverrideRemovedAuditEvent(
     Guid?  IAuditEvent.ActorUserId     => ActorUserId;
     Guid?  IAuditEvent.ActorEmployeeId => null;
     Guid?  IAuditEvent.CorrelationId   => null;
-    string? IAuditEvent.Summary        => $"Removed {OverrideType} override for role {RoleId}";
+    string? IAuditEvent.Summary        => $"Removed {EnumText.Humanize(OverrideType)} override for role {RoleId}";
     object? IAuditEvent.Before         => new { RoleId, OverrideType };
     object? IAuditEvent.After          => null;
     object? IAuditEvent.Metadata       => null;
@@ -385,7 +385,7 @@ internal sealed record EmployeeRoleOverrideExpiredAuditEvent(
     Guid?  IAuditEvent.ActorEmployeeId => null;
     AuditActorType IAuditEvent.ActorType => AuditActorType.ScheduledJob;
     Guid?  IAuditEvent.CorrelationId   => null;
-    string? IAuditEvent.Summary        => $"{OverrideType} override for role {RoleId} expired";
+    string? IAuditEvent.Summary        => $"{EnumText.Humanize(OverrideType)} override for role {RoleId} expired";
     object? IAuditEvent.Before         => new { RoleId, OverrideType };
     object? IAuditEvent.After          => null;
     object? IAuditEvent.Metadata       => null;

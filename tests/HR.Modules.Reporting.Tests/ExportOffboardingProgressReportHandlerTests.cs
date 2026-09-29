@@ -36,7 +36,7 @@ public class ExportOffboardingProgressReportHandlerTests
             ["Employee", "Last Working Day", "Status", "Outstanding Tasks", "Access Disabled", "Documents Returned", "Assets Returned"],
             exporter.LastData.ColumnHeaders);
         var row = Assert.Single(exporter.LastData.Rows);
-        Assert.Equal("InProgress", row[2]);
+        Assert.Equal("In Progress", row[2]);
         Assert.Equal("2026-08-01", row[1]);
     }
 

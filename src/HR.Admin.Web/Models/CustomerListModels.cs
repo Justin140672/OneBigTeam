@@ -9,4 +9,7 @@ public sealed record CustomerListItem(
     int CurrentEmployeeCount,
     decimal? MonthlyCharge,
     DateTimeOffset? TrialEndsAt,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt)
+{
+    public string SubscriptionStatusText => HR.SharedKernel.EnumText.Humanize(SubscriptionStatus);
+}

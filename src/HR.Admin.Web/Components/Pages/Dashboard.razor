@@ -92,7 +92,7 @@ else
                                 <a href="@($"/customers/{change.CompanyId}")">@change.CompanyName</a>
                             </Template>
                         </GridColumn>
-                        <GridColumn Field="@nameof(CustomerDashboardSubscriptionChange.Status)" HeaderText="Status" />
+                        <GridColumn Field="@nameof(CustomerDashboardSubscriptionChange.StatusText)" HeaderText="Status" />
                         <GridColumn Field="@nameof(CustomerDashboardSubscriptionChange.ChangedAt)" HeaderText="Changed" Format="dd MMM yyyy HH:mm" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />
                     </GridColumns>
                 </SfGrid>

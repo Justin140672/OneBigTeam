@@ -62,7 +62,10 @@ public sealed record LeaveBalanceHistoryItemModel(
     string Reason,
     decimal BalanceAfter,
     string CreatedBy,
-    string Description);
+    string Description)
+{
+    public string ReasonText => HR.SharedKernel.EnumText.Humanize(Reason);
+}
 
 
 public enum LeaveDayPart { FullDay, Morning, Afternoon }

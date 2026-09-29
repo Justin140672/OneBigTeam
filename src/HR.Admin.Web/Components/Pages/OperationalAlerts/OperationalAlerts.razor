@@ -51,14 +51,14 @@ else
         <GridEvents TValue="OperationalAlertListItem" RowSelected="OnRowSelected" />
         <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Excel" />
         <GridColumns>
-            <GridColumn Field="@nameof(OperationalAlertListItem.Severity)" HeaderText="Severity" Width="120" />
-            <GridColumn Field="@nameof(OperationalAlertListItem.Category)" HeaderText="Category" Width="160" />
+            <GridColumn Field="@nameof(OperationalAlertListItem.SeverityText)" HeaderText="Severity" Width="120" />
+            <GridColumn Field="@nameof(OperationalAlertListItem.CategoryText)" HeaderText="Category" Width="160" />
             <GridColumn Field="@nameof(OperationalAlertListItem.CompanyId)" HeaderText="Company" Width="200" />
             <GridColumn Field="@nameof(OperationalAlertListItem.Summary)" HeaderText="Summary" Width="320" />
             <GridColumn Field="@nameof(OperationalAlertListItem.OccurrenceCount)" HeaderText="Occurrences" Width="130" TextAlign="Syncfusion.Blazor.Grids.TextAlign.Right" />
             <GridColumn Field="@nameof(OperationalAlertListItem.FirstOccurredAt)" HeaderText="First seen" Width="170" Format="dd MMM yyyy HH:mm" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />
             <GridColumn Field="@nameof(OperationalAlertListItem.LastOccurredAt)" HeaderText="Latest" Width="170" Format="dd MMM yyyy HH:mm" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />
-            <GridColumn Field="@nameof(OperationalAlertListItem.Status)" HeaderText="Status" Width="130" />
+            <GridColumn Field="@nameof(OperationalAlertListItem.StatusText)" HeaderText="Status" Width="130" />
         </GridColumns>
     </SfGrid>
 

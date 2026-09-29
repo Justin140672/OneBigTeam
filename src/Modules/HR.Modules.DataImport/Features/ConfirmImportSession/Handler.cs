@@ -49,7 +49,7 @@ internal sealed class ConfirmImportSessionHandler(
         if (!confirmable)
         {
             return Result.Failure<ConfirmImportSessionResponse>(
-                Error.Conflict($"Import session '{request.ImportSessionId}' is not in a confirmable state (status: {session.Status})."));
+                Error.Conflict($"Import session '{request.ImportSessionId}' is not in a confirmable state (status: {EnumText.Humanize(session.Status)})."));
         }
 
         // Re-confirming a session that already finished with errors is only meaningful as a retry of

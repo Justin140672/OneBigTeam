@@ -504,19 +504,12 @@ else
 
     private static string FormatDateRange(DateOnly start, string startPart, DateOnly end, string endPart)
     {
-        var startStr = startPart == "FullDay" ? start.ToString("d MMM") : $"{start:d MMM} ({startPart})";
-        var endStr   = endPart   == "FullDay" ? end.ToString("d MMM yyyy") : $"{end:d MMM yyyy} ({endPart})";
+        var startStr = startPart == "FullDay" ? start.ToString("d MMM") : $"{start:d MMM} ({EnumDisplay.Humanize(startPart)})";
+        var endStr   = endPart   == "FullDay" ? end.ToString("d MMM yyyy") : $"{end:d MMM yyyy} ({EnumDisplay.Humanize(endPart)})";
         return start == end ? endStr : $"{startStr} – {endStr}";
     }
 
-    private static string StatusDisplayName(string status) => status switch
-    {
-        "Active"         => "Active",
-        "Suspended"      => "Suspended",
-        "Leaving"        => "Leaving",
-        "FormerEmployee" => "Former Employee",
-        _                => status
-    };
+    private static string StatusDisplayName(string status) => EnumDisplay.Humanize(status);
 
     private string WorkingPatternSummary()
     {

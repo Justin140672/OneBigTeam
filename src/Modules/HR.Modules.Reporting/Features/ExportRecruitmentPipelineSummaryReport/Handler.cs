@@ -37,7 +37,7 @@ internal sealed class ExportRecruitmentPipelineSummaryReportHandler(
                         v.VacancyTitle,
                         v.PositionProfileTitle,
                         v.DepartmentName,
-                        v.Status,
+                        EnumText.Humanize(v.Status),
                         v.OpenedAt?.ToString("yyyy-MM-dd"),
                         v.CandidateCount.ToString(),
                     };

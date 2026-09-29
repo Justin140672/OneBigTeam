@@ -271,7 +271,7 @@
                                                             @{
                                                                 var row = (context as SharedCompanyDocumentVersionModel)!;
                                                             }
-                                                            <span class="badge @StatusBadgeClass(row.PublicationStatus)">@row.PublicationStatus</span>
+                                                            <span class="badge @StatusBadgeClass(row.PublicationStatus)">@EnumDisplay.Humanize(row.PublicationStatus)</span>
                                                         </Template>
                                                     </GridColumn>
                                                     <GridColumn Field="@nameof(SharedCompanyDocumentVersionModel.FileName)" HeaderText="File Name" Width="220" />

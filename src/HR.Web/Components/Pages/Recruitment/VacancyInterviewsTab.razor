@@ -47,7 +47,7 @@
                         @{
                             var row = (InterviewListItemModel)context;
                         }
-                        <StatusBadge Variant="@OutcomeVariant(row.Outcome)">@row.Outcome</StatusBadge>
+                        <StatusBadge Variant="@OutcomeVariant(row.Outcome)">@EnumDisplay.Humanize(row.Outcome)</StatusBadge>
                     </Template>
                 </GridColumn>
                 <GridColumn HeaderText="Actions" Width="160">
@@ -73,7 +73,9 @@
                 <DataAnnotationsValidator />
                 <div class="mb-3">
                     <label class="form-label">Outcome <span class="text-danger">*</span></label>
-                    <SfDropDownList TValue="string" TItem="string" DataSource="@_outcomeOptions" @bind-Value="_model.Outcome" Placeholder="Select outcome" />
+                    <SfDropDownList TValue="string" TItem="OutcomeOption" DataSource="@_outcomeOptions" @bind-Value="_model.Outcome" Placeholder="Select outcome">
+                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                    </SfDropDownList>
                     <ValidationMessage For="@(() => _model.Outcome)" />
                 </div>
                 <div class="mb-3">
@@ -109,7 +111,10 @@
     private readonly RecordOutcomeFormModel _model = new();
     private EditContext _editContext = default!;
 
-    private static readonly string[] _outcomeOptions = ["Passed", "Failed", "NoShow", "Cancelled"];
+    private sealed record OutcomeOption(string Value, string Label);
+
+    private static readonly OutcomeOption[] _outcomeOptions =
+        [.. new[] { "Passed", "Failed", "NoShow", "Cancelled" }.Select(o => new OutcomeOption(o, EnumDisplay.Humanize(o)))];
 
     protected override void OnInitialized()
     {

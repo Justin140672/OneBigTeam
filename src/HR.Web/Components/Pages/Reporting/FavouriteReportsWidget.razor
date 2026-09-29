@@ -45,7 +45,7 @@ else
                         <span class="priority-pip priority-pip--low"></span>
                         <div class="task-widget-content">
                             <span class="task-widget-title">@r.DisplayName</span>
-                            <span class="task-widget-meta">@r.Category</span>
+                            <span class="task-widget-meta">@EnumDisplay.Humanize(r.Category)</span>
                         </div>
                     </div>
                 }

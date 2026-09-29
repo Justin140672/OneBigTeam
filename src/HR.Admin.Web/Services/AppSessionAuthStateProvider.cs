@@ -13,7 +13,7 @@ namespace HR.Admin.Web.Services;
 // This used to call the tenant-oriented /api/me (HR.Modules.Identity's GetMe feature), the same
 // endpoint HR.Web's own AppSessionAuthStateProvider uses. That endpoint requires "role:employee"
 // and unconditionally resolves a TenantId/company, so a platform-administrator-only account (no
-// UserRole/Employee/tenant at all — e.g. justin.etherington@acme.example, seeded purely via
+// UserRole/Employee/tenant at all — e.g. justinetherington@hotmail.com, seeded purely via
 // PlatformAdmin:AllowedEmails / identity.platform_administrators) got a 403 and was treated as
 // *not authenticated at all* by Blazor's router, bouncing them to /login despite having a
 // perfectly valid platform-administrator session.

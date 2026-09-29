@@ -40,7 +40,7 @@ internal sealed class ExportOffboardingProgressReportHandler(
                 {
                     item.EmployeeName,
                     item.LastWorkingDay.ToString("yyyy-MM-dd"),
-                    item.Status,
+                    EnumText.Humanize(item.Status),
                     string.Join("; ", item.OutstandingTasks),
                     item.AccessDisabled.ToString(),
                     item.DocumentsReturned.ToString(),

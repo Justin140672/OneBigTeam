@@ -63,7 +63,7 @@ else
                             <span class="task-widget-title">@i.EmployeeName</span>
                             <span class="task-widget-meta">@i.LeaveTypeName · @i.StartDate.ToString("d MMM") – @i.EndDate.ToString("d MMM")</span>
                         </div>
-                        <span class="due-badge due-badge--@StatusCss(i.Status)">@i.Status</span>
+                        <span class="due-badge due-badge--@StatusCss(i.Status)">@EnumDisplay.Humanize(i.Status)</span>
                     </div>
                 }
             }

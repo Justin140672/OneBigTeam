@@ -34,7 +34,7 @@
         {
             @foreach (var eventType in _response.AvailableEventTypes)
             {
-                <option value="@eventType">@eventType</option>
+                <option value="@eventType">@EnumText.Humanize(eventType)</option>
             }
         }
     </select>
@@ -66,7 +66,7 @@ else
         <GridPageSettings PageSize="20" />
         <GridColumns>
             <GridColumn Field="@nameof(AuditLogItem.OccurredAt)" HeaderText="Occurred At" Width="170" Format="dd MMM yyyy HH:mm" Type="Syncfusion.Blazor.Grids.ColumnType.DateTime" />
-            <GridColumn Field="@nameof(AuditLogItem.EventType)" HeaderText="Action" Width="220" />
+            <GridColumn Field="@nameof(AuditLogItem.EventTypeText)" HeaderText="Action" Width="220" />
             <GridColumn Field="@nameof(AuditLogItem.CompanyName)" HeaderText="Customer" Width="180" />
             <GridColumn Field="@nameof(AuditLogItem.AdministratorEmail)" HeaderText="Administrator" Width="220" />
             <GridColumn Field="@nameof(AuditLogItem.Summary)" HeaderText="Summary" Width="320" />

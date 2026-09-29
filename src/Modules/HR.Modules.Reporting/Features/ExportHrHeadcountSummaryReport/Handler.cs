@@ -39,7 +39,7 @@ internal sealed class ExportHrHeadcountSummaryReportHandler(
                     item.Location,
                     item.Position,
                     item.EmploymentType,
-                    item.Status,
+                    EnumText.Humanize(item.Status),
                     item.StartDate.ToString("yyyy-MM-dd"),
                     item.LeavingDate?.ToString("yyyy-MM-dd"),
                     item.Fte?.ToString("0.00"),

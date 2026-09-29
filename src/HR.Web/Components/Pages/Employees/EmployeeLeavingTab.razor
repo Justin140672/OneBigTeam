@@ -257,12 +257,7 @@ else
         }
     }
 
-    private static string EmploymentStatusLabel(string? status) => status switch
-    {
-        "Leaving" => "Leaving",
-        "FormerEmployee" => "Former Employee",
-        _ => status ?? "—"
-    };
+    private static string EmploymentStatusLabel(string? status) => status is null ? "—" : EnumDisplay.Humanize(status);
 
     private static string StatusBadgeClass(string? status) => status switch
     {
@@ -302,35 +297,13 @@ else
         };
     }
 
-    private static string NoticePeriodSourceLabel(string source) => source switch
-    {
-        "Employee"        => "Employee",
-        "PositionProfile" => "Position Profile",
-        "CompanyDefault"  => "Company Default",
-        _                 => source
-    };
+    private static string NoticePeriodSourceLabel(string source) => EnumDisplay.Humanize(source);
 
-    private static string NoticePeriodUnitLabel(NoticePeriodUnit unit) => unit switch
-    {
-        NoticePeriodUnit.Weeks  => "Weeks",
-        NoticePeriodUnit.Months => "Months",
-        _                       => EnumDisplay.Humanize(unit)
-    };
+    private static string NoticePeriodUnitLabel(NoticePeriodUnit unit) => EnumDisplay.Humanize(unit);
 
-    internal static string LeavingReasonLabel(string reason) => reason switch
-    {
-        "EndOfContract"    => "End of Contract",
-        "MutualAgreement"  => "Mutual Agreement",
-        _                  => reason
-    };
+    internal static string LeavingReasonLabel(string reason) => EnumDisplay.Humanize(reason);
 
-    private static string LeavingStatusLabel(string status) => status switch
-    {
-        "InProgress" => "In Progress",
-        "Cancelled"  => "Cancelled",
-        "Completed"  => "Completed",
-        _            => status
-    };
+    private static string LeavingStatusLabel(string status) => EnumDisplay.Humanize(status);
 
     private static string LeavingStatusBadgeClass(string status) => status switch
     {

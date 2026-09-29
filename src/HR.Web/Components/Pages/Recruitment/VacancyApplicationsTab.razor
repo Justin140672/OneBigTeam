@@ -1028,7 +1028,7 @@
         }
 
         _showOfferResponseDialog = false;
-        _actionSuccess = $"Offer response recorded: {result.OfferResponseStatus}.";
+        _actionSuccess = $"Offer response recorded: {EnumDisplay.Humanize(result.OfferResponseStatus)}.";
         _actionError = null;
         await LoadAsync();
     }

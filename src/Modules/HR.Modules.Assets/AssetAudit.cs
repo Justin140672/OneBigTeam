@@ -106,7 +106,7 @@ internal sealed record AssetAssignmentReturnedAuditEvent(
     Guid? IAuditEvent.ActorUserId => ReturnedBy;
     Guid? IAuditEvent.ActorEmployeeId => EmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
-    string? IAuditEvent.Summary => Outcome == "Returned" ? "Asset returned by employee" : $"Asset return recorded as {Outcome}";
+    string? IAuditEvent.Summary => Outcome == "Returned" ? "Asset returned by employee" : $"Asset return recorded as {EnumText.Humanize(Outcome)}";
     object? IAuditEvent.Before => null;
     object? IAuditEvent.After => new { ReturnedBy, OccurredAt, Outcome };
     object? IAuditEvent.Metadata => Notes is null ? null : new { Notes };

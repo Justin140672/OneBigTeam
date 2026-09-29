@@ -29,7 +29,7 @@ internal sealed class GetProbationRecordAuditHistoryHandler(
         var items = entries
             .Select(e => new ProbationAuditHistoryItem(
                 e.OccurredAt,
-                string.IsNullOrEmpty(e.Summary) ? e.EventType : e.Summary,
+                string.IsNullOrEmpty(e.Summary) ? EnumText.Humanize(e.EventType) : e.Summary,
                 ResolveUser(e.ActorEmployeeId, names),
                 BuildChanges(ParseFields(e.BeforeJson), ParseFields(e.AfterJson))))
             .ToList();

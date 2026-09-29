@@ -382,7 +382,7 @@ internal sealed record SharedCompanyDocumentReminderSentAuditEvent(
     Guid?   IAuditEvent.ActorUserId     => null;
     Guid?   IAuditEvent.ActorEmployeeId => null;
     Guid?   IAuditEvent.CorrelationId   => null;
-    string? IAuditEvent.Summary         => $"Reminder ({NotificationType}) sent for document '{Title}'";
+    string? IAuditEvent.Summary         => $"Reminder ({EnumText.Humanize(NotificationType)}) sent for document '{Title}'";
     object? IAuditEvent.Before          => null;
     // Deliberately in After, not Metadata — GetSharedCompanyDocumentAuditHistoryHandler's
     // BuildChanges only ever parses Before/After JSON, never Metadata, so anything placed there
@@ -730,7 +730,7 @@ internal sealed record FileScanStatusChangedAuditEvent(
     // user available at all - must not default to Human (which requires an actor) or every scan
     // status change is rejected by AuditActorAttributionGuard.
     AuditActorType IAuditEvent.ActorType => AuditActorType.ScheduledJob;
-    string? IAuditEvent.Summary         => $"{EntityTypeName} {FileEntityId} scan status changed: {PreviousStatus} -> {NewStatus}";
+    string? IAuditEvent.Summary         => $"{EntityTypeName} {FileEntityId} scan status changed: {EnumText.Humanize(PreviousStatus)} -> {EnumText.Humanize(NewStatus)}";
     object? IAuditEvent.Before          => new { Status = PreviousStatus };
     object? IAuditEvent.After           => new { Status = NewStatus, FailureReason };
     object? IAuditEvent.Metadata        => null;

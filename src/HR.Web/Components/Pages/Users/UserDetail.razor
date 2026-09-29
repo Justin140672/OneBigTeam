@@ -26,7 +26,7 @@
     {
         <div class="d-flex align-items-center gap-2 mb-1">
             <h1 class="mb-0 fs-4">@_user.Name</h1>
-            <span class="badge @AccountStatusBadgeClass(_user.AccountStatus)">@_user.AccountStatus</span>
+            <span class="badge @AccountStatusBadgeClass(_user.AccountStatus)">@EnumDisplay.Humanize(_user.AccountStatus)</span>
             @if (!string.IsNullOrEmpty(_user.InvitationStatus))
             {
                 <span class="badge @InvitationStatusBadgeClass(_user.InvitationStatus)">@_user.InvitationStatus</span>

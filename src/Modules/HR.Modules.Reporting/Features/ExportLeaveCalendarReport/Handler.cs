@@ -54,7 +54,7 @@ internal sealed class ExportLeaveCalendarReportHandler(
                     r.LeaveEnd.ToString("yyyy-MM-dd"),
                     r.LeaveTypeName,
                     r.DurationDays.ToString("0.##"),
-                    r.ApprovalStatus,
+                    EnumText.Humanize(r.ApprovalStatus),
                 })
                 .ToList();
 

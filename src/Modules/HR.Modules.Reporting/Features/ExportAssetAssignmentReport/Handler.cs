@@ -42,7 +42,7 @@ internal sealed class ExportAssetAssignmentReportHandler(
                     item.AssetName,
                     item.SerialNumber,
                     item.AssignedDate.ToString("yyyy-MM-dd"),
-                    item.ReturnStatus,
+                    EnumText.Humanize(item.ReturnStatus),
                 })
                 .ToList();
 

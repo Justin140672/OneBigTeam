@@ -26,7 +26,7 @@ else
 {
     <div class="stat-cards">
         <div class="stat-card">
-            <span class="stat-value">@_view.SubscriptionStatus</span>
+            <span class="stat-value">@EnumText.Humanize(_view.SubscriptionStatus)</span>
             <span class="stat-label">Subscription status</span>
         </div>
         <div class="stat-card">
@@ -50,9 +50,9 @@ else
                 <dt>Company</dt>
                 <dd>@_view.CompanyName</dd>
                 <dt>Company status</dt>
-                <dd>@_view.Status</dd>
+                <dd>@EnumText.Humanize(_view.Status)</dd>
                 <dt>Subscription status</dt>
-                <dd>@_view.SubscriptionStatus</dd>
+                <dd>@EnumText.Humanize(_view.SubscriptionStatus)</dd>
                 <dt>Trial started</dt>
                 <dd>@FormatDate(_view.TrialStartedAt)</dd>
                 <dt>Trial expires</dt>

@@ -31,7 +31,7 @@
                         @foreach (var source in _result.Sources)
                         {
                             <tr>
-                                <td>@source.Source</td>
+                                <td>@EnumDisplay.Humanize(source.Source)</td>
                                 <td>@source.Created</td>
                                 <td>@source.Skipped</td>
                                 <td>@source.Failed</td>
