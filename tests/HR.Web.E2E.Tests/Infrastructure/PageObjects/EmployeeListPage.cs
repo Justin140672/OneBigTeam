@@ -25,13 +25,24 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     {
         var button = page.GetByRole(AriaRole.Button, new() { Name = "Add employee" });
         await button.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 60_000 });
-        const int maxAttempts = 8;
+        // Under severe transient load a genuinely-working click can still take well past a single
+        // attempt's window even after several retries — one observed run exhausted a 7×5s + 30s
+        // budget entirely and still failed. Give the last few attempts real headroom (not just the
+        // very last one) rather than assuming one long attempt is always enough.
+        const int maxAttempts = 12;
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            await button.ClickAsync();
+            var isLateAttempt = attempt > maxAttempts - 3;
             try
             {
-                await page.WaitForURLAsync("**/employees/new**", new() { Timeout = attempt < maxAttempts ? 3_000 : 15_000 });
+                // ClickAsync must be inside the try too, not just the URL wait — it has no
+                // explicit Timeout of its own, so it uses Playwright's default 30s actionability
+                // wait. If the button is momentarily non-actionable (a transient overlay,
+                // mid-render state) on an early attempt, an unwrapped ClickAsync would throw and
+                // escape the loop immediately, defeating the retry entirely — which is exactly
+                // what an unretried "Timeout 30000ms exceeded" failure here looks like.
+                await button.ClickAsync(new() { Timeout = isLateAttempt ? 20_000 : 5_000 });
+                await page.WaitForURLAsync("**/employees/new**", new() { Timeout = isLateAttempt ? 15_000 : 3_000 });
                 return;
             }
             catch (TimeoutException) when (attempt < maxAttempts)

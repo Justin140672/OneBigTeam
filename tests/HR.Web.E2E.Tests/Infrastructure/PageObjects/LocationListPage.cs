@@ -15,8 +15,27 @@ public sealed class LocationListPage(IPage page, string baseUrl)
 
     public async Task ClickNewLocationAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
-        await page.WaitForURLAsync("**/locations/new**", new() { Timeout = 30_000 });
+        // Retry the click rather than a single fire-and-wait — see
+        // EmployeeListPage.ClickNewEmployeeAsync's remarks for why a fixed single-shot timeout
+        // genuinely isn't enough under a full parallel E2E run.
+        var button = page.GetByRole(AriaRole.Button, new() { Name = "Add" });
+        await button.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 60_000 });
+        const int maxAttempts = 8;
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                // ClickAsync must be inside the try too — see EmployeeListPage.ClickNewEmployeeAsync's
+                // remarks for why an unwrapped ClickAsync (default 30s actionability wait) can
+                // escape the retry loop entirely and look like an unretried 30000ms timeout.
+                await button.ClickAsync(new() { Timeout = attempt < maxAttempts ? 5_000 : 30_000 });
+                await page.WaitForURLAsync("**/locations/new**", new() { Timeout = attempt < maxAttempts ? 3_000 : 15_000 });
+                return;
+            }
+            catch (TimeoutException) when (attempt < maxAttempts)
+            {
+            }
+        }
     }
 
     public async Task<bool> HasLocationAsync(string nameFragment)

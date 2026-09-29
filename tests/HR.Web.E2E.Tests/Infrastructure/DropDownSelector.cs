@@ -128,10 +128,26 @@ public static class DropDownSelector
             }
         }
 
-        await Assertions.Expect(combobox.Locator("input").First)
-            .ToHaveValueAsync(
-                new Regex($"{Regex.Escape(text)}|{Regex.Escape(text.Replace(" ", ""))}"),
-                new() { Timeout = 10_000 });
+        var valuePattern = new Regex($"{Regex.Escape(text)}|{Regex.Escape(text.Replace(" ", ""))}");
+        var comboInput = combobox.Locator("input").First;
+
+        try
+        {
+            await Assertions.Expect(comboInput).ToHaveValueAsync(valuePattern, new() { Timeout = 8_000 });
+        }
+        catch (PlaywrightException)
+        {
+            // A forced click (attempt 3 above) bypasses Syncfusion's own actionability/hover
+            // state, which can register as a DOM click without the widget actually processing it
+            // as a selection — the value never commits even though ClickAsync itself succeeded.
+            // Syncfusion's own keyboard handling (Enter selects the currently-highlighted item)
+            // goes through its normal internal path rather than synthetic mouse events, so it's a
+            // more reliable fallback than trying yet another mouse click. Re-highlight the item
+            // with the mouse (hover only, no click) so it's the one Enter will select, then press it.
+            await item.HoverAsync(new() { Timeout = 5_000, Force = true });
+            await page.Keyboard.PressAsync("Enter");
+            await Assertions.Expect(comboInput).ToHaveValueAsync(valuePattern, new() { Timeout = 10_000 });
+        }
 
         try
         {

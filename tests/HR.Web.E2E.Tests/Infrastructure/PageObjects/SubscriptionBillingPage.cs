@@ -105,8 +105,28 @@ public sealed class SubscriptionBillingPage(IPage page, string baseUrl)
         await IsCancelConfirmDialogVisibleAsync();
     }
 
-    public Task<bool> IsCancelConfirmDialogVisibleAsync() =>
-        page.GetByRole(AriaRole.Dialog, new() { Name = "Cancel subscription" }).IsVisibleAsync();
+    /// <summary>
+    /// Returns true once the "Cancel subscription" confirmation dialog is visible, or false if it
+    /// never appears within the timeout. A plain IsVisibleAsync() snapshot right after the
+    /// triggering click races the dialog's own open animation (RequestCancelAsync flips
+    /// _showCancelConfirm, then SfDialog renders and animates in) — a caller that checks
+    /// immediately can see it as not-yet-visible even though it's about to appear. Bound-wait for
+    /// it instead, the same pattern used by CancelLeavingProcessDialog.OpenAsync and
+    /// SidebarPage.IsSidebarVisibleAsync elsewhere in this suite.
+    /// </summary>
+    public async Task<bool> IsCancelConfirmDialogVisibleAsync()
+    {
+        try
+        {
+            await page.GetByRole(AriaRole.Dialog, new() { Name = "Cancel subscription" })
+                .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+            return true;
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+    }
 
     public async Task ConfirmCancelAsync()
     {

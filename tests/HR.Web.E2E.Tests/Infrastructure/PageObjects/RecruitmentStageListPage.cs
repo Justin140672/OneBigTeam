@@ -15,8 +15,28 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
 
     public async Task ClickNewAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
-        await page.WaitForURLAsync("**/recruitment-stages/new**", new() { Timeout = 15_000 });
+        // Retry the click rather than a single fire-and-wait: under real load (a full parallel
+        // E2E run) the same navigation genuinely takes longer than a fixed single-shot timeout
+        // often enough to fail — see EmployeeListPage.ClickNewEmployeeAsync, which already uses
+        // this exact retry pattern for the same reason.
+        var button = page.GetByRole(AriaRole.Button, new() { Name = "Add" });
+        await button.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 60_000 });
+        const int maxAttempts = 8;
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                // ClickAsync must be inside the try too — see EmployeeListPage.ClickNewEmployeeAsync's
+                // remarks for why an unwrapped ClickAsync (default 30s actionability wait) can
+                // escape the retry loop entirely and look like an unretried 30000ms timeout.
+                await button.ClickAsync(new() { Timeout = attempt < maxAttempts ? 5_000 : 30_000 });
+                await page.WaitForURLAsync("**/recruitment-stages/new**", new() { Timeout = attempt < maxAttempts ? 3_000 : 15_000 });
+                return;
+            }
+            catch (TimeoutException) when (attempt < maxAttempts)
+            {
+            }
+        }
     }
 
     public async Task<bool> HasItemAsync(string nameFragment)

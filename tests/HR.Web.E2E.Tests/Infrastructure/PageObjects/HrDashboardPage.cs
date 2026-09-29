@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 
@@ -91,15 +92,39 @@ public sealed class HrDashboardPage(IPage page, string baseUrl)
     public async Task<IReadOnlyList<LayoutRect>> GetAnalyticsGridTileBoundsAsync()
     {
         var tiles = page.Locator(".dashboard-analytics-grid > .widget-card, .dashboard-analytics-grid > .chart-tile");
-        var count = await tiles.CountAsync();
-        var bounds = new List<LayoutRect>();
-        for (var i = 0; i < count; i++)
+
+        // The dashboard has several other widgets ABOVE the analytics grid (attention queue,
+        // favourite reports, recent changes, sickness widgets, ...) that load asynchronously and
+        // each shift the analytics grid's Y position as their own content grows in. Waiting for
+        // just these three charts' own content to load isn't enough — the page's total layout can
+        // still be settling above them at that exact moment, which is what produced wildly
+        // different/huge Y readings between runs (thousands of px, and not matching each other)
+        // rather than a genuine "not in the same row" bug. Poll until two consecutive reads agree
+        // on every tile's Y position (within a small tolerance) before trusting the measurement.
+        IReadOnlyList<LayoutRect>? previous = null;
+        for (var attempt = 0; attempt < 20; attempt++)
         {
-            var box = await tiles.Nth(i).BoundingBoxAsync();
-            if (box is not null)
-                bounds.Add(new LayoutRect(box.X, box.Y, box.Width, box.Height));
+            var count = await tiles.CountAsync();
+            var bounds = new List<LayoutRect>();
+            for (var i = 0; i < count; i++)
+            {
+                var box = await tiles.Nth(i).BoundingBoxAsync();
+                if (box is not null)
+                    bounds.Add(new LayoutRect(box.X, box.Y, box.Width, box.Height));
+            }
+
+            if (previous is not null
+                && previous.Count == bounds.Count
+                && previous.Zip(bounds, (p, b) => Math.Abs(p.Y - b.Y) < 1).All(same => same))
+            {
+                return bounds;
+            }
+
+            previous = bounds;
+            await page.WaitForTimeoutAsync(250);
         }
-        return bounds;
+
+        return previous ?? [];
     }
 
     public readonly record struct LayoutRect(float X, float Y, float Width, float Height);

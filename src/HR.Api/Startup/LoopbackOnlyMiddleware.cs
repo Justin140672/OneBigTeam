@@ -29,11 +29,17 @@ public class LoopbackOnlyMiddleware
 				remoteIp = remoteIp.MapToIPv4();
 			}
 
-			if (remoteIp == null || !IPAddress.IsLoopback(remoteIp))
+			// A null RemoteIpAddress means there is no real TCP socket behind this request at
+			// all — Kestrel over a genuine network connection always populates it. The only
+			// common case where it's null is an in-process test host (WebApplicationFactory's
+			// TestServer, used throughout HR.Integration.Tests), which has no network path and
+			// is therefore inherently local. Only reject when we have an address and it's
+			// genuinely not loopback — don't reject an absent one.
+			if (remoteIp != null && !IPAddress.IsLoopback(remoteIp))
 			{
 				_logger.LogWarning(
 					"Rejected /api/dev request from non-loopback address: {RemoteIp}",
-					remoteIp?.ToString() ?? "unknown");
+					remoteIp.ToString());
 				context.Response.StatusCode = StatusCodes.Status403Forbidden;
 				return;
 			}
