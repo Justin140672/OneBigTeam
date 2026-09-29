@@ -137,6 +137,30 @@ public class SignUpEndpointTests
     }
 
     [Fact]
+    public async Task Post_SignUp_Scaffolds_Only_Future_Public_Holidays_For_New_Company()
+    {
+        using var client = _factory.CreateClient();
+        _factory.SupabaseAuthGateway.UserIdToReturn = Guid.NewGuid();
+
+        var response = await client.PostAsJsonAsync("/api/signup", ValidSignUpRequest());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<SignUpPayload>();
+
+        using var scope = _factory.Services.CreateScope();
+        var companiesDb = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+        var holidays = await companiesDb.PublicHolidays
+            .Where(h => h.CompanyId == payload!.CompanyId)
+            .ToListAsync();
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        Assert.NotEmpty(holidays);
+        Assert.All(holidays, h => Assert.True(h.Date > today));
+        Assert.Equal(holidays.Count, holidays.Select(h => h.Date).Distinct().Count());
+        Assert.All(holidays, h => Assert.Equal("GB", h.CountryCode));
+    }
+
+    [Fact]
     public async Task Post_SignUp_Returns_Conflict_For_Duplicate_Email()
     {
         using var client = _factory.CreateClient();

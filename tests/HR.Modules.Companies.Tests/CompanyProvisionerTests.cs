@@ -36,6 +36,50 @@ public class CompanyProvisionerTests
         Assert.Equal("GB", address.CountryCode);
     }
 
+    [Fact]
+    public async Task ProvisionCompanyAsync_Scaffolds_Only_Public_Holidays_After_Today()
+    {
+        await using var companiesContext = BuildContext();
+        await using var platformContext = BuildPlatformContext();
+        var provisioner = new CompanyProvisioner(
+            companiesContext,
+            platformContext,
+            new FakeClock(new DateTime(2026, 12, 25, 10, 0, 0, DateTimeKind.Utc)),
+            new ConfigurationBuilder().Build());
+
+        var companyId = await provisioner.ProvisionCompanyAsync("Acme Corporation", CancellationToken.None);
+
+        var holidays = await companiesContext.PublicHolidays
+            .Where(h => h.CompanyId == companyId)
+            .OrderBy(h => h.Date)
+            .ToListAsync();
+
+        Assert.NotEmpty(holidays);
+        Assert.All(holidays, h => Assert.True(h.Date > new DateOnly(2026, 12, 25)));
+        Assert.All(holidays, h => Assert.Equal("GB", h.CountryCode));
+        Assert.Equal(new DateOnly(2026, 12, 28), holidays[0].Date);
+        Assert.Equal(new DateOnly(2027, 12, 28), holidays[^1].Date);
+    }
+
+    [Fact]
+    public async Task PublicHolidayScaffolder_Does_Not_Duplicate_When_Run_Twice()
+    {
+        await using var companiesContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(2026, 9, 29, 10, 0, 0, TimeSpan.Zero);
+
+        await PublicHolidayScaffolder.AddUpcomingAsync(companiesContext, companyId, now, CancellationToken.None);
+        await companiesContext.SaveChangesAsync();
+        var first = await companiesContext.PublicHolidays.CountAsync(h => h.CompanyId == companyId);
+
+        await PublicHolidayScaffolder.AddUpcomingAsync(companiesContext, companyId, now, CancellationToken.None);
+        await companiesContext.SaveChangesAsync();
+        var second = await companiesContext.PublicHolidays.CountAsync(h => h.CompanyId == companyId);
+
+        Assert.Equal(10, first);
+        Assert.Equal(first, second);
+    }
+
     private static CompaniesDbContext BuildContext()
     {
         var options = new DbContextOptionsBuilder<CompaniesDbContext>()

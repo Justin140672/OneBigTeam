@@ -34,6 +34,8 @@ internal sealed class CompanyProvisioner(
         companiesDbContext.Companies.Add(company);
         companiesDbContext.CustomerSubscriptions.Add(subscription);
 
+        await PublicHolidayScaffolder.AddUpcomingAsync(companiesDbContext, company.Id, now, cancellationToken);
+
         await companiesDbContext.SaveChangesAsync(cancellationToken);
 
         return company.Id;
