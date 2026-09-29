@@ -7,7 +7,7 @@ namespace HR.Architecture.Tests;
 
 public class TenantScopedRouteConventionTests
 {
-    private static readonly Assembly[] ModuleAssemblies =
+    internal static readonly Assembly[] ModuleAssemblies =
         [
             typeof(HR.Modules.Companies.CompaniesModule).Assembly,
             typeof(HR.Modules.CompanyOnboarding.CompanyOnboardingModule).Assembly,
@@ -26,6 +26,7 @@ public class TenantScopedRouteConventionTests
             typeof(HR.Modules.Onboarding.OnboardingModule).Assembly,
             typeof(HR.Modules.Offboarding.OffboardingModule).Assembly,
             typeof(HR.Modules.Support.SupportModule).Assembly,
+            typeof(HR.Modules.Marketing.MarketingModule).Assembly,
         ];
 
     /// <summary>
@@ -42,6 +43,13 @@ public class TenantScopedRouteConventionTests
     /// </summary>
     private static readonly string[] AllowedExceptionRouteTemplates = [];
 
+    /// <summary>
+    /// Ratchet: the number of routes under <c>/api/companies/{...}</c>. If this drops, endpoints
+    /// have silently fallen out of inspection (or been deleted - lower the floor deliberately in
+    /// that case). It may grow freely.
+    /// </summary>
+    private const int MinimumExpectedCompanyScopedRoutes = 400;
+
     private static readonly Regex FirstCompaniesParam =
         new(@"^/api/companies/\{(?<name>[A-Za-z_][A-Za-z0-9_]*)", RegexOptions.Compiled);
 
@@ -50,36 +58,37 @@ public class TenantScopedRouteConventionTests
     {
         var violations = new List<string>();
         var inspected = 0;
+        var (routesByEndpoint, failures) = InspectAll();
 
-        foreach (var assembly in ModuleAssemblies)
+        Assert.True(failures.Count == 0,
+            "Endpoint route inspection failed for the following endpoints (they would otherwise " +
+            "silently escape the tenant-route check):" + Environment.NewLine +
+            string.Join(Environment.NewLine, failures));
+
+        foreach (var (endpointType, routes) in routesByEndpoint)
         {
-            foreach (var endpointType in assembly.GetTypes()
-                         .Where(t => t is { IsAbstract: false, IsClass: true }
-                                     && typeof(IEndpoint).IsAssignableFrom(t)))
+            foreach (var route in routes)
             {
-                foreach (var route in TryReadRouteTemplates(endpointType))
+                if (!route.StartsWith("/api/companies/{", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (!route.StartsWith("/api/companies/{", StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
-                    inspected++;
+                inspected++;
 
-                    if (AllowedExceptionRouteTemplates.Contains(route, StringComparer.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
+                if (AllowedExceptionRouteTemplates.Contains(route, StringComparer.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
 
-                    var match = FirstCompaniesParam.Match(route);
-                    var paramName = match.Success ? match.Groups["name"].Value : "(unparseable)";
+                var match = FirstCompaniesParam.Match(route);
+                var paramName = match.Success ? match.Groups["name"].Value : "(unparseable)";
 
-                    if (!string.Equals(paramName, "companyId", StringComparison.Ordinal))
-                    {
-                        violations.Add($"{endpointType.FullName}: route '{route}' uses first path " +
-                                       $"parameter '{{{paramName}}}' — must be '{{companyId}}' so " +
-                                       "TenantRouteAuthorizationMiddleware enforces tenant isolation.");
-                    }
+                if (!string.Equals(paramName, "companyId", StringComparison.Ordinal))
+                {
+                    violations.Add($"{endpointType.FullName}: route '{route}' uses first path " +
+                                   $"parameter '{{{paramName}}}' — must be '{{companyId}}' so " +
+                                   "TenantRouteAuthorizationMiddleware enforces tenant isolation.");
                 }
             }
         }
@@ -93,30 +102,109 @@ public class TenantScopedRouteConventionTests
             Environment.NewLine + string.Join(Environment.NewLine, violations));
     }
 
-    private static IReadOnlyCollection<string> TryReadRouteTemplates(Type endpointType)
+    [Fact]
+    public void Every_Endpoint_Is_Inspected_And_Declares_A_Route()
     {
+        var (routesByEndpoint, failures) = InspectAll();
+        var allTypes = AllEndpointTypes().ToList();
+
+        Assert.True(failures.Count == 0,
+            "Endpoint inspection failures:" + Environment.NewLine + string.Join(Environment.NewLine, failures));
+
+        var notInspected = allTypes.Where(t => !routesByEndpoint.ContainsKey(t)).Select(t => t.FullName).ToList();
+        Assert.True(notInspected.Count == 0,
+            "Endpoints not inspected: " + string.Join(", ", notInspected));
+
+        var noRoutes = routesByEndpoint.Where(kv => kv.Value.Count == 0).Select(kv => kv.Key.FullName).ToList();
+        Assert.True(noRoutes.Count == 0,
+            "Endpoints that declare no route (route reading is broken or the endpoint is unreachable): "
+            + string.Join(", ", noRoutes));
+
+        var companyScoped = routesByEndpoint.Values
+            .SelectMany(r => r)
+            .Count(r => r.StartsWith("/api/companies/{", StringComparison.OrdinalIgnoreCase));
+
+        Assert.True(companyScoped >= MinimumExpectedCompanyScopedRoutes,
+            $"Only {companyScoped} company-scoped routes inspected; expected at least " +
+            $"{MinimumExpectedCompanyScopedRoutes}. Endpoints have dropped out of inspection.");
+    }
+
+    [Fact]
+    public void Route_Inspection_Failures_Are_Reported_With_Type_And_Message()
+    {
+        var ex = Assert.Throws<InvalidOperationException>(() => ReadRouteTemplates(typeof(BrokenEndpointForTest)));
+        Assert.Contains("boom", ex.Message);
+        Assert.Contains(nameof(InvalidOperationException), ex.Message);
+    }
+
+    private sealed class BrokenEndpointForTest : EndpointWithoutRequest
+    {
+        public override void Configure() => throw new InvalidOperationException("boom");
+    }
+
+    /// <summary>
+    /// Reads the route templates an endpoint declares in <c>Configure()</c>. Any failure is
+    /// surfaced (never swallowed) so an endpoint can never silently drop out of the inspection.
+    /// </summary>
+    internal static IReadOnlyCollection<string> ReadRouteTemplates(Type endpointType)
+    {
+        var endpoint = (BaseEndpoint)RuntimeHelpers.GetUninitializedObject(endpointType);
+
+        var definition = (EndpointDefinition)RuntimeHelpers
+            .GetUninitializedObject(typeof(EndpointDefinition));
+
+        typeof(BaseEndpoint)
+            .GetProperty("Definition", BindingFlags.Public | BindingFlags.Instance)!
+            .SetValue(endpoint, definition);
+
+        var configure = endpointType.GetMethod("Configure", BindingFlags.Public | BindingFlags.Instance)
+            ?? throw new InvalidOperationException($"{endpointType.FullName}: no public Configure() method found.");
+
         try
         {
-            var endpoint = (BaseEndpoint)RuntimeHelpers.GetUninitializedObject(endpointType);
-
-            var definition = (EndpointDefinition)RuntimeHelpers
-                .GetUninitializedObject(typeof(EndpointDefinition));
-
-            typeof(BaseEndpoint)
-                .GetProperty("Definition", BindingFlags.Public | BindingFlags.Instance)!
-                .SetValue(endpoint, definition);
-
-            endpointType.GetMethod("Configure", BindingFlags.Public | BindingFlags.Instance)!
-                .Invoke(endpoint, null);
-
-            var routesProp = typeof(EndpointDefinition)
-                .GetProperty("Routes", BindingFlags.Public | BindingFlags.Instance);
-
-            return routesProp?.GetValue(definition) as string[] ?? [];
+            configure.Invoke(endpoint, null);
         }
-        catch
+        catch (TargetInvocationException tie) when (tie.InnerException is not null)
         {
-            return [];
+            throw new InvalidOperationException(
+                $"{endpointType.FullName}: Configure() threw {tie.InnerException.GetType().FullName}: " +
+                tie.InnerException.Message, tie.InnerException);
         }
+
+        var routesProp = typeof(EndpointDefinition)
+            .GetProperty("Routes", BindingFlags.Public | BindingFlags.Instance)
+            ?? throw new InvalidOperationException("EndpointDefinition.Routes property not found.");
+
+        return routesProp.GetValue(definition) as string[] ?? [];
+    }
+
+    internal static IEnumerable<Type> AllEndpointTypes() =>
+        ModuleAssemblies.SelectMany(a => a.GetTypes())
+            .Where(t => t is { IsAbstract: false, IsClass: true } && typeof(IEndpoint).IsAssignableFrom(t)
+                        && t.GetCustomAttribute<CompilerGeneratedAttribute>() is null
+                        && !t.Name.Contains("ForTest"));
+
+    /// <summary>
+    /// Inspects every endpoint. Failures are collected with endpoint type, exception type and
+    /// message, and returned so callers can fail the test.
+    /// </summary>
+    internal static (Dictionary<Type, IReadOnlyCollection<string>> Routes, List<string> Failures) InspectAll()
+    {
+        var routes = new Dictionary<Type, IReadOnlyCollection<string>>();
+        var failures = new List<string>();
+
+        foreach (var endpointType in AllEndpointTypes())
+        {
+            try
+            {
+                routes[endpointType] = ReadRouteTemplates(endpointType);
+            }
+            catch (Exception ex)
+            {
+                failures.Add($"{endpointType.FullName}: {ex.GetType().FullName}: {ex.Message}");
+            }
+        }
+
+        return (routes, failures);
     }
 }
