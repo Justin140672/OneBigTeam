@@ -128,7 +128,7 @@ builder.Services.AddScoped<SupportService>();
 builder.Services.AddScoped<WidgetSourceLoader>();
 builder.Services.AddScoped<DashboardService>();
 builder.Services.AddScoped<AppSession>();
-builder.Services.AddScoped<HR.SharedKernel.ICompanyTimeProvider, HR.Web.Services.SessionCompanyTimeProvider>();
+builder.Services.AddScoped<HR.Web.Services.ICompanyTimeProvider, HR.Web.Services.SessionCompanyTimeProvider>();
 builder.Services.AddScoped<AuthenticationStateProvider, AppSessionAuthStateProvider>();
 builder.Services.AddAuthentication("NoOp")
     .AddScheme<AuthenticationSchemeOptions, NoOpAuthenticationHandler>("NoOp", _ => { });

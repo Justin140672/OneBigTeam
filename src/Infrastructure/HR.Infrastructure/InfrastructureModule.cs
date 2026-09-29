@@ -72,7 +72,6 @@ public static class InfrastructureModule
             .AddCheck<SupabaseStorageHealthCheck>("storage", tags: ["degraded"]);
 
         services.AddScoped<IClockProvider, SystemClockProvider>();
-        services.AddScoped<ICompanyTimeProvider, CompanyTimeProvider>();
 
         return services;
     }

@@ -1,27 +1,35 @@
-using HR.SharedKernel;
-
 namespace HR.Web.Services;
 
-public sealed class SessionCompanyTimeProvider(AppSession session) : ICompanyTimeProvider
+/// <summary>
+/// Company-local date from the session's IANA time zone. No I/O, no caching: the zone is read from
+/// <see cref="AppSession"/> (loaded at session start, refreshed with it). A missing, blank, unknown or
+/// invalid zone falls back to UTC. The clock is injectable via <see cref="TimeProvider"/> for tests.
+/// </summary>
+public sealed class SessionCompanyTimeProvider(AppSession session, TimeProvider? timeProvider = null) : ICompanyTimeProvider
 {
-    public TimeZoneInfo TimeZone
+    private readonly TimeProvider _timeProvider = timeProvider ?? TimeProvider.System;
+
+    public TimeZoneInfo TimeZone => ResolveTimeZone(session.TimeZone);
+
+    public DateOnly Today => TodayIn(session.TimeZone, _timeProvider.GetUtcNow());
+
+    public static TimeZoneInfo ResolveTimeZone(string? timeZoneId)
     {
-        get
+        if (string.IsNullOrWhiteSpace(timeZoneId))
         {
-            try
-            {
-                return TimeZoneInfo.FindSystemTimeZoneById(session.TimeZone);
-            }
-            catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException or ArgumentException)
-            {
-                return TimeZoneInfo.Utc;
-            }
+            return TimeZoneInfo.Utc;
+        }
+
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+        }
+        catch (Exception ex) when (ex is TimeZoneNotFoundException or InvalidTimeZoneException or ArgumentException)
+        {
+            return TimeZoneInfo.Utc;
         }
     }
 
-    public DateOnly Today =>
-        DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, TimeZone).DateTime);
-
-    public Task<DateOnly> GetTodayAsync(Guid companyId, CancellationToken cancellationToken = default) =>
-        Task.FromResult(Today);
+    public static DateOnly TodayIn(string? timeZoneId, DateTimeOffset utcNow) =>
+        DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(utcNow, ResolveTimeZone(timeZoneId)).DateTime);
 }
