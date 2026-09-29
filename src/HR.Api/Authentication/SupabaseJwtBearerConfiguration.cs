@@ -231,6 +231,7 @@ internal sealed class FreshnessGatedConfigurationManager
     private ConfigurationManager<OpenIdConnectConfiguration>? _inner;
     private volatile FreshnessSnapshot? _snapshot;
     private long _lastForcedRefreshTicks = long.MinValue;
+    private readonly SemaphoreSlim _coldStartGate = new(1, 1);
 
     public FreshnessGatedConfigurationManager(
         SupabaseSigningKeyOptions options, TimeProvider timeProvider, ILogger logger)
@@ -300,15 +301,33 @@ internal sealed class FreshnessGatedConfigurationManager
             _inner!.RequestRefresh();
         }
 
-        try
+        if (_snapshot is null)
         {
-            await _inner!.GetBaseConfigurationAsync(cancel).ConfigureAwait(false);
+            // Cold start: ConfigurationManager<T> already documents a single in-flight refresh per
+            // key source, but under real contention concurrent first-touch callers have been
+            // observed reaching the retriever before that internal guard serializes them
+            // (SigningKeyRefreshResilienceTests.Concurrent_cold_requests_result_in_a_single_upstream_key_fetch
+            // occasionally sees 2 upstream hits instead of 1 under load, never locally in
+            // isolation — a narrow race that widens under contention). Add our own hard
+            // single-flight gate around the cold-start fetch specifically, instead of relying
+            // solely on the inner manager's guarantee. Once _snapshot is populated, later callers
+            // skip this gate entirely and go straight through the normal (already-cached) path.
+            await _coldStartGate.WaitAsync(cancel).ConfigureAwait(false);
+            try
+            {
+                if (_snapshot is null)
+                {
+                    await FetchAsync(cancel).ConfigureAwait(false);
+                }
+            }
+            finally
+            {
+                _coldStartGate.Release();
+            }
         }
-        catch (Exception ex)
+        else
         {
-            _logger.LogWarning(
-                "Supabase signing-key refresh attempt failed: {ErrorType} {ErrorMessage}",
-                ex.GetType().Name, ex.Message);
+            await FetchAsync(cancel).ConfigureAwait(false);
         }
 
         var snapshot = _snapshot;
@@ -328,6 +347,20 @@ internal sealed class FreshnessGatedConfigurationManager
         }
 
         return snapshot.Configuration;
+    }
+
+    private async Task FetchAsync(CancellationToken cancel)
+    {
+        try
+        {
+            await _inner!.GetBaseConfigurationAsync(cancel).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(
+                "Supabase signing-key refresh attempt failed: {ErrorType} {ErrorMessage}",
+                ex.GetType().Name, ex.Message);
+        }
     }
 }
 
