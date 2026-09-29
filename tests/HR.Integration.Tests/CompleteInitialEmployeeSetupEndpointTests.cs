@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Companies.Persistence;
 using HR.Modules.Employees.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -214,6 +215,57 @@ public class CompleteInitialEmployeeSetupEndpointTests
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
+
+    private async Task ExpireTrialAsync(Guid companyId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+        var subscription = await db.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
+        var entry = db.Entry(subscription);
+        entry.Property(s => s.TrialStartedAt).CurrentValue = DateTimeOffset.UtcNow.AddDays(-30);
+        entry.Property(s => s.TrialExpiresAt).CurrentValue = DateTimeOffset.UtcNow.AddDays(-16);
+        await db.SaveChangesAsync();
+    }
+
+    private async Task ActivateSubscriptionAsync(Guid companyId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+        var subscription = await db.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
+        subscription.ActivateSubscription("cus_test", "sub_test", "price_test", DateTimeOffset.UtcNow.AddDays(30), DateTimeOffset.UtcNow);
+        await db.SaveChangesAsync();
+    }
+
+    [Fact]
+    public async Task Put_CompleteInitialSetup_Returns_403_SubscriptionReadOnly_When_Trial_Has_Expired()
+    {
+        var (client, companyId, _) = await SignUpAsync();
+        await ExpireTrialAsync(companyId);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/me/complete-initial-setup",
+            ValidSetupRequest());
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ReadOnlyErrorPayload>();
+        Assert.Equal("subscription_read_only", payload!.Error);
+    }
+
+    [Fact]
+    public async Task Put_CompleteInitialSetup_Succeeds_After_Subscription_Is_Restored()
+    {
+        var (client, companyId, _) = await SignUpAsync();
+        await ExpireTrialAsync(companyId);
+        await ActivateSubscriptionAsync(companyId);
+
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/me/complete-initial-setup",
+            ValidSetupRequest());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    private sealed record ReadOnlyErrorPayload(string Error, string Message);
 
     private sealed record SignUpPayload(Guid UserId, Guid CompanyId, string Email, string FirstName, string LastName);
 

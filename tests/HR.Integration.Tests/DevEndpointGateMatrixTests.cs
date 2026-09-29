@@ -93,13 +93,15 @@ public class DevEndpointGateMatrixTests
         {
             typeof(HR.Modules.Employees.EmployeesModule).Assembly,
             typeof(HR.Modules.Identity.IdentityModule).Assembly,
+            typeof(HR.Modules.Companies.CompaniesModule).Assembly,
         };
         var devTypes = assemblies.SelectMany(a => a.GetTypes())
             .Where(t => Attribute.IsDefined(t, typeof(HR.SharedKernel.DevEndpoints.DevOnlyEndpointAttribute), false))
             .ToList();
 
         Assert.Contains(devTypes, t => t.Name == "DepartureFinaliserTestEndpoint");
-        Assert.Equal(3, devTypes.Count);
+        Assert.Contains(devTypes, t => t.Name == "Endpoint" && t.Namespace!.EndsWith("DevExpireCompanyTrial"));
+        Assert.Equal(4, devTypes.Count);
 
         var environment = new Microsoft.Extensions.Hosting.Internal.HostingEnvironment { EnvironmentName = environmentName };
         foreach (var type in devTypes)

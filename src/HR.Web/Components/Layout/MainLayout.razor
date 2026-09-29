@@ -10,7 +10,7 @@
 @inject HR.Web.Services.AuthHandoffStore HandoffStore
 @inject IWebHostEnvironment Env
 
-@if (!Session.IsLoaded)
+@if (Session.LayoutMode == MainLayoutMode.Loading)
 {
     <div class="app-loading">
         <div class="app-loading-spinner">
@@ -19,7 +19,7 @@
         </div>
     </div>
 }
-else if (Session.RequiresInitialEmployeeSetup)
+else if (Session.LayoutMode == MainLayoutMode.CompleteProfile)
 {
     <EmployeeCompletionDialog OnCompleted="@(() => StateHasChanged())" />
 }

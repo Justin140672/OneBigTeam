@@ -67,9 +67,36 @@ public sealed class AppSession(HrApiHttpClientFactory httpClientFactory, Employe
 
     public void MarkInitialEmployeeSetupComplete() => RequiresInitialEmployeeSetup = false;
 
+    public SubscriptionResolution SubscriptionResolution { get; private set; } = SubscriptionResolution.Unresolved;
     public SubscriptionStatus SubscriptionStatus { get; private set; } = SubscriptionStatus.Active;
     public int TrialDaysRemaining { get; private set; }
     public bool IsReadOnly { get; private set; }
+
+    public MainLayoutMode LayoutMode =>
+        MainLayoutModeResolver.Resolve(IsLoaded, SubscriptionResolution, IsReadOnly, RequiresInitialEmployeeSetup);
+
+    public void ApplySubscriptionStatus(GetSubscriptionStatusResponse? subscription)
+    {
+        if (subscription is null) return;
+        SetSubscription(subscription);
+        Changed?.Invoke();
+    }
+
+    private void SetSubscription(GetSubscriptionStatusResponse subscription)
+    {
+        SubscriptionStatus = subscription.Status;
+        TrialDaysRemaining = subscription.TrialDaysRemaining;
+        IsReadOnly = subscription.IsReadOnly;
+        SubscriptionResolution = SubscriptionResolution.Resolved;
+    }
+
+    private void ResetSubscription()
+    {
+        SubscriptionResolution = SubscriptionResolution.Unresolved;
+        SubscriptionStatus = SubscriptionStatus.Active;
+        TrialDaysRemaining = 0;
+        IsReadOnly = false;
+    }
 
     public string MyProfileUrl => EmployeeId.HasValue
         ? $"/companies/{CompanyId}/employees/{EmployeeId}/profile"
@@ -188,6 +215,7 @@ public sealed class AppSession(HrApiHttpClientFactory httpClientFactory, Employe
         JobTitle = null;
         ProfileImageUrl = null;
         RequiresInitialEmployeeSetup = false;
+        ResetSubscription();
 
         Changed?.Invoke();
         navigationManager.NavigateTo("/login", forceLoad: true);
@@ -203,6 +231,8 @@ public sealed class AppSession(HrApiHttpClientFactory httpClientFactory, Employe
             {
                 IsLoaded = false;
                 _inFlight = null;
+                RequiresInitialEmployeeSetup = false;
+                ResetSubscription();
             }
             else
             {
@@ -246,6 +276,9 @@ public sealed class AppSession(HrApiHttpClientFactory httpClientFactory, Employe
 
         if (me is null) return;
 
+        ResetSubscription();
+        RequiresInitialEmployeeSetup = false;
+
         UserId    = me.UserId;
         CompanyId = me.CompanyId;
         Email     = me.Email;
@@ -263,7 +296,14 @@ public sealed class AppSession(HrApiHttpClientFactory httpClientFactory, Employe
         // EmployeeId at that first check would wrongly and permanently deny access for the whole
         // page's lifetime. This is one single call (not the six-way fan-out below), so it doesn't
         // reintroduce the multi-call blocking problem LoadEnrichmentAsync exists to avoid.
-        var employee = await GetEmployeeOrNullAsync(me.CompanyId);
+        // The subscription status is resolved in this same blocking phase (in parallel with the
+        // employee fetch) so MainLayout never has to guess read-only state while deciding whether
+        // to show the Complete Profile dialog.
+        var employeeTask = GetEmployeeOrNullAsync(me.CompanyId);
+        var subscriptionTask = ResolveSubscriptionAsync();
+        await Task.WhenAll(employeeTask, subscriptionTask);
+
+        var employee = await employeeTask;
         if (employee is not null)
         {
             EmployeeId          = employee.EmployeeId;
@@ -291,24 +331,15 @@ public sealed class AppSession(HrApiHttpClientFactory httpClientFactory, Employe
             var onboardingTask = IsHrAdministrator || CanViewOnboarding
                 ? GetOnboardingChecklistOrNullAsync()
                 : Task.FromResult<GetCompanyOnboardingChecklistResponse?>(null);
-            var subscriptionTask = GetSubscriptionStatusOrNullAsync();
 
-            await Task.WhenAll(companyTask, settingsTask, hrSettingsTask, onboardingTask, subscriptionTask);
+            await Task.WhenAll(companyTask, settingsTask, hrSettingsTask, onboardingTask);
 
             var company      = await companyTask;
             var settings     = await settingsTask;
             var hrSettings   = await hrSettingsTask;
             var onboarding   = await onboardingTask;
-            var subscription = await subscriptionTask;
 
             ShowGettingStarted = onboarding is not null && !onboarding.IsHidden && !onboarding.IsDismissedEarly;
-
-        if (subscription is not null)
-        {
-            SubscriptionStatus = subscription.Status;
-            TrialDaysRemaining = subscription.TrialDaysRemaining;
-            IsReadOnly = subscription.IsReadOnly;
-        }
 
         if (company is not null)
         {
@@ -421,16 +452,34 @@ public sealed class AppSession(HrApiHttpClientFactory httpClientFactory, Employe
         }
     }
 
-    // Mirrors GetOnboardingChecklistOrNullAsync's guard above — a transient failure must not take
-    // down session initialisation; SubscriptionStatus/TrialDaysRemaining/IsReadOnly simply keep
-    // their fail-open defaults in that case.
+    private const int SubscriptionFetchAttempts = 3;
+
+    private async Task ResolveSubscriptionAsync()
+    {
+        GetSubscriptionStatusResponse? subscription = null;
+        for (var attempt = 1; attempt <= SubscriptionFetchAttempts && subscription is null; attempt++)
+        {
+            subscription = await GetSubscriptionStatusOrNullAsync();
+            if (subscription is null && attempt < SubscriptionFetchAttempts)
+                await Task.Delay(100 * attempt);
+        }
+
+        if (subscription is null)
+        {
+            SubscriptionResolution = SubscriptionResolution.Failed;
+            return;
+        }
+
+        SetSubscription(subscription);
+    }
+
     private async Task<GetSubscriptionStatusResponse?> GetSubscriptionStatusOrNullAsync()
     {
         try
         {
             return await subscriptionService.GetStatusAsync();
         }
-        catch (HttpRequestException)
+        catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or NotSupportedException)
         {
             return null;
         }

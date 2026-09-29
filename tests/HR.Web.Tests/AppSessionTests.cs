@@ -51,7 +51,7 @@ public class AppSessionTests
     private static RoutingHandler BuildHappyPathHandler(
         Guid userId, Guid companyId, Guid employeeId,
         bool isHrAdministrator = false, bool isManager = false, bool isRecruiter = false,
-        bool isEmailConfirmed = true)
+        bool isEmailConfirmed = true, GetSubscriptionStatusResponse? subscription = null, bool requiresInitialSetup = false)
     {
         var me = new MeResponse(userId, companyId, "alice@example.com", [ManageEmployeesPermission], [], true,
             isHrAdministrator, isManager, isRecruiter, isEmailConfirmed);
@@ -66,16 +66,143 @@ public class AppSessionTests
             NoticePeriodUnit.Months, 1, true,
             EmployeeNumberMode.Automatic, "EMP-", 1, 4,
             AssetNumberMode.Manual, null, 1, 1, DateTime.UtcNow, 9);
-        var employee = new MyEmployeeResponse(employeeId, "Alice", "Smith", "Engineer", null, null, "avatar.png", false);
+        var employee = new MyEmployeeResponse(employeeId, "Alice", "Smith", "Engineer", null, null, "avatar.png", requiresInitialSetup);
 
-        return new RoutingHandler(new()
+        var responses = new Dictionary<string, object>
         {
             ["api/me"] = me,
             [$"api/companies/{companyId}"] = company,
             [$"api/companies/{companyId}/settings"] = settings,
             [$"api/companies/{companyId}/hr-settings"] = hrSettings,
             [$"api/companies/{companyId}/employees/me"] = employee,
-        });
+        };
+        if (subscription is not null)
+            responses["api/companies/subscription-status"] = subscription;
+
+        return new RoutingHandler(responses);
+    }
+
+    private static async Task<AppSession> LoadSessionAsync(GetSubscriptionStatusResponse? subscription, bool requiresInitialSetup = true)
+    {
+        var handler = BuildHappyPathHandler(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            subscription: subscription, requiresInitialSetup: requiresInitialSetup);
+        var session = BuildSession(BuildFactory(handler));
+        await session.InitialiseAsync();
+        return session;
+    }
+
+    [Fact]
+    public void Subscription_Is_Unresolved_And_Layout_Is_Loading_Before_Load()
+    {
+        var session = BuildSession(BuildFactory(new StaticResponseHandler(HttpStatusCode.Unauthorized)));
+
+        Assert.Equal(SubscriptionResolution.Unresolved, session.SubscriptionResolution);
+        Assert.False(session.IsLoaded);
+        Assert.Equal(MainLayoutMode.Loading, session.LayoutMode);
+    }
+
+    [Fact]
+    public async Task IsLoaded_Is_Not_Exposed_Until_Subscription_Has_Resolved()
+    {
+        var gate = new TaskCompletionSource();
+        var inner = BuildHappyPathHandler(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            subscription: new GetSubscriptionStatusResponse(SubscriptionStatus.Trial, false, 10));
+        var session = BuildSession(BuildFactory(new GatedSubscriptionHandler(inner, gate.Task)));
+
+        var load = session.InitialiseAsync();
+        await Task.Delay(200);
+
+        Assert.False(session.IsLoaded);
+        Assert.Equal(SubscriptionResolution.Unresolved, session.SubscriptionResolution);
+        Assert.Equal(MainLayoutMode.Loading, session.LayoutMode);
+
+        gate.SetResult();
+        await load;
+
+        Assert.True(session.IsLoaded);
+        Assert.Equal(SubscriptionResolution.Resolved, session.SubscriptionResolution);
+    }
+
+    [Theory]
+    [InlineData(SubscriptionStatus.TrialExpired)]
+    [InlineData(SubscriptionStatus.Paused)]
+    public async Task Read_Only_Subscription_Resolves_Read_Only_And_Skips_Complete_Profile(SubscriptionStatus status)
+    {
+        var session = await LoadSessionAsync(new GetSubscriptionStatusResponse(status, true, 0));
+
+        Assert.Equal(SubscriptionResolution.Resolved, session.SubscriptionResolution);
+        Assert.True(session.IsReadOnly);
+        Assert.True(session.RequiresInitialEmployeeSetup);
+        Assert.Equal(MainLayoutMode.Shell, session.LayoutMode);
+    }
+
+    [Theory]
+    [InlineData(SubscriptionStatus.Trial)]
+    [InlineData(SubscriptionStatus.Active)]
+    public async Task Full_Access_Subscription_Permits_Profile_Completion(SubscriptionStatus status)
+    {
+        var session = await LoadSessionAsync(new GetSubscriptionStatusResponse(status, false, 10));
+
+        Assert.False(session.IsReadOnly);
+        Assert.Equal(MainLayoutMode.CompleteProfile, session.LayoutMode);
+    }
+
+    [Fact]
+    public async Task Subscription_Fetch_Failure_Does_Not_Assume_Active_And_Renders_Shell()
+    {
+        var session = await LoadSessionAsync(subscription: null);
+
+        Assert.True(session.IsLoaded);
+        Assert.Equal(SubscriptionResolution.Failed, session.SubscriptionResolution);
+        Assert.Equal(MainLayoutMode.Shell, session.LayoutMode);
+    }
+
+    [Fact]
+    public async Task ApplySubscriptionStatus_Re_Evaluates_Layout_When_Read_Only_Changes()
+    {
+        var session = await LoadSessionAsync(new GetSubscriptionStatusResponse(SubscriptionStatus.TrialExpired, true, 0));
+        Assert.Equal(MainLayoutMode.Shell, session.LayoutMode);
+
+        var changed = 0;
+        session.Changed += () => changed++;
+        session.ApplySubscriptionStatus(new GetSubscriptionStatusResponse(SubscriptionStatus.Active, false, 0));
+
+        Assert.Equal(1, changed);
+        Assert.Equal(MainLayoutMode.CompleteProfile, session.LayoutMode);
+    }
+
+    [Fact]
+    public async Task Reload_After_Invalidation_Refetches_Subscription()
+    {
+        var sessionState = new CircuitSessionState();
+        sessionState.SetToken("token-a");
+        var handler = BuildHappyPathHandler(
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            subscription: new GetSubscriptionStatusResponse(SubscriptionStatus.Active, false, 0));
+        var session = BuildSession(BuildFactory(handler, sessionState), sessionState);
+
+        await session.InitialiseAsync();
+        var afterFirst = handler.RequestCount;
+
+        sessionState.Clear();
+        sessionState.SetToken("token-b");
+        await session.InitialiseAsync();
+
+        Assert.True(handler.RequestCount > afterFirst);
+        Assert.Equal(SubscriptionResolution.Resolved, session.SubscriptionResolution);
+    }
+
+    private sealed class GatedSubscriptionHandler(RoutingHandler inner, Task gate) : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (request.RequestUri!.AbsolutePath.EndsWith("subscription-status", StringComparison.Ordinal))
+                await gate;
+            return await inner.PublicSendAsync(request, cancellationToken);
+        }
     }
 
     [Fact]
