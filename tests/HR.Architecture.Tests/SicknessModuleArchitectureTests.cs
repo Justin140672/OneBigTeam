@@ -51,7 +51,6 @@ public class SicknessModuleArchitectureTests
         Assert.Equal("sickness", context.Model.GetDefaultSchema());
     }
 
-    // ── SicknessCategory ─────────────────────────────────────────────────────────
 
     [Fact]
     public void SicknessCategory_Entity_Is_Not_Public()
@@ -86,7 +85,6 @@ public class SicknessModuleArchitectureTests
         AssertSnakeCase(context.Model.FindEntityType(typeof(SicknessCategory))!);
     }
 
-    // ── SicknessRecord ───────────────────────────────────────────────────────────
 
     [Fact]
     public void SicknessRecord_Entity_Is_Not_Public()
@@ -121,7 +119,6 @@ public class SicknessModuleArchitectureTests
         AssertSnakeCase(context.Model.FindEntityType(typeof(SicknessRecord))!);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private static void AssertSnakeCase(Microsoft.EntityFrameworkCore.Metadata.IEntityType entityType)
     {

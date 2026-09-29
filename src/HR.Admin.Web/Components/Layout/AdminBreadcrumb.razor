@@ -23,6 +23,5 @@
 </nav>
 
 @code {
-    /// <summary>Ordered crumbs from the root to the current page (the last item renders as plain text).</summary>
     [Parameter, EditorRequired] public IReadOnlyList<(string Text, string? Url)> Trail { get; set; } = [];
 }

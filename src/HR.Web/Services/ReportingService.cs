@@ -104,7 +104,6 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
         return query.ToString() ?? string.Empty;
     }
 
-    // ── Employee Starter report ──────────────────────────────────────────────
 
     public async Task<GetEmployeeStarterReportResponse?> GetEmployeeStarterReportAsync(
         Guid companyId, EmployeeStarterReportFilter filter, CancellationToken cancellationToken = default)
@@ -166,7 +165,6 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
         return query.ToString() ?? string.Empty;
     }
 
-    // ── Employee Leaver report ───────────────────────────────────────────────
 
     public async Task<GetEmployeeLeaverReportResponse?> GetEmployeeLeaverReportAsync(
         Guid companyId, EmployeeLeaverReportFilter filter, CancellationToken cancellationToken = default)
@@ -226,7 +224,6 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
         return query.ToString() ?? string.Empty;
     }
 
-    // ── Leave Summary report ─────────────────────────────────────────────────
 
     public async Task<GetLeaveSummaryReportResponse?> GetLeaveSummaryReportAsync(
         Guid companyId, LeaveSummaryReportFilter filter, CancellationToken cancellationToken = default)
@@ -282,7 +279,6 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
         return query.ToString() ?? string.Empty;
     }
 
-    // ── Leave Calendar report ────────────────────────────────────────────────
 
     public async Task<GetLeaveCalendarReportResponse?> GetLeaveCalendarReportAsync(
         Guid companyId, LeaveCalendarReportFilter filter, CancellationToken cancellationToken = default)
@@ -337,7 +333,6 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
         return query.ToString() ?? string.Empty;
     }
 
-    // ── Sickness report ───────────────────────────────────────────────────────
 
     public async Task<GetSicknessReportResponse?> GetSicknessReportAsync(
         Guid companyId, SicknessReportFilter filter, CancellationToken cancellationToken = default)
@@ -392,7 +387,6 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
         return query.ToString() ?? string.Empty;
     }
 
-    // ── Recruitment Pipeline report ──────────────────────────────────────────
 
     public async Task<(GetRecruitmentPipelineReportResponse? Response, string? Error)> GetRecruitmentPipelineReportAsync(
         Guid companyId, RecruitmentPipelineReportFilter filter, CancellationToken cancellationToken = default)
@@ -453,7 +447,6 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
         return query.ToString() ?? string.Empty;
     }
 
-    // ── Vacancy Performance report ───────────────────────────────────────────
 
     public async Task<GetVacancyPerformanceReportResponse?> GetVacancyPerformanceReportAsync(
         Guid companyId, VacancyPerformanceReportFilter filter, CancellationToken cancellationToken = default)
@@ -508,7 +501,6 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
         return query.ToString() ?? string.Empty;
     }
 
-    // ── Probation report ──────────────────────────────────────────────────────
 
     public async Task<GetProbationReportResponse?> GetProbationReportAsync(
         Guid companyId, CancellationToken cancellationToken = default)
@@ -548,7 +540,6 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    // ── Onboarding Progress report ───────────────────────────────────────────
 
     public async Task<GetOnboardingProgressReportResponse?> GetOnboardingProgressReportAsync(
         Guid companyId, OnboardingProgressReportFilter filter, CancellationToken cancellationToken = default)
@@ -599,7 +590,6 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
         return query.ToString() ?? string.Empty;
     }
 
-    // ── Offboarding Progress report ──────────────────────────────────────────
 
     public async Task<GetOffboardingProgressReportResponse?> GetOffboardingProgressReportAsync(
         Guid companyId, CancellationToken cancellationToken = default)
@@ -639,7 +629,6 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    // ── Document Compliance report ───────────────────────────────────────────
 
     public async Task<GetDocumentComplianceReportResponse?> GetDocumentComplianceReportAsync(
         Guid companyId, DocumentComplianceReportFilter filter, CancellationToken cancellationToken = default)
@@ -690,7 +679,6 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
         return query.ToString() ?? string.Empty;
     }
 
-    // ── Company Document Acknowledgement report ──────────────────────────────
 
     public async Task<GetCompanyDocumentAcknowledgementReportResponse?> GetCompanyDocumentAcknowledgementReportAsync(
         Guid companyId, CancellationToken cancellationToken = default)
@@ -730,7 +718,6 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    // ── Asset Assignment report ──────────────────────────────────────────────
 
     public async Task<GetAssetAssignmentReportResponse?> GetAssetAssignmentReportAsync(
         Guid companyId, CancellationToken cancellationToken = default)
@@ -770,7 +757,6 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    // ── Workload & HR Actions report ─────────────────────────────────────────
 
     public async Task<GetWorkloadActionsResponse?> GetWorkloadActionsReportAsync(
         Guid companyId, WorkloadActionsReportFilter filter, CancellationToken cancellationToken = default)
@@ -831,7 +817,6 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    // ── Recruitment Pipeline Summary report ──────────────────────────────────
 
     public async Task<(GetRecruitmentPipelineSummaryReportResponse? Response, string? Error)> GetRecruitmentPipelineSummaryReportAsync(
         Guid companyId, RecruitmentPipelineSummaryReportFilter filter, CancellationToken cancellationToken = default)
@@ -888,7 +873,6 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
         return query.ToString() ?? string.Empty;
     }
 
-    // ── HR Headcount Summary report ──────────────────────────────────────────
 
     public async Task<(GetHrHeadcountSummaryReportResponse? Response, string? Error)> GetHrHeadcountSummaryReportAsync(
         Guid companyId, HrHeadcountSummaryReportFilter filter, CancellationToken cancellationToken = default)
@@ -947,7 +931,6 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
         return query.ToString() ?? string.Empty;
     }
 
-    // ── ADM-08 Governance reporting hub ──────────────────────────────────────
 
     public Task<(GetGovernanceAuditReportResponse? Response, string? Error)> GetGovernanceUserActivityReportAsync(
         Guid companyId, GovernanceAuditReportFilter filter, CancellationToken cancellationToken = default)
@@ -1099,7 +1082,6 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
         return query.ToString() ?? string.Empty;
     }
 
-    // ── Favourites ────────────────────────────────────────────────────────────
 
     public async Task<GetReportFavouritesResponse?> GetReportFavouritesAsync(
         Guid companyId, CancellationToken cancellationToken = default)
@@ -1146,7 +1128,6 @@ public class ReportingService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    // ── Saved Report Views ───────────────────────────────────────────────────
 
     public async Task<GetReportViewsResponse?> GetReportViewsAsync(
         Guid companyId, string reportId, CancellationToken cancellationToken = default)

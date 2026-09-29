@@ -78,8 +78,6 @@ public class AcceptInviteWorkEmailPolicyEndpointTests
     [Fact]
     public async Task Post_Accept_Rejected_Legacy_Invite_Is_Still_Rejected_On_Retry()
     {
-        // Idempotency of the guard: the invite is left untouched, so a second attempt is refused
-        // exactly the same way rather than slipping through on some partially-created state.
         var employeeId = Guid.NewGuid();
         var invite = await SeedLegacyInviteAsync(employeeId, $"legacy.retry.{Guid.NewGuid():N}@outlook.com");
 

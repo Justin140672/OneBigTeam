@@ -3,11 +3,6 @@ using HR.Modules.Recruitment.Persistence;
 
 namespace HR.Modules.Recruitment.Tests;
 
-/// <summary>
-/// [P1] Case-insensitive candidate email uniqueness: the single normaliser
-/// (<see cref="CandidateEmail.Normalise"/>), the domain keeping <see cref="Candidate.NormalisedEmail"/>
-/// in step with every email assignment, and the stable advisory-lock key shared by all creation paths.
-/// </summary>
 public class CandidateEmailTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 25, 10, 0, 0, TimeSpan.Zero);

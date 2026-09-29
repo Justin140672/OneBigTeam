@@ -34,7 +34,6 @@ public class PreviewLeaveRequestHandlerTests
             publicHolidayReader ?? new FakePublicHolidayReader(),
             new LeaveWarningCalculator(publicHolidayReader ?? new FakePublicHolidayReader()));
 
-    // 2026-08-03 = Monday, 2026-08-07 = Friday
     private static PreviewLeaveRequestRequest BaseRequest(Guid companyId, Guid employeeId, Guid leaveTypeId) => new()
     {
         CompanyId = companyId,
@@ -107,7 +106,6 @@ public class PreviewLeaveRequestHandlerTests
 
         var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
             AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, Now);
-        // Wednesday 2026-08-05 is a public holiday
         context.LeaveTypes.Add(leaveType);
         await context.SaveChangesAsync();
 
@@ -140,7 +138,6 @@ public class PreviewLeaveRequestHandlerTests
         var settings = new FakeCompanyLeaveSettingsReader(
             CompanyLeaveSettings.Default with { ExcludePublicHolidaysFromLeave = false });
 
-        // Reader would return a holiday but exclusion is OFF so it's not consulted
         var result = await BuildHandler(context, settings, publicHolidayReader: new FakePublicHolidayReader([new DateOnly(2026, 8, 5)])).HandleAsync(
             BaseRequest(companyId, employeeId, leaveType.Id), CancellationToken.None);
 
@@ -163,10 +160,8 @@ public class PreviewLeaveRequestHandlerTests
 
         var settings = new FakeCompanyLeaveSettingsReader(
             CompanyLeaveSettings.Default with { ExcludePublicHolidaysFromLeave = true });
-        // 2026-08-08 = Saturday — not a working day in default Mon–Fri pattern
         var reader = new FakePublicHolidayReader([new DateOnly(2026, 8, 8)], "Weekend Holiday");
 
-        // Request spans Mon–Mon (2026-08-03 to 2026-08-10) = 6 working days; Sat holiday has no effect
         var result = await BuildHandler(context, settings, publicHolidayReader: reader).HandleAsync(
             BaseRequest(companyId, employeeId, leaveType.Id) with
             {
@@ -254,8 +249,6 @@ public class PreviewLeaveRequestHandlerTests
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        // AccrualMethod.None: this test is about balance-sufficiency reporting, not accrual
-        // pacing, so the full entitlement is available immediately (LEAVE-04).
         var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
             AccrualMethod.None, LeaveTypeBehaviour.Standard, Now);
         var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(),
@@ -272,7 +265,7 @@ public class PreviewLeaveRequestHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(25m, result.Value!.RemainingBalance);
-        Assert.False(result.Value.WouldExceedBalance); // 5 days requested, 25 remaining
+        Assert.False(result.Value.WouldExceedBalance);
     }
 
     [Fact]
@@ -285,7 +278,7 @@ public class PreviewLeaveRequestHandlerTests
         var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
             AccrualMethod.None, LeaveTypeBehaviour.Standard, Now);
         var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(),
-            2026, 3m, new DateOnly(2026, 1, 1), Now); // only 3 days, requesting Mon–Fri = 5
+            2026, 3m, new DateOnly(2026, 1, 1), Now);
         context.LeaveTypes.Add(leaveType);
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
@@ -327,21 +320,12 @@ public class PreviewLeaveRequestHandlerTests
     [Fact]
     public async Task HandleAsync_Reports_Balance_For_Requests_StartDate_Policy_Year_Not_Todays()
     {
-        // Today is in policy year 2026, but the request's StartDate falls in 2027. Preview must
-        // report the 2027 balance, not the (non-existent / irrelevant) 2026 balance.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        // AccrualMethod.None: "today" (clock) is in policy year 2026, before this 2027 balance's
-        // own accrual start date, so Monthly/Fortnightly accrual would (correctly) report zero
-        // accrued here - not what this test is verifying (year resolution, not accrual pacing).
         var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
             AccrualMethod.None, LeaveTypeBehaviour.Standard, Now);
-        // AccrualStartDate set before "today" (Now, still in 2026), not the balance's own 2027
-        // policy year start, since AccrualMethod.None still requires asOfDate >= accrualStartDate
-        // to clear the gate (see LeaveAccrualCalculator) - not what this test is verifying (year
-        // resolution, not accrual pacing).
         var balance2027 = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(),
             2027, 25m, new DateOnly(2026, 1, 1), Now);
 
@@ -352,7 +336,6 @@ public class PreviewLeaveRequestHandlerTests
         var result = await BuildHandler(context).HandleAsync(
             BaseRequest(companyId, employeeId, leaveType.Id) with
             {
-                // 2027-01-04 = Monday, 2027-01-08 = Friday
                 StartDate = new DateOnly(2027, 1, 4),
                 EndDate = new DateOnly(2027, 1, 8)
             },
@@ -373,7 +356,6 @@ public class PreviewLeaveRequestHandlerTests
         var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Unpaid Leave", "UNPAID", 0,
             AccrualMethod.None, LeaveTypeBehaviour.Standard, Now, hasBalance: false);
 
-        // A stale/irrelevant balance row exists but must be ignored entirely since HasBalance is false.
         var staleBalance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(),
             2026, 0m, new DateOnly(2026, 1, 1), Now);
 
@@ -439,13 +421,6 @@ public class PreviewLeaveRequestHandlerTests
     [Fact]
     public async Task HandleAsync_Reports_Accrued_Not_Raw_RemainingBalance_And_WouldExceedBalance_For_Monthly_Accrual()
     {
-        // LEAVE-04 wiring: Monthly accrual with an accrual start date of Feb 1 2026 means, by Now
-        // (Jun 12 2026), only complete monthly periods Feb1->Mar1->Apr1->May1->Jun1 = 4 of the 10
-        // total periods (Feb1..Dec1) in this Jan-Dec policy year have elapsed. Accrued = 24 * 4/10
-        // = 9.60, floored to the nearest half day = 9.5. Preview must report this accrued figure -
-        // not the raw 24-day entitlement - as RemainingBalance, and flag WouldExceedBalance for a
-        // 10-day request that exceeds the accrued amount even though it would have fit comfortably
-        // within the raw entitlement.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -461,13 +436,12 @@ public class PreviewLeaveRequestHandlerTests
         var settings = new FakeCompanyLeaveSettingsReader(
             CompanyLeaveSettings.Default with { ExcludePublicHolidaysFromLeave = false });
 
-        // 10 working days, 2026-08-03 (Mon) to 2026-08-14 (Fri, next week).
         var result = await BuildHandler(context, settings).HandleAsync(
             BaseRequest(companyId, employeeId, leaveType.Id) with { EndDate = new DateOnly(2026, 8, 14) },
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(9.5m, result.Value!.RemainingBalance);
-        Assert.True(result.Value.WouldExceedBalance); // 10 requested > 9.5 accrued (though < 24 raw)
+        Assert.True(result.Value.WouldExceedBalance);
     }
 }

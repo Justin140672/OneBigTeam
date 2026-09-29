@@ -4,12 +4,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the employee data import wizard end-to-end flow: upload an .xlsx workbook, confirm
-/// the auto-detected column mapping, validate it, view the row preview, and confirm the import to
-/// create employee records. Also covers the Download Template and Download Error Report
-/// affordances on the Upload and Preview &amp; Confirm steps.
-/// </summary>
 public sealed class DataImportWizardTests(HrSettingsSerialFixture fixture) : HrSettingsSerialTestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -22,18 +16,6 @@ public sealed class DataImportWizardTests(HrSettingsSerialFixture fixture) : HrS
         var suffix = Guid.NewGuid().ToString("N")[..8];
         var workEmail = $"e2e.import.{suffix}@example.com";
 
-        // Date Of Birth, Nationality, Gender, Salary Amount, Department, Location, Employment
-        // Type, and Position Profile are all required by EmployeeStagingRowValidator.RequiredFields/
-        // RequiredLookupFields (src/Modules/HR.Modules.DataImport/Services/
-        // EmployeeStagingRowValidator.cs) — omitting any of them fails the row before it ever
-        // reaches ConfirmImportSessionHandler. Department/Location/Employment Type/Position
-        // Profile are resolved by name (auto-created if they don't already exist), so using the
-        // seeded "Engineering"/"London Office"/"Senior Software Engineer" values (see
-        // CreateEmployeeTests) avoids an unnecessary auto-create warning.
-        //
-        // No "Employee Number" column: Acme runs in its seeded Automatic numbering mode for the
-        // whole E2E run (no test mutates it any more — see CreateEmployeeTests' remarks), where
-        // EmployeeStagingRowValidator rejects a supplied number and the import assigns one.
         string[] headers =
         [
             "First Name", "Last Name", "Work Email", "Date Of Birth", "Nationality", "Gender",
@@ -61,9 +43,6 @@ public sealed class DataImportWizardTests(HrSettingsSerialFixture fixture) : HrS
             await wizard.GoToAsync(AcmeId);
             await wizard.UploadFileAsync(tempFile);
 
-            // The Column Mapping step auto-detects the file's headers and pre-suggests a
-            // mapping; since the uploaded workbook's headers match the standard field names
-            // exactly, the "First Name" row's dropdown should already be selected to "First Name".
             var firstNameMapping = await wizard.GetMappingSelectionAsync("First Name");
             Assert.Equal("First Name", firstNameMapping);
 
@@ -109,11 +88,6 @@ public sealed class DataImportWizardTests(HrSettingsSerialFixture fixture) : HrS
         var suffix = Guid.NewGuid().ToString("N")[..8];
         var validEmail = $"e2e.importok.{suffix}@example.com";
 
-        // The second row is missing a Last Name (a required field), which should produce a row
-        // error surfaced on the Preview & Confirm step. Date Of Birth/Nationality/Gender/Salary
-        // Amount/Department/Location/Employment Type/Position Profile are also required (see
-        // EmployeeStagingRowValidator) and are included on both rows so Last Name is the only
-        // thing that fails the second one.
         string[] headers =
         [
             "First Name", "Last Name", "Work Email", "Date Of Birth", "Nationality", "Gender",
@@ -163,10 +137,6 @@ public sealed class DataImportWizardTests(HrSettingsSerialFixture fixture) : HrS
         var validEmail = $"e2e.importsalok.{suffix}@example.com";
         var invalidEmail = $"e2e.importsalbad.{suffix}@example.com";
 
-        // Same shape as Preview_WithInvalidRow_AllowsDownloadingErrorReport above, but the
-        // second row omits Salary Amount instead of Last Name — EmployeeStagingRowValidator now
-        // requires Salary Amount unconditionally (RequiredFields), regardless of whether any
-        // other compensation column is mapped.
         string[] headers =
         [
             "First Name", "Last Name", "Work Email", "Date Of Birth", "Nationality", "Gender",
@@ -209,10 +179,6 @@ public sealed class DataImportWizardTests(HrSettingsSerialFixture fixture) : HrS
         }
     }
 
-    // EmployeeImportFileParser (HR.Modules.DataImport) reads uploaded files as an .xlsx workbook
-    // via ClosedXML's XLWorkbook — there is no CSV code path, so a plain-text CSV (even with a
-    // .csv extension) fails to parse as a workbook at all. Builds a minimal single-sheet workbook
-    // with the given headers and rows, same helper as ImportHistoryTests.WriteImportWorkbook.
     private static void WriteImportWorkbook(string filePath, string[] headers, string[][] rows)
     {
         using var workbook = new XLWorkbook();

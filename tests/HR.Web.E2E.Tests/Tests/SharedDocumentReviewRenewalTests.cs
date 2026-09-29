@@ -64,42 +64,21 @@ public sealed class SharedDocumentReviewRenewalTests(HrAdminPersonaFixture fixtu
             Assert.False(await detail.IsReviewDialogOpenAsync(),
                 "Expected the Complete Review dialog to close after a successful submission with a renewed file");
 
-            // A real backend integration test (CompleteReview_AfterUploadingRenewedVersion_
-            // StillPersists_LastReviewedFields) proves the server genuinely persists
-            // LastReviewedAt/LastReviewedByEmployeeId correctly after this exact chained
-            // upload-version + complete-review sequence — so a footer that doesn't show "Last
-            // reviewed by" here is a client-side rendering/timing gap, not a backend bug.
-            // "Dialog closed" is an unreliable proxy for "the page's post-close reload
-            // (SharedDocumentDetail.razor's OnReviewCompletedAsync re-fetching _detail) has landed
-            // in the DOM" — the two can arrive in separate render batches. Assert directly on the
-            // footer's own content with Playwright's auto-retrying Expect instead of a one-shot
-            // read, so the assertion itself waits out that gap rather than a proxy signal.
             var expectedReviewedOn = DateTime.Today.ToString("d MMM yyyy");
             await Assertions.Expect(detail.FooterSummary)
                 .ToContainTextAsync($"Last reviewed by Laura Bennett on {expectedReviewedOn}", new() { Timeout = 15_000 });
 
-            // The renewed file must have gone through the version-retention mechanism (a second,
-            // additive row) rather than silently replacing the first version in place.
             Assert.Equal(2, await detail.WaitForVersionRowCountAsync(2));
 
             var originalFileNameFragment = Path.GetFileName(originalFile);
             var renewedFileNameFragment  = Path.GetFileName(renewedFile);
 
-            // SharedDocumentDetail.razor's Version column renders "v{VersionNumber}", not a bare
-            // number.
             Assert.Equal("v1", await detail.GetVersionRowCellAsync(originalFileNameFragment, 0));
             Assert.Equal("Superseded", await detail.GetVersionRowCellAsync(originalFileNameFragment, 1));
 
-            // The renewed version is now current, so its cell carries the "Current" badge suffix
-            // (concatenated with no separator in InnerText) — see SharedDocumentVersionHistoryTests
-            // for the same pattern.
             Assert.Equal("v2Current", await detail.GetVersionRowCellAsync(renewedFileNameFragment, 0));
             Assert.Equal("Draft", await detail.GetVersionRowCellAsync(renewedFileNameFragment, 1));
 
-            // CompleteSharedCompanyDocumentReviewDialog.razor prefixes the version note with
-            // "Renewed via document review. " ahead of the operator's own review notes. Note moved
-            // out of the grid's own columns and into the per-row "Details" popup as part of the
-            // grid's compaction — see SharedDocumentDetailPage.GetVersionDetailAsync.
             var (renewedVersionNote, _, _) = await detail.GetVersionDetailAsync(renewedFileNameFragment);
             Assert.Contains("Renewed via document review.", renewedVersionNote);
             Assert.Contains(reviewNotes, renewedVersionNote);
@@ -130,28 +109,19 @@ public sealed class SharedDocumentReviewRenewalTests(HrAdminPersonaFixture fixtu
             var documentId = await GetUploadedDocumentIdAsync(title);
             await detail.GoToAsync(AcmeId, documentId);
 
-            // Newly uploaded documents don't require acknowledgement by default (Model.RequiresAcknowledgement
-            // defaults to false on UploadSharedCompanyDocumentDialog.razor) — set it explicitly via the
-            // Acknowledgement card's Edit dialog, same helper CompanyDocumentsTabTests uses.
             await detail.RequireAcknowledgementAsync(DateOnly.FromDateTime(DateTime.Today.AddMonths(1)));
 
             await detail.OpenReviewDialogAsync();
 
-            // RequiresAcknowledgement is now true, but no file has been selected yet — the
-            // checkbox must stay hidden.
             Assert.False(await detail.IsReviewReacknowledgementCheckboxVisibleAsync(),
                 "Expected the reacknowledgement checkbox to stay hidden until a Renewed File is selected");
 
             await File.WriteAllBytesAsync(renewedFile, BuildTestPdf());
             await detail.SetReviewRenewedFileAsync(renewedFile);
 
-            // Both conditions are now met — the checkbox must appear.
             Assert.True(await detail.IsReviewReacknowledgementCheckboxVisibleAsync(),
                 "Expected the reacknowledgement checkbox to appear once RequiresAcknowledgement is true and a file is selected");
 
-            // Don't submit — this test is scoped to the checkbox's visibility, not the
-            // acknowledgement-task-creation consequence of checking it (already covered elsewhere
-            // for the general Upload New Version flow).
             await detail.ClickReviewCancelAsync();
         }
         finally
@@ -175,8 +145,6 @@ public sealed class SharedDocumentReviewRenewalTests(HrAdminPersonaFixture fixtu
         var renewedFile  = Path.Combine(Path.GetTempPath(), $"shared-doc-renewed-{Guid.NewGuid():N}.pdf");
         try
         {
-            // No RequireAcknowledgementAsync call here — this document never requires
-            // acknowledgement, so the checkbox must stay hidden even once a file is selected.
             await UploadDocumentAsync(title, originalFile);
 
             var documentId = await GetUploadedDocumentIdAsync(title);
@@ -199,9 +167,6 @@ public sealed class SharedDocumentReviewRenewalTests(HrAdminPersonaFixture fixtu
         }
     }
 
-    // Uploads a shared document from the Shared Documents list page (same flow as
-    // SharedDocumentCompleteReviewTests / SharedDocumentVersionHistoryTests), without a Review
-    // Frequency or Review Owner since this file's assertions don't depend on either.
     private async Task UploadDocumentAsync(string title, string filePath)
     {
         await _page.GotoAsync(_fixture.WebBaseUrl + $"/companies/{AcmeId}/shared-documents");
@@ -226,8 +191,6 @@ public sealed class SharedDocumentReviewRenewalTests(HrAdminPersonaFixture fixtu
         await _page.WaitForSelectorAsync($"text={title}", new() { Timeout = 15_000 });
     }
 
-    // Reads the document id straight from the list row's link href, avoiding a separate
-    // click+navigate+wait round trip (same pattern as e.g. SharedDocumentArchiveTests).
     private async Task<Guid> GetUploadedDocumentIdAsync(string title)
     {
         var href = await _page.Locator(".e-rowcell a").Filter(new() { HasText = title }).First.GetAttributeAsync("href");
@@ -235,7 +198,6 @@ public sealed class SharedDocumentReviewRenewalTests(HrAdminPersonaFixture fixtu
         return Guid.Parse(href.Split('/').Last());
     }
 
-    // %PDF- followed by padding, so magic-byte content validation passes.
     private static byte[] BuildTestPdf()
     {
         var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };

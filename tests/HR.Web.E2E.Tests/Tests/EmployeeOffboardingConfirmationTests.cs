@@ -3,21 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the "Start offboarding" entry point on the employee profile page (moved into the
-/// "More actions" overflow menu and renamed from "Start Leaving Process" — see
-/// EmployeeEdit.razor's BuildMoreActionsItems/HandleMoreActionSelected) and the added
-/// consequences-explanation paragraph on the StartLeavingProcessDialog's confirmation step. Does
-/// not re-cover the full wizard end to end — see EmployeeLeavingProcessTests.cs for that; this
-/// file focuses on the new confirmation-step text and the cancel-leaves-employee-unchanged path.
-///
-/// None of the three tests below ever actually confirms/completes the Start Leaving Process
-/// wizard (the second only drives it as far as the "5. Confirm" step to check its text, the third
-/// explicitly cancels), so no test here permanently mutates the employee — safe to share ONE
-/// employee across all three instead of each paying the full New Employee form. Same
-/// create-once-lazily pattern as EmployeeProfileViewEditModeTests.cs; see that file's own remarks
-/// on why sharing is safe (xUnit runs methods within one class sequentially).
-/// </summary>
 public sealed class EmployeeOffboardingConfirmationTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -53,9 +38,6 @@ public sealed class EmployeeOffboardingConfirmationTests(HrAdminPersonaFixture f
         }
     }
 
-    // All three tests share one dedicated pre-seeded pool employee — none ever confirms the
-    // wizard, so nothing about the employee is mutated (see class remarks). GetSharedEmployeeAsync
-    // still handles landing the browser on its "/view" route.
     private async Task<Guid> CreateEmployeeAsync(EmployeeListPage empList, EmployeeEditPage empEdit, string suffix)
     {
         _ = empList;
@@ -113,25 +95,6 @@ public sealed class EmployeeOffboardingConfirmationTests(HrAdminPersonaFixture f
 
         Assert.Equal("5. Confirm", await dialog.GetActiveStepLabelAsync());
 
-        // SPEC-OFF-01: the confirmation step's wording is now tailored per leaving reason (see
-        // StartLeavingProcessDialog.ReasonConfirmationWording) rather than one generic
-        // "Starting offboarding..." sentence, but every reason still shares the same explanation
-        // that confirming automatically creates the checklist with no separate "start offboarding"
-        // step — assert on that shared, reason-independent portion.
-        //
-        // ClickNextAsync only waits for the stepper's own label to change (".hr-stepper-item--current"),
-        // not for step 5's body content to finish its own Blazor Server render, so a raw snapshot
-        // read immediately after landing on step 5 can race that body render.
-        //
-        // Also: the source markup wraps this sentence across multiple lines
-        // (StartLeavingProcessDialog.razor: "...there is no" / "separate \"start offboarding\"
-        // step..."), so the RAW text content read via TextContentAsync() literally contains a
-        // newline + indentation whitespace between "no" and "separate" — a plain string
-        // Assert.Contains("no separate...") can never match that, even once the content has fully
-        // rendered (this is what actually failed, not the render-timing race originally suspected
-        // here). Playwright's own ToContainTextAsync/text-matching normalizes whitespace when
-        // comparing, so use that for all three checks instead of a raw TextContentAsync() + string
-        // Assert.Contains.
         var confirmDialog = _page.GetByRole(Microsoft.Playwright.AriaRole.Dialog, new() { Name = "Start Leaving Process" });
         await Microsoft.Playwright.Assertions.Expect(confirmDialog)
             .ToContainTextAsync("This employee has resigned", new() { Timeout = 10_000 });
@@ -154,10 +117,6 @@ public sealed class EmployeeOffboardingConfirmationTests(HrAdminPersonaFixture f
 
         await GetSharedEmployeeAsync(empList, empEdit);
 
-        // A freshly-created employee starts as "Draft" (Employee.Create's unconditional default —
-        // there's no status field on the New Employee form itself), not "Active". The point of
-        // this test is that cancelling leaves the status unchanged, not that it's specifically
-        // "Active", so capture whatever the real baseline is rather than assuming one.
         var originalStatus = await empEdit.GetEmployeeStatusBadgeTextAsync();
 
         await dialog.OpenAsync();

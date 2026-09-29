@@ -23,10 +23,6 @@ internal sealed class GetVacancyHandler(RecruitmentDbContext db, IPositionProfil
             return Result.Failure<GetVacancyResponse>(
                 Error.NotFound($"Vacancy '{request.VacancyId}' was not found."));
 
-        // Cross-module read: the linked Position Profile is owned by HR.Modules.Employees, so its
-        // canonical role information is resolved through the narrow IPositionProfileReader contract
-        // rather than a direct module reference. A deactivated/no-longer-findable profile resolves to
-        // null here rather than failing the request — see GetVacancyResponse's remarks.
         var positionProfile = await positionProfileReader.GetSummaryAsync(
             request.CompanyId, vacancy.PositionProfileId, cancellationToken);
 

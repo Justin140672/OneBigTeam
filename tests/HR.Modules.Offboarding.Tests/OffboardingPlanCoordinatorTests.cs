@@ -21,9 +21,6 @@ public class OffboardingPlanCoordinatorTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
 
-    // CancelOutstandingTasksAsync never touches StartOffboardingHandler — it's only a constructor
-    // dependency of OffboardingPlanCoordinator because StartAsync (the sibling method) delegates to
-    // it. Any validly-constructed instance works here since this test path never calls it.
     private static StartOffboardingHandler BuildUnusedStartOffboardingHandler(OffboardingDbContext dbContext) =>
         new(
             dbContext,
@@ -207,10 +204,6 @@ public class OffboardingPlanCoordinatorTests
         Assert.Equal(OffboardingStatus.Completed, savedPlan.Status);
     }
 
-    // OFF-01: the cross-module Tasks-module sync is the entire point of this method — previously
-    // only the local OffboardingTask rows were marked Skipped, leaving the real Tasks-module
-    // TaskItems dangling Open. This pins that CancelManyBySourceEntitiesAsync is actually invoked
-    // with the plan's own OffboardingTask ids and the correct source/action-type filter.
     [Fact]
     public async Task CancelOutstandingTasksAsync_Invokes_TaskCanceller_With_Plans_OffboardingTask_Ids()
     {
@@ -296,9 +289,6 @@ public class OffboardingPlanCoordinatorTests
         Assert.Empty(taskCanceller.CancelManyCalls);
     }
 
-    // OFF-07: cascade-skip via CancelOutstandingTasksAsync must go through OffboardingTask.Skip's
-    // new required reason/actor overload, not a bare "no reason" call — verifies the actual
-    // SkipReason/SkippedByUserId/SkippedAt values recorded on the automatically-skipped task.
     [Fact]
     public async Task CancelOutstandingTasksAsync_Records_SkipReason_And_SystemActor_On_Skipped_Tasks()
     {
@@ -321,11 +311,10 @@ public class OffboardingPlanCoordinatorTests
         var savedTask = await dbContext.OffboardingTasks.SingleAsync(t => t.Id == pendingTask.Id);
         Assert.Equal(OffboardingTaskStatus.Cancelled, savedTask.Status);
         Assert.Equal("Leaving process cancelled.", savedTask.SkipReason);
-        Assert.Equal(Guid.Empty, savedTask.SkippedByUserId); // OffboardingSystemActor.Id
+        Assert.Equal(Guid.Empty, savedTask.SkippedByUserId);
         Assert.Equal(Now, savedTask.SkippedAt);
     }
 
-    // OFF-02: RescheduleOutstandingTasksAsync tests below.
 
     [Fact]
     public async Task RescheduleOutstandingTasksAsync_Is_NoOp_When_No_Plan_Exists()
@@ -495,9 +484,6 @@ public class OffboardingPlanCoordinatorTests
         Assert.Equal(newLastWorkingDay, call.NewDueDate);
     }
 
-    // OFF-02: there is no confirmation step in Offboarding — Employees' AmendLeavingProcess handler
-    // already gates a backdated leaving date on ConfirmBackdatedLeavingDate before this event is even
-    // published, so the coordinator must just process whatever (possibly past) date arrives.
     [Fact]
     public async Task RescheduleOutstandingTasksAsync_Processes_Backdated_LastWorkingDay_Without_SpecialCasing()
     {
@@ -516,7 +502,6 @@ public class OffboardingPlanCoordinatorTests
         var auditPublisher = new FakeAuditPublisher();
         var coordinator = BuildCoordinator(dbContext, auditPublisher);
 
-        // FixedUtcNow is 2026-07-24, so this date is in the past relative to "now".
         var backdatedLastWorkingDay = new DateOnly(2026, 7, 1);
 
         await coordinator.RescheduleOutstandingTasksAsync(

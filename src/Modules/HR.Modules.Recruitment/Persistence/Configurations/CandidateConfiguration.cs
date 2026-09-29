@@ -35,8 +35,6 @@ internal sealed class CandidateConfiguration : IEntityTypeConfiguration<Candidat
             .HasMaxLength(256)
             .IsRequired();
 
-        // Canonical (trimmed, lower-cased) email — see CandidateEmail.Normalise. Set by the domain;
-        // the unique index below is the final safeguard against duplicate candidates.
         builder.Property(c => c.NormalisedEmail)
             .HasColumnName("normalised_email")
             .HasMaxLength(256)
@@ -95,8 +93,6 @@ internal sealed class CandidateConfiguration : IEntityTypeConfiguration<Candidat
             .IsRequired();
 
         builder.HasIndex(c => c.CompanyId);
-        // One candidate per (company, normalised email) — includes inactive candidates, which are
-        // still the same person. Replaces the former non-unique (company_id, email) index.
         builder.HasIndex(c => new { c.CompanyId, c.NormalisedEmail })
             .IsUnique()
             .HasDatabaseName(CandidateEmailUniqueness.UniqueIndexName);

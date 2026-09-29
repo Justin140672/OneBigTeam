@@ -16,13 +16,10 @@ public sealed class InterviewService(HrApiHttpClientFactory httpClientFactory)
         return result.Success ? result.Value : null;
     }
 
-    // DSH-03: non-swallowing sibling of GetInterviewsTodayCountAsync.
     public Task<GetInterviewsTodayCountResponse?> GetInterviewsTodayCountOrThrowAsync(Guid companyId) =>
         Http.GetFromJsonAsync<GetInterviewsTodayCountResponse>(
             $"api/companies/{companyId}/interviews/today-count", HrApiJsonOptions.Default);
 
-    // DSH-04: authoritative "interviews requiring action" metric (Pending outcome, scheduled at or
-    // before end of today). Non-swallowing (DSH-03 style) for the dashboard's per-source failure UI.
     public Task<InterviewsRequiringActionMetricResponse?> GetInterviewsRequiringActionMetricOrThrowAsync(
         Guid companyId, CancellationToken cancellationToken = default) =>
         Http.GetFromJsonAsync<InterviewsRequiringActionMetricResponse>(
@@ -37,9 +34,6 @@ public sealed class InterviewService(HrApiHttpClientFactory httpClientFactory)
         return result.Success ? result.Value : null;
     }
 
-    // Non-swallowing sibling of GetUpcomingInterviewsAsync, for callers (e.g.
-    // UpcomingInterviewsWidget) that use WidgetSourceLoader to distinguish a failed load from a
-    // genuine empty result rather than collapsing both into null.
     public Task<GetUpcomingInterviewsResponse?> GetUpcomingInterviewsOrThrowAsync(
         Guid companyId, CancellationToken cancellationToken = default) =>
         Http.GetFromJsonAsync<GetUpcomingInterviewsResponse>(

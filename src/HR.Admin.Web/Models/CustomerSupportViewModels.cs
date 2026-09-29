@@ -1,7 +1,5 @@
 namespace HR.Admin.Web.Models;
 
-// Mirrors HR.Modules.Companies.Features.GetCustomerSupportView.Response's shape exactly — same
-// "app-local DTO matching the API contract" convention as CustomerDetailsModels.cs.
 public sealed record CustomerSupportViewResponse(
     Guid CompanyId,
     string CompanyName,

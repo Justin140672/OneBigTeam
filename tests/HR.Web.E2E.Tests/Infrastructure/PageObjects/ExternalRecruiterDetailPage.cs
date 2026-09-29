@@ -2,11 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the External Recruiter create/edit/view page
-/// (/companies/{companyId}/external-recruiters/new|{id}|{id}/view, ExternalRecruiterDetail.razor),
-/// including its soft duplicate-agency-name warning banner and read-only Activity Summary card.
-/// </summary>
 public sealed class ExternalRecruiterDetailPage(IPage page, string baseUrl)
 {
     public async Task GoToNewAsync(Guid companyId)
@@ -33,11 +28,6 @@ public sealed class ExternalRecruiterDetailPage(IPage page, string baseUrl)
         await page.Keyboard.PressAsync("Tab");
     }
 
-    /// <summary>
-    /// True if the "Contact Name" field sits alone on its own full-width row (".col-12" — see
-    /// ExternalRecruiterDetail.razor), rather than sharing a row with another field
-    /// (e.g. previously paired 6-wide alongside another ".col-md-6" field).
-    /// </summary>
     public async Task<bool> IsContactNameOnItsOwnRowAsync()
     {
         var field = page.GetByPlaceholder("Primary contact");
@@ -60,7 +50,6 @@ public sealed class ExternalRecruiterDetailPage(IPage page, string baseUrl)
     public Task<string> GetAgencyNameAsync() =>
         page.GetByPlaceholder("e.g. Acme Recruiting").InputValueAsync();
 
-    /// <summary>The recruiter entity id parsed out of the current edit/view URL (/external-recruiters/{id}[/view]).</summary>
     public Guid GetIdFromUrl() => UrlIdParser.LastGuid(page.Url);
 
     // ── Contact Name field (optional) — mutated field for concurrency tests ─────
@@ -90,7 +79,6 @@ public sealed class ExternalRecruiterDetailPage(IPage page, string baseUrl)
         return await input.InputValueAsync();
     }
 
-    // ── Optimistic-concurrency conflict banner (shared SaveConflictBanner via EditPageBase) ──
     private ILocator ConcurrencyWarningBanner =>
         page.Locator(".save-conflict-banner[role='alert']")
             .Filter(new() { Has = page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }) });
@@ -113,10 +101,6 @@ public sealed class ExternalRecruiterDetailPage(IPage page, string baseUrl)
         await page.WaitForTimeoutAsync(300);
     }
 
-    /// <summary>
-    /// Blurs the Agency Name field (tabbing to the next field) — required to trigger the
-    /// non-blocking duplicate-agency-name check (ExternalRecruiterDetail.razor's OnAgencyNameBlurAsync).
-    /// </summary>
     public async Task BlurAgencyNameAsync()
     {
         await page.GetByPlaceholder("e.g. Acme Recruiting").FocusAsync();
@@ -127,8 +111,6 @@ public sealed class ExternalRecruiterDetailPage(IPage page, string baseUrl)
 
     public async Task<bool> IsDuplicateWarningVisibleAsync()
     {
-        // The duplicate-name check is an async server round-trip triggered on blur — checking
-        // IsVisibleAsync() immediately after BlurAgencyNameAsync races that round-trip.
         try
         {
             await DuplicateWarning.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
@@ -163,7 +145,6 @@ public sealed class ExternalRecruiterDetailPage(IPage page, string baseUrl)
         }
     }
 
-    // ── Activity Summary (existing recruiter only) ───────────────────────────────
 
     private ILocator ActivitySummaryCard => page.Locator("[data-testid='recruiter-activity-summary']");
 
@@ -195,7 +176,6 @@ public sealed class ExternalRecruiterDetailPage(IPage page, string baseUrl)
             .GetByText(vacancyTitleFragment, new() { Exact = false })
             .IsVisibleAsync();
 
-    // ── Unsaved changes dialog (EditPageBase, shared convention) ─────────────────
 
     private ILocator UnsavedChangesDialog => page.Locator("[role='dialog']:has-text('Unsaved Changes')");
 

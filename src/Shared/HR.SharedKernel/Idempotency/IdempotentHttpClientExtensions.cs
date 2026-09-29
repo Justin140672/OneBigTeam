@@ -18,10 +18,6 @@ public static class IdempotentHttpClientExtensions
 {
     public const string HeaderName = "Idempotency-Key";
 
-    /// <summary>
-    /// Sends <paramref name="content"/> (JSON, multipart, or any other <see cref="HttpContent"/>)
-    /// with <paramref name="idempotencyKey"/> attached as the Idempotency-Key header.
-    /// </summary>
     public static Task<HttpResponseMessage> SendIdempotentAsync(
         this HttpClient client,
         HttpMethod method,
@@ -35,7 +31,6 @@ public static class IdempotentHttpClientExtensions
         return client.SendAsync(request, cancellationToken);
     }
 
-    /// <summary>JSON convenience wrapper over <see cref="SendIdempotentAsync"/> for POST.</summary>
     public static Task<HttpResponseMessage> PostAsJsonIdempotentAsync<TValue>(
         this HttpClient client,
         string requestUri,
@@ -46,7 +41,6 @@ public static class IdempotentHttpClientExtensions
         client.SendIdempotentAsync(
             HttpMethod.Post, requestUri, JsonContent.Create(value, options: options), idempotencyKey, cancellationToken);
 
-    /// <summary>JSON convenience wrapper over <see cref="SendIdempotentAsync"/> for PUT.</summary>
     public static Task<HttpResponseMessage> PutAsJsonIdempotentAsync<TValue>(
         this HttpClient client,
         string requestUri,

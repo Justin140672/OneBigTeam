@@ -71,9 +71,6 @@
         StateHasChanged();
     }
 
-    // The actual acknowledgement — reading the statement and explicitly confirming it, distinct
-    // from viewing/downloading — happens on the dedicated document screen, not in this panel.
-    // Passing the task id lets that screen complete this task once acknowledgement succeeds.
     private void OpenDocument()
     {
         if (Task.SourceEntityId is not { } documentId) return;

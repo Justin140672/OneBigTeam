@@ -50,17 +50,6 @@ internal sealed class ToilExpiryService(LeaveDbContext dbContext, IClock clock, 
 {
     internal static readonly Guid SystemActorId = Guid.Empty;
 
-    /// <summary>
-    /// Test-only extensibility point (P1.1 follow-up). When set, invoked exactly once per
-    /// <see cref="ExpireCompanyAsync"/> call, immediately after the locked balances have been
-    /// loaded (<see cref="LoadLockedBalancesAsync"/>) but before the ledger is read/calculated -
-    /// i.e. squarely inside the concurrency boundary described in this class's doc comment. This
-    /// lets Postgres-backed integration tests either (a) pause the method here (e.g. via a
-    /// <see cref="TaskCompletionSource"/>) so a concurrent caller can commit a change in that
-    /// window, or (b) deterministically force a stale-concurrency-token save failure by mutating
-    /// the loaded entities' tracked original values. Never set outside tests; defaults to null and
-    /// is a no-op for every real caller (constructor-injected via DI, which never sets it).
-    /// </summary>
     internal Func<LeaveDbContext, Dictionary<Guid, LeaveBalance>, CancellationToken, Task>? TestOnlyAfterLockedLoadAsync { get; set; }
 
     public async Task<ToilExpiryResult> ExpireCompanyAsync(Guid companyId, DateOnly asOf, CancellationToken cancellationToken)
@@ -85,15 +74,8 @@ internal sealed class ToilExpiryService(LeaveDbContext dbContext, IClock clock, 
         if (balanceIds.Count == 0)
             return ToilExpiryResult.Empty;
 
-        // Concurrency boundary starts here, BEFORE any ledger read used for the expiry calculation.
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-        // Row-lock every candidate balance up front, AND materialize the tracked balance entities
-        // used for the rest of this calculation from that same locked read - never from an earlier,
-        // separately-loaded snapshot. Any concurrent writer touching one of these balance rows
-        // (another expiry run, or TOIL usage/reversal) blocks until this transaction commits or
-        // rolls back, so both the balances in memory and the ledger reads below are guaranteed
-        // consistent with whatever that writer eventually persists - never a stale interleaving.
         var balances = await LoadLockedBalancesAsync(balanceIds, cancellationToken);
 
         if (TestOnlyAfterLockedLoadAsync is not null)
@@ -120,9 +102,6 @@ internal sealed class ToilExpiryService(LeaveDbContext dbContext, IClock clock, 
                      && bucketIds.Contains(t.RelatedTransactionId!.Value))
             .ToListAsync(cancellationToken);
 
-        // Idempotency guard: a bucket that already has an Expired transaction against it has
-        // already been processed. Backed by the unique filtered index below as the authoritative
-        // guard; this in-memory check just avoids the round trip to discover that on the common path.
         var alreadyExpiredBucketIds = drawdowns
             .Where(d => d.Type == ToilTransactionType.Expired)
             .Select(d => d.RelatedTransactionId!.Value)
@@ -201,25 +180,14 @@ internal sealed class ToilExpiryService(LeaveDbContext dbContext, IClock clock, 
         return new ToilExpiryResult(expiredTransactions.Count);
     }
 
-    /// <summary>
-    /// Loads the tracked <see cref="LeaveBalance"/> entities used for the rest of
-    /// <see cref="ExpireCompanyAsync"/>'s calculation. On relational providers, the row lock IS the
-    /// query that produces these tracked entities (<c>SELECT ... FOR UPDATE</c> via
-    /// <c>FromSqlInterpolated</c>), so there is no window between "read the balance" and "lock the
-    /// balance" during which a concurrent writer could commit a change this method would miss.
-    /// </summary>
     private async Task<Dictionary<Guid, LeaveBalance>> LoadLockedBalancesAsync(
         List<Guid> balanceIds, CancellationToken cancellationToken)
     {
-        // Only relational providers (Postgres in production, Sqlite/Postgres in integration tests)
-        // support raw SQL / row locking. Unit tests exercise this service against EF's InMemory
-        // provider, which has no concept of row locks - correctness of the concurrency boundary
-        // itself is covered by the Postgres-backed integration tests, not these unit tests.
         if (!dbContext.Database.IsRelational())
         {
             return await dbContext.LeaveBalances
                 .Where(b => balanceIds.Contains(b.Id))
-                .OrderBy(b => b.Id) // stable order avoids lock-ordering deadlocks with ToilLedgerService
+                .OrderBy(b => b.Id)
                 .ToDictionaryAsync(b => b.Id, cancellationToken);
         }
 

@@ -51,15 +51,10 @@ public class RecordInterviewOutcomeHandlerTests
         Assert.Equal(InterviewOutcome.Passed, result.Value!.Outcome);
         Assert.Equal("Strong technical skills.", result.Value.Notes);
 
-        // Recording an outcome is metadata-only (ticket #99) — it never moves the application off
-        // its current stage; advancing the pipeline remains a separate, explicit action.
         var savedApplication = await db.Applications.SingleAsync();
         Assert.Equal(stages.Interview.Id, savedApplication.CurrentStageId);
         Assert.Equal(InterviewOutcome.Passed, savedApplication.InterviewOutcome);
 
-        // Exactly one audit event is published now: InterviewOutcomeRecordedAuditEvent. Unlike before
-        // ticket #99, recording an outcome no longer transitions the stage, so no
-        // ApplicationStageChangedAuditEvent accompanies it.
         var auditEvent = Assert.IsType<InterviewOutcomeRecordedAuditEvent>(Assert.Single(auditPublisher.Published));
         Assert.Equal("interview.outcome_recorded", ((IAuditEvent)auditEvent).EventType);
         Assert.Equal("Interview", ((IAuditEvent)auditEvent).EntityType);

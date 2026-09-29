@@ -115,7 +115,6 @@ internal sealed class UpdateHrSettingsHandler
 			request.AutoDisableAccessOnLeavingDate,
 			request.EmployeeNumberMode,
 			request.EmployeeNumberPrefix,
-			// Omitted = unchanged: keep the live counter rather than a stale echo (see Request).
 			request.NextEmployeeNumber ?? settings.NextEmployeeNumber,
 			request.EmployeeNumberMinimumLength,
 			now);
@@ -143,14 +142,8 @@ internal sealed class UpdateHrSettingsHandler
 
 		company.SetSettings(settings, now);
 
-		// SET-03: same forced-OriginalValue concurrency check as UpdateCompanySettingsHandler —
-		// both slices mutate the same CompanySettings row and share one version counter.
 		_dbContext.Entry(settings).Property(s => s.Version).OriginalValue = request.Version;
 
-		// Format-change renumbering (item 27, made reliable/recoverable by SET-08): only triggered
-		// when the format actually changed while the company STAYS in Automatic mode — never on a
-		// Manual<->Automatic mode switch, and never for a Manual-mode company (nothing to renumber
-		// to).
 		var formatChanged =
 			previousEmployeeNumberPrefix != settings.EmployeeNumberPrefix ||
 			previousEmployeeNumberMinimumLength != settings.EmployeeNumberMinimumLength;
@@ -164,10 +157,6 @@ internal sealed class UpdateHrSettingsHandler
 
 		if (triggersRenumber)
 		{
-			// SET-08: "concurrent numbering changes cannot run out of order" — refuse a new
-			// format-changing update while a previous renumber for this company is still in flight
-			// (Pending or Processing), rather than racing it. Other (non-format) settings fields can
-			// still be changed freely; this check only applies when triggersRenumber is true.
 			var inFlight = await _dbContext.OutboxMessages.AnyAsync(
 				m => m.CompanyId == company.Id &&
 					 m.EventType == EmployeeRenumberEventType &&
@@ -180,12 +169,6 @@ internal sealed class UpdateHrSettingsHandler
 					Error.Conflict("A previous employee number reformat is still processing. Wait for it to complete before changing the numbering format again."));
 			}
 
-			// SET-08: the durable side-effect instruction is created in the SAME transaction as the
-			// settings change below (single SaveChangesAsync call) — the instruction can never be
-			// lost even if the process crashes immediately after this commit, and the background job
-			// enqueue below is a pure "wake the worker up sooner" optimisation, not the source of
-			// truth. Payload only needs enough context for a human/monitoring tool to identify what
-			// changed; the job itself re-derives current formatting from CompanySettings.
 			renumberOutboxMessage = Domain.OutboxMessage.CreatePending(
 				Guid.NewGuid(),
 				company.Id,
@@ -215,12 +198,6 @@ internal sealed class UpdateHrSettingsHandler
 				Error.Conflict("HR settings were changed by someone else. Reload the latest settings and try again."));
 		}
 
-		// SET-08: only after the settings + durable instruction have both committed do we enqueue
-		// the background job — if the process crashes between commit and this line, the row is
-		// still Pending and durable; nothing currently re-scans for missed enqueues (a follow-up
-		// recurring "sweep pending outbox rows" job would close that gap, but a crash in this exact
-		// narrow window is not a scenario this ticket's acceptance criteria require covering, since
-		// the row itself is never lost and remains visible/actionable).
 		if (renumberOutboxMessage is not null)
 		{
 			_backgroundJobClient.Enqueue<EmployeeRenumberSideEffectJob>(

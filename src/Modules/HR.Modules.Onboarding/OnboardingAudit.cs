@@ -2,10 +2,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Onboarding;
 
-// Published when a plan completes — the moment the Onboarding tab on the Employee Overview page
-// stops being shown (see EmployeeEdit.razor's _showOnboardingTab). This is what lets HR still
-// find completed onboarding history in the Audit tab afterward; nothing about the underlying
-// OnboardingPlan/OnboardingTask rows is deleted, only the tab disappears.
 internal sealed record OnboardingPlanCompletedAuditEvent(
     Guid CompanyId,
     Guid OnboardingPlanId,

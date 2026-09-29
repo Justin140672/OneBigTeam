@@ -99,11 +99,9 @@ public sealed class RecruitmentStageEditConcurrencyConflictTests(RecruiterPerson
 
         try
         {
-            // ── Tab 1: open the editor and start editing the Name (loads version v1) ──
             await stageEdit.GoToAsync(AcmeId, id);
             await stageEdit.SetNameAsync(firstTabName);
 
-            // ── Tab 2 (same context / persona): load the same stage and save first ──
             var otherPage = await _context.NewPageAsync();
             try
             {
@@ -117,7 +115,6 @@ public sealed class RecruitmentStageEditConcurrencyConflictTests(RecruiterPerson
                 await otherPage.CloseAsync();
             }
 
-            // ── Tab 1: saving now is stale → conflict banner, page stays, input preserved ──
             await stageEdit.SaveExpectingConflictAsync();
 
             Assert.True(await stageEdit.IsConcurrencyWarningVisibleAsync(),
@@ -125,14 +122,12 @@ public sealed class RecruitmentStageEditConcurrencyConflictTests(RecruiterPerson
             Assert.Contains($"/recruitment-stages/{id}", _page.Url);
             Assert.Equal(firstTabName, await stageEdit.GetNameAsync());
 
-            // ── Tab 1: "Reload latest values" clears the banner and adopts the other tab's value ──
             await stageEdit.ClickReloadLatestValuesAsync();
 
             Assert.False(await stageEdit.IsConcurrencyWarningVisibleAsync(),
                 "Expected the conflict banner to clear after reloading latest values");
             Assert.Equal(otherTabName, await stageEdit.WaitForNameAsync(otherTabName));
 
-            // ── Tab 1: re-edit against the fresh version and save successfully ──
             await stageEdit.SetNameAsync(finalName);
             await stageEdit.SaveAsync();
 
@@ -153,7 +148,6 @@ public sealed class RecruitmentStageEditConcurrencyConflictTests(RecruiterPerson
         }
     }
 
-    /// <summary>Creates a uniquely-named non-terminal recruitment stage and returns its name and id.</summary>
     private async Task<(string Name, Guid Id)> CreateStageAsync(
         RecruitmentStageListPage stageList, RecruitmentStageEditPage stageEdit)
     {
@@ -162,7 +156,6 @@ public sealed class RecruitmentStageEditConcurrencyConflictTests(RecruiterPerson
         await stageList.GoToAsync(AcmeId);
         await stageList.ClickNewAsync();
         await stageEdit.FillNameAsync(name);
-        // Leave Terminal Outcome at its default "None" — a plain non-terminal stage.
         await stageEdit.SaveAsync();
 
         Assert.True(await stageList.HasItemAsync(name), $"Failed to seed recruitment stage '{name}'");

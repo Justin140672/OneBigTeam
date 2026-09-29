@@ -10,8 +10,6 @@ public class AddReportFavouriteHandlerTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 7, 29, 10, 0, 0, DateTimeKind.Utc);
 
-    // "employee-directory" (used throughout this test file) requires reporting:view-hr access in
-    // the ReportRegistry.
     private static readonly ReportAccessGates AuthorizedGates = new(
         CanViewRecruitment: false,
         CanViewHr: true,

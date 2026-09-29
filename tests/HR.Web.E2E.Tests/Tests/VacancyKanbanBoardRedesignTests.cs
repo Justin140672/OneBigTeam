@@ -4,18 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the recruitment Kanban board / Recruitment Dashboard redesign (VacancyKanbanBoard.razor,
-/// KanbanCandidateCard.razor, RecruitmentDashboard.razor): the narrower-viewport toolbar layout, the
-/// Board/List view toggle's aria-pressed state, the "No candidates at this stage" empty-column copy,
-/// the new keyboard-accessible "Move to stage…" card menu (an alternative to dragging, sharing the
-/// same server-side MoveApplicationStageAsync call and validation as the drag path — see
-/// VacancyKanbanBoard.MoveApplicationAsync's remarks), and the "dragging" CSS class lifecycle on the
-/// board's columns container.
-///
-/// Follows VacancyKanbanBoardTests' exact fixture/persona pattern: RecruiterPersonaFixture,
-/// Marcus Diallo (Recruiter) against the seeded Acme company.
-/// </summary>
 public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -23,7 +11,6 @@ public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixt
     private const string MarcusEmail = "marcus.diallo@acme.example";
     private const string LauraEmail = "laura.bennett@acme.example";
 
-    // RecruitmentStageSeeder.BuildDefaultStages (see VacancyKanbanBoardTests' identical constants).
     private const string InitialStage  = "Application Received";
     private const string SecondStage   = "CV Review";
     private const string TerminalHired = "Hired";
@@ -45,8 +32,6 @@ public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixt
 
         await dashboard.GoToAsync();
 
-        // Toolbar elements must still be visible AND interactable at this width, not merely present
-        // in the DOM (e.g. hidden via display:none or collapsed to zero width would still "exist").
         var vacancyPicker = _page.Locator(".recruitment-dashboard-vacancy-picker");
         await vacancyPicker.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
         await DropDownSelector.SelectAsync(_page, vacancyPicker, vacancyTitle);
@@ -54,13 +39,10 @@ public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixt
         var kanban = new VacancyKanbanBoardPage(_page, _fixture.WebBaseUrl);
         await kanban.WaitForLoadedAsync();
 
-        // Search box: fill it and confirm the filter actually applies (proves it's interactable, not
-        // just visible).
         await dashboard.FillBoardSearchAsync(candidateLast);
         Assert.True(await kanban.HasCardForNameAsync(candidateLast),
             "Expected the search box to remain fillable and functional at a narrow (390px) viewport");
 
-        // View toggle: still clickable and switches views.
         var viewToggle = _page.Locator("[data-testid='recruitment-view-toggle']");
         await Assertions.Expect(viewToggle).ToBeVisibleAsync(new() { Timeout = 10_000 });
         await dashboard.SwitchToListViewAsync();
@@ -83,7 +65,6 @@ public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixt
         var boardBtn = _page.Locator("[data-testid='recruitment-view-board-btn']");
         var listBtn  = _page.Locator("[data-testid='recruitment-view-list-btn']");
 
-        // Board is the default view.
         Assert.Equal("true", await boardBtn.GetAttributeAsync("aria-pressed"));
         Assert.Equal("false", await listBtn.GetAttributeAsync("aria-pressed"));
 
@@ -92,7 +73,6 @@ public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixt
         Assert.Equal("false", await boardBtn.GetAttributeAsync("aria-pressed"));
         Assert.Equal("true", await listBtn.GetAttributeAsync("aria-pressed"));
 
-        // And back — the negated branch (Board re-selected after having been off) is exercised too.
         await dashboard.SwitchToBoardViewAsync();
 
         Assert.Equal("true", await boardBtn.GetAttributeAsync("aria-pressed"));
@@ -106,8 +86,6 @@ public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixt
     {
         var (candidateLast, kanban) = await ArrangeAppliedApplicationAsync();
 
-        // The freshly created application sits on InitialStage — Hired has nothing on this vacancy's
-        // board yet, so its column must render the empty-state text rather than any cards.
         Assert.Equal(0, await kanban.GetColumnCountAsync(TerminalHired));
 
         var emptyText = await kanban.GetColumnEmptyTextAsync(TerminalHired);
@@ -126,8 +104,6 @@ public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixt
         Assert.True(await kanban.IsCardInColumnAsync(candidateLast, InitialStage),
             $"Expected the freshly created application to start on '{InitialStage}'");
 
-        // Keyboard-only: FocusAsync + Enter to open the menu, FocusAsync + Enter on the target
-        // stage's menu item to select it — no mouse involved anywhere in this call.
         await kanban.MoveToStageViaKeyboardAsync(candidateLast, SecondStage);
 
         Assert.True(await kanban.IsCardInColumnAsync(candidateLast, SecondStage),
@@ -135,9 +111,6 @@ public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixt
         Assert.False(await kanban.IsCardInColumnAsync(candidateLast, InitialStage),
             $"Expected the card to no longer be reported on '{InitialStage}' after the keyboard move");
 
-        // Re-navigate to the standalone board (fresh GetRecruitmentKanbanHandler query) to confirm
-        // the move was actually persisted server-side, not just reflected in leftover client state —
-        // same persistence-check pattern as DraggingCard_MovesApplicationToTargetStage_AndPersistsAcrossReload.
         var vacancyId = ExtractVacancyIdFromUrl(_page.Url);
         var reloadedKanban = new VacancyKanbanBoardPage(_page, _fixture.WebBaseUrl);
         await reloadedKanban.GoToStandaloneAsync(AcmeId, vacancyId);
@@ -153,12 +126,6 @@ public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixt
     {
         var (candidateLast, kanban) = await ArrangeAppliedApplicationAsync();
 
-        // Get the card onto a terminal stage via the dedicated Hire workflow — NOT drag. The generic
-        // Kanban move endpoint (MoveApplicationStageHandler) always rejects any target stage that
-        // IsTerminal, specifically because a terminal stage like "Hired" has required side effects
-        // (provisioning the Employee record) that only the dedicated HireCandidate endpoint performs;
-        // dragging a card onto "Hired" can never succeed. Route through the real Hire dialog instead,
-        // the only sanctioned way onto a Hired stage (see HireCandidateHandler's remarks).
         var vacancyId = ExtractVacancyIdFromUrl(_page.Url);
         var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
         await vacancyDetail.GoToAsync(AcmeId, vacancyId);
@@ -175,17 +142,10 @@ public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixt
 
         Assert.Equal("Hired", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
 
-        // Back to the standalone Kanban board (fresh GetRecruitmentKanbanHandler query) to attempt
-        // the further move against a genuinely terminal-stage card.
         await kanban.GoToStandaloneAsync(AcmeId, vacancyId);
         Assert.True(await kanban.IsCardInColumnAsync(candidateLast, TerminalHired),
             $"Sanity check: expected the Hire workflow to land the card on '{TerminalHired}' before attempting a further move");
 
-        // Now attempt a further move via the keyboard "Move to stage…" menu on the now-terminal
-        // card — MoveApplicationStageHandler rejects any move off a terminal stage, and this
-        // assertion proves that rejection surfaces through the exact same error banner
-        // (data-testid="kanban-error") the drag path uses, i.e. the keyboard path is validated by
-        // the same server-side rule rather than a separate/looser client-side one.
         await kanban.MoveToStageViaKeyboardAsync(candidateLast, SecondStage);
 
         Assert.True(await kanban.IsErrorVisibleAsync(),
@@ -206,18 +166,10 @@ public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixt
         Assert.False(await kanban.HasDraggingClassAsync(),
             "Expected the 'dragging' class to be absent before any drag has started");
 
-        // Playwright's Locator.DragToAsync dispatches the full dragstart→dragend sequence fast
-        // enough that the intermediate "dragging" class is not reliably observable through it (it
-        // completes the whole gesture before a subsequent assertion can run). To actually observe
-        // the class mid-drag, dispatch a bare "dragstart" DOM event manually (without ever
-        // dispatching "drop"), assert the class, then dispatch "dragend" to return to rest — see
-        // VacancyKanbanBoardPage.ObserveDraggingClassDuringManualDragAsync's remarks. This never
-        // drops the card onto a column, so no server-side move happens as a side effect.
         var wasDraggingMidGesture = await kanban.ObserveDraggingClassDuringManualDragAsync(candidateLast);
         Assert.True(wasDraggingMidGesture,
             "Expected the 'dragging' class to be present on the columns container while a drag is in progress");
 
-        // After dragend, the class must be removed again.
         Assert.False(await kanban.HasDraggingClassAsync(),
             "Expected the 'dragging' class to be removed once the drag ends");
 
@@ -226,11 +178,6 @@ public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixt
             "Expected the manual dragstart/dragend probe to have no effect on the card's actual stage");
     }
 
-    /// <summary>
-    /// Same shape as VacancyKanbanBoardTests.ExtractVacancyIdFromUrl — extracts the vacancy id from
-    /// the current URL (Vacancy Detail or the standalone Kanban route both carry it in the same URL
-    /// segment).
-    /// </summary>
     private static Guid ExtractVacancyIdFromUrl(string url)
     {
         var match = System.Text.RegularExpressions.Regex.Match(url, @"/vacancies/([0-9a-fA-F-]{36})");
@@ -239,12 +186,6 @@ public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixt
         return Guid.Parse(match.Groups[1].Value);
     }
 
-    /// <summary>
-    /// Same shape as VacancyKanbanBoardTests.ArrangeAppliedApplicationAsync — creates a fresh
-    /// candidate and vacancy, adds the candidate's application (leaving it on the seeded initial
-    /// stage), then navigates to the vacancy's standalone Kanban board. Returns the candidate's
-    /// (unique) last name and the ready-to-use board page object.
-    /// </summary>
     private async Task<(string CandidateLast, VacancyKanbanBoardPage Kanban)> ArrangeAppliedApplicationAsync()
     {
         var (vacancyTitle, candidateLast) = await ArrangeAppliedApplicationForDashboardAsync();
@@ -256,11 +197,6 @@ public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixt
         return (candidateLast, kanban);
     }
 
-    /// <summary>
-    /// Variant used by NarrowViewport_PipelineToolbar_RemainsUsable, which needs the vacancy title
-    /// (to select it in the dashboard's vacancy picker) rather than an already-opened Kanban tab.
-    /// Leaves the caller on the Vacancy Detail page after adding the application.
-    /// </summary>
     private async Task<(string VacancyTitle, string CandidateLast)> ArrangeAppliedApplicationForDashboardAsync()
     {
         var unique         = Guid.NewGuid().ToString("N")[..8];

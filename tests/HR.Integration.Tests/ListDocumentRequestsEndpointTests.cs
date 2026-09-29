@@ -38,7 +38,7 @@ public class ListDocumentRequestsEndpointTests
     {
         var companyId   = Guid.NewGuid();
         var employeeId  = Guid.NewGuid();
-        var callerId    = Guid.NewGuid(); // different employee
+        var callerId    = Guid.NewGuid();
 
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader,   callerId.ToString());
@@ -138,7 +138,6 @@ public class ListDocumentRequestsEndpointTests
         Assert.Empty(payload!.Items);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private async Task<(Guid CompanyId, Guid EmployeeId, Guid FirstRequestId, IReadOnlyList<Guid> AllRequestIds)>
         SetupAsync(int count = 1)

@@ -25,22 +25,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Architecture.Tests;
 
-/// <summary>
-/// Composes the exact same set of module/infrastructure registrations that
-/// <c>HR.Api/Program.cs</c> wires up, then asks the container to validate itself
-/// (<see cref="ServiceProviderOptions.ValidateOnBuild"/> + <see cref="ServiceProviderOptions.ValidateScopes"/>).
-///
-/// This is the only test in the solution that actually proves the composed DI graph can be
-/// built. Unit tests construct handlers manually with fakes and never assemble the real
-/// container, so a constructor-time cycle across two modules (e.g. Recruitment and Tasks each
-/// depending on the other through ITaskCompleter / IInterviewFeedbackService) can pass every
-/// unit test while still crashing the application at startup. If this test ever fails, do not
-/// work around it by disabling validation — it means the application cannot start.
-///
-/// No database connection is required: registration alone (AddDbContext, AddHangfire, etc.)
-/// does not open a connection, and this test never resolves a scope or calls any Migrate/Seed
-/// method.
-/// </summary>
 public class ServiceContainerCompositionTests
 {
     [Fact]
@@ -52,22 +36,12 @@ public class ServiceContainerCompositionTests
 
         var services = new ServiceCollection();
 
-        // WebApplicationBuilder normally supplies these; a plain ServiceCollection needs them
-        // registered explicitly so that unrelated "missing ILogger<T>/IConfiguration" noise
-        // does not mask (or get confused with) a genuine circular-dependency failure below.
         services.AddLogging();
         services.AddSingleton<IConfiguration>(configuration);
 
-        // HR.Api/Program.cs registers authorization via AddAuthorizationBuilder(); OBT-721's
-        // IWorkloadActionProvider implementations inject IAuthorizationService directly (each
-        // provider self-enforces its own row-level scoping), so the composed container needs this
-        // registered here too or container validation fails even though the real app starts fine.
         services.AddAuthorizationCore();
 
         services.AddCompaniesModule(connectionString, configuration);
-        // Development environment: this test validates DI graph composition only, not the
-        // staging/production fail-fast behaviour for missing ClamAv/Supabase config (see
-        // DocumentsModuleArchitectureTests / DocumentsModuleTests for that).
         var environment = new HostingEnvironment { EnvironmentName = Environments.Development };
         services.AddDataImportModule(connectionString, configuration, environment);
         services.AddDocumentsModule(connectionString, configuration, environment);

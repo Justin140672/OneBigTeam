@@ -127,7 +127,6 @@
     [Parameter, EditorRequired] public WidgetPanelSummary Summary { get; set; } = WidgetPanelState.Summarise([]);
     [Parameter, EditorRequired] public IReadOnlyList<AttentionQueueItem> Items { get; set; } = [];
 
-    /// <summary>Raised when the caller should re-fetch (retry-all button, or after the task dialog closes).</summary>
     [Parameter, EditorRequired] public EventCallback OnReload { get; set; }
 
     private Guid? _selectedTaskId;
@@ -144,8 +143,6 @@
             return Task.CompletedTask;
         }
 
-        // Guard: never navigate to a missing/blank target (stale item). We cannot detect a
-        // server-side 404 before navigating — this only covers absent deep links.
         if (!string.IsNullOrWhiteSpace(item.DeepLinkUrl))
             Navigation.NavigateTo(item.DeepLinkUrl);
 

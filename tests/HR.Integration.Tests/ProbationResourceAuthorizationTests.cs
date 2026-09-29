@@ -5,16 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// PROB-02: reporting-hierarchy / HR-administrator resource-level authorization for the two
-/// Probation endpoints guarded by <c>HR.Modules.Probation.Services.ProbationResourceAuthorizer</c>
-/// — GetUpcomingProbationReviews and GetProbationReview. The "probation:review" policy those
-/// endpoints carry only proves Manager/HrAdministrator role membership; it never proves the caller
-/// has a reporting relationship to the specific employee(s) whose probation review data is being
-/// requested, so these tests exercise that resource-ownership check end-to-end over real HTTP.
-/// Mirrors HR.Integration.Tests.SicknessResourceAuthorizationTests' pattern for SICK-02's
-/// equivalent authorizer.
-/// </summary>
 [Collection("Integration")]
 public class ProbationResourceAuthorizationTests
 {
@@ -25,9 +15,6 @@ public class ProbationResourceAuthorizationTests
         _factory = factory;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // GetUpcomingProbationReviews
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task GetUpcomingProbationReviews_Visible_To_Direct_Manager()
@@ -163,9 +150,6 @@ public class ProbationResourceAuthorizationTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // GetProbationReview (single-resource read; unauthorized -> 404, never 403)
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task GetProbationReview_Visible_To_Direct_Manager()
@@ -235,9 +219,6 @@ public class ProbationResourceAuthorizationTests
         using var peerClient = await ClientFor(companyId, peerManager);
         var response = await peerClient.GetAsync($"/api/companies/{companyId}/probation-reviews/{reviewId}");
 
-        // PROB-02: a manager unrelated to the review's employee must receive the same 404 as a
-        // genuinely nonexistent review id — never 403 — so review ids cannot be enumerated to
-        // fish for the existence of unrelated reviews.
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -302,8 +283,6 @@ public class ProbationResourceAuthorizationTests
         using var otherHrClient = await HrAdminClientAsync(otherCompanyId);
         var response = await otherHrClient.GetAsync($"/api/companies/{otherCompanyId}/probation-reviews/{reviewId}");
 
-        // Even an HR Administrator of a different company cannot fetch Company A's review by
-        // guessing/knowing its id — the review lookup itself is scoped by CompanyId.
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -317,9 +296,6 @@ public class ProbationResourceAuthorizationTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> HrAdminClientAsync(Guid companyId)
     {
@@ -332,13 +308,6 @@ public class ProbationResourceAuthorizationTests
         return client;
     }
 
-    /// <summary>
-    /// An employee's id doubles as the identity user id for the linked account (see
-    /// GetMyEmployeeHandler's `e.Id == userId` lookup), so this id is used both as the probation
-    /// resource's EmployeeId and as the TestAuthHandler.UserHeader value when acting "as" that
-    /// employee/manager. Employee role is always assigned; Manager/HrAdministrator must be
-    /// assigned explicitly by callers via AssignRoleAsync.
-    /// </summary>
     private async Task<Guid> CreateEmployeeAsync(
         HttpClient hrClient, Guid companyId, EmployeeReferenceDataSeeder.ReferenceData reference)
     {
@@ -378,17 +347,6 @@ public class ProbationResourceAuthorizationTests
         response.EnsureSuccessStatusCode();
     }
 
-    /// <summary>
-    /// Creates a probation record and a Pending review due within the next 30 days, so it
-    /// surfaces from both GetUpcomingProbationReviews and a direct GetProbationReview lookup.
-    ///
-    /// PROB-06's EmployeeCreatedHandler / ManagerChangedHandler auto-create a deferred probation
-    /// record as soon as the employee has both a manager and a resolvable probation end date — by
-    /// the time this runs (after CreateEmployeeAsync + AssignManagerAsync), that auto-created
-    /// record usually already exists, so an explicit create here would conflict. Reuse the
-    /// existing record via GetProbationRecordByEmployee in that case rather than assuming this is
-    /// always the first record for the employee.
-    /// </summary>
     private async Task<Guid> CreateUpcomingReviewAsync(HttpClient hrClient, Guid companyId, Guid employeeId)
     {
         var recordResponse = await hrClient.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new

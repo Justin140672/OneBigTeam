@@ -2,9 +2,6 @@ using HR.Modules.Offboarding.Domain;
 
 namespace HR.Modules.Offboarding.Tests;
 
-// OFF-07: pins OffboardingProgressCalculator as the single source of truth for progress reporting —
-// every reader (GetOffboardingOverview, OffboardingReportReader, the Blazor tab) must see identical
-// numbers, and CanComplete here must always agree with OffboardingPlan.CanComplete.
 public class OffboardingProgressCalculatorTests
 {
     private static readonly DateTimeOffset FixedNow = new(2026, 6, 25, 10, 0, 0, TimeSpan.Zero);
@@ -30,15 +27,12 @@ public class OffboardingProgressCalculatorTests
         Assert.Equal(0, summary.ResolvedTasks);
         Assert.Equal(0, summary.ProgressPercent);
         Assert.False(summary.CanComplete);
-        // SPEC-OFF-01: the new required/total obligation counters must also be all-zero for an
-        // empty task list, not just the legacy fields above.
         Assert.Equal(0, summary.RequiredTotal);
         Assert.Equal(0, summary.RequiredResolved);
         Assert.Equal(0, summary.TotalResolved);
         Assert.Equal(0, summary.TotalCount);
     }
 
-    // ---- SPEC-OFF-01: RequiredTotal / RequiredResolved / TotalResolved / TotalCount ----
 
     [Fact]
     public void Calculate_Counts_Waived_Mandatory_Task_As_Resolved_In_Required_And_Total_Counters()
@@ -68,7 +62,6 @@ public class OffboardingProgressCalculatorTests
         var summary = OffboardingProgressCalculator.Calculate(
             [completedMandatory, cancelledMandatory, cancelledOptional]);
 
-        // Only the one non-cancelled mandatory task counts towards either total.
         Assert.Equal(1, summary.RequiredTotal);
         Assert.Equal(1, summary.RequiredResolved);
         Assert.Equal(1, summary.TotalCount);
@@ -125,8 +118,8 @@ public class OffboardingProgressCalculatorTests
         Assert.Equal(1, summary.CompletedTasks);
         Assert.Equal(1, summary.SkippedTasks);
         Assert.Equal(2, summary.ResolvedTasks);
-        Assert.Equal(67, summary.ProgressPercent); // 2/3 = 66.67% rounds to 67
-        Assert.False(summary.CanComplete); // pendingMandatory is still outstanding
+        Assert.Equal(67, summary.ProgressPercent);
+        Assert.False(summary.CanComplete);
         Assert.Equal(OffboardingPlan.CanComplete(tasks), summary.CanComplete);
     }
 
@@ -141,10 +134,8 @@ public class OffboardingProgressCalculatorTests
         var tasks = new[] { completedMandatory, skippedMandatory };
         var summary = OffboardingProgressCalculator.Calculate(tasks);
 
-        // Both are "resolved" (terminal) for progress-bar purposes...
         Assert.Equal(2, summary.ResolvedTasks);
         Assert.Equal(100, summary.ProgressPercent);
-        // ...but a skipped mandatory task must never allow the plan to complete.
         Assert.False(summary.CanComplete);
         Assert.Equal(OffboardingPlan.CanComplete(tasks), summary.CanComplete);
     }

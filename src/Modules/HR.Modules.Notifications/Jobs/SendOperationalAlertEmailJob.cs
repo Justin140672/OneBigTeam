@@ -11,41 +11,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Notifications.Jobs;
 
-/// <summary>
-/// Follow-up C: Hangfire enqueue-style job that sends a single internal-operations notification email
-/// when a new missing-file organisation-data-export alert opens. Enqueued by
-/// <see cref="Persistence.AdministrativeAlertWriter"/> only on the first open of the alert, and
-/// re-enqueued by <see cref="ReconcileStalledOperationalAlertEmailDeliveriesJob"/> for a delivery
-/// that was saved but never queued, or whose owning worker crashed mid-send.
-///
-/// <para>Follow-up E — exclusive, recoverable delivery:
-/// <list type="bullet">
-///   <item><b>Atomic claim.</b> Before contacting Postmark the job calls
-///   <see cref="OperationalAlertEmailDelivery.Claim"/> (row -&gt; Sending, attempt++, ownership lease)
-///   and persists it under the <c>xmin</c> concurrency token. Two jobs racing after the first claim
-///   has committed: the loser gets <see cref="DbUpdateConcurrencyException"/> and returns without
-///   sending.</item>
-///   <item><b>Lease.</b> A second job cannot claim a row whose lease is still live. A crashed owner's
-///   lease expires and the row becomes re-claimable.</item>
-///   <item><b>Recovery of interrupted sends.</b> A transient failure calls
-///   <see cref="OperationalAlertEmailDelivery.ReleaseForRetry"/> (back to Pending) and rethrows so
-///   Hangfire retries; the reconciliation sweep is the backstop if the process dies first.</item>
-///   <item><b>Retry limit / terminal states.</b> Once <see cref="OperationalAlertEmailDelivery.MaxAttempts"/>
-///   is reached the row is marked permanently <c>Failed</c> and every subsequent execution is a
-///   no-op. <c>Sent</c> and <c>Skipped</c> are also terminal. There is no endless resend loop.</item>
-///   <item><b>Alert always survives.</b> The alert is committed before this job runs; no email
-///   outcome can hide or roll it back.</item>
-/// </list></para>
-///
-/// <para>Idempotency reality: Postmark's send endpoint accepts no client idempotency key, so a crash
-/// in the window between "Postmark accepted" and "row saved as Sent" can cause one duplicate send on
-/// recovery. This is at-least-once delivery to an internal operations mailbox — see
-/// <see cref="OperationalAlertEmailDelivery"/>.</para>
-///
-/// <para>Content safety: the email carries only non-sensitive metadata (company id, export id,
-/// affected-item count, severity, category, occurrence count, admin deep link). It never includes
-/// the alert Detail text, document filenames, document contents or storage credentials.</para>
-/// </summary>
 [AutomaticRetry(Attempts = OperationalAlertEmailDelivery.MaxAttempts, DelaysInSeconds = new[] { 30, 120, 600 })]
 internal sealed class SendOperationalAlertEmailJob(
     NotificationsDbContext db,
@@ -66,7 +31,6 @@ internal sealed class SendOperationalAlertEmailJob(
             return;
         }
 
-        // Terminal states are final: a previous attempt delivered, was skipped, or exhausted retries.
         if (delivery.IsTerminal)
         {
             logger.LogInformation(
@@ -111,10 +75,6 @@ internal sealed class SendOperationalAlertEmailJob(
             return;
         }
 
-        // No live owner remains. Only now may the attempt budget retire the row: this covers a final
-        // owner that crashed with an expired lease, and a duplicate/reconcile execution finding an
-        // already-exhausted row. (The current owner recording its own failed final attempt happens in
-        // the catch below, where it still legitimately holds the lease.)
         if (!delivery.HasAttemptsRemaining)
         {
             delivery.MarkFailed("Delivery abandoned after repeated failed attempts.");
@@ -124,7 +84,6 @@ internal sealed class SendOperationalAlertEmailJob(
             }
             catch (DbUpdateConcurrencyException)
             {
-                // A send job re-claimed the row between our load and this save — its ownership wins.
                 logger.LogInformation(
                     "SendOperationalAlertEmailJob: delivery for alert {AlertId} was re-claimed before it could be failed — deferring.",
                     alertId);
@@ -152,8 +111,6 @@ internal sealed class SendOperationalAlertEmailJob(
         }
         catch (DbUpdateConcurrencyException)
         {
-            // Another execution of this same delivery already committed its claim since we loaded the
-            // row — back off as a no-op so we never send twice.
             logger.LogInformation(
                 "SendOperationalAlertEmailJob: concurrent claim detected for alert {AlertId} — deferring.", alertId);
             return;
@@ -166,8 +123,6 @@ internal sealed class SendOperationalAlertEmailJob(
         }
         catch (Exception ex)
         {
-            // AttemptCount was incremented by Claim above, so this comparison already accounts for
-            // the attempt we just made.
             if (!delivery.HasAttemptsRemaining)
             {
                 delivery.MarkFailed(SanitizeFailureReason(ex));
@@ -195,8 +150,6 @@ internal sealed class SendOperationalAlertEmailJob(
         }
         catch (DbUpdateConcurrencyException)
         {
-            // The email was accepted by Postmark but another worker re-claimed the row while we were
-            // sending (our lease had expired). At-least-once: the email is out; nothing more to do.
             logger.LogWarning(
                 "SendOperationalAlertEmailJob: alert {AlertId} email was sent but the delivery row was re-claimed before the Sent status could be persisted.",
                 alertId);
@@ -216,7 +169,6 @@ internal sealed class SendOperationalAlertEmailJob(
         }
         catch (DbUpdateConcurrencyException)
         {
-            // Another worker owns the row now; its own outcome handling is authoritative.
         }
     }
 

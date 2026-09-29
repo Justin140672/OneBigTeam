@@ -4,38 +4,18 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the "Internal Vacancies" self-service feature:
-/// - A Recruiter can tick "Advertise this vacancy to employees" on an Open vacancy and save.
-/// - A plain employee then sees the "Internal Vacancies" quick action on My Profile, can open the
-///   list, and sees the advertised vacancy as a card whose detail dialog offers an Apply action
-///   (or the Applied state, if already applied) and no Save action. The Apply flow itself is
-///   covered in isolation by InternalVacancyApplyTests.
-/// - The list page itself is NOT recruiter-gated (unlike /vacancies) — a plain employee reaches it
-///   directly without an access-denied redirect.
-/// - An Open vacancy that is NOT advertised internally does not appear in the employee list.
-///
-/// Dependency: these tests rely on the seeded Acme "Senior Software Engineer" vacancy
-/// (RecruitmentModule.SeedRecruitmentAsync) being Open. It is NOT advertised internally in seed
-/// data, so every test that needs the populated list first flips that flag on via the Recruiter UI
-/// (idempotent — the checkbox just stays checked once saved).
-/// </summary>
 public sealed class InternalVacanciesTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId = Guid.Parse("30000000-0000-0000-0000-000000000004");
 
-    private const string MarcusEmail = "marcus.diallo@acme.example"; // Recruiter
-    private const string LauraEmail = "laura.bennett@acme.example";   // HR Administrator
-    private const string TomEmail = "tom.williams@acme.example";      // plain employee
+    private const string MarcusEmail = "marcus.diallo@acme.example";
+    private const string LauraEmail = "laura.bennett@acme.example";
+    private const string TomEmail = "tom.williams@acme.example";
 
     private const string SeededVacancyTitle = "Senior Software Engineer";
     private const string SeededVacancyDescriptionFragment = "Own delivery of core platform services";
 
-    /// <summary>
-    /// Ensures the seeded "Senior Software Engineer" vacancy is Open + advertised internally,
-    /// driving it entirely through the Recruiter UI. Idempotent — safe to call from every test.
-    /// </summary>
     private async Task EnsureSeededVacancyAdvertisedInternallyAsync(LoginPage login)
     {
         var vacancyList = new VacancyListPage(_page, _fixture.WebBaseUrl);
@@ -73,7 +53,6 @@ public sealed class InternalVacanciesTests(CrossUserFixture fixture) : RoleE2ETe
         Assert.False(await vacancyDetail.HasErrorAsync(),
             "Did not expect an error after saving a vacancy with 'advertise internally' ticked");
 
-        // Reopen and confirm the flag persisted.
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickVacancyAsync(SeededVacancyTitle);
         Assert.True(await vacancyDetail.IsAdvertiseInternallyCheckedAsync(),
@@ -131,9 +110,6 @@ public sealed class InternalVacanciesTests(CrossUserFixture fixture) : RoleE2ETe
         Assert.Contains(SeededVacancyTitle, await internalVacancies.GetDetailTitleAsync() ?? "");
         Assert.Contains(SeededVacancyDescriptionFragment, await internalVacancies.GetDetailDescriptionAsync() ?? "");
 
-        // The dialog now offers the employee an Apply action. Tom is a shared seeded persona that
-        // InternalVacancyApplyTests never applies as, but tolerate him having applied (shown as the
-        // Applied state + disabled Applied button instead of Apply). Either way there is no Save.
         var applyOrApplied = _page.Locator(
             "[data-testid='internal-vacancy-apply'], [data-testid='internal-vacancy-applied-state']").First;
         Assert.True(await applyOrApplied.WaitUntilVisibleAsync(15_000),
@@ -164,8 +140,6 @@ public sealed class InternalVacanciesTests(CrossUserFixture fixture) : RoleE2ETe
         var vacancyList = new VacancyListPage(_page, _fixture.WebBaseUrl);
         var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
 
-        // Ensure the list is populated (seeded vacancy advertised) so this is a real "present vs
-        // absent" contrast rather than just an empty list.
         await EnsureSeededVacancyAdvertisedInternallyAsync(login);
 
         var unique = Guid.NewGuid().ToString("N")[..8];
@@ -184,13 +158,11 @@ public sealed class InternalVacanciesTests(CrossUserFixture fixture) : RoleE2ETe
         await vacancyDetail.SelectHiringManagerAsync("James");
         await vacancyDetail.SaveNewVacancyAsync();
 
-        // Publish it so it's Open — but leave "advertise internally" unchecked.
         await vacancyList.ClickVacancyAsync(vacancyTitle);
         Assert.False(await vacancyDetail.IsAdvertiseInternallyCheckedAsync(),
             "Sanity: a freshly-created vacancy should not be advertised internally by default");
         await vacancyDetail.PublishVacancyAsync();
 
-        // Now view the internal list as a plain employee.
         var internalVacancies = new InternalVacanciesPage(_page, _fixture.WebBaseUrl);
         await login.GoToAsync();
         await login.LoginAsync(TomEmail);

@@ -100,8 +100,6 @@ public class EmployeeImportLookupReaderTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        // Production normalizes work emails to lowercase before saving (see CreateEmployeeHandler);
-        // seed data the same way here.
         SeedEmployee(db, companyId, "alice@example.com");
 
         var reader = new EmployeeImportLookupReader(db);

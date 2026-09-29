@@ -9,20 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Verifies the complete leave-via-task lifecycle as a single coherent flow:
-///
-///   Create employee + manager → assign manager relationship → assign leave policy
-///     → Seed balance
-///     → Submit leave request → task auto-created for manager (Source=Leave, ActionType=Approve)
-///     → Manager completes task with outcomeDecision=Approve
-///     → Leave request status transitions to Approved
-///     → Balance is deducted (UsedDays > 0)
-///
-/// This covers the cross-module handshake that is NOT exercised by LeaveLifecycleIntegrationTests
-/// (which uses the direct /approve endpoint) or LeaveSubmittedCreatesTaskTests (which only
-/// checks that the task was created, not that completing it approves the leave).
-/// </summary>
 [Collection("Integration")]
 public class LeaveApprovalViaTaskEndToEndTests
 {
@@ -51,54 +37,38 @@ public class LeaveApprovalViaTaskEndToEndTests
         using var adminClient   = await AuthenticatedClient(AdminUser, companyId);
         using var managerClient = await AuthenticatedClient(managerId, companyId);
 
-        // ── Step 1: Create leave type ─────────────────────────────────────────
         var leaveTypeId = Guid.NewGuid();
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
-            // AccrualMethod.None: this test exercises submit/approve balance math, not LEAVE-04's
-            // on-read accrual pacing (see LeaveAccrualCalculator), which would gate RemainingDays by
-            // real elapsed time since accrualStartDate.
             db.LeaveTypes.Add(LeaveType.Create(
                 leaveTypeId, companyId, "Annual Leave", "ANNUAL", 25,
                 AccrualMethod.None, LeaveTypeBehaviour.Standard, DateTimeOffset.UtcNow));
             await db.SaveChangesAsync();
         }
 
-        // ── Step 2: Create leave policy ───────────────────────────────────────
         var policyResp = await adminClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/leave-policies",
             new { companyId, name = $"Policy {Guid.NewGuid():N}", carryOverDays = 0, allowNegativeBalance = false });
         policyResp.EnsureSuccessStatusCode();
         var policy = await policyResp.Content.ReadFromJsonAsync<IdPayload>();
 
-        // ── Step 3: Create manager and employee ───────────────────────────────
-        // The manager's Employee record id is pinned to managerId (the auth user id used by
-        // managerClient below) — Employee ID and User ID are the same value by construction
-        // throughout this app (see CompleteTaskHandler.cs remarks), and SEC-003's assignee
-        // check compares the task's AssignedEmployeeId against the authenticated caller's id.
-        // Without this, the manager completing their own assigned task would 403.
         var refData      = await CreateReferenceDataAsync(adminClient, companyId);
         var managerEmpId = await CreateEmployeeAsync(adminClient, companyId, "Leave", "Manager", refData, managerId);
         var empId        = await CreateEmployeeAsync(adminClient, companyId, "Leave", "Employee", refData);
 
-        // ── Step 4: Assign manager relationship ───────────────────────────────
         var managerAssignResp = await adminClient.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{empId}/manager",
             new { companyId, id = empId, managerId = managerEmpId });
         managerAssignResp.EnsureSuccessStatusCode();
 
-        // ── Step 5: Assign leave policy to employee ───────────────────────────
         var policyAssignResp = await adminClient.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{empId}/leave-policy",
             new { companyId, employeeId = empId, leavePolicyId = policy!.Id, effectiveFrom = "2026-01-01" });
         policyAssignResp.EnsureSuccessStatusCode();
 
-        // ── Step 6: Ensure leave balance exists ───────────────────────────────
         await EnsureBalanceAsync(companyId, empId, leaveTypeId, policy.Id);
 
-        // ── Step 7: Submit leave request ──────────────────────────────────────
-        // Mon–Fri = 5 working days
         var submitResp = await adminClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{empId}/leave-requests",
             new
@@ -116,20 +86,17 @@ public class LeaveApprovalViaTaskEndToEndTests
         var leaveRequest = await submitResp.Content.ReadFromJsonAsync<LeaveRequestPayload>();
         Assert.Equal("Pending", leaveRequest!.Status);
 
-        // ── Step 8: Verify task was created for manager ───────────────────────
         var managerTasks = await GetEmployeeTasksAsync(adminClient, companyId, managerEmpId);
         var approvalTask = Assert.Single(
             managerTasks,
             t => t.Source == "Leave" && t.ActionType == "Approve" && t.SourceEntityId == leaveRequest.Id);
         Assert.Equal("Open", approvalTask.Status);
 
-        // ── Step 9: Manager completes the task with Approve decision ──────────
         var completeResp = await managerClient.PostAsync(
             $"/api/companies/{companyId}/tasks/{approvalTask.Id}/complete",
             Json(new { outcomeDecision = "Approve" }));
         completeResp.EnsureSuccessStatusCode();
 
-        // ── Step 10: Leave request should now be Approved ─────────────────────
         var listResp = await adminClient.GetAsync(
             $"/api/companies/{companyId}/employees/{empId}/leave-requests");
         listResp.EnsureSuccessStatusCode();
@@ -137,7 +104,6 @@ public class LeaveApprovalViaTaskEndToEndTests
         var request = Assert.Single(list!.Items);
         Assert.Equal("Approved", request.Status);
 
-        // ── Step 11: Balance should reflect the 5-day deduction ───────────────
         var balanceResp = await adminClient.GetAsync(
             $"/api/companies/{companyId}/employees/{empId}/leave-balances?policyYear={DateTimeOffset.UtcNow.Year}");
         balanceResp.EnsureSuccessStatusCode();
@@ -161,7 +127,6 @@ public class LeaveApprovalViaTaskEndToEndTests
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
-            // AccrualMethod.None: see note in the Approval test above.
             db.LeaveTypes.Add(LeaveType.Create(
                 leaveTypeId, companyId, "Annual Leave", "ANNUAL", 25,
                 AccrualMethod.None, LeaveTypeBehaviour.Standard, DateTimeOffset.UtcNow));
@@ -174,8 +139,6 @@ public class LeaveApprovalViaTaskEndToEndTests
         policyResp.EnsureSuccessStatusCode();
         var policy = await policyResp.Content.ReadFromJsonAsync<IdPayload>();
 
-        // See SEC-003 note in the approval test above — the manager Employee id must match
-        // managerId (the auth user id) for the manager to be recognized as the task assignee.
         var refData2     = await CreateReferenceDataAsync(adminClient, companyId);
         var managerEmpId = await CreateEmployeeAsync(adminClient, companyId, "Leave", "Manager", refData2, managerId);
         var empId        = await CreateEmployeeAsync(adminClient, companyId, "Leave", "Employee", refData2);
@@ -303,14 +266,12 @@ public class LeaveApprovalViaTaskEndToEndTests
             managerTasks,
             t => t.Source == "Leave" && t.ActionType == "Approve" && t.SourceEntityId == leaveRequest!.Id);
 
-        // No outcomeDecision supplied at all.
         var completeResp = await managerClient.PostAsync(
             $"/api/companies/{companyId}/tasks/{approvalTask.Id}/complete",
             Json(new { }));
 
         Assert.False(completeResp.IsSuccessStatusCode);
 
-        // The task must still be Open, and therefore still completable with a real decision later.
         var refetchedTasks = await GetEmployeeTasksAsync(adminClient, companyId, managerEmpId);
         var stillOpenTask = Assert.Single(refetchedTasks, t => t.Id == approvalTask.Id);
         Assert.Equal("Open", stillOpenTask.Status);
@@ -336,7 +297,6 @@ public class LeaveApprovalViaTaskEndToEndTests
         Assert.Equal("Approved", Assert.Single(listAfterRetry!.Items).Status);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)
     {

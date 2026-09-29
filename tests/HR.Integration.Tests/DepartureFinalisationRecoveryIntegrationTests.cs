@@ -16,41 +16,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Durable-recovery coverage for employee departure finalisation across module boundaries
-/// (HR.Modules.Employees -> HR.Modules.Leave via IIntegrationEventPublisher, and Employees'
-/// own manager-departure cascade -> ReconcilePendingManagerChangedEventsJob). Everything here runs
-/// against the real Postgres-backed <see cref="ApiWebApplicationFactory"/>: real
-/// EmployeesDbContext/LeaveDbContext, the real IEmployeeDepartureFinalizer, the real
-/// EmployeeDepartureFinalisedHandler, and the real LeavePolicyDeactivationJob /
-/// ReconcileLeavePolicyDeactivationsJob / ReconcilePendingManagerChangedEventsJob resolved from DI.
-///
-/// IBackgroundJobClient is replaced in this test host with a no-op fake (see
-/// ApiWebApplicationFactory.ConfigureWebHost), so Hangfire-enqueued jobs (LeavePolicyDeactivationJob
-/// from EmployeeDepartureFinalisedHandler, and the re-enqueue inside
-/// ReconcileLeavePolicyDeactivationsJob) never execute on their own within a test. Tests that depend
-/// on that work actually running therefore resolve the job type from a fresh DI scope and invoke it
-/// directly — this still exercises every real production code path (the durable row, the real
-/// handler, the real job body, real Postgres persistence); only Hangfire's own scheduling/retry
-/// plumbing is out of scope, which is Hangfire's contract to keep, not this codebase's.
-///
-/// Scenario coverage vs. the recovery-scenario list this file was commissioned against:
-///  1. Leave-policy deactivation durable pipeline — covered (LeavePolicyDeactivationPipeline_*).
-///  2. Manager-cascade PendingManagerChangedEvent + reconciliation of a never-published row —
-///     covered (ManagerCascade_*).
-///  3. Multiple direct reports, no duplicates across two reconciliation runs — covered
-///     (ManagerCascade_MultipleReports_*).
-///  4. Stranded departure recovery (Completed but FinalisationCompletedAt == null) — covered
-///     (StrandedDeparture_*).
-///  5. Per-employee isolation within ProcessLeavingEmployeesJob — covered
-///     (PerEmployeeIsolation_*), using a decorator around the real, DI-resolved
-///     IDirectReportsReader that throws for one specific manager id, mirroring the same
-///     wrap-the-real-DI-instance technique already used by
-///     PositionRoleSyncRecoveryIntegrationTests.ThrowingForOnePositionReader — a real failure
-///     surface (a downstream read failing) rather than a fabricated test-only hook.
-///  6. Idempotency of repeated reconciliation runs — covered inline within scenarios 1-3 above
-///     (each reconciliation-style job is invoked twice and asserted not to duplicate rows/timestamps).
-/// </summary>
 [Collection("Integration")]
 public class DepartureFinalisationRecoveryIntegrationTests
 {
@@ -61,7 +26,6 @@ public class DepartureFinalisationRecoveryIntegrationTests
         _factory = factory;
     }
 
-    // ---- shared seeding helpers -------------------------------------------------------------
 
     private async Task<Guid> SeedEmployeeAsync(
         EmployeesDbContext db, Guid companyId, EmployeeReferenceDataSeeder.ReferenceData referenceData,
@@ -106,10 +70,6 @@ public class DepartureFinalisationRecoveryIntegrationTests
             now: now,
             replacementManagerEmployeeId: replacementManagerId);
 
-    // ==========================================================================================
-    // Scenario 1: real EmployeeDepartureFinalisedIntegrationEvent -> real
-    // EmployeeDepartureFinalisedHandler -> durable Pending row -> real LeavePolicyDeactivationJob.
-    // ==========================================================================================
 
     [Fact]
     public async Task LeavePolicyDeactivationPipeline_FinalisationThroughRealJob_DeactivatesAssignment()
@@ -139,9 +99,6 @@ public class DepartureFinalisationRecoveryIntegrationTests
             await employeesDb.SaveChangesAsync();
         }
 
-        // Real finalisation: publishes EmployeeDepartureFinalisedIntegrationEvent through the real
-        // IIntegrationEventPublisher, which invokes the real, DI-resolved
-        // EmployeeDepartureFinalisedHandler in Leave synchronously (in-process).
         using (var scope = _factory.Services.CreateScope())
         {
             var employeesDb = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
@@ -160,13 +117,10 @@ public class DepartureFinalisationRecoveryIntegrationTests
             Assert.Equal(LeavePolicyDeactivationOnDeparture.StatusPending, request.Status);
             deactivationId = request.Id;
 
-            // Not yet deactivated — the real Hangfire enqueue never executes in this test host.
             var assignment = await leaveDb.EmployeeLeavePolicyAssignments.SingleAsync(a => a.Id == assignmentId);
             Assert.True(assignment.IsActive);
         }
 
-        // Directly invoke the real job body from a fresh scope, as the (faked) Hangfire dispatch
-        // would have done.
         using (var scope = _factory.Services.CreateScope())
         {
             var job = scope.ServiceProvider.GetRequiredService<LeavePolicyDeactivationJob>();
@@ -189,13 +143,6 @@ public class DepartureFinalisationRecoveryIntegrationTests
     [Fact]
     public async Task LeavePolicyDeactivationPipeline_ReconciliationSweep_ReEnqueuesStuckPendingRow_AndConverges()
     {
-        // Simulates "the initial Hangfire enqueue in EmployeeDepartureFinalisedHandler itself never
-        // happened" — the durable Pending row exists (real handler ran), but nothing ever processed
-        // it. ReconcileLeavePolicyDeactivationsJob re-enqueues via IBackgroundJobClient, which is
-        // faked as a no-op in this test host, so — as documented at the top of this file — the test
-        // proves the reconciliation job correctly identifies and re-enqueues the stuck row (no
-        // exception, row untouched/still Pending, one enqueue call observed) rather than depending on
-        // Hangfire itself to execute it.
         var companyId = Guid.NewGuid();
         Guid employeeId, assignmentId;
 
@@ -235,8 +182,6 @@ public class DepartureFinalisationRecoveryIntegrationTests
             deactivationId = request.Id;
         }
 
-        // Now actually run the job the reconciliation sweep would have triggered, proving the
-        // pipeline converges once the (faked-away) enqueue is substituted with a direct invocation.
         using (var scope = _factory.Services.CreateScope())
         {
             var job = scope.ServiceProvider.GetRequiredService<LeavePolicyDeactivationJob>();
@@ -251,9 +196,6 @@ public class DepartureFinalisationRecoveryIntegrationTests
         }
     }
 
-    // ==========================================================================================
-    // Scenarios 2, 3 & 6 (manager-cascade half): PendingManagerChangedEvent + reconciliation.
-    // ==========================================================================================
 
     [Fact]
     public async Task ManagerCascade_MultipleReports_AllGetPendingEvents_PublishedInline_AndReconciliationIsIdempotent()
@@ -302,8 +244,7 @@ public class DepartureFinalisationRecoveryIntegrationTests
             {
                 var pendingEvent = Assert.Single(pendingEvents, e => e.ReportEmployeeId == reportId);
                 Assert.Equal(managerId, pendingEvent.PreviousManagerId);
-                Assert.Null(pendingEvent.NewManagerId); // no replacement manager was nominated
-                // Published inline as part of the same finalisation call under normal operation.
+                Assert.Null(pendingEvent.NewManagerId);
                 Assert.NotNull(pendingEvent.PublishedAt);
             }
 
@@ -314,8 +255,6 @@ public class DepartureFinalisationRecoveryIntegrationTests
             }
         }
 
-        // Running the reconciliation sweep now (nothing left Pending) must be a pure no-op: no new
-        // rows, no exceptions.
         using (var scope = _factory.Services.CreateScope())
         {
             var reconcileJob = scope.ServiceProvider.GetRequiredService<ReconcilePendingManagerChangedEventsJob>();
@@ -329,7 +268,7 @@ public class DepartureFinalisationRecoveryIntegrationTests
             var pendingEvents = await employeesDb.PendingManagerChangedEvents
                 .Where(e => e.CompanyId == companyId && e.LeavingProcessId == processId)
                 .ToListAsync();
-            Assert.Equal(3, pendingEvents.Count); // no duplicates
+            Assert.Equal(3, pendingEvents.Count);
             Assert.All(pendingEvents, e => Assert.NotNull(e.PublishedAt));
         }
     }
@@ -337,12 +276,6 @@ public class DepartureFinalisationRecoveryIntegrationTests
     [Fact]
     public async Task ManagerCascade_InterruptedPublish_ReconciliationPublishesTheMissedEvent_AndConsumerSideEffectIsObservable()
     {
-        // Simulates "the process crashed after report.ManagerId was reassigned and the
-        // PendingManagerChangedEvent row was saved, but before the publish loop reached it" — modeled
-        // directly here (rather than via a fault-injection seam) by inserting a
-        // PendingManagerChangedEvent row with PublishedAt == null for an already-reassigned report,
-        // exactly matching the durable row EmployeeDepartureFinalizer's CascadeManagerDepartureAsync
-        // itself would have left behind mid-cascade.
         var companyId = Guid.NewGuid();
         Guid managerId, reportId, replacementManagerId, processId, strandedEventId;
 
@@ -357,9 +290,6 @@ public class DepartureFinalisationRecoveryIntegrationTests
 
             var now = DateTimeOffset.UtcNow;
 
-            // Model the "already reassigned, but event never published" mid-crash state directly:
-            // the report's ManagerId already points at the replacement (as the real cascade would
-            // have saved it), and a PendingManagerChangedEvent row exists with PublishedAt == null.
             var report = await employeesDb.Employees.SingleAsync(e => e.Id == reportId);
             report.Assign(report.DepartmentId, report.PositionProfileId, report.LocationId, replacementManagerId, now);
 
@@ -399,18 +329,12 @@ public class DepartureFinalisationRecoveryIntegrationTests
             var after = await employeesDb.PendingManagerChangedEvents.SingleAsync(e => e.Id == strandedEventId);
             Assert.NotNull(after.PublishedAt);
 
-            // Real consumer side effect: Employees' own ManagerChangedHandler
-            // (Features/CreateTimelineEntryOnManagerChanged) reacts to
-            // EmployeeManagerChangedIntegrationEvent by writing an EmployeeTimelineEntry — assert
-            // that happened as a result of the reconciliation-driven publish, not a fabricated check.
             var timelineAfter = await employeesDb.EmployeeTimelineEntries
                 .Where(t => t.EmployeeId == reportId && t.EventType == EmployeeTimelineEventType.ManagerChanged)
                 .ToListAsync();
             Assert.Single(timelineAfter);
         }
 
-        // A second reconciliation run must be a pure no-op: no duplicate PendingManagerChangedEvent
-        // rows, and MarkPublished's own guard keeps PublishedAt stable.
         DateTimeOffset? publishedAtAfterFirstRun;
         using (var scope = _factory.Services.CreateScope())
         {
@@ -428,19 +352,16 @@ public class DepartureFinalisationRecoveryIntegrationTests
         {
             var employeesDb = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
             var rows = await employeesDb.PendingManagerChangedEvents.Where(e => e.Id == strandedEventId).ToListAsync();
-            Assert.Single(rows); // no duplicate row created
-            Assert.Equal(publishedAtAfterFirstRun, rows[0].PublishedAt); // unchanged by the no-op second run
+            Assert.Single(rows);
+            Assert.Equal(publishedAtAfterFirstRun, rows[0].PublishedAt);
 
             var timelineAfterSecondRun = await employeesDb.EmployeeTimelineEntries
                 .Where(t => t.EmployeeId == reportId && t.EventType == EmployeeTimelineEventType.ManagerChanged)
                 .ToListAsync();
-            Assert.Single(timelineAfterSecondRun); // consumer side effect not duplicated either
+            Assert.Single(timelineAfterSecondRun);
         }
     }
 
-    // ==========================================================================================
-    // Scenario 4: stranded departure recovery (Completed but FinalisationCompletedAt == null).
-    // ==========================================================================================
 
     [Fact]
     public async Task StrandedDeparture_CompletedWithoutFinalisationCompletedAt_IsRecoveredByProcessLeavingEmployeesJob()
@@ -456,10 +377,6 @@ public class DepartureFinalisationRecoveryIntegrationTests
 
             var now = DateTimeOffset.UtcNow;
 
-            // Simulate "a prior FinalizeAsync attempt got as far as PersistTerminalStateAsync's save
-            // but crashed before CompleteDownstreamFinalisationAsync finished" — call the same real
-            // terminal-state transitions directly (Complete()/SetFormerEmployee are exactly what
-            // PersistTerminalStateAsync does) and stop there, leaving FinalisationCompletedAt null.
             var employee = await employeesDb.Employees.SingleAsync(e => e.Id == employeeId);
             var process = CreateInProgressProcess(companyId, employeeId, new DateOnly(2026, 1, 1), now);
             processId = process.Id;
@@ -491,8 +408,6 @@ public class DepartureFinalisationRecoveryIntegrationTests
             Assert.NotNull(after.FinalisationCompletedAt);
         }
 
-        // Idempotency guard: running the job again must be a safe no-op (FinalizeAsync's own
-        // FinalisationCompletedAt-not-null short-circuit) — no exception, no change.
         DateTimeOffset? finalisationCompletedAtAfterFirstRun;
         using (var scope = _factory.Services.CreateScope())
         {
@@ -515,9 +430,6 @@ public class DepartureFinalisationRecoveryIntegrationTests
         }
     }
 
-    // ==========================================================================================
-    // Scenario 5: per-employee isolation inside ProcessLeavingEmployeesJob's due-leaver loop.
-    // ==========================================================================================
 
     [Fact]
     public async Task PerEmployeeIsolation_OneEmployeesFinalisationFailure_DoesNotBlockTheOtherEmployeeInTheSameBatch()
@@ -530,12 +442,6 @@ public class DepartureFinalisationRecoveryIntegrationTests
             var employeesDb = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
             var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(employeesDb, companyId);
 
-            // The "failing" employee has a direct report, so CascadeManagerDepartureAsync's call to
-            // IDirectReportsReader.GetDirectReportIdsAsync — the first read in
-            // PersistTerminalStateAsync, before any state mutation — is where we inject a real
-            // downstream-read failure for exactly this employee (see ThrowingForOneManagerDirectReportsReader
-            // below, which wraps the real, DI-resolved IDirectReportsReader exactly as
-            // PositionRoleSyncRecoveryIntegrationTests.ThrowingForOnePositionReader does).
             failingManagerId = await SeedEmployeeAsync(employeesDb, companyId, referenceData, "Failing", "Manager");
             await SeedEmployeeAsync(employeesDb, companyId, referenceData, "Failing", "Report", failingManagerId);
 
@@ -548,7 +454,7 @@ public class DepartureFinalisationRecoveryIntegrationTests
             failingEmployeeId = failingManagerId;
 
             var now = DateTimeOffset.UtcNow;
-            var pastDueDate = new DateOnly(2020, 1, 1); // always due, regardless of company time zone "today"
+            var pastDueDate = new DateOnly(2020, 1, 1);
 
             var healthyProcess = CreateInProgressProcess(companyId, healthyEmployeeId, pastDueDate, now);
             healthyProcessId = healthyProcess.Id;
@@ -606,11 +512,6 @@ public class DepartureFinalisationRecoveryIntegrationTests
         }
     }
 
-    /// <summary>Wraps the real, DI-resolved <see cref="IDirectReportsReader"/> but throws when asked
-    /// for one specific manager's direct reports — simulating a real downstream-read failure for
-    /// exactly one employee's departure finalisation while every other employee's finalisation
-    /// (including a healthy one processed in the same batch) still goes through the real
-    /// implementation. Mirrors PositionRoleSyncRecoveryIntegrationTests.ThrowingForOnePositionReader.</summary>
     private sealed class ThrowingForOneManagerDirectReportsReader(
         IDirectReportsReader inner, Guid throwForManagerId) : IDirectReportsReader
     {

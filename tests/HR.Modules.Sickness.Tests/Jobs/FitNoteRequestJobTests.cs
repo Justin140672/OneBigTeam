@@ -9,13 +9,6 @@ using HR.Modules.Sickness;
 
 namespace HR.Modules.Sickness.Tests.Jobs;
 
-/// <summary>
-/// SICK-01: FitNoteRequestJob re-evaluates open records' calendar-day duration against "today" and
-/// catches any closed record left without a request. These tests use a fixed "today" of
-/// 2026-06-15 and express eligibility via StartDate relative to that date rather than any TotalDays
-/// field on the record (the working-day total is irrelevant to the fit-note threshold — see
-/// FitNoteEvaluator).
-/// </summary>
 public class FitNoteRequestJobTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 15, 2, 0, 0, DateTimeKind.Utc);
@@ -49,10 +42,6 @@ public class FitNoteRequestJobTests
         return category.Id;
     }
 
-    /// <summary>
-    /// An open record that started <paramref name="daysAgo"/> calendar days before Today (inclusive
-    /// — StartDate itself counts as day 1, so daysAgo=6 means 7 calendar days have elapsed today).
-    /// </summary>
     private static SicknessRecord CreateOpenRecord(
         Guid companyId,
         Guid categoryId,
@@ -103,7 +92,6 @@ public class FitNoteRequestJobTests
         var companyId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
 
-        // Started 6 days before Today → 7 calendar days elapsed today (inclusive) = threshold met
         var record = CreateOpenRecord(companyId, categoryId, daysAgo: 6);
         db.SicknessRecords.Add(record);
         await db.SaveChangesAsync();
@@ -125,7 +113,6 @@ public class FitNoteRequestJobTests
         var companyId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
 
-        // Started 5 days before Today → only 6 calendar days elapsed, threshold 7 not yet reached
         var record = CreateOpenRecord(companyId, categoryId, daysAgo: 5);
         db.SicknessRecords.Add(record);
         await db.SaveChangesAsync();
@@ -175,7 +162,7 @@ public class FitNoteRequestJobTests
         await job.ExecuteAsync();
 
         var requests = await db.SicknessEvidenceRequests.ToListAsync();
-        Assert.Single(requests); // only the pre-existing one
+        Assert.Single(requests);
         Assert.Equal(existingRequest.Id, requests[0].Id);
     }
 
@@ -305,7 +292,6 @@ public class FitNoteRequestJobTests
     [Fact]
     public async Task ExecuteAsync_IsIdempotent_OnRepeatedExecution()
     {
-        // Simulates a Hangfire retry / re-run of the same daily job.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
@@ -328,7 +314,6 @@ public class FitNoteRequestJobTests
     [Fact]
     public async Task ExecuteAsync_ClosedRecord_ShortAbsence_DoesNotCreateRequest()
     {
-        // A short closed absence (below threshold at close) must never get a request.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
@@ -348,14 +333,12 @@ public class FitNoteRequestJobTests
     [Fact]
     public async Task ExecuteAsync_EligibleClosedRecord_WithoutExistingRequest_CreatesRequest()
     {
-        // Simulates a record closed before the job last ran (or a legacy/imported closed record)
-        // that never got its evidence request.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
 
         var start = Today.AddDays(-20);
-        var end = Today.AddDays(-14); // 7 calendar days elapsed at close — threshold met
+        var end = Today.AddDays(-14);
         var record = CreateClosedRecord(companyId, categoryId, start, end, evidenceStatus: SicknessEvidenceStatus.Pending);
         db.SicknessRecords.Add(record);
         await db.SaveChangesAsync();

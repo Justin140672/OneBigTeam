@@ -10,11 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// SET-05 end-to-end: proves that flipping the VacancyApprovalRequired/OfferApprovalRequired company
-/// settings actually changes PublishVacancy/OfferCandidate behaviour through the real HTTP pipeline —
-/// not just at the unit-test level (see PublishVacancyHandlerTests/OfferCandidateHandlerTests).
-/// </summary>
 [Collection("Integration")]
 public class RecruitmentApprovalSettingsEndToEndTests
 {
@@ -94,12 +89,10 @@ public class RecruitmentApprovalSettingsEndToEndTests
             $"/api/companies/{companyId}/vacancies/{vacancyId}/publish", new { });
         Assert.Equal(HttpStatusCode.BadRequest, firstPublishResponse.StatusCode);
 
-        // Approve the vacancy.
         var approveResponse = await recruiterClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}/approve", new { });
         Assert.Equal(HttpStatusCode.OK, approveResponse.StatusCode);
 
-        // Publish now succeeds.
         var secondPublishResponse = await recruiterClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}/publish", new { });
         Assert.Equal(HttpStatusCode.OK, secondPublishResponse.StatusCode);
@@ -128,12 +121,10 @@ public class RecruitmentApprovalSettingsEndToEndTests
             $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/offer", new { });
         Assert.Equal(HttpStatusCode.BadRequest, firstOfferResponse.StatusCode);
 
-        // Approve the offer.
         var approveOfferResponse = await recruiterClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/approve-offer", new { });
         Assert.Equal(HttpStatusCode.OK, approveOfferResponse.StatusCode);
 
-        // Offer now succeeds.
         var secondOfferResponse = await recruiterClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/offer", new { });
         Assert.Equal(HttpStatusCode.OK, secondOfferResponse.StatusCode);

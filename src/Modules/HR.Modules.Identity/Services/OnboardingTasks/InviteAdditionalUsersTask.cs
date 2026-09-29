@@ -5,13 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Services.OnboardingTasks;
 
-/// <summary>
-/// Identity's ApplicationUser rows are keyed by the same id as the owning Employee (see
-/// ListUsersHandler's employeeIds-first approach), and ApplicationUser itself carries no
-/// CompanyId — company scoping is resolved via the cross-module IEmployeeAudienceReader
-/// contract (implemented in HR.Modules.Employees), the same pattern ListUsersHandler already
-/// uses via IEmployeeAudienceReader.GetAllEmployeeIdsAsync.
-/// </summary>
 internal sealed class InviteAdditionalUsersTask(
     IdentityDbContext dbContext,
     IEmployeeAudienceReader employeeAudienceReader) : IOnboardingTaskDefinition
@@ -22,11 +15,6 @@ internal sealed class InviteAdditionalUsersTask(
     public bool IsMandatory => true;
     public int Order => 6;
 
-    // Opens the employee list in bulk invitation mode (see EmployeeList.razor's "mode=invite"
-    // query parameter) rather than User Administration — the employee list is company-scoped
-    // ("/companies/{CompanyId:guid}/employees"), and the "{companyId}" placeholder is substituted
-    // by HR.Web with the current company id. OnboardingTaskCard.ResolvedLinkUrl appends its own
-    // "returnUrl" query parameter after this, joined with "&" rather than a second "?".
     public Task<string> GetLinkUrlAsync(Guid companyId, CancellationToken cancellationToken) =>
         Task.FromResult("/companies/{companyId}/employees?mode=invite");
 

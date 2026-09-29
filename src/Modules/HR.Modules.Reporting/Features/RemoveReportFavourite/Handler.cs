@@ -11,7 +11,6 @@ internal sealed class RemoveReportFavouriteHandler(ReportingDbContext dbContext)
         Guid userId,
         CancellationToken cancellationToken)
     {
-        // Idempotent — removing a favourite that doesn't exist is still a success.
         var existing = await dbContext.ReportFavourites
             .Where(f => f.CompanyId == request.CompanyId && f.UserId == userId && f.ReportId == request.ReportId)
             .ToListAsync(cancellationToken);

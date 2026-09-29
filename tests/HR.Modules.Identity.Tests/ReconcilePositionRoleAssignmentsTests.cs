@@ -9,13 +9,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Identity.Tests;
 
-/// <summary>
-/// IAM-03: covers IdentityModule.ReconcilePositionRoleAssignmentsAsync — the additive-only backfill
-/// run on every startup so employees created before position/role bridging existed still end up with
-/// a matching identity.user_positions row. Built via a minimal ServiceProvider (rather than calling
-/// the handler directly) since the method is a `this IServiceProvider` extension that resolves its
-/// own scope/services internally.
-/// </summary>
 [Collection("IdentityDatabase")]
 public class ReconcilePositionRoleAssignmentsTests(IdentityDatabaseFixture fixture)
 {
@@ -130,7 +123,7 @@ public class ReconcilePositionRoleAssignmentsTests(IdentityDatabaseFixture fixtu
 
         await using var db2 = fixture.BuildContext();
         var assignments = await db2.UserPositions.Where(up => up.UserId == employeeId).ToListAsync();
-        Assert.Single(assignments); // untouched, not duplicated
+        Assert.Single(assignments);
     }
 
     [Fact]
@@ -172,11 +165,9 @@ public class ReconcilePositionRoleAssignmentsTests(IdentityDatabaseFixture fixtu
         await using var db2 = fixture.BuildContext();
         Assert.Single(await db2.UserPositions.Where(up => up.UserId == employeeA).ToListAsync());
         var employeeBAssignment = await db2.UserPositions.SingleAsync(up => up.UserId == employeeB);
-        Assert.Equal(sharedPositionId, employeeBAssignment.PositionId); // created fresh for company B, not skipped
+        Assert.Equal(sharedPositionId, employeeBAssignment.PositionId);
     }
 
-    /// <summary>Multi-company variant of <see cref="FakeAudienceReaderForReconcile"/>, needed for the
-    /// isolation test where two different companies must resolve different employee/profile sets.</summary>
     private sealed class CompanyScopedAudienceReader(
         IReadOnlyDictionary<Guid, (Guid EmployeeId, Guid? PositionId)[]> byCompany) : IEmployeeAudienceReader
     {

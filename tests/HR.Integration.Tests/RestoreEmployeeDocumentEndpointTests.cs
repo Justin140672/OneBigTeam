@@ -129,7 +129,7 @@ public class RestoreEmployeeDocumentEndpointTests
     private static MultipartFormDataContent BuildPdfUpload(string title = "Restore Test Doc")
     {
         var pdfBytes = new byte[1024];
-        pdfBytes[0] = 0x25; pdfBytes[1] = 0x50; pdfBytes[2] = 0x44; pdfBytes[3] = 0x46; // %PDF
+        pdfBytes[0] = 0x25; pdfBytes[1] = 0x50; pdfBytes[2] = 0x44; pdfBytes[3] = 0x46;
 
         var content = new MultipartFormDataContent();
         content.Add(new StringContent(title), "Title");
@@ -142,8 +142,6 @@ public class RestoreEmployeeDocumentEndpointTests
         return content;
     }
 
-    // FastEndpoints rejects with 415 Unsupported Media Type once past authorization — an empty
-    // JSON body is the minimal content that satisfies model binding for this no-payload action.
     private static StringContent EmptyJson() =>
         new("{}", Encoding.UTF8, "application/json");
 

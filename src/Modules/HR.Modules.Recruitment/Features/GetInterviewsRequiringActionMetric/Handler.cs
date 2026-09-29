@@ -7,21 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.GetInterviewsRequiringActionMetric;
 
-/// <summary>
-/// DSH-04 — "Interviews requiring action".
-///
-/// <para><b>Business definition.</b> The count of interviews that have already started or finished
-/// (scheduled at or before the end of the current UTC day) but still have no recorded outcome
-/// (<c>outcome = Pending</c>). These are the interviews genuinely blocking the pipeline: someone
-/// needs to record how they went. Cancelled and completed (Passed / Failed / NoShow) interviews are
-/// excluded, and interviews scheduled for later than today are excluded because no action is due yet.</para>
-///
-/// <para>This replaces the previous dashboard proxy, which was simply "count of interviews scheduled
-/// today" — that number both missed overdue interviews from previous days and wrongly included
-/// today's not-yet-happened interviews.</para>
-///
-/// Company scope enforced by the <c>{companyId}</c> route + <c>company_id</c> filter on every query.
-/// </summary>
 internal sealed class GetInterviewsRequiringActionMetricHandler(
     RecruitmentDbContext db, IClock clock, IPositionProfileReader positionProfileReader)
 {

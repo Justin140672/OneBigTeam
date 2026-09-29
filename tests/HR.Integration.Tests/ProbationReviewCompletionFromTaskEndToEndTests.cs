@@ -9,10 +9,6 @@ using HR.SharedKernel;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Verifies that completing a task whose Source is ProbationReview triggers
-/// CompleteProbationReviewFromTaskAction and updates both the review and the record.
-/// </summary>
 [Collection("Integration")]
 public class ProbationReviewCompletionFromTaskEndToEndTests
 {
@@ -184,8 +180,6 @@ public class ProbationReviewCompletionFromTaskEndToEndTests
             sourceEntityId: reviewId,
             assignedEmployeeId: Guid.NewGuid());
 
-        // The seeded record's expectedEndDate is 2026-04-01 — an extend date equal to it does not
-        // move the date strictly forward, tripping the same guard as CompleteProbationReviewFromTaskAction.
         var completeResponse = await client.PostAsync(
             $"/api/companies/{companyId}/tasks/{taskId}/complete",
             Json(new { outcomeDecision = "Extend|2026-04-01", outcomeReason = "No actual extension." }));
@@ -204,7 +198,6 @@ public class ProbationReviewCompletionFromTaskEndToEndTests
         Assert.Equal("Active", reloadedRecord.Status);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)
     {

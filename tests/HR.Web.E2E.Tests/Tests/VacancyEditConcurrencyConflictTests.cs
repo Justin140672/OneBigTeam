@@ -87,11 +87,9 @@ public sealed class VacancyEditConcurrencyConflictTests(RecruiterPersonaFixture 
         var otherTabTitle = $"E2E Vac Other {Guid.NewGuid().ToString("N")[..8]}";
         var finalTitle    = $"E2E Vac Final {Guid.NewGuid().ToString("N")[..8]}";
 
-        // ── Tab 1: open the editor and start editing the Advert Title (loads version v1) ──
         await vacancyDetail.GoToAsync(AcmeId, id);
         await vacancyDetail.SetAdvertTitleAsync(firstTabTitle);
 
-        // ── Tab 2 (same context / persona): load the same vacancy and save first ──
         var otherPage = await _context.NewPageAsync();
         try
         {
@@ -105,7 +103,6 @@ public sealed class VacancyEditConcurrencyConflictTests(RecruiterPersonaFixture 
             await otherPage.CloseAsync();
         }
 
-        // ── Tab 1: saving now is stale → conflict banner, page stays, input preserved ──
         await vacancyDetail.SaveExpectingConflictAsync();
 
         Assert.True(await vacancyDetail.IsConcurrencyWarningVisibleAsync(),
@@ -113,14 +110,12 @@ public sealed class VacancyEditConcurrencyConflictTests(RecruiterPersonaFixture 
         Assert.Contains($"/vacancies/{id}", _page.Url);
         Assert.Equal(firstTabTitle, await vacancyDetail.GetTitleAsync());
 
-        // ── Tab 1: "Reload latest values" clears the banner and adopts the other tab's value ──
         await vacancyDetail.ClickReloadLatestValuesAsync();
 
         Assert.False(await vacancyDetail.IsConcurrencyWarningVisibleAsync(),
             "Expected the conflict banner to clear after reloading latest values");
         Assert.Equal(otherTabTitle, await vacancyDetail.WaitForAdvertTitleAsync(otherTabTitle));
 
-        // ── Tab 1: re-edit against the fresh version and save successfully ──
         await vacancyDetail.SetAdvertTitleAsync(finalTitle);
         await vacancyDetail.SaveExistingVacancyAsync();
 
@@ -128,7 +123,6 @@ public sealed class VacancyEditConcurrencyConflictTests(RecruiterPersonaFixture 
         Assert.Equal(finalTitle, await vacancyDetail.WaitForAdvertTitleAsync(finalTitle));
     }
 
-    /// <summary>Creates a fresh Position Profile + Draft vacancy and returns the vacancy's advert title and id.</summary>
     private async Task<(string Title, Guid Id)> CreateVacancyAsync(
         LoginPage login, VacancyListPage vacancyList, VacancyDetailPage vacancyDetail)
     {

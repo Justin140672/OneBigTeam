@@ -1,18 +1,9 @@
-// DSH-07 introduced this axe-core scan for the three operational dashboards. NFR-05 generalised the
-// inline axe block into the reusable AccessibilityScan helper (Infrastructure/AccessibilityScan.cs)
-// and applies the same gate across many more journeys — this class keeps its original 3 dashboard
-// theory cases and now just delegates to that shared helper.
 
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Runs an axe-core accessibility scan against /dashboard/hr, /dashboard/manager and
-/// /dashboard/recruitment and fails on any serious/critical WCAG violation. Compile-only in this
-/// repo's CI, like the rest of HR.Web.E2E.Tests.
-/// </summary>
 public sealed class AxeCoreDashboardScanTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     [Theory]

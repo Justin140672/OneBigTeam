@@ -5,11 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Integration coverage for the position-profile required-asset slices:
-/// AddRequiredAssetToPositionProfile, RemoveRequiredAssetFromPositionProfile and
-/// ListRequiredAssetsForPositionProfile. Real HTTP + EF/Postgres + real auth.
-/// </summary>
 [Collection("Integration")]
 public class RequiredAssetsForPositionProfileEndpointTests
 {
@@ -50,7 +45,6 @@ public class RequiredAssetsForPositionProfileEndpointTests
         return (await response.Content.ReadFromJsonAsync<IdPayload>())!.Id;
     }
 
-    // ── Auth ──────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Post_RequiredAsset_Returns_Unauthorized_For_Anonymous()
@@ -87,7 +81,6 @@ public class RequiredAssetsForPositionProfileEndpointTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ── Add ───────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Post_RequiredAsset_Creates_And_Persists_Entry()
@@ -116,7 +109,6 @@ public class RequiredAssetsForPositionProfileEndpointTests
         Assert.True(created.IsMandatory);
         Assert.Equal(2, created.Quantity);
 
-        // Persisted — visible through the list endpoint
         var list = await client.GetFromJsonAsync<RequiredAssetListPayload>(
             $"/api/companies/{companyId}/position-profiles/{refData.PositionProfileId}/required-assets");
         var item = Assert.Single(list!.Items);
@@ -155,8 +147,6 @@ public class RequiredAssetsForPositionProfileEndpointTests
     [Fact]
     public async Task Post_RequiredAsset_Returns_NotFound_When_AssetCategory_Belongs_To_Another_Company()
     {
-        // Category is created under a different company — the reader is company-scoped, so it must
-        // not be visible to this position profile.
         var otherCompanyId = Guid.NewGuid();
         using var otherClient = await AdminClient(otherCompanyId);
         var foreignCategoryId = await CreateAssetCategoryAsync(otherClient, otherCompanyId);
@@ -207,7 +197,6 @@ public class RequiredAssetsForPositionProfileEndpointTests
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
-    // ── Remove ────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Delete_RequiredAsset_Removes_Entry_And_Allows_ReAdd()
@@ -272,7 +261,6 @@ public class RequiredAssetsForPositionProfileEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, secondDelete.StatusCode);
     }
 
-    // ── List ──────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_RequiredAssets_Returns_NotFound_For_Unknown_PositionProfile()

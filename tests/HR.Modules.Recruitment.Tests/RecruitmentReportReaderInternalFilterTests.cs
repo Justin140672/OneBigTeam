@@ -24,16 +24,6 @@ public class RecruitmentReportReaderInternalFilterTests
 
     private sealed record Seed(Guid CompanyId, Guid VacancyId, Guid RecruiterId);
 
-    // One vacancy (assigned to a recruiter) with:
-    //   internal A1 — reached Offer, 1 interview
-    //   internal A2 — Application Received
-    //   external Direct E1 — Interview stage, 2 interviews
-    //   legacy null-Source E2 — Application Received
-    //   hired external E3 (Source Direct, Candidate.EmployeeId set) — Offer then Hired, 1 interview
-    // Expected:            candidates  interviews  offers  hires
-    //   isInternal null         5           4         2       1
-    //   isInternal true         2           1         1       0
-    //   isInternal false        3           3         1       1
     private static async Task<Seed> SeedAsync(RecruitmentDbContext db)
     {
         var companyId = Guid.NewGuid();
@@ -66,7 +56,6 @@ public class RecruitmentReportReaderInternalFilterTests
 
     private static RecruitmentReportReader Reader(RecruitmentDbContext db) => new(db, new FakePositionProfileReader());
 
-    // ----- GetByVacancyAsync -----
 
     [Theory]
     [InlineData(null, 5, 4, 2, 1)]
@@ -105,7 +94,6 @@ public class RecruitmentReportReaderInternalFilterTests
         Assert.Equal(1, Assert.Single(externalRows).Candidates);
     }
 
-    // ----- GetByRecruiterAsync -----
 
     [Theory]
     [InlineData(null, 5, 4, 2, 1)]
@@ -120,7 +108,6 @@ public class RecruitmentReportReaderInternalFilterTests
 
         var row = Assert.Single(rows);
         Assert.Equal(seed.RecruiterId, row.RecruiterId);
-        // The vacancy count is not affected by the application filter.
         Assert.Equal(1, row.Vacancies);
         Assert.Equal(candidates, row.Candidates);
         Assert.Equal(interviews, row.Interviews);
@@ -128,7 +115,6 @@ public class RecruitmentReportReaderInternalFilterTests
         Assert.Equal(hires, row.Hires);
     }
 
-    // ----- GetVacancyPerformanceAsync -----
 
     [Theory]
     [InlineData(null, 5, 4, 2)]
@@ -154,8 +140,6 @@ public class RecruitmentReportReaderInternalFilterTests
     [InlineData(true, false)]
     public async Task GetVacancyPerformanceAsync_HireDate_Comes_Only_From_Hired_External_Application(bool? isInternal, bool expectHireDate)
     {
-        // The only hire in the seed is an external candidate who was later linked to an employee — it
-        // must be attributed to the external slice, never the internal one.
         await using var db = BuildContext();
         var seed = await SeedAsync(db);
 
@@ -187,7 +171,6 @@ public class RecruitmentReportReaderInternalFilterTests
         Assert.Null(item.HireDate);
     }
 
-    // ----- Filter combines with date range -----
 
     [Fact]
     public async Task GetByVacancyAsync_IsInternal_Filter_Combines_With_Date_Range()
@@ -197,7 +180,6 @@ public class RecruitmentReportReaderInternalFilterTests
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Platform Engineer", null, Guid.NewGuid(), Now);
         db.Vacancies.Add(vacancy);
-        // Internal applications on 2026-07-06 (in range) and 2026-06-01 (out of range).
         InternalApplicationTestData.AddInternal(db, companyId, vacancy.Id, stages.ApplicationReceived.Id, Guid.NewGuid(), Now);
         InternalApplicationTestData.AddInternal(db, companyId, vacancy.Id, stages.ApplicationReceived.Id, Guid.NewGuid(), new DateTimeOffset(2026, 6, 1, 9, 0, 0, TimeSpan.Zero), "Tom", "Baker");
         InternalApplicationTestData.AddExternal(db, companyId, vacancy.Id, stages.ApplicationReceived.Id, ApplicationSource.Direct, Now);

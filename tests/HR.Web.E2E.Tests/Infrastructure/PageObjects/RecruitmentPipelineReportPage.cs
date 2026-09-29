@@ -2,13 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the Recruitment Pipeline report
-/// (/companies/{companyId}/reporting/recruitment-pipeline — RecruitmentPipelineReportPage.razor).
-/// Uses a date-range-only ReportFilterPanel plus a standalone "Group by" (Recruiter/Vacancy)
-/// SfDropDownList that sits outside the filter panel's card, and exports via the same
-/// SfDropDownButton pattern as the other report pages.
-/// </summary>
 public sealed class RecruitmentPipelineReportPage(IPage page, string baseUrl)
 {
     private const string RowsRenderedSelector = ".e-grid .e-row, .e-grid .e-emptyrow";
@@ -36,7 +29,6 @@ public sealed class RecruitmentPipelineReportPage(IPage page, string baseUrl)
         return await page.Locator(".e-grid .e-row").CountAsync();
     }
 
-    // ── Filter panel (ReportFilterPanel — Date range only: "Start Date From"/"Start Date To") ──
 
     private ILocator FilterField(string labelText) =>
         page.Locator(".card-body .col-md-3").Filter(new() { HasText = labelText }).First;
@@ -65,7 +57,6 @@ public sealed class RecruitmentPipelineReportPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 
-    // ── Group by (standalone SfDropDownList, outside the filter panel's card) ──
 
     private ILocator GroupByField =>
         page.Locator(".d-flex.align-items-center.gap-2.mb-3").Filter(new() { HasText = "Group by" }).First;
@@ -76,7 +67,6 @@ public sealed class RecruitmentPipelineReportPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 
-    // ── Export ─────────────────────────────────────────────────────────────────
 
     public async Task<IDownload> ExportAsync(string formatLabel)
     {
@@ -98,14 +88,6 @@ public sealed class RecruitmentPipelineReportPage(IPage page, string baseUrl)
 
     public Task ExpectRenderedWithoutErrorAsync() => ReportApplicationTypeFilter.ExpectGridRenderedWithoutErrorAsync(page);
 
-    /// <summary>
-    /// With Group by = Vacancy, waits until the row for <paramref name="vacancyTitle"/> (a unique,
-    /// test-owned advert title) shows <paramref name="expectedCandidates"/> in its Candidates column.
-    /// The grid is client-paged over every Acme vacancy, so the row is searched for across pages
-    /// (LocatorExtensions.HasGridCellOnAnyPageAsync). Polls because a filter/group change reloads the
-    /// whole grid — callers should alternate expected values between calls so a read of the
-    /// pre-reload grid can never satisfy the expectation by accident.
-    /// </summary>
     public async Task ExpectVacancyRowCandidatesAsync(string vacancyTitle, string expectedCandidates)
     {
         var deadline = DateTime.UtcNow.AddSeconds(60);
@@ -133,7 +115,6 @@ public sealed class RecruitmentPipelineReportPage(IPage page, string baseUrl)
             }
             catch (PlaywrightException ex)
             {
-                // The grid was swapped out mid-read by the reload — re-read on the next pass.
                 lastSeen = $"(read failed: {ex.Message.Split('\n')[0]})";
             }
 

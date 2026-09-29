@@ -23,7 +23,6 @@ namespace HR.Infrastructure.Abstractions;
 /// </summary>
 public sealed class LocalStorageUrlSigner : ILocalStorageUrlSigner
 {
-    /// <summary>How long a minted URL stays valid.</summary>
     public static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(5);
 
     // Tolerance for an expiry slightly beyond now + Lifetime (clock granularity); anything further out
@@ -31,7 +30,7 @@ public sealed class LocalStorageUrlSigner : ILocalStorageUrlSigner
     private static readonly TimeSpan MaxClockSkew = TimeSpan.FromSeconds(30);
 
     private const int KeySizeBytes = 32;
-    private const int SignatureSizeBytes = 32; // HMAC-SHA256
+    private const int SignatureSizeBytes = 32;
 
     private readonly byte[] _key;
     private readonly TimeProvider _timeProvider;

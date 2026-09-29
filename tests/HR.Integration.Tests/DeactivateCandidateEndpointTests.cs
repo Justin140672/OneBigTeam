@@ -10,10 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// See DeactivateCandidateHandlerTests/DeactivateCandidateValidatorTests/CandidateTests in
-/// HR.Modules.Recruitment.Tests for the equivalent unit-level coverage of the same behaviour.
-/// </summary>
 [Collection("Integration")]
 public class DeactivateCandidateEndpointTests
 {

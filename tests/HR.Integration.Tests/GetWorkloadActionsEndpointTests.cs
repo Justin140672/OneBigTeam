@@ -20,14 +20,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// OBT-721 Workload &amp; HR Actions Report integration coverage. Every <see cref="HR.Infrastructure.Abstractions.IWorkloadActionProvider"/>
-/// self-scopes by caller (see xmldoc on that interface), so one key security assertion here is that
-/// no persona ever receives another manager's or another category's company-wide data. REP-04
-/// additionally locks the endpoint itself to the dedicated "reporting:view-workload-actions" policy
-/// (Manager, HrAdministrator only) rather than the broader baseline "reporting:view" policy (Manager,
-/// Recruiter, HrAdministrator) — see the Forbidden/Ok tests below for that gate.
-/// </summary>
 [Collection("Integration")]
 public class GetWorkloadActionsEndpointTests
 {
@@ -140,13 +132,10 @@ public class GetWorkloadActionsEndpointTests
 
         var employeeId = await SeedEmployeeAsync(companyId, "Priya", "Patel");
 
-        // Pending leave approval.
         await SeedLeaveRequestAsync(companyId, employeeId, Today.AddDays(5));
 
-        // Due probation review (via the real HTTP endpoints, matching CompleteProbationReviewEndpointTests).
         await SeedProbationRecordAndReviewAsync(hrClient, companyId, employeeId, Today.AddDays(5));
 
-        // Overdue task assigned to the same employee.
         await SeedOverdueTaskAsync(companyId, employeeId, Today.AddDays(-2));
 
         var response = await hrClient.GetAsync($"/api/companies/{companyId}/reporting/workload-actions");
@@ -159,9 +148,6 @@ public class GetWorkloadActionsEndpointTests
         Assert.Contains("Pending Leave Approvals", categories);
         Assert.Contains("Probation Reviews Due", categories);
         Assert.Contains("Manager Tasks Overdue", categories);
-        // Recruitment vacancy actions were removed from the shared Manager/HR workload aggregation —
-        // see VacanciesAwaitingActionWorkloadActionProvider removal; recruitment needs its own scoped
-        // surface in a future ticket.
         Assert.DoesNotContain("Vacancies Awaiting Action", categories);
         Assert.True(payload.Summary.TotalOutstanding >= 3);
     }
@@ -178,22 +164,16 @@ public class GetWorkloadActionsEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
         await TestRoleSeeder.AssignRoleAsync(_factory, otherManagerId, SystemRoles.Manager);
 
-        // "employee:manage" (AssignManager's policy) is HR-only, so a dedicated HR Administrator
-        // seeds the reporting-line data — the Manager persona under test never needs that policy.
         var hrBootstrapUserId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, hrBootstrapUserId, SystemRoles.HrAdministrator);
         using var hrBootstrapClient = await ClientFor(companyId, hrBootstrapUserId);
         await AssignManagerAsync(hrBootstrapClient, companyId, directReportId, managerId);
         await AssignManagerAsync(hrBootstrapClient, companyId, otherManagersReportId, otherManagerId);
 
-        // Own direct report's pending leave request — should be visible.
         await SeedLeaveRequestAsync(companyId, directReportId, Today.AddDays(5));
-        // Another manager's direct report's pending leave request — must never be visible.
         await SeedLeaveRequestAsync(companyId, otherManagersReportId, Today.AddDays(5));
 
-        // Overdue task for own direct report — should be visible via Manager Tasks Overdue.
         await SeedOverdueTaskAsync(companyId, directReportId, Today.AddDays(-1));
-        // Overdue task for the other manager's report — must never be visible.
         await SeedOverdueTaskAsync(companyId, otherManagersReportId, Today.AddDays(-1));
 
         using var client = await ClientFor(companyId, managerId);
@@ -206,9 +186,7 @@ public class GetWorkloadActionsEndpointTests
         Assert.All(payload!.Items, item => Assert.NotEqual(otherManagersReportId, item.EmployeeId));
         Assert.Contains(payload.Items, i => i.EmployeeId == directReportId);
 
-        // Sickness is HR-only — a Manager, regardless of direct reports, must never see it.
         Assert.DoesNotContain(payload.Items, i => i.ActionCategory == "Pending Sickness Actions");
-        // Recruitment vacancy actions were removed from the shared Manager/HR workload aggregation entirely.
         Assert.DoesNotContain(payload.Items, i => i.ActionCategory == "Vacancies Awaiting Action");
     }
 
@@ -246,7 +224,7 @@ public class GetWorkloadActionsEndpointTests
         var otherEmployeeId = await SeedEmployeeAsync(companyId, "Upcoming", "Task");
 
         await SeedOverdueTaskAsync(companyId, employeeId, Today.AddDays(-5));
-        await SeedOverdueTaskAsync(companyId, otherEmployeeId, Today.AddDays(30), status: TaskItemStatus.Open); // not overdue, filtered out by provider anyway
+        await SeedOverdueTaskAsync(companyId, otherEmployeeId, Today.AddDays(30), status: TaskItemStatus.Open);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/workload-actions?urgency=Overdue");
 
@@ -305,8 +283,6 @@ public class GetWorkloadActionsEndpointTests
         var employeeId = await SeedEmployeeAsync(companyId, "Nadia", "Newstarter");
         await SeedOutstandingOnboardingTaskAsync(companyId, employeeId);
 
-        // A caller with no reporting-related role at all is forbidden at the endpoint's baseline
-        // reporting:view gate before any provider even runs.
         var callerId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, callerId, SystemRoles.Employee);
         using var client = await ClientFor(companyId, callerId);
@@ -407,7 +383,6 @@ public class GetWorkloadActionsEndpointTests
         Assert.True(item.IsOwnerActionable);
     }
 
-    // ── Seeding helpers ──────────────────────────────────────────────────────
 
     private async Task<Guid> SeedEmployeeAsync(Guid companyId, string firstName, string lastName)
     {
@@ -509,7 +484,6 @@ public class GetWorkloadActionsEndpointTests
         await db.SaveChangesAsync();
     }
 
-    /// <summary>Seeds a real open Tasks-module TaskItem whose SourceEntityId links back to a source-module task/record id.</summary>
     private async Task<Guid> SeedOpenTaskLinkedToSourceAsync(
         Guid companyId, Guid sourceEntityId, TaskSource source, TaskActionType actionType, Guid assignedEmployeeId)
     {

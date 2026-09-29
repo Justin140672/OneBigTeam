@@ -4,19 +4,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Documents.Services;
 
-/// <summary>
-/// Real virus scanner backed by a clamd (ClamAV daemon) instance, speaking the INSTREAM protocol
-/// directly over TCP — the file's bytes are streamed to clamd in length-prefixed chunks with no
-/// temp file ever written to disk, matching the ticket's "no temp files unless truly unavoidable"
-/// requirement.
-///
-/// INSTREAM wire format (see https://docs.clamav.net/manual/Usage/Scanning.html#instream):
-///   1. Send "zINSTREAM\0" (the leading 'z' means the command itself is NUL-terminated).
-///   2. Send the file in chunks, each chunk prefixed with its 4-byte big-endian length.
-///   3. Send a zero-length chunk (4 zero bytes) to signal end of stream.
-///   4. Read clamd's reply line — "stream: OK" (clean) or "stream: <name> FOUND" (infected), or
-///      an error string.
-/// </summary>
 internal sealed class ClamAvVirusScanService(IOptions<ClamAvOptions> options) : IVirusScanService
 {
     private const int ChunkSize = 8192;
@@ -48,7 +35,6 @@ internal sealed class ClamAvVirusScanService(IOptions<ClamAvOptions> options) : 
             await networkStream.WriteAsync(buffer.AsMemory(0, bytesRead), timeoutCts.Token);
         }
 
-        // Zero-length chunk terminates the stream.
         var zeroLength = new byte[4];
         await networkStream.WriteAsync(zeroLength, timeoutCts.Token);
 
@@ -57,7 +43,6 @@ internal sealed class ClamAvVirusScanService(IOptions<ClamAvOptions> options) : 
 
         if (reply.Contains("FOUND", StringComparison.Ordinal))
         {
-            // Reply format: "stream: <threat-name> FOUND"
             var threatName = reply
                 .Replace("stream:", string.Empty, StringComparison.OrdinalIgnoreCase)
                 .Replace("FOUND", string.Empty, StringComparison.OrdinalIgnoreCase)
@@ -69,9 +54,6 @@ internal sealed class ClamAvVirusScanService(IOptions<ClamAvOptions> options) : 
         if (reply.Contains("OK", StringComparison.Ordinal))
             return VirusScanResult.Clean();
 
-        // Any other reply (ERROR, connection reset mid-scan, etc.) is treated as an unreachable/
-        // errored scanner — the caller (ScanUploadedFileJob) lets Hangfire's automatic retry
-        // handle this rather than treating it as "infected".
         throw new InvalidOperationException($"Unexpected clamd response scanning '{fileName}': '{reply}'.");
     }
 }

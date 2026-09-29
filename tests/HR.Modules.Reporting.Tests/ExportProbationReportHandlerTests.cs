@@ -7,7 +7,6 @@ namespace HR.Modules.Reporting.Tests;
 
 public class ExportProbationReportHandlerTests
 {
-    /// <summary>Throws from the reader call so the handler's catch block is exercised (REP-06).</summary>
     private sealed class ThrowingProbationReportReader : IProbationReportReader
     {
         public Task<IReadOnlyList<ProbationReportItem>> GetProbationReportAsync(

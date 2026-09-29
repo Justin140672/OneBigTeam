@@ -44,7 +44,6 @@ internal sealed class IdentityAuthorizationService(
     {
         var now = new DateTimeOffset(clock.UtcNow, TimeSpan.Zero);
 
-        // 1. Roles inherited from active position assignments.
         var positionRoleIds = await db.UserPositions
             .Where(up => up.UserId == userId &&
                          (up.ExpiresAt == null || up.ExpiresAt > now))
@@ -55,20 +54,14 @@ internal sealed class IdentityAuthorizationService(
             .Distinct()
             .ToListAsync(ct);
 
-        // 2. Direct user-role assignments.
         var directRoleIds = await db.UserRoles
             .Where(ur => ur.UserId == userId)
             .Select(ur => ur.RoleId)
             .ToListAsync(ct);
 
-        // 3. Merge base set.
         var effectiveRoles = new HashSet<Guid>(positionRoleIds);
         effectiveRoles.UnionWith(directRoleIds);
 
-        // 4. Apply employee-level overrides (Deny removes, Grant adds). IAM-04: an expired
-        // override (ExpiresAt <= now) must stop affecting access automatically — excluded here at
-        // read time, same strictly-greater-than convention as position-assignment expiry above, so
-        // an override expiring exactly "now" is already treated as expired.
         var overrides = await db.EmployeeRoleOverrides
             .Where(o => o.UserId == userId && (o.ExpiresAt == null || o.ExpiresAt > now))
             .ToListAsync(ct);

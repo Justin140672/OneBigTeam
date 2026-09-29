@@ -22,7 +22,6 @@ internal enum PostmarkFailureCategory
     ProviderUnavailable,
 }
 
-/// <summary>Stable diagnostics extracted from a failed Postmark response.</summary>
 internal readonly record struct PostmarkFailure(int StatusCode, int? ErrorCode, PostmarkFailureCategory Category)
 {
     /// <summary>
@@ -36,20 +35,15 @@ internal readonly record struct PostmarkFailure(int StatusCode, int? ErrorCode, 
         return new PostmarkFailure(status, errorCode, Classify(response.StatusCode, errorCode));
     }
 
-    /// <summary>
-    /// Maps Postmark's documented API error codes (https://postmarkapp.com/developer/api/overview#error-codes)
-    /// and the HTTP status to a small, fixed category set. Unknown codes fall back to
-    /// <see cref="PostmarkFailureCategory.Other"/>.
-    /// </summary>
     public static PostmarkFailureCategory Classify(HttpStatusCode status, int? errorCode)
     {
         var byCode = errorCode switch
         {
-            10 => PostmarkFailureCategory.Authentication,               // Bad or missing API token
+            10 => PostmarkFailureCategory.Authentication,
             300 or 402 or 403 or 409 or 410 or 411 => PostmarkFailureCategory.InvalidRequest,
-            400 or 401 => PostmarkFailureCategory.SenderSignature,      // Sender signature not found / not confirmed
+            400 or 401 => PostmarkFailureCategory.SenderSignature,
             406 => PostmarkFailureCategory.InactiveRecipient,
-            405 or 412 => PostmarkFailureCategory.AccountRestricted,    // Not allowed to send / account pending
+            405 or 412 => PostmarkFailureCategory.AccountRestricted,
             >= 1100 and < 1200 => PostmarkFailureCategory.Template,
             _ => (PostmarkFailureCategory?)null,
         };
@@ -66,10 +60,6 @@ internal readonly record struct PostmarkFailure(int StatusCode, int? ErrorCode, 
         };
     }
 
-    /// <summary>
-    /// A fixed-shape exception message built only from stable diagnostics — safe for any logger,
-    /// exception destructurer or persisted failure reason.
-    /// </summary>
     public string ToExceptionMessage(string operation) =>
         $"{operation} failed. StatusCode={StatusCode} PostmarkErrorCode={ErrorCode?.ToString() ?? "none"} FailureCategory={Category}";
 

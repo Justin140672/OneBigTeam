@@ -3,10 +3,6 @@ using Xunit;
 
 namespace HR.Modules.Documents.Tests;
 
-/// <summary>
-/// Reliability review issue 3 (P1): startup previously only checked that ClamAv:Host was
-/// non-empty; this proves the port range and timeout bound are now enforced too.
-/// </summary>
 public class ClamAvOptionsValidatorTests
 {
     private static ClamAvOptions ValidOptions() => new()

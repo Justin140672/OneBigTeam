@@ -112,7 +112,7 @@ public class RemoveEmployeeRoleOverrideHandlerTests(IdentityDatabaseFixture fixt
         Assert.Empty(auditPublisher.PublishedEvents);
 
         await using var db = fixture.BuildContext();
-        Assert.True(await db.EmployeeRoleOverrides.AnyAsync(o => o.UserId == targetUserId)); // untouched
+        Assert.True(await db.EmployeeRoleOverrides.AnyAsync(o => o.UserId == targetUserId));
     }
 
     [Fact]

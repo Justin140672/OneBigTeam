@@ -9,12 +9,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Probation.Tests;
 
-/// <summary>
-/// OBT-721 workload action provider tests for probation reviews due/overdue — mirrors
-/// GetProbationReportHandlerTests row-scoping coverage (HR company-wide, Manager scoped to direct
-/// reports, Manager with no direct reports empty, unrecognised caller empty), plus the due-vs-overdue
-/// split that is unique to ProbationReviewWorkloadActions.GetAsync.
-/// </summary>
 public class ProbationReviewsDueWorkloadActionProviderTests
 {
     private static readonly DateOnly Today = new(2026, 7, 29);
@@ -44,7 +38,6 @@ public class ProbationReviewsDueWorkloadActionProviderTests
         return (record, review);
     }
 
-    // ── ProbationReviewsDueWorkloadActionProvider ───────────────────────────────
 
     [Fact]
     public async Task DueProvider_HrCaller_Sees_All_Due_Reviews_CompanyWide_Excludes_Overdue()
@@ -52,8 +45,8 @@ public class ProbationReviewsDueWorkloadActionProviderTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var callerId = Guid.NewGuid();
-        SeedReview(context, companyId, Guid.NewGuid(), Today.AddDays(5));  // due
-        SeedReview(context, companyId, Guid.NewGuid(), Today.AddDays(-2)); // overdue
+        SeedReview(context, companyId, Guid.NewGuid(), Today.AddDays(5));
+        SeedReview(context, companyId, Guid.NewGuid(), Today.AddDays(-2));
         await context.SaveChangesAsync();
 
         var provider = new ProbationReviewsDueWorkloadActionProvider(
@@ -151,11 +144,9 @@ public class ProbationReviewsDueWorkloadActionProviderTests
         var action = Assert.Single(result);
         Assert.Equal("Complete ManagerCheckIn Probation Review", action.ActionType);
         Assert.Equal(dueDate, action.DueDate);
-        // No employee-profile fallback: this category is entirely task-backed.
         Assert.Equal("", action.DeepLinkUrl);
     }
 
-    // ── OverdueProbationReviewsWorkloadActionProvider ───────────────────────────
 
     [Fact]
     public async Task OverdueProvider_Excludes_Reviews_That_Are_Due_But_Not_Yet_Overdue()
@@ -163,8 +154,8 @@ public class ProbationReviewsDueWorkloadActionProviderTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var callerId = Guid.NewGuid();
-        SeedReview(context, companyId, Guid.NewGuid(), Today.AddDays(5));  // due, not overdue
-        SeedReview(context, companyId, Guid.NewGuid(), Today.AddDays(-3)); // overdue
+        SeedReview(context, companyId, Guid.NewGuid(), Today.AddDays(5));
+        SeedReview(context, companyId, Guid.NewGuid(), Today.AddDays(-3));
         await context.SaveChangesAsync();
 
         var provider = new OverdueProbationReviewsWorkloadActionProvider(
@@ -218,7 +209,6 @@ public class ProbationReviewsDueWorkloadActionProviderTests
         Assert.Empty(result);
     }
 
-    // ── Dual HR+Manager role regression coverage ────────────────────────────────
 
     [Fact]
     public async Task DueProvider_DualHrAndManagerCaller_Requesting_ManagerScope_Sees_Only_TeamScoped_Results()
@@ -276,7 +266,6 @@ public class ProbationReviewsDueWorkloadActionProviderTests
         SeedReview(context, companyId, Guid.NewGuid(), Today.AddDays(5));
         await context.SaveChangesAsync();
 
-        // Caller only holds the manager-tier policy, not reporting:view-hr.
         var provider = new ProbationReviewsDueWorkloadActionProvider(
             context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-probation"), new FakeCurrentUser(callerId),

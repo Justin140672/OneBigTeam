@@ -4,7 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>Split out of BulkEmployeeInvitationTests for real cross-test parallelism — see BulkEmployeeInvitationGettingStartedTests' remarks.</summary>
 public sealed class BulkEmployeeInvitationPreselectionTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -29,8 +28,6 @@ public sealed class BulkEmployeeInvitationPreselectionTests(HrAdminPersonaFixtur
 
         await grid.WaitForLoadedAsync();
 
-        // A seeded pool employee with a valid work email and no linked account is eligible —
-        // auto-selected on load (InviteModeCandidateGrid.EligibleIndexes/OnAfterRenderAsync).
         Assert.True(await grid.IsRowCheckedAsync(candidate.FullName),
             $"Expected eligible candidate '{candidate.FullName}' to be pre-selected");
 

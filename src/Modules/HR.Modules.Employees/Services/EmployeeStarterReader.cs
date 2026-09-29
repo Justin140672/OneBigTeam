@@ -74,10 +74,6 @@ internal sealed class EmployeeStarterReader(
                 .ToDictionaryAsync(p => p.Id, p => p.Title, cancellationToken)
             : new Dictionary<Guid, string>();
 
-        // Recruiter is a batch lookup; onboarding/probation status are single-employee reader
-        // contracts (IOnboardingStatusReader/IProbationSummaryReader) called per row of the
-        // CURRENT PAGE only (bounded to pagination.PageSize), never against the full company —
-        // avoids needing a new batch-shaped contract for those two while still staying bounded.
         var recruiterNames = await recruiterReader.GetRecruiterNamesAsync(companyId, employeeIds, cancellationToken);
 
         var items = new List<EmployeeStarterReportItem>(employees.Count);

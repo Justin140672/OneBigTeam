@@ -50,10 +50,6 @@ namespace HR.Architecture.Tests;
 /// </summary>
 public class ProblemResultsAdoptionArchitectureTests
 {
-    /// <summary>
-    /// Endpoints permitted to keep manual <c>Error.Code</c> mapping indefinitely because they match a
-    /// documented exception category from <see cref="HR.SharedKernel.ProblemResults"/>.
-    /// </summary>
     private static readonly string[] DocumentedExceptionFiles =
     [
         // Ticket 20: bound to a pre-existing, separately-tested 422 status-code contract
@@ -248,8 +244,6 @@ public class ProblemResultsAdoptionArchitectureTests
 
             if (hasManualMapping && hasTranslator)
             {
-                // Leftover dead manual-mapping code sitting alongside the new translator call —
-                // never allow-listed, always a violation so it gets cleaned up.
                 danglingManualCodeAlongsideTranslator.Add(relativePath);
                 continue;
             }
@@ -281,10 +275,6 @@ public class ProblemResultsAdoptionArchitectureTests
             Environment.NewLine + string.Join(Environment.NewLine, newViolations));
     }
 
-    /// <summary>
-    /// Walks up from the test assembly's location until it finds a directory containing both
-    /// <c>src/Modules</c> and a <c>.sln</c>/<c>.slnx</c> file, which identifies the repository root.
-    /// </summary>
     private static string FindRepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

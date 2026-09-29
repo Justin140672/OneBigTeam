@@ -10,12 +10,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Sickness.Tests.Jobs;
 
-/// <summary>
-/// OBT-REM-10: a <c>SaveChangesAsync</c> failure while transitioning one request in a batch from
-/// Pending to Overdue must only affect that one request. Before this fix,
-/// <c>db.ChangeTracker.Clear()</c> on a save failure detached every other request already loaded
-/// into the batch, silently preventing their transitions from being persisted.
-/// </summary>
 public class SicknessEvidenceReminderJobBatchIsolationTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 15, 2, 0, 0, DateTimeKind.Utc);
@@ -58,9 +52,6 @@ public class SicknessEvidenceReminderJobBatchIsolationTests
         return request;
     }
 
-    /// <summary>Fails the very next SaveChangesAsync call whose modified SicknessEvidenceRequest set
-    /// includes the given id — exactly once — regardless of what order the job's batch loop visits
-    /// requests in.</summary>
     private static Func<SicknessDbContext, bool> FailOnceForRequest(Guid requestId)
     {
         var alreadyFailed = false;

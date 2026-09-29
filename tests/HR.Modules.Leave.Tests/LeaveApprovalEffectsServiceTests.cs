@@ -152,11 +152,6 @@ public class LeaveApprovalEffectsServiceTests
         Assert.IsType<LeaveApprovedIntegrationEvent>(Assert.Single(integrationPublisher.Published));
     }
 
-    // NOT-03: wording-migration fidelity — PublishApprovalOutcomeAsync now raises this notification
-    // via WriteTemplatedAsync(NotificationType.LeaveApproved, ...) instead of a pre-formatted string;
-    // this pins the exact previous wording ("Your leave request has been approved" /
-    // "Your leave from {StartDate} to {EndDate} has been approved.") so a future catalogue wording
-    // change is caught here, not just in HR.Modules.Notifications.Tests.
     [Fact]
     public async Task PublishApprovalOutcomeAsync_Notification_Has_Expected_Title_And_Body_Wording()
     {

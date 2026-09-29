@@ -4,13 +4,6 @@ using Microsoft.AspNetCore.Http;
 
 namespace HR.Infrastructure.Tests.Storage;
 
-/// <summary>
-/// CodeQL #63-#65 (log forging via storage keys): support-attachment storage keys are later logged
-/// (redacted) by the upload cleanup paths. This pins the key shape produced by
-/// <see cref="LocalSupportAttachmentStorageService"/>: "support/{companyId}/{requestId}/" + a
-/// server-generated 32-hex GUID + the (allow-listed) extension — the caller-supplied file name
-/// never reaches the key, so it cannot smuggle control characters into a log line.
-/// </summary>
 public sealed class SupportStorageKeyShapeTests
 {
     [Fact]

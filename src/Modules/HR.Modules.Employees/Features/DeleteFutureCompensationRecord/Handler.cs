@@ -43,8 +43,6 @@ internal sealed class DeleteFutureCompensationRecordHandler(
             return Result.Failure(
                 Error.Conflict("A later compensation record exists for this employee; delete it first."));
 
-        // If this record's creation closed an earlier one, reopen that predecessor so the
-        // employee's compensation timeline has no gap once this future record is removed.
         var predecessor = await dbContext.Compensations
             .SingleOrDefaultAsync(
                 c => c.CompanyId == companyId && c.EmployeeId == employeeId &&

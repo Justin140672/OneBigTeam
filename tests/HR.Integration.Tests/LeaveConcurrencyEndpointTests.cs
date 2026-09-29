@@ -9,14 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// P1 #4 (optimistic concurrency): genuine-concurrency coverage for LeaveBalance/LeaveRequest.Version,
-/// run against the real Postgres-backed <see cref="ApiWebApplicationFactory"/> (not EF InMemory - see
-/// HR.Modules.Leave.Tests/LeaveConcurrencyHandlerTests.cs for InMemory-level coverage of the same
-/// rules with more granular assertions). Two HttpClient requests are fired via Task.WhenAll, mirroring
-/// StripeWebhookConcurrencyTests, so the handlers' two invocations genuinely race each other's
-/// SaveChangesAsync calls against the same row(s) under Postgres MVCC.
-/// </summary>
 [Collection("Integration")]
 public class LeaveConcurrencyEndpointTests
 {
@@ -38,8 +30,8 @@ public class LeaveConcurrencyEndpointTests
     {
         var (client, companyId, leaveTypeId, employeeId) = await SetupEmployeeWithBalanceAsync();
 
-        var requestAId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId, "2026-08-03", "2026-08-05"); // 3 days
-        var requestBId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId, "2026-09-07", "2026-09-08"); // 2 days
+        var requestAId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId, "2026-08-03", "2026-08-05");
+        var requestBId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId, "2026-09-07", "2026-09-08");
 
         var taskA = ApproveAsync(client, companyId, employeeId, requestAId);
         var taskB = ApproveAsync(client, companyId, employeeId, requestBId);
@@ -57,8 +49,6 @@ public class LeaveConcurrencyEndpointTests
         Assert.Equal("concurrency", conflictBody!.Code);
 
         var balance = await GetBalanceAsync(client, companyId, employeeId, leaveTypeId);
-        // Only one of the two deductions (3 or 2 days) landed - never both (5, a phantom double
-        // apply) and never neither (0, a lost update).
         Assert.True(balance.UsedDays == 3m || balance.UsedDays == 2m);
         Assert.Equal(25m - balance.UsedDays, balance.RemainingDays);
     }
@@ -68,7 +58,7 @@ public class LeaveConcurrencyEndpointTests
     {
         var (client, companyId, leaveTypeId, employeeId) = await SetupEmployeeWithBalanceAsync();
 
-        var requestId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId, "2026-08-10", "2026-08-12"); // 3 days
+        var requestId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId, "2026-08-10", "2026-08-12");
 
         var approveTask = ApproveAsync(client, companyId, employeeId, requestId);
         var rejectTask = RejectAsync(client, companyId, employeeId, requestId);
@@ -77,10 +67,6 @@ public class LeaveConcurrencyEndpointTests
         var succeeded = responses.Where(r => r.StatusCode == HttpStatusCode.OK).ToList();
         var rejected = responses.Where(r => r.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.BadRequest).ToList();
 
-        // Exactly one of the two competing transitions wins; the other is turned away either as a
-        // 409 concurrency conflict (both loaded Pending, loser's save is stale) or - if the two
-        // requests happen to be serialized by the test host rather than truly overlapping - as a
-        // 400 business-rule failure (status no longer Pending). Either way, never both 200s.
         Assert.Single(succeeded);
         Assert.Single(rejected);
 
@@ -106,10 +92,8 @@ public class LeaveConcurrencyEndpointTests
         var (client, companyId, employeeId) = await SetupEmployeeWithToilBalanceAsync(awardedDays: 4m);
         var toilLeaveTypeId = await GetToilLeaveTypeIdAsync(companyId);
 
-        // Two separate TOIL leave requests, each requesting 3 days from a 4-day pot - only one can
-        // legitimately be approved without going negative (AllowNegativeToilBalance defaults false).
-        var requestAId = await SubmitLeaveRequestAsync(client, companyId, employeeId, toilLeaveTypeId, "2026-08-03", "2026-08-05"); // 3 days
-        var requestBId = await SubmitLeaveRequestAsync(client, companyId, employeeId, toilLeaveTypeId, "2026-09-07", "2026-09-09"); // 3 days
+        var requestAId = await SubmitLeaveRequestAsync(client, companyId, employeeId, toilLeaveTypeId, "2026-08-03", "2026-08-05");
+        var requestBId = await SubmitLeaveRequestAsync(client, companyId, employeeId, toilLeaveTypeId, "2026-09-07", "2026-09-09");
 
         var taskA = ApproveAsync(client, companyId, employeeId, requestAId);
         var taskB = ApproveAsync(client, companyId, employeeId, requestBId);
@@ -118,17 +102,14 @@ public class LeaveConcurrencyEndpointTests
         var succeeded = responses.Count(r => r.StatusCode == HttpStatusCode.OK);
         var notSucceeded = responses.Count(r => r.StatusCode != HttpStatusCode.OK);
 
-        // At most one of the two 3-day requests can be approved against a 4-day pot without the
-        // AllowNegativeToilBalance override - proving TOIL was not double-spent under a genuine race.
         Assert.Equal(1, succeeded);
         Assert.Equal(1, notSucceeded);
 
         var balance = await GetBalanceAsync(client, companyId, employeeId, toilLeaveTypeId);
-        Assert.Equal(3m, balance.UsedDays); // only the winner's consumption applied
-        Assert.Equal(1m, balance.RemainingDays); // 4 awarded - 3 used
+        Assert.Equal(3m, balance.UsedDays);
+        Assert.Equal(1m, balance.RemainingDays);
     }
 
-    // ─── Helpers ───────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {

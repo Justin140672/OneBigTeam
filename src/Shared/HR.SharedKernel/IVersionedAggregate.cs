@@ -14,9 +14,7 @@ namespace HR.SharedKernel;
 /// </summary>
 public interface IVersionedAggregate
 {
-    /// <summary>The current persisted concurrency token. Starts at 1 on creation.</summary>
     int Version { get; }
 
-    /// <summary>Advance the token by one. Called by the save helper immediately before persistence.</summary>
     void IncrementVersion();
 }

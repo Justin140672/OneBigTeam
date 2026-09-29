@@ -11,11 +11,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// GET/PUT/DELETE <c>/api/companies/{companyId}/employees/{employeeId}/equality-record</c> —
-/// voluntary equality-monitoring data. Self-service only (caller must target their own employee id)
-/// and answer columns are encrypted at rest.
-/// </summary>
 [Collection("Integration")]
 public class EqualityRecordEndpointTests
 {
@@ -32,10 +27,6 @@ public class EqualityRecordEndpointTests
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee, companyId);
 
-        // The equality-record endpoints write to employees.employee_equality_data, which has a real
-        // FK (ON DELETE CASCADE) to employees.employees. Seed a minimal self-service employee row
-        // whose Id == the identity user id (the established convention — see
-        // GetMyPersonalDetails/Handler.cs: e.Id == userId).
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
@@ -60,7 +51,6 @@ public class EqualityRecordEndpointTests
         ethnicGroup = value
     };
 
-    // ── 401 ───────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_Returns_Unauthorized_For_Anonymous_Request()
@@ -86,7 +76,6 @@ public class EqualityRecordEndpointTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ── 403 self-only ─────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_Returns_Forbidden_When_Targeting_A_Different_Employee()
@@ -112,7 +101,6 @@ public class EqualityRecordEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── GET initial state ─────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_Returns_HasRecord_False_When_No_Record_Exists()
@@ -128,7 +116,6 @@ public class EqualityRecordEndpointTests
         Assert.Null(payload.EthnicGroup);
     }
 
-    // ── PUT create + ciphertext at rest ───────────────────────────────────────
 
     [Fact]
     public async Task Put_Creates_Record_And_Stores_Answer_Columns_As_Ciphertext()
@@ -148,13 +135,11 @@ public class EqualityRecordEndpointTests
         Assert.True(saved!.HasRecord);
         Assert.Equal("White", saved.EthnicGroup);
 
-        // GET reflects the saved (decrypted) values.
         var getResponse = await client.GetAsync(Route(companyId, employeeId));
         var fetched = await getResponse.Content.ReadFromJsonAsync<EqualityPayload>();
         Assert.Equal("White", fetched!.EthnicGroup);
         Assert.Equal("Woman", fetched.GenderIdentity);
 
-        // The raw column value must be an OBTENC1 token, not the plaintext enum name.
         var rawEthnicGroup = await ReadRawColumnAsync(companyId, employeeId, "ethnic_group");
         Assert.StartsWith("OBTENC1:", rawEthnicGroup);
         Assert.NotEqual("White", rawEthnicGroup);
@@ -185,14 +170,12 @@ public class EqualityRecordEndpointTests
         Assert.StartsWith("OBTENC1:", raw);
         Assert.NotEqual("Yes", raw);
 
-        // The audit trail still carries no answer values.
         var (events, rawJson) = await ReadEqualityAuditAsync(companyId, employeeId);
         Assert.Single(events);
         foreach (var forbidden in new[] { "Yes", "White", "OBTENC1:" })
             Assert.DoesNotContain(forbidden, rawJson, StringComparison.Ordinal);
     }
 
-    // ── PUT update in place ───────────────────────────────────────────────────
 
     [Fact]
     public async Task Put_Twice_Updates_In_Place_And_Keeps_A_Single_Row()
@@ -210,7 +193,6 @@ public class EqualityRecordEndpointTests
         Assert.Equal(1, await CountRowsAsync(companyId, employeeId));
     }
 
-    // ── PUT validation failure ────────────────────────────────────────────────
 
     [Fact]
     public async Task Put_Returns_UnprocessableEntity_When_SelfDescribed_Free_Text_Is_Set_Without_SelfDescribed_Enum()
@@ -226,7 +208,6 @@ public class EqualityRecordEndpointTests
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
-    // ── DELETE ────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Delete_Returns_NotFound_When_No_Record_Exists()
@@ -250,7 +231,6 @@ public class EqualityRecordEndpointTests
             .Content.ReadFromJsonAsync<EqualityPayload>();
         Assert.False(payload!.HasRecord);
 
-        // A second delete is a no-op 404.
         var secondDelete = await client.DeleteAsync(Route(companyId, employeeId));
         Assert.Equal(HttpStatusCode.NotFound, secondDelete.StatusCode);
     }
@@ -287,7 +267,6 @@ public class EqualityRecordEndpointTests
         foreach (var forbidden in new[] { "White", "Christian", "Yes", disabilityFreeText, genderFreeText, "OBTENC1:" })
             Assert.DoesNotContain(forbidden, rawJson, StringComparison.Ordinal);
 
-        // Negative control: the answer column is still encrypted at rest.
         var rawEthnicGroup = await ReadRawColumnAsync(companyId, employeeId, "ethnic_group");
         Assert.StartsWith("OBTENC1:", rawEthnicGroup);
     }
@@ -319,11 +298,6 @@ public class EqualityRecordEndpointTests
 
     private sealed record EqualityAuditRow(string EventType, string? Summary, Guid? ActorEmployeeId, DateTimeOffset OccurredAt);
 
-    /// <summary>
-    /// Returns the promoted equality <see cref="AuditEvent"/> rows for this employee plus the full
-    /// concatenated text of every audit artifact (summary + before/after/metadata JSON on the
-    /// promoted rows, and the raw staging <c>PayloadJson</c>) so tests can assert no value leaked.
-    /// </summary>
     private async Task<(IReadOnlyList<EqualityAuditRow> Events, string RawJson)> ReadEqualityAuditAsync(
         Guid companyId, Guid employeeId)
     {
@@ -354,7 +328,6 @@ public class EqualityRecordEndpointTests
         return (rows, promotedText + "|" + string.Join("|", pendingPayloads));
     }
 
-    // ── helpers ───────────────────────────────────────────────────────────────
 
     private async Task<string> ReadRawColumnAsync(Guid companyId, Guid employeeId, string column)
     {

@@ -208,7 +208,7 @@ public class UpdateSharedCompanyDocumentAudienceHandlerTests
             {
                 CompanyId             = companyId,
                 DocumentId            = doc.Id,
-                AudienceDepartmentIds = [departmentId], // same set, resubmitted
+                AudienceDepartmentIds = [departmentId],
             },
             Guid.NewGuid(), CancellationToken.None);
 

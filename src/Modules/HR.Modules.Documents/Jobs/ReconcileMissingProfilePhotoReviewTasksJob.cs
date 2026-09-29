@@ -6,19 +6,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Documents.Jobs;
 
-/// <summary>
-/// Guarantees every current pending profile-photo submission has exactly one active HR review
-/// task, recovering the two ways that guarantee can otherwise be violated without a re-upload:
-///
-///  1. A PendingProfilePhoto whose review task was never created (or was lost — e.g. an interrupted
-///     request, or a submission created before this reconciliation/idempotency fix existed).
-///  2. A PendingProfilePhoto with a review task that was somehow closed (completed/cancelled)
-///     without the submission itself being resolved — left with no way for HR to find it again.
-///
-/// Uses the same deterministic idempotency key as UploadMyProfilePhotoHandler
-/// ("ProfilePhotoReview:{pendingPhotoId}"), so re-running this job — or racing against a genuine
-/// upload — can never create a duplicate task for the same submission.
-/// </summary>
 internal sealed class ReconcileMissingProfilePhotoReviewTasksJob(
     DocumentsDbContext db,
     ITaskCreator taskCreator,
@@ -71,8 +58,6 @@ internal sealed class ReconcileMissingProfilePhotoReviewTasksJob(
                 }
                 catch (Exception ex)
                 {
-                    // One submission's reconciliation failing must never stop the rest of the batch
-                    // from being checked.
                     logger.LogError(
                         ex,
                         "Profile photo review task reconciliation failed for pending submission " +

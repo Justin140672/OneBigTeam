@@ -52,7 +52,6 @@ public class MarketingFeatureHandlerTests
         return result.Value!.Id;
     }
 
-    // ── Create ───────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Create_Persists_Fields_Starts_Unpublished_And_Publishes_Audit()
@@ -102,7 +101,6 @@ public class MarketingFeatureHandlerTests
         Assert.Equal("validation", result.Error.Code);
     }
 
-    // ── Update ───────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Update_Persists_New_Values_And_Publishes_Audit()
@@ -160,7 +158,6 @@ public class MarketingFeatureHandlerTests
         Assert.True(result.IsSuccess);
     }
 
-    // ── Publication toggle ───────────────────────────────────────────────────────
 
     [Fact]
     public async Task SetPublication_Publish_Sets_IsPublished_True_Regardless_Of_DeliveryStatus()
@@ -214,7 +211,6 @@ public class MarketingFeatureHandlerTests
         Assert.Empty(content.Value!.Features);
     }
 
-    // ── Reorder ──────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Reorder_Sets_DisplayOrder_By_Index()

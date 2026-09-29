@@ -5,10 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Disabled-mode security tests for the DepartureFinaliserTestEndpoint.
-/// Verifies that the endpoint returns 404 when E2E_TESTING is not set (default production mode).
-/// </summary>
 [Collection("Integration")]
 public class DepartureFinaliserEndpointDisabledModeTests
 {
@@ -21,15 +17,9 @@ public class DepartureFinaliserEndpointDisabledModeTests
         _factory.SupabaseAuthGateway.Reset();
     }
 
-    /// <summary>
-    /// Verifies that the endpoint returns 404 when E2E_TESTING environment variable is not set.
-    /// The endpoint is completely hidden in production/normal-dev mode.
-    /// This gate prevents accidental exposure of development testing infrastructure in production.
-    /// </summary>
     [Fact]
     public async Task Post_DepartureFinaliser_Returns_404_When_E2E_Testing_Disabled()
     {
-        // When E2E_TESTING is not set (default), the endpoint must return 404 (hidden from production)
         var employeeId = Guid.NewGuid();
         var url = $"/api/dev/departure-finaliser/{AcmeCompanyId:N}/{employeeId:N}";
 
@@ -60,7 +50,6 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
     private static readonly Guid AcmeCompanyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid BetaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
 
-    // Well-known test user IDs for role-based authorization tests
     private static readonly Guid HrAdminUserId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     private static readonly Guid EmployeeUserId = Guid.Parse("33333333-3333-3333-3333-333333333333");
     private static readonly Guid BetaCorpHrAdminId = Guid.Parse("44444444-4444-4444-4444-444444444444");
@@ -72,8 +61,6 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
         _factory = factory;
         _factory.SupabaseAuthGateway.Reset();
 
-        // The endpoint authorises via the real "role:hr-administrator" policy (DB-resolved roles),
-        // so the personas must actually hold their roles in Acme.
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUserId, SystemRoles.HrAdministrator, AcmeCompanyId);
@@ -81,17 +68,12 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
         }).GetAwaiter().GetResult();
     }
 
-    /// <summary>
-    /// Verifies that E2E_TESTING=true enables the endpoint and anonymous requests fail with 401.
-    /// The endpoint requires authentication even when E2E testing is enabled.
-    /// </summary>
     [Fact]
     public async Task Post_DepartureFinaliser_Returns_401_Anonymous_WhenE2EEnabled()
     {
         var employeeId = Guid.NewGuid();
         var url = $"/api/dev/departure-finaliser/{AcmeCompanyId:N}/{employeeId:N}";
 
-        // Temporarily enable E2E testing for this test
         var originalValue = Environment.GetEnvironmentVariable("E2E_TESTING");
         try
         {
@@ -100,7 +82,6 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
             using var client = _factory.CreateClient();
             var response = await client.PostAsync(url, content: null);
 
-            // Anonymous requests should get 401 Unauthorized
             Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         }
         finally
@@ -109,10 +90,6 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
         }
     }
 
-    /// <summary>
-    /// Verifies that users without HR Administrator role receive 403 Forbidden.
-    /// The endpoint requires "role:hr-administrator" policy.
-    /// </summary>
     [Fact]
     public async Task Post_DepartureFinaliser_Returns_403_NonHrAdmin()
     {
@@ -126,7 +103,6 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
 
             using var client = _factory.CreateClient();
 
-            // Set auth headers for an employee (no HR admin role)
             client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, EmployeeUserId.ToString());
             client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, AcmeCompanyId.ToString());
 
@@ -140,10 +116,6 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
         }
     }
 
-    /// <summary>
-    /// Verifies that HR admins from a different company receive 403 Forbidden.
-    /// Even with the correct role, company isolation must be enforced.
-    /// </summary>
     [Fact]
     public async Task Post_DepartureFinaliser_Returns_403_WrongTenant()
     {
@@ -155,14 +127,12 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
         {
             Environment.SetEnvironmentVariable("E2E_TESTING", "true");
 
-            // First, set up HR admin role for BetaCorpHrAdminId in BetaCorp
             await TestRoleSeeder.AssignRoleAsync(_factory, BetaCorpHrAdminId,
                 SystemRoles.HrAdministrator,
                 BetaCorpId, ensureActiveSubscription: false);
 
             using var client = _factory.CreateClient();
 
-            // Set auth headers for HR admin from BetaCorp (different tenant from route)
             client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, BetaCorpHrAdminId.ToString());
             client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, BetaCorpId.ToString());
 
@@ -176,10 +146,6 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
         }
     }
 
-    /// <summary>
-    /// Verifies that requests for non-existent employees receive 404 Not Found.
-    /// The endpoint validates employee existence before attempting finalization.
-    /// </summary>
     [Fact]
     public async Task Post_DepartureFinaliser_Returns_404_EmployeeNotFound()
     {
@@ -193,7 +159,6 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
 
             using var client = _factory.CreateClient();
 
-            // Set auth headers for HR admin in correct company
             client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, HrAdminUserId.ToString());
             client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, AcmeCompanyId.ToString());
 
@@ -207,10 +172,6 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
         }
     }
 
-    /// <summary>
-    /// Verifies that requests for employees without a leaving process receive 400 Bad Request.
-    /// The endpoint cannot finalize employees that have no leaving process.
-    /// </summary>
     [Fact]
     public async Task Post_DepartureFinaliser_Returns_400_NoLeavingProcess()
     {
@@ -219,7 +180,6 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
         {
             Environment.SetEnvironmentVariable("E2E_TESTING", "true");
 
-            // Create a test employee without a leaving process
             var employeeId = await CreateEmployeeAsync(AcmeCompanyId);
             var url = $"/api/dev/departure-finaliser/{AcmeCompanyId:N}/{employeeId:N}";
 
@@ -238,10 +198,6 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
         }
     }
 
-    /// <summary>
-    /// Verifies that authorized HR admins can successfully finalize leaving employees.
-    /// This is the happy path: correct role, correct company, valid employee, in-progress process.
-    /// </summary>
     [Fact]
     public async Task Post_DepartureFinaliser_Returns_200_Success()
     {
@@ -250,7 +206,6 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
         {
             Environment.SetEnvironmentVariable("E2E_TESTING", "true");
 
-            // Create an employee with an in-progress leaving process
             var employeeId = await CreateEmployeeWithLeavingProcessAsync(AcmeCompanyId, "InProgress");
             var url = $"/api/dev/departure-finaliser/{AcmeCompanyId:N}/{employeeId:N}";
 
@@ -269,10 +224,6 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
         }
     }
 
-    /// <summary>
-    /// Verifies idempotency: finalized employees (already Former Employee with Completed process)
-    /// return 200 when finalization is requested again.
-    /// </summary>
     [Fact]
     public async Task Post_DepartureFinaliser_Returns_200_Idempotent()
     {
@@ -281,7 +232,6 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
         {
             Environment.SetEnvironmentVariable("E2E_TESTING", "true");
 
-            // Create an employee with a completed leaving process
             var employeeId = await CreateEmployeeWithCompletedLeavingProcessAsync(AcmeCompanyId);
             var url = $"/api/dev/departure-finaliser/{AcmeCompanyId:N}/{employeeId:N}";
 
@@ -300,7 +250,6 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
         }
     }
 
-    // ── Test Data Setup Helpers ──────────────────────────────────────────────────
 
     private async Task<Guid> CreateEmployeeAsync(Guid companyId)
     {
@@ -310,13 +259,11 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
         adminClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, hrAdminId.ToString());
         adminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
-        // Create required ref data with seeded IDs so we can reuse them
         var depId = Guid.Parse("10000000-0000-0000-0000-000000000001");
         var locId = Guid.Parse("70000000-0000-0000-0000-000000000001");
         var posId = Guid.Parse("20000000-0000-0000-0000-000000000002");
         var empTypeId = Guid.Parse("40000000-0000-0000-0000-000000000001");
 
-        // Create employee via API
         var unique = Guid.NewGuid().ToString("N")[..12];
         var response = await adminClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees",
@@ -363,7 +310,6 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
                 leavingDate,
                 lastWorkingDay = leavingDate,
                 leavingReason = "Resignation",
-                // Leaving date is already past so the finaliser job picks the process up.
                 confirmBackdatedLeavingDate = true
             });
 
@@ -373,8 +319,6 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
 
     private async Task<Guid> CreateEmployeeWithCompletedLeavingProcessAsync(Guid companyId)
     {
-        // For now, just create an employee with a leaving process
-        // A full test would need to simulate completion, but this tests the core endpoint
         return await CreateEmployeeWithLeavingProcessAsync(companyId, "Completed");
     }
 

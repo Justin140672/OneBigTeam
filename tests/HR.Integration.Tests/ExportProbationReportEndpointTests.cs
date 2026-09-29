@@ -76,7 +76,7 @@ public class ExportProbationReportEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
         var lines = body.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        Assert.Single(lines); // header row only, no data rows
+        Assert.Single(lines);
     }
 
     [Fact]

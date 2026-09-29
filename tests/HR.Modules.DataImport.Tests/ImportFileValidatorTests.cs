@@ -28,7 +28,6 @@ public class ImportFileValidatorTests
     [Fact]
     public void Validate_CsvExtension_ReturnsFailure()
     {
-        // CSV import support has been removed; only .xlsx is accepted now.
         var validator = CreateValidator();
 
         var result = validator.Validate("employees.csv", "text/csv", 1024);
@@ -54,7 +53,6 @@ public class ImportFileValidatorTests
     [Fact]
     public void Validate_BrowserExcelContentType_ReturnsFailure()
     {
-        // "application/vnd.ms-excel" (legacy .xls / some browsers' CSV mime type) is no longer allowed.
         var validator = CreateValidator();
 
         var result = validator.Validate("employees.xlsx", "application/vnd.ms-excel", 1024);
@@ -148,7 +146,6 @@ public class ImportFileValidatorTests
     [Fact]
     public void Validate_DisallowedContentType_ReturnsFailure()
     {
-        // Extension is allowed but content type is not one of the accepted values.
         var validator = CreateValidator();
 
         var result = validator.Validate("employees.xlsx", "application/json", 1024);
@@ -171,9 +168,8 @@ public class ImportFileValidatorTests
         Assert.True(result.IsSuccess);
     }
 
-    // --- ValidateContent (magic bytes) ---
 
-    private static Stream XlsxZipStream() => new MemoryStream([0x50, 0x4B, 0x03, 0x04, 0x00]); // PK zip
+    private static Stream XlsxZipStream() => new MemoryStream([0x50, 0x4B, 0x03, 0x04, 0x00]);
     private static Stream ZeroStream()    => new MemoryStream([0x00, 0x00, 0x00, 0x00, 0x00]);
     private static Stream CsvTextStream() => new MemoryStream("a,b,c\n1,2,3"u8.ToArray());
 
@@ -190,7 +186,6 @@ public class ImportFileValidatorTests
     [Fact]
     public void ValidateContent_Xlsx_WithWrongMagicBytes_ReturnsFailure()
     {
-        // File claims to be XLSX but the bytes are not a ZIP/OOXML container (spoofed/renamed).
         var result = CreateValidator().ValidateContent(
             ZeroStream(),
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
@@ -203,8 +198,6 @@ public class ImportFileValidatorTests
     [Fact]
     public void ValidateContent_Csv_HasNoKnownSignature_AlwaysReturnsSuccess()
     {
-        // CSV has no entry in the magic-byte table (it's no longer a supported content type),
-        // so ValidateContent defers to other checks rather than failing here itself.
         var result = CreateValidator().ValidateContent(CsvTextStream(), "text/csv");
 
         Assert.True(result.IsSuccess);

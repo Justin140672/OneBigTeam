@@ -9,11 +9,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.DataImport.Tests;
 
-/// <summary>
-/// TEST-007 hardening coverage for ConfirmImportSession: cross-tenant isolation, partial-failure
-/// bookkeeping, retry/double-confirm idempotency, invalid cross-references, cancellation, and the
-/// imported-employees-skip-onboarding contract (asserted via the published integration event).
-/// </summary>
 public class ConfirmImportSessionHardeningTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 30, 10, 0, 0, DateTimeKind.Utc);
@@ -56,7 +51,6 @@ public class ConfirmImportSessionHardeningTests
             session.Validate(successfulRows: totalRows, failedRows: 0, FixedNowOffset);
         db.SaveChanges();
 
-        // Force the exact requested status (Validate lands on Validated whenever successful > 0).
         if (target == ImportStatus.CompletedWithErrors && session.Status != ImportStatus.CompletedWithErrors)
         {
             session.Confirm(createdCount: 0, failedCount: 1, FixedNowOffset);
@@ -108,7 +102,6 @@ public class ConfirmImportSessionHardeningTests
     private static ConfirmImportSessionRequest Request(Guid companyId, Guid sessionId) =>
         new() { CompanyId = companyId, ImportSessionId = sessionId };
 
-    // --- Cross-tenant isolation ---
 
     [Fact]
     public async Task Another_Tenant_Cannot_Confirm_A_Session_It_Does_Not_Own()
@@ -132,7 +125,6 @@ public class ConfirmImportSessionHardeningTests
         Assert.Equal(ImportStatus.Validated, saved.Status);
     }
 
-    // --- Partial failure bookkeeping / no undocumented partial state ---
 
     [Fact]
     public async Task Partial_Failure_Records_Exact_Counts_And_Persists_A_RowError_Per_Failed_Row()
@@ -167,7 +159,6 @@ public class ConfirmImportSessionHardeningTests
         Assert.Equal(ImportRowErrorSeverity.Error, rowError.Severity);
     }
 
-    // --- Invalid cross-reference: unresolvable required lookup name ---
 
     [Fact]
     public async Task Row_With_Unresolvable_Required_Lookup_Reference_Fails_That_Row_Only()
@@ -176,9 +167,6 @@ public class ConfirmImportSessionHardeningTests
         var companyId = Guid.NewGuid();
         var session = SeedSession(db, companyId, totalRows: 2);
 
-        // Row 2 has NO resolved lookup ids and its raw data omits DepartmentName/LocationName/
-        // EmploymentTypeName/PositionProfileTitle, so the confirm handler cannot resolve the
-        // reference and GetRequired throws -> the row is recorded as an error, not imported.
         var badRow = ImportStagingEmployee.Create(
             Guid.NewGuid(), companyId, session.Id, 2, "EMP-BAD", "nodept@example.com", null,
             departmentId: null, locationId: null, employmentTypeId: null, positionProfileId: null,
@@ -201,7 +189,6 @@ public class ConfirmImportSessionHardeningTests
         Assert.Equal(ImportRowErrorSeverity.Error, rowError.Severity);
     }
 
-    // --- Double confirm / retry idempotency ---
 
     [Fact]
     public async Task Confirming_An_Already_Imported_Session_Is_Rejected_With_No_Duplicate_Employee_Creation()
@@ -223,7 +210,7 @@ public class ConfirmImportSessionHardeningTests
 
         Assert.True(second.IsFailure);
         Assert.Equal("conflict", second.Error.Code);
-        Assert.Single(employeeWriter.CreateRequests); // still exactly one - no duplicate business record
+        Assert.Single(employeeWriter.CreateRequests);
     }
 
     [Fact]
@@ -243,8 +230,6 @@ public class ConfirmImportSessionHardeningTests
         Assert.Equal(nameof(ImportStatus.CompletedWithErrors), first.Value!.Status);
         Assert.Equal(0, first.Value.CreatedCount);
 
-        // CompletedWithErrors is still a confirmable state, so a retry is allowed once the
-        // underlying issue is fixed.
         var fixedWriter = new FakeEmployeeImportWriter();
         var retryHandler = BuildHandler(db, fixedWriter);
 
@@ -257,7 +242,6 @@ public class ConfirmImportSessionHardeningTests
         Assert.Single(fixedWriter.CreateRequests);
     }
 
-    // --- Concurrent / duplicate confirmation requests ---
 
     [Fact]
     public async Task Concurrent_Confirmation_Requests_Do_Not_Both_Create_Employees()
@@ -269,8 +253,6 @@ public class ConfirmImportSessionHardeningTests
 
         var employeeWriter = new FakeEmployeeImportWriter();
 
-        // Same DbContext is not thread-safe; model the race as two sequential handler instances
-        // sharing one store, which is what the status guard must defend against.
         var handlerA = BuildHandler(db, employeeWriter);
         var handlerB = BuildHandler(db, employeeWriter);
 
@@ -283,7 +265,6 @@ public class ConfirmImportSessionHardeningTests
         Assert.Single(employeeWriter.CreateRequests);
     }
 
-    // --- Cancellation during confirmation ---
 
     [Fact]
     public async Task Cancellation_Before_Confirmation_Throws_And_Leaves_Session_Unconfirmed()
@@ -304,7 +285,6 @@ public class ConfirmImportSessionHardeningTests
         Assert.Equal(ImportStatus.Validated, saved.Status);
     }
 
-    // --- Imported employees skip onboarding (event contract) ---
 
     [Fact]
     public async Task Every_Imported_Row_Publishes_EmployeeCreated_With_IsImported_True()
@@ -326,7 +306,6 @@ public class ConfirmImportSessionHardeningTests
         Assert.All(created, e => Assert.True(e.IsImported));
     }
 
-    // --- OBT-REM-08: granular per-row resume, without ever recreating an already-created employee ---
 
     [Fact]
     public async Task Row_With_Employee_Already_Created_But_Events_Not_Published_Republishes_Without_Recreating_Employee()
@@ -336,8 +315,6 @@ public class ConfirmImportSessionHardeningTests
         var session = SeedSession(db, companyId, totalRows: 1);
         var employeeId = Guid.NewGuid();
 
-        // Simulates a crash immediately after MarkEmployeeCreated was persisted, before any of the
-        // downstream steps ran.
         var row = AddRow(db, companyId, session.Id, 2, workEmail: "resume@example.com");
         row.MarkEmployeeCreated(employeeId, FixedNowOffset);
         db.SaveChanges();
@@ -351,7 +328,7 @@ public class ConfirmImportSessionHardeningTests
         var result = await handler.HandleAsync(Request(companyId, session.Id), Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Empty(employeeWriter.CreateRequests); // never recreated
+        Assert.Empty(employeeWriter.CreateRequests);
         Assert.Equal(1, employeeWriter.GetImportSnapshotCalls);
         Assert.Single(publisher.Published.OfType<EmployeeCreatedIntegrationEvent>());
         Assert.Single(publisher.Published.OfType<EmployeeImportedIntegrationEvent>());
@@ -420,8 +397,6 @@ public class ConfirmImportSessionHardeningTests
         row.MarkEmployeeCreated(employeeId, FixedNowOffset);
         row.MarkEmployeeCreatedEventPublished(FixedNowOffset);
         row.MarkEmployeeImportedEventPublished(FixedNowOffset);
-        // The step under test is already marked complete from a previous attempt; only manager
-        // assignment (which resolves to "no manager reference" here) is still outstanding.
         row.MarkOpeningLeaveBalanceProcessed(FixedNowOffset);
         db.SaveChanges();
 
@@ -448,9 +423,6 @@ public class ConfirmImportSessionHardeningTests
         var session = SeedSession(db, companyId, totalRows: 1, target: ImportStatus.CompletedWithErrors);
         var employeeId = Guid.NewGuid();
 
-        // Every step is already done except manager assignment (no manager reference here, so this
-        // finalizes with no external calls at all) - proves a retry that only needed to finish the
-        // very last step still transitions the session out of CompletedWithErrors.
         var row = AddRow(db, companyId, session.Id, 2, workEmail: "last-step@example.com");
         row.MarkEmployeeCreated(employeeId, FixedNowOffset);
         row.MarkEmployeeCreatedEventPublished(FixedNowOffset);
@@ -485,7 +457,6 @@ public class ConfirmImportSessionHardeningTests
         var companyId = Guid.NewGuid();
         var session = SeedSession(db, companyId, totalRows: 2, target: ImportStatus.CompletedWithErrors);
 
-        // Row 2 was fully confirmed by an earlier attempt; row 3 has never been touched at all.
         var alreadyDoneEmployeeId = Guid.NewGuid();
         var rowAlreadyDone = AddRow(db, companyId, session.Id, 2, workEmail: "done@example.com", employeeNumber: "EMP-0002");
         rowAlreadyDone.MarkEmployeeCreated(alreadyDoneEmployeeId, FixedNowOffset);
@@ -510,13 +481,9 @@ public class ConfirmImportSessionHardeningTests
         Assert.Equal(0, result.Value.FailedCount);
         Assert.Equal(nameof(ImportStatus.Imported), result.Value.Status);
         Assert.Equal(2, result.Value.CreatedRows.Count);
-        // The already-confirmed row is fully skipped (no writer interaction at all) - only the
-        // still-outstanding row goes through CreateEmployeeAsync.
         Assert.Single(employeeWriter.CreateRequests);
     }
 
-    // --- OBT-REM-08: an actively-running claim is judged for staleness from when THIS attempt
-    // started, not from the original Validate timestamp. ---
 
     [Fact]
     public async Task Stale_Processing_Claim_Older_Than_15_Minutes_Is_Reclaimable_And_StartedAt_Is_Refreshed()
@@ -526,8 +493,6 @@ public class ConfirmImportSessionHardeningTests
         var session = SeedSession(db, companyId, totalRows: 1);
         AddRow(db, companyId, session.Id, 2, workEmail: "stale@example.com");
 
-        // Simulates a prior run that claimed the session (Processing) 20 minutes ago and then
-        // crashed without ever completing - older than the 15-minute stale-claim window.
         session.Start(FixedNowOffset.AddMinutes(-20));
         db.SaveChanges();
 
@@ -538,9 +503,6 @@ public class ConfirmImportSessionHardeningTests
         Assert.True(result.IsSuccess);
 
         var saved = await db.ImportSessions.SingleAsync(s => s.Id == session.Id);
-        // The bug this guards against: StartedAt used to only ever be set once (??=), so a stale
-        // claim's timestamp would stay frozen at the original crash time forever. It must now
-        // reflect this attempt's own claim time.
         Assert.Equal(FixedNowOffset, saved.StartedAt);
         Assert.NotEqual(FixedNowOffset.AddMinutes(-20), saved.StartedAt);
     }

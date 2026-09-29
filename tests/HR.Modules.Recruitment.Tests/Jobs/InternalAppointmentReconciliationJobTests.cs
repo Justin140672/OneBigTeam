@@ -92,7 +92,6 @@ public class InternalAppointmentReconciliationJobTests
         Assert.Empty(c.Events.PublishedEvents.OfType<CandidateHiredIntegrationEvent>());
         Assert.Empty(c.Service.AppointRequests);
 
-        // Resumed with the original requester.
         Assert.Equal(requestedBy, Assert.Single(c.Service.ResumeCalls).PerformedBy);
     }
 
@@ -138,8 +137,6 @@ public class InternalAppointmentReconciliationJobTests
     [Fact]
     public async Task ExecuteAsync_Treats_Exactly_StaleAfter_As_Still_Fresh()
     {
-        // The cutoff comparison is strict (RequestedAt < now - StaleAfter), so an appointment pending
-        // for exactly StaleAfter is not yet reconciled — an in-flight request is never raced.
         var c = await SeedCompanyAsync();
         var (application, _, _) = await AddPendingAsync(c, InternalAppointmentReconciliationJob.StaleAfter);
 

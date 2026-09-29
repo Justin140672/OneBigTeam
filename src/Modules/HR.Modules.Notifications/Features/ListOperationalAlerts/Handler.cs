@@ -11,10 +11,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Notifications.Features.ListOperationalAlerts;
 
-/// <summary>
-/// Follow-up B: platform-admin Operational Alerts list. Relies solely on the global
-/// <c>platform:admin</c> policy (same modern pattern as GetAuditLog) — no tenant scoping.
-/// </summary>
 internal sealed class ListOperationalAlertsHandler(NotificationsDbContext dbContext)
 {
     public async Task<Result<ListOperationalAlertsResponse>> HandleAsync(

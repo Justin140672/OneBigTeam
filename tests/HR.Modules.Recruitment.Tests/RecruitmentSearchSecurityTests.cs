@@ -1,5 +1,3 @@
-// SEA-08: Search security matrix — recruitment search cross-company isolation,
-// consistent out-of-range page behaviour and search term validation.
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.ListCandidates;
 using HR.Modules.Recruitment.Persistence;
@@ -11,7 +9,6 @@ public class RecruitmentSearchSecurityTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 28, 9, 0, 0, TimeSpan.Zero);
 
-    // ── Cross-company isolation ────────────────────────────────────────────
 
     [Fact]
     public async Task ListCandidates_TotalCount_Excludes_Other_Company_Records()
@@ -54,7 +51,6 @@ public class RecruitmentSearchSecurityTests
         Assert.Equal("Smith", result.Value.Items[0].LastName);
     }
 
-    // ── Out-of-range page behaviour ────────────────────────────────────────
 
     [Fact]
     public async Task ListCandidates_Out_Of_Range_Page_Returns_Empty_Items_With_Correct_TotalCount()
@@ -75,7 +71,6 @@ public class RecruitmentSearchSecurityTests
         Assert.Empty(result.Value.Items);
     }
 
-    // ── Search term validation ─────────────────────────────────────────────
 
     [Fact]
     public void ListCandidates_Validator_Rejects_Oversized_Search_Term()

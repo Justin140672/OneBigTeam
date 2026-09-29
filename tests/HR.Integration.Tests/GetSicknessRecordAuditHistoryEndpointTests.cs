@@ -5,13 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// AUD-07: GET .../companies/{companyId}/sickness-records/{sicknessRecordId}/audit-history.
-/// Gated by <c>sickness:manage</c>. Reads the real AuditDbContext via IAuditHistoryReader,
-/// newest-first, scoped by companyId.
-///
-/// Red until the foreign AUD-04 "actor_type" audit migration is fixed. Write the test correctly anyway.
-/// </summary>
 [Collection("Integration")]
 public class GetSicknessRecordAuditHistoryEndpointTests
 {
@@ -91,7 +84,6 @@ public class GetSicknessRecordAuditHistoryEndpointTests
         var employeeId = Guid.NewGuid();
         var recordId = await CreateRecord(client, companyId, employeeId, categoryId);
 
-        // Second mutation -> a second audit event on the same entity.
         var updateResp = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/sickness-records/{recordId}",
             new { companyId, employeeId, id = recordId, categoryId, startDate = "2026-06-02", startDayPart = 0, notes = "amended", expectedVersion = 1 });
@@ -111,7 +103,6 @@ public class GetSicknessRecordAuditHistoryEndpointTests
     [Fact]
     public async Task Returns_Empty_History_For_Unknown_Record()
     {
-        // Handler always returns Result.Success -> 200 + empty Items for an unknown id (not 404).
         var companyId = Guid.NewGuid();
         using var client = await AdminClient(companyId);
 

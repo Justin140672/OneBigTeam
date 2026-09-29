@@ -20,7 +20,6 @@ public class UpdateLeaveTypeConcurrencyEndpointTests
         _factory = factory;
         Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator))
             .GetAwaiter().GetResult();
-        // ListLeaveTypes (used to read the pre-edit Version) is gated on role:employee.
         Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.Employee))
             .GetAwaiter().GetResult();
     }

@@ -6,12 +6,6 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace HR.Marketing.Services;
 
-/// <summary>
-/// Fetches the configurable subscription pricing model (Story 4) from HR.Api's anonymous public
-/// feed (<c>/api/public/subscription-pricing</c>), cached in-memory for ~5 minutes. Any failure
-/// (network, deserialization, structurally invalid config) falls back to
-/// <see cref="SubscriptionPricingConfig.Default"/> so the pricing page always renders.
-/// </summary>
 public sealed class SubscriptionPricingProvider(
     IHttpClientFactory httpClientFactory,
     IMemoryCache cache,

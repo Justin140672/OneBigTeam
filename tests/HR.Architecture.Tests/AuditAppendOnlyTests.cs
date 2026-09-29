@@ -3,21 +3,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Architecture.Tests;
 
-/// <summary>
-/// AUD-02: proves that AuditDbContext's application-layer append-only guard fires correctly.
-///
-/// EnforceAppendOnly() iterates ChangeTracker.Entries() and throws before EF dispatches any
-/// SQL, so no database connection is required.  We configure Npgsql with a dummy connection
-/// string so EF accepts the context at construction time; the guard always throws before the
-/// provider attempts a connection.
-///
-/// Database-level enforcement (REVOKE UPDATE/DELETE on the runtime role) must be validated
-/// separately via migration review and DBA sign-off.
-/// </summary>
 public class AuditAppendOnlyTests
 {
-    // Npgsql accepts this at configuration time; no connection is ever attempted because
-    // EnforceAppendOnly() throws before the provider runs.
     private const string DummyConnectionString = "Host=localhost;Database=audit_append_only_unit_test";
 
     private static AuditDbContext BuildContext()
@@ -34,8 +21,6 @@ public class AuditAppendOnlyTests
         await using var ctx = BuildContext();
         var entry = ctx.AuditEvents.Add(BuildMinimalAuditEvent());
 
-        // Force Modified without a DB round-trip — guard must fire regardless of how state
-        // was reached.
         entry.State = EntityState.Modified;
 
         await Assert.ThrowsAsync<InvalidOperationException>(
@@ -117,7 +102,6 @@ public class AuditAppendOnlyTests
     [Fact]
     public void SaveChanges_Does_Not_Throw_AUD02_When_AuditPendingItem_Is_Deleted()
     {
-        // A committed/failed pending item may legitimately be pruned from the staging table.
         using var ctx = BuildContext();
         var entry = ctx.AuditPendingItems.Add(AuditPendingItem.From(new FakeAuditEvent()));
 
@@ -133,18 +117,12 @@ public class AuditAppendOnlyTests
         AuditEvent.From(new FakeAuditEvent());
 }
 
-/// <summary>
-/// Minimal IAuditEvent stub for AUD-02 unit tests.
-/// AuditEvent.From() is internal to HR.Infrastructure; the Architecture test project
-/// calls it via the InternalsVisibleTo attribute on that assembly.
-/// </summary>
 internal sealed class FakeAuditEvent : HR.SharedKernel.IAuditEvent
 {
     public Guid           CompanyId       => Guid.NewGuid();
     public string         EventType       => "test.event";
     public string         EntityType      => "Test";
     public Guid           EntityId        => Guid.NewGuid();
-    // AUD-04: test fixture uses a fixed actor so the attribution guard passes.
     public Guid?          ActorUserId     => Guid.Parse("00000000-0000-0000-0000-000000000001");
     public Guid?          ActorEmployeeId => null;
     public DateTimeOffset OccurredAt      => DateTimeOffset.UtcNow;

@@ -126,7 +126,6 @@ public class GetEmployeePromotionHistoryEndpointTests
         var items = payload.GetProperty("items").EnumerateArray().ToList();
 
         Assert.Equal(2, items.Count);
-        // Most recent EffectiveDate first
         Assert.Equal("Latest promotion", items[0].GetProperty("reason").GetString());
         Assert.Equal("Earlier promotion", items[1].GetProperty("reason").GetString());
     }

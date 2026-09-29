@@ -92,13 +92,6 @@ internal sealed class TaskItemConfiguration : IEntityTypeConfiguration<TaskItem>
         builder.HasIndex(t => t.AssignedUserId);
         builder.HasIndex(t => new { t.CompanyId, t.Status });
 
-        // OBT-REM-13: DB-enforced idempotency for workflow-created tasks. Scoped per company (not
-        // globally) and filtered to non-null keys only, so the many tasks with no idempotency key
-        // (the overwhelming majority — manual/interactive-endpoint-created tasks) never collide with
-        // each other, and the same key in two different companies never collides either. Callers that
-        // want idempotent creation supply a deterministic key such as
-        // "SicknessEvidenceOverdue:{evidenceRequestId}" — different workflow keys against the same
-        // source entity (e.g. a different workflow prefix) remain free to create separate tasks.
         builder.HasIndex(t => new { t.CompanyId, t.IdempotencyKey })
             .IsUnique()
             .HasFilter("idempotency_key IS NOT NULL")

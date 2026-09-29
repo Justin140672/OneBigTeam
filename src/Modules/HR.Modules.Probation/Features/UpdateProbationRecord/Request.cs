@@ -18,7 +18,5 @@ internal sealed record UpdateProbationRecordRequest
     // Ticket 16 (optimistic concurrency) — see UpdateSupportRequestStatusRequest.ExpectedVersion.
     public int? ExpectedVersion { get; init; }
 
-    // PROB-07: populated by the endpoint from the authenticated user's resolved identity — never
-    // bound from the client body.
     internal Guid? ActorEmployeeId { get; init; }
 }

@@ -12,18 +12,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// OBT-REM-08: end-to-end coverage for ConfirmImportSession's resumable confirmation behaviour,
-/// running against a real Postgres testcontainer (see ApiWebApplicationFactory) rather than the
-/// in-memory-DbContext handler tests in HR.Modules.DataImport.Tests/ConfirmImportSessionHardeningTests.cs.
-///
-/// There is no built-in fault-injection hook for "crash between employee creation and the
-/// downstream steps" at the HTTP boundary, so the crash/partial-progress and stale-claim scenarios
-/// here are simulated by reaching into the real DataImportDbContext via the test host's DI
-/// container (the same pattern AuditHistoryIntegrationTests uses for direct DbContext reads) and
-/// calling the (InternalsVisibleTo-exposed) internal domain methods directly - never by editing
-/// production code to add test seams.
-/// </summary>
 [Collection("Integration")]
 public class ConfirmImportSessionResumabilityEndpointTests
 {
@@ -48,9 +36,6 @@ public class ConfirmImportSessionResumabilityEndpointTests
         var sessionId = await UploadAsync(client, companyId, ValidCsv());
         (await client.PostAsync(ValidateUrl(companyId, sessionId), EmptyJson())).EnsureSuccessStatusCode();
 
-        // Two independent clients (same auth) racing the same confirm call. The xmin concurrency
-        // token on ImportSession.ClaimForConfirmation means only one of these can win the save
-        // that transitions the session into Processing.
         using var clientA = await AdminClientAsync(companyId);
         using var clientB = await AdminClientAsync(companyId);
 
@@ -80,8 +65,6 @@ public class ConfirmImportSessionResumabilityEndpointTests
         var sessionId = await UploadAsync(client, companyId, ValidCsv());
         (await client.PostAsync(ValidateUrl(companyId, sessionId), EmptyJson())).EnsureSuccessStatusCode();
 
-        // Simulate a prior confirm attempt that claimed the session (Processing) 20 minutes ago and
-        // then crashed before finishing - older than the handler's 15-minute stale-claim window.
         await MutateSessionAsync(sessionId, session => session.Start(DateTimeOffset.UtcNow.AddMinutes(-20)));
 
         var beforeConfirm = DateTimeOffset.UtcNow;
@@ -93,9 +76,6 @@ public class ConfirmImportSessionResumabilityEndpointTests
         Assert.Equal("Imported", payload!.Status);
         Assert.Equal(2, payload.CreatedCount);
 
-        // The bug this guards against: StartedAt used to only ever be set once (??=), so a reclaimed
-        // stale session would keep reporting its StartedAt frozen at the original crash time. It
-        // must now reflect this (successful) attempt's own claim time.
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DataImportDbContext>();
         var saved = await db.ImportSessions.AsNoTracking().SingleAsync(s => s.Id == sessionId);
@@ -123,7 +103,6 @@ public class ConfirmImportSessionResumabilityEndpointTests
     public async Task Retry_After_Simulated_Crash_Between_Employee_Creation_And_Downstream_Steps_Resumes_Without_Duplicate_Employee()
     {
         var (client, companyId) = await ManualModeAdminClientAsync();
-        // Single-row file keeps the "exactly one employee, ever" assertion unambiguous.
         const string csv =
             "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount\n" +
             "John,Doe,john.resume@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer,50000\n";
@@ -151,9 +130,6 @@ public class ConfirmImportSessionResumabilityEndpointTests
                 s => s.ImportSessionId == sessionId && s.WorkEmail == "john.resume@example.com");
             createdEmployeeId = row.CreatedEmployeeId!.Value;
 
-            // Property() bypasses the entity's private setters (this is EF Core's standard escape
-            // hatch for exactly this kind of test-only state manipulation), letting the test force
-            // the row back into a "partially resumed" shape without any production code change.
             db.Entry(row).Property(nameof(ImportStagingEmployee.EmployeeCreatedEventPublishedAt)).CurrentValue = null;
             db.Entry(row).Property(nameof(ImportStagingEmployee.EmployeeImportedEventPublishedAt)).CurrentValue = null;
             db.Entry(row).Property(nameof(ImportStagingEmployee.OpeningLeaveBalanceProcessedAt)).CurrentValue = null;
@@ -186,7 +162,7 @@ public class ConfirmImportSessionResumabilityEndpointTests
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<DataImportDbContext>();
         var savedRow = await verifyDb.ImportStagingEmployees.AsNoTracking().SingleAsync(
             s => s.ImportSessionId == sessionId && s.WorkEmail == "john.resume@example.com");
-        Assert.Equal(createdEmployeeId, savedRow.CreatedEmployeeId); // same employee id - never recreated
+        Assert.Equal(createdEmployeeId, savedRow.CreatedEmployeeId);
         Assert.NotNull(savedRow.EmployeeCreatedEventPublishedAt);
         Assert.NotNull(savedRow.EmployeeImportedEventPublishedAt);
         Assert.NotNull(savedRow.OpeningLeaveBalanceProcessedAt);

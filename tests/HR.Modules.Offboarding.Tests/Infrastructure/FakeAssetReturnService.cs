@@ -17,7 +17,6 @@ internal sealed class FakeAssetReturnService : IAssetReturnService
     public List<Call> Calls { get; } = [];
     public List<VerifiedCall> VerifiedCalls { get; } = [];
 
-    /// <summary>Result returned by the verified overload for every call. Defaults to Success.</summary>
     public AssetReturnResult NextResult { get; set; } = AssetReturnResult.Success;
 
     public Task ReturnAsync(

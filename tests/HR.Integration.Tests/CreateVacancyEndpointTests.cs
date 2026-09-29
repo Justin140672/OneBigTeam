@@ -100,7 +100,6 @@ public class CreateVacancyEndpointTests
         var otherCompanyId = Guid.NewGuid();
         using var client = await AuthenticatedClient(companyId);
 
-        // Position profile exists, but for a different company than the one making the request.
         var otherCompanyReferenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, otherCompanyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/vacancies", new
@@ -215,8 +214,6 @@ public class CreateVacancyEndpointTests
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        // Parse the raw JSON rather than a typed DTO to prove "departmentId" is genuinely absent from
-        // the wire contract, not merely unused by our own payload record.
         using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
         var propertyNames = document.RootElement.EnumerateObject().Select(p => p.Name).ToList();
         Assert.DoesNotContain(propertyNames, name => string.Equals(name, "departmentId", StringComparison.OrdinalIgnoreCase));
@@ -266,9 +263,6 @@ public class CreateVacancyEndpointTests
         var createPayload = await createResponse.Content.ReadFromJsonAsync<VacancyPayload>();
         Assert.NotNull(createPayload);
 
-        // Re-fetch through GetVacancy — a persistence round-trip, proving the values written by
-        // CreateVacancy survive being read back rather than only ever being echoed from the create
-        // response itself.
         var getResponse = await client.GetAsync($"/api/companies/{companyId}/vacancies/{createPayload!.Id}");
         Assert.Equal(HttpStatusCode.OK, getResponse.StatusCode);
         var getPayload = await getResponse.Content.ReadFromJsonAsync<VacancyPayload>();

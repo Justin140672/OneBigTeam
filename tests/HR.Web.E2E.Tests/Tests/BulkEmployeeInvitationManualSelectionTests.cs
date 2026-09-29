@@ -3,16 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Split out of BulkEmployeeInvitationTests for real cross-test parallelism — see
-/// BulkEmployeeInvitationGettingStartedTests' remarks.
-///
-/// The "Invite selected (N)" toolbar action also works from the NORMAL (non-invite-mode) grid
-/// with a manual multi-row selection — not just the dedicated invitation-mode grid. Complements
-/// EmployeeUserAccountColumnTests (individual row Quick Invite, still covered there) and
-/// EmployeeListBulkUpdateTests (compensation bulk-update, unaffected by this feature) — this test
-/// is scoped to the one new toolbar action neither of those covers.
-/// </summary>
 public sealed class BulkEmployeeInvitationManualSelectionTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");

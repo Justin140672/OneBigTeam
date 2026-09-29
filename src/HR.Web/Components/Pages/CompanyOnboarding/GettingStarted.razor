@@ -67,10 +67,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // OBT-IAM-09: gate on onboarding:view (the same permission the underlying checklist API
-        // policy enforces) — not company:edit (CanManageCompanyConfiguration), which a
-        // Company-Administrator-only account keeps regardless and would have let it render this
-        // page's shell even though the checklist fetch itself is 403'd server-side.
         if (!(Session.IsHrAdministrator || Session.CanViewOnboarding))
         {
             Navigation.NavigateTo("/access-denied", replace: true);
@@ -80,11 +76,6 @@
         _checklist = await CompanyOnboardingService.GetChecklistAsync();
         _isLoading = false;
 
-        // The checklist fetch above already persisted IsHidden=true server-side if this load
-        // pushed completion to 100% (see GetOnboardingChecklistHandler) — refresh AppSession's
-        // own cached flag immediately so the nav menu / landing redirect reflect it for the rest
-        // of this session too, not only on the user's next login. See MarkGettingStartedHidden's
-        // remarks for why this can't just wait for a fresh circuit.
         if (_checklist is { IsHidden: true })
             Session.MarkGettingStartedHidden();
     }

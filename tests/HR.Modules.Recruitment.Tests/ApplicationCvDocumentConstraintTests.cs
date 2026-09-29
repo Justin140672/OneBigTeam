@@ -110,7 +110,6 @@ public class ApplicationCvDocumentConstraintTests(RecruitmentDatabaseFixture fix
         return pg;
     }
 
-    // ---- (a) other candidate's document ----------------------------------------------------------
 
     [Fact]
     public async Task Inserting_Application_Referencing_Another_Candidates_Cv_Is_Rejected_By_The_Database()
@@ -119,8 +118,6 @@ public class ApplicationCvDocumentConstraintTests(RecruitmentDatabaseFixture fix
         var otherCandidateId = await SeedCandidateAsync(seed.CompanyId);
         var otherCandidatesCv = await AddDocumentAsync(Document(seed.CompanyId, otherCandidateId, "other.pdf", Now));
 
-        // A fresh application for the seeded candidate on a second vacancy, with the FK property
-        // written directly (bypassing Application.AttachCv's guard).
         Guid newApplicationId;
         Exception? ex;
         await using (var db = fixture.BuildContext())
@@ -157,7 +154,6 @@ public class ApplicationCvDocumentConstraintTests(RecruitmentDatabaseFixture fix
         Assert.Null((await ReloadApplicationAsync(seed.ApplicationId)).CvDocumentId);
     }
 
-    // ---- (b) other company's document -----------------------------------------------------------
 
     [Fact]
     public async Task Updating_Application_To_Reference_Another_Companys_Document_Is_Rejected_By_The_Database()
@@ -218,7 +214,6 @@ public class ApplicationCvDocumentConstraintTests(RecruitmentDatabaseFixture fix
         Assert.Equal(seed.Cv2.Id, (await ReloadApplicationAsync(seed.ApplicationId)).CvDocumentId);
     }
 
-    // ---- (c) delete restricted while referenced --------------------------------------------------
 
     [Fact]
     public async Task Deleting_A_Referenced_Cv_Row_Fails_With_Foreign_Key_Violation()
@@ -271,7 +266,6 @@ public class ApplicationCvDocumentConstraintTests(RecruitmentDatabaseFixture fix
         Assert.False(await DocumentExistsAsync(seed.Cv2.Id));
     }
 
-    // ---- (d) null reference allowed ---------------------------------------------------------------
 
     [Fact]
     public async Task Application_With_Null_Cv_Document_Id_Is_Accepted_And_Loads()
@@ -299,7 +293,6 @@ public class ApplicationCvDocumentConstraintTests(RecruitmentDatabaseFixture fix
         Assert.Null((await ReloadApplicationAsync(seed.ApplicationId)).CvDocumentId);
     }
 
-    // ---- (e) clear then delete --------------------------------------------------------------------
 
     [Fact]
     public async Task After_Removing_The_Reference_Via_SetApplicationCv_The_Cv_Can_Be_Deleted()
@@ -386,14 +379,10 @@ public class ApplicationCvDocumentConstraintTests(RecruitmentDatabaseFixture fix
         Assert.False(await verify.CandidateDocumentDeletionOperations.AnyAsync(o => o.CandidateId == seed.CandidateId));
     }
 
-    // ---- (f) concurrency --------------------------------------------------------------------------
 
     [Fact]
     public async Task Two_Contexts_Setting_Different_Cvs_From_The_Same_Version_Exactly_One_Wins()
     {
-        // Deterministic stale-writer race: context B has already loaded (and tracks) the application
-        // at Version 1 before A's change commits, so B's handler passes the up-front version check and
-        // reaches Postgres with a genuinely stale "WHERE version = 1" UPDATE that affects zero rows.
         var seed = await SeedAsync();
 
         await using var ctxB = fixture.BuildContext();
@@ -444,13 +433,10 @@ public class ApplicationCvDocumentConstraintTests(RecruitmentDatabaseFixture fix
         Assert.Equal(2, saved.Version);
     }
 
-    // ---- Purge -------------------------------------------------------------------------------------
 
     [Fact]
     public async Task Purge_Of_Candidate_Whose_Application_References_A_Cv_Clears_Reference_And_Deletes_The_Cv()
     {
-        // With ON DELETE RESTRICT, the purge can only delete the candidate's CV documents if the same
-        // save also clears the application's reference (Application.RedactPersonalData).
         var oldEnough = Now.AddDays(-800);
         var seed = await SeedAsync(attachCv1: true, at: oldEnough, withdrawn: true);
 
@@ -470,7 +456,6 @@ public class ApplicationCvDocumentConstraintTests(RecruitmentDatabaseFixture fix
         Assert.False(await DocumentExistsAsync(seed.Cv2.Id));
     }
 
-    // ---- Helpers -----------------------------------------------------------------------------------
 
     private static SetApplicationCvHandler SetCvHandler(RecruitmentDbContext db, FakeAuditPublisher audit) =>
         new(db, new FakeClock(FixedUtcNow), audit);
@@ -488,12 +473,6 @@ public class ApplicationCvDocumentConstraintTests(RecruitmentDatabaseFixture fix
         new(db, storage, new FakeClock(FixedUtcNow), new RecordingBackgroundJobClient(),
             NullLogger<DeleteCandidateDocumentHandler>.Instance);
 
-    /// <summary>
-    /// Fires once, immediately before the first command that deletes from candidate_documents is
-    /// sent: commits (on a separate connection, outside the handler's transaction) an UPDATE making
-    /// the application reference the CV being deleted, simulating a reference that appears between
-    /// DeleteCandidateDocumentHandler's pre-check and its save.
-    /// </summary>
     private sealed class AttachReferenceBeforeDeleteInterceptor(string connectionString, Guid applicationId, Guid documentId)
         : DbCommandInterceptor
     {

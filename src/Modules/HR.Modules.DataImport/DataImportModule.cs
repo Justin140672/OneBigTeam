@@ -75,22 +75,9 @@ public static class DataImportModule
         return services;
     }
 
-    /// <summary>
-    /// Reliability review issue 2 (P1): import files must be durable (Supabase-backed) in every
-    /// environment except Development or an explicit automated-test environment, matching the rule
-    /// already applied to documents/profile photos/support attachments/organisation exports/candidate
-    /// documents. This matters more here than for most other categories: import validation and
-    /// confirmation both happen in requests after the initial upload, so a process restart between
-    /// stages on local temp storage would orphan an otherwise-valid import — Supabase-backed storage
-    /// keeps the file available from any service instance across the whole import lifecycle.
-    /// </summary>
     private static void AddImportFileStorage(
         IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
-        // The options validator resolves IHostEnvironment via constructor injection to gate the
-        // Development/Test-only HTTP allowance (security review finding 6). The host already
-        // registers IHostEnvironment in production; TryAddSingleton is a no-op there and only
-        // matters for tests that build a bare IServiceCollection.
         services.TryAddSingleton(environment);
 
         var supabaseSection = configuration.GetSection("DataImport:Supabase:ImportFiles");
@@ -130,14 +117,10 @@ public static class DataImportModule
             "dataimport-idempotency-maintenance",
             job => job.ExecuteAsync(),
             "*/5 * * * *");
-        // Security review finding #2: hourly sweep for raw import files not already deleted
-        // inline by ValidateImportSession (abandoned sessions, retries of a failed inline delete).
         jobManager.AddOrUpdate<PurgeImportSessionFilesJob>(
             "dataimport-purge-session-files",
             job => job.ExecuteAsync(CancellationToken.None),
             Cron.Hourly());
-        // Security review finding #3: hourly sweep for uploaded blobs whose owning session row
-        // failed to save and whose immediate compensating delete also failed.
         jobManager.AddOrUpdate<PurgeOrphanedImportFileUploadsJob>(
             "dataimport-purge-orphaned-uploads",
             job => job.ExecuteAsync(CancellationToken.None),

@@ -9,20 +9,11 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient();
 
-    // Maps the shared ApiResult<T> failure classification onto the pre-existing ApiSaveResult
-    // shape consumed by EditSectionBase/EditPageBase/SaveConflictBanner across ~25 call sites.
-    // IsConcurrencyConflict is driven exclusively by ApiFailureKind.Concurrency (code == "concurrency"),
-    // the same convention EditSectionBase already used.
     private static ApiSaveResult ToSaveResult<T>(ApiResult<T> result, Func<T?, int?>? versionSelector = null)
         => result.Success
             ? ApiSaveResult.Ok(versionSelector is not null ? versionSelector(result.Value) : null)
             : ApiSaveResult.Fail(result.DisplayMessage ?? "Failed to save.", result.IsConcurrencyConflict);
 
-    /// <summary>
-    /// The full employee administration list (EmployeeList grid). API-gated to "employee:manage"
-    /// (HR Administrator only). Non-HR-admin pickers must call
-    /// <see cref="ListSelectableEmployeesAsync"/> instead.
-    /// </summary>
     public Task<ListEmployeesResponse?> ListEmployeesAsync(
         Guid companyId,
         string? search = null,
@@ -34,11 +25,6 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         Guid? locationId = null)
         => GetEmployeeListAsync("employees", companyId, search, pageNumber, pageSize, departmentId, status, managerId, locationId);
 
-    /// <summary>
-    /// The read-only "pick a person" projection, API-gated to "employee:read" (Manager / Recruiter /
-    /// HR Administrator). Same response shape as <see cref="ListEmployeesAsync"/>; use this for
-    /// dropdown/combobox pickers where the caller may be a Manager or Recruiter.
-    /// </summary>
     public Task<ListEmployeesResponse?> ListSelectableEmployeesAsync(
         Guid companyId,
         string? search = null,
@@ -185,20 +171,14 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    // DSH-03: non-swallowing sibling of GetMyTeamAsync.
     public Task<GetMyTeamResponse?> GetMyTeamOrThrowAsync(Guid companyId, bool includeIndirect) =>
         Http.GetFromJsonAsync<GetMyTeamResponse>(
             $"api/companies/{companyId}/employees/me/team?includeIndirect={includeIndirect}", HrApiJsonOptions.Default);
 
-    // DSH-05: authoritative server-computed team status summary (counts + drill-down members
-    // from one payload, so headline counts and lists always agree). Non-swallowing.
     public Task<TeamStatusSummaryResponse?> GetTeamStatusSummaryOrThrowAsync(Guid companyId, Guid managerId) =>
         Http.GetFromJsonAsync<TeamStatusSummaryResponse>(
             $"api/companies/{companyId}/employees/{managerId}/team-status-summary", HrApiJsonOptions.Default);
 
-    // Full discoverable roster behind "View all team" (MyTeamRoster.razor) — every direct/indirect
-    // report GetEmployeeTeamView still authorizes (Draft/Active/Suspended/Leaving), unlike
-    // GetMyTeamAsync above, which stays scoped to the compact, Active-only dashboard preview.
     public Task<GetMyTeamRosterResponse?> GetMyTeamRosterAsync(Guid companyId, bool includeIndirect) =>
         Http.GetFromJsonAsync<GetMyTeamRosterResponse>(
             $"api/companies/{companyId}/employees/me/team/roster?includeIndirect={includeIndirect}", HrApiJsonOptions.Default);
@@ -216,11 +196,6 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    // Manager-facing, operational-only counterpart to GetEmployeeAsync above — hits the separate
-    // GetEmployeeTeamView endpoint and deserializes into the distinct, reduced
-    // GetEmployeeTeamViewResponse model, never the full GetEmployeeResponse. Non-swallowing (the
-    // caller needs to distinguish 403/404 from a genuine API error to render the right page
-    // state) — see TeamMemberProfile.razor.
     public Task<ApiResult<GetEmployeeTeamViewResponse>> GetEmployeeTeamViewAsync(Guid companyId, Guid id) =>
         ApiResponseReader.ExecuteAsync<GetEmployeeTeamViewResponse>(
             ct => Http.GetAsync($"api/companies/{companyId}/employees/{id}/team-view", ct),
@@ -235,8 +210,6 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         return ToSaveResult(result, v => v?.Version);
     }
 
-    // Item 5: atomic combined save for the Employee Edit screen (profile + employment in one
-    // transaction, one version guarding the shared Employee aggregate).
     public async Task<ApiSaveResult> UpdateEmployeeProfileAndEmploymentAsync(
         Guid companyId, Guid id, UpdateEmployeeProfileAndEmploymentRequest request)
     {
@@ -254,8 +227,6 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         var response = await Http.PutAsJsonAsync(
             $"api/companies/{companyId}/employees/me/complete-initial-setup", request, cancellationToken);
 
-        // A 409 here means setup was already completed (e.g. a double-submit/race) — treat it
-        // as a soft success rather than an error so the caller just closes the dialog.
         if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
             return (true, null);
 
@@ -491,7 +462,6 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    // ── EQUALITY & DIVERSITY (self-service) ───────────────────────────────────
 
     public async Task<GetMyEqualityDataResponse?> GetMyEqualityRecordAsync(
         Guid companyId,

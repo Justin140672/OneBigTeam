@@ -57,7 +57,6 @@ public class BulkApplyCompensationAdjustmentsHandlerTests
 
         Assert.Equal(2, await context.Compensations.CountAsync(c => c.EffectiveFrom == new DateOnly(2026, 1, 1)));
 
-        // 2 closed + 2 bulk-applied events, all sharing the same CorrelationId (BulkOperationId).
         Assert.Equal(4, publisher.Published.Count);
         var bulkAppliedEvents = publisher.Published.OfType<CompensationRecordBulkAppliedAuditEvent>().ToList();
         Assert.Equal(2, bulkAppliedEvents.Count);
@@ -82,12 +81,10 @@ public class BulkApplyCompensationAdjustmentsHandlerTests
         var companyId = Guid.NewGuid();
 
         var employee1 = CreateEmployee(companyId, now);
-        var employee2 = CreateEmployee(companyId, now); // will conflict
+        var employee2 = CreateEmployee(companyId, now);
         var employee3 = CreateEmployee(companyId, now);
         context.Employees.AddRange(employee1, employee2, employee3);
 
-        // Employee2 already has an open record starting on the same date as the requested effective date,
-        // which the writer treats as a conflict (not a "close and replace" scenario).
         var conflicting = Compensation.Create(Guid.NewGuid(), companyId, employee2.Id, new DateOnly(2026, 1, 1), SalaryType.Annual, 40000m, "GBP", null, null, null, CompensationChangeReason.NewHire, Guid.NewGuid(), now);
         context.Compensations.Add(conflicting);
         await context.SaveChangesAsync();
@@ -115,7 +112,6 @@ public class BulkApplyCompensationAdjustmentsHandlerTests
         Assert.Equal("conflict", result.Error.Code);
         Assert.Contains(employee2.Id.ToString(), result.Error.Message);
 
-        // Employee3 comes after the conflicting employee2 in the batch, so the loop must never reach it.
         Assert.Empty(await context.Compensations.Where(c => c.EmployeeId == employee3.Id).ToListAsync());
         Assert.Single(await context.Compensations.Where(c => c.EmployeeId == employee2.Id).ToListAsync());
         Assert.Empty(publisher.Published);
@@ -181,8 +177,6 @@ public class BulkApplyCompensationAdjustmentsHandlerTests
         Assert.Contains(compensationEvents, e => e.EmployeeId == employee1.Id);
         Assert.Contains(compensationEvents, e => e.EmployeeId == employee2.Id);
 
-        // Redaction: no salary/amount figure exists on this event type at all (no such field) —
-        // assert the serialized form never contains either proposed salary as a defence-in-depth check.
         foreach (var evt in compensationEvents)
         {
             var json = System.Text.Json.JsonSerializer.Serialize(evt);

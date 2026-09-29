@@ -42,8 +42,6 @@ internal sealed class GetUpcomingInterviewsHandler(
             .Take(MaxItems)
             .ToListAsync(cancellationToken);
 
-        // Batch cross-module read for the pure-display "VacancyTitle" — same pattern/rationale as
-        // GetApplicationsByStatusHandler.
         var positionProfileIds = rows
             .Select(r => r.PositionProfileId)
             .Distinct()

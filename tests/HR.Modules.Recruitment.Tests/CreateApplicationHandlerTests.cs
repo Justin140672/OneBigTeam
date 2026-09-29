@@ -407,7 +407,6 @@ public class CreateApplicationHandlerTests
     [Fact]
     public async Task HandleAsync_Two_Applications_For_Same_Candidate_Keep_Their_Own_Different_Cvs()
     {
-        // Acceptance: each application fixes the CV it was submitted with, independently of the other.
         await using var db = BuildContext();
         var (companyId, vacancyA, candidate) = await SeedVacancyAndCandidateAsync(db);
         var vacancyB = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);

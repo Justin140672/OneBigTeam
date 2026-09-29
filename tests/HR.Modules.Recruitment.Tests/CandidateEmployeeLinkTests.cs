@@ -15,7 +15,6 @@ public class CandidateEmployeeLinkTests
         Candidate.CreateForEmployee(
             Guid.NewGuid(), Guid.NewGuid(), employeeId, "Priya", "Shah", "priya.shah@acme.example", phone, Now);
 
-    // ----- DescribeEmployeeIdentityViolation -----
 
     [Fact]
     public void DescribeEmployeeIdentityViolation_Returns_Null_For_Valid_Identity()
@@ -80,7 +79,6 @@ public class CandidateEmployeeLinkTests
         Assert.NotNull(Candidate.DescribeEmployeeIdentityViolation("Priya", "Shah", email));
     }
 
-    // ----- CreateForEmployee -----
 
     [Fact]
     public void CreateForEmployee_Links_Employee_Trims_Identity_And_Is_Active()
@@ -199,7 +197,6 @@ public class CandidateEmployeeLinkTests
         Assert.Equal(email, candidate.Email);
     }
 
-    // ----- SyncEmployeeIdentity -----
 
     [Fact]
     public void SyncEmployeeIdentity_Returns_False_And_Leaves_UpdatedAt_When_Unchanged()
@@ -207,7 +204,6 @@ public class CandidateEmployeeLinkTests
         var employeeId = Guid.NewGuid();
         var candidate = CreateLinked(employeeId);
 
-        // Same values, differing only in surrounding whitespace, are not a change.
         var changed = candidate.SyncEmployeeIdentity(
             employeeId, " Priya ", "Shah ", " priya.shah@acme.example", " 07700 900456 ", Now.AddDays(1));
 
@@ -333,7 +329,6 @@ public class CandidateEmployeeLinkTests
         Assert.Equal(Now, candidate.UpdatedAt);
     }
 
-    // ----- Existing link guard interplay -----
 
     [Fact]
     public void LinkToEmployee_On_Employee_Linked_Candidate_Throws()

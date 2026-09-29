@@ -3,7 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>Split out of BulkEmployeeInvitationTests for real cross-test parallelism — see BulkEmployeeInvitationGettingStartedTests' remarks.</summary>
 public sealed class BulkEmployeeInvitationConfirmAndSendTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -26,9 +25,6 @@ public sealed class BulkEmployeeInvitationConfirmAndSendTests(HrAdminPersonaFixt
         await empList.GoToInviteModeAsync(AcmeId);
         await grid.WaitForLoadedAsync();
 
-        // Isolate this batch to just this one candidate — a shared, long-lived Acme company can
-        // have other genuinely-eligible candidates too, and this test only wants to assert on its
-        // own recipient.
         await grid.ClickClearSelectionAsync();
         await grid.ToggleRowAsync(name);
         Assert.Equal(1, await grid.GetSelectedCountAsync());

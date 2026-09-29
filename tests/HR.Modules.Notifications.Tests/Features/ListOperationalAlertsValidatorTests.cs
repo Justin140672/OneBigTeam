@@ -22,7 +22,6 @@ public class ListOperationalAlertsValidatorTests
         Assert.True(Validator.Validate(Request(category: null, status: null)).IsValid);
     }
 
-    // ── Page ───────────────────────────────────────────────────────────────
 
     [Theory]
     [InlineData(0, false)]
@@ -34,7 +33,6 @@ public class ListOperationalAlertsValidatorTests
         Assert.Equal(expectValid, Validator.Validate(Request(page: page)).IsValid);
     }
 
-    // ── PageSize ───────────────────────────────────────────────────────────
 
     [Theory]
     [InlineData(0, false)]
@@ -46,7 +44,6 @@ public class ListOperationalAlertsValidatorTests
         Assert.Equal(expectValid, Validator.Validate(Request(pageSize: pageSize)).IsValid);
     }
 
-    // ── Category ───────────────────────────────────────────────────────────
 
     [Theory]
     [InlineData("ReportGeneration")]
@@ -68,7 +65,6 @@ public class ListOperationalAlertsValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(ListOperationalAlertsRequest.Category));
     }
 
-    // ── Status ─────────────────────────────────────────────────────────────
 
     [Theory]
     [InlineData("open")]
@@ -79,7 +75,7 @@ public class ListOperationalAlertsValidatorTests
     }
 
     [Theory]
-    [InlineData("Open")]      // case-sensitive: only lowercase accepted
+    [InlineData("Open")]
     [InlineData("RESOLVED")]
     [InlineData("closed")]
     [InlineData("")]

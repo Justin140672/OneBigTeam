@@ -84,7 +84,6 @@ public class GetSubscriptionStatusEndpointTests
         Assert.NotNull(payload);
         Assert.Equal(nameof(SubscriptionStatus.Trial), payload!.Status);
         Assert.False(payload.IsReadOnly);
-        // Allow for a small amount of test-execution drift around the day boundary.
         Assert.InRange(payload.TrialDaysRemaining, 12, 14);
     }
 
@@ -95,7 +94,6 @@ public class GetSubscriptionStatusEndpointTests
         var userId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee);
 
-        // Trial started 30 days ago with a 14-day length, so it's well past TrialExpiresAt.
         var trialStartedAt = DateTimeOffset.UtcNow.AddDays(-30);
         await SeedTrialSubscriptionAsync(companyId, trialStartedAt, trialLengthDays: 14);
 
@@ -118,7 +116,6 @@ public class GetSubscriptionStatusEndpointTests
         var userId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee);
 
-        // No CustomerSubscription row seeded for this company at all.
         using var client = await ClientFor(userId, companyId, ensureActiveSubscription: false);
 
         var response = await client.GetAsync("/api/companies/subscription-status");

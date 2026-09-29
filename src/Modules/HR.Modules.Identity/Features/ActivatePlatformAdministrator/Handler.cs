@@ -4,20 +4,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Features.ActivatePlatformAdministrator;
 
-/// <summary>
-/// P1: completes platform-administrator provisioning by linking the local record to the caller's
-/// REAL, currently-authenticated Supabase identity. This is the ownership-verification step for
-/// both provisioning paths:
-///   - PendingProvisioning (brand-new provider account): the caller reached this endpoint by
-///     confirming Supabase's own account-confirmation email and then authenticating — a genuine
-///     first login as that new identity.
-///   - PendingLinkVerification (pre-existing provider account): the caller reached this endpoint by
-///     signing in with their EXISTING credentials — proof of control that a mere email-address
-///     match could never provide, and exactly why this codebase's guardrails forbid linking on
-///     email match alone.
-/// Either way, <see cref="ICurrentUser.UserId"/> here is a real Supabase "sub" claim verified by
-/// HR.Api's JWT Bearer pipeline — never client-supplied, never trusted from a route/body value.
-/// </summary>
 internal sealed class ActivatePlatformAdministratorHandler(IdentityDbContext db, IClock clock, IAuditEventPublisher auditEventPublisher)
 {
     public async Task<Result<ActivatePlatformAdministratorResponse>> HandleAsync(

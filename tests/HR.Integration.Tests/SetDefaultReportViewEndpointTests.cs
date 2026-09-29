@@ -37,8 +37,6 @@ public class SetDefaultReportViewEndpointTests
         return payload!;
     }
 
-    // SetDefaultReportView's request is entirely route-bound (CompanyId, ViewId) with no JSON body
-    // fields, but FastEndpoints still requires a valid Content-Type on PATCH requests.
     private static StringContent EmptyJsonBody() => new("{}", Encoding.UTF8, "application/json");
 
     [Fact]

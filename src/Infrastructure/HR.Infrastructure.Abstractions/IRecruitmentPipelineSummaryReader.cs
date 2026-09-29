@@ -33,7 +33,4 @@ public sealed record RecruitmentPipelineSummaryRow(
     string Status,
     DateOnly? OpenedAt,
     int CandidateCount,
-    // Count of applications currently sitting at each configured RecruitmentStage, keyed by StageId.
-    // A stage with no applications currently on it for this vacancy is simply absent from the
-    // dictionary — callers should treat a missing key as zero.
     IReadOnlyDictionary<Guid, int> CandidatesByStage);

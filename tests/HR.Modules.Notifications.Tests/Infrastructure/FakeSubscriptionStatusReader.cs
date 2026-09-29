@@ -4,7 +4,6 @@ namespace HR.Modules.Notifications.Tests.Infrastructure;
 
 internal sealed class FakeSubscriptionStatusReader : ISubscriptionStatusReader
 {
-    /// <summary>Per-company override. Companies not present here default to <see cref="DefaultStatus"/>.</summary>
     public Dictionary<Guid, SubscriptionStatus> Statuses { get; } = [];
 
     public SubscriptionStatus DefaultStatus { get; set; } = SubscriptionStatus.Active;

@@ -6,8 +6,6 @@ namespace HR.Modules.Assets.Services;
 
 internal sealed class AssetAssignmentReportReader(AssetsDbContext dbContext) : IAssetAssignmentReportReader
 {
-    // Row cap (OBT-720 perf pass) — see HR.Modules.Sickness.Services.SicknessReportReader.MaxRows
-    // for rationale.
     private const int MaxRows = 50_000;
 
     public async Task<IReadOnlyList<AssetAssignmentReportItem>> GetAssetAssignmentsAsync(

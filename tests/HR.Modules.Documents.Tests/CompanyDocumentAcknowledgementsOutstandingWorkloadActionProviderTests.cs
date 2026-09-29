@@ -5,10 +5,6 @@ using HR.Modules.Documents.Tests.Infrastructure;
 
 namespace HR.Modules.Documents.Tests;
 
-/// <summary>
-/// OBT-721 workload action provider tests for outstanding company document acknowledgements.
-/// HR-only, one WorkloadAction per (document, employee) pair that has not yet acknowledged.
-/// </summary>
 public class CompanyDocumentAcknowledgementsOutstandingWorkloadActionProviderTests
 {
     private static ClaimsPrincipal AnyCaller() => new(new ClaimsIdentity());

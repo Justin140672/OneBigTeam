@@ -4,11 +4,6 @@ using Xunit;
 
 namespace HR.Modules.DataImport.Tests;
 
-/// <summary>
-/// Reliability review issue 3 (P1): startup validation for import file storage must catch every
-/// missing/malformed required field, and error messages must name the configuration key without
-/// ever printing the secret value itself.
-/// </summary>
 public class SupabaseImportFileStorageOptionsValidatorTests
 {
     private static SupabaseImportFileStorageOptions ValidOptions() => new()
@@ -131,10 +126,6 @@ public class SupabaseImportFileStorageOptionsValidatorTests
     }
 }
 
-/// <summary>
-/// Minimal IHostEnvironment test double used to exercise the Development/Test-only HTTP allowance
-/// added for security review finding 6, without pulling in a full WebApplicationFactory host.
-/// </summary>
 internal sealed class FakeHostEnvironment(string environmentName) : IHostEnvironment
 {
     public string EnvironmentName { get; set; } = environmentName;

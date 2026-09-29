@@ -70,7 +70,6 @@ public class SetApplicationCvEndpointTests
         return await db.Applications.AsNoTracking().SingleAsync(a => a.Id == applicationId);
     }
 
-    // ---- Auth ------------------------------------------------------------------------------------
 
     [Fact]
     public async Task Put_Returns_Unauthorized_For_Anonymous()
@@ -98,7 +97,6 @@ public class SetApplicationCvEndpointTests
         Assert.Null((await LoadApplicationAsync(seeded.ApplicationId)).CvDocumentId);
     }
 
-    // ---- Attach / replace / remove ---------------------------------------------------------------
 
     [Fact]
     public async Task Put_Attaches_Cv_And_Get_Application_Returns_It_As_The_Submitted_Cv()
@@ -170,7 +168,6 @@ public class SetApplicationCvEndpointTests
         var application = await GetApplicationAsync(client, companyId, seeded.VacancyId, seeded.ApplicationId);
         Assert.Null(application.CvDocumentId);
         Assert.Null(application.CvFileName);
-        // The document still exists and is still the candidate's current CV.
         Assert.Equal(cvId, application.CurrentCandidateCvDocumentId);
     }
 
@@ -196,7 +193,6 @@ public class SetApplicationCvEndpointTests
     [Fact]
     public async Task Uploading_A_Newer_Cv_After_Attaching_Does_Not_Change_The_Submitted_Cv()
     {
-        // Acceptance: the application keeps the exact CV it was submitted with.
         var companyId = Guid.NewGuid();
         var seeded = await RecruitmentTestSeeder.SeedApplicationAsync(_factory, companyId, Now);
         var submittedCvId = await SeedCvAsync(companyId, seeded.CandidateId, "submitted-cv.pdf", Now.AddMinutes(-10));
@@ -222,7 +218,6 @@ public class SetApplicationCvEndpointTests
         Assert.Equal(submittedCvId, (await LoadApplicationAsync(seeded.ApplicationId)).CvDocumentId);
     }
 
-    // ---- Audit -----------------------------------------------------------------------------------
 
     [Fact]
     public async Task Put_Persists_Audit_Record_With_Previous_And_New_Cv_Ids_And_Actor()
@@ -253,7 +248,6 @@ public class SetApplicationCvEndpointTests
         Assert.Contains(replacementCvId.ToString(), auditRecord.AfterJson, StringComparison.OrdinalIgnoreCase);
     }
 
-    // ---- Not found -------------------------------------------------------------------------------
 
     [Fact]
     public async Task Put_Returns_NotFound_For_Unknown_Application()
@@ -285,7 +279,6 @@ public class SetApplicationCvEndpointTests
         Assert.Null((await LoadApplicationAsync(seeded.ApplicationId)).CvDocumentId);
     }
 
-    // ---- Validation ------------------------------------------------------------------------------
 
     [Fact]
     public async Task Put_Without_ExpectedVersion_Is_Rejected_By_Validation()
@@ -298,7 +291,6 @@ public class SetApplicationCvEndpointTests
         var response = await client.PutAsJsonAsync(
             CvUrl(companyId, seeded.VacancyId, seeded.ApplicationId), new { cvDocumentId = cvId });
 
-        // FastEndpoints validation failures are configured as 422 in HR.Api/Program.cs.
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
         Assert.Null((await LoadApplicationAsync(seeded.ApplicationId)).CvDocumentId);
     }
@@ -346,7 +338,6 @@ public class SetApplicationCvEndpointTests
             CvUrl(companyA, seeded.VacancyId, seeded.ApplicationId), new { cvDocumentId = foreignCvId, expectedVersion = 1 });
 
         var problem = await AssertProblemAsync(response, HttpStatusCode.BadRequest, "validation");
-        // Another tenant's document is reported exactly like a missing one.
         Assert.Equal(Application.CvDocumentNotFoundMessage, problem.Error);
         Assert.Null((await LoadApplicationAsync(seeded.ApplicationId)).CvDocumentId);
     }
@@ -381,7 +372,6 @@ public class SetApplicationCvEndpointTests
         Assert.Null((await LoadApplicationAsync(seeded.ApplicationId)).CvDocumentId);
     }
 
-    // ---- Concurrency -----------------------------------------------------------------------------
 
     [Fact]
     public async Task Put_Returns_Conflict_For_Stale_ExpectedVersion()
@@ -435,7 +425,6 @@ public class SetApplicationCvEndpointTests
         Assert.Equal(2, saved.Version);
     }
 
-    // ---- Helpers ---------------------------------------------------------------------------------
 
     private static async Task<ProblemPayload> AssertProblemAsync(HttpResponseMessage response, HttpStatusCode expectedStatus, string expectedCode)
     {

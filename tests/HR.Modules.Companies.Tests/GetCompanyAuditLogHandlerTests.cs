@@ -4,10 +4,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Companies.Tests;
 
-/// <summary>
-/// AUD-05: unit tests for <see cref="GetCompanyAuditLogHandler"/>.
-/// Uses FakeAuditHistoryReader / FakeUserEmailDirectoryReader in place of real infrastructure.
-/// </summary>
 public class GetCompanyAuditLogHandlerTests
 {
     private static readonly Guid CompanyId = Guid.NewGuid();
@@ -181,7 +177,6 @@ public class GetCompanyAuditLogHandlerTests
         Assert.Equal(0, result.Value!.TotalCount);
     }
 
-    // ── helpers ───────────────────────────────────────────────────────────────────
 
     private AuditHistoryEntry MakeEntry(string eventType, DateTimeOffset at, Guid employeeId) =>
         new(at, eventType, "Employee", ActorId, null, "summary", null, null, employeeId, default, CompanyId: CompanyId);

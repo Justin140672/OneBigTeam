@@ -5,11 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Proves the sickness:manage / sickness:view-team FastEndpoints policy declarations
-/// actually enforce access end-to-end over real HTTP. Unit tests on handlers cannot
-/// exercise policy middleware, so this coverage lives exclusively at this layer.
-/// </summary>
 [Collection("Integration")]
 public class SicknessAuthorizationTests
 {
@@ -48,11 +43,7 @@ public class SicknessAuthorizationTests
         return client;
     }
 
-    // --- sickness:manage — plain Employee is denied on HR-only endpoints ---
 
-    // ListSicknessCategories is read-only reference data (category names) shared with employee
-    // self-service "notify sickness" — same pattern as ListDocumentTypes — so it's "role:employee"
-    // rather than "sickness:manage" and a plain employee is allowed to list it.
     [Fact]
     public async Task PlainEmployee_Gets_Ok_Listing_Sickness_Categories()
     {
@@ -123,9 +114,6 @@ public class SicknessAuthorizationTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    // Company Administrator is scoped to company profile/settings management only and no
-    // longer holds sickness:manage / sickness:view-team — see the narrowing in
-    // HR.Modules.Identity.IdentityModule.AddRolePolicies.
     [Fact]
     public async Task CompanyAdministrator_Gets_Forbidden_Creating_Sickness_Category()
     {
@@ -154,7 +142,6 @@ public class SicknessAuthorizationTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // --- sickness:view-team — GetTeamSicknessToday manager self-scoping ---
 
     [Fact]
     public async Task Manager_Gets_Ok_Viewing_Own_Team_Sickness_Today()
@@ -216,7 +203,6 @@ public class SicknessAuthorizationTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // --- RecordMySickness / GetMySicknessRecords self-service scoping ---
 
     [Fact]
     public async Task Employee_Can_Record_And_List_Their_Own_Sickness()
@@ -224,7 +210,6 @@ public class SicknessAuthorizationTests
         var companyId = Guid.NewGuid();
         using var client = await ClientFor(companyId, PlainEmployeeUser);
 
-        // Plain employees cannot create categories directly — use HR admin for setup.
         using var hrClient = await ClientFor(companyId, HrAdminUser);
         var setupResponse = await hrClient.PostAsJsonAsync($"/api/companies/{companyId}/sickness-categories", new
         {
@@ -268,8 +253,6 @@ public class SicknessAuthorizationTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // --- sickness:review — GetMissingFitNotes now includes Manager (dashboard widening; was
-    // previously "sickness:manage", HrAdministrator only) ---
 
     [Fact]
     public async Task Manager_Gets_Ok_Getting_Missing_Fit_Notes()

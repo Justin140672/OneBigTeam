@@ -3,13 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the optional "Recruitment Agency" dropdown on the vacancy form (ticket #81/#94) —
-/// VacancyDetail.razor's SfDropDownList bound to Model.AssignedRecruiterId, a FK to
-/// ExternalRecruiter (not the removed VacancyRecruiterAssignment/Recruiters-tab feature). The
-/// DataSource is active-recruiters-only, with a prepended "Not assigned" sentinel item rather
-/// than Syncfusion's ShowClearButton.
-/// </summary>
 public sealed class VacancyRecruitmentAgencyTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -32,7 +25,6 @@ public sealed class VacancyRecruitmentAgencyTests(RecruiterPersonaFixture fixtur
         await login.GoToAsync();
         await login.LoginAsync(MarcusEmail);
 
-        // Seed an active external recruiter (agency) with a unique name.
         await recruiterList.GoToAsync(AcmeId);
         await recruiterList.ClickNewAsync();
         await recruiterDetail.FillAgencyNameAsync(agencyName);
@@ -47,7 +39,6 @@ public sealed class VacancyRecruitmentAgencyTests(RecruiterPersonaFixture fixtur
         var profileTitle = await PositionProfileTestHelpers.CreateUniquePositionProfileAsync(
             _page, _fixture.WebBaseUrl, AcmeId, login, LauraEmail, MarcusEmail);
 
-        // Create a vacancy and assign that agency via the Recruitment Agency dropdown.
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickNewVacancyAsync();
         await vacancyDetail.FillTitleAsync(vacancyTitle);
@@ -56,7 +47,6 @@ public sealed class VacancyRecruitmentAgencyTests(RecruiterPersonaFixture fixtur
         await vacancyDetail.SelectRecruitmentAgencyAsync(agencyName);
         await vacancyDetail.SaveNewVacancyAsync();
 
-        // Reopen the vacancy and confirm the assignment persisted.
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickVacancyAsync(vacancyTitle);
 
@@ -77,7 +67,6 @@ public sealed class VacancyRecruitmentAgencyTests(RecruiterPersonaFixture fixtur
         await login.GoToAsync();
         await login.LoginAsync(MarcusEmail);
 
-        // Seed one active and one (subsequently deactivated) agency.
         await recruiterList.GoToAsync(AcmeId);
         await recruiterList.ClickNewAsync();
         await recruiterDetail.FillAgencyNameAsync(activeAgencyName);
@@ -91,8 +80,6 @@ public sealed class VacancyRecruitmentAgencyTests(RecruiterPersonaFixture fixtur
         Assert.False(await recruiterList.IsActiveAsync(inactiveAgencyName),
             $"Expected '{inactiveAgencyName}' to be deactivated before checking the vacancy form's dropdown");
 
-        // On the vacancy create form, the Recruitment Agency dropdown must list the active agency
-        // but never the deactivated one.
         await vacancyDetail.GoToNewAsync(AcmeId);
         await vacancyDetail.OpenRecruitmentAgencyDropdownAsync();
         var options = await vacancyDetail.GetRecruitmentAgencyDropdownOptionsAsync();

@@ -22,7 +22,6 @@ internal sealed class EmployeeCreatedHandler : IIntegrationEventHandler<Employee
 
     public async Task HandleAsync(EmployeeCreatedIntegrationEvent integrationEvent, CancellationToken cancellationToken)
     {
-        // Only balance-tracked leave types get a LeaveBalance row (see LeaveType.HasBalance).
         var activeLeaveTypes = await _dbContext.LeaveTypes
             .Where(lt => lt.CompanyId == integrationEvent.CompanyId && lt.IsActive && lt.HasBalance)
             .ToListAsync(cancellationToken);
@@ -56,12 +55,6 @@ internal sealed class EmployeeCreatedHandler : IIntegrationEventHandler<Employee
         var policyYear = LeaveYearCalculator.GetPolicyYear(now, leaveSettings.LeaveYearStartMonth);
         var (policyYearStart, policyYearEnd) = LeaveYearCalculator.GetPolicyYearBounds(policyYear, leaveSettings.LeaveYearStartMonth);
 
-        // Idempotency guard (per 04-event-architecture.md — integration event consumers must
-        // tolerate repeated/duplicate delivery). Without this check, a redelivered
-        // EmployeeCreatedIntegrationEvent would add a second full set of LeaveBalance rows for the
-        // same employee/policy year, which the Leave Summary Report then silently sums together —
-        // inflating the displayed entitlement (e.g. 25 real days appearing as 50, 75, 92...
-        // depending on how many times the event was redelivered).
         var existingLeaveTypeIds = await _dbContext.LeaveBalances
             .Where(b => b.CompanyId == integrationEvent.CompanyId
                      && b.EmployeeId == integrationEvent.EmployeeId
@@ -69,13 +62,6 @@ internal sealed class EmployeeCreatedHandler : IIntegrationEventHandler<Employee
             .Select(b => b.LeaveTypeId)
             .ToListAsync(cancellationToken);
 
-        // Entitlement is pro-rated for employees whose start date falls after the first day of
-        // the company's leave year (LeaveEntitlementCalculator is the single source of truth for
-        // this, also reused by RecalculateEntitlementOnStartDateChange when a start date is later
-        // corrected). Employees starting on or before the leave year start get full entitlement.
-        // Accrual (Monthly/Fortnightly - LEAVE-04) is paced from the employee's actual eligible-
-        // from date within this policy year, which is their start date for the year in which they
-        // join (never before the policy year itself starts).
         var accrualStartDate = integrationEvent.StartDate < policyYearStart ? policyYearStart : integrationEvent.StartDate;
 
         var balances = activeLeaveTypes

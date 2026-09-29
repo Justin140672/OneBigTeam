@@ -56,7 +56,6 @@ public class CreateMarketingFeatureValidatorTests
     [Fact]
     public void Normalizes_Slug_Before_Pattern_Check_So_Uppercase_Input_Is_Accepted()
     {
-        // The Must() rule lower-cases/trims before testing SlugPattern, mirroring MarketingFeature.Create.
         Assert.True(IsValid(Valid() with { Slug = "EMPLOYEE-MANAGEMENT" }));
         Assert.True(IsValid(Valid() with { Slug = "  employee-management  " }));
     }

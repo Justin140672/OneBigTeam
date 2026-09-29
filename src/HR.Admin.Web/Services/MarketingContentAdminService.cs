@@ -4,11 +4,6 @@ using HR.Admin.Web.Models;
 
 namespace HR.Admin.Web.Services;
 
-/// <summary>
-/// Wraps the platform-admin marketing content endpoints (<c>/api/marketing/admin/*</c>) exposed by
-/// HR.Modules.Marketing. Modeled on <see cref="PlatformSettingsService"/>: "hrapi" HttpClientFactory
-/// client, null on read failure, 422 FluentValidation field errors surfaced on writes.
-/// </summary>
 public sealed class MarketingContentAdminService(HrApiHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient();

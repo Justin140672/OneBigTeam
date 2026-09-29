@@ -71,9 +71,6 @@ public sealed class OrganisationDataExportBuildJobResourceLimitTests
 
         var clock = new FakeClock(Now);
 
-        // Both the worker and the renewal loop share this single in-memory context in the harness, so
-        // serialise every store call to model the production per-scope isolation and keep the
-        // renewal-loop assertions deterministic at high parallelism.
         IOrganisationDataExportJobStore store = new SerializingJobStore(new OrganisationDataExportJobStore(db, clock));
 
         storage ??= new FakeStorage();
@@ -83,7 +80,6 @@ public sealed class OrganisationDataExportBuildJobResourceLimitTests
         var sources = new EmptySources();
         var renewer = new RenewerSpy(store);
 
-        // MinimumFreeDiskBytes = 0: the CI host's real free space must never make a test flaky.
         limits ??= new OrganisationDataExportResourceLimits { MinimumFreeDiskBytes = 0 };
         var workRoot = Path.Combine(Path.GetTempPath(), "obt-test-buildjob-rl", Guid.NewGuid().ToString("N"));
         var workspaceFactory = new OrganisationDataExportWorkspaceFactory(limits, rootOverride: workRoot);
@@ -107,7 +103,6 @@ public sealed class OrganisationDataExportBuildJobResourceLimitTests
     private async Task<OrganisationDataExport> ReloadAsync(Harness h, Guid id) =>
         await h.Db.OrganisationDataExports.AsNoTracking().SingleAsync(e => e.Id == id);
 
-    // ---------------------------------------------------------------------------------------------
 
     [Fact]
     public async Task Temp_Disk_Exhaustion_Mid_Build_Fails_The_Export_With_A_Clear_Reason_And_One_Dedup_Alert()
@@ -144,9 +139,6 @@ public sealed class OrganisationDataExportBuildJobResourceLimitTests
     [Fact]
     public async Task Oversized_Streamed_Table_Trips_The_Ceiling_Mid_Entry_And_Fails_The_Export_With_One_Dedup_Alert()
     {
-        // A single streamed CSV table far larger than the per-export ceiling: the budget-enforcing
-        // write stream must trip DURING the entry (not only at the post-entry check), and the failure
-        // must map exactly like the oversized-document case.
         var bigTable = new BigStreamedAuditSource(rowCount: 20_000, cellChars: 200);
 
         var h = CreateHarness(out var export, auditSource: bigTable,
@@ -172,7 +164,6 @@ public sealed class OrganisationDataExportBuildJobResourceLimitTests
         Assert.Empty(h.Publisher.Published);
         Assert.Empty(h.WorkspaceDirs);
 
-        // The generator was abandoned mid-stream, never fully enumerated.
         Assert.True(bigTable.RowsYielded < 20_000,
             $"streamed source should have been abandoned mid-stream, yielded {bigTable.RowsYielded}");
     }
@@ -194,7 +185,6 @@ public sealed class OrganisationDataExportBuildJobResourceLimitTests
             for (var i = 0; i < rowCount; i++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                // High-entropy content so ZIP deflate cannot shrink it below the ceiling.
                 var cell = string.Concat(Enumerable.Range(0, Math.Max(1, cellChars / 32))
                     .Select(_ => Guid.NewGuid().ToString("N")));
                 yield return new string?[] { i.ToString(), cell };
@@ -238,7 +228,6 @@ public sealed class OrganisationDataExportBuildJobResourceLimitTests
         Assert.Equal(0, h.FakeStorage.UploadCount);
         Assert.Empty(h.Publisher.Published);
         Assert.Empty(h.WorkspaceDirs);
-        // The attempt was claimed (InProgress) then cancelled; recovery re-enqueues it after the lease lapses.
         Assert.Equal("InProgress", await StatusOf(h, export.Id));
     }
 
@@ -308,8 +297,6 @@ public sealed class OrganisationDataExportBuildJobResourceLimitTests
         var h = CreateHarness(out var export, storage: storage, manifest: manifest);
         await using var _ = h.Db;
 
-        // The upload holds open until the renewal loop has ticked at least twice — a deterministic
-        // handshake rather than a fixed delay racing the timer on a busy CI host.
         storage.ReleaseWhen = () => h.Renewer.CallCount > 1;
 
         await h.Job.RunAsync(export.Id, export.CompanyId, export.RequestedByUserId, CancellationToken.None);
@@ -358,11 +345,9 @@ public sealed class OrganisationDataExportBuildJobResourceLimitTests
         }
         catch
         {
-            // best-effort test cleanup
         }
     }
 
-    // ----- local fakes -----
 
     private sealed class PassThroughGate : IOrganisationDataExportConcurrencyGate
     {
@@ -442,11 +427,6 @@ public sealed class OrganisationDataExportBuildJobResourceLimitTests
         public bool AlwaysThrow { get; init; }
         public TimeSpan UploadDelay { get; init; } = TimeSpan.Zero;
 
-        /// <summary>
-        /// When set, the upload blocks until this predicate returns true (polled), instead of racing a
-        /// fixed <see cref="UploadDelay"/> against the renewal timer. Keeps the "renewal loop ticked
-        /// during a slow upload" assertion deterministic on a thread-starved CI host.
-        /// </summary>
         public Func<bool>? ReleaseWhen { get; set; }
 
         public async Task<string> UploadAsync(Guid companyId, Guid exportId, Guid attemptToken, Stream content, CancellationToken cancellationToken)
@@ -462,7 +442,6 @@ public sealed class OrganisationDataExportBuildJobResourceLimitTests
                     await Task.Delay(10, cancellationToken);
             }
 
-            // Drain the stream so a streamed upload is actually exercised (and never a buffered copy).
             using var sink = new MemoryStream();
             await content.CopyToAsync(sink, cancellationToken);
 
@@ -510,11 +489,6 @@ public sealed class OrganisationDataExportBuildJobResourceLimitTests
         }
     }
 
-    /// <summary>
-    /// Serialises every call to the inner store behind a single gate — models the production
-    /// separation of the worker's DbContext scope from the renewal loop's, which the EF in-memory
-    /// provider does not tolerate when both share one context here.
-    /// </summary>
     private sealed class SerializingJobStore(IOrganisationDataExportJobStore inner) : IOrganisationDataExportJobStore
     {
         private readonly SemaphoreSlim _gate = new(1, 1);

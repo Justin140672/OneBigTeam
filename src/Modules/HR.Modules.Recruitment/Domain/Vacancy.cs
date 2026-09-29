@@ -32,16 +32,11 @@ internal sealed class Vacancy : HR.SharedKernel.IVersionedAggregate
     // requires a cross-module read via IPositionProfileReader which the domain layer must not perform.
     public string? AdvertTitle { get; private set; }
 
-    // Optional recruitment-specific override of the linked Position Profile's canonical description —
-    // same rationale as AdvertTitle above.
     public string? AdvertDescription { get; private set; }
 
     public VacancyStatus Status { get; private set; }
     public Guid HiringManagerId { get; private set; }
 
-    // When true, this vacancy is advertised to the company's own employees via the internal
-    // vacancy list on My Profile. Recruitment users control this flag on the create/edit screen.
-    // A vacancy is only visible to employees when this is true AND Status == Open.
     public bool IsAdvertisedInternally { get; private set; }
 
     // The external recruitment agency (ExternalRecruiter) assigned to run this vacancy, if any.
@@ -58,9 +53,6 @@ internal sealed class Vacancy : HR.SharedKernel.IVersionedAggregate
     public DateOnly? OpenedAt { get; private set; }
     public DateOnly? ClosedAt { get; private set; }
 
-    // SET-05: when the company's VacancyApprovalRequired setting is on, a vacancy must be approved
-    // (see Approve()) before it can be published (see PublishVacancyHandler). Null means "not yet
-    // approved" — always null for companies that never require approval.
     public DateTimeOffset? ApprovedAt { get; private set; }
     public Guid? ApprovedByUserId { get; private set; }
 
@@ -108,23 +100,12 @@ internal sealed class Vacancy : HR.SharedKernel.IVersionedAggregate
         UpdatedAt          = now;
     }
 
-    /// <summary>
-    /// Assigns (or clears) the recruiter running this vacancy's pipeline, independent of a full
-    /// details update. Used by a dedicated "assign recruiter" action if/when the UI phase adds one;
-    /// UpdateDetails above also accepts the recruiter for the standard edit-vacancy flow.
-    /// </summary>
     public void AssignRecruiter(Guid? recruiterId, DateTimeOffset now)
     {
         AssignedRecruiterId = recruiterId;
         UpdatedAt = now;
     }
 
-    /// <summary>
-    /// Assigns (or re-assigns) the position profile linked to this vacancy. Used by the manual HR
-    /// review action (AssignVacancyPositionProfile) and by the auto-match backfill process
-    /// (ApplyPositionProfileMatches / VacancyPositionProfileMatcher) — distinct from Create() because
-    /// this can also apply to vacancies that already had a value (HR overriding a prior assignment).
-    /// </summary>
     public void AssignPositionProfile(Guid positionProfileId, DateTimeOffset now)
     {
         PositionProfileId = positionProfileId;
@@ -176,12 +157,6 @@ internal sealed class Vacancy : HR.SharedKernel.IVersionedAggregate
         UpdatedAt = now;
     }
 
-    /// <summary>
-    /// SET-05: records that this vacancy has been approved for publishing. Only meaningful when the
-    /// company's VacancyApprovalRequired setting is on — PublishVacancyHandler enforces that
-    /// ApprovedAt is set before allowing the vacancy to open in that case. Idempotency/re-approval is
-    /// the caller's concern; this always overwrites with the latest approver/timestamp.
-    /// </summary>
     public void Approve(Guid approvedByUserId, DateTimeOffset now)
     {
         ApprovedAt = now;

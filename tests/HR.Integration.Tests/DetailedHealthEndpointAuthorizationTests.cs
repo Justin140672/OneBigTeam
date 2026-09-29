@@ -31,7 +31,6 @@ public sealed class DetailedHealthEndpointAuthorizationTests
 
     public void Dispose() => _rotationFactory.Dispose();
 
-    // ─── /health/background-jobs ───────────────────────────────────────────────
 
     [Fact]
     public async Task BackgroundJobs_anonymous_request_is_rejected_without_detail()
@@ -76,7 +75,6 @@ public sealed class DetailedHealthEndpointAuthorizationTests
         Assert.True(doc.RootElement.TryGetProperty("statistics", out _));
     }
 
-    // ─── /health/startup-migrations ────────────────────────────────────────────
 
     [Fact]
     public async Task StartupMigrations_anonymous_request_gets_minimal_body_only()
@@ -134,7 +132,6 @@ public sealed class DetailedHealthEndpointAuthorizationTests
         Assert.Equal(HttpStatusCode.OK, authorizedResponse.StatusCode);
     }
 
-    // ─── rotation overlap window (deployment-pipeline runbook section 5) ──────
 
     [Fact]
     public async Task Ready_current_token_returns_full_detail_during_rotation_overlap()

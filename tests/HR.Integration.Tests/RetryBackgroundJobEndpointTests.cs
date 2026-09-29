@@ -5,17 +5,6 @@ using HR.Integration.Tests.Infrastructure;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// See ForceCustomerReadOnlyEndpointTests for the shared platform-admin allow-list test pattern
-/// this class follows. Exercises the real HangfireJobStatusReader against the test harness's real
-/// (test) Hangfire storage — no fake IBackgroundJobStatusReader is registered.
-///
-/// A full happy-path (200 + job transitions out of Failed state) is not covered here: doing so
-/// would require actually enqueuing a Hangfire job and forcing a worker to fail it within this
-/// test harness, and no existing integration test in this project does that (BackgroundJobDiagnosticsTests
-/// only asserts a fresh database has zero failed jobs). Fabricating a failed-job row directly against
-/// Hangfire's storage tables would not reflect real Hangfire behaviour, so this is left as a gap.
-/// </summary>
 [Collection("Integration")]
 public class RetryBackgroundJobEndpointTests
 {
@@ -61,8 +50,6 @@ public class RetryBackgroundJobEndpointTests
         var response = await client.PostAsJsonAsync(
             Url("some-job-id"), new { reason = "Investigating a transient failure before retrying." });
 
-        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
-        // is Forbidden (403), not Unauthorized (401).
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 

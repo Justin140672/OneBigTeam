@@ -34,9 +34,6 @@ public class AddEmployeeRoleOverrideHandlerTests(IdentityDatabaseFixture fixture
     {
         await using var db = fixture.BuildContext();
         var roleId = Guid.NewGuid();
-        // Suffix with the role id so repeated calls with the same literal name (this class calls
-        // SeedRole("SomeRole") from several test methods sharing one real Postgres database via
-        // IdentityDatabaseFixture) never collide on the unique normalized_name index.
         db.Roles.Add(Role.Create(roleId, $"{name}-{roleId:N}", Now));
         await db.SaveChangesAsync();
         return roleId;
@@ -227,8 +224,6 @@ public class AddEmployeeRoleOverrideHandlerTests(IdentityDatabaseFixture fixture
     [Fact]
     public async Task HandleAsync_Allows_Self_Deny()
     {
-        // Negated branch of the self-elevation guard: a self-created Deny is not a privilege
-        // escalation risk and must be allowed.
         var actorId = await SeedUser("self-deny");
         await GrantSystemRole(actorId, SystemRoles.HrAdministrator);
         var roleId = SystemRoles.Manager;
@@ -255,7 +250,6 @@ public class AddEmployeeRoleOverrideHandlerTests(IdentityDatabaseFixture fixture
     [Fact]
     public async Task HandleAsync_Rejects_Role_Outside_Actors_Administrable_Set()
     {
-        // HR Administrator can never grant/deny Company Administrator via an override.
         var targetUserId = await SeedUser("unauthorised-target");
         var actorId = Guid.NewGuid();
         await GrantSystemRole(actorId, SystemRoles.HrAdministrator);
@@ -331,7 +325,6 @@ public class AddEmployeeRoleOverrideHandlerTests(IdentityDatabaseFixture fixture
         var auditPublisher = new FakeAuditEventPublisher();
         var companyId = Guid.NewGuid();
 
-        // First a Deny...
         var firstHandler = BuildHandler(auditPublisher);
         var firstResult = await firstHandler.HandleAsync(
             new AddEmployeeRoleOverrideRequest
@@ -352,8 +345,6 @@ public class AddEmployeeRoleOverrideHandlerTests(IdentityDatabaseFixture fixture
             firstOverrideId = (await db.EmployeeRoleOverrides.SingleAsync(o => o.UserId == targetUserId)).Id;
         }
 
-        // ...then a Grant for the same role, which must replace it rather than violate the
-        // unique (user_id, role_id) index.
         var secondHandler = BuildHandler(auditPublisher);
         var secondResult = await secondHandler.HandleAsync(
             new AddEmployeeRoleOverrideRequest

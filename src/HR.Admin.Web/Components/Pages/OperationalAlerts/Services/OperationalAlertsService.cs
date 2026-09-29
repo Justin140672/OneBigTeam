@@ -4,13 +4,6 @@ using HR.Admin.Web.Models;
 
 namespace HR.Admin.Web.Services;
 
-/// <summary>
-/// Wraps the /api/notifications/admin/operational-alerts endpoints (all Policies("platform:admin"))
-/// via the shared "hrapi" HttpClient. GetXOrNullAsync returns null on any non-2xx / transport
-/// failure — same null-means-"show error state" contract as CustomerListService/AuditLogService.
-/// ResolveAlertAsync returns a small result type so the page can distinguish
-/// success / already-resolved (409) / validation (422) / generic error.
-/// </summary>
 public sealed class OperationalAlertsService(HrApiHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient();

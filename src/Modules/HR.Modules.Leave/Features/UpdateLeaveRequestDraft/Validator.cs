@@ -2,8 +2,6 @@ using FluentValidation;
 
 namespace HR.Modules.Leave.Features.UpdateLeaveRequestDraft;
 
-// LEAVE-07: same minimal, field-level-only validation as CreateLeaveRequestDraftValidator -
-// business checks are deferred to SubmitLeaveRequestDraftValidator/Handler.
 internal sealed class UpdateLeaveRequestDraftValidator : AbstractValidator<UpdateLeaveRequestDraftRequest>
 {
     public UpdateLeaveRequestDraftValidator()

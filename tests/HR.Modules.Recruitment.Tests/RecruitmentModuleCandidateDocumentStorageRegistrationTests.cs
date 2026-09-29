@@ -10,13 +10,6 @@ using Xunit;
 
 namespace HR.Modules.Recruitment.Tests;
 
-/// <summary>
-/// Reliability review issue 2 (P1): candidate document storage must never fall back to the
-/// ephemeral local temp-directory implementation outside Development/an explicit automated-test
-/// environment, and Staging/Production must fail fast at registration time rather than silently
-/// using it when Supabase storage is not configured. Mirrors
-/// HR.Modules.Documents.Tests.DocumentsModuleVirusScanRegistrationTests.
-/// </summary>
 public class RecruitmentModuleCandidateDocumentStorageRegistrationTests
 {
     private const string ConnectionString =
@@ -91,8 +84,6 @@ public class RecruitmentModuleCandidateDocumentStorageRegistrationTests
 
         services.AddRecruitmentModule(ConnectionString, ConfigurationWithSupabase(), environment);
 
-        // AddHttpClient<TInterface, TImpl> registers TInterface via a typed-client factory, not a
-        // plain ImplementationType — resolve an instance to prove the concrete type actually wired.
         var provider = services.BuildServiceProvider();
         var resolved = provider.GetRequiredService<ICandidateDocumentStorageService>();
         Assert.IsType<SupabaseCandidateDocumentStorageService>(resolved);

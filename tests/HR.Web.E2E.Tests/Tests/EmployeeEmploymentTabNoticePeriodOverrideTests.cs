@@ -3,43 +3,12 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the "Override notice period" toggle on the Employee edit page's Employment tab
-/// (EmployeeEmploymentTab.razor's Dates card), including the read-only "Notice source"
-/// summary that reflects EffectiveNoticePeriodResolver's server-side resolution (Employee
-/// override -> Position Profile override -> Company Default).
-///
-/// Mirrors the existing "Override company default notice period" toggle coverage for
-/// Position Profiles in <see cref="PositionProfileNoticePeriodOverrideTests"/> — same
-/// SfCheckBox/SfDropDownList/SfNumericTextBox interaction pattern, reused here via the
-/// equivalent helpers added to <see cref="EmployeeEditPage"/>.
-///
-/// Each test creates its own fresh employee (rather than mutating a shared seeded one like
-/// Tom Williams or Sarah Chen, which other tests rely on remaining untouched — see
-/// CreateEmployeeTests.EmploymentTab_ChangingPositionProfile_PersistsDepartmentAndLocationAfterSave
-/// for the same rationale) via "Software Engineer", a seeded Position Profile with
-/// Engineering / London Office attached and no notice period override of its own — so any
-/// employee assigned to it that doesn't set its own override resolves straight through to
-/// the company default (Months / 1, unmodified from CompanySettings' seeded default).
-/// </summary>
 public sealed class EmployeeEmploymentTabNoticePeriodOverrideTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private const string LauraEmail = "laura.bennett@acme.example";
 
-    /// <summary>
-    /// Creates a fresh Acme employee assigned to the "Software Engineer" position profile
-    /// (Engineering / London Office, no notice period override) and returns its id and last
-    /// name, leaving the caller positioned on that employee's editable (not "/view") profile
-    /// page.
-    /// </summary>
-    // Uses a dedicated pre-seeded pool employee (SeededE2eEmployees.NoticePeriodOverride[slot])
-    // instead of the full New Employee form. Pool members are assigned "QA Engineer" which — like
-    // "Software Engineer" — has no notice period override of its own, so an employee with no
-    // override of its own still resolves straight through to the company default ("1 Months").
-    // Each test mutates its own employee's notice period, so each takes a distinct slot. Leaves the
-    // caller on the editable (not "/view") profile route.
     private async Task<(Guid EmployeeId, string LastName)> CreateEmployeeAsync(
         EmployeeListPage empList, EmployeeEditPage empEdit, int slot)
     {
@@ -67,8 +36,6 @@ public sealed class EmployeeEmploymentTabNoticePeriodOverrideTests(HrAdminPerson
         Assert.False(await empEdit.IsNoticePeriodOverrideFieldsVisibleAsync(),
             "Expected the Unit/Length fields to stay hidden while the override is unchecked");
 
-        // Neither this employee nor "Software Engineer" (its Position Profile) has an
-        // override, so the effective value falls all the way through to the company default.
         Assert.Equal("Company Default", await empEdit.GetNoticeSourceLabelAsync());
         Assert.Equal("1 Months", await empEdit.GetEffectiveNoticePeriodTextAsync());
     }
@@ -118,7 +85,6 @@ public sealed class EmployeeEmploymentTabNoticePeriodOverrideTests(HrAdminPerson
 
         var (employeeId, _) = await CreateEmployeeAsync(empList, empEdit, slot: 2);
 
-        // Set an override first, so there's something to turn off.
         await empEdit.OpenEmploymentTabAsync();
 
         await empEdit.SetOverrideNoticePeriodAsync(true);
@@ -127,20 +93,15 @@ public sealed class EmployeeEmploymentTabNoticePeriodOverrideTests(HrAdminPerson
 
         await empEdit.ClickSaveChangesAsync();
 
-        // Reopen and confirm the override was saved before turning it off.
         await empEdit.GoToAsync(AcmeId, employeeId);
         await empEdit.OpenEmploymentTabAsync();
         Assert.True(await empEdit.IsOverrideNoticePeriodCheckedAsync(),
             "Expected the 'Override notice period' checkbox to be checked before editing it off");
         Assert.Equal("Employee", await empEdit.GetNoticeSourceLabelAsync());
 
-        // Turn the override off and save.
         await empEdit.SetOverrideNoticePeriodAsync(false);
         await empEdit.ClickSaveChangesAsync();
 
-        // Reopen and confirm the override is now unchecked, its fields are hidden, and the
-        // effective source falls back through to the Position Profile ("Software Engineer",
-        // which has no override of its own) all the way to the Company Default.
         await empEdit.GoToAsync(AcmeId, employeeId);
         await empEdit.OpenEmploymentTabAsync();
 

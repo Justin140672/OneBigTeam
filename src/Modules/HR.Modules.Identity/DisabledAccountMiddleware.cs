@@ -38,8 +38,6 @@ internal sealed class DisabledAccountMiddleware(RequestDelegate next)
             return;
         }
 
-        // Anonymous endpoints (login, logout, dev helpers, health) must keep working regardless of
-        // account state — mirrors the same exemption in RequireTenantMiddleware.
         var allowsAnonymous = context.GetEndpoint()?.Metadata.GetMetadata<IAllowAnonymous>() is not null;
         if (allowsAnonymous)
         {
@@ -55,9 +53,6 @@ internal sealed class DisabledAccountMiddleware(RequestDelegate next)
 
         if (resolvedUserId is Guid userId)
         {
-            // By convention ApplicationUser.Id == UserProfile.Id == EmployeeId, and
-            // SupabaseCurrentUserResolutionMiddleware sets ResolvedCurrentUser.UserId to
-            // UserProfile.Id once a profile exists.
             var accountIsActive = await dbContext.Users
                 .AsNoTracking()
                 .Where(u => u.Id == userId)
@@ -78,10 +73,6 @@ internal sealed class DisabledAccountMiddleware(RequestDelegate next)
 
             if (accountIsActive == false)
             {
-                // A disabled company account stays blocked everywhere except a genuine
-                // platform-administration endpoint accessed by an enabled platform administrator —
-                // matched exactly as PlatformAdminAuthorizationHandler does (enabled row, by
-                // SupabaseAuthUserId or email).
                 if (IsPlatformAdminEndpoint(context))
                 {
                     var isPlatformAdmin = await dbContext.PlatformAdministrators

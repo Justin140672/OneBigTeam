@@ -131,11 +131,6 @@ internal sealed class RecordMySicknessHandler(
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        // One-time evaluation at creation time (SICK-01) — catches an absence that is already at or
-        // over the fit-note threshold when recorded (e.g. a backdated ongoing absence, or a closed
-        // absence entered after the fact) instead of waiting for the next daily FitNoteRequestJob
-        // run. For an ongoing absence the evaluation date is today; for one recorded already closed,
-        // it's the absence's own end date.
         var fitNoteEvaluationDate = entity.EndDate ?? DateOnly.FromDateTime(now.UtcDateTime);
         await fitNoteEvidenceRequestService.RequestIfEligibleAsync(
             entity, sicknessSettings.FitNoteRequiredAfterDays, fitNoteEvaluationDate, now, cancellationToken);

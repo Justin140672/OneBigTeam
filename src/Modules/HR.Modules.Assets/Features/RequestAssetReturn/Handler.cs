@@ -53,10 +53,6 @@ internal sealed class RequestAssetReturnHandler(
 
         var now = clock.UtcNowOffset();
 
-        // This handler has no business-entity mutation of its own to stage on `db` — task
-        // creation/notification/audit below are each performed via their own writer. Claim the
-        // idempotency key up front (its own SaveChangesAsync) so a retried/duplicated request
-        // short-circuits before re-running those side effects.
         if (request.IdempotencyKey is { } key)
         {
             var outcome = await db.SaveIdempotentAsync<IdempotencyRecord, object?>(db.IdempotencyRecords, 
@@ -66,11 +62,6 @@ internal sealed class RequestAssetReturnHandler(
                 return Result.Success();
         }
 
-        // AssetTaskCompletionAction already creates a "Return asset" task automatically the
-        // moment the employee acknowledges receiving the asset (by design — see that class's own
-        // tests) — this explicit admin-initiated request is a SEPARATE trigger for the same kind
-        // of task against the same assignment. Without this check, both paths create their own
-        // "Return asset" task, leaving two open tasks for one assignment.
         var existingReturnTaskId = await openTaskReader.GetOpenTaskIdForAssigneeAsync(
             request.CompanyId, assignment.Id, assignment.EmployeeId, TaskActionType.Return, cancellationToken);
 

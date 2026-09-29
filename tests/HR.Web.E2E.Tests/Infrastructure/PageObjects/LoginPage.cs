@@ -5,13 +5,6 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 public sealed class LoginPage(IPage page, string baseUrl)
 {
-    // Login.razor now performs a real Supabase password-grant sign-in (HR.Modules.Identity's
-    // Login feature, POST /api/login) rather than the earlier dev-persona stub that accepted any
-    // seeded email with the literal password "password". Every seeded Development persona still
-    // has a real Supabase account (see IdentityModule.SeedDevSupabaseUsersAsync) — just under
-    // this actual password. Canonical definition:
-    // HR.Modules.Identity.Services.SupabaseAuthGateway.DevSupabasePassword (internal, not
-    // referenceable from this project).
     private const string DevPersonaPassword = "Dev-Only-Password-1!";
 
     // "Successfully authenticated" signal. Normally the app shell — but a brand-new company's
@@ -24,13 +17,6 @@ public sealed class LoginPage(IPage page, string baseUrl)
     public async Task GoToAsync()
     {
         using var totalTimer = E2eDiag.Time("LoginPage", "GoToAsync total");
-        // WaitUntil=Commit (not the Playwright default of Load): the app's host page pulls in
-        // third-party resources — the Google Fonts stylesheet, the jsDelivr Bootstrap CSS — whose
-        // "load" can stall for tens of seconds under a full parallel headless run (15 circuits all
-        // warming the same shared app), which surfaced as "Timeout 30000ms navigating to /login
-        // waiting until 'load'" across dozens of unrelated classes even though the login form itself
-        // was already interactive. We only need the navigation to commit; the loop below then polls
-        // for the real readiness signal (form field or app shell) on its own generous deadline.
         var gotoTimer = E2eDiag.Time("LoginPage", "GoToAsync: GotoAsync(/login, Commit)");
         await page.GotoAsync($"{baseUrl}/login", new()
         {
@@ -39,10 +25,6 @@ public sealed class LoginPage(IPage page, string baseUrl)
         });
         gotoTimer.Dispose();
 
-        // Either the login form renders (fresh/unauthenticated context) or, if this context was
-        // built from a role fixture's storageState (see RolePersonaFixtureBase), the app redirects
-        // straight past /login to the shell because a session cookie is already present. Wait for
-        // whichever shows up first instead of always blocking for the full form-render timeout.
         var pollTimer = E2eDiag.Time("LoginPage", "GoToAsync: poll for login form / app shell (30s budget)");
         var deadline = DateTime.UtcNow.AddSeconds(30);
         while (true)
@@ -58,28 +40,12 @@ public sealed class LoginPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>
-    /// Logs in as <paramref name="email"/>, preferring a cached Playwright storageState (see
-    /// <see cref="PersonaLoginCache"/>) over a real interactive form login. A real login only ever
-    /// happens once per persona for the whole test run — the first caller for a given persona (or a
-    /// caller whose cached state turned out stale) pays for it, and it gets cached for everyone else,
-    /// no matter which xUnit collection or test class asks. There is no test in this suite whose
-    /// subject-under-test is the login FORM itself, so unconditionally preferring the cache here is
-    /// safe — nothing depends on this method actually driving the form UI.
-    /// </summary>
     public async Task LoginAsync(string email, string password = DevPersonaPassword)
     {
         if (await page.Locator(AuthenticatedSelector).First.IsVisibleAsync())
         {
-            // Already authenticated — either a role fixture's storageState landed us straight on
-            // the shell, or an earlier LoginAsync call in this same test already logged in. If it's
-            // for the SAME persona we're being asked to log in as, there's nothing left to do — that
-            // is the entire point of storageState reuse.
             if (await IsAuthenticatedAsAsync(email)) return;
 
-            // A different persona is authenticated than requested (a role-fixed collection's default
-            // persona while this specific test wants an outlier persona, e.g. an access-denied
-            // check). Clear the session and fall through to a login for the requested persona.
             await page.Context.ClearCookiesAsync();
             await page.GotoAsync($"{baseUrl}/login", new() { WaitUntil = WaitUntilState.Commit, Timeout = 60_000 });
             await page.WaitForSelectorAsync("[placeholder='you@example.com']", new() { Timeout = 30_000 });
@@ -89,33 +55,20 @@ public sealed class LoginPage(IPage page, string baseUrl)
         if (browser is not null && await TryCachedLoginAsync(browser, email))
             return;
 
-        // Cache unavailable or exhausted its one refresh attempt — genuine last-resort real login.
         await RealFormLoginAsync(email, password);
 
         if (browser is not null)
         {
-            // Publish this freshly-good session so subsequent callers for this persona (this was
-            // presumably a previously-unseen or twice-stale persona) get the cache speed-up too.
             await PersonaLoginCache.PublishAsync(email, page);
         }
     }
 
-    /// <summary>
-    /// Tries the cached storageState for <paramref name="email"/>; if applying it doesn't reach the
-    /// authenticated shell, invalidates the cache entry and tries exactly one fresh real login before
-    /// giving up on the cache for this call (the caller then falls back to a direct real login on this
-    /// page). Guards against a stale/expired Supabase session being served indefinitely.
-    /// </summary>
     private async Task<bool> TryCachedLoginAsync(IBrowser browser, string email)
     {
         var (options, entry) = await PersonaLoginCache.GetOrLoginWithEntryForCallerAsync(browser, baseUrl, email);
         if (options.StorageState is string json && await PersonaLoginCache.TryApplyStorageStateAsync(page, baseUrl, json))
             return true;
 
-        // Route through the coalescing refresh gate instead of a blind Invalidate + relogin — under
-        // load, many racing callers for the SAME persona (overwhelmingly laura.bennett) can hit this
-        // same false-negative app-shell wait at once; only the first should pay for a fresh real
-        // login, the rest should just await and reuse it. See PersonaLoginCache.InvalidateAndRefreshAsync.
         var refreshed = await PersonaLoginCache.InvalidateAndRefreshAsync(browser, baseUrl, email, entry);
         return refreshed.StorageState is string refreshedJson &&
             await PersonaLoginCache.TryApplyStorageStateAsync(page, baseUrl, refreshedJson);
@@ -185,16 +138,6 @@ public sealed class LoginPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>
-    /// Best-effort check of whether the currently authenticated user matches <paramref name="email"/>,
-    /// used to skip redundant logins when a context is already authenticated via storageState. Dev
-    /// seed personas are consistently named "firstname.lastname@..." (see DevPersonaStore), and the
-    /// topbar renders that same "Firstname Lastname" as Session.DisplayName (MainLayout.razor), so we
-    /// can compare without any app-side test hook. If the topbar user block isn't present (e.g. a
-    /// persona with no linked employee record, or the shell hasn't finished its first render yet),
-    /// this conservatively returns false, which just means a real login runs instead of being skipped
-    /// — slower, never incorrect.
-    /// </summary>
     private async Task<bool> IsAuthenticatedAsAsync(string email)
     {
         var expectedName = DerivePersonaDisplayName(email);
@@ -227,20 +170,9 @@ public sealed class LoginPage(IPage page, string baseUrl)
 
     public async Task SwitchAccountAsync(string email, string password = DevPersonaPassword)
     {
-        // In dev mode, persona switcher is an SfDropDownList in the topbar — we don't have a
-        // userId mapping from an email here, so this always falls back to cookie-based login.
         await page.GotoAsync($"{baseUrl}/login", new() { WaitUntil = WaitUntilState.Commit, Timeout = 60_000 });
         await LoginAsync(email, password);
 
-        // A switch that silently leaves the PREVIOUS persona signed in surfaces much later as an
-        // unrelated-looking failure (e.g. a recruiter-only list redirecting to /access-denied and
-        // its "Add" button never appearing). LoginAsync decides whether to drop the old session from
-        // an instant ".app-shell" check right after a Commit-level navigation, which can run before
-        // /login has rendered. Verify the switch actually took; if not, clear the old session
-        // explicitly and log in once more, then fail loudly at the switch itself.
-        // Only for persona-shaped addresses ("first.last@…" — every DevPersonaStore persona), whose
-        // top-bar display name IsAuthenticatedAsAsync can derive from the email. Generated users
-        // (e.g. "e2e.apply.<id>@acme.example") display a different name, so they're not checked.
         if (IsPersonaShapedEmail(email) && !await IsAuthenticatedAsAsync(email))
         {
             await page.Context.ClearCookiesAsync();
@@ -254,11 +186,6 @@ public sealed class LoginPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>
-    /// The compact legal / trust link row rendered beneath the login form
-    /// (<c>&lt;nav aria-label="Legal and policies"&gt;</c> in Login.razor). Returns the visible
-    /// link text paired with its resolved <c>href</c>, in document order.
-    /// </summary>
     public async Task<IReadOnlyList<(string Text, string Href)>> GetLegalLinksAsync()
     {
         var links = page.Locator("[data-testid='login-legal'] a");
@@ -277,9 +204,7 @@ public sealed class LoginPage(IPage page, string baseUrl)
 
     public async Task SwitchPersonaAsync(string personaNameFragment)
     {
-        // Dev-mode topbar persona switcher — Syncfusion SfDropDownList, see DropDownSelector.
         await DropDownSelector.SelectAsync(page, page.Locator(".dev-persona-switcher"), personaNameFragment);
-        // Selecting triggers a full navigation, wait for the shell to reload.
         await page.WaitForSelectorAsync(".app-shell", new() { Timeout = 30_000 });
     }
 }

@@ -3,15 +3,6 @@ using HR.Modules.Support.Services;
 
 namespace HR.Modules.Support.Tests;
 
-/// <summary>
-/// CodeQL #63-#65 (log forging via storage keys): <see cref="UploadedAttachmentCleanupScope"/>
-/// logs orphaned-attachment cleanup failures with <see cref="UploadedAttachmentCleanupScope.RedactStorageKey"/>.
-/// Real keys are "support/{companyId}/{requestId}/{server GUID}{allow-listed extension}", so the
-/// retained tail is already safe; these tests prove that (a) the redaction keeps only a short,
-/// character-allow-listed tail for every real key shape, (b) even a hypothetical hostile key can
-/// never emit a control character, and (c) the extension allow-list rejects any file name whose
-/// extension carries control or encoded characters, so nothing hostile reaches a key in the first place.
-/// </summary>
 public class SupportStorageKeyLogSafetyTests
 {
     private const char LineSeparator = (char)0x2028;

@@ -89,7 +89,6 @@ public class CreatePlatformAdministratorWorkEmailPolicyEndpointTests
     [Fact]
     public async Task Post_PlatformAdministrators_Existing_Owner_On_Public_Domain_Can_Still_Create_Org_Domain_Administrator()
     {
-        // Existing accounts on public domains are unaffected — only the NEW address is evaluated.
         var (_, ownerEmail) = await PlatformAdministratorTestHelpers.SeedAdministratorAsync(
             _factory, PlatformAdministratorRole.PlatformOwner, email: $"legacy-owner-{Guid.NewGuid():N}@gmail.com");
         using var client = PlatformAdministratorTestHelpers.ClientFor(_factory, Guid.NewGuid(), ownerEmail);

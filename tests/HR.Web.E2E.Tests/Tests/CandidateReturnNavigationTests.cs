@@ -4,18 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the Add Candidate editor's return-navigation (CandidateDetail.razor's "?origin=" query
-/// value, resolved via CandidateReturnDestination — src/HR.Web/Components/Pages/Recruitment/
-/// CandidateReturnDestination.cs): Save and Close should send the recruiter back to whichever
-/// screen launched the editor (Recruitment Dashboard or the Candidates list), and an
-/// unrecognized/missing origin must safely fall back to the Candidates list rather than accepting
-/// an arbitrary redirect target.
-///
-/// Uses Marcus Diallo (Recruiter role) — candidate:view/recruitment:manage (candidate creation)
-/// are Recruiter-only, same persona used by CandidateEditCloseBehaviorTests and
-/// RecruitmentDashboardRedesignTests.
-/// </summary>
 public sealed class CandidateReturnNavigationTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -71,8 +59,6 @@ public sealed class CandidateReturnNavigationTests(RecruiterPersonaFixture fixtu
 
         await candidateEdit.GoToNewAsync(AcmeId, "dashboard");
 
-        // No edits made yet, so Close should navigate straight back without the unsaved-changes
-        // prompt appearing (mirrors CandidateEditCloseBehaviorTests.Close_ExistingRecordWithNoChanges).
         await candidateEdit.CloseAndWaitForUrlAsync("**/dashboard/recruitment");
 
         Assert.EndsWith("/dashboard/recruitment", _page.Url);
@@ -132,7 +118,6 @@ public sealed class CandidateReturnNavigationTests(RecruiterPersonaFixture fixtu
         await login.GoToAsync();
         await login.LoginAsync(MarcusEmail);
 
-        // No "?origin=" at all — the original "launched from nowhere in particular" case.
         await candidateEdit.GoToNewAsync(AcmeId);
         await candidateEdit.FillFirstNameAsync("E2E");
         await candidateEdit.FillLastNameAsync(lastName);
@@ -155,10 +140,6 @@ public sealed class CandidateReturnNavigationTests(RecruiterPersonaFixture fixtu
         await login.GoToAsync();
         await login.LoginAsync(MarcusEmail);
 
-        // "origin" is resolved through a closed enum switch (CandidateReturnDestination) — an
-        // unrecognized value (or an attempt to smuggle an arbitrary path/host through it) must be
-        // treated the same as "no origin" and fall back to the Candidates list, never redirect
-        // off to whatever string was supplied.
         await candidateEdit.GoToNewAsync(AcmeId, "https://evil.example.com");
         await candidateEdit.FillFirstNameAsync("E2E");
         await candidateEdit.FillLastNameAsync(lastName);

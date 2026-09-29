@@ -4,14 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers two marketing-site UI changes on the "marketing" Aspire resource:
-///   1. Contact navigation consistency — SiteHeader's and SiteFooter's "Contact" links now point
-///      at /contact#contact-form (instead of the bare /contact) so every Contact CTA site-wide
-///      consistently lands on the visible contact form, not just the top of the page.
-///   2. The homepage's compact trust/security section (Home.razor), with its heading, summary
-///      copy and outbound links to Security and Privacy Policy.
-/// </summary>
 public sealed class MarketingContactAndTrustSectionTests(ParallelBlankPersonaFixture fixture)
     : RoleE2ETestBase<ParallelBlankPersonaFixture>(fixture)
 {
@@ -52,8 +44,6 @@ public sealed class MarketingContactAndTrustSectionTests(ParallelBlankPersonaFix
     {
         await _page.GotoAsync($"{_fixture.MarketingBaseUrl}/");
 
-        // The trust section's "get in touch" link (distinct from the header/footer links
-        // already covered above).
         var contactCta = _page.Locator("section.trust-section a", new() { HasText = "get in touch" });
         Assert.EndsWith("/contact#contact-form", await contactCta.GetAttributeAsync("href"));
 
@@ -84,7 +74,6 @@ public sealed class MarketingContactAndTrustSectionTests(ParallelBlankPersonaFix
         await Assertions.Expect(_page.Locator("#trust-heading"))
             .ToHaveTextAsync("Your employee data, handled carefully.");
 
-        // Positioned below the #features, #watch and setup-timeline sections.
         var featuresBox = await _page.Locator("section#features").BoundingBoxAsync();
         var watchBox = await _page.Locator("section#watch").BoundingBoxAsync();
         var timelineBox = await _page.Locator(".timeline-steps").BoundingBoxAsync();

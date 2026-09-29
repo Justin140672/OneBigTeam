@@ -13,7 +13,6 @@ public class SubmitLeaveRequestEndpointTests
     private static readonly Guid User1 = new("bbbbbbbb-0000-0000-0000-000000000001");
     private static readonly Guid User2 = new("bbbbbbbb-0000-0000-0000-000000000002");
 
-    // Pre-seeded leave type for the seeded company (see LeaveModule.SeedLeaveAsync)
     private static readonly Guid SeededCompanyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid AnnualLeaveTypeId = Guid.Parse("A0000000-0000-0000-0000-000000000001");
 
@@ -84,7 +83,6 @@ public class SubmitLeaveRequestEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, User2, SystemRoles.HrAdministrator, companyId);
 
-        // Create a leave policy with AllowNegativeBalance so no balance initialisation is required
         var policyResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/leave-policies",
             new
@@ -97,7 +95,6 @@ public class SubmitLeaveRequestEndpointTests
         policyResponse.EnsureSuccessStatusCode();
         var policy = await policyResponse.Content.ReadFromJsonAsync<PolicyPayload>();
 
-        // Create an employee
         var employeeResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees",
             new
@@ -119,7 +116,6 @@ public class SubmitLeaveRequestEndpointTests
         employeeResponse.EnsureSuccessStatusCode();
         var employee = await employeeResponse.Content.ReadFromJsonAsync<EmployeePayload>();
 
-        // Assign the policy to the employee
         var assignResponse = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employee!.Id}/leave-policy",
             new
@@ -131,7 +127,6 @@ public class SubmitLeaveRequestEndpointTests
             });
         assignResponse.EnsureSuccessStatusCode();
 
-        // Submit leave request
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employee.Id}/leave-requests",
             new

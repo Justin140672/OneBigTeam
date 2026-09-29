@@ -63,17 +63,13 @@ public sealed class SignupWorkEmailPolicyTests(ParallelBlankPersonaFixture fixtu
         await signUp.FillAsync(companyName, firstName, lastName, email, Password);
         await signUp.SubmitAsync();
 
-        // /signup-submit proxies to HR.Api's POST /api/signup; the email-domain guard rejects
-        // before any Supabase call, but keep the same headroom as the other signup redirects.
         await _page.WaitForURLAsync(new Regex(@"/signup\?.*emailError=work_email_required"), new() { Timeout = 40_000 });
         Assert.DoesNotContain("/check-your-email", _page.Url);
         Assert.DoesNotContain("password", _page.Url, StringComparison.OrdinalIgnoreCase);
 
-        // Page-level banner.
         await Assertions.Expect(signUp.ErrorBanner).ToBeVisibleAsync();
         await Assertions.Expect(signUp.ErrorBanner).ToContainTextAsync(WorkEmailRequiredMessage);
 
-        // Field-level error, linked to the input and flagged invalid.
         await Assertions.Expect(signUp.WorkEmailError).ToBeVisibleAsync();
         await Assertions.Expect(signUp.WorkEmailError).ToHaveTextAsync(WorkEmailRequiredMessage);
         await Assertions.Expect(signUp.EmailInput).ToHaveAttributeAsync("aria-invalid", "true");
@@ -81,7 +77,6 @@ public sealed class SignupWorkEmailPolicyTests(ParallelBlankPersonaFixture fixtu
             "aria-describedby", new Regex(@"(^|\s)email-error(\s|$)"));
         await Assertions.Expect(signUp.EmailFieldWrapper).ToHaveClassAsync(new Regex(@"(^|\s)is-invalid(\s|$)"));
 
-        // Everything except the password is round-tripped.
         await Assertions.Expect(_page.Locator("#companyName")).ToHaveValueAsync(companyName);
         await Assertions.Expect(_page.Locator("#firstName")).ToHaveValueAsync(firstName);
         await Assertions.Expect(_page.Locator("#lastName")).ToHaveValueAsync(lastName);
@@ -101,7 +96,6 @@ public sealed class SignupWorkEmailPolicyTests(ParallelBlankPersonaFixture fixtu
         await signUp.FillAsync(companyName, "Ada", "Lovelace", email, Password);
         await signUp.SubmitAsync();
 
-        // Same real-Supabase-call headroom as SignupToCheckYourEmailJourneyTests.SignUpAsync.
         await _page.WaitForURLAsync(new Regex("/check-your-email"), new() { Timeout = 40_000 });
 
         Assert.Contains(Uri.EscapeDataString(email), _page.Url);

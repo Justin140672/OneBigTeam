@@ -5,7 +5,6 @@ using HR.Modules.Companies.Contracts;
 
 namespace HR.Web.Models;
 
-// ── LIST ──────────────────────────────────────────────────────────────────────
 
 public record ListPositionProfilesResponse(
     IReadOnlyList<PositionProfileListItemModel> Items);
@@ -22,7 +21,6 @@ public record PositionProfileListItemModel(
     NoticePeriodUnit? NoticePeriodUnitOverride = null,
     int? NoticePeriodLengthOverride = null);
 
-// ── GET ───────────────────────────────────────────────────────────────────────
 
 public record GetPositionProfileResponse(
     Guid Id,
@@ -72,7 +70,6 @@ public record PositionProfileRequiredAssetModel(
     bool IsMandatory,
     int Quantity);
 
-// ── EDIT MODEL ────────────────────────────────────────────────────────────────
 
 public sealed class PositionProfileEditModel
 {
@@ -100,13 +97,9 @@ public sealed class PositionProfileEditModel
     public Guid? DefaultLeavePolicyId { get; set; }
     public Guid? OnboardingTemplateId { get; set; }
 
-    // Optional roles every holder of this position inherits (the mandatory "Employee" role is
-    // implicit and never stored here). Edited on the "Inherited Roles" tab and persisted by the
-    // page's single Save alongside the profile fields — see PositionProfileEdit.SaveCoreAsync.
     public List<Guid> InheritedRoleIds { get; set; } = [];
 }
 
-// ── CREATE ────────────────────────────────────────────────────────────────────
 
 public record CreatePositionProfileRequest(
     Guid CompanyId,
@@ -134,7 +127,6 @@ public record CreatePositionProfileResponse(
     bool IsActive,
     DateTimeOffset CreatedAt);
 
-// ── LIST REQUIRED DOCUMENTS ───────────────────────────────────────────────────
 
 public record ListRequiredDocumentsResponse(IReadOnlyList<RequiredDocumentListItemModel> Items);
 
@@ -146,7 +138,6 @@ public record RequiredDocumentListItemModel(
     int? DueDaysAfterStart,
     bool RequiresExpiryDate);
 
-// ── ADD / REMOVE REQUIRED DOCUMENT ────────────────────────────────────────────
 
 public record AddRequiredDocumentToProfileRequest(
     Guid CompanyId,
@@ -158,7 +149,6 @@ public record AddRequiredDocumentToProfileRequest(
 
 public record AddRequiredDocumentToProfileResponse(Guid Id);
 
-// ── LIST REQUIRED ASSETS ──────────────────────────────────────────────────────
 
 public record ListRequiredAssetsResponse(IReadOnlyList<RequiredAssetListItemModel> Items);
 
@@ -169,7 +159,6 @@ public record RequiredAssetListItemModel(
     bool IsMandatory,
     int Quantity);
 
-// ── ADD / REMOVE REQUIRED ASSET ───────────────────────────────────────────────
 
 public record AddRequiredAssetToProfileRequest(
     Guid CompanyId,
@@ -180,7 +169,6 @@ public record AddRequiredAssetToProfileRequest(
 
 public record AddRequiredAssetToProfileResponse(Guid Id);
 
-// ── LIST / ADD / REMOVE ONBOARDING TEMPLATES ──────────────────────────────────
 
 public record ListOnboardingTemplatesForProfileResponse(IReadOnlyList<OnboardingTemplateAssignmentListItemModel> Items);
 
@@ -198,7 +186,6 @@ public record AddOnboardingTemplateToProfileRequest(
 
 public record AddOnboardingTemplateToProfileResponse(Guid Id);
 
-// ── ROLE DEFAULTS (INHERITED ROLES) ───────────────────────────────────────────
 
 public record ListPositionRoleDefaultsResponse(IReadOnlyList<PositionRoleDefaultsListItemModel> Positions);
 
@@ -215,7 +202,6 @@ public record SetPositionRoleDefaultsRequest(
 
 public record SetPositionRoleDefaultsResponse(Guid PositionProfileId, IReadOnlyList<Guid> RoleIds);
 
-// ── UPDATE ────────────────────────────────────────────────────────────────────
 
 public record UpdatePositionProfileRequest(
     Guid CompanyId,

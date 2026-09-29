@@ -4,10 +4,6 @@ using HR.SharedKernel.Http;
 
 namespace HR.SharedKernel.Tests;
 
-// Pins the shared HTTP response-reading layer's status-code -> ApiFailureKind classification and
-// the { error, code } / { errors } envelope parsing it replaces ~90 files' worth of bespoke local
-// parsing for. In particular: a 409 is Concurrency only when code == "concurrency" (the existing
-// EditSectionBase/SaveConflictBanner convention), never inferred any other way.
 public class ApiResponseReaderTests
 {
     private sealed record Sample(string Name);
@@ -19,7 +15,6 @@ public class ApiResponseReaderTests
 
     private static HttpResponseMessage NoBodyResponse(HttpStatusCode status) => new(status);
 
-    // ── ReadJsonAsync: success ──────────────────────────────────────────────────
 
     [Fact]
     public async Task ReadJsonAsync_Returns_Success_With_Value_For_200_With_Valid_Body()
@@ -55,7 +50,6 @@ public class ApiResponseReaderTests
         Assert.Equal(ApiFailureKind.InvalidResponse, result.FailureKind);
     }
 
-    // ── ReadNoContentAsync: success ─────────────────────────────────────────────
 
     [Fact]
     public async Task ReadNoContentAsync_Returns_Success_For_204_No_Body()
@@ -78,7 +72,6 @@ public class ApiResponseReaderTests
         Assert.True(result.Success);
     }
 
-    // ── 401 / 403 / 404 ──────────────────────────────────────────────────────────
 
     [Fact]
     public async Task ReadJsonAsync_Returns_Unauthenticated_For_401()
@@ -126,7 +119,6 @@ public class ApiResponseReaderTests
         Assert.Equal("Employee not found.", result.Error);
     }
 
-    // ── 409 concurrency vs plain conflict ───────────────────────────────────────
 
     [Fact]
     public async Task ReadJsonAsync_Returns_Concurrency_For_409_With_Concurrency_Code()
@@ -165,7 +157,6 @@ public class ApiResponseReaderTests
         Assert.False(result.IsConcurrencyConflict);
     }
 
-    // ── 400 / 422 validation ─────────────────────────────────────────────────────
 
     [Fact]
     public async Task ReadJsonAsync_Returns_Validation_For_400_With_Validation_Envelope()
@@ -230,7 +221,6 @@ public class ApiResponseReaderTests
         Assert.Equal(ApiFailureKind.InvalidResponse, result.FailureKind);
     }
 
-    // ── 5xx and unmapped statuses ────────────────────────────────────────────────
 
     [Fact]
     public async Task ReadJsonAsync_Returns_Server_For_500()
@@ -278,7 +268,6 @@ public class ApiResponseReaderTests
         Assert.NotNull(result.Error);
     }
 
-    // ── Cancellation propagation ─────────────────────────────────────────────────
 
     [Fact]
     public async Task ReadJsonAsync_Rethrows_When_Supplied_Token_Already_Cancelled()
@@ -304,7 +293,6 @@ public class ApiResponseReaderTests
             () => ApiResponseReader.ReadJsonAsync<Sample>(response, cancellationToken: cts.Token));
     }
 
-    // ── ExecuteAsync ─────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task ExecuteAsync_Returns_Network_When_Send_Throws_HttpRequestException()
@@ -319,8 +307,6 @@ public class ApiResponseReaderTests
     [Fact]
     public async Task ExecuteAsync_Returns_Network_When_Send_Throws_OperationCanceledException_Not_From_Supplied_Token()
     {
-        // Simulates an internal HttpClient timeout: the exception is not caused by the caller's
-        // own (never-cancelled) token, so it must be classified as a network failure, not rethrown.
         var neverCancelled = new CancellationTokenSource().Token;
 
         var result = await ApiResponseReader.ExecuteAsync<Sample>(
@@ -364,7 +350,6 @@ public class ApiResponseReaderTests
     }
 }
 
-// ApiResult<T>.DisplayMessage: flattens ValidationErrors when present, falls back to Error.
 public class ApiResultDisplayMessageTests
 {
     [Fact]

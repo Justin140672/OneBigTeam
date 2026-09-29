@@ -4,14 +4,6 @@ using HR.Web.Services;
 
 namespace HR.Web.Tests;
 
-/// <summary>
-/// Covers <see cref="TaskService.GetTaskResultAsync"/>, which distinguishes a genuinely
-/// missing/forbidden task (404/403 → <see cref="TaskLoadStatus.NotFound"/>) from a
-/// recoverable/transient load failure (network error, non-2xx status other than 404/403 →
-/// <see cref="TaskLoadStatus.Failed"/>), so TaskViewDialog can offer a retry for the latter instead
-/// of treating every failure as "task not found". <see cref="TaskService.GetTaskAsync"/> delegates
-/// to it, so is not separately re-tested here beyond confirming the delegation.
-/// </summary>
 public class TaskServiceTests
 {
     private static TaskDetailModel SampleTask(Guid companyId, Guid taskId) => new(
@@ -51,8 +43,6 @@ public class TaskServiceTests
     [Fact]
     public async Task GetTaskResultAsync_Returns_NotFound_On_403_Forbidden()
     {
-        // A task belonging to a different company/caller — must be treated the same as "does not
-        // exist", not surfaced as a recoverable failure.
         var factory = ApiTestSupport.BuildFactory(new ApiTestSupport.JsonResponseHandler(HttpStatusCode.Forbidden, null));
         var service = new TaskService(factory);
 

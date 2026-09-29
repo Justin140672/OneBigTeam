@@ -22,8 +22,6 @@ internal sealed class InvitationBatchConfiguration : IEntityTypeConfiguration<In
 
         builder.HasIndex(b => b.CompanyId);
 
-        // Partial unique index: prevents a double-clicked/retried queue submission (with the same
-        // supplied Idempotency-Key) from creating a second batch for the same company.
         builder.HasIndex(b => new { b.CompanyId, b.IdempotencyKey })
             .IsUnique()
             .HasDatabaseName("ix_invitation_batches_company_id_idempotency_key")

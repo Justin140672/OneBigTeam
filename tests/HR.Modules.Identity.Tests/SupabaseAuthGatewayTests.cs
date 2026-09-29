@@ -36,9 +36,6 @@ public class SupabaseAuthGatewayTests
         Assert.Equal(userId, result);
         Assert.Equal(2, handler.Requests.Count);
 
-        // Step 1: admin-create the user with the real password baked in from the start (not
-        // /auth/v1/invite — see CreateUserAsync's remarks on why that combination doesn't produce
-        // a working password against real Supabase).
         var (createRequest, createBody) = handler.Requests[0];
         Assert.Equal(HttpMethod.Post, createRequest.Method);
         Assert.Equal("https://example.supabase.co/auth/v1/admin/users", createRequest.RequestUri!.ToString());
@@ -47,8 +44,6 @@ public class SupabaseAuthGatewayTests
         Assert.Equal(options.SecretKey, createRequest.Headers.GetValues("apikey").Single());
         Assert.Equal(options.SecretKey, createRequest.Headers.Authorization?.Parameter);
 
-        // Step 2: the confirmation email is sent via a separate /auth/v1/resend call, since the
-        // admin-create endpoint above never sends one itself.
         var (resendRequest, resendBody) = handler.Requests[1];
         Assert.Equal(HttpMethod.Post, resendRequest.Method);
         Assert.Equal("https://example.supabase.co/auth/v1/resend", resendRequest.RequestUri!.ToString());
@@ -225,8 +220,6 @@ public class SupabaseAuthGatewayTests
         var (request, _) = handler.Requests[0];
         Assert.Equal(HttpMethod.Post, request.Method);
         Assert.Equal("https://example.supabase.co/auth/v1/logout?scope=global", request.RequestUri!.ToString());
-        // apikey stays the publishable key; Authorization carries the user's own token so GoTrue
-        // knows whose sessions to revoke.
         Assert.Equal(options.PublishableKey, request.Headers.GetValues("apikey").Single());
         Assert.Equal("user-access-token", request.Headers.Authorization?.Parameter);
     }

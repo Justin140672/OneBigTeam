@@ -6,10 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Infrastructure.Storage;
 
-/// <summary>
-/// Development implementation that stores profile photos on the local file system.
-/// Replace with a cloud implementation (Azure Blob, S3, etc.) for production.
-/// </summary>
 internal sealed class LocalProfilePhotoStorageService(
     IHttpContextAccessor httpContextAccessor,
     IServiceProvider serviceProvider,
@@ -25,8 +21,6 @@ internal sealed class LocalProfilePhotoStorageService(
         string storageFolder,
         CancellationToken cancellationToken)
     {
-        // The original file name is untrusted; the physical storage key never incorporates it, so
-        // it cannot be used to escape the storage root via ".." or rooted path segments.
         var extension  = Path.GetExtension(fileName);
         var safeFolder = string.Join('/', storageFolder.Split('/', StringSplitOptions.RemoveEmptyEntries)
             .Select(Uri.EscapeDataString));
@@ -41,25 +35,6 @@ internal sealed class LocalProfilePhotoStorageService(
         return storageKey;
     }
 
-    // A raw file:// path here is not loadable by a browser <img> tag (or a redirect-based
-    // download endpoint) once served from an http(s):// page — route through the dev-only
-    // streaming endpoint in Program.cs instead, which serves the same local file over HTTP.
-    // The URL is short-lived and HMAC-signed (ILocalStorageUrlSigner), and the route re-checks the
-    // photo record is still present and Clean (the Documents module's profile-photo resolver); this
-    // method is only reached after the calling handler has authorised the caller and checked Clean.
-    // (ScanUploadedFileJob reads via ILocalStorageFileReader instead, because the route refuses
-    // files that are not yet Clean.)
-    //
-    // Called from two very different contexts: (1) inline during a request, where
-    // IHttpContextAccessor.HttpContext gives us the real scheme/host the browser is using, and
-    // (2) from ScanUploadedFileJob, a Hangfire background job with no HttpContext at all — there
-    // the previous "http://localhost" fallback pointed at port 80, which nothing listens on (the
-    // app binds to whatever dynamic port Aspire/Kestrel assigned), so the job's own
-    // HttpClient.GetStreamAsync(downloadUrl) call always failed and the scan never completed
-    // inline, only after Hangfire's automatic-retry backoff (30s+) — long enough to blow past
-    // every UI poll window waiting on the scan (e.g. MyProfilePhotoHeader.PollForPendingPhotoAsync
-    // and EmployeeProfilePhotoHeader.PollForCurrentPhotoAsync). Fall back to the server's own
-    // bound address (IServerAddressesFeature) instead, which is available in both contexts.
     public Task<Uri> GetDownloadUrlAsync(
         string storageKey,
         CancellationToken cancellationToken)
@@ -78,11 +53,6 @@ internal sealed class LocalProfilePhotoStorageService(
         return Task.FromResult<Stream?>(File.Exists(fullPath) ? File.OpenRead(fullPath) : null);
     }
 
-    // Resolved lazily via IServiceProvider (rather than taking IServer as a constructor
-    // dependency) so this service doesn't require a real Kestrel host to be present in the DI
-    // graph — IServer is only ever registered by WebApplicationBuilder, so a plain
-    // ServiceCollection composition check (see ServiceContainerCompositionTests) would otherwise
-    // fail container validation even though the real app always has one.
     private string GetServerBaseUrl()
     {
         var addresses = serviceProvider.GetService<IServer>()?.Features.Get<IServerAddressesFeature>()?.Addresses;

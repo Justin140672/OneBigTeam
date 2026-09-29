@@ -96,8 +96,6 @@ public class AwardToilEndpointTests
         setupClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, HrAdminUserId.ToString());
         setupClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
-        // The manager must be a real employee in the company (AssignManager rejects unknown manager
-        // ids), and the caller identity must be that employee's id for the reporting-line check.
         var managerEmployeeId = await CreateEmployeeAsync(setupClient, companyId, "Manager");
         await TestRoleSeeder.AssignRoleAsync(_factory, managerEmployeeId, SystemRoles.Manager, companyId);
         await UpdateManagerAsync(setupClient, companyId, employeeId, managerEmployeeId);
@@ -128,7 +126,6 @@ public class AwardToilEndpointTests
         await SeedToilLeaveTypeAsync(companyId);
         await SeedPolicyAssignmentAsync(companyId, employeeId);
 
-        // Do NOT set up manager relationship — ManagerUserId is not a manager of employeeId
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/toil",
@@ -145,14 +142,11 @@ public class AwardToilEndpointTests
 
     private async Task<(HttpClient Client, Guid CompanyId, Guid EmployeeId)> SetupAsync(Guid userId)
     {
-        // Use HrAdmin for setup so employee:manage policy is satisfied regardless of userId
         var setupClient = _factory.CreateClient();
         setupClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, HrAdminUserId.ToString());
         setupClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, HrAdminUserId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, HrAdminUserId, SystemRoles.HrAdministrator, HrAdminUserId);
 
-        // POST /api/companies (CreateCompany) was removed in 78a43344; seed the company directly
-        // via CompaniesDbContext instead, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
         var companyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"TOIL Test {Guid.NewGuid():N}");
 
         setupClient.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
@@ -160,7 +154,6 @@ public class AwardToilEndpointTests
 
         var employeeId = await CreateEmployeeAsync(setupClient, companyId, "TOIL");
 
-        // Return a client authenticated as the target userId, scoped to the created company
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());

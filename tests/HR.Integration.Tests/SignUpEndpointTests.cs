@@ -61,8 +61,6 @@ public class SignUpEndpointTests
         Assert.Equal("Ada", payload.FirstName);
         Assert.Equal("Lovelace", payload.LastName);
 
-        // The gateway was invoked instead of any real Supabase call, and the resulting
-        // UserProfile carries the Supabase auth user id it returned.
         Assert.Contains(_factory.SupabaseAuthGateway.CreatedUsers, u => u.Email == email);
 
         using var scope = _factory.Services.CreateScope();
@@ -73,29 +71,18 @@ public class SignUpEndpointTests
         Assert.Equal(payload.CompanyId, profile.CompanyId);
         Assert.Equal(email, profile.Email);
 
-        // Also granted SystemRoles.HrAdministrator alongside CompanyAdministrator — the
-        // self-service admin is the company's only user at this point, so CompanyAdministrator
-        // alone would lock them out of Employees/HR Settings/User Administration. Plus
-        // SystemRoles.Employee, the floor role required by "role:employee", which gates core
-        // session endpoints (GetMe, GetCompany, etc.) that every seeded persona also carries (see
-        // SignUpHandler remarks). Roles are keyed to UserProfile.Id (payload.UserId), not the raw
-        // Supabase auth user id.
         var roleIds = await db.UserRoles.Where(r => r.UserId == payload.UserId).Select(r => r.RoleId).ToListAsync();
         Assert.Contains(SystemRoles.CompanyAdministrator, roleIds);
         Assert.Contains(SystemRoles.HrAdministrator, roleIds);
         Assert.Contains(SystemRoles.Employee, roleIds);
         Assert.Equal(3, roleIds.Count);
 
-        // Self-service signup starts a company in PendingVerification — it is not yet Active
-        // until an email-verification step (out of scope for Phase A) flips it.
         var companiesDb = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
         var company = await companiesDb.Companies.SingleOrDefaultAsync(c => c.Id == payload.CompanyId);
         Assert.NotNull(company);
         Assert.Equal(CompanyStatus.PendingVerification, company!.Status);
         Assert.False(company.IsActive);
 
-        // Default setup data (Department/Location/EmploymentType/PositionProfile) was seeded so the
-        // admin's own Employee record could be created against it.
         var employeesDb = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
         var department = await employeesDb.Departments.SingleOrDefaultAsync(d => d.CompanyId == payload.CompanyId);
         Assert.NotNull(department);
@@ -105,9 +92,6 @@ public class SignUpEndpointTests
         Assert.NotNull(location);
         Assert.Equal("Head Office", location!.Name);
 
-        // Full default Employment Types set (matches the dev/E2E seed data's canonical set — see
-        // CompanyDefaultDataSeeder), not a single placeholder "Full-time" type. "Permanent" is the
-        // one actually assigned to the admin's own Employee record below.
         var employmentTypeNames = await employeesDb.EmploymentTypes
             .Where(et => et.CompanyId == payload.CompanyId).Select(et => et.Name).ToListAsync();
         Assert.Equal(

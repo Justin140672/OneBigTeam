@@ -113,7 +113,6 @@ public class GetProbationStatusEndpointTests
         Assert.Equal("Failed", payload.Status);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid user, Guid companyId)
     {

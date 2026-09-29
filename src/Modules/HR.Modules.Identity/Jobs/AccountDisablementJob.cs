@@ -44,13 +44,9 @@ internal sealed class AccountDisablementJob(
 {
     public const int MaxAttempts = 4;
 
-    /// <summary>Live-dispatch entry point — claims the row itself (see class remarks).</summary>
     public Task ProcessAsync(Guid accountDisablementId, Guid companyId) =>
         ProcessCoreAsync(accountDisablementId, companyId, alreadyClaimedBy: null);
 
-    /// <summary>Reconciliation entry point — <paramref name="claimedBy"/> is the id
-    /// AccountDisablementReconciliationJob already atomically claimed this row under; verified
-    /// (not re-claimed) before proceeding (see class remarks).</summary>
     public Task ProcessAsync(Guid accountDisablementId, Guid companyId, Guid claimedBy) =>
         ProcessCoreAsync(accountDisablementId, companyId, alreadyClaimedBy: claimedBy);
 
@@ -75,8 +71,6 @@ internal sealed class AccountDisablementJob(
                 $"AccountDisablement {accountDisablementId} does not belong to company {companyId}.");
         }
 
-        // Idempotency guard: already completed (a prior attempt that succeeded but crashed before
-        // marking Processed, or a duplicate enqueue) — no-op.
         if (request.Status == Domain.AccountDisablement.StatusProcessed)
             return;
 
@@ -145,7 +139,6 @@ internal sealed class AccountDisablementJob(
 
             if (user is null && profile is null)
             {
-                // The linked account no longer exists — nothing left to disable; treat as done.
                 request.MarkProcessed(clock.UtcNow);
                 await db.SaveChangesAsync();
                 return;
@@ -200,9 +193,6 @@ internal sealed class AccountDisablementJob(
                     request.AttemptCount, request.ApplicationUserId, request.CompanyId);
             }
 
-            // Rethrow while retries remain so Hangfire schedules the next attempt; rethrow on the
-            // final attempt too so BackgroundJobAuditFilter records the standard operational-failure
-            // audit trail every other job already relies on.
             throw;
         }
     }

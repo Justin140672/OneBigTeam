@@ -10,15 +10,7 @@ namespace HR.SharedKernel.ExecutionContext;
 /// </summary>
 public interface IExecutionContextAccessor
 {
-    /// <summary>The context for the work currently executing on this logical async call chain, or
-    /// null if nothing has established one yet (e.g. code running outside any tracked entry point).</summary>
     IExecutionContext? Current { get; }
 
-    /// <summary>
-    /// Establishes <paramref name="context"/> as current for the duration of the returned scope
-    /// (and for any async continuation of the calling code), restoring the previous value on
-    /// dispose. Nest freely — e.g. a handler processing message A pushes a new context before
-    /// publishing message B, and pops back to A's context afterwards.
-    /// </summary>
     IDisposable Push(IExecutionContext context);
 }

@@ -2,12 +2,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Infrastructure.Storage;
 
-/// <summary>
-/// Development/test implementation of <see cref="IOrganisationDataExportStorage"/> that stores
-/// export ZIP archives on the local file system. Mirrors
-/// <see cref="LocalSupportAttachmentStorageService"/>. Replace with
-/// <see cref="SupabaseOrganisationDataExportStorage"/> for hosted environments.
-/// </summary>
 internal sealed class LocalOrganisationDataExportStorage : IOrganisationDataExportStorage
 {
     private readonly string _basePath =

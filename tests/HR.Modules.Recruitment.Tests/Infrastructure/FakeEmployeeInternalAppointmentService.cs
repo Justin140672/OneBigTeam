@@ -22,30 +22,21 @@ internal sealed class FakeEmployeeInternalAppointmentService : IEmployeeInternal
     private readonly ConcurrentQueue<(Guid CompanyId, string SourceReference, Guid PerformedBy)> _resumeCalls = new();
     private readonly object _gate = new();
 
-    /// <summary>When set, every AppointAsync call fails with this error and records nothing.</summary>
     public Error? FailWith { get; set; }
 
-    /// <summary>
-    /// "Today" used to decide IsApplied (effective date &lt;= Today). Null means every change is
-    /// treated as applied immediately.
-    /// </summary>
     public DateOnly? Today { get; set; }
 
-    /// <summary>Department / location reported for a newly recorded change (the real service reads them from the profile).</summary>
     public Guid NewDepartmentId { get; set; } = Guid.NewGuid();
     public Guid NewLocationId { get; set; } = Guid.NewGuid();
     public Guid PreviousPositionProfileId { get; set; } = Guid.NewGuid();
 
-    /// <summary>Optional hook awaited at the start of AppointAsync (e.g. to widen a race window).</summary>
     public Func<Task>? BeforeAppoint { get; set; }
 
     public IReadOnlyList<InternalAppointmentRequest> AppointRequests => _appointRequests.ToList();
     public IReadOnlyList<(Guid CompanyId, string SourceReference, Guid PerformedBy)> ResumeCalls => _resumeCalls.ToList();
 
-    /// <summary>Number of distinct changes recorded (never more than one per source reference).</summary>
     public int RecordedCount => _recorded.Count;
 
-    /// <summary>Pre-records a change, simulating an earlier attempt that committed on the Employees side.</summary>
     public InternalAppointmentResult Seed(
         Guid companyId,
         string sourceReference,

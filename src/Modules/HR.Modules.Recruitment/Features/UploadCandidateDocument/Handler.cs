@@ -63,11 +63,6 @@ internal sealed class UploadCandidateDocumentHandler(
         if (validationResult.IsFailure)
             return Result.Failure<UploadCandidateDocumentResponse>(validationResult.Error);
 
-        // Follow-up review finding: the storage key is reserved and the durable upload-intent row is
-        // persisted BEFORE any bytes are uploaded — this is what makes the intent's durability
-        // independent of whatever happens afterward (upload failure, session-save failure, process
-        // crash). If this initial save itself fails, the request fails cleanly with nothing uploaded
-        // yet — there is nothing to compensate for.
         var staging = new CandidateDocumentUploadStaging(db, storage, clock, logger, executionContextAccessor);
         var staged = await staging.ReserveAndUploadAsync(request.CompanyId, request.CandidateId, file, cancellationToken);
 
@@ -95,18 +90,10 @@ internal sealed class UploadCandidateDocumentHandler(
 
         try
         {
-            // Both the document insert and the intent's confirmation are saved atomically in this
-            // one call — if it fails, the intent row (already durably persisted above, before the
-            // upload) simply remains unconfirmed, which is exactly what makes it discoverable by the
-            // reconciliation sweep without relying on any compensation write succeeding.
             await db.SaveChangesAsync(cancellationToken);
         }
         catch
         {
-            // The failed document entity is still tracked as Added — clear the change tracker
-            // before any further SaveChangesAsync call on this context, otherwise a subsequent save
-            // could silently re-attempt (and this time succeed in) persisting the very document row
-            // whose save just failed.
             db.ChangeTracker.Clear();
             await staging.CompensateAsync(staged);
             throw;
@@ -124,8 +111,6 @@ internal sealed class UploadCandidateDocumentHandler(
             document.CreatedAt));
     }
 
-    /// <summary>Kept for existing callers (e.g. DeleteCandidateDocument); see
-    /// <see cref="CandidateDocumentUploadStaging.RedactStorageKey"/>.</summary>
     internal static string RedactStorageKey(string storageKey) =>
         CandidateDocumentUploadStaging.RedactStorageKey(storageKey);
 }

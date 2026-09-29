@@ -17,10 +17,6 @@ public class AdjustLeaveBalanceHandlerTests
 
     private static LeaveDbContext BuildContext()
     {
-        // The handler under test wraps its save in an explicit database transaction (a ticket
-        // requirement for atomicity). EF Core's InMemory provider doesn't support transactions
-        // and raises a warning-as-error for it by default; ignore that specific warning here
-        // since it's purely a test-provider limitation (real Postgres supports transactions).
         var options = new DbContextOptionsBuilder<LeaveDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
@@ -94,7 +90,6 @@ public class AdjustLeaveBalanceHandlerTests
         context.LeaveTypes.Add(leaveType);
         await context.SaveChangesAsync();
 
-        // Employee name reader returns a dict that does NOT contain employeeId.
         var handler = BuildHandler(context, new Dictionary<Guid, string>());
 
         var result = await handler.HandleAsync(
@@ -146,8 +141,6 @@ public class AdjustLeaveBalanceHandlerTests
         var handler = BuildHandler(context, new Dictionary<Guid, string> { [employeeId] = "Jane Doe" });
         var adjustedBy = Guid.NewGuid();
 
-        // Standard-behaviour leave type: AdjustmentValue is interpreted directly as days (no
-        // hours-per-day division), so 2m here means a 2-day adjustment.
         var request = BuildRequest(companyId, employeeId, leaveType.Id, adjustmentValue: 2m, comments: "Awarded extra days") with
         {
             AdjustedByEmployeeId = adjustedBy
@@ -156,9 +149,9 @@ public class AdjustLeaveBalanceHandlerTests
         var result = await handler.HandleAsync(request, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(202.5m, result.Value!.NewRemainingHours); // (25 + 2 - 0) days * 7.5 hours/day
+        Assert.Equal(202.5m, result.Value!.NewRemainingHours);
         Assert.Equal(2m, result.Value.AdjustmentDays);
-        Assert.Null(result.Value.AdjustmentHours); // Standard behaviour: no hours value recorded
+        Assert.Null(result.Value.AdjustmentHours);
         Assert.Equal(adjustedBy, result.Value.AdjustedByEmployeeId);
 
         var updatedBalance = await context.LeaveBalances.SingleAsync();
@@ -206,8 +199,6 @@ public class AdjustLeaveBalanceHandlerTests
         var handler = BuildHandler(context, new Dictionary<Guid, string> { [employeeId] = "Jane Doe" });
         var adjustedBy = Guid.NewGuid();
 
-        // Toil-behaviour leave type: AdjustmentValue is interpreted as HOURS and divided by the
-        // fake working pattern's 7.5 hours/day, giving 15 / 7.5 = 2 days.
         var request = BuildRequest(companyId, employeeId, leaveType.Id, adjustmentValue: 15m, comments: "TOIL awarded") with
         {
             AdjustedByEmployeeId = adjustedBy
@@ -255,7 +246,6 @@ public class AdjustLeaveBalanceHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        // (5 entitlement - 8 adjustment days - 0 used) = -3 days remaining
         Assert.Equal(-22.5m, result.Value!.NewRemainingHours);
 
         var updatedBalance = await context.LeaveBalances.SingleAsync();
@@ -318,7 +308,6 @@ public class AdjustLeaveBalanceHandlerTests
             "This adjustment would take the balance below zero. Enable the override to allow it.",
             result.Error.Message);
 
-        // Balance must be untouched.
         var unchangedBalance = await context.LeaveBalances.SingleAsync();
         Assert.Equal(0m, unchangedBalance.AdjustmentDays);
         Assert.Empty(context.LeaveBalanceAdjustments);
@@ -348,7 +337,6 @@ public class AdjustLeaveBalanceHandlerTests
 
         Assert.True(result.IsSuccess);
 
-        // (25 entitlement - 2 adjustment days - 0 used) = 23 days remaining, never negative.
         var updatedBalance = await context.LeaveBalances.SingleAsync();
         Assert.Equal(23m, updatedBalance.RemainingDays);
     }

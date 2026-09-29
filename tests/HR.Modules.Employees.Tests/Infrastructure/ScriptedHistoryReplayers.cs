@@ -4,13 +4,6 @@ using HR.Modules.Employees.Persistence;
 
 namespace HR.Modules.Employees.Tests.Infrastructure;
 
-// Shared scripting behaviour for the 4 cross-module history replayer fakes used by
-// BackfillEmployeeTimelineHandlerTests. Each fake, when invoked, writes the configured number of
-// EmployeeTimelineEntry rows directly into the same EmployeesDbContext instance the handler under
-// test uses — simulating the real replayer's effect of publishing an integration event whose
-// handler (unmodified, in-module) writes via IEmployeeTimelineWriter into that same DbContext/DI
-// scope. This lets RunCrossModuleSourceAsync's before/after count-delta logic be exercised
-// faithfully without needing a real integration event bus in these unit tests.
 internal sealed class ScriptedReplayerBehavior(
     EmployeesDbContext dbContext,
     EmployeeTimelineEventType eventType)

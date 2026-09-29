@@ -113,8 +113,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // On a cold circuit this component's OnInitialized can run before MainLayout's
-        // Session.InitialiseAsync() await has completed, so re-render if the session changes later.
         Session.Changed += OnSessionChanged;
         await Session.InitialiseAsync();
     }
@@ -246,9 +244,6 @@
     {
         _open = false;
         _debounceCts?.Cancel();
-        // The admin employee record (EmployeeEdit.razor), not "/…/profile" — that route is
-        // MyProfile.razor, which redirects away from any employee id that isn't the signed-in
-        // user's own. This palette is HR-only and is for looking at other people's records.
         Navigation.NavigateTo($"/companies/{Session.CompanyId}/employees/{item.Id}");
     }
 

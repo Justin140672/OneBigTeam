@@ -25,7 +25,6 @@ public class RequestAdditionalEmployeeDocumentEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    // ── Happy path ───────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Returns_Created_With_DocumentRequest_When_Valid()
@@ -115,7 +114,6 @@ public class RequestAdditionalEmployeeDocumentEndpointTests
         Assert.Equal(new DateOnly(2026, 10, 15), task.DueDate);
     }
 
-    // ── Authorization ─────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Returns_Unauthorized_Without_Auth()
@@ -159,7 +157,6 @@ public class RequestAdditionalEmployeeDocumentEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── Error cases ───────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Returns_NotFound_When_DocumentType_Does_Not_Exist()
@@ -188,7 +185,6 @@ public class RequestAdditionalEmployeeDocumentEndpointTests
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────────
 
     private async Task<(Guid CompanyId, Guid EmployeeId, Guid DocTypeId)> SetupAsync()
     {

@@ -1,7 +1,5 @@
 namespace HR.Admin.Web.Models;
 
-// Mirrors the Companies module's deletion-queue endpoint contracts exactly — same app-local DTO
-// convention as CustomerDashboardModels.cs (no shared contracts project).
 public sealed record DeletionQueueResponse(IReadOnlyList<DeletionQueueItem> Items);
 
 public sealed record DeletionQueueItem(

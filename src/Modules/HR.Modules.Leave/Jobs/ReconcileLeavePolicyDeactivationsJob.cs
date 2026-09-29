@@ -6,14 +6,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Leave.Jobs;
 
-/// <summary>
-/// Daily sweep that re-enqueues any LeavePolicyDeactivationOnDeparture record still Pending or
-/// Failed — covers the case where the initial Hangfire enqueue in
-/// EmployeeDepartureFinalisedHandler itself never happened (process crashed between the durable
-/// insert and the enqueue call) or where a Failed record needs a fresh round of retries after
-/// investigation. Safe to run repeatedly: LeavePolicyDeactivationJob is itself idempotent
-/// (Status == Processed short-circuits, Deactivate() is a no-op if already inactive).
-/// </summary>
 internal sealed class ReconcileLeavePolicyDeactivationsJob(
     LeaveDbContext dbContext,
     IBackgroundJobClient backgroundJobClient,

@@ -33,8 +33,6 @@ public class GetLeavingProcessHistoryEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    // Relative to "today" rather than hardcoded literals — see StartLeavingProcessEndpointTests'
-    // identical fields for why a fixed near-term literal eventually becomes "backdated".
     private static readonly DateOnly LeavingDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
     private static readonly DateOnly LastWorkingDay = LeavingDate.AddDays(-1);
 
@@ -202,19 +200,15 @@ public class GetLeavingProcessHistoryEndpointTests
 
         var employeeId = await CreateEmployeeAsync(client, companyId);
 
-        // Create first process
         await StartLeavingProcessAsync(client, companyId, employeeId, "Resignation");
-        await Task.Delay(100); // Small delay to ensure different timestamps
+        await Task.Delay(100);
 
-        // Amend the process to create an updated timestamp
         var earlierLeavingDate = LeavingDate.AddDays(5);
         var earlierLastWorkingDay = earlierLeavingDate.AddDays(-1);
         await AmendLeavingProcessAsync(client, companyId, employeeId, earlierLeavingDate, earlierLastWorkingDay);
 
-        // Cancel the process
         await CancelLeavingProcessAsync(client, companyId, employeeId, "Changed my mind");
 
-        // Create a second process
         await StartLeavingProcessAsync(client, companyId, employeeId, "Retirement");
 
         var response = await client.GetAsync(
@@ -226,20 +220,17 @@ public class GetLeavingProcessHistoryEndpointTests
         Assert.NotNull(payload);
         Assert.Equal(2, payload!.Items.Count);
 
-        // Most recent (second process) should come first
         var mostRecent = payload.Items[0];
         Assert.Equal("InProgress", mostRecent.Status);
         Assert.Equal("Retirement", mostRecent.LeavingReason);
         Assert.Null(mostRecent.CancelledAt);
 
-        // Older (first process, now cancelled) should come second
         var older = payload.Items[1];
         Assert.Equal("Cancelled", older.Status);
         Assert.Equal("Resignation", older.LeavingReason);
         Assert.NotNull(older.CancelledAt);
         Assert.Equal("Changed my mind", older.CancellationReason);
 
-        // Verify reverse-chronological ordering by StartedAt
         Assert.True(mostRecent.StartedAt >= older.StartedAt,
             "Most recent process should have StartedAt >= older process");
     }
@@ -313,7 +304,6 @@ public class GetLeavingProcessHistoryEndpointTests
         var employeeId = await CreateEmployeeAsync(client, companyId);
         var replacementManagerId = await CreateEmployeeAsync(client, companyId);
 
-        // Start a leaving process with a replacement manager
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
         var startResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leaving-process",
@@ -341,7 +331,6 @@ public class GetLeavingProcessHistoryEndpointTests
         var item = payload.Items[0];
         Assert.NotNull(item.ReplacementManagerName);
         Assert.NotEmpty(item.ReplacementManagerName);
-        // Verify it contains the expected parts (First + Last name)
         Assert.Contains(" ", item.ReplacementManagerName);
     }
 
@@ -357,7 +346,6 @@ public class GetLeavingProcessHistoryEndpointTests
         var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
         await StartLeavingProcessAsync(hrAdminClient, companyId, employeeId);
 
-        // A different user with Manager role only
         using var managerClient = _factory.CreateClient();
         var managerId = Guid.NewGuid();
         managerClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, managerId.ToString());
@@ -382,7 +370,6 @@ public class GetLeavingProcessHistoryEndpointTests
         var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
         await StartLeavingProcessAsync(hrAdminClient, companyId, employeeId);
 
-        // A different user with Employee role only
         using var employeeClient = _factory.CreateClient();
         var otherEmployeeId = Guid.NewGuid();
         employeeClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, otherEmployeeId.ToString());
@@ -407,7 +394,6 @@ public class GetLeavingProcessHistoryEndpointTests
         var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
         await StartLeavingProcessAsync(hrAdminClient, companyId, employeeId);
 
-        // A different user with Recruiter role
         using var recruiterClient = _factory.CreateClient();
         var recruiterId = Guid.NewGuid();
         recruiterClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, recruiterId.ToString());
@@ -433,8 +419,6 @@ public class GetLeavingProcessHistoryEndpointTests
         var employeeId = await CreateEmployeeAsync(client, companyId);
         await StartLeavingProcessAsync(client, companyId, employeeId);
 
-        // Authenticated as companyId but the route targets otherCompanyId —
-        // TenantRouteAuthorizationMiddleware blocks it before the handler ever runs.
         var response = await client.GetAsync(
             $"/api/companies/{otherCompanyId}/employees/{employeeId}/leaving-process-history");
 
@@ -467,7 +451,6 @@ public class GetLeavingProcessHistoryEndpointTests
 
         var item = payload.Items[0];
 
-        // Verify all fields are present and correctly mapped
         Assert.NotEqual(Guid.Empty, item.Id);
         Assert.NotNull(item.Status);
         Assert.NotNull(item.ResignationReceivedDate);
@@ -477,7 +460,6 @@ public class GetLeavingProcessHistoryEndpointTests
         Assert.Equal(notes, item.Notes);
         Assert.True(item.StartedAt > DateTimeOffset.MinValue);
         Assert.True(item.UpdatedAt >= item.StartedAt);
-        // These should be null for an InProgress process
         Assert.Null(item.CancelledAt);
         Assert.Null(item.CancellationReason);
     }

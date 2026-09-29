@@ -6,15 +6,6 @@ using Xunit;
 
 namespace HR.Modules.Recruitment.Tests;
 
-/// <summary>
-/// Reliability review issue 2 (P1): proves a candidate document uploaded through one
-/// <see cref="SupabaseCandidateDocumentStorageService"/> instance (standing in for one API service
-/// instance/process) remains fully retrievable and deletable through a second, independently
-/// constructed instance (standing in for a different service instance after a restart/redeploy) —
-/// unlike <see cref="LocalCandidateDocumentStorageService"/>, no state lives in this process's local
-/// temp directory; everything needed to address the file (the storage key) is self-contained and the
-/// actual bytes live in the remote Supabase Storage bucket, not on this machine's disk.
-/// </summary>
 public class SupabaseCandidateDocumentStorageRestartSafetyTests
 {
     private static IOptions<SupabaseCandidateDocumentStorageOptions> Options() =>
@@ -51,7 +42,6 @@ public class SupabaseCandidateDocumentStorageRestartSafetyTests
     [Fact]
     public async Task Upload_Then_Download_And_Delete_From_A_Fresh_Instance_Succeeds()
     {
-        // Instance A: simulates the service instance/process that received the original upload.
         var handlerA = new RecordingHandler();
         var serviceA = new SupabaseCandidateDocumentStorageService(new HttpClient(handlerA), Options());
 
@@ -62,9 +52,6 @@ public class SupabaseCandidateDocumentStorageRestartSafetyTests
         Assert.False(string.IsNullOrWhiteSpace(storageKey));
         Assert.DoesNotContain(Path.GetTempPath().Replace('\\', '/'), storageKey, StringComparison.OrdinalIgnoreCase);
 
-        // Instance B: a brand-new instance built only from the same durable config — nothing is
-        // shared in-process with instance A, proving the file is addressable purely via the
-        // storage key against the remote store, independent of any single process's lifetime.
         var handlerB = new RecordingHandler();
         var serviceB = new SupabaseCandidateDocumentStorageService(new HttpClient(handlerB), Options());
 

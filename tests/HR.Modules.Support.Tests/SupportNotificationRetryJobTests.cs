@@ -121,7 +121,7 @@ public class SupportNotificationRetryJobTests
         var email = new FakeEmailSender { ThrowOnSend = true };
         var job = BuildJob(db, email);
 
-        await job.ExecuteAsync(); // provider down
+        await job.ExecuteAsync();
 
         var afterOutage = await db.SupportNotificationAttempts.SingleAsync();
         Assert.Equal(SupportNotificationStatus.Failed, afterOutage.Status);
@@ -130,7 +130,7 @@ public class SupportNotificationRetryJobTests
         Assert.Empty(email.Sent);
 
         email.ThrowOnSend = false;
-        await job.ExecuteAsync(); // provider recovered
+        await job.ExecuteAsync();
 
         var recovered = await db.SupportNotificationAttempts.SingleAsync();
         Assert.Equal(SupportNotificationStatus.Sent, recovered.Status);
@@ -164,7 +164,6 @@ public class SupportNotificationRetryJobTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        // No SupportRequest row seeded for this id.
         db.SupportNotificationAttempts.Add(SeedFailedAttempt(companyId, Guid.NewGuid()));
         await db.SaveChangesAsync();
 
@@ -194,7 +193,7 @@ public class SupportNotificationRetryJobTests
         Assert.Empty(email.Sent);
         var saved = await db.SupportNotificationAttempts.SingleAsync();
         Assert.Equal(SupportNotificationStatus.Failed, saved.Status);
-        Assert.Equal(MaxRetryCount, saved.RetryCount); // untouched
+        Assert.Equal(MaxRetryCount, saved.RetryCount);
     }
 
     [Fact]
@@ -210,13 +209,13 @@ public class SupportNotificationRetryJobTests
         var email = new FakeEmailSender { ThrowOnSend = true };
         var job = BuildJob(db, email);
 
-        await job.ExecuteAsync(); // 4 -> 5, fails again
+        await job.ExecuteAsync();
         var afterFinalRetry = await db.SupportNotificationAttempts.SingleAsync();
         Assert.Equal(MaxRetryCount, afterFinalRetry.RetryCount);
         Assert.Equal(SupportNotificationStatus.Failed, afterFinalRetry.Status);
 
         email.ThrowOnSend = false;
-        await job.ExecuteAsync(); // now excluded by the RetryCount < Max guard
+        await job.ExecuteAsync();
 
         Assert.Empty(email.Sent);
         var terminal = await db.SupportNotificationAttempts.SingleAsync();

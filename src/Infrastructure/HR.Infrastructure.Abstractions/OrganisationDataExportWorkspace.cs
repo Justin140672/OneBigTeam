@@ -11,49 +11,22 @@ public sealed class OrganisationDataExportTempCapacityException(string message) 
 /// </summary>
 public interface IOrganisationDataExportWorkspace : IDisposable
 {
-    /// <summary>Opens the (single) archive file for read/write. The caller writes the ZIP then rewinds to upload it.</summary>
     FileStream OpenArchiveStream();
 
-    /// <summary>The per-export temp-disk ceiling this workspace enforces (bytes).</summary>
     long MaxArchiveBytes { get; }
 
-    /// <summary>
-    /// Wraps <paramref name="inner"/> (the archive <see cref="FileStream"/>) in a counting stream that
-    /// throws <see cref="OrganisationDataExportTempCapacityException"/> the moment a write — including a
-    /// ZIP central-directory / finalisation write — would push the archive past
-    /// <see cref="MaxArchiveBytes"/>. The offending write never completes. The returned stream does not
-    /// dispose <paramref name="inner"/>.
-    /// </summary>
     Stream CreateBudgetEnforcingWriteStream(Stream inner);
 
-    /// <summary>
-    /// Throws <see cref="OrganisationDataExportTempCapacityException"/> if the archive has grown past
-    /// the per-export ceiling. Called by the package builder after every entry (belt-and-braces
-    /// alongside <see cref="CreateBudgetEnforcingWriteStream"/>, which trips mid-write).
-    /// </summary>
     void EnsureWithinBudget(long currentArchiveBytes);
 }
 
 public interface IOrganisationDataExportWorkspaceFactory
 {
-    /// <summary>
-    /// Creates a fresh workspace for <paramref name="exportId"/>, first checking the combined work-root
-    /// size and the drive's free space against the configured budgets, then atomically reserving the
-    /// per-export ceiling against a process-wide accounted total (so two builds starting together
-    /// cannot both see room and jointly overshoot). The reservation is released on workspace disposal.
-    /// </summary>
-    /// <exception cref="OrganisationDataExportTempCapacityException">Budgets would be exceeded.</exception>
     IOrganisationDataExportWorkspace CreateWorkspace(Guid exportId);
 
-    /// <summary>
-    /// Removes workspace directories older than <see cref="OrganisationDataExportResourceLimits.OrphanWorkspaceAge"/>
-    /// (relative to <paramref name="now"/>) — leftovers from a hard process kill. Best-effort; returns
-    /// the number of directories removed.
-    /// </summary>
     int SweepOrphans(DateTimeOffset now);
 }
 
-/// <summary>Default implementation rooted under the OS temp path. Register as a singleton.</summary>
 public sealed class OrganisationDataExportWorkspaceFactory : IOrganisationDataExportWorkspaceFactory
 {
     private readonly string _root;
@@ -73,8 +46,6 @@ public sealed class OrganisationDataExportWorkspaceFactory : IOrganisationDataEx
     // to counting as orphan bytes against the next admission.
     private readonly object _reservationLock = new();
 
-    // Active workspace directory -> the reservation it holds. Sum of the values is the outstanding
-    // reservation total. Removal (on disposal or creation failure) is idempotent.
     private readonly Dictionary<string, long> _activeReservations = new(StringComparer.OrdinalIgnoreCase);
 
     public OrganisationDataExportWorkspaceFactory(
@@ -84,13 +55,6 @@ public sealed class OrganisationDataExportWorkspaceFactory : IOrganisationDataEx
         _root = rootOverride ?? Path.Combine(Path.GetTempPath(), "onebigteam", "organisation-export-work");
     }
 
-    /// <summary>
-    /// How much combined temp disk a single in-flight build reserves up front. This is also the
-    /// effective per-export archive ceiling handed to the workspace: a reservation must always cover
-    /// the maximum a workspace is allowed to write, so when <see cref="OrganisationDataExportResourceLimits.MaxArchiveBytesPerExport"/>
-    /// is configured larger than the whole-root budget the archive ceiling is reduced to the budget
-    /// rather than reserving less than the workspace may write.
-    /// </summary>
     private long ReservationUnit => Math.Min(_limits.MaxArchiveBytesPerExport, _limits.MaxTotalWorkspaceBytes);
 
     public IOrganisationDataExportWorkspace CreateWorkspace(Guid exportId)
@@ -115,9 +79,6 @@ public sealed class OrganisationDataExportWorkspaceFactory : IOrganisationDataEx
         string dir;
         lock (_reservationLock)
         {
-            // Bytes on disk that are NOT inside an active workspace directory: orphans from a hard
-            // process kill, plus anything an earlier workspace's failed delete left behind. Bytes
-            // inside an active workspace are already covered by that workspace's reservation.
             var orphanBytes = OrphanBytesLocked();
 
             if (orphanBytes >= _limits.MaxTotalWorkspaceBytes)
@@ -130,8 +91,6 @@ public sealed class OrganisationDataExportWorkspaceFactory : IOrganisationDataEx
             foreach (var reserved in _activeReservations.Values)
                 activeReservations += reserved;
 
-            // Admission: orphan bytes + every active reservation + this reservation must stay within
-            // the combined ceiling. Atomic under the lock so two simultaneous callers cannot both pass.
             if (orphanBytes + activeReservations + unit > _limits.MaxTotalWorkspaceBytes)
             {
                 throw new OrganisationDataExportTempCapacityException(
@@ -156,10 +115,6 @@ public sealed class OrganisationDataExportWorkspaceFactory : IOrganisationDataEx
         }
     }
 
-    /// <summary>
-    /// Sum of every byte under <see cref="_root"/> that is not inside a currently-active workspace
-    /// directory. Call under <see cref="_reservationLock"/>.
-    /// </summary>
     private long OrphanBytesLocked()
     {
         if (!Directory.Exists(_root))
@@ -188,8 +143,6 @@ public sealed class OrganisationDataExportWorkspaceFactory : IOrganisationDataEx
     {
         lock (_reservationLock)
         {
-            // Idempotent: a second disposal (or a disposal after a creation-failure release) is a no-op,
-            // so a reservation is never released twice.
             _activeReservations.Remove(dir);
         }
     }
@@ -213,7 +166,6 @@ public sealed class OrganisationDataExportWorkspaceFactory : IOrganisationDataEx
             }
             catch
             {
-                // Locked or already gone — retried on the next sweep.
             }
         }
 
@@ -267,7 +219,6 @@ public sealed class OrganisationDataExportWorkspaceFactory : IOrganisationDataEx
             }
             catch
             {
-                // Swallowed: the orphan sweep will retry.
             }
             finally
             {

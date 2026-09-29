@@ -8,12 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Services;
 
-/// <summary>
-/// OBT-721 Workload &amp; HR Actions Report provider for upcoming employee leaving dates. HR-only,
-/// same tier as <see cref="UpcomingEmployeeStartDatesWorkloadActionProvider"/>. Sourced from
-/// EmployeeLeavingProcess (in-progress only — cancelled/completed processes are not upcoming
-/// actions), which is the same entity IEmployeeLeaverReader composes for the Employee Leaver Report.
-/// </summary>
 internal sealed class UpcomingEmployeeLeavingDatesWorkloadActionProvider(
     EmployeesDbContext dbContext,
     IEmployeeDepartmentReader employeeDepartmentReader,

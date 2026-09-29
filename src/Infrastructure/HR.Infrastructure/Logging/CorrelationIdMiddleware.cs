@@ -40,12 +40,6 @@ public sealed class CorrelationIdMiddleware(RequestDelegate next)
     /// bounded and to make header-injection/DoS-via-oversized-header attempts cheap to reject.</summary>
     private const int MaxHeaderLength = 128;
 
-    /// <summary>Documented character policy: ASCII alphanumerics plus '-', '_', '.', ':' — enough for
-    /// GUIDs, ULIDs, and common "prefix-id" conventions, while excluding anything that could enable
-    /// log/header injection (newlines, control characters, delimiters) or be otherwise unsafe to
-    /// echo back verbatim into an HTTP header and structured logs.
-    /// Anchored with <c>\z</c>, not <c>$</c>: in .NET <c>$</c> also matches immediately before a
-    /// trailing newline, which would let a value such as "abc" + LF through the allow-list.</summary>
     private static readonly Regex AllowedCharacters = new(@"^[A-Za-z0-9._:-]+\z", RegexOptions.Compiled);
 
     public async Task InvokeAsync(HttpContext context, IExecutionContextAccessor executionContextAccessor)
@@ -63,14 +57,8 @@ public sealed class CorrelationIdMiddleware(RequestDelegate next)
             return Task.CompletedTask;
         });
 
-        // Associate with the active trace for cross-referencing in tracing backends, without
-        // conflating correlation identity with trace identity — the trace id remains
-        // Activity.Current?.TraceId; this is only a tag alongside it.
         Activity.Current?.SetTag("correlation.id", correlationId);
 
-        // Root context for an HTTP request always uses the resolved (accepted-or-generated)
-        // correlation id verbatim, so downstream audit/outbox records trace back to exactly what the
-        // caller (or this middleware, if none/invalid was supplied) established.
         var executionContext = new ExecutionContextInfo(
             CorrelationId: correlationId,
             MessageId: Guid.NewGuid(),
@@ -88,7 +76,6 @@ public sealed class CorrelationIdMiddleware(RequestDelegate next)
         }
     }
 
-    /// <summary>Length + character allow-list applied to a caller-supplied correlation id (CodeQL #63-#65, #67).</summary>
     internal static bool IsAcceptable(string? supplied) =>
         !string.IsNullOrWhiteSpace(supplied)
         && supplied.Length <= MaxHeaderLength

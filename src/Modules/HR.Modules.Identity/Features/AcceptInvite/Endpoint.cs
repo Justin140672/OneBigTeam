@@ -12,15 +12,6 @@ using Microsoft.EntityFrameworkCore.Storage;
 
 namespace HR.Modules.Identity.Features.AcceptInvite;
 
-// Creates a real Supabase-backed UserProfile (not a local-auth ApplicationUser — that Phase A
-// stand-in has been superseded here the same way SignUp's was, see SignUpHandler's remarks) so an
-// invited employee can actually use every Supabase-based flow: real password-grant Login,
-// RequestPasswordReset/forgot-password (which only ever looks at UserProfiles — an
-// ApplicationUser-only account was silently invisible to it), etc. Uses
-// ISupabaseAuthGateway.CreateConfirmedUserAsync rather than CreateUserAsync: the invite link
-// itself, emailed to invite.Email when the invite was sent, already proves ownership of that
-// address, so there's no separate "verify your email" step needed here the way self-service
-// SignUp needs one.
 internal sealed class Endpoint(
     IdentityDbContext db,
     ISupabaseAuthGateway supabaseAuthGateway,
@@ -35,7 +26,6 @@ internal sealed class Endpoint(
     {
         Post("/api/invites/accept");
         AllowAnonymous();
-        // See HR.Modules.Identity.Features.Login.Endpoint's remarks on why this is a literal.
         Options(b => b.RequireRateLimiting("identity-accept-invite"));
     }
 
@@ -73,8 +63,6 @@ internal sealed class Endpoint(
             return;
         }
 
-        // Use the employee ID as the user ID — single identity across modules (UserRole.UserId
-        // below relies on this matching, same as SignUpHandler's admin profile).
         InviteAcceptanceOperation? operation = null;
         Guid? newProfileSupabaseUserId = null;
 
@@ -202,9 +190,6 @@ internal sealed class Endpoint(
             await db.SaveChangesAsync(ct);
         }
 
-        // Assign the roles selected when the invite was sent (Features/InviteEmployeeUser),
-        // falling back to the base Employee role for invites created before role selection
-        // existed (e.g. via the older SendInvite endpoint).
         var roleIds = invite.PendingRoleIds.Count > 0
             ? invite.PendingRoleIds
             : [SystemRoles.Employee];
@@ -223,11 +208,6 @@ internal sealed class Endpoint(
         {
             if (commitResult.Error.Code == "concurrency")
             {
-                // Someone else (most likely CancelInvite, or another AcceptInvite request) modified
-                // this invite between our read and our write — re-check its current state so the
-                // response is accurate rather than a generic conflict. Because the whole local commit
-                // above ran in a single transaction that has now rolled back in its entirety, no
-                // profile or role rows from this attempt remain committed.
                 var current = await db.UserInvites.AsNoTracking().FirstOrDefaultAsync(i => i.Id == invite.Id, ct);
                 if (current?.IsCancelled == true)
                 {
@@ -343,8 +323,6 @@ internal sealed class Endpoint(
         }
         catch
         {
-            // The transaction may already be aborted server-side by the failure that triggered this
-            // rollback attempt; disposal (via the caller's `await using`) still guarantees cleanup.
         }
     }
 
@@ -371,9 +349,6 @@ internal sealed class Endpoint(
             return;
         }
 
-        // The winning request is still provisioning (or has just finished and the invite hasn't yet
-        // reflected as claimed above, due to an ordinary read-after-write gap). Ask the client to
-        // retry shortly rather than risk this request touching Supabase or local identity rows.
         await Send.ResultAsync(TypedResults.Conflict(new
         {
             error = "This invitation is already being accepted by another request. Please try again shortly.",

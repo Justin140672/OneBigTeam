@@ -62,8 +62,6 @@ public class ListRecruitmentStagesEndpointTests
 
         var response = await client.GetAsync($"/api/companies/{companyId}/recruitment-stages");
 
-        // c3b6f4f3: stage administration is recruiter-only (recruitment:manage); the internal vacancy
-        // board is the employee-facing surface.
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 

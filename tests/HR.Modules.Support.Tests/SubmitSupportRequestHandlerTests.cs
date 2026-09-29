@@ -19,10 +19,6 @@ public class SubmitSupportRequestHandlerTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
 
-    /// <summary>Security review finding #4 (P1): UploadedAttachmentCleanupScope now persists
-    /// cleanup bookkeeping through a genuinely separate DI scope/DbContext, not the ambient one.
-    /// None of these tests exercise cleanup failure paths, so an isolated in-memory database is
-    /// sufficient here.</summary>
     private static IServiceScopeFactory BuildScopeFactory() =>
         new ServiceCollection()
             .AddDbContext<SupportDbContext>(o => o.UseInMemoryDatabase(Guid.NewGuid().ToString("N")))
@@ -78,9 +74,6 @@ public class SubmitSupportRequestHandlerTests
     [InlineData("Tom & Sons <support@example.com>")]
     public async Task HandleAsync_HtmlEncodes_Title_In_Admin_Notification_Email(string maliciousTitle)
     {
-        // CodeQL alert: the support request title is user-controlled free text that is interpolated
-        // into the admin notification's HTML body — it must be HTML-encoded so it cannot execute as
-        // markup/script in the recipient's mail client.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var emailSender = new FakeEmailSender();
@@ -96,8 +89,6 @@ public class SubmitSupportRequestHandlerTests
         var sent = Assert.Single(emailSender.Sent);
         Assert.DoesNotContain("<script>", sent.HtmlBody, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("<img", sent.HtmlBody, StringComparison.OrdinalIgnoreCase);
-        // The encoded form of the dangerous characters must be present instead — "onerror=" may
-        // still appear, but only as inert encoded text, never as a live tag/attribute.
         Assert.Contains("&lt;", sent.HtmlBody);
     }
 
@@ -257,7 +248,7 @@ public class SubmitSupportRequestHandlerTests
 
         var result = await handler.HandleAsync(ValidRequest(companyId), Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
 
-        Assert.True(result.IsSuccess); // submission still succeeds even though notification could not be attempted
+        Assert.True(result.IsSuccess);
         var attempt = await db.SupportNotificationAttempts.SingleAsync(a => a.SupportRequestId == result.Value!.Id);
         Assert.Equal(SupportNotificationStatus.Failed, attempt.Status);
         Assert.NotNull(attempt.ErrorMessage);

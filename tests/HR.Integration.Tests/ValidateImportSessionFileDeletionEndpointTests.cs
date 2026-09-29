@@ -12,19 +12,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Security review finding #2: once ValidateImportSession completes, the raw uploaded workbook
-/// (PII: names, emails, employment data) is deleted from storage rather than left indefinitely.
-/// See ValidateImportSessionHandler.TryDeleteSessionFileAsync and PurgeImportSessionFilesJob.
-///
-/// The physical storage layer in this test environment is LocalImportFileStorageService (a
-/// temp-directory fallback — see DataImportModule.AddImportFileStorage), so this asserts both the
-/// black-box observable session status via GetImportSession and, more directly, that the
-/// underlying storage key is genuinely gone by resolving IImportFileStorageService/
-/// DataImportDbContext out of the running host and inspecting them, matching the existing
-/// `_factory.Services.CreateScope()` DbContext-inspection pattern used elsewhere in this project
-/// (e.g. AdjustLeaveBalanceEndpointTests).
-/// </summary>
 [Collection("Integration")]
 public class ValidateImportSessionFileDeletionEndpointTests
 {
@@ -44,8 +31,6 @@ public class ValidateImportSessionFileDeletionEndpointTests
 
         var sessionId = await UploadAsync(client, companyId, ValidCsv());
 
-        // Capture the storage key before validating so we can independently verify the physical
-        // file is gone afterwards (not just that the session's business Status changed).
         string storageKey;
         await using (var preScope = _factory.Services.CreateAsyncScope())
         {
@@ -65,9 +50,6 @@ public class ValidateImportSessionFileDeletionEndpointTests
         Assert.NotNull(session.FileDeletedAt);
         Assert.Equal(0, session.FileDeletionAttemptCount);
 
-        // Confirm the physical file is genuinely gone, not just that FileDeletedAt was set: a
-        // second delete of the same key must still succeed (DeleteAsync is documented idempotent)
-        // and reading it back must fail.
         var storage = scope.ServiceProvider.GetRequiredService<IImportFileStorageService>();
         await storage.DeleteAsync(storageKey, CancellationToken.None); // idempotent no-op, must not throw
         await Assert.ThrowsAnyAsync<Exception>(
@@ -142,8 +124,6 @@ public class ValidateImportSessionFileDeletionEndpointTests
         return content;
     }
 
-    // Builds a minimal XLSX workbook (via ClosedXML) from comma-delimited "csv-shaped" header/data
-    // lines, mirroring the existing helper in ValidateImportSessionEndpointTests.
     private static byte[] BuildXlsxBytes(string csvShapedContent)
     {
         var lines = csvShapedContent

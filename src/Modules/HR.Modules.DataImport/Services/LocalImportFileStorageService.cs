@@ -1,17 +1,10 @@
 namespace HR.Modules.DataImport.Services;
 
-/// <summary>
-/// Development implementation that stores files on the local file system.
-/// Replace with a cloud implementation (Azure Blob, S3, Supabase Storage, etc.) for production.
-/// </summary>
 internal sealed class LocalImportFileStorageService : IImportFileStorageService
 {
     private readonly string _basePath =
         Path.Combine(Path.GetTempPath(), "onebigteam", "data-import");
 
-    // The original file name is untrusted and is recorded separately as display metadata
-    // (ImportSession.FileName); the physical storage key never incorporates it, so it cannot
-    // be used to escape the storage root via ".." or rooted path segments.
     public string GenerateStorageKey(string storageFolder, string fileName)
     {
         var extension  = Path.GetExtension(fileName);

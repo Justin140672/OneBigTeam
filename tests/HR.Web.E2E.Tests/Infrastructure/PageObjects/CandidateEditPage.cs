@@ -2,10 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the candidate create/edit/view page.
-/// Routes: /companies/{id}/candidates/new, /candidates/{id}, /candidates/{id}/view
-/// </summary>
 public sealed class CandidateEditPage(IPage page, string baseUrl)
 {
     public async Task GoToNewAsync(Guid companyId)
@@ -14,11 +10,6 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("input[placeholder='First name']", new() { Timeout = 20_000 });
     }
 
-    /// <summary>
-    /// Navigates directly to the create-candidate route with an explicit "?origin=" query value
-    /// (see CandidateReturnDestination / CandidateDetail.razor) — used to test the Save/Close
-    /// return-navigation behavior without going through a launch button.
-    /// </summary>
     public async Task GoToNewAsync(Guid companyId, string origin)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/candidates/new?origin={origin}");
@@ -62,22 +53,12 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
-    /// <summary>
-    /// Clicks Save and waits for whichever return destination the page was launched with (the
-    /// Candidates list or the Recruitment Dashboard) rather than assuming "**/candidates" — see
-    /// <see cref="SaveNewCandidateAsync"/> for the list-only equivalent.
-    /// </summary>
     public async Task SaveNewCandidateAndWaitForUrlAsync(string urlGlob)
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
         await page.WaitForURLAsync(urlGlob, new() { Timeout = 30_000 });
     }
 
-    /// <summary>
-    /// Clicks Close (no unsaved-changes prompt expected) and waits for whichever return
-    /// destination the page was launched with — see <see cref="CloseAndWaitForListAsync"/> for the
-    /// list-only equivalent.
-    /// </summary>
     public async Task CloseAndWaitForUrlAsync(string urlGlob)
     {
         await ClickCloseAsync();
@@ -97,11 +78,6 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>Returns true if the "hired and linked to an employee" banner is visible on the candidate detail page.</summary>
-    // A bare IsVisibleAsync() snapshot right after navigating in can catch a transient
-    // pre-load render pass — the "hired and linked" banner depends on the candidate detail
-    // page's own async load of the just-created hire link, which can still be in flight the
-    // instant after GoToAsync's wait condition (the First name input) is satisfied. Retry.
     public async Task<bool> HasHiredBannerAsync()
     {
         try
@@ -119,13 +95,8 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
     public Task<string> GetFirstNameAsync() =>
         page.GetByPlaceholder("First name").InputValueAsync();
 
-    /// <summary>The candidate entity id parsed out of the current edit/view URL (/candidates/{id}[/view]).</summary>
     public Guid GetIdFromUrl() => UrlIdParser.LastGuid(page.Url);
 
-    // ── Phone field (optional HrTextBox) — mutated field for concurrency tests ────
-    // Click-focus / select-all / delete / type-for-real / Tab-to-commit — the same technique
-    // CompanyEditPage.SetFirstAddressLine1Async / DocumentTypeEditPage.SetDescriptionAsync use so
-    // the typed value actually round-trips to the Blazor-bound model.
     public async Task SetPhoneAsync(string value)
     {
         var input = page.GetByPlaceholder("e.g. 07700 900000");
@@ -149,7 +120,6 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
         return await input.InputValueAsync();
     }
 
-    /// <summary>Clicks Save on an existing candidate and waits for the redirect back to the list.</summary>
     public async Task SaveAndWaitForListAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
@@ -157,10 +127,6 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
-    // ── Optimistic-concurrency conflict banner (shared SaveConflictBanner via EditPageBase) ──
-    // Scope on the component's own `.save-conflict-banner` class (+ role='alert') and additionally
-    // require the "Reload latest values" action so an unrelated warning alert can never satisfy
-    // strict mode. Match on structure, not text.
     private ILocator ConcurrencyWarningBanner =>
         page.Locator(".save-conflict-banner[role='alert']")
             .Filter(new() { Has = page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }) });
@@ -183,7 +149,6 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
         await page.WaitForTimeoutAsync(300);
     }
 
-    // ── Close / unsaved-changes prompt (EditPageBase) ────────────────────────────
 
     private ILocator UnsavedChangesDialog => page.Locator("[role='dialog']:has-text('Unsaved Changes')");
 
@@ -217,9 +182,7 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
-    // ── Deactivate / Reactivate (CandidateDetail.razor) ──────────────────────────────
 
-    /// <summary>Returns true if the "This candidate is inactive" alert banner is visible.</summary>
     public Task<bool> HasInactiveBannerAsync() =>
         page.Locator(".alert-secondary:has-text('inactive')").WaitUntilVisibleAsync();
 
@@ -227,7 +190,6 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
     public Task<string?> GetInactiveBannerTextAsync() =>
         page.Locator(".alert-secondary:has-text('inactive')").TextContentAsync();
 
-    /// <summary>Text of the action-error alert shown when a deactivate/reactivate call fails server-side.</summary>
     public async Task<string?> GetActionErrorAsync()
     {
         var locator = page.Locator(".alert-danger.alert-dismissible");
@@ -242,13 +204,6 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
     public Task ClickReactivateAsync() =>
         page.GetByRole(AriaRole.Button, new() { Name = "Reactivate", Exact = true }).ClickAsync();
 
-    // The deactivate dialog is a plain custom SfDialog (not HrConfirmDialog) with a header of
-    // "Deactivate Candidate" and an HrTextBox (Multiline="true") reason field, which renders as a
-    // bare <textarea> with Syncfusion's own classes (no Bootstrap "form-control") — matches the
-    // convention used elsewhere in this suite for HrTextBox Multiline fields (e.g.
-    // SharedDocumentDetailPage's AcknowledgementStatementTextArea). There is no data-testid or
-    // role='dialog' name to anchor to besides the header text, so it's scoped via :has-text on the
-    // dialog container the same way CandidateEditPage's UnsavedChangesDialog is.
     private ILocator DeactivateDialog => page.Locator("[role='dialog']:has-text('Deactivate Candidate')");
 
     public Task<bool> IsDeactivateDialogVisibleAsync() => DeactivateDialog.WaitUntilVisibleAsync();
@@ -256,15 +211,9 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
     public Task FillDeactivateReasonAsync(string reason) =>
         DeactivateDialog.Locator("textarea").FillAsync(reason);
 
-    /// <summary>
-    /// Clicks the dialog's "Deactivate" confirm button without waiting for the dialog to close —
-    /// for the client-side "reason is required" guard, which keeps the dialog open and shows an
-    /// inline validation message instead of calling the API.
-    /// </summary>
     public Task ClickConfirmDeactivateAsync() =>
         DeactivateDialog.GetByRole(AriaRole.Button, new() { Name = "Deactivate", Exact = true }).ClickAsync();
 
-    /// <summary>Confirms deactivation and waits for the dialog to close (successful deactivation).</summary>
     public async Task ConfirmDeactivateAndCloseAsync()
     {
         await ClickConfirmDeactivateAsync();
@@ -274,17 +223,9 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
     public Task CancelDeactivateAsync() =>
         DeactivateDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
 
-    /// <summary>
-    /// True if the inline "A reason is required." validation message is visible inside the
-    /// deactivate dialog (client-side guard in ConfirmDeactivateAsync).
-    /// </summary>
     public Task<bool> HasDeactivateReasonErrorAsync() =>
         DeactivateDialog.Locator(".text-danger.small").WaitUntilVisibleAsync();
 
-    // The reactivate dialog is an HrConfirmDialog with Title="Reactivate Candidate" and its own
-    // confirm button labelled "Reactivate" (DangerConfirm="false", no "e-danger" styling) — scoped
-    // the same way ExternalRecruiterListPage scopes its HrConfirmDialog confirm button, since the
-    // toolbar/detail-page "Reactivate" button shares its accessible name with the dialog's own.
     private ILocator ReactivateDialog => page.GetByRole(AriaRole.Dialog).Filter(new() { HasText = "Reactivate Candidate" });
 
     public Task<bool> IsReactivateDialogVisibleAsync() => ReactivateDialog.WaitUntilVisibleAsync();
@@ -309,12 +250,6 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
     private ILocator CandidateApplicationRow(Guid applicationId) =>
         ApplicationsCard.Locator($"li[data-testid='candidate-application-row'][data-application-id='{applicationId}']");
 
-    /// <summary>
-    /// Asserts the Applications card lists <paramref name="applicationId"/> for
-    /// <paramref name="vacancyTitle"/>, and whether that row carries the Internal badge and
-    /// data-internal flag. The row is awaited visible first so the "no badge" case is never satisfied
-    /// by a list that simply hasn't loaded yet.
-    /// </summary>
     public async Task ExpectApplicationRowAsync(Guid applicationId, string vacancyTitle, bool isInternal)
     {
         var row = CandidateApplicationRow(applicationId);
@@ -334,21 +269,14 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>Waits for the row's "Stage:" value to read <paramref name="expectedStage"/>.</summary>
     public Task ExpectApplicationRowStageAsync(Guid applicationId, string expectedStage) =>
         Assertions.Expect(CandidateApplicationRow(applicationId).Locator("[data-testid='candidate-application-stage']"))
             .ToHaveTextAsync(expectedStage, new() { Timeout = 15_000 });
 
-    /// <summary>Waits until the Applications card lists exactly <paramref name="expectedCount"/> rows.</summary>
     public Task ExpectApplicationRowCountAsync(int expectedCount) =>
         Assertions.Expect(ApplicationsCard.Locator("li[data-testid='candidate-application-row']"))
             .ToHaveCountAsync(expectedCount, new() { Timeout = 30_000 });
 
-    /// <summary>
-    /// Asserts whether the "This candidate is a current employee (internal applicant)." alert shows.
-    /// Call only after the Applications card has loaded (e.g. after <see cref="ExpectApplicationRowAsync"/>)
-    /// — the alert is derived from the same list, so the absent case is then meaningful.
-    /// </summary>
     public async Task ExpectInternalApplicantAlertAsync(bool visible)
     {
         var alert = page.Locator("[data-testid='candidate-internal-applicant-alert']");
@@ -363,7 +291,6 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>Asserts the "hired and linked to an employee" alert (data-testid="candidate-hired-alert") is not rendered.</summary>
     public Task ExpectNoHiredAlertAsync() =>
         Assertions.Expect(page.Locator("[data-testid='candidate-hired-alert']")).ToHaveCountAsync(0);
 }

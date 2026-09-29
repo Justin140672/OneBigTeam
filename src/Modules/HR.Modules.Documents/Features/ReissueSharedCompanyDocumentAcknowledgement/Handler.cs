@@ -96,9 +96,6 @@ internal sealed class ReissueSharedCompanyDocumentAcknowledgementHandler(
 
         foreach (var employeeId in outstandingEmployeeIds)
         {
-            // Mirrors SharedCompanyDocumentAcknowledgementReminderJob's reconciliation path: an
-            // employee with no open Acknowledge task for this document gets one created here
-            // (notifyAssignee: false because the explicit reminder notification below covers it).
             var existingTaskId = await openTaskReader.GetOpenTaskIdForAssigneeAsync(
                 document.CompanyId, document.Id, employeeId, TaskActionType.Acknowledge, cancellationToken);
 
@@ -126,9 +123,6 @@ internal sealed class ReissueSharedCompanyDocumentAcknowledgementHandler(
                 taskId = existingTaskId.Value;
             }
 
-            // Unlike the daily reminder job's interval-gated SendIfIntervalElapsedAsync, this is an
-            // explicit "nudge now" HR action: every outstanding employee always gets a fresh
-            // notification here, regardless of when they were last reminded.
             await notificationWriter.WriteAsync(
                 Guid.NewGuid(),
                 document.CompanyId,
@@ -148,8 +142,6 @@ internal sealed class ReissueSharedCompanyDocumentAcknowledgementHandler(
 
         if (request.IdempotencyKey is { } key)
         {
-            // Nothing else on this DbContext needed saving; this only persists the idempotency
-            // record itself (with the final response) so a retry of the same key can be replayed.
             await db.SaveIdempotentAsync(db.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
         }
 

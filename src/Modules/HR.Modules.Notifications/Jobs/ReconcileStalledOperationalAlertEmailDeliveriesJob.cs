@@ -8,26 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Notifications.Jobs;
 
-/// <summary>
-/// Follow-up E: periodic reconciliation for <see cref="OperationalAlertEmailDelivery"/> rows that
-/// were saved but whose send never completed:
-/// <list type="bullet">
-///   <item><b>Saved but never queued.</b> A <see cref="EmailDeliveryStatus.Pending"/> row older than
-///   <see cref="PendingGraceMinutes"/> — the alert committed but the process died before
-///   <c>IBackgroundJobClient.Enqueue</c> in <see cref="Persistence.AdministrativeAlertWriter"/>, or
-///   the enqueue itself was lost — is re-enqueued.</item>
-///   <item><b>Interrupted mid-send.</b> A <see cref="EmailDeliveryStatus.Sending"/> row whose
-///   ownership lease has expired (the owning worker crashed) is re-enqueued while it still has
-///   attempts left, or marked permanently <see cref="EmailDeliveryStatus.Failed"/> once
-///   <see cref="OperationalAlertEmailDelivery.MaxAttempts"/> is spent.</item>
-/// </list>
-///
-/// Safety controls: a grace period so an in-flight first attempt is never touched; terminal rows
-/// (<c>Sent</c>/<c>Skipped</c>/<c>Failed</c>) are excluded; the batch is bounded; and the re-enqueued
-/// <see cref="SendOperationalAlertEmailJob"/> re-claims under the concurrency token, so a duplicate
-/// Hangfire job for the same delivery converges on exactly one effective send. Idempotent and safe
-/// to run repeatedly. Scheduled from <see cref="NotificationsModule.UseNotificationsRecurringJobs"/>.
-/// </summary>
 [AutomaticRetry(Attempts = 0)]
 internal sealed class ReconcileStalledOperationalAlertEmailDeliveriesJob(
     NotificationsDbContext db,

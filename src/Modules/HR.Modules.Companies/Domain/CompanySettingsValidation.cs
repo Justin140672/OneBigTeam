@@ -1,11 +1,5 @@
 namespace HR.Modules.Companies.Domain;
 
-/// <summary>
-/// Central validation/normalisation helpers for company settings values that are later passed to
-/// system time-zone and culture APIs (SET-01). Kept here, rather than duplicated across the
-/// UpdateCompanySettings and UpdateHrSettings validators, so both slices resolve identifiers the
-/// same way.
-/// </summary>
 internal static class CompanySettingsValidation
 {
     /// <summary>
@@ -72,10 +66,6 @@ internal static class CompanySettingsValidation
         }
     }
 
-    /// <summary>
-    /// Safe fallback used when previously stored data cannot be resolved (e.g. platform-specific
-    /// time-zone databases changed, or invalid legacy data). UTC is always resolvable.
-    /// </summary>
     public const string FallbackTimeZone = "UTC";
 
     public const string FallbackLocale = "en-GB";

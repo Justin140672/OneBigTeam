@@ -2,10 +2,6 @@ using HR.Modules.Employees.Domain;
 
 namespace HR.Modules.Employees.Tests.Domain;
 
-// Reliability fix: durable record of a manager-changed integration event that must survive an
-// interruption between the report's ManagerId reassignment save and the publish loop in
-// EmployeeDepartureFinalizer.CascadeManagerDepartureAsync. See that class's remarks for the full
-// rationale.
 public class PendingManagerChangedEventTests
 {
     private static readonly DateTimeOffset OccurredAt = new(2026, 9, 11, 8, 0, 0, TimeSpan.Zero);

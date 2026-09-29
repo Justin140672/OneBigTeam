@@ -86,10 +86,6 @@ public class NotifyHrOfFitNoteThresholdHandlerTests
 
         await handler.HandleAsync(MakeEvent(), CancellationToken.None);
 
-        // Not TaskActionType.Review — that combo (Source=Sickness, ActionType=Review) is reserved
-        // for return-to-work review tasks in TaskView.razor's dispatch; this task's SourceEntityId
-        // is a SicknessEvidenceRequest.Id, not a ReturnToWorkReview.Id, so reusing Review would
-        // route it to the wrong panel in the UI.
         Assert.Equal(TaskActionType.Complete, creator.Created[0].ActionType);
     }
 

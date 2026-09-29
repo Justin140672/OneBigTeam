@@ -46,11 +46,6 @@ public class TaskCompletionActionReplaySafetyConformanceTests
         "HR.Modules.Documents.Features.CompleteProfilePhotoReviewFromTask.CompleteProfilePhotoReviewFromTaskAction",
     ];
 
-    /// <summary>
-    /// Assemblies known to register <see cref="ITaskCompletionAction"/> implementations. Referenced
-    /// explicitly (rather than scanning every loaded assembly) so this test's inventory is exactly as
-    /// deliberate as <see cref="ExpectedActionTypeNames"/> itself.
-    /// </summary>
     private static readonly Type[] ModuleMarkerTypes =
     [
         typeof(HR.Modules.Tasks.TasksModule),

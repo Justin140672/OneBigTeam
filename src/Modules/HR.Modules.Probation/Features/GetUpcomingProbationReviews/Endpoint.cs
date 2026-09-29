@@ -13,11 +13,6 @@ internal sealed class Endpoint(
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/probation-reviews/upcoming");
-        // "probation:review" (Manager + HrAdministrator) rather than "probation:manage"
-        // (HrAdministrator only) — this read is what backs UpcomingProbationReviewsWidget, shown
-        // on both the HR and Manager dashboards. The policy only proves role membership; PROB-02
-        // scopes the actual rows returned to the caller's reporting hierarchy (or company-wide
-        // for HR).
         Policies("probation:review");
     }
 

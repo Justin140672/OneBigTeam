@@ -137,8 +137,6 @@ public class BackfillEmployeeTimelineHandlerTests
         Assert.Equal(7, response.Sources.Count);
         Assert.Equal(0, response.TotalFailed);
 
-        // 1 EmployeeJoined + 1 EmployeePromoted + 1 CompensationChanged
-        // + 2 ProbationPassed + 1 OnboardingCompleted + 3 SharedCompanyDocumentAcknowledged + 1 OffboardingStarted
         Assert.Equal(10, response.TotalCreated);
         Assert.Equal(0, response.TotalSkipped);
 
@@ -167,9 +165,6 @@ public class BackfillEmployeeTimelineHandlerTests
         var companyId = Guid.NewGuid();
 
         var harness = BuildHandler(dbContext);
-        // Simulate 3 historical offboarding plans processed, but only 1 new timeline entry actually
-        // created (the other 2 already had entries from a prior backfill run) — no self-dedup lives
-        // in the replayer, so this can only be represented via ProcessedOverride here.
         harness.OffboardingBehavior.EntriesToCreate = 1;
         harness.OffboardingBehavior.ProcessedOverride = 3;
 
@@ -213,8 +208,6 @@ public class BackfillEmployeeTimelineHandlerTests
         Assert.Equal(1, offboardingResult.Failed);
         Assert.Equal(1, response.TotalFailed);
 
-        // The 6 other sources still ran successfully: EmployeeCreated, EmployeePromoted,
-        // CompensationChanged, ProbationPassed, OnboardingCompleted, SharedCompanyDocumentAcknowledged.
         var otherResults = response.Sources.Where(s => s.Source != "OffboardingStarted").ToList();
         Assert.Equal(6, otherResults.Count);
         Assert.All(otherResults, s => Assert.Equal(0, s.Failed));

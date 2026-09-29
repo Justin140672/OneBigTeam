@@ -35,9 +35,6 @@ internal sealed class RetryInvitationBatchHandler(
             recipient.ResetForRetry();
         }
 
-        // A batch only settles to Completed once ProcessInvitationBatchJob's loop finishes — reopen
-        // it so the retry pass is visible while it runs. Sent/Skipped recipients are left untouched
-        // (never re-processed — see InvitationBatchRecipient.ResetForRetry remarks).
         batch.ReopenForRetry();
 
         await db.SaveChangesAsync(cancellationToken);

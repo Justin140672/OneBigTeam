@@ -78,8 +78,6 @@ internal sealed class EmployeeCreatedHandler : IIntegrationEventHandler<Employee
         _dbContext.ProbationRecords.Add(record);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        // PROB-07: system-generated creation — actor is ProbationSystemActor.Id, distinct from a
-        // human directly creating a record via CreateProbationRecordHandler.
         await _auditPublisher.PublishAsync(new ProbationRecordCreatedAuditEvent(
             record.CompanyId,
             record.Id,

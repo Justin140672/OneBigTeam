@@ -5,11 +5,6 @@ using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Documents.Features.GetEmployeeDocumentVersionHistory;
 
-// DOC-05: "previous versions remain immutable and available to authorised HR users" — gated the
-// same way as GetArchivedEmployeeDocuments (DOC-04): "employee:manage" policy plus
-// DocumentResourceAuthorizer.IsHrAdministratorAsync, narrower than the self/manager-hierarchy scope
-// normal document access gets. A manager is never allowed to view a direct report's full version
-// history through this endpoint, only HR administrators.
 internal sealed class Endpoint(
     GetEmployeeDocumentVersionHistoryHandler handler,
     ICurrentUser currentUser,

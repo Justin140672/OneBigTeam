@@ -14,9 +14,6 @@ internal sealed class Endpoint(ReassignTaskHandler handler, ICurrentUser current
 
     public override async Task HandleAsync(ReassignTaskRequest request, CancellationToken cancellationToken)
     {
-        // DSH-01: derive the acting identity from the authenticated principal.
-        // NOT User.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's resolved
-        // Employee/UserId (see GetMyEmployee/Endpoint.cs for the rationale).
         if (currentUser.UserId is not { } actorUserId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());

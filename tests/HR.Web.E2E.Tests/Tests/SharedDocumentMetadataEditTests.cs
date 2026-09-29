@@ -4,16 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers editing a Shared Company Document's core metadata — Title, Description, and Category
-/// together — via the page header's "Edit" button and
-/// EditSharedCompanyDocumentMetadataDialog.razor. SharedDocumentAudienceTests and
-/// SharedDocumentReviewOwnerTests already cover the Audience and Review Owner fields of the same
-/// dialog individually; this file exercises the remaining core fields in one combined edit.
-///
-/// Uses Laura Bennett (laura.bennett@acme.example, HrAdministrator) against the seeded Acme
-/// company, matching the other Shared Documents E2E tests.
-/// </summary>
 public sealed class SharedDocumentMetadataEditTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -50,7 +40,6 @@ public sealed class SharedDocumentMetadataEditTests(HrAdminPersonaFixture fixtur
             Assert.Equal(updatedDescription, await detail.GetDescriptionAsync());
             Assert.Equal("Handbook", await detail.GetCategoryAsync());
 
-            // ── Reload and verify the changes persisted server-side ────────────
             await detail.GoToAsync(AcmeId, documentId);
 
             Assert.Equal(updatedTitle, await detail.GetTitleAsync());
@@ -63,8 +52,6 @@ public sealed class SharedDocumentMetadataEditTests(HrAdminPersonaFixture fixtur
         }
     }
 
-    // Uploads a shared document from the Shared Documents list page with the "Policy" category —
-    // same flow as SharedDocumentUploadTests/SharedDocumentReviewOwnerTests.
     private async Task UploadDocumentAsync(string title, string filePath)
     {
         await _page.GotoAsync(_fixture.WebBaseUrl + $"/companies/{AcmeId}/shared-documents");
@@ -89,8 +76,6 @@ public sealed class SharedDocumentMetadataEditTests(HrAdminPersonaFixture fixtur
         await _page.WaitForSelectorAsync($"text={title}", new() { Timeout = 15_000 });
     }
 
-    // Reads the document id straight from the list row's link href, avoiding a separate
-    // click+navigate+wait round trip (same pattern as e.g. SharedDocumentReviewOwnerTests).
     private async Task<Guid> GetUploadedDocumentIdAsync(string title)
     {
         var href = await _page.Locator(".e-rowcell a").Filter(new() { HasText = title }).First.GetAttributeAsync("href");
@@ -98,7 +83,6 @@ public sealed class SharedDocumentMetadataEditTests(HrAdminPersonaFixture fixtur
         return Guid.Parse(href.Split('/').Last());
     }
 
-    // %PDF- followed by padding, so magic-byte content validation passes.
     private static byte[] BuildTestPdf()
     {
         var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };

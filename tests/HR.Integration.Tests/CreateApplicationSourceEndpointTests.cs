@@ -8,11 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Covers the ticket #78 Source/SourceExternalRecruiterId fields added to CreateApplication.
-/// See CreateApplicationHandlerTests/CreateApplicationValidatorTests in HR.Modules.Recruitment.Tests
-/// for the equivalent unit-level coverage of the same behaviour.
-/// </summary>
 [Collection("Integration")]
 public class CreateApplicationSourceEndpointTests
 {

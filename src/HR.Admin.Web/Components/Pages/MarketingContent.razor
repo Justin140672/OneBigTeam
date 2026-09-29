@@ -298,8 +298,6 @@ else
                 .Where(b => b.Length > 0)
                 .ToList();
 
-            // DetailedContent is rich/formatted marketing copy — not run through FormText, its
-            // whitespace/formatting is meaningful and preserved verbatim.
             MarketingMutationResult result;
             if (_editingFeatureId is null)
             {

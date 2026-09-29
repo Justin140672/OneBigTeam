@@ -13,9 +13,6 @@ internal sealed class ReviewCompanyDocumentsTask(DocumentsDbContext dbContext) :
     public bool IsMandatory => true;
     public int Order => 7;
 
-    // HR.Web's shared company documents route is company-scoped
-    // ("/companies/{CompanyId:guid}/shared-documents") — the "{companyId}" placeholder is
-    // substituted by HR.Web with the current company id.
     public Task<string> GetLinkUrlAsync(Guid companyId, CancellationToken cancellationToken) =>
         Task.FromResult("/companies/{companyId}/shared-documents");
 

@@ -101,8 +101,6 @@ public class EmployeeTimelineEntryTests
         var methods = typeof(EmployeeTimelineEntry).GetMethods(
             System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
 
-        // Exclude property accessors (get_Xxx) which are compiler-generated methods, not
-        // behaviour the entity exposes.
         var nonAccessorMethods = methods.Where(
             m => m.DeclaringType == typeof(EmployeeTimelineEntry) && !m.IsSpecialName);
 

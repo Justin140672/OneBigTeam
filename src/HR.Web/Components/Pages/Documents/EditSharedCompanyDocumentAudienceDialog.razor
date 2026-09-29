@@ -107,11 +107,6 @@
     private List<PositionProfileListItemModel> _positionProfiles = [];
     private List<EmployeeOption> _employees = [];
 
-    // The SfMultiSelect audience fields aren't mounted until their DataSource is already
-    // populated — Syncfusion's SfMultiSelect (unlike SfDropDownList) can hit a JS interop
-    // "tracked object disposed" error if its DataSource is reassigned from an empty list to a
-    // populated one shortly after its first render, which is exactly what happens if these are
-    // rendered immediately and then backed by the lists this method loads.
     private bool _audienceDataLoaded;
 
     // Ticket 2: optimistic-concurrency token loaded with the document, sent as ExpectedVersion on save.
@@ -124,8 +119,6 @@
         _loadedVersion = Document?.Version;
         _audienceDataLoaded = false;
 
-        // Independent calls fired concurrently rather than awaited one at a time — see
-        // UploadSharedCompanyDocumentDialog.OnOpenedAsync for the same pattern and reasoning.
         var departmentsTask      = DepartmentService.ListDepartmentsAsync(CompanyId);
         var locationsTask        = LocationService.ListLocationsAsync(CompanyId);
         var positionProfilesTask = PositionProfileService.ListPositionProfilesAsync(CompanyId);

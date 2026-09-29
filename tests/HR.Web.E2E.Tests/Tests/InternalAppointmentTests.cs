@@ -34,11 +34,8 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
 {
     private static readonly Guid AcmeId = InternalVacancyApplyApi.AcmeId;
 
-    // The fresh applicant's pre-appointment manager (InternalVacancyApplyApi) and the vacancy's
-    // hiring manager — the dialog pre-selects the hiring manager.
     private const string JamesFullName = "James Okafor";
 
-    // RecruitmentStageSeeder.BuildDefaultStages.
     private const string InitialStage = "Application Received";
     private const string HiredStage = "Hired";
 
@@ -73,12 +70,6 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
         }
     }
 
-    /// <summary>
-    /// Creates this test's own vacancy + internal application (and optionally an external one), then
-    /// signs the browser in and opens the vacancy's Applications tab. The browser user is the seeded
-    /// Recruiter (recruitment:manage only) unless <paramref name="withEmployeeProfileAccess"/> asks for
-    /// the HR Administrator + Recruiter appointer, needed only to follow the banner's profile link.
-    /// </summary>
     private async Task<(Arranged Arranged, VacancyDetailPage VacancyDetail)> ArrangeAsync(
         bool withExternalApplication = false, bool withEmployeeProfileAccess = false)
     {
@@ -142,7 +133,6 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
 
     private static DateOnly Today => DateOnly.FromDateTime(DateTime.Today);
 
-    // ── Employee profile helpers (the page the success banner links to) ──────────────
 
     private Task ExpectProfileHeaderAsync(string fullName) =>
         Assertions.Expect(_page.Locator("h1").Filter(new() { HasText = fullName }).First)
@@ -154,8 +144,6 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
     {
         var employee = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
         await employee.OpenEmploymentTabAsync();
-        // The Organisation card's column whose form label is exactly "Position Profile *"
-        // (EmployeeEmploymentTab.razor) — not any column that merely mentions the phrase.
         var positionInput = _page.Locator(".col-md-4")
             .Filter(new()
             {
@@ -169,7 +157,6 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
         await Assertions.Expect(positionInput).ToHaveValueAsync(positionProfileTitle, new() { Timeout = 20_000 });
     }
 
-    // ── 1. Appoint vs Hire ────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Toolbar_InternalRowEnablesAppointNotHire_ExternalRowOnSameVacancyEnablesHireNotAppoint()
@@ -181,21 +168,15 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
         await vacancyDetail.ExpectApplicationRowInternalAsync(arranged.ExternalApplicationId!.Value, isInternal: false);
         await vacancyDetail.ExpectToolbarTooltipAsync("Complete internal appointment");
 
-        // A fresh internal application is not mid-appointment.
         await vacancyDetail.ExpectAppointmentPendingHintAsync(arranged.InternalApplicationId, visible: false);
 
-        // Internal row: Appoint enabled, Hire disabled (Hire's enable-state is applied before
-        // Appoint's in RefreshToolbarStateAsync, so it has settled once Appoint is enabled).
         await vacancyDetail.ExpectToolbarItemEnabledForRowAsync(arranged.Applicant.LastName, "Appoint");
         await vacancyDetail.ExpectToolbarItemDisabledAsync("Hire");
 
-        // External row on the same vacancy: the reverse. Appoint going from enabled to disabled is a
-        // real transition, not the toolbar's initial no-selection state.
         await vacancyDetail.ExpectToolbarItemEnabledForRowAsync(arranged.ExternalLastName!, "Hire");
         await vacancyDetail.ExpectToolbarItemDisabledAsync("Appoint");
     }
 
-    // ── 2. Dialog context ─────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Dialog_ShowsExistingEmployeeNotice_AndVacancyDerivedProfileDepartmentAndLocation()
@@ -215,7 +196,6 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
         await dialog.ExpectDerivedFieldsAsync(arranged.NewPositionProfileTitle, departmentName, locationName);
         await dialog.ExpectOnlyManagerComboboxAsync();
 
-        // Defaults: effective today (no offer), hiring manager pre-selected, no date-specific UI.
         await dialog.ExpectEffectiveDateAsync(Today);
         await dialog.ExpectManagerAsync(JamesFullName);
         await dialog.ExpectFutureDateHintAsync(visible: false);
@@ -225,12 +205,10 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
         await dialog.CancelAsync();
     }
 
-    // ── 3. Appoint with a selected manager, effective today ──────────────────────
 
     [Fact]
     public async Task Appoint_WithSelectedManagerToday_UpdatesExistingEmployee_LinksToProfile_AndMovesApplicationToHired()
     {
-        // This test's own new manager — never a shared seeded persona.
         var newManager = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "AppointMgr", activate: true);
 
         var (arranged, vacancyDetail) = await ArrangeAsync(withEmployeeProfileAccess: true);
@@ -246,24 +224,20 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
         await dialog.ExpectAppliedSuccessBannerAsync();
         await dialog.ExpectEmployeeLinkAsync(AcmeId, applicant.Id);
 
-        // The application row reloads onto the Hired terminal stage, not left mid-appointment.
         await vacancyDetail.ExpectApplicationStatusAsync(applicant.LastName, HiredStage);
         await vacancyDetail.ExpectAppointmentPendingHintAsync(arranged.InternalApplicationId, visible: false);
 
-        // The EXISTING employee record was updated — and no second employee was created for them.
         var after = await InternalAppointmentApi.GetEmployeeAsync(arranged.HrAdminApi, applicant.Id);
         Assert.Equal(arranged.VacancyDetail.PositionProfileId, after.PositionProfileId);
         Assert.Equal(newManager.Id, after.ManagerId);
         Assert.Equal(1, await InternalAppointmentApi.CountEmployeesMatchingAsync(arranged.HrAdminApi, applicant.LastName));
 
-        // Following the link opens that same employee's profile showing the new position/manager.
         await dialog.FollowEmployeeLinkAsync(applicant.Id);
         await ExpectProfileHeaderAsync(applicant.FullName);
         await Assertions.Expect(ReportsToLine.First).ToContainTextAsync(newManager.FullName, new() { Timeout = 15_000 });
         await ExpectEmploymentTabPositionProfileAsync(arranged.NewPositionProfileTitle);
     }
 
-    // ── 4. "No manager" ───────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Appoint_WithNoManager_CompletesAndProfileShowsNoManager()
@@ -272,7 +246,6 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
         using var _ = arranged;
         var applicant = arranged.Applicant;
 
-        // Before: the applicant reports to James (so "no manager" is a real change).
         Assert.NotNull(arranged.ApplicantBefore.ManagerId);
 
         var dialog = await OpenAppointDialogAsync(vacancyDetail, arranged);
@@ -289,13 +262,10 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
 
         await dialog.FollowEmployeeLinkAsync(applicant.Id);
         await ExpectProfileHeaderAsync(applicant.FullName);
-        // Header rendered from the same _employee load as the "Reports To:" line, so its absence
-        // here is the post-load state, not a not-yet-rendered one.
         await Assertions.Expect(ReportsToLine).ToHaveCountAsync(0, new() { Timeout = 10_000 });
         await ExpectEmploymentTabPositionProfileAsync(arranged.NewPositionProfileTitle);
     }
 
-    // ── 5. Future effective date ──────────────────────────────────────────────────
 
     [Fact]
     public async Task Appoint_FutureEffectiveDate_ShowsHint_BannerMentionsDate_AndEmployeeUnchangedUntilThen()
@@ -314,10 +284,8 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
 
         await dialog.SubmitExpectingSuccessAsync();
         await dialog.ExpectScheduledSuccessBannerAsync(effectiveDate);
-        // The Recruiter cannot open the full employee record: the banner names the employee, no link.
         await dialog.ExpectEmployeeNameWithoutLinkAsync(applicant.FullName);
 
-        // Scheduled, not applied: the employee keeps their current position and manager until then.
         var after = await InternalAppointmentApi.GetEmployeeAsync(arranged.HrAdminApi, applicant.Id);
         Assert.Equal(arranged.ApplicantBefore.PositionProfileId, after.PositionProfileId);
         Assert.NotEqual(arranged.VacancyDetail.PositionProfileId, after.PositionProfileId);
@@ -325,7 +293,6 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
         Assert.Equal(1, await InternalAppointmentApi.CountEmployeesMatchingAsync(arranged.HrAdminApi, applicant.LastName));
     }
 
-    // ── 6. Past effective date needs confirmation ────────────────────────────────
 
     [Fact]
     public async Task Appoint_PastEffectiveDate_RequiresBackdatedConfirmation_ThenAppliesImmediately()
@@ -342,13 +309,11 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
         await dialog.ExpectBackdatedConfirmationAsync(visible: true);
         await dialog.ExpectFutureDateHintAsync(visible: false);
 
-        // Unconfirmed: blocked client-side, dialog stays open, nothing is changed.
         await dialog.SubmitExpectingErrorAsync("confirm the backdated appointment");
         await dialog.ExpectNoSuccessBannerAsync();
         var blocked = await InternalAppointmentApi.GetEmployeeAsync(arranged.HrAdminApi, applicant.Id);
         Assert.Equal(arranged.ApplicantBefore.PositionProfileId, blocked.PositionProfileId);
 
-        // Confirmed: applied immediately (no "takes effect on" clause).
         await dialog.ConfirmBackdatedAsync();
         await dialog.SubmitExpectingSuccessAsync();
         await dialog.ExpectAppliedSuccessBannerAsync();
@@ -358,7 +323,6 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
         Assert.Equal(arranged.VacancyDetail.PositionProfileId, after.PositionProfileId);
     }
 
-    // ── 7. Compensation change ───────────────────────────────────────────────────
 
     [Fact]
     public async Task Appoint_WithCompensationChange_RevealsFields_RequiresSalary_AndRecordsRoleChangeCompensation()
@@ -374,7 +338,6 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
         await dialog.SetChangeCompensationAsync(true);
         await dialog.ExpectCompensationFieldsVisibleAsync();
 
-        // Salary is required once the compensation change is on (no offer → no prefilled salary).
         await dialog.SubmitExpectingErrorAsync("Please enter a salary greater than zero.");
 
         await dialog.FillSalaryAsync("42000");
@@ -396,7 +359,6 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
         Assert.Equal(arranged.VacancyDetail.PositionProfileId, after.PositionProfileId);
     }
 
-    // ── 8. Cancel ─────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Cancel_ClosesDialog_WithoutAppointing()
@@ -406,7 +368,6 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
         var applicant = arranged.Applicant;
 
         var dialog = await OpenAppointDialogAsync(vacancyDetail, arranged);
-        // Make an edit first so Cancel demonstrably discards it rather than there being nothing to lose.
         await dialog.SelectManagerAsync("No manager");
         await dialog.CancelAsync();
 
@@ -418,7 +379,6 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
         Assert.Equal(arranged.ApplicantBefore.PositionProfileId, after.PositionProfileId);
         Assert.Equal(arranged.ApplicantBefore.ManagerId, after.ManagerId);
 
-        // The internal row can still be appointed afterwards.
         await vacancyDetail.ExpectToolbarItemEnabledForRowAsync(applicant.LastName, "Appoint");
     }
 }

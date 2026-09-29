@@ -64,18 +64,8 @@ internal sealed class WithdrawApplicationHandler(RecruitmentDbContext db, IClock
         var now = clock.UtcNowOffset();
         var expectedVersion = application.Version;
 
-        // Ticket #99 judgement call: withdrawal is candidate-initiated and orthogonal to the pipeline
-        // — there is no "Withdrawn" RecruitmentStage. CurrentStageId is left unchanged (the stage the
-        // application was at when withdrawn is preserved for historical accuracy); WithdrawnAt is set
-        // instead so Kanban/reporting can treat this application as inactive. No stage-history entry
-        // or ApplicationStageChangedIntegrationEvent is recorded here, since CurrentStageId does not
-        // change — only the audit trail (below) records that the withdrawal happened.
         application.Withdraw(now);
 
-        // Any interview still awaiting an outcome shouldn't keep showing as scheduled/pending once
-        // the candidate has withdrawn — cancel it via the entity's own Cancel() so its invariants
-        // (only a Pending interview can be cancelled) are enforced the same way as a direct cancel
-        // would be. Already-resolved interviews (Passed/Failed/NoShow/Cancelled) are untouched.
         var pendingInterviews = await db.Interviews
             .Where(i => i.ApplicationId == application.Id && i.CompanyId == request.CompanyId
                 && i.Outcome == HR.Modules.Recruitment.Domain.InterviewOutcome.Pending)

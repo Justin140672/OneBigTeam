@@ -10,14 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Same "platform:admin" policy + allow-list gate pattern as
-/// GetCustomerBillingBreakdownEndpointTests — see its remarks. No live Stripe API calls happen in
-/// this test host: appsettings.Development.json has no real Stripe:SecretKey configured, so every
-/// scenario here exercises the "StripeConfigured = false" branch of GetCustomerBillingHistoryHandler
-/// (no Stripe API key configured in this environment). Real-Stripe-response mapping is covered by
-/// GetCustomerBillingHistoryHandlerTests in HR.Modules.Companies.Tests via FakeStripeGateway.
-/// </summary>
 [Collection("Integration")]
 public class GetCustomerBillingHistoryEndpointTests
 {
@@ -73,8 +65,6 @@ public class GetCustomerBillingHistoryEndpointTests
         var response = await client.GetAsync(
             $"/api/companies/admin/customers/{Guid.NewGuid()}/billing-history");
 
-        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
-        // is Forbidden (403), not Unauthorized (401).
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 

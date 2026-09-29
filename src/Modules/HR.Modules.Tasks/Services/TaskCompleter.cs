@@ -66,11 +66,6 @@ internal sealed class TaskCompleter(
         task.Complete(completedBy, now);
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        // Ticket: completing a task from the notifications menu left the original
-        // assignment/due/overdue notification sitting in the list forever, since nothing
-        // previously removed it once the underlying task was actioned. Remove all "open task"
-        // notification types tied to this task now that it's done — the fresh "Task completed"
-        // notification written just below is the only one that should remain for this task.
         foreach (var openTaskNotificationType in new[]
                  {
                      NotificationType.TaskAssigned,

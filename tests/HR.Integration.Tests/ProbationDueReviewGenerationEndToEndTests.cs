@@ -6,10 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Verifies that GenerateDueProbationReviewsJob creates the correct reviews
-/// and transitions records when run against a real database.
-/// </summary>
 [Collection("Integration")]
 public class ProbationDueReviewGenerationEndToEndTests
 {
@@ -19,10 +15,6 @@ public class ProbationDueReviewGenerationEndToEndTests
     private static readonly Guid User2 = new("cccccccc-0000-0000-0000-000000000002");
     private static readonly Guid User3 = new("cccccccc-0000-0000-0000-000000000003");
 
-    // 90-day probation starting 70 days ago.
-    // ManagerCheckIn (day 30) due 40 days ago ✓
-    // HrReview       (day 60) due 10 days ago ✓
-    // FinalDecision  (day 90) due 20 days from now ✗
     private static readonly DateOnly StartDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-70));
     private static readonly DateOnly EndDate   = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(20));
 
@@ -100,7 +92,6 @@ public class ProbationDueReviewGenerationEndToEndTests
         Assert.Single(reviews, r => r.ReviewType == "HrReview");
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)
     {

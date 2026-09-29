@@ -2,11 +2,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Documents.Domain;
 
-/// <summary>
-/// A company-configurable category for <see cref="SharedCompanyDocument"/> (e.g. "Policy",
-/// "Handbook") — mirrors <see cref="DocumentType"/>'s shape/lifecycle so categories can be
-/// managed per company rather than hard-coded.
-/// </summary>
 internal sealed class CompanyDocumentCategory : IVersionedAggregate
 {
     private CompanyDocumentCategory() { }

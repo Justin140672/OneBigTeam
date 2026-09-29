@@ -3,13 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers NestedDataAnnotationsValidator's field-level revalidation (Components/Controls/
-/// NestedDataAnnotationsValidator.cs) via the Company Profile tab's address fields — the one place
-/// in the app that validator is actually wired up. Before this fix, the validator only revalidated
-/// on submit (OnValidationRequested), never on individual field changes (OnFieldChanged), so a
-/// corrected field's error message stayed on screen until the next full Save.
-/// </summary>
 public sealed class CompanyAddressValidationTests(PriyaShahPersonaFixture fixture)
     : RoleE2ETestBase<PriyaShahPersonaFixture>(fixture)
 {
@@ -32,13 +25,11 @@ public sealed class CompanyAddressValidationTests(PriyaShahPersonaFixture fixtur
 
         try
         {
-            // Clear Line 1, save to trigger the validation failure and surface the message.
             await companyEdit.SetFirstAddressLine1Async("");
             await companyEdit.SaveAsync();
             Assert.True(await companyEdit.IsAddressLine1ValidationMessageVisibleAsync(),
                 "Expected the 'Line 1 is required.' message after saving with it blank");
 
-            // Fix the field — the message must disappear immediately, without clicking Save again.
             await companyEdit.SetFirstAddressLine1Async("1 Example Street");
 
             Assert.False(await companyEdit.IsAddressLine1ValidationMessageVisibleAsync(),
@@ -46,8 +37,6 @@ public sealed class CompanyAddressValidationTests(PriyaShahPersonaFixture fixtur
         }
         finally
         {
-            // Restore the seeded value so this test doesn't leak state into other tests that
-            // share Acme's company record.
             await companyEdit.SetFirstAddressLine1Async(originalLine1);
             await companyEdit.SaveAsync();
         }

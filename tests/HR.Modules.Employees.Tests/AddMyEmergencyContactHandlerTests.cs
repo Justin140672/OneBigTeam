@@ -81,8 +81,8 @@ public class AddMyEmergencyContactHandlerTests
     }
 
     [Theory]
-    [InlineData("07700 900000")] // mobile format
-    [InlineData("01234 567890")] // landline format
+    [InlineData("07700 900000")]
+    [InlineData("01234 567890")]
     public async Task HandleAsync_Succeeds_When_Phone_Matches_Mobile_Or_Telephone_Regex(string phone)
     {
         await using var context = BuildContext();

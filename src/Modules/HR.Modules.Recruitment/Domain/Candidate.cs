@@ -13,11 +13,6 @@ internal sealed class Candidate : HR.SharedKernel.IVersionedAggregate
     public Guid CompanyId { get; private set; }
     public string FirstName { get; private set; } = string.Empty;
     public string LastName { get; private set; } = string.Empty;
-    /// <summary>
-    /// Every assignment also refreshes <see cref="NormalisedEmail"/>, so no domain method can change
-    /// the email without keeping the uniqueness key in step. EF materialises through the backing
-    /// field, and <see cref="NormalisedEmail"/> is loaded from its own column.
-    /// </summary>
     public string Email
     {
         get;
@@ -28,10 +23,6 @@ internal sealed class Candidate : HR.SharedKernel.IVersionedAggregate
         }
     } = string.Empty;
 
-    /// <summary>
-    /// Canonical form of <see cref="Email"/> (see <see cref="CandidateEmail.Normalise"/>). Unique per
-    /// company in the database (ux_candidates_company_id_normalised_email).
-    /// </summary>
     public string NormalisedEmail { get; private set; } = string.Empty;
 
     public string? Phone { get; private set; }
@@ -44,9 +35,6 @@ internal sealed class Candidate : HR.SharedKernel.IVersionedAggregate
     public DateTimeOffset? ReactivatedAt { get; private set; }
     public Guid? ReactivatedByUserId { get; private set; }
 
-    // SET-05: set only by the explicit, separately-authorised PurgeEligibleCandidates action once
-    // the company's CandidateRetentionDays window has elapsed — never automatically, and never as a
-    // side effect of merely changing the retention setting. See PurgeEligibleCandidatesHandler.
     public DateTimeOffset? PurgedAt { get; private set; }
     public Guid? PurgedByUserId { get; private set; }
 
@@ -101,7 +89,6 @@ internal sealed class Candidate : HR.SharedKernel.IVersionedAggregate
         UpdatedAt  = now;
     }
 
-    // Column limits (see CandidateConfiguration) — employee-sourced identity must fit them.
     public const int FirstNameMaxLength = 100;
     public const int LastNameMaxLength  = 100;
     public const int EmailMaxLength     = 256;
@@ -198,8 +185,6 @@ internal sealed class Candidate : HR.SharedKernel.IVersionedAggregate
         return true;
     }
 
-    // An employee's phone number is optional on the candidate; one that does not fit the candidate
-    // column is dropped rather than failing the application.
     private static string? NormalisePhone(string? phone)
     {
         if (string.IsNullOrWhiteSpace(phone))
@@ -209,13 +194,6 @@ internal sealed class Candidate : HR.SharedKernel.IVersionedAggregate
         return trimmed.Length > PhoneMaxLength ? null : trimmed;
     }
 
-    /// <summary>
-    /// Soft-deactivates the candidate. This is a status flag only — it never deletes or anonymises
-    /// any candidate data (applications, notes, documents, communications, consent records, audit
-    /// history are all retained). Callers (validator/handler) are responsible for enforcing that the
-    /// candidate has no active/open applications before calling this, and that a non-empty reason has
-    /// been supplied.
-    /// </summary>
     public void Deactivate(Guid deactivatedByUserId, string reason, DateTimeOffset now)
     {
         if (!IsActive)
@@ -228,11 +206,6 @@ internal sealed class Candidate : HR.SharedKernel.IVersionedAggregate
         UpdatedAt            = now;
     }
 
-    /// <summary>
-    /// Restores an inactive candidate to active status, re-including them in active searches,
-    /// pipelines and selectors. Does not clear the historical DeactivatedAt/DeactivatedByUserId/
-    /// DeactivationReason fields — those remain as an audit-visible record of the prior deactivation.
-    /// </summary>
     public void Reactivate(Guid reactivatedByUserId, DateTimeOffset now)
     {
         if (IsActive)

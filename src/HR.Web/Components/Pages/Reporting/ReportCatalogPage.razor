@@ -85,12 +85,6 @@
         var response = await ReportingService.GetReportCatalogAsync(CompanyId);
         if (response is null)
         {
-            // The catalog endpoint requires baseline "reporting:view" access (Manager, Recruiter
-            // or HrAdministrator); a caller with none of those roles is denied outright (403) and
-            // GetReportCatalogAsync surfaces that as a null response. Rather than showing a raw
-            // error banner here, redirect to the caller's default location — mirroring the
-            // Session.MyProfileUrl redirect-on-unauthorized convention used by every other gated
-            // list page (see DepartmentList.razor, LocationList.razor, LeaveTypeList.razor, etc.).
             Navigation.NavigateTo("/access-denied", replace: true);
             return;
         }
@@ -122,9 +116,6 @@
 
     private void OnSearchChanged(string value) => _searchTerm = value;
 
-    // ReportCategory.Hr.ToString() yields "Hr" (PascalCase enum name) rather than the correct
-    // "HR" capitalisation — map that one exception explicitly, then fall back to the shared
-    // humanizer for everything else instead of showing the raw enum name.
     private static string CategoryLabel(string category) => category switch
     {
         "Hr" => "HR",

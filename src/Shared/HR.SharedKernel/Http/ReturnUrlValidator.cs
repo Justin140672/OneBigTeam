@@ -1,24 +1,7 @@
 namespace HR.SharedKernel.Http;
 
-/// <summary>
-/// Validates and normalizes internal return URLs to prevent open-redirect vulnerabilities.
-/// Accepts only application-relative paths and rejects scheme-relative URIs, absolute URLs,
-/// and other potentially malicious patterns.
-/// </summary>
 public static class ReturnUrlValidator
 {
-    /// <summary>
-    /// Validates an internal return URL and returns it if safe, null otherwise.
-    /// Only application-relative paths (starting with exactly one '/') are accepted.
-    /// </summary>
-    /// <param name="returnUrl">The URL to validate, typically from a query parameter.</param>
-    /// <returns>The validated URL if valid; null if invalid, empty, or dangerous.</returns>
-    /// <summary>
-    /// Like <see cref="ValidateInternalPath"/>, but also accepts base-relative paths without a leading
-    /// '/' (as produced by NavigationManager.ToBaseRelativePath, which the kanban board and
-    /// applications tab use when building returnUrl) by prefixing '/' before validating.
-    /// Absolute URLs still fail because the '://' check runs on the prefixed value.
-    /// </summary>
     public static string? ValidateInternalPathAllowingBaseRelative(string? returnUrl)
     {
         if (string.IsNullOrWhiteSpace(returnUrl))
@@ -30,7 +13,6 @@ public static class ReturnUrlValidator
 
     public static string? ValidateInternalPath(string? returnUrl)
     {
-        // Empty, null, or whitespace-only values are invalid
         if (string.IsNullOrWhiteSpace(returnUrl))
             return null;
 
@@ -73,12 +55,10 @@ public static class ReturnUrlValidator
             if (encodedSchemePatterns.Any(pattern => lowerUrl.Contains(pattern)))
                 return null;
 
-            // Application-relative path is safe to use as a navigation target
             return url;
         }
         catch
         {
-            // If any parsing or validation step throws, return null (invalid/unsafe URL)
             return null;
         }
     }

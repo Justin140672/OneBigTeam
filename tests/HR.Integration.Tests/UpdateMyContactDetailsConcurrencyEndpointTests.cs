@@ -107,7 +107,6 @@ public class UpdateMyContactDetailsConcurrencyEndpointTests
         var reloaded = await GetContactDetailsAsync(ctx.EmployeeClient, ctx.CompanyId);
         Assert.Equal(version + 1, reloaded.Version);
 
-        // A follow-up save with the fresh version also succeeds (no false positives).
         var next = await ctx.EmployeeClient.PutAsJsonAsync(
             $"/api/companies/{ctx.CompanyId}/employees/me/contact-details",
             ContactBody(city: "Manchester", expectedVersion: payload.Version));
@@ -148,7 +147,6 @@ public class UpdateMyContactDetailsConcurrencyEndpointTests
     {
         var ctx = await CreateEmployeeAsync(Admin5);
 
-        // Admin6 has the employee role globally but no employee record in this company.
         using var strangerClient = _factory.CreateClient();
         strangerClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, Admin6.ToString());
         strangerClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, ctx.CompanyId.ToString());
@@ -171,7 +169,6 @@ public class UpdateMyContactDetailsConcurrencyEndpointTests
             $"/api/companies/{ctx.CompanyId}/employees/me/contact-details",
             new { addressLine1 = "1 Test Street", city = "", postCode = "SW1A 1AA", country = "United Kingdom", expectedVersion = (int?)null });
 
-        // FastEndpoints request-validation failures surface as 422, not 400.
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 

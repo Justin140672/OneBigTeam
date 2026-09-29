@@ -8,7 +8,6 @@ namespace HR.Modules.Probation.Tests;
 
 public class GetUpcomingProbationReviewsHandlerTests
 {
-    // Handler treats "today" as DateOnly from clock.UtcNow.
     private static readonly DateTime    FixedUtcNow = new(2026, 6, 25, 10, 0, 0, DateTimeKind.Utc);
     private static readonly DateOnly    Today       = new(2026, 6, 25);
     private static readonly DateTimeOffset Now      = new(2026, 6, 25, 10, 0, 0, TimeSpan.Zero);
@@ -52,7 +51,6 @@ public class GetUpcomingProbationReviewsHandlerTests
         var (companyId, employeeId) = (Guid.NewGuid(), Guid.NewGuid());
         var record = SeedRecord(context, companyId, employeeId);
 
-        // Due in 31 days — outside the window.
         context.ProbationReviews.Add(ProbationReview.Create(
             Guid.NewGuid(), companyId, record.Id,
             ProbationReviewType.HrReview, Today.AddDays(31), Now));
@@ -172,12 +170,10 @@ public class GetUpcomingProbationReviewsHandlerTests
         Assert.All(result.Value.Items, item => Assert.Equal(company1Id, item.ReviewId != Guid.Empty ? company1Id : Guid.Empty));
     }
 
-    // ── PROB-02: authorizedEmployeeIds filtering ────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Null_AuthorizedEmployeeIds_Returns_All_Matching_Reviews()
     {
-        // null == HR Administrator (unrestricted/company-wide).
         await using var context = BuildContext();
         var (companyId, employeeId) = (Guid.NewGuid(), Guid.NewGuid());
         var record = SeedRecord(context, companyId, employeeId);
@@ -220,8 +216,6 @@ public class GetUpcomingProbationReviewsHandlerTests
     [Fact]
     public async Task HandleAsync_Empty_AuthorizedEmployeeIds_Returns_Empty_Without_Querying()
     {
-        // A manager with zero reports must get an empty response, not an unrestricted one —
-        // an empty (non-null) set must never be treated the same as "no restriction".
         await using var context = BuildContext();
         var (companyId, employeeId) = (Guid.NewGuid(), Guid.NewGuid());
         var record = SeedRecord(context, companyId, employeeId);

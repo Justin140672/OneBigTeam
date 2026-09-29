@@ -4,14 +4,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Infrastructure.Storage;
 
-/// <summary>
-/// Registered as the "storage" named health check (System Health Dashboard, Platform Monitoring
-/// epic). Calls Supabase Storage's GET /storage/v1/bucket endpoint (list buckets) using the same
-/// service-role key as SupabaseProfilePhotoStorageService — a cheap, real reachability probe (one
-/// list call, no file transfer). Reports Degraded (not Unhealthy) when Supabase Storage isn't
-/// configured (LocalProfilePhotoStorageService is in use instead), the same non-fatal-in-dev
-/// convention as the other integration health checks.
-/// </summary>
 internal sealed class SupabaseStorageHealthCheck(
     IHttpClientFactory httpClientFactory,
     IOptions<SupabaseProfilePhotoStorageOptions> options) : IHealthCheck

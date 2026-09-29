@@ -6,11 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Probation.Services;
 
-// Historical replay counterpart to CompleteProbationReviewHandler: that handler publishes
-// ProbationPassedIntegrationEvent only when a ProbationRecord is moved to Passed (via
-// ProbationRecord.Pass). This replayer targets exactly the same condition — every ProbationRecord
-// currently in the Passed status — for records that were passed before the employee timeline
-// feature existed.
 internal sealed class ProbationHistoryReplayer(
     ProbationDbContext dbContext,
     IIntegrationEventPublisher integrationEventPublisher) : IProbationHistoryReplayer
@@ -24,11 +19,6 @@ internal sealed class ProbationHistoryReplayer(
 
         foreach (var record in passedRecords)
         {
-            // DecisionDate is a DateOnly; the live handler uses the DateTimeOffset `now` at the
-            // moment the review was completed as OccurredAt. That moment is no longer available
-            // for historical records, so DecisionDate (midnight UTC) is the closest available
-            // substitute — mirrors the same fallback approach used elsewhere in this codebase
-            // when only a DateOnly is available for a DateTimeOffset-shaped signal.
             var occurredAt = record.DecisionDate.HasValue
                 ? new DateTimeOffset(record.DecisionDate.Value.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero)
                 : record.UpdatedAt;

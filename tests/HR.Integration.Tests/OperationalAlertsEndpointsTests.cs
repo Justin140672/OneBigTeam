@@ -11,13 +11,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Follow-up B: platform-admin Operational Alerts endpoints (list / detail / resolve). Same
-/// "platform:admin" policy + allow-list gate pattern as GetAuditLogEndpointTests /
-/// ListCustomersEndpointTests — anonymous is 401, authenticated-but-not-allow-listed is 403.
-/// FastEndpoints request-validation failures surface as 422 (UnprocessableEntity), matching the
-/// rest of the suite.
-/// </summary>
 [Collection("Integration")]
 public class OperationalAlertsEndpointsTests
 {
@@ -81,7 +74,6 @@ public class OperationalAlertsEndpointsTests
         await db.AdministrativeAlerts.Where(a => a.CompanyId == companyId).ExecuteDeleteAsync();
     }
 
-    // ── Authorization ──────────────────────────────────────────────────────
 
     [Fact]
     public async Task List_Anonymous_Is_Unauthorized()
@@ -123,7 +115,6 @@ public class OperationalAlertsEndpointsTests
         Assert.Equal(HttpStatusCode.Forbidden, resolve.StatusCode);
     }
 
-    // ── LIST ───────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task List_Returns_Seeded_Alerts_Without_Detail_And_Paginated()
@@ -167,20 +158,17 @@ public class OperationalAlertsEndpointsTests
         (await client.PostAsJsonAsync($"{BaseUrl}/{toResolve}/resolve", new { ResolutionNote = "Handled offline" }))
             .EnsureSuccessStatusCode();
 
-        // company + category filter
         var byCategory = await client.GetFromJsonAsync<ListPayload>(
             $"{BaseUrl}?companyId={companyId}&category=reportgeneration");
         Assert.NotNull(byCategory);
         Assert.Equal(2, byCategory!.TotalCount);
         Assert.All(byCategory.Items, i => Assert.Equal("ReportGeneration", i.Category));
 
-        // status=open excludes the resolved one
         var open = await client.GetFromJsonAsync<ListPayload>(
             $"{BaseUrl}?companyId={companyId}&category=reportgeneration&status=open");
         Assert.NotNull(open);
         Assert.Equal(new[] { openReport }, open!.Items.Select(i => i.Id).ToArray());
 
-        // status=resolved returns only the resolved one
         var resolved = await client.GetFromJsonAsync<ListPayload>(
             $"{BaseUrl}?companyId={companyId}&status=resolved");
         Assert.NotNull(resolved);
@@ -199,7 +187,6 @@ public class OperationalAlertsEndpointsTests
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
-    // ── GET details ────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_Returns_Full_Detail_For_A_Known_Alert()
@@ -227,7 +214,6 @@ public class OperationalAlertsEndpointsTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    // ── RESOLVE ────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Resolve_Sets_Resolved_Status_And_Caller_Attribution()

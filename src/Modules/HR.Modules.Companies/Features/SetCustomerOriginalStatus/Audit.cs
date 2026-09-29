@@ -2,11 +2,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Companies.Features.SetCustomerOriginalStatus;
 
-/// <summary>
-/// Records a platform-administrator updating a customer's original classification status
-/// (whether they existed before a specific product launch). Used to filter product update
-/// communications to appropriate audience segments.
-/// </summary>
 internal sealed record CustomerClassificationUpdatedAuditEvent(
     Guid CompanyId,
     Guid? ActorUserId,

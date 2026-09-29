@@ -146,8 +146,8 @@ public class StartOffboardingHandlerTests
     }
 
     [Theory]
-    [InlineData(1)] // NotStarted
-    [InlineData(2)] // InProgress
+    [InlineData(1)]
+    [InlineData(2)]
     public async Task HandleAsync_Returns_Conflict_When_Active_Plan_Already_Exists(int statusValue)
     {
         await using var dbContext = BuildContext();
@@ -171,8 +171,8 @@ public class StartOffboardingHandlerTests
     }
 
     [Theory]
-    [InlineData(true)]  // Completed
-    [InlineData(false)] // Cancelled
+    [InlineData(true)]
+    [InlineData(false)]
     public async Task HandleAsync_Allows_New_Plan_When_Existing_Plan_Is_Terminal(bool isCompleted)
     {
         await using var dbContext = BuildContext();
@@ -410,12 +410,10 @@ public class StartOffboardingHandlerTests
 
         var result = await harness.Handler.HandleAsync(BuildRequest(companyId, employeeId), CancellationToken.None);
 
-        // 1 asset task + 1 HR document-review task + 4 manager checklist tasks = 6
         Assert.Equal(6, result.Value!.GeneratedTaskIds.Count);
         Assert.Equal(6, dbContext.OffboardingTasks.Count());
     }
 
-    // OFF-04
     [Fact]
     public async Task HandleAsync_AssetReturnTask_Carries_The_AssetAssignmentId_From_AssignedAssetReader()
     {
@@ -435,7 +433,6 @@ public class StartOffboardingHandlerTests
         Assert.Contains("MacBook Pro", assetTask.Title);
     }
 
-    // OFF-04
     [Fact]
     public async Task HandleAsync_NonAssetTask_Has_Null_AssetAssignmentId()
     {
@@ -463,7 +460,6 @@ public class StartOffboardingHandlerTests
     // HR.Integration.Tests (StartOffboardingEndpointTests — concurrent-request test), which is the
     // only place that can actually trigger the index and prove the catch path returns Conflict.
 
-    // OFF-03
     [Fact]
     public async Task HandleAsync_Commits_Plan_And_Tasks_Before_Calling_TaskCreator()
     {
@@ -485,15 +481,12 @@ public class StartOffboardingHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.NotEmpty(pendingAddedEntriesObservedDuringSync);
-        // By the time any TaskCreator.CreateAsync call happens, the plan/tasks SaveChangesAsync has
-        // already run — nothing should still be pending "Added" in the change tracker.
         Assert.All(pendingAddedEntriesObservedDuringSync, count => Assert.Equal(0, count));
 
         var plan = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == result.Value!.Id);
         Assert.NotEqual(default, plan.Id);
     }
 
-    // OFF-03
     [Fact]
     public async Task HandleAsync_Returns_Success_Even_When_TaskSynchronizer_Fails_For_One_Generated_Task()
     {
@@ -517,7 +510,6 @@ public class StartOffboardingHandlerTests
             t => Assert.NotNull(t.TaskItemCreatedAt));
     }
 
-    // OFF-03
     [Fact]
     public async Task HandleAsync_Sets_AssignedEmployeeId_On_Generated_Tasks()
     {
@@ -541,7 +533,6 @@ public class StartOffboardingHandlerTests
         Assert.All(managerTasks, t => Assert.Equal(managerId, t.AssignedEmployeeId));
     }
 
-    // OFF-03
     [Fact]
     public async Task HandleAsync_Manager_Tasks_Have_Null_AssignedEmployeeId_When_No_Manager()
     {
@@ -557,9 +548,8 @@ public class StartOffboardingHandlerTests
         Assert.All(managerTasks, t => Assert.Null(t.AssignedEmployeeId));
     }
 
-    // ---- OFF-05: backdated departure reconciliation ----
 
-    private static DateOnly BackdatedLastWorkingDay => DateOnly.FromDateTime(FixedUtcNow); // today == backdated
+    private static DateOnly BackdatedLastWorkingDay => DateOnly.FromDateTime(FixedUtcNow);
     private static DateOnly FutureLastWorkingDay => new(2026, 8, 1);
 
     [Fact]
@@ -683,7 +673,6 @@ public class StartOffboardingHandlerTests
             n => n.Type == NotificationType.OffboardingRequiresHrReconciliation);
     }
 
-    // ---- OFF-06: departing manager cascade ----
 
     [Fact]
     public async Task HandleAsync_Departing_Manager_With_Replacement_Creates_No_Exception_Tasks_And_Reassigns_Own_Tasks()
@@ -791,8 +780,6 @@ public class StartOffboardingHandlerTests
         Assert.All(exceptionTasks, t => Assert.True(t.RequiresHrConfirmation));
     }
 
-    // OFF-08: the human HR actor who started the plan (e.g. via the manual "Start Offboarding"
-    // endpoint) must be attributed on OffboardingPlanStartedAuditEvent, never null/unattributed.
     [Fact]
     public async Task HandleAsync_Publishes_OffboardingPlanStartedAuditEvent_With_Human_Actor()
     {
@@ -814,9 +801,6 @@ public class StartOffboardingHandlerTests
         Assert.Equal(actorEmployeeId, startedEvent.ActorEmployeeId);
     }
 
-    // OFF-08: when no actor is supplied (e.g. the reconciliation job's system-driven path), the
-    // event falls back to OffboardingSystemActor.Id rather than publishing an unattributed audit
-    // entry.
     [Fact]
     public async Task HandleAsync_Falls_Back_To_SystemActor_When_No_ActorEmployeeId_Supplied()
     {

@@ -60,8 +60,6 @@ internal sealed class UploadRequestedDocumentHandler(
 
         await using var fileStream = file.OpenReadStream();
 
-        // Virus scanning happens asynchronously via ScanUploadedFileJob (enqueued below) rather
-        // than inline — the row is stored with ScanStatus = Pending.
         var contentResult = fileValidator.ValidateContent(fileStream, file.ContentType);
         if (contentResult.IsFailure)
             return Result.Failure<UploadRequestedDocumentResponse>(contentResult.Error);

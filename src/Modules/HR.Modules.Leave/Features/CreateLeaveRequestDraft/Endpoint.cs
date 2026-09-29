@@ -20,7 +20,6 @@ internal sealed class Endpoint(
         CreateLeaveRequestDraftRequest request,
         CancellationToken cancellationToken)
     {
-        // LEAVE-07: drafts are self-service only, same scope as submit - see LEAVE-01.
         if (currentUser.UserId is not { } callerId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());

@@ -18,13 +18,6 @@ internal sealed class Notification
     public NotificationPriority Priority { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
-    /// <summary>
-    /// NOT-04: application-relative navigation target computed once at write time by
-    /// NotificationActionRouteBuilder (never recomputed per read). Null for notification types
-    /// with no natural destination (purely informational). Always either null or a same-origin
-    /// relative path — see NotificationActionRouteBuilder.EnforceRelative for the invariant this
-    /// column depends on; external/absolute URLs must never reach this column.
-    /// </summary>
     public string? ActionUrl { get; private set; }
 
     public static Notification Create(

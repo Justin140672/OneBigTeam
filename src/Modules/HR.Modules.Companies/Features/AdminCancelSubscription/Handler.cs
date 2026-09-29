@@ -9,11 +9,6 @@ using Microsoft.Extensions.Configuration;
 
 namespace HR.Modules.Companies.Features.AdminCancelSubscription;
 
-/// <summary>
-/// Same defense-in-depth allow-list gate as ExtendCustomerTrialHandler (see its remarks). Calls the
-/// same IStripeGateway as the customer-initiated CancelSubscription feature so Stripe's own state
-/// stays authoritative — this is a support-initiated equivalent, not a purely local override.
-/// </summary>
 internal sealed class AdminCancelSubscriptionHandler(
     CompaniesDbContext dbContext,
     IStripeGateway stripeGateway,

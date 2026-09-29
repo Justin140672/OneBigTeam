@@ -17,8 +17,6 @@ public class GetOrganisationChartEndpointTests
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.HrAdministrator);
-            // CreateEmployeeAsync GETs the employee (policy role:employee) to round-trip the
-            // concurrency version before activating via the employment PUT.
             await TestRoleSeeder.AssignRoleAsync(factory, AdminUserId, SystemRoles.Employee);
         }).GetAwaiter().GetResult();
     }
@@ -46,29 +44,22 @@ public class GetOrganisationChartEndpointTests
         var reportId = await CreateEmployeeAsync(
             client, companyId, "Rick", "Report", departmentId, locationId, positionProfileId, employmentTypeId, "ORG-REP", managerId);
 
-        // A Draft employee (never activated) — should be excluded as "inactive".
         await CreateEmployeeAsync(
             client, companyId, "Dana", "Draft", departmentId, locationId, positionProfileId, employmentTypeId, "ORG-DRAFT",
             activate: false);
 
-        // An employee in a completely different company — should never appear.
         var otherCompanyId = Guid.NewGuid();
         using var otherClient = await AdminClient(otherCompanyId);
         var (otherDeptId, otherLocId, otherProfileId, otherTypeId) = await CreateReferenceDataAsync(otherClient, otherCompanyId);
         await CreateEmployeeAsync(
             otherClient, otherCompanyId, "Olivia", "Other", otherDeptId, otherLocId, otherProfileId, otherTypeId, "ORG-OTHER");
 
-        // Status is an optional filter on this endpoint (defaults to showing every status) —
-        // ?status=Active mirrors what the Organisation Chart page itself defaults to, and is
-        // needed here so the never-activated Draft employee below is excluded as intended.
         var response = await client.GetAsync($"/api/companies/{companyId}/organisation-chart?status=Active");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<OrganisationChartPayload>();
         Assert.NotNull(payload);
 
-        // Only the two Active employees for this company — Draft and the other company's
-        // employee are both excluded.
         Assert.Equal(2, payload!.Items.Count);
 
         var manager = Assert.Single(payload.Items, i => i.EmployeeId == managerId);
@@ -117,11 +108,6 @@ public class GetOrganisationChartEndpointTests
         return (departmentId, locationId, positionProfileId, employmentTypeId);
     }
 
-    // Employees are created in Draft status (see Employee.Create/CreateEmployeeHandler — nothing
-    // auto-activates them). The Employment tab's own PUT is how HR actually activates an
-    // employee in this system (UpdateEmploymentDetailsValidator rejects Status == Draft, so
-    // there's no separate "Activate" endpoint) — it also doubles as where a manager gets
-    // assigned, so both happen in one follow-up call here.
     private static async Task<Guid> CreateEmployeeAsync(
         HttpClient client, Guid companyId, string firstName, string lastName,
         Guid departmentId, Guid locationId, Guid positionProfileId, Guid employmentTypeId,

@@ -69,7 +69,6 @@ public class UploadEmployeeDocumentHandlerTests
         return docType;
     }
 
-    // Produces a PDF file with valid magic bytes so magic-byte validation passes.
     private static IFormFile FakePdfFile(int extraSize = 1020) =>
         FakeFile("contract.pdf", "application/pdf", PdfBytes(extraSize));
 
@@ -83,10 +82,9 @@ public class UploadEmployeeDocumentHandlerTests
             ContentType = contentType,
         };
 
-    // %PDF- followed by padding
     private static byte[] PdfBytes(int extraSize = 1020)
     {
-        var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D }; // %PDF-
+        var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };
         var bytes = new byte[magic.Length + extraSize];
         magic.CopyTo(bytes, 0);
         return bytes;
@@ -143,7 +141,7 @@ public class UploadEmployeeDocumentHandlerTests
         Assert.Equal(result.Value.DocumentId, savedDoc.Id);
         Assert.Equal(employeeId,              savedDoc.EmployeeId);
         Assert.Equal(uploadedBy,              savedDoc.UploadedBy);
-        Assert.Null(savedDoc.ExpiryDate); // expiry lives on EmployeeDocument, not Document
+        Assert.Null(savedDoc.ExpiryDate);
 
         var savedEmployeeDoc = await db.EmployeeDocuments.SingleAsync();
         Assert.Equal(result.Value.EmployeeDocumentId, savedEmployeeDoc.Id);
@@ -265,9 +263,6 @@ public class UploadEmployeeDocumentHandlerTests
     [Fact]
     public async Task HandleAsync_Stores_Document_With_Pending_ScanStatus()
     {
-        // Virus scanning now happens asynchronously (ScanUploadedFileJob, enqueued after
-        // persistence) rather than inline during upload — the upload itself always succeeds and
-        // the new row starts life as Pending.
         await using var db = BuildContext();
         var companyId      = Guid.NewGuid();
         var docType        = await SeedDocumentType(db, companyId);
@@ -316,7 +311,6 @@ public class UploadEmployeeDocumentHandlerTests
         var docType        = await SeedDocumentType(db, companyId);
         var handler        = BuildHandler(db);
 
-        // File extension and content type say PDF, but bytes are zeros (renamed/spoofed file)
         var spoofedFile = FakeFile("legit.pdf", "application/pdf", [0x00, 0x00, 0x00, 0x00, 0x00]);
 
         var result = await handler.HandleAsync(
@@ -354,14 +348,13 @@ public class UploadEmployeeDocumentHandlerTests
         var employeeId = Guid.NewGuid();
         var uploadedBy = Guid.NewGuid();
 
-        // Use a context that throws on SaveChangesAsync to simulate a DB failure.
         var options = new DbContextOptionsBuilder<DocumentsDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
         await using var db      = new ThrowingDocumentsDbContext(options);
         var docType             = DocumentType.Create(Guid.NewGuid(), companyId, "Contract", null, DateTimeOffset.UtcNow);
         db.DocumentTypes.Add(docType);
-        await db.BaseSaveChangesAsync(); // use base to seed without throwing
+        await db.BaseSaveChangesAsync();
 
         var handler = BuildHandler(db, storage);
 
@@ -371,7 +364,6 @@ public class UploadEmployeeDocumentHandlerTests
                 uploadedBy,
                 CancellationToken.None));
 
-        // The file that was uploaded must have been cleaned up.
         Assert.Single(storage.Uploads);
         Assert.Single(storage.Deletions);
         Assert.Equal(storage.Uploads[0].StorageKey, storage.Deletions[0]);
@@ -510,13 +502,13 @@ public class UploadEmployeeDocumentHandlerTests
 
         await handler.HandleAsync(
             BuildRequest(companyId, employeeId, docType.Id),
-            uploadedBy:      employeeId,   // self-upload: actor IS the employee
+            uploadedBy:      employeeId,
             isManagerUpload: false,
             CancellationToken.None);
 
         var evt = Assert.Single(audit.Published);
         Assert.Equal(employeeId, evt.ActorUserId);
-        Assert.Equal(employeeId, evt.ActorEmployeeId); // set for self-uploads
+        Assert.Equal(employeeId, evt.ActorEmployeeId);
     }
 
     [Fact]
@@ -538,7 +530,7 @@ public class UploadEmployeeDocumentHandlerTests
 
         var evt = Assert.Single(audit.Published);
         Assert.Equal(managerId, evt.ActorUserId);
-        Assert.Null(evt.ActorEmployeeId); // manager is a user, not an employee actor
+        Assert.Null(evt.ActorEmployeeId);
     }
 
     [Fact]
@@ -549,14 +541,13 @@ public class UploadEmployeeDocumentHandlerTests
         var handler        = BuildHandler(db, auditPublisher: audit);
 
         await handler.HandleAsync(
-            BuildRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()), // unknown doc type
+            BuildRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()),
             Guid.NewGuid(),
             CancellationToken.None);
 
         Assert.Empty(audit.Published);
     }
 
-    // Subclass used only in the orphan-cleanup test to simulate a DB save failure.
     private sealed class ThrowingDocumentsDbContext(DbContextOptions<DocumentsDbContext> options)
         : DocumentsDbContext(options)
     {

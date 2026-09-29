@@ -3,11 +3,6 @@ using HR.Modules.Employees.Services;
 
 namespace HR.Modules.Employees.Tests.Infrastructure;
 
-/// <summary>
-/// Wraps a real IEmployeeDepartureFinalizer but throws for a configured set of employee ids —
-/// lets ProcessLeavingEmployeesJobTests simulate one employee's finalisation permanently failing
-/// while proving the rest of the batch (and the stranded-recovery scan) still runs.
-/// </summary>
 internal sealed class SelectivelyThrowingDepartureFinalizer(
     IEmployeeDepartureFinalizer inner, params Guid[] throwingEmployeeIds) : IEmployeeDepartureFinalizer
 {

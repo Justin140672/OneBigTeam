@@ -5,9 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Tests;
 
-// OFF-03: ActiveLeavingProcessReader is the Employees-side implementation of the cross-module port
-// (IActiveLeavingProcessReader) Offboarding's reconciliation job depends on to find every employee
-// with an InProgress leaving process but no active offboarding plan.
 public class ActiveLeavingProcessReaderTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 8, 25, 10, 0, 0, DateTimeKind.Utc);

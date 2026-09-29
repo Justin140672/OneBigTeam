@@ -61,8 +61,6 @@ public class RejectLeaveRequestEndpointTests
     [Fact]
     public async Task HrAdministrator_Can_Reject_A_Pending_Request_Without_A_Reason()
     {
-        // The FluentValidation rules make RejectionReason optional (MaximumLength only). If the
-        // product intent is that a reason is mandatory, this test documents the current gap.
         var employee = await CreateEmployeeAsync();
         var leaveRequestId = await SeedLeaveRequestAsync(employee, LeaveRequestStatus.Pending);
 
@@ -160,7 +158,6 @@ public class RejectLeaveRequestEndpointTests
     [Fact]
     public async Task An_Approved_Request_Can_Still_Be_Rejected()
     {
-        // The negated branch of the state guard: Approved is the *other* permitted prior state.
         var employee = await CreateEmployeeAsync();
         var leaveRequestId = await SeedLeaveRequestAsync(employee, LeaveRequestStatus.Approved);
 
@@ -189,7 +186,6 @@ public class RejectLeaveRequestEndpointTests
         Assert.Equal(HttpStatusCode.BadRequest, second.StatusCode);
     }
 
-    // ── helpers ──────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId, bool hrAdministrator = false)
     {

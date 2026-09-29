@@ -60,10 +60,6 @@ public class ListSicknessCategoriesHandlerTests
     [Fact]
     public async Task HandleAsync_Orders_Ties_By_DisplayOrder_Newest_First()
     {
-        // Categories created via the UI without an explicit Display Order all default to 0 —
-        // with no secondary sort, Postgres does not guarantee a stable tie order, so a newly
-        // created category could sort anywhere among same-DisplayOrder rows and fall off a
-        // paginated grid's first page. Newest-first as the tiebreaker keeps new rows visible.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
 

@@ -38,12 +38,6 @@ internal sealed class ListExternalRecruitersHandler(RecruitmentDbContext db)
                 r.ContactEmail,
                 r.ContactTelephone,
                 r.IsActive,
-                // Ticket #81: VacancyRecruiterAssignment (with its own active/historical rows) has been
-                // removed — this now simply counts Vacancy rows where AssignedRecruiterId currently
-                // points at this recruiter. Unlike the old all-time count, this is a current-snapshot
-                // figure only (a vacancy that had this recruiter assigned and was later reassigned no
-                // longer counts) — see GetExternalRecruiterActivitySummaryHandler's remarks for the
-                // same underlying trade-off.
                 db.Vacancies.Count(v => v.AssignedRecruiterId == r.Id),
                 r.CreatedAt))
             .ToListAsync(cancellationToken);

@@ -4,13 +4,8 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Employees.Tests;
 
-/// <summary>
-/// Equality monitoring answers are special-category data — audit payloads must never carry an
-/// answer value, only ids, timestamps and boolean "was X provided" flags.
-/// </summary>
 public class EqualityDataAuditEventTests
 {
-    // Strings that would appear if any answer value leaked into a payload.
     private static readonly string[] AnswerLikeTokens =
     [
         "White", "Mixed", "SelfDescribed", "Woman", "Man", "Bisexual", "GayOrLesbian",
@@ -40,11 +35,9 @@ public class EqualityDataAuditEventTests
         Assert.Null(evt.Before);
         Assert.Equal("Equality monitoring data provided", evt.Summary);
 
-        // The After payload is only presence flags.
         var after = JsonSerializer.Serialize(evt.After);
         Assert.Contains("Provided", after);
         Assert.Contains("Created", after);
-        // The caring-responsibilities presence flag is included — and still value-free.
         Assert.Contains("CaringResponsibilitiesProvided", after);
     }
 
@@ -74,7 +67,6 @@ public class EqualityDataAuditEventTests
         Assert.Equal("Equality monitoring data withdrawn", evt.Summary);
     }
 
-    // Spot-check enum member names from EqualityEnums.cs — none may appear in a serialized payload.
     private static readonly string[] EnumMemberNames =
         ["Christian", "GayOrLesbian", "Woman", "White", "Muslim", "Bisexual", "NonBinary",
          "AsianOrAsianBritish", "PreferNotToSay", "SelfDescribed"];
@@ -96,7 +88,6 @@ public class EqualityDataAuditEventTests
             CaringResponsibilitiesProvided: true,
             OccurredAt: DateTimeOffset.UtcNow);
 
-        // Serialize Before/After/Metadata exactly as AuditPendingItem.From does.
         var before = evt.Before is null ? null : JsonSerializer.Serialize(evt.Before);
         var after = evt.After is null ? null : JsonSerializer.Serialize(evt.After);
         var metadata = evt.Metadata is null ? null : JsonSerializer.Serialize(evt.Metadata);
@@ -107,7 +98,6 @@ public class EqualityDataAuditEventTests
         foreach (var name in EnumMemberNames)
             Assert.DoesNotContain(name, combined, StringComparison.Ordinal);
 
-        // After carries only the six presence flags plus Created — all booleans, no strings.
         using var doc = JsonDocument.Parse(after!);
         foreach (var prop in doc.RootElement.EnumerateObject())
             Assert.Contains(prop.Value.ValueKind, new[] { JsonValueKind.True, JsonValueKind.False });

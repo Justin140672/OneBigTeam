@@ -141,8 +141,6 @@ internal sealed class QueueInvitationBatchHandler(
 
             if (!seenEmails.Add(candidate.WorkEmail))
             {
-                // Defensive: shouldn't happen given the duplicateEmails check above, but guards
-                // against creating two recipients with the same email regardless.
                 excluded.Add(new ExcludedInvitationCandidate(employeeId, candidate.WorkEmail, "DuplicateEmail"));
                 continue;
             }
@@ -159,8 +157,6 @@ internal sealed class QueueInvitationBatchHandler(
         {
             if (rejectedByEmailPolicy.Count > 0)
             {
-                // Name every affected address so the administrator knows exactly which employee
-                // records need an organisation email before they can be invited.
                 var rejectedEmails = excluded
                     .Where(e => e.Reason == AccountCreationEmailGuard.BulkExclusionReason)
                     .Select(e => e.Email)
@@ -201,8 +197,6 @@ internal sealed class QueueInvitationBatchHandler(
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        // Enqueue only after the save has committed, so a crash before this point leaves a Queued
-        // batch that never got processed rather than a job racing an uncommitted transaction.
         backgroundJobClient.Enqueue<ProcessInvitationBatchJob>(job => job.RunAsync(batch.Id, CancellationToken.None));
 
         await auditEventPublisher.PublishAsync(

@@ -12,7 +12,6 @@ public sealed class FakeProbationDateResolver(int months = 6) : IProbationDateRe
         => Task.FromResult(startDate.AddMonths(positionMonthsOverride ?? months));
 }
 
-// Matches anything by default, so tests that don't care about contact validation aren't affected.
 public sealed class FakeCompanyContactValidationReader(
     string postcodeRegex = ".*", string telephoneRegex = ".*", string mobileRegex = ".*")
     : ICompanyContactValidationReader
@@ -21,8 +20,6 @@ public sealed class FakeCompanyContactValidationReader(
         => Task.FromResult(new CompanyContactValidationRules(postcodeRegex, telephoneRegex, mobileRegex));
 }
 
-// Manual mode by default, matching the pre-existing behaviour where every employee number was
-// manually supplied — tests that don't care about automatic numbering aren't affected.
 public sealed class FakeCompanyEmployeeNumberSettingsReader(EmployeeNumberMode mode = EmployeeNumberMode.Manual)
     : ICompanyEmployeeNumberSettingsReader
 {

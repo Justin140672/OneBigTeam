@@ -8,12 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Services;
 
-// Extracted from ProcessLeavingEmployeesJob so the exact same finalisation steps (status
-// transition, conditional access disabling, offboarding-completeness check, manager notification,
-// audit publish, integration event publish) run whether triggered by the daily job reaching a due
-// LeavingDate, or by HR confirming a backdated LeavingDate via Start/AmendLeavingProcess. Both
-// Employee/EmployeeLeavingProcess guard their own state transitions (Complete throws unless
-// InProgress), which is what keeps repeated calls for the same process safe.
 internal sealed class EmployeeDepartureFinalizer(
     EmployeesDbContext dbContext,
     IAuditEventPublisher auditEventPublisher,
@@ -30,18 +24,9 @@ internal sealed class EmployeeDepartureFinalizer(
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        // Already fully finalised (terminal state persisted AND every downstream step below
-        // completed) — a safe no-op if invoked again defensively.
         if (process.FinalisationCompletedAt is not null)
             return;
 
-        // If the process is already Completed but FinalisationCompletedAt is still null, a prior
-        // attempt got as far as persisting the terminal state but crashed/threw before finishing
-        // the downstream steps below (see ProcessLeavingEmployeesJob's reconciliation scan, which
-        // is what re-invokes FinalizeAsync in that situation). Re-running PersistTerminalStateAsync
-        // in that case would throw (Complete()/SetFormerEmployee guard against a second real
-        // transition), so instead recompute accessDisabled from the already-persisted
-        // Employee.HasSystemAccess and go straight to the downstream steps.
         var accessDisabled = process.Status == LeavingProcessStatus.Completed
             ? !employee.HasSystemAccess
             : await PersistTerminalStateAsync(employee, process, now, cancellationToken);
@@ -49,8 +34,6 @@ internal sealed class EmployeeDepartureFinalizer(
         await CompleteDownstreamFinalisationAsync(employee, process, now, accessDisabled, cancellationToken);
     }
 
-    // Persists the actual departure transition: manager-cascade reassignment, access disabling,
-    // Employee -> FormerEmployee, and EmployeeLeavingProcess -> Completed.
     private async Task<bool> PersistTerminalStateAsync(
         Employee employee,
         EmployeeLeavingProcess process,
@@ -89,11 +72,6 @@ internal sealed class EmployeeDepartureFinalizer(
         return accessDisabled;
     }
 
-    // Runs the finalisation steps that follow the terminal-state save: offboarding-completeness
-    // check, manager notification, audit publish, integration event publish, timeline write, and
-    // finally marks the process's FinalisationCompletedAt. May be re-entered on its own (with the
-    // terminal state already persisted) if an earlier attempt failed partway through — see
-    // FinalizeAsync and ProcessLeavingEmployeesJob's reconciliation scan.
     private async Task CompleteDownstreamFinalisationAsync(
         Employee employee,
         EmployeeLeavingProcess process,
@@ -107,9 +85,6 @@ internal sealed class EmployeeDepartureFinalizer(
 
         if (offboardingIncomplete && employee.ManagerId.HasValue)
         {
-            // Idempotency guard: this step can be re-run for the same process by the reconciliation
-            // scan above, so check for an existing notification (matched by employee/source-entity/
-            // type) rather than relying on Guid.NewGuid() uniqueness, which would double-send it.
             var alreadyNotified = await notificationWriter.ExistsAsync(
                 employee.ManagerId.Value, employee.Id, NotificationType.IncompleteOffboardingAtDeparture, cancellationToken);
 
@@ -148,10 +123,6 @@ internal sealed class EmployeeDepartureFinalizer(
                 offboardingIncomplete),
             cancellationToken);
 
-        // Cross-module notification so consuming modules (e.g. Leave) can stop treating this
-        // employee as active — e.g. no new policy-year balance/carry-over should be generated for
-        // them from this point on. Published after the audit event, mirroring the ordering used
-        // elsewhere in this codebase (state change -> audit -> integration event).
         await integrationEventPublisher.PublishAsync(
             new EmployeeDepartureFinalisedIntegrationEvent(
                 employee.CompanyId,
@@ -182,12 +153,6 @@ internal sealed class EmployeeDepartureFinalizer(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    // OFF-06: reassigns every direct report currently pointing at the departing employee to
-    // process.ReplacementManagerEmployeeId (or clears ManagerId if none was nominated), and
-    // publishes EmployeeManagerChangedIntegrationEvent for each. This is the only place a
-    // manager's own departure cascades a manager change to their reports — a direct edit to an
-    // employee's ManagerId field still goes through AssignManager/UpdateEmploymentDetails, which
-    // already publish this same event for that scenario.
     private async Task CascadeManagerDepartureAsync(
         Employee employee,
         EmployeeLeavingProcess process,
@@ -210,22 +175,12 @@ internal sealed class EmployeeDepartureFinalizer(
 
         foreach (var report in reports)
         {
-            // Idempotency guard: only act on reports still pointing at the departing employee —
-            // relevant if this is somehow invoked twice for the same process (Complete() already
-            // guards against that at the process level, but this keeps the cascade itself safe on
-            // its own terms too).
             if (report.ManagerId != employee.Id)
                 continue;
 
             report.Assign(report.DepartmentId, report.PositionProfileId, report.LocationId, replacementManagerId, now);
             reassignedReports.Add(report);
 
-            // Durability fix: capture the previous/new manager values now, in the SAME save as the
-            // reassignment below, rather than relying on publishing immediately afterwards. If the
-            // process is interrupted between the save and publish, report.ManagerId already points
-            // at replacementManagerId, so the "still pointing at the departing employee" guard above
-            // would skip this report entirely on any retry — silently losing the event. This record
-            // survives that gap and is delivered by ReconcilePendingManagerChangedEventsJob.
             pendingEvents.Add(PendingManagerChangedEvent.Create(
                 Guid.NewGuid(), employee.CompanyId, report.Id, employee.Id, replacementManagerId,
                 process.Id, now, now));

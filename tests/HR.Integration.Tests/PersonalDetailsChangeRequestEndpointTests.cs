@@ -46,11 +46,9 @@ public class PersonalDetailsChangeRequestEndpointTests
     [Fact]
     public async Task Returns_Forbidden_When_Requesting_For_Different_Employee()
     {
-        // Create an employee
         using var adminClient = await AdminClient();
         var employee          = await CreateEmployeeAsync(adminClient);
 
-        // Authenticate as a different user (not the employee) and try to request a change for them
         var otherUserId  = Guid.NewGuid();
         using var client = await AuthenticatedClient(otherUserId);
 
@@ -67,7 +65,6 @@ public class PersonalDetailsChangeRequestEndpointTests
         using var adminClient = await AdminClient();
         var employee          = await CreateEmployeeAsync(adminClient);
 
-        // Authenticate as the employee (sub == employee.Id)
         using var client = await AuthenticatedClient(employee.Id);
 
         var response = await client.PostAsJsonAsync(
@@ -92,7 +89,6 @@ public class PersonalDetailsChangeRequestEndpointTests
         changeResp.EnsureSuccessStatusCode();
         var changePayload = await changeResp.Content.ReadFromJsonAsync<ChangeRequestPayload>();
 
-        // The created task has no assignee — verify it appears in unassigned tasks
         var tasksResp = await adminClient.GetAsync(
             $"/api/companies/{SeededCompanyId}/tasks/unassigned");
         Assert.Equal(HttpStatusCode.OK, tasksResp.StatusCode);
@@ -101,7 +97,6 @@ public class PersonalDetailsChangeRequestEndpointTests
         Assert.Contains(tasks!.Items, t => t.Id == changePayload!.TaskId);
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AdminClient()
     {

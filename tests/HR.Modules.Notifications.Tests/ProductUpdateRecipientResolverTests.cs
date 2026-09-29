@@ -4,10 +4,6 @@ using HR.Modules.Notifications.Tests.Infrastructure;
 
 namespace HR.Modules.Notifications.Tests;
 
-/// <summary>
-/// Customer Release Notifications: eligibility-branch coverage for ProductUpdateRecipientResolver,
-/// the single source of truth shared by PreviewProductUpdateRecipients and SendProductUpdate.
-/// </summary>
 public class ProductUpdateRecipientResolverTests
 {
     [Fact]
@@ -130,16 +126,11 @@ public class ProductUpdateRecipientResolverTests
     [Fact]
     public async Task ResolveAsync_Does_Not_Fall_Back_To_Hr_Administrators()
     {
-        // ICompanyAdministratorDirectory is the only recipient source consulted — an HR
-        // Administrator with no Company Administrator role must never be resolved even though a
-        // separate IHrAdministratorDirectory exists elsewhere in the codebase.
         var companyId = Guid.NewGuid();
 
         var activeCompanies = new FakeActiveCompanyDirectory { ActiveCompanyIds = [companyId] };
         var subscriptions   = new FakeSubscriptionStatusReader { DefaultStatus = SubscriptionStatus.Active };
         var admins = new FakeCompanyAdministratorDirectory();
-        // No entry seeded for companyId — simulates a company whose only privileged users are HR
-        // Administrators, not Company Administrators.
 
         var result = await ProductUpdateRecipientResolver.ResolveAsync(
             activeCompanies, subscriptions, admins, CancellationToken.None);

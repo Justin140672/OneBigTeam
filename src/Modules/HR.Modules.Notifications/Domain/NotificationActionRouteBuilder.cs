@@ -29,8 +29,6 @@ internal static class NotificationActionRouteBuilder
     {
         var url = type switch
         {
-            // Tasks module owns a single task-detail route keyed by task id, which is exactly
-            // SourceEntityId for every task-related notification type.
             NotificationType.TaskAssigned
                 or NotificationType.TaskDueSoon
                 or NotificationType.TaskOverdue
@@ -38,23 +36,15 @@ internal static class NotificationActionRouteBuilder
                 or NotificationType.TaskDateChanged
                 => $"/companies/{companyId}/tasks/{sourceEntityId}",
 
-            // Leave has no standalone request-detail route; leave requests are reviewed from the
-            // employee record's Leave tab.
             NotificationType.LeaveApproved
                 or NotificationType.LeaveRejected
                 or NotificationType.LeaveRequested
                 => $"/companies/{companyId}/employees/{employeeId}?tab=leave",
 
-            // Documents (employee-owned expiring/expired documents) are reviewed from the
-            // employee record's Documents tab — there is no standalone document-detail route.
             NotificationType.DocumentExpiring
                 or NotificationType.DocumentExpired
                 => $"/companies/{companyId}/employees/{employeeId}?tab=documents",
 
-            // Assets module owns a single asset-detail route keyed by asset id. Every asset
-            // notification's SourceEntityId is the assignment id, not the asset id, but the
-            // assignment is shown inline on the asset detail page, which is the closest and most
-            // useful landing point available.
             NotificationType.AssetAssigned
                 or NotificationType.AssetReturnRequested
                 or NotificationType.AssetAcknowledgementReminder
@@ -63,8 +53,6 @@ internal static class NotificationActionRouteBuilder
                 or NotificationType.AssetReturnOverdue
                 => $"/companies/{companyId}/assets/{sourceEntityId}/view",
 
-            // Sickness has no standalone record-detail route; sickness records and
-            // return-to-work reviews are reviewed from the employee record's Sickness tab.
             NotificationType.SicknessRecorded
                 or NotificationType.SicknessEvidenceReminder
                 or NotificationType.SicknessEvidenceOverdue
@@ -84,8 +72,6 @@ internal static class NotificationActionRouteBuilder
                 or NotificationType.InterviewReminder
                 => null,
 
-            // Onboarding/offboarding progress is reviewed from the employee record's Onboarding /
-            // Offboarding tabs; there is no standalone plan-detail route.
             NotificationType.OnboardingStarted
                 or NotificationType.OnboardingTaskOverdue
                 => $"/companies/{companyId}/employees/{employeeId}?tab=onboarding",
@@ -100,41 +86,29 @@ internal static class NotificationActionRouteBuilder
                 or NotificationType.IncompleteOffboardingAtDeparture
                 => $"/companies/{companyId}/employees/{employeeId}?tab=leaving",
 
-            // Profile photo review always lands the employee back on their own profile page.
             NotificationType.ProfilePhotoApproved
                 or NotificationType.ProfilePhotoRejected
                 => $"/companies/{companyId}/employees/{employeeId}/profile",
 
-            // Shared company documents have a single detail route keyed by document id, which is
-            // exactly SourceEntityId for every one of these notification types.
             NotificationType.SharedCompanyDocumentAcknowledgementReminder
                 or NotificationType.SharedCompanyDocumentAcknowledgementOverdue
                 or NotificationType.SharedCompanyDocumentReviewDue
                 or NotificationType.SharedCompanyDocumentManagerEscalation
                 => $"/companies/{companyId}/shared-documents/{sourceEntityId}",
 
-            // Support requests are viewed via SearchPageBase's established "/support/{id}"
-            // deep-link convention (see SupportRequestQueue.GetViewUrl), keyed by the support
-            // request id, which is exactly SourceEntityId here.
             NotificationType.SupportRequestStatusChanged
                 => $"/companies/{companyId}/support/{sourceEntityId}",
 
-            // Probation events are reviewed from the employee record's Probation tab; there is no
-            // standalone probation-detail route.
             NotificationType.ProbationExtended
                 or NotificationType.ProbationReviewDue
                 or NotificationType.ProbationOutcomeRecorded
                 => $"/companies/{companyId}/employees/{employeeId}?tab=probation",
 
-            // NOT-03 template-catalogue types with no live call site yet, included here for
-            // completeness. SourceEntityId is the employee/candidate id respectively.
             NotificationType.EmployeeCreated
                 => $"/companies/{companyId}/employees/{sourceEntityId}",
             NotificationType.CandidateHired
                 => $"/companies/{companyId}/candidates/{sourceEntityId}",
 
-            // Story 2: the organisation data export panel lives on the company's subscription page
-            // (there is no customer-facing account-closure page in HR.Web today).
             NotificationType.OrganisationDataExportReady
                 => "/subscription",
 
@@ -144,20 +118,6 @@ internal static class NotificationActionRouteBuilder
         return EnforceRelative(url);
     }
 
-    /// <summary>
-    /// Defensive guard documenting the "application-relative only" invariant every branch above
-    /// must already satisfy. Rejects (returns null instead of) anything that isn't a same-origin
-    /// relative path — absolute URLs ("http://…", "https://…") and scheme-relative URLs ("//…")
-    /// are never stored or returned, per NOT-04's external/unsafe URL acceptance criterion. This
-    /// should never trigger given every branch above is a hard-coded relative template, but it is
-    /// the single choke point every computed URL passes through before reaching persistence.
-    /// </summary>
-    /// <summary>
-    /// Exposed (not just used internally by <see cref="BuildActionUrl"/>) so callers supplying an
-    /// explicit ActionUrl override — e.g. NotificationWriter.WriteAsync's admin-authored-URL
-    /// parameter — apply the exact same "application-relative only" guard rather than a
-    /// second, potentially-drifting implementation.
-    /// </summary>
     public static string? EnforceRelative(string? url)
     {
         if (string.IsNullOrEmpty(url))

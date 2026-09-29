@@ -8,13 +8,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// TEST-007 end-to-end hardening for the employee data-import pipeline: duplicate rows within a
-/// file, unsupported file types, and partial-failure confirm bookkeeping that must reach the
-/// persisted session + error report. Cross-tenant isolation and double-confirm rejection are
-/// covered in ConfirmImportSessionEndpointTests / ValidateImportSessionEndpointTests /
-/// ExportImportErrorsEndpointTests.
-/// </summary>
 [Collection("Integration")]
 public class DataImportHardeningEndpointTests
 {
@@ -46,8 +39,6 @@ public class DataImportHardeningEndpointTests
 
         var response = await client.PostAsync($"/api/companies/{companyId}/data-import/sessions", content);
 
-        // The upload handler rejects a disallowed file type as a domain validation failure, which
-        // the endpoint maps to 422 UnprocessableEntity (not a 400 model-binding failure).
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
@@ -58,8 +49,6 @@ public class DataImportHardeningEndpointTests
         using var _ = client;
         await EnsureDefaultLeavePolicyAsync(client, companyId);
 
-        // Row 2 is a unique, fully valid employee. Rows 3 and 4 share a work email, so per
-        // EmployeeStagingRowValidator both are flagged (duplicate-within-file is symmetric).
         const string csv =
             "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount\n" +
             "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer,50000\n" +
@@ -91,9 +80,6 @@ public class DataImportHardeningEndpointTests
         using var _ = client;
         await EnsureDefaultLeavePolicyAsync(client, companyId);
 
-        // Row 2 valid; row 3 missing Last Name -> invalid at validate. Confirm must import row 2
-        // only, and the session must land on CompletedWithErrors with FailedCount == 1 (the
-        // already-invalid row is carried into the confirm bookkeeping, not silently dropped).
         const string csv =
             "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount\n" +
             "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer,50000\n" +

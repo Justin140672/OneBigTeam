@@ -38,8 +38,6 @@ public class GetEmployeeDirectoryReportEndpointTests
     [Fact]
     public async Task Get_EmployeeDirectory_Returns_Forbidden_For_Manager()
     {
-        // Manager has baseline "reporting:view" but not "reporting:view-hr" — this report is
-        // HR-only PII (email, manager assignment), unlike the baseline reporting:view gate.
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Manager);
@@ -54,8 +52,6 @@ public class GetEmployeeDirectoryReportEndpointTests
     [Fact]
     public async Task Get_EmployeeDirectory_Returns_Forbidden_For_Recruiter()
     {
-        // Recruiter has "reporting:view" + "reporting:view-recruitment" but not
-        // "reporting:view-hr".
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Recruiter);
@@ -112,8 +108,6 @@ public class GetEmployeeDirectoryReportEndpointTests
         Assert.Equal(1, payload!.TotalCount);
         var item = Assert.Single(payload.Items);
         Assert.Equal("Alice Smith", item.Name);
-        // Newly created employees default to "Draft" status (per GetEmployeeEndpointTests) —
-        // the reader surfaces whatever status the employee record actually has.
         Assert.Equal("Draft", item.Status);
     }
 

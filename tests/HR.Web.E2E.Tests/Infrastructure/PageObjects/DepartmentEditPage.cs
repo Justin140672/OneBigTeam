@@ -2,17 +2,11 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the department create/edit page.
-/// Routes: /companies/{id}/departments/new  and  /companies/{id}/departments/{id}
-/// </summary>
 public sealed class DepartmentEditPage(IPage page, string baseUrl)
 {
     public async Task GoToNewAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/departments/new");
-        // DepartmentEdit has an SfDropDownList for Parent Department; span[role='combobox'] only
-        // appears after Blazor's interactive render, ensuring event handlers are wired up.
         await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
     }
 
@@ -37,9 +31,7 @@ public sealed class DepartmentEditPage(IPage page, string baseUrl)
     public async Task SaveAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
-        // Navigates back to the department list on success.
         await page.WaitForURLAsync("**/departments", new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
-        // With prerender:false the circuit connects after navigation, wait for the grid.
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
@@ -61,8 +53,6 @@ public sealed class DepartmentEditPage(IPage page, string baseUrl)
 
     public Guid GetIdFromUrl() => UrlIdParser.LastGuid(page.Url);
 
-    // ── Description field (optional HrTextBox) — robust type-for-real technique, see
-    // DocumentTypeEditPage.SetDescriptionAsync for the full rationale. ─────────────
     public async Task SetDescriptionAsync(string value)
     {
         var input = page.GetByPlaceholder("Optional description");
@@ -109,9 +99,6 @@ public sealed class DepartmentEditPage(IPage page, string baseUrl)
         await page.WaitForTimeoutAsync(300);
     }
 
-    // The shared "Unsaved Changes" confirmation dialog rendered by EditPageBase's Close action
-    // (see UnsavedChangesDialog.razor). Scoped by header text since Syncfusion dialogs share
-    // the generic role="dialog"/.e-dialog markup.
     private ILocator UnsavedChangesDialog => page.Locator("[role='dialog']:has-text('Unsaved Changes')");
 
     public Task ClickCloseAsync() =>

@@ -6,10 +6,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-// DOC-05: a new version is created as a NEW EmployeeDocument row rather than mutating the one it
-// replaces — see UploadEmployeeDocumentVersionHandler. Uses the same access gate as normal document
-// upload (HR-administrator/manager via "role:employee" + DocumentResourceAuthorizer.
-// CanAccessEmployeeDocumentsAsync), not the narrower HR-only scope used by version history reads.
 [Collection("Integration")]
 public class UploadEmployeeDocumentVersionEndpointTests
 {
@@ -58,7 +54,6 @@ public class UploadEmployeeDocumentVersionEndpointTests
             BuildPdfUpload());
         firstVersionResponse.EnsureSuccessStatusCode();
 
-        // Attempting a second version against the now-superseded original must conflict.
         var secondAttempt = await client.PostAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{employeeId}/documents/{original.EmployeeDocumentId}/versions",
             BuildPdfUpload());
@@ -73,16 +68,12 @@ public class UploadEmployeeDocumentVersionEndpointTests
         using var client = await AdminClient();
         var original     = await Upload(client, employeeId);
 
-        var content = new MultipartFormDataContent(); // no File part
+        var content = new MultipartFormDataContent();
 
         var response = await client.PostAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{employeeId}/documents/{original.EmployeeDocumentId}/versions",
             content);
 
-        // A missing file passes FluentValidation's NotNull check trivially against the model
-        // binder's placeholder and is instead caught by the handler's IFileUploadValidator check,
-        // which the endpoint maps to 422 (UnprocessableEntity) — the same behaviour as the sibling
-        // UploadEmployeeDocument endpoint's own validation-failure mapping.
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
@@ -102,7 +93,7 @@ public class UploadEmployeeDocumentVersionEndpointTests
         Assert.NotNull(payload);
         Assert.NotEqual(original.EmployeeDocumentId, payload!.EmployeeDocumentId);
         Assert.Equal(original.EmployeeDocumentId, payload.PreviousVersionId);
-        Assert.Equal("Original Title", payload.Title); // title carried forward
+        Assert.Equal("Original Title", payload.Title);
 
         var listResponse = await client.GetAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{employeeId}/documents");
@@ -135,7 +126,7 @@ public class UploadEmployeeDocumentVersionEndpointTests
     private static MultipartFormDataContent BuildPdfUpload(string title = "Test Contract")
     {
         var pdfBytes = new byte[1024];
-        pdfBytes[0] = 0x25; pdfBytes[1] = 0x50; pdfBytes[2] = 0x44; pdfBytes[3] = 0x46; // %PDF
+        pdfBytes[0] = 0x25; pdfBytes[1] = 0x50; pdfBytes[2] = 0x44; pdfBytes[3] = 0x46;
 
         var content = new MultipartFormDataContent();
         content.Add(new StringContent(title), "Title");

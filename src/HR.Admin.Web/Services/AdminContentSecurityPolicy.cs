@@ -2,39 +2,10 @@ using HR.SharedKernel.Http;
 
 namespace HR.Admin.Web.Services;
 
-/// <summary>
-/// P1 support-conversation stored-XSS fix — secondary mitigation. The Admin Portal renders
-/// tenant-authored support content inside the platform-admin origin, so it sends a Content
-/// Security Policy that, even if a sanitiser bug ever let markup through, blocks:
-/// <list type="bullet">
-/// <item>inline event-handler attributes (<c>onerror</c>, <c>onload</c>, ...) and inline
-/// <c>&lt;script&gt;</c> blocks — <c>script-src</c> has no <c>'unsafe-inline'</c>; the only inline
-/// script, Blazor's import map, is authorised by a per-request nonce;</item>
-/// <item><c>javascript:</c> navigations (also covered by the lack of <c>'unsafe-inline'</c>);</item>
-/// <item>scripts from any other origin, plugins (<c>object-src 'none'</c>), frames
-/// (<c>frame-src 'none'</c>), framing of the portal (<c>frame-ancestors 'none'</c>),
-/// <c>&lt;base&gt;</c> hijacking and off-site form posts.</item>
-/// </list>
-///
-/// Deliberate relaxations (documented so they are not tightened blindly):
-/// <list type="bullet">
-/// <item><c>'unsafe-eval'</c> in <c>script-src</c>: Syncfusion's client script compiles templates
-/// with <c>new Function(...)</c>, and the dev sign-in hands off via JS interop <c>eval</c>. This does
-/// not re-enable inline handlers or <c>javascript:</c> URLs.</item>
-/// <item><c>'unsafe-inline'</c> in <c>style-src</c>: Syncfusion components and Blazor set inline
-/// style attributes. Styles cannot execute script.</item>
-/// <item>Development only: <c>localhost</c> script/connect sources for dotnet-watch browser refresh
-/// and Visual Studio Browser Link.</item>
-/// </list>
-///
-/// CSP is defence in depth only — the primary control is the shared allow-list sanitiser
-/// (<c>HR.SharedKernel.Html.SupportHtmlSanitizer</c>) applied before persistence and at render time.
-/// </summary>
 public static class AdminContentSecurityPolicy
 {
     public const string HeaderName = "Content-Security-Policy";
 
-    /// <summary><see cref="HttpContext.Items"/> key holding this request's script nonce.</summary>
     public const string NonceItemKey = "HR.Admin.Web.CspNonce";
 
     public static string CreateNonce() => ContentSecurityPolicyBuilder.CreateNonce();
@@ -51,8 +22,6 @@ public static class AdminContentSecurityPolicy
             ? ["ws://localhost:*", "wss://localhost:*", "http://localhost:*", "https://localhost:*"]
             : [];
 
-        // Serialised by the shared HR.SharedKernel.Http.ContentSecurityPolicyBuilder (validation and
-        // nonce mechanics only); the directive list itself stays explicit and Admin-specific here.
         return new ContentSecurityPolicyBuilder()
             .Add("default-src", "'self'")
             .Add("script-src", ["'self'", ContentSecurityPolicyBuilder.NonceSource(nonce), "'unsafe-eval'", .. devSources])
@@ -68,10 +37,6 @@ public static class AdminContentSecurityPolicy
             .Build();
     }
 
-    /// <summary>
-    /// Adds the policy (with a fresh per-request nonce) to every response. Register after the
-    /// exception-handler / status-code-page middleware so re-executed error pages get it too.
-    /// </summary>
     public static IApplicationBuilder UseAdminContentSecurityPolicy(this IApplicationBuilder app, bool isDevelopment) =>
         app.Use(async (context, next) =>
         {

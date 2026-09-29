@@ -24,9 +24,6 @@ internal sealed class ListPositionProfilesHandler
         if (!request.IncludeInactive)
             profileQuery = profileQuery.Where(p => p.IsActive);
 
-        // Opt-in only — see Request.cs's remarks. Without a PageSize, this remains the original
-        // unbounded "return every Position Profile the company has" query every other caller
-        // already depends on.
         if (!string.IsNullOrWhiteSpace(request.Search))
             profileQuery = profileQuery.Where(p => EF.Functions.ILike(p.Title, $"%{request.Search}%"));
 

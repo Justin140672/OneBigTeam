@@ -63,8 +63,6 @@ public class EmployeeTimelineWriterTests
         var firstResult = await writer.TryAddAsync(first, CancellationToken.None);
         Assert.True(firstResult);
 
-        // Same company/source module/event type/source record id — differing only by id/title
-        // should still be treated as a duplicate by the natural key check.
         var duplicate = CreateEntry(companyId, employeeId, sourceRecordId: sourceRecordId);
         var duplicateResult = await writer.TryAddAsync(duplicate, CancellationToken.None);
 
@@ -104,8 +102,6 @@ public class EmployeeTimelineWriterTests
         var firstResult = await writer.TryAddAsync(first, CancellationToken.None);
         Assert.True(firstResult);
 
-        // Same company/employee/event type/event date, both with a null SourceRecordId — this is
-        // the natural key used for the null case.
         var duplicate = CreateEntry(
             companyId, employeeId, eventDate, EmployeeTimelineEventType.ManagerChanged, sourceRecordId: null);
         var duplicateResult = await writer.TryAddAsync(duplicate, CancellationToken.None);
@@ -117,8 +113,6 @@ public class EmployeeTimelineWriterTests
     [Fact]
     public async Task TryAddAsync_Does_Not_Treat_Null_And_NonNull_SourceRecordId_As_The_Same_Entry()
     {
-        // A null SourceRecordId entry and a non-null one for the same employee/event type/date
-        // are deduplicated by different natural keys and should not collide with each other.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();

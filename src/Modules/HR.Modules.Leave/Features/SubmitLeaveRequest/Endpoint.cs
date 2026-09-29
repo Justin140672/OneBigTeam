@@ -20,8 +20,6 @@ internal sealed class Endpoint(
         SubmitLeaveRequestRequest request,
         CancellationToken cancellationToken)
     {
-        // LEAVE-01: submitting leave is self-service only — an employee can never submit on
-        // behalf of another employee. HR Administrators retain the override.
         if (currentUser.UserId is not { } callerId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());

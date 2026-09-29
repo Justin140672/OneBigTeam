@@ -21,9 +21,6 @@ public class AuditOutboxMetadataTests
 
     private sealed record TestOutboxIntegrationEvent(Guid Marker) : IIntegrationEvent;
 
-    // Captures whatever execution context is ambient (via the supplied accessor) at the moment it
-    // is asked to publish — used to observe what DispatchPendingAsync restored as ambient for the
-    // duration of a single entry's redelivery.
     private sealed class ContextCapturingIntegrationEventPublisher(IExecutionContextAccessor accessor) : IIntegrationEventPublisher
     {
         public IExecutionContext? ObservedDuringLastPublish { get; private set; }
@@ -54,7 +51,6 @@ public class AuditOutboxMetadataTests
             .UseInMemoryDatabase(dbName)
             .Options);
 
-    // ── EnqueueIntegrationOutbox: stamping from ambient context ─────────────────────
 
     [Fact]
     public async Task EnqueueIntegrationOutbox_With_Ambient_Context_Stamps_CorrelationId_And_CausationId_From_It()
@@ -110,9 +106,6 @@ public class AuditOutboxMetadataTests
             new TestOutboxIntegrationEvent(Guid.NewGuid()), companyId, Now, executionContextAccessor: null);
         await context.SaveChangesAsync();
 
-        // MessageId is always minted fresh regardless of ambient context (every outbox row needs its
-        // own stable identity for tracing/redelivery) - only Correlation/CausationId depend on what,
-        // if anything, is ambient.
         var entry = await context.AuditOutboxEntries.SingleAsync();
         Assert.Null(entry.CorrelationId);
         Assert.Null(entry.CausationId);
@@ -125,7 +118,7 @@ public class AuditOutboxMetadataTests
     {
         var dbName = Guid.NewGuid().ToString("N");
         await using var context = BuildContext(dbName);
-        var accessor = new ExecutionContextAccessor(); // nothing pushed
+        var accessor = new ExecutionContextAccessor();
         var companyId = Guid.NewGuid();
 
         context.AuditOutboxEntries.EnqueueIntegrationOutbox(
@@ -139,7 +132,6 @@ public class AuditOutboxMetadataTests
         Assert.NotEqual(Guid.Empty, entry.MessageId!.Value);
     }
 
-    // ── DispatchPendingAsync: restoring persisted context across a simulated restart ─
 
     [Fact]
     public async Task DispatchPendingAsync_Restores_Persisted_CorrelationId_CausationId_And_MessageId_Across_A_Simulated_Restart()
@@ -150,7 +142,6 @@ public class AuditOutboxMetadataTests
         Guid stagedCausationId;
         Guid stagedMessageId;
 
-        // --- "Process 1": stage the entry with an ambient context, then commit and go away. ---
         await using (var firstProcessContext = BuildContext(dbName))
         {
             var firstAccessor = new ExecutionContextAccessor();
@@ -169,8 +160,6 @@ public class AuditOutboxMetadataTests
             stagedMessageId = staged.MessageId!.Value;
         }
 
-        // --- "Process 2" (simulated restart): brand-new accessor/context/publisher instances,
-        // nothing held in memory from process 1 — everything is read back from the DB row. ---
         await using var secondProcessContext = BuildContext(dbName);
         var secondAccessor = new ExecutionContextAccessor();
         var capturingPublisher = new ContextCapturingIntegrationEventPublisher(secondAccessor);
@@ -187,8 +176,6 @@ public class AuditOutboxMetadataTests
 
         Assert.NotNull(capturingPublisher.ObservedDuringLastPublish);
         var restored = capturingPublisher.ObservedDuringLastPublish!;
-        // Restored context's CorrelationId is the string form of the persisted Guid (see
-        // ExecutionContextInfo.Restore / DbSetAuditOutboxExtensions.DispatchPendingAsync).
         Assert.Equal(stagedCorrelationId.ToString("D"), restored.CorrelationId);
         Assert.Equal(stagedCausationId, restored.CausationId);
         Assert.Equal(stagedMessageId, restored.MessageId);
@@ -204,8 +191,6 @@ public class AuditOutboxMetadataTests
         var dbName = Guid.NewGuid().ToString("N");
         await using var context = BuildContext(dbName);
 
-        // Simulate a row written before the metadata columns existed — added directly, bypassing
-        // EnqueueIntegrationOutbox, so Correlation/Causation/MessageId are all null.
         context.AuditOutboxEntries.Add(new AuditOutboxEntry
         {
             Id = Guid.NewGuid(),
@@ -238,7 +223,6 @@ public class AuditOutboxMetadataTests
         var dispatched = await context.AuditOutboxEntries.SingleAsync();
         Assert.NotNull(dispatched.DispatchedAt);
 
-        // Legacy row falls back to a fresh root context rather than throwing.
         Assert.NotNull(capturingPublisher.ObservedDuringLastPublish);
         Assert.Equal(ExecutionOrigin.ReconciliationJob, capturingPublisher.ObservedDuringLastPublish!.Origin);
         Assert.Null(capturingPublisher.ObservedDuringLastPublish.CausationId);

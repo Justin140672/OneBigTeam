@@ -9,12 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Web.Tests;
 
-/// <summary>
-/// [P2] Content Security Policy — boots the real HR.Web pipeline (Program.cs) in-memory and asserts
-/// that the header is present on every kind of response (Razor page, static asset, minimal-API page,
-/// re-executed 404 and exception pages, redirects), that each response gets a fresh nonce, and that
-/// the nonce is applied to every inline script HR.Web emits (App.razor and the auth hand-off pages).
-/// </summary>
 public sealed partial class HrWebContentSecurityPolicyPipelineTests : IDisposable
 {
     private const string ProductionHost = "app.onebigteam.example";
@@ -58,14 +52,12 @@ public sealed partial class HrWebContentSecurityPolicyPipelineTests : IDisposabl
 
     public static TheoryData<string, HttpStatusCode> ProductionResponses => new()
     {
-        { "/login", HttpStatusCode.OK },                                   // Razor page (App.razor)
-        { "/app.js", HttpStatusCode.OK },                                  // static asset (MapStaticAssets)
-        { "/verify-email", HttpStatusCode.OK },                            // minimal-API inline-script page
+        { "/login", HttpStatusCode.OK },
+        { "/app.js", HttpStatusCode.OK },
+        { "/verify-email", HttpStatusCode.OK },
         { "/reset-password", HttpStatusCode.OK },
         { "/platform-admin/activate", HttpStatusCode.OK },
-        { "/this/route/does/not/exist", HttpStatusCode.NotFound },         // re-executed /not-found page
-        // Unhandled exception → UseExceptionHandler re-executes /Error. That page inherits Pages/_Imports'
-        // [Authorize], so for this anonymous request the re-execution is challenged to /login (302).
+        { "/this/route/does/not/exist", HttpStatusCode.NotFound },
         { ThrowPath, HttpStatusCode.Found },
     };
 
@@ -150,7 +142,6 @@ public sealed partial class HrWebContentSecurityPolicyPipelineTests : IDisposabl
         Assert.All(inlineScripts, attrs =>
         {
             var attrNonce = NonceAttribute().Match(attrs).Groups["nonce"].Value;
-            // Blazor HTML-encodes '+' as &#x2B; in attribute values; unescape it.
             attrNonce = System.Net.WebUtility.HtmlDecode(attrNonce);
             Assert.Equal(nonce, attrNonce);
         });
@@ -222,14 +213,10 @@ public sealed partial class HrWebContentSecurityPolicyPipelineTests : IDisposabl
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             builder.UseEnvironment(environment);
-            // HR.Web resolves the hrapi base address from Aspire service discovery config; nothing in
-            // these tests reaches it (a dead local port keeps any accidental call fast and offline).
             builder.UseSetting("services:api:http:0", "http://127.0.0.1:9");
             builder.UseSetting("ContentSecurityPolicy:ImageOrigins:0", SupabaseOrigin);
             builder.UseSetting("ContentSecurityPolicy:ReportOnly", reportOnly ? "true" : "false");
 
-            // Appended after HR.Web's own pipeline, so it only runs for a request no endpoint handled:
-            // throws for ThrowPath to exercise UseExceptionHandler("/Error") re-execution.
             builder.ConfigureServices(services => services.AddTransient<Microsoft.AspNetCore.Hosting.IStartupFilter, ThrowingStartupFilter>());
         }
     }

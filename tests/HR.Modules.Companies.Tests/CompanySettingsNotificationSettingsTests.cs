@@ -27,7 +27,6 @@ public class CompanySettingsNotificationSettingsTests
     [Fact]
     public void UpdateNotificationSettings_Sets_Only_EmailNotificationsEnabled_False_When_ScheduledRemindersEnabled_Is_True()
     {
-        // Covers the negated branch of each independent bool flag.
         var settings = CompanySettings.CreateDefault(Guid.NewGuid(), DateTimeOffset.UtcNow);
 
         settings.UpdateNotificationSettings(false, true, DateTimeOffset.UtcNow);

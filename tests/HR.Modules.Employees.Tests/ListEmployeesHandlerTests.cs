@@ -76,7 +76,7 @@ public class ListEmployeesHandlerTests
         Assert.True(result.IsSuccess);
         var items = result.Value!.Items;
         Assert.Equal("Jones", items[0].LastName);
-        Assert.Equal("Alice", items[1].FirstName);  // Smith, Alice before Smith, Bob
+        Assert.Equal("Alice", items[1].FirstName);
         Assert.Equal("Bob", items[2].FirstName);
     }
 
@@ -340,7 +340,6 @@ public class ListEmployeesHandlerTests
         Assert.Equal(2, page1.Value.Items.Count);
         Assert.Equal(2, page2.Value!.Items.Count);
 
-        // No overlap between pages
         var page1Ids = page1.Value.Items.Select(i => i.Id).ToHashSet();
         Assert.DoesNotContain(page2.Value.Items, i => page1Ids.Contains(i.Id));
     }
@@ -385,7 +384,6 @@ public class ListEmployeesHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        // No entry seeded in FakeEmployeeUserAccountStatusReader for this employee.
         var handler = new ListEmployeesHandler(context, new FakeProfilePhotoReader(), new FakeEmployeeUserAccountStatusReader());
 
         var result = await handler.HandleAsync(

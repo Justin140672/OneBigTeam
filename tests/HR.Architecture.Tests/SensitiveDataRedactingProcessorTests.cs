@@ -4,11 +4,6 @@ using Microsoft.Extensions.Hosting;
 
 namespace HR.Architecture.Tests;
 
-/// <summary>
-/// NFR-01: the OpenTelemetry span processor must strip sensitive values from span tags before
-/// they are exported — redacting whole values for prohibited tag names and scrubbing
-/// sensitive-looking tokens from other tag values.
-/// </summary>
 public class SensitiveDataRedactingProcessorTests
 {
     private static Activity StartActivity()

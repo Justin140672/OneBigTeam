@@ -34,33 +34,11 @@ internal static class SharedAppFixture
         {
             if (_instance is null)
             {
-                // Started before InitializeAsync so we also capture the app/Postgres boot itself, not
-                // just steady-state test execution — see ResourceSampler's remarks for why this exists.
                 ResourceSampler.StartOnce();
 
                 var candidate = new AppFixture();
-                // Only publish to the static field once InitializeAsync has actually succeeded. If it
-                // throws (a transient Aspire/Postgres/Chromium startup failure), the caller that
-                // triggered it fails loudly as expected, but _instance must stay null so the NEXT
-                // caller gets a fresh attempt instead of permanently inheriting a half-initialized
-                // instance (WebBaseUrl/Browser etc. still unset) — that previously cascaded into a
-                // NullReferenceException for every other test in the run, since nothing ever retried.
                 await candidate.InitializeAsync();
 
-                // Pre-warm all 4 canonical personas' real logins SERIALLY, right here, before
-                // publishing _instance — every one of the ~170 role-fixed test classes blocks on this
-                // same _gate via RolePersonaFixtureBase.InitializeAsync -> AcquireAsync, so nothing else
-                // can even reach PersonaLoginCache until this finishes. That turns what used to be a
-                // run-start stampede (dozens of classes, overwhelmingly laura.bennett's ~110, all
-                // racing PersonaLoginCache.GetOrLoginAsync the instant they unblock) into 4 sequential,
-                // uncontended real logins against an otherwise-idle app. Several rounds of patching the
-                // stampede's SYMPTOMS (widening app-shell wait timeouts, coalescing racing
-                // invalidate+relogin callers) each helped but never fully closed it, because they were
-                // all reacting to contention after the fact instead of removing the concurrent race that
-                // causes it. This removes the race itself: by the time _gate is released and every
-                // waiting class's InitializeAsync resumes, PersonaLoginCache already holds a good,
-                // unstale entry for all 4 personas, so essentially no test should ever need a real login
-                // (or the invalidate+relogin path) again for the rest of the run.
                 foreach (var personaEmail in new[]
                 {
                     "laura.bennett@acme.example",

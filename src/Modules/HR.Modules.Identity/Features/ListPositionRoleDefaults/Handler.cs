@@ -5,10 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Features.ListPositionRoleDefaults;
 
-// IAM-03: lists every active position profile in the company (via IPositionProfileReader — the
-// authoritative source, owned by HR.Modules.Employees) alongside whatever default RoleIds have
-// been configured for it in identity.position_roles (empty list if none configured yet). This is
-// the read side administrators use before calling Features/SetPositionRoleDefaults.
 internal sealed class ListPositionRoleDefaultsHandler(
     IdentityDbContext db,
     IPositionProfileReader positionProfileReader)

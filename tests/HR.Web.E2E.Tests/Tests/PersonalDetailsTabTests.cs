@@ -4,12 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the Personal Details tab on the self-service My Profile page:
-/// - Read-only view of personal data
-/// - Submitting a change request shows a success banner
-/// - Empty submission shows a validation error
-/// </summary>
 public sealed class PersonalDetailsTabTests(EmployeePersonaFixture fixture) : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -34,7 +28,6 @@ public sealed class PersonalDetailsTabTests(EmployeePersonaFixture fixture) : Ro
         Assert.True(await personalDetails.IsVisibleAsync(),
             "Expected the Personal Details card to render");
 
-        // The seeded first name is "Tom" and last name is "Williams".
         var firstName = await personalDetails.GetDetailAsync("First Name");
         Assert.False(string.IsNullOrWhiteSpace(firstName),
             "Expected First Name to be displayed");
@@ -62,15 +55,12 @@ public sealed class PersonalDetailsTabTests(EmployeePersonaFixture fixture) : Ro
         await profile.OpenPersonalDetailsTabAsync();
         await personalDetails.WaitForLoadAsync();
 
-        // Open the "Request Change" dialog.
         await personalDetails.ClickRequestChangeAsync();
         Assert.True(await personalDetails.IsDialogOpenAsync());
 
-        // Fill notes and submit.
         await personalDetails.FillChangeRequestNotesAsync(notes);
         await personalDetails.SubmitChangeRequestAsync();
 
-        // Dialog closes and success banner appears.
         Assert.False(await personalDetails.IsDialogOpenAsync(),
             "Dialog should be closed after successful submission");
         Assert.True(await personalDetails.IsSuccessBannerVisibleAsync(),
@@ -94,7 +84,6 @@ public sealed class PersonalDetailsTabTests(EmployeePersonaFixture fixture) : Ro
         await personalDetails.ClickRequestChangeAsync();
         Assert.True(await personalDetails.IsDialogOpenAsync());
 
-        // Cancel should close the dialog without submitting.
         await personalDetails.CancelChangeRequestAsync();
 
         await _page.WaitForSelectorAsync(".e-dialog",
@@ -103,7 +92,6 @@ public sealed class PersonalDetailsTabTests(EmployeePersonaFixture fixture) : Ro
         Assert.False(await personalDetails.IsDialogOpenAsync(),
             "Dialog should be closed after cancelling");
 
-        // No success banner should appear.
         Assert.False(await personalDetails.IsSuccessBannerVisibleAsync(),
             "No success banner should appear when the request was cancelled");
     }

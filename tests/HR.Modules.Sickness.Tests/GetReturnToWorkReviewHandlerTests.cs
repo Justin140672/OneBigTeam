@@ -131,7 +131,6 @@ public class GetReturnToWorkReviewHandlerTests
         db.ReturnToWorkReviews.Add(review);
         await db.SaveChangesAsync();
 
-        // Manager's reporting hierarchy does not include this review's employee.
         var handler = new GetReturnToWorkReviewHandler(db, BuildManagerAuthorizer(Guid.NewGuid()));
         var result = await handler.HandleAsync(
             new GetReturnToWorkReviewRequest { CompanyId = companyId, ReviewId = review.Id },

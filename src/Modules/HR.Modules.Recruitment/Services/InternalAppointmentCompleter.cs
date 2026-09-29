@@ -30,10 +30,6 @@ internal sealed class InternalAppointmentCompleter(
             .Select(s => (Guid?)s.Id)
             .SingleOrDefaultAsync(cancellationToken);
 
-    /// <summary>
-    /// Completes a Pending appointment on a tracked <paramref name="application"/>. Nothing is
-    /// published unless the save commits; a concurrency conflict leaves the application Pending.
-    /// </summary>
     public async Task<Result> CompleteAsync(
         Application application,
         Guid hiredStageId,

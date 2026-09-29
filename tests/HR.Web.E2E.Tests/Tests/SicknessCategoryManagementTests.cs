@@ -68,7 +68,6 @@ public sealed class SicknessCategoryManagementTests(HrAdminPersonaFixture fixtur
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Create first so we have a category to edit.
         await catList.GoToAsync(AcmeId);
         await catList.ClickNewAsync();
         await catEdit.FillNameAsync(originalName);
@@ -78,10 +77,8 @@ public sealed class SicknessCategoryManagementTests(HrAdminPersonaFixture fixtur
         Assert.True(await catList.HasItemAsync(originalName),
             $"Pre-condition: expected '{originalName}' to appear in the list.");
 
-        // Edit the category via the link in the grid.
         await catList.ClickEditAsync(originalName);
 
-        // Clear the name field and type the new name.
         var nameInput = _page.GetByPlaceholder("e.g. Cold, Stress, Back Pain");
         await nameInput.ClearAsync();
         await nameInput.FillAsync(updatedName);
@@ -106,7 +103,6 @@ public sealed class SicknessCategoryManagementTests(HrAdminPersonaFixture fixtur
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Create the category to delete.
         await catList.GoToAsync(AcmeId);
         await catList.ClickNewAsync();
         await catEdit.FillNameAsync(catName);
@@ -120,8 +116,6 @@ public sealed class SicknessCategoryManagementTests(HrAdminPersonaFixture fixtur
 
         await catList.DeleteAsync(catName);
 
-        // "Delete" is a soft-deactivate. The list defaults to active-only, so the row
-        // disappears until "Show Inactive" is toggled — then it reappears as Inactive.
         Assert.False(await catList.HasItemAsync(catName),
             $"Expected '{catName}' to no longer appear in the default active-only view after deletion.");
 
@@ -142,9 +136,6 @@ public sealed class SicknessCategoryManagementTests(HrAdminPersonaFixture fixtur
         await login.LoginAsync(TomEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/sickness-categories");
-        // See E2ETestBase.WaitForUrlToStopContainingAsync's doc comment: the redirect is a
-        // client-side Blazor NavigateTo, not a full page navigation, so NetworkIdle after the
-        // initial GET is not a reliable signal that the redirect has completed.
         await WaitForUrlToStopContainingAsync("/sickness-categories");
 
         var finalUrl = _page.Url;

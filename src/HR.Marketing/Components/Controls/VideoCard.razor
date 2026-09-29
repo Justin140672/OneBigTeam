@@ -24,7 +24,6 @@
 </div>
 
 @code {
-    /// <summary>YouTube video id. Leave null until a real recording exists — renders an honest pending state instead of a fake/broken player.</summary>
     [Parameter] public string? YouTubeId { get; set; }
 
     [Parameter, EditorRequired] public string Title { get; set; } = "";

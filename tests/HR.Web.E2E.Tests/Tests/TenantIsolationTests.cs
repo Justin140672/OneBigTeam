@@ -4,18 +4,12 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies that a Company 1 (Acme) user cannot see tasks, notifications, or task detail
-/// pages that belong to Company 2 (Beta Corp).
-/// </summary>
 public sealed class TenantIsolationTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
-    // ── Company 1 — Acme Corporation ─────────────────────────────────────────
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid JamesId = Guid.Parse("30000000-0000-0000-0000-000000000002");
     private const string JamesEmail = "james.okafor@acme.example";
 
-    // ── Company 2 — Beta Corp ────────────────────────────────────────────────
     private static readonly Guid BetaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
     private static readonly Guid AliceId    = Guid.Parse("30000000-0000-0000-0000-000000000011");
     private static readonly Guid BobId      = Guid.Parse("30000000-0000-0000-0000-000000000012");
@@ -36,7 +30,6 @@ public sealed class TenantIsolationTests(CrossUserFixture fixture) : RoleE2ETest
         var notif       = new NotificationPanel(_page);
         var taskView    = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
-        // ── Step 1: Login as Bob (Beta Corp employee) and submit leave ─────────
         await login.GoToAsync();
         await login.LoginAsync(BobEmail);
 
@@ -49,9 +42,6 @@ public sealed class TenantIsolationTests(CrossUserFixture fixture) : RoleE2ETest
         await _page.WaitForSelectorAsync("table tbody tr", new() { Timeout = 15_000 });
         Assert.Equal("Pending", await profile.GetLeaveRequestStatusAsync(reason));
 
-        // ── Step 2: Login as Alice (Beta Corp manager) and open the task ──────
-        // Uses Alice's own profile Tasks tab — the role-agnostic replacement for the old
-        // dashboard "My Tasks" widget (MyTasksWidget.razor), which is dead code now.
         await login.SwitchAccountAsync(AliceEmail);
 
         await aliceProfile.GoToAsync(BetaCorpId, AliceId);
@@ -60,16 +50,12 @@ public sealed class TenantIsolationTests(CrossUserFixture fixture) : RoleE2ETest
         Assert.Contains(aliceTasks, t => t.Contains("Bob Taylor", StringComparison.OrdinalIgnoreCase)
                                       || t.Contains("leave", StringComparison.OrdinalIgnoreCase));
 
-        // Open the task dialog — there is no longer a standalone task URL to capture
-        // (TaskViewDialog opens in place), so the cross-tenant check below (step 6)
-        // instead targets Bob's profile URL directly.
         await aliceProfile.ClickTaskAsync("Bob Taylor");
         await taskView.WaitForLoadedAsync();
 
         Assert.Contains("Bob Taylor", await taskView.GetTitleAsync(), StringComparison.OrdinalIgnoreCase);
         Assert.True(await taskView.HasLeaveReviewPanelAsync());
 
-        // ── Step 3: Login as James (Acme manager) ────────────────────────────
         await login.SwitchAccountAsync(JamesEmail);
 
         // ── Step 4: James's own task list must NOT contain Bob's task ─────────
@@ -82,7 +68,6 @@ public sealed class TenantIsolationTests(CrossUserFixture fixture) : RoleE2ETest
         // ── Step 5: Notification bell must NOT show Beta Corp notification ────
         var unread = await notif.GetUnreadCountAsync();
 
-        // If there are any notifications, none should mention Bob Taylor.
         if (unread > 0)
         {
             await notif.OpenAsync();
@@ -92,10 +77,6 @@ public sealed class TenantIsolationTests(CrossUserFixture fixture) : RoleE2ETest
             await notif.CloseAsync();
         }
 
-        // ── Step 6: James cannot navigate to Bob's profile URL either ─────────
-        // There is no longer a standalone task detail URL to attack directly (TaskViewDialog
-        // opens in place from the owning employee's own profile Tasks tab), so the remaining
-        // cross-tenant attack surface is the profile URL itself.
         await _page.GotoAsync(
             $"{_fixture.WebBaseUrl}/companies/{BetaCorpId}/employees/{BobId}/profile");
 

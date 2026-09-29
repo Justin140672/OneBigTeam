@@ -48,8 +48,6 @@ internal sealed class OperationalAlertEmailDeliveryConfiguration : IEntityTypeCo
             .HasColumnName("created_at")
             .IsRequired();
 
-        // Follow-up E: bounded ownership lease taken before the Postmark call — see
-        // OperationalAlertEmailDelivery.Claim. Null whenever no worker is mid-send.
         builder.Property(e => e.LeaseOwnerToken)
             .HasColumnName("lease_owner_token");
 
@@ -59,14 +57,10 @@ internal sealed class OperationalAlertEmailDeliveryConfiguration : IEntityTypeCo
         builder.Property(e => e.LeaseExpiresAt)
             .HasColumnName("lease_expires_at");
 
-        // Follow-up C: one delivery row per alert — the idempotency key that stops a duplicate email.
         builder.HasIndex(e => e.AlertId).IsUnique();
 
-        // Follow-up E: the reconciliation sweep scans by status (stale Pending / lease-expired Sending).
         builder.HasIndex(e => e.Status);
 
-        // Optimistic concurrency guard against two concurrent executions of the same send job
-        // (ordinary retry racing a reconciliation, etc.) — the loser backs off as a no-op.
         builder.Property<uint>("xmin")
             .HasColumnName("xmin")
             .HasColumnType("xid")

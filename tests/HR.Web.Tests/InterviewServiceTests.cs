@@ -7,7 +7,6 @@ namespace HR.Web.Tests;
 
 public class InterviewServiceTests
 {
-    // ── GetInterviewsTodayCountAsync (representative read) ───────────────────────
 
     [Fact]
     public async Task GetInterviewsTodayCountAsync_Returns_Value_When_Api_Returns_Ok()
@@ -55,7 +54,6 @@ public class InterviewServiceTests
             () => service.GetInterviewsTodayCountAsync(Guid.NewGuid(), cts.Token));
     }
 
-    // ── ScheduleInterviewAsync (write) ───────────────────────────────────────────
 
     [Fact]
     public async Task ScheduleInterviewAsync_Returns_Result_When_Api_Returns_Created()
@@ -110,7 +108,6 @@ public class InterviewServiceTests
         Assert.NotNull(error);
     }
 
-    // ── RecordInterviewOutcomeAsync (write) ──────────────────────────────────────
 
     [Fact]
     public async Task RecordInterviewOutcomeAsync_Returns_Failure_When_Api_Returns_Conflict()

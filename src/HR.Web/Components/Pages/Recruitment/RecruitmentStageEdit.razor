@@ -112,9 +112,6 @@
         : Model.Name.Trim().Length > 0 ? Model.Name
         : IsViewMode ? "View Recruitment Stage" : "Edit Recruitment Stage";
 
-    // Required dropdown — no ShowClearButton/"None" clear affordance, per this codebase's
-    // convention for required fields. "None" is instead a genuine, explicit list item here since
-    // it's a real, meaningful value (a non-terminal stage), not a placeholder for "unset".
     private static readonly Option[] _terminalOutcomeOptions =
     [
         new(RecruitmentStageTerminalOutcome.None, "None"),
@@ -122,8 +119,6 @@
         new(RecruitmentStageTerminalOutcome.Rejected, "Rejected"),
     ];
 
-    // Optional dropdown — "None" (null) is an explicit, meaningful list item ("no metric meaning"),
-    // not a placeholder, so no ShowClearButton, per this codebase's dropdown convention.
     private static readonly PurposeOption[] _purposeOptions =
     [
         new(null, "None"),
@@ -138,9 +133,6 @@
 
     protected override string? ListUrl => $"/companies/{CompanyId}/recruitment-stages";
 
-    // Recruiter-only, matching RecruitmentStageList.razor's guard and the backend's
-    // recruitment:manage policy — this page previously had no client-side check at all, so anyone
-    // could reach it directly by URL even though the list page and dashboard button were gated.
     protected override Task OnLoadedAsync()
     {
         if (!Session.CanManageRecruitment)

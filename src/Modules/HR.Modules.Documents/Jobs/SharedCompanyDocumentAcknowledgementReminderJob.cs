@@ -27,9 +27,6 @@ internal sealed class SharedCompanyDocumentAcknowledgementReminderJob(
         var now = clock.UtcNowOffset();
         var today = DateOnly.FromDateTime(now.UtcDateTime);
 
-        // Only Published documents are considered — an Archived document is the closest thing
-        // this codebase has to a "cancelled assignment", and skipping it here means reminders
-        // stop automatically without needing any cross-module Tasks-state changes.
         var documents = await db.SharedCompanyDocuments
             .AsNoTracking()
             .Where(d => d.Status == SharedCompanyDocumentStatus.Published &&
@@ -59,20 +56,10 @@ internal sealed class SharedCompanyDocumentAcknowledgementReminderJob(
             var reminderIntervalDays = await acknowledgementSettingsReader.GetReminderIntervalDaysAsync(
                 document.CompanyId, CancellationToken.None);
 
-            // Overdue employees are escalated to their manager (one notification per manager per
-            // document, listing all their overdue direct reports for that document) — collected
-            // here as we walk the outstanding list below, then sent once after the per-employee loop.
             var overdueEmployeeIds = new List<Guid>();
 
             foreach (var employeeId in outstandingEmployeeIds)
             {
-                // An employee who does not yet have an open Acknowledge task for this document has
-                // not yet been engaged — this is the reconciliation path: it covers anyone whose
-                // department/location/position change (or an audience-rule edit, or being newly
-                // hired) brought them into the audience after Publish/UploadSharedCompanyDocumentVersion
-                // already ran their one-time task-creation loop. They get their task and first
-                // notice on this run, regardless of how far the due date is — not deferred until
-                // the due-soon window below.
                 var existingTaskId = await openTaskReader.GetOpenTaskIdForAssigneeAsync(
                     document.CompanyId, document.Id, employeeId, TaskActionType.Acknowledge, CancellationToken.None);
 
@@ -103,12 +90,6 @@ internal sealed class SharedCompanyDocumentAcknowledgementReminderJob(
                     alreadyEngaged = true;
                 }
 
-                // Overdue always fires once the due date has passed. The reminder fires immediately
-                // for a never-before-engaged employee (rather than waiting for the window below) —
-                // this both gives prompt notice to anyone newly brought into the audience (department/
-                // location/position change, new hire, or an audience-rule edit) and closes a
-                // duplicate-task hole: without it, "alreadyEngaged" would stay false and a task would
-                // be created again on every subsequent run until the window was finally reached.
                 if (dueDate < today)
                 {
                     overdueEmployeeIds.Add(employeeId);
@@ -144,10 +125,6 @@ internal sealed class SharedCompanyDocumentAcknowledgementReminderJob(
         }
     }
 
-    // One notification per manager per document, listing all of that manager's overdue direct
-    // reports for this document — not one notification per (manager, report) pair. Dedup/interval
-    // is keyed on document.Id rather than a task id, since a manager has no Acknowledge task of
-    // their own to key on.
     private async Task EscalateToManagersAsync(
         SharedCompanyDocument document,
         IReadOnlyList<Guid> overdueEmployeeIds,
@@ -205,10 +182,6 @@ internal sealed class SharedCompanyDocumentAcknowledgementReminderJob(
         }
     }
 
-    // Dedup is keyed on (employeeId, taskId, type), where taskId is the per-employee Acknowledge
-    // task's own id — stable across job runs since a task isn't recreated once it exists, only its
-    // notifications repeat. A reminder/overdue notification for a given employee+document can be
-    // re-sent once the configured interval has elapsed since the last one, but not before.
     private async Task SendIfIntervalElapsedAsync(
         SharedCompanyDocument document,
         Guid employeeId,

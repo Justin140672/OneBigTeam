@@ -7,13 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Follow-up D: an organisation data export is owned by exactly one worker at a time via a renewable
-/// lease. These tests prove, against the real database and the real
-/// <see cref="IOrganisationDataExportJobStore"/>, that a healthy long-running build keeps ownership,
-/// and that a superseded worker can neither fail nor publish the export once a replacement has taken
-/// over.
-/// </summary>
 [Collection("Integration")]
 public class OrganisationDataExportOwnershipTests
 {
@@ -36,12 +29,9 @@ public class OrganisationDataExportOwnershipTests
 
             Assert.True(await store.BeginAttemptAsync(exportId, tokenA, CancellationToken.None));
 
-            // Simulate a build that runs well past the 15-minute lease window: the worker heartbeats
-            // repeatedly and each renewal must succeed.
             for (var i = 0; i < 5; i++)
                 Assert.True(await store.RenewLeaseAsync(exportId, tokenA, CancellationToken.None));
 
-            // While the lease is live the recovery sweep must never see the row as recoverable.
             var now = DateTimeOffset.UtcNow;
             var recoverable = await store.GetRecoverableAsync(now, now, CancellationToken.None);
             Assert.DoesNotContain(exportId, recoverable.Select(r => r.Id));
@@ -129,10 +119,8 @@ public class OrganisationDataExportOwnershipTests
 
             Assert.True(await store.BeginAttemptAsync(exportId, tokenB, CancellationToken.None));
 
-            // Replacement worker B finishes the job.
             Assert.True(await store.MarkCompletedAsync(exportId, tokenB, keyB, 8192, CancellationToken.None));
 
-            // Original worker A wakes up and tries to carry on.
             Assert.False(await store.RenewLeaseAsync(exportId, tokenA, CancellationToken.None));
             Assert.False(await store.MarkCompletedAsync(
                 exportId, tokenA, $"organisation-exports/{companyId}/{exportId}/{tokenA}.zip", 4096, CancellationToken.None));
@@ -159,10 +147,6 @@ public class OrganisationDataExportOwnershipTests
         return export.Id;
     }
 
-    /// <summary>
-    /// Seed an export already claimed by <paramref name="ownerToken"/> whose 15-minute lease is long
-    /// expired (claimed 40 minutes ago), so a replacement worker can immediately take over.
-    /// </summary>
     private async Task<Guid> SeedInProgressWithExpiredLeaseAsync(Guid companyId, Guid ownerToken)
     {
         using var scope = _factory.Services.CreateScope();

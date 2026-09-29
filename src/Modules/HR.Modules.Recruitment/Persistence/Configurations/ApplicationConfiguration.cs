@@ -187,8 +187,6 @@ internal sealed class ApplicationConfiguration : IEntityTypeConfiguration<Applic
         builder.HasIndex(a => a.SourceExternalRecruiterId);
         builder.HasIndex(a => a.CurrentStageId);
 
-        // Supports the FK (restrict-delete checks and "which applications reference this CV?"
-        // lookups in DeleteCandidateDocument). Partial: most historic rows have no CV reference.
         builder.HasIndex(a => new { a.CvDocumentId, a.CandidateId, a.CompanyId })
             .HasDatabaseName("ix_applications_cv_document_id")
             .HasFilter("cv_document_id IS NOT NULL");

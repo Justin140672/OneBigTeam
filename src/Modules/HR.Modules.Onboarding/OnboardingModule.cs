@@ -54,17 +54,6 @@ public static class OnboardingModule
         return app;
     }
 
-    /// <summary>
-    /// E2E-only: gives each supplied employee a NotStarted <see cref="Domain.OnboardingPlan"/>
-    /// with the three default checklist tasks — exactly mirroring the fallback (no linked
-    /// onboarding template) path of
-    /// <see cref="Features.CreateOnboardingPlanOnEmployeeCreated.EmployeeCreatedHandler"/> for an
-    /// employee created with no manager: same three OnboardingTask rows AND the three matching
-    /// unassigned Tasks-module tasks (so they surface in the HR Inbox just as they would for a
-    /// UI-created employee). Employees seeded directly by the Employees module bypass that handler
-    /// entirely, so tests covering the employee Onboarding tab / onboarding-task completion need
-    /// this. Idempotent per employee.
-    /// </summary>
     public static async Task SeedE2eOnboardingPlansAsync(
         this IServiceProvider services,
         IEnumerable<(Guid CompanyId, Guid EmployeeId, DateOnly StartDate, string EmployeeName)> employees)
@@ -101,8 +90,6 @@ public static class OnboardingModule
                     Guid.NewGuid(), companyId, plan.Id, d.Title, d.Description, d.AssignTo, d.Due, now);
                 db.OnboardingTasks.Add(onboardingTask);
 
-                // No-manager employee => every default checklist task is unassigned (lands in the
-                // HR Inbox), matching EmployeeCreatedHandler's behaviour for a manager-less hire.
                 await taskCreator.CreateAsync(
                     companyId,
                     createdBy:          employeeId,

@@ -38,7 +38,6 @@ public class RequestAdditionalEmployeeDocumentHandlerTests
         return dt;
     }
 
-    // ── Happy path ───────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Returns_Success_With_Created_Request()
@@ -161,7 +160,6 @@ public class RequestAdditionalEmployeeDocumentHandlerTests
         Assert.Equal("Certificate", evt.DocumentTypeName);
     }
 
-    // ── Failure paths ────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_DocumentType_Does_Not_Exist()
@@ -207,7 +205,6 @@ public class RequestAdditionalEmployeeDocumentHandlerTests
         var employeeId     = Guid.NewGuid();
         var docType        = await SeedDocumentTypeAsync(db, companyId);
 
-        // Seed an existing request for the same employee+type
         db.DocumentRequests.Add(DocumentRequest.Create(
             Guid.NewGuid(), companyId, employeeId, docType.Id,
             null, null, false, null, null, DateTimeOffset.UtcNow));

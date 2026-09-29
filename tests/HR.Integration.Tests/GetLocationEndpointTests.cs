@@ -115,7 +115,6 @@ public class GetLocationEndpointTests
         var created = await createResponse.Content.ReadFromJsonAsync<LocationPayload>();
         Assert.NotNull(created);
 
-        // Authenticated as companyA but route targets companyB — middleware blocks it.
         var response = await client.GetAsync($"/api/companies/{companyB}/locations/{created!.Id}");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);

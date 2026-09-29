@@ -42,8 +42,6 @@ public class GetProbationReportEndpointTests
     [Fact]
     public async Task Get_ProbationReport_Returns_Forbidden_For_EmployeeOnly()
     {
-        // "reporting:view-probation" grants baseline access to Manager or HrAdministrator only —
-        // a plain Employee (no Manager, no HrAdministrator role) is outside the policy entirely.
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee);
@@ -73,9 +71,6 @@ public class GetProbationReportEndpointTests
     [Fact]
     public async Task Get_ProbationReport_Returns_Empty_Not_CompanyWide_For_Manager_With_No_Direct_Reports()
     {
-        // Row-level manager scoping (mirrors GetLeaveSummaryReport): the policy alone grants
-        // baseline access to Manager, but the handler must hard-scope down to the caller's own
-        // direct reports, never fall through to company-wide data.
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Manager);
@@ -109,11 +104,6 @@ public class GetProbationReportEndpointTests
     [Fact]
     public async Task Get_ProbationReport_For_Manager_Includes_Entire_Reporting_Hierarchy_Not_Just_Direct_Reports()
     {
-        // Regression coverage: the handler now scopes a Manager caller to their COMPLETE reporting
-        // hierarchy (via IDirectReportsReader.GetAllDescendantIdsAsync) rather than only direct
-        // reports (GetDirectReportIdsAsync). A 3-level chain — TopManager -> MidManager ->
-        // LeafEmployee — proves the grandchild (2 levels deep) is visible to TopManager even though
-        // LeafEmployee is not TopManager's direct report.
         var companyId = Guid.NewGuid();
         var topManagerId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, topManagerId, SystemRoles.Manager, companyId);

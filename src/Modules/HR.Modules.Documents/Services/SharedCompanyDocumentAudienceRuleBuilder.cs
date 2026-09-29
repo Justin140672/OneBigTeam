@@ -5,12 +5,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Documents.Services;
 
-/// <summary>
-/// Validates a proposed audience (department/location/position/employee id sets) against the
-/// Employees module — every target must exist and belong to the same company — and turns it into
-/// the <see cref="SharedCompanyDocumentAudienceRule"/> rows to persist. Shared by Upload and
-/// UpdateAudience so both apply the exact same validation.
-/// </summary>
 internal sealed class SharedCompanyDocumentAudienceRuleBuilder(IEmployeeAudienceReader audienceReader)
 {
     public async Task<Result<IReadOnlyList<SharedCompanyDocumentAudienceRule>>> BuildAsync(

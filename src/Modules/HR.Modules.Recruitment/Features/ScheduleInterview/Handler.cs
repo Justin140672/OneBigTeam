@@ -81,14 +81,6 @@ internal sealed class ScheduleInterviewHandler(
         var now = clock.UtcNowOffset();
         var expectedVersion = application.Version;
 
-        // Ticket #99 judgement call: interview sub-states (Screening/InterviewScheduled/Interviewed)
-        // no longer exist as separate pipeline stages — "Interview" is just one configurable stage
-        // among however many a company defines, and a company may have zero, one, or several
-        // interview-shaped stages. Scheduling an interview is therefore pure metadata (an Interview
-        // row plus Application.InterviewOutcome defaulting to Pending) and never itself moves
-        // CurrentStageId — moving stage remains an explicit, separate action via
-        // MoveApplicationStage/OfferCandidate/etc. No stage-history entry/integration/audit event is
-        // recorded here, since the stage does not change.
         if (application.InterviewOutcome is null)
             application.SetInterviewOutcome(Domain.InterviewOutcome.Pending, now);
 
@@ -125,9 +117,6 @@ internal sealed class ScheduleInterviewHandler(
                 db.IdempotencyRecords, application, expectedVersion, scope, key, fingerprint!,
                 StatusCodes.Status201Created, response, now, cancellationToken);
 
-            // Lost a race against a concurrent duplicate under the same key - this attempt's
-            // Interview row was rolled back along with it, so skip creating tasks/sending the
-            // notification and hand back the winner's result untouched.
             switch (outcome.Kind)
             {
                 case IdempotencyOutcomeKind.Replayed:
@@ -150,8 +139,6 @@ internal sealed class ScheduleInterviewHandler(
             .Select(c => c.FirstName + " " + c.LastName)
             .SingleOrDefaultAsync(cancellationToken) ?? "the candidate";
 
-        // Pure-display title for task/notification text — not the advert-vs-profile distinction, so
-        // resolved as AdvertTitle ?? PositionProfile.Title, same as the dashboard read features.
         var vacancyFields = await db.Vacancies
             .Where(v => v.Id == application.VacancyId)
             .Select(v => new { v.AdvertTitle, v.PositionProfileId })

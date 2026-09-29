@@ -7,12 +7,6 @@ using Microsoft.Extensions.Configuration;
 
 namespace HR.Modules.Companies.Features.GetCustomerSupportView;
 
-/// <summary>
-/// Same defense-in-depth allow-list gate as GetCustomerDetailsHandler/GetCustomerBillingBreakdownHandler
-/// (see their remarks) — no first-class platform-administrator identity model exists yet, so the
-/// caller's email must additionally appear in the "PlatformAdmin:AllowedEmails" configuration
-/// allow-list.
-/// </summary>
 internal sealed class GetCustomerSupportViewHandler(
     CompaniesDbContext dbContext,
     ICurrentUser currentUser,
@@ -47,13 +41,6 @@ internal sealed class GetCustomerSupportViewHandler(
             .AsNoTracking()
             .SingleOrDefaultAsync(s => s.CompanyId == request.CompanyId, cancellationToken);
 
-        // Sequential, not Task.WhenAll — see GetCustomerDetailsHandler's matching fix/remarks.
-        // activeEmployeeCount/totalEmployeeCount both go through the same scoped
-        // IEmployeeDirectoryReader (one shared EmployeesDbContext), and running them concurrently
-        // throws "A second operation was started on this context instance before a previous
-        // operation completed." Every call here is made sequential rather than reasoning about
-        // exactly which subset shares a DbContext with which — the safest way to rule this whole
-        // class of bug out for this handler.
         var activeEmployeeCount = (await employeeDirectoryReader.GetEmployeeDirectoryAsync(
             company.Id,
             new ReportFilterCriteria(EmployeeStatus: "Active"),

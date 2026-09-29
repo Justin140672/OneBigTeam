@@ -111,14 +111,9 @@ internal sealed class OrganisationDataExportConfiguration : IEntityTypeConfigura
             .IsConcurrencyToken()
             .IsRequired();
 
-        // Reporting's DbContext has no tenant/current-user ctor dependency, so there is no global
-        // query filter here — every handler/reader query filters company_id explicitly. These
-        // indexes back those access paths.
         builder.HasIndex(e => new { e.CompanyId, e.Status });
         builder.HasIndex(e => new { e.CompanyId, e.RequestedAt });
 
-        // Follow-up I: backs the retryable artefact-cleanup job's candidate scan
-        // (terminal exports whose orphan attempt archives have not yet been swept).
         builder.HasIndex(e => new { e.Status, e.AttemptFilesCleanedAt });
 
         // Ticket 3K: back the durable cleanup cursor scan (eligible-now candidates, oldest first).

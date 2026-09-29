@@ -111,7 +111,7 @@ public class DisableUserHandlerTests(IdentityDatabaseFixture fixture)
 
         await using var db2 = fixture.BuildContext();
         var reloaded = await db2.Users.FirstAsync(u => u.Id == userId);
-        Assert.True(reloaded.IsActive); // untouched — guard short-circuited before any read/write
+        Assert.True(reloaded.IsActive);
 
         Assert.Empty(auditPublisher.PublishedEvents);
     }
@@ -142,7 +142,7 @@ public class DisableUserHandlerTests(IdentityDatabaseFixture fixture)
 
         await using var db2 = fixture.BuildContext();
         var reloaded = await db2.Users.FirstAsync(u => u.Id == userId);
-        Assert.True(reloaded.IsActive); // untouched
+        Assert.True(reloaded.IsActive);
     }
 
     [Fact]

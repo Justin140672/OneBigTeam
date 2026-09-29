@@ -72,8 +72,6 @@ internal sealed class ListInternalVacanciesHandler(RecruitmentDbContext db, IPos
         return Result.Success(new ListInternalVacanciesResponse(items));
     }
 
-    // Same definition of "already applied" as the Apply endpoint: any application (in any state) by
-    // the employee's single linked candidate.
     private async Task<HashSet<Guid>> GetAppliedVacancyIdsAsync(
         Guid companyId,
         Guid employeeId,

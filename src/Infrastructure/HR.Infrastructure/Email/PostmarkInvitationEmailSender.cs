@@ -6,10 +6,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Infrastructure.Email;
 
-/// <summary>
-/// Sends employee invitation emails via the Postmark /email/withTemplate endpoint
-/// using the configured <c>user-invitation</c> template alias.
-/// </summary>
 internal sealed class PostmarkInvitationEmailSender : IInvitationEmailSender
 {
     private readonly HttpClient _httpClient;
@@ -88,8 +84,6 @@ internal sealed class PostmarkInvitationEmailSender : IInvitationEmailSender
 
             if (!response.IsSuccessStatusCode)
             {
-                // Stable diagnostics only — never the action URL (invitation token), the recipient
-                // email/name, or Postmark's free-form Message (it can echo the recipient address).
                 var failure = await PostmarkFailure.FromResponseAsync(response, ct);
                 _logger.LogWarning(
                     "Postmark invitation email send failed. StatusCode={StatusCode} PostmarkErrorCode={PostmarkErrorCode} FailureCategory={FailureCategory}",

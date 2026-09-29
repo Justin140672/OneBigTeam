@@ -21,7 +21,6 @@ public class FormTextServiceNormalizationTests
         return new HrApiHttpClientFactory(services.BuildServiceProvider().GetRequiredService<IHttpClientFactory>(), new CircuitSessionState());
     }
 
-    // ── ApplicationService.CreateApplicationAsync ──────────────────────────────
 
     [Fact]
     public async Task CreateApplicationAsync_Trims_Notes_In_Posted_Body()
@@ -47,7 +46,6 @@ public class FormTextServiceNormalizationTests
         Assert.Equal(JsonValueKind.Null, body.GetProperty("notes").ValueKind);
     }
 
-    // ── ApplicationService.RejectCandidateAsync ────────────────────────────────
 
     [Fact]
     public async Task RejectCandidateAsync_Trims_Rejection_Reason_In_Posted_Body()
@@ -73,7 +71,6 @@ public class FormTextServiceNormalizationTests
         Assert.Equal(JsonValueKind.Null, body.GetProperty("rejectionReason").ValueKind);
     }
 
-    // ── AssetService.AssignAssetAsync ──────────────────────────────────────────
 
     [Fact]
     public async Task AssignAssetAsync_Trims_Notes_In_Posted_Body()
@@ -99,7 +96,6 @@ public class FormTextServiceNormalizationTests
         Assert.Equal(JsonValueKind.Null, body.GetProperty("notes").ValueKind);
     }
 
-    // ── AuthService.LoginAsync ──────────────────────────────────────────────────
 
     [Fact]
     public async Task LoginAsync_Trims_Email_But_Preserves_Password_Unchanged_In_Posted_Body()
@@ -115,10 +111,6 @@ public class FormTextServiceNormalizationTests
         Assert.Equal("  s3cret pw  ", body.GetProperty("password").GetString());
     }
 
-    // ── DepartmentService (representative of the reference-data services: AssetCategory,
-    // DocumentType, EmploymentType, LeavePolicy, LeaveType, Location, LocationType,
-    // PublicHoliday, RecruitmentStage, SicknessCategory, Vacancy all follow this same
-    // FormText.Required(name)/FormText.Optional(description) pattern) ────────────────────
 
     [Fact]
     public async Task DepartmentService_CreateAsync_Trims_Name_And_Normalizes_Blank_Description_To_Null()
@@ -150,7 +142,6 @@ public class FormTextServiceNormalizationTests
         Assert.Equal("Formerly HR", body.GetProperty("description").GetString());
     }
 
-    // ── DocumentService.ListSharedCompanyDocumentsAsync search trimming ────────────────
 
     [Fact]
     public async Task ListSharedCompanyDocumentsAsync_Trims_Search_Term_In_Query_String()
@@ -174,7 +165,6 @@ public class FormTextServiceNormalizationTests
         Assert.DoesNotContain("search=", capturing.CapturedRequestUri);
     }
 
-    // ── DocumentService.ArchiveSharedCompanyDocumentAsync ───────────────────────────────
 
     [Fact]
     public async Task ArchiveSharedCompanyDocumentAsync_Trims_Reason_In_Posted_Body()
@@ -188,7 +178,6 @@ public class FormTextServiceNormalizationTests
         Assert.Equal("no longer needed", body.GetProperty("reason").GetString());
     }
 
-    // ── CandidateService search trimming ────────────────────────────────────────────────
 
     [Fact]
     public async Task ListCandidatesAsync_Trims_Search_Term_In_Query_String()
@@ -201,7 +190,6 @@ public class FormTextServiceNormalizationTests
         Assert.Contains("search=jane", capturing.CapturedRequestUri);
     }
 
-    // ── DocumentService.UploadEmployeeDocumentAsync (multipart) ────────────────────────
 
     [Fact]
     public async Task UploadEmployeeDocumentAsync_Trims_Title_And_Normalizes_Description_In_Posted_Multipart_Body()
@@ -238,7 +226,6 @@ public class FormTextServiceNormalizationTests
         Assert.DoesNotContain("name=\"Description\"", body);
     }
 
-    // ── DocumentService.UploadSharedCompanyDocumentAsync (multipart) ───────────────────
 
     [Fact]
     public async Task UploadSharedCompanyDocumentAsync_Trims_Title_Description_And_AcknowledgementStatement_In_Posted_Multipart_Body()
@@ -289,7 +276,6 @@ public class FormTextServiceNormalizationTests
         Assert.DoesNotContain("name=\"AcknowledgementStatement\"", body);
     }
 
-    // ── DocumentService.UpdateSharedCompanyDocumentMetadataAsync ────────────────────────
 
     [Fact]
     public async Task UpdateSharedCompanyDocumentMetadataAsync_Trims_Title_And_Normalizes_Blank_Description_To_Null()
@@ -306,9 +292,6 @@ public class FormTextServiceNormalizationTests
         Assert.Equal(JsonValueKind.Null, body.GetProperty("description").ValueKind);
     }
 
-    // ── AdjustLeaveBalanceDialog's request model is exercised via LeaveService directly ─
-    // (the dialog builds the normalized request and idempotency key from the same value —
-    // covered here by verifying the service posts a trimmed value it is handed).
 
     [Fact]
     public async Task AdjustLeaveBalanceAsync_Posts_Comments_As_Given_Preserving_PreNormalized_Value()
@@ -325,7 +308,6 @@ public class FormTextServiceNormalizationTests
         Assert.Equal("correction requested", body.GetProperty("comments").GetString());
     }
 
-    // ── TaskService.CompleteTaskAsync ───────────────────────────────────────────────────
 
     [Fact]
     public async Task CompleteTaskAsync_Trims_Outcome_Decision_And_Reason_In_Posted_Body()
@@ -353,7 +335,6 @@ public class FormTextServiceNormalizationTests
         Assert.Equal(JsonValueKind.Null, body.GetProperty("outcomeReason").ValueKind);
     }
 
-    // ── SupportService.SubmitSupportRequestAsync (multipart) ───────────────────────────
 
     [Fact]
     public async Task SubmitSupportRequestAsync_Trims_Title_And_Description_In_Posted_Multipart_Body()
@@ -373,7 +354,6 @@ public class FormTextServiceNormalizationTests
         Assert.DoesNotContain("  It fails every time  ", body);
     }
 
-    // ── Fake handlers ────────────────────────────────────────────────────────────
 
     private sealed class BodyCapturingHandler(HttpStatusCode statusCode, HttpContent? responseContent = null) : HttpMessageHandler
     {
@@ -399,8 +379,6 @@ public class FormTextServiceNormalizationTests
         }
     }
 
-    // Minimal IBrowserFile stand-in so multipart upload service methods can be exercised without
-    // a real Blazor rendering context — only the members those methods actually touch are wired up.
     private sealed class FakeBrowserFile(string name, string contentType) : IBrowserFile
     {
         public string Name { get; } = name;

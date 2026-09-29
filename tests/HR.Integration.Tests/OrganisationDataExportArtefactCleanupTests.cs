@@ -8,12 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Follow-up I: attempt archives left in storage by a failed or superseded export build (upload
-/// succeeded, completion never persisted) must be swept up and the export marked cleaned. Proven here
-/// against the real database, the real <see cref="IOrganisationDataExportJobStore"/> and the real
-/// (local file system) <see cref="IOrganisationDataExportStorage"/>.
-/// </summary>
 [Collection("Integration")]
 public class OrganisationDataExportArtefactCleanupTests
 {
@@ -34,14 +28,12 @@ public class OrganisationDataExportArtefactCleanupTests
             var store = scope.ServiceProvider.GetRequiredService<IOrganisationDataExportJobStore>();
             var storage = scope.ServiceProvider.GetRequiredService<IOrganisationDataExportStorage>();
 
-            // Two attempts uploaded their archives; neither completion persisted.
             await UploadOrphanAsync(storage, companyId, exportId);
             await UploadOrphanAsync(storage, companyId, exportId);
 
             var keys = await storage.ListAttemptKeysAsync(companyId, exportId, CancellationToken.None);
             Assert.Equal(2, keys.Count);
 
-            // Cleanup: the export has no published StorageKey, so every attempt archive is an orphan.
             foreach (var key in keys)
                 await storage.DeleteAsync(key, CancellationToken.None);
             await store.MarkAttemptFilesCleanedAsync(exportId, CancellationToken.None);

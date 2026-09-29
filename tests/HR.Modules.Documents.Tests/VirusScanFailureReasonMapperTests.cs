@@ -32,8 +32,6 @@ public class VirusScanFailureReasonMapperTests
     public void ToSafeCategory_SocketException_With_Internal_Host_Maps_To_ScannerUnavailable_And_Strips_Details()
     {
         var ex = new SocketException();
-        // SocketException's message is derived from the error code, but we still verify the
-        // hardcoded internal-host details a caller might have wrapped are never echoed back.
         var wrappingMessage = "No connection could be made to host 10.0.4.17:3310 (clamd internal)";
         Assert.DoesNotContain(wrappingMessage, VirusScanFailureReasonMapper.ScannerUnavailable);
 

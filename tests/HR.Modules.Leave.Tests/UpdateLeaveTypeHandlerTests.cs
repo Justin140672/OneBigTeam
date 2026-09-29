@@ -95,9 +95,6 @@ public class UpdateLeaveTypeHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_Conflict_When_Renaming_System_LeaveType()
     {
-        // Item 50: a system leave type (e.g. the platform-provisioned Annual Leave) can never be
-        // renamed. Other fields (code, default entitlement, accrual method, behaviour,
-        // tracks-balance) remain editable.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
@@ -135,8 +132,6 @@ public class UpdateLeaveTypeHandlerTests
     [Fact]
     public async Task HandleAsync_Updates_NonName_Fields_On_System_LeaveType_When_Name_Unchanged()
     {
-        // A system leave type's other fields (default entitlement, etc.) remain editable as long
-        // as the Name itself is submitted unchanged.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
@@ -171,8 +166,6 @@ public class UpdateLeaveTypeHandlerTests
     [Fact]
     public async Task HandleAsync_Renames_NonSystem_LeaveType_Unaffected_By_IsSystem_Restriction()
     {
-        // Confirms the IsSystem guard is opt-in: an ordinary (non-system) leave type can still be
-        // renamed exactly as before.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);

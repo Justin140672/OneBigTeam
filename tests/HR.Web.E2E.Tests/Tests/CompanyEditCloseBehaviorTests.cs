@@ -20,9 +20,6 @@ public sealed class CompanyEditCloseBehaviorTests(PriyaShahPersonaFixture fixtur
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    // CompanyEdit's edit mode (LoadAsync) gates on Session.CanManageCompany, which the
-    // company:manage policy restricts to CompanyAdministrator — HrAdministrator no longer
-    // qualifies, so these tests need a CompanyAdministrator-only persona.
     private const string CompanyAdminEmail = "priya.shah@acme.example";
 
     [Fact]
@@ -62,12 +59,6 @@ public sealed class CompanyEditCloseBehaviorTests(PriyaShahPersonaFixture fixtur
             "Expected the unsaved-changes dialog when closing with an edited Profile name");
     }
 
-    /// <summary>
-    /// Choosing "Save" from the unsaved-changes prompt always navigates away on success — unlike
-    /// the page's own Save button, which stays put and shows an inline success banner. Exercised
-    /// via the Profile tab's Company Name field now that Settings (which used to carry this
-    /// coverage via its own independently-saved model) is gone.
-    /// </summary>
     [Fact]
     public async Task Close_SaveFromUnsavedChangesDialog_PersistsAndNavigatesAway()
     {
@@ -98,8 +89,6 @@ public sealed class CompanyEditCloseBehaviorTests(PriyaShahPersonaFixture fixtur
         }
         finally
         {
-            // Restore the original name so this test doesn't leak state into other tests that
-            // rely on the seeded "Acme Corp" name.
             await companyEdit.FillCompanyNameInputAsync(originalName);
             await companyEdit.SaveAsync();
         }

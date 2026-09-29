@@ -1,18 +1,7 @@
 namespace HR.Web.Components.Pages.Dashboards;
 
-/// <summary>
-/// The observed outcome of one data source feeding a dashboard widget panel.
-/// </summary>
-/// <param name="SourceName">Stable, human-readable name (e.g. "Leave requests").</param>
-/// <param name="Required">Whether a failure of this source degrades the whole panel (lookups are not required).</param>
-/// <param name="Failed">True if loading the source threw / could not complete.</param>
-/// <param name="ActionableCount">Number of actionable rows this source contributed (ignored when <paramref name="Failed"/>).</param>
 public readonly record struct WidgetSourceOutcome(string SourceName, bool Required, bool Failed, int ActionableCount);
 
-/// <summary>
-/// Aggregated view of every source feeding one widget panel — the signal the UI uses to decide
-/// between a genuine "all clear", a partial-failure warning, and a total-failure state.
-/// </summary>
 public sealed record WidgetPanelSummary(
     IReadOnlyList<string> FailedSources,
     bool AnyFailed,
@@ -22,11 +11,6 @@ public sealed record WidgetPanelSummary(
     bool HasPartialFailure,
     bool TotalFailure);
 
-/// <summary>
-/// Pure, DI-free state logic for a dashboard widget panel (the DSH-03 analogue of
-/// ManagerAttentionQueueOrdering). Distinguishes a source failure from a genuine empty result so
-/// widgets stop showing a misleading "all clear" / zero.
-/// </summary>
 public static class WidgetPanelState
 {
     public static WidgetPanelSummary Summarise(IEnumerable<WidgetSourceOutcome> outcomes)

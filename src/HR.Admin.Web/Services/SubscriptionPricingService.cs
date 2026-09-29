@@ -4,12 +4,6 @@ using HR.Admin.Web.Models;
 
 namespace HR.Admin.Web.Services;
 
-/// <summary>
-/// Wraps the configurable subscription pricing endpoints (Story 4). Modeled on
-/// PlatformSettingsService: "hrapi" HttpClientFactory client, null on any read failure. The PUT
-/// surfaces both the handler's structural-validation failure (400 <c>{"error": "..."}</c> from
-/// SubscriptionPricingConfig.Validate) and FluentValidation 422 field errors.
-/// </summary>
 public sealed class SubscriptionPricingService(HrApiHttpClientFactory httpClientFactory)
 {
     private const string Route = "api/companies/admin/subscription-pricing-config";

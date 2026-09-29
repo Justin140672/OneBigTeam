@@ -21,7 +21,6 @@ internal sealed class Endpoint(
         PreviewLeaveRequestRequest request,
         CancellationToken cancellationToken)
     {
-        // LEAVE-01: preview mirrors submit's self-service-only scope.
         if (currentUser.UserId is not { } callerId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());

@@ -10,12 +10,9 @@ namespace HR.Modules.Sickness.Domain;
 /// </summary>
 internal enum FitToReturnOutcome
 {
-    /// <summary>Fully fit to return to normal duties with no adjustments.</summary>
     Fit,
 
-    /// <summary>Fit to return, but only with workplace adjustments in place.</summary>
     FitWithAdjustments,
 
-    /// <summary>Not fit to return — the employee's sickness absence continues.</summary>
     NotFit
 }

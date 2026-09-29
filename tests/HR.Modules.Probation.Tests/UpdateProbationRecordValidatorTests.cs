@@ -173,8 +173,6 @@ public class UpdateProbationRecordValidatorTests
     [Fact]
     public async Task Zero_ExpectedVersion_Passes_Version_Rule()
     {
-        // Zero is a legal (if unusual) version value — the rule only guards against a missing
-        // (null) version, not against any particular numeric value.
         var result = await _validator.ValidateAsync(new UpdateProbationRecordRequest
         {
             CompanyId = Guid.NewGuid(),

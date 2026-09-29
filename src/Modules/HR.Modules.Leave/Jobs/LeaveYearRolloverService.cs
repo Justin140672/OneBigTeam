@@ -33,9 +33,6 @@ internal sealed class LeaveYearRolloverService(
     ICompanyLeaveSettingsReader leaveSettingsReader,
     IAuditEventPublisher auditPublisher)
 {
-    // Background-job actor convention used elsewhere in the codebase (e.g.
-    // ProcessDocumentExpiryNotifications, FitNoteRequestJob) for adjustments/events with no human
-    // actor.
     internal static readonly Guid SystemActorId = Guid.Empty;
 
     public async Task<LeaveYearRolloverResult> RolloverCompanyAsync(
@@ -46,10 +43,6 @@ internal sealed class LeaveYearRolloverService(
         var previousPolicyYear = newPolicyYear - 1;
         var now = clock.UtcNowOffset();
 
-        // New policy-year balances start accruing (for Monthly/Fortnightly leave types - LEAVE-04)
-        // from the new policy year's start date - the employee is a continuing employee by
-        // definition here (a departed employee's assignment was deactivated and is filtered out
-        // below), so there is no partial-year pro-rating to account for.
         var leaveSettings = await leaveSettingsReader.GetLeaveSettingsAsync(companyId, cancellationToken);
         var (newPolicyYearStart, _) = LeaveYearCalculator.GetPolicyYearBounds(newPolicyYear, leaveSettings.LeaveYearStartMonth);
 
@@ -101,8 +94,6 @@ internal sealed class LeaveYearRolloverService(
 
         foreach (var previous in previousBalances)
         {
-            // Idempotency guard — a prior (possibly interrupted) run may already have created this
-            // employee/leave-type's balance for the new policy year.
             if (existingNewYearKeys.Contains((previous.EmployeeId, previous.LeaveTypeId)))
                 continue;
 
@@ -111,9 +102,6 @@ internal sealed class LeaveYearRolloverService(
                 !leaveType.HasBalance)
                 continue;
 
-            // No active policy assignment (never assigned, or the employee's departure has been
-            // finalised and their assignment was deactivated) — do not generate a new policy-year
-            // balance or carry-over for them.
             if (!assignments.TryGetValue(previous.EmployeeId, out var assignment))
                 continue;
 
@@ -137,8 +125,6 @@ internal sealed class LeaveYearRolloverService(
                 newPolicyYearStart,
                 now);
 
-            // Never carry a negative balance forward — an exhausted/over-drawn balance simply
-            // carries zero. A CarryOverDays limit of zero also carries nothing.
             var remaining = previous.RemainingDays;
             var carryOverDays = remaining > 0 ? Math.Min(remaining, policy.CarryOverDays) : 0m;
 
@@ -170,9 +156,6 @@ internal sealed class LeaveYearRolloverService(
         dbContext.LeaveBalances.AddRange(newBalances);
         dbContext.LeaveBalanceAdjustments.AddRange(carryOvers.Select(x => x.Adjustment));
 
-        // Explicit transaction so the new balances and their carry-over adjustments are committed
-        // atomically — a partial write would otherwise leave a balance with no matching adjustment
-        // record for its carried-over days.
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);

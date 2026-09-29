@@ -19,8 +19,6 @@ internal sealed class ApproveProfilePhotoHandler(
         if (result.IsFailure)
             return result;
 
-        // pendingPhotoId is null when this call was answered from an idempotency replay (the
-        // original attempt already completed the linked task) — nothing further to do here.
         if (pendingPhotoId is { } id)
         {
             await taskCompleter.CompleteBySourceEntityAsync(

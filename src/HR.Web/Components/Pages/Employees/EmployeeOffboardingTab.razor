@@ -165,27 +165,21 @@ else
     private bool _waiveDialogOpen;
     private Guid _waiveTaskId;
 
-    // SPEC-OFF-01 §Finalisation/Reporting: "Overdue after departure" takes priority over the raw
-    // InProgress status shown by the API, since that's a distinct, more specific state HR needs to
-    // see at a glance rather than a generic "In Progress".
     private string EffectivePlanStatus => Overview?.IsOverdueAfterDeparture == true ? "OverdueAfterDeparture" : Overview?.PlanStatus ?? "NotStarted";
 
     private int ProgressPercent => Overview?.ProgressPercent ?? 0;
 
-    // Sort order (SPEC-OFF-01 §checklist UI): unresolved overdue first, then upcoming unresolved,
-    // then completed/waived/cancelled at the bottom — still visible, never hidden.
     private IEnumerable<OffboardingTaskOverviewItem> SortedTasks
     {
         get
         {
-            // Use company-local date for business-calendar task sorting (overdue/upcoming status).
             var today = CompanyTimeProvider.Today;
             return (Overview?.Tasks ?? []).OrderBy(t => Rank(t, today)).ThenBy(t => t.DueDate ?? DateOnly.MaxValue);
 
             static int Rank(OffboardingTaskOverviewItem t, DateOnly today)
             {
                 var unresolved = t.Status is "Pending" or "InProgress";
-                if (!unresolved) return 2; // completed/waived/cancelled/skipped
+                if (!unresolved) return 2;
                 var overdue = t.DueDate.HasValue && t.DueDate.Value < today;
                 return overdue ? 0 : 1;
             }
@@ -250,7 +244,6 @@ else
 
     private (string Css, string Label) GetTaskBadge(OffboardingTaskOverviewItem t)
     {
-        // Use company-local date for business-calendar overdue status.
         var today = CompanyTimeProvider.Today;
         if (t.Status is "Pending" or "InProgress" && t.DueDate.HasValue && t.DueDate.Value < today)
             return ("text-bg-danger", "Overdue");

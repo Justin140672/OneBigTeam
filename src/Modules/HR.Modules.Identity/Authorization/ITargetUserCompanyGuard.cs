@@ -19,6 +19,5 @@ namespace HR.Modules.Identity.Authorization;
 /// </summary>
 internal interface ITargetUserCompanyGuard
 {
-    /// <summary>True only if <paramref name="userId"/> is an employee of <paramref name="companyId"/>.</summary>
     Task<bool> IsMemberAsync(Guid companyId, Guid userId, CancellationToken cancellationToken);
 }

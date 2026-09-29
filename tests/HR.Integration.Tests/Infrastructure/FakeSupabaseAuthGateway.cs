@@ -2,12 +2,6 @@ using HR.Modules.Identity.Services;
 
 namespace HR.Integration.Tests.Infrastructure;
 
-/// <summary>
-/// Test double for the Identity module's internal ISupabaseAuthGateway, registered against the
-/// shared integration test host (see ApiWebApplicationFactory). Never calls the real Supabase Auth
-/// API. Safe to mutate per-test because the assembly disables test parallelization (see
-/// AssemblyInfo.cs), so tests run strictly sequentially against the shared factory.
-/// </summary>
 internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
 {
     public List<(string Email, string RedirectTo)> CreatedUsers { get; } = [];
@@ -31,9 +25,6 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
     /// </summary>
     public string? EmailAlreadyRegisteredFor { get; set; }
 
-    // Simulates Supabase rejecting a recovery access token (expired / already used / tampered):
-    // UpdatePasswordAsync surfaces any non-success Supabase response as an InvalidOperationException,
-    // which ResetPasswordHandler maps to a generic validation failure rather than a 500.
     public bool ShouldThrowOnUpdatePassword { get; set; }
 
     public List<(string Email, string Password)> EnsuredDevUsers { get; } = [];
@@ -83,8 +74,6 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
 
     public List<string> SignOutCalls { get; } = [];
 
-    // Simulates GoTrue rejecting the sign-out (e.g. token already expired). The /logout journey must
-    // still complete: the caller swallows this and clears the cookie regardless.
     public bool ShouldThrowOnSignOut { get; set; }
 
     public Task SignOutAsync(string userAccessToken, CancellationToken cancellationToken)
@@ -115,11 +104,8 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         return Task.FromResult(MfaFactorsRemovedToReturn);
     }
 
-    /// <summary>Populate to have <see cref="GetUserIdByEmailAsync"/> resolve an id for that email.</summary>
     public Dictionary<string, Guid> UserIdsByEmail { get; } = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Simulates the identity-provider lookup itself failing before any local record
-    /// would be persisted (see CreatePlatformAdministratorHandler).</summary>
     public bool ShouldThrowOnGetUserIdByEmail { get; set; }
 
     public Task<Guid?> GetUserIdByEmailAsync(string email, CancellationToken cancellationToken)
@@ -137,9 +123,6 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
             throw new InvalidOperationException("Simulated invalid/expired Supabase verification code.");
         }
 
-        // Reuses UserIdToReturn (the same knob SignUp tests set before calling /api/signup) so a
-        // test can drive the full SignUp -> VerifyEmail flow against the same Supabase auth user
-        // id without a separate code->session mapping.
         return Task.FromResult(new SupabaseSession("access-token", "refresh-token", UserIdToReturn ?? Guid.NewGuid(), DateTimeOffset.UtcNow.AddHours(1)));
     }
 

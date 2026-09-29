@@ -34,8 +34,6 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
     private const string MarcusEmail = "marcus.diallo@acme.example";
     private const string LauraEmail  = "laura.bennett@acme.example";
 
-    // RecruitmentStageSeeder.BuildDefaultStages — a freshly created Application starts on the first
-    // (DisplayOrder 1); Move Forward advances it to the next active non-terminal stage.
     private const string InitialStage = "Application Received";
     private const string NextStage    = "CV Review";
     private const string RejectedStage = "Rejected";
@@ -81,8 +79,6 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
 
         var applicationId = review.GetApplicationIdFromUrl();
 
-        // Fresh navigation → proves the notes were persisted server-side, not just left in local
-        // component state.
         await review.GoToAsync(AcmeId, arranged.VacancyId, applicationId);
         Assert.Equal(notes, await review.GetNotesAsync());
         Assert.Equal(InitialStage, await review.GetCurrentStageAsync());
@@ -105,13 +101,11 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
 
         await review.MoveForwardAsync();
 
-        // Returned to the board (the returnUrl the card menu carried).
         await arranged.Kanban.WaitForLoadedAsync();
         Assert.True(await arranged.Kanban.IsCardInColumnAsync(arranged.CandidateLast, NextStage),
             $"Expected the candidate to have moved to '{NextStage}' after Move Forward");
         Assert.False(await arranged.Kanban.IsCardInColumnAsync(arranged.CandidateLast, InitialStage));
 
-        // Notes typed before Move Forward are persisted as part of the same call.
         await review.GoToAsync(AcmeId, arranged.VacancyId, applicationId);
         Assert.Equal(notes, await review.GetNotesAsync());
         Assert.Equal(NextStage, await review.GetCurrentStageAsync());
@@ -139,7 +133,6 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
 
         var applicationId = review.GetApplicationIdFromUrl();
 
-        // Type notes but DON'T save — Close must discard them and not move the candidate.
         await review.SetNotesAsync("Draft thoughts that should never be saved.");
         await review.CloseAsync();
 
@@ -159,8 +152,6 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
     [Fact]
     public async Task CvPanel_LegacyApplicationWithNoCvAtAll_ShowsPlainCvTitleNoBannerAndUploadSection()
     {
-        // The Add Candidate dialog creates the application without a cvDocumentId and the fresh
-        // candidate has no documents — the same shape as a historic/legacy application.
         var arranged = await ArrangeApplicationAsync();
         var review = await OpenReviewCvFromKanbanAsync(arranged);
 
@@ -196,7 +187,6 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
 
         await AssertShowsSubmittedCvAsync(review, fileName);
 
-        // Fresh navigation → proves the state is what the server returns, not leftover component state.
         await review.GoToAsync(AcmeId, arranged.VacancyId, applicationId);
         await AssertShowsSubmittedCvAsync(review, fileName);
         Assert.False(await review.IsUseCurrentCvVisibleAsync(),
@@ -213,7 +203,6 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
     [Fact]
     public async Task ReplaceCv_UpdatesOnlyThisApplication_OtherApplicationKeepsOriginalCv()
     {
-        // Application A and application B: the SAME candidate on two different fresh vacancies.
         var arrangedA = await ArrangeApplicationAsync();
         var reviewA = await OpenReviewCvFromKanbanAsync(arrangedA);
         var applicationAId = reviewA.GetApplicationIdFromUrl();
@@ -222,7 +211,6 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
         var reviewB = await OpenReviewCvFromKanbanAsync(arrangedB);
         var applicationBId = reviewB.GetApplicationIdFromUrl();
 
-        // Seed CV v1 as the submitted CV of BOTH applications via the real API.
         using var api = await CreateRecruiterApiClientAsync();
         var appA = await GetApplicationAsync(api, arrangedA.VacancyId, applicationAId);
         var appB = await GetApplicationAsync(api, arrangedB.VacancyId, applicationBId);
@@ -233,7 +221,6 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
         await SetApplicationCvAsync(api, arrangedA.VacancyId, applicationAId, v1DocId, appA.Version);
         await SetApplicationCvAsync(api, arrangedB.VacancyId, applicationBId, v1DocId, appB.Version);
 
-        // Replace on A through the UI.
         await reviewA.GoToAsync(AcmeId, arrangedA.VacancyId, applicationAId);
         await AssertShowsSubmittedCvAsync(reviewA, v1FileName);
         Assert.Equal("Replace CV", await reviewA.GetReplaceSubmitTextAsync());
@@ -242,7 +229,6 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
         await reviewA.ReplaceCvAsync(v2FileName, CandidateCvApi.BuildTestPdf(), ReviewCvPage.CvReplacedSuccess);
         await AssertShowsSubmittedCvAsync(reviewA, v2FileName);
 
-        // API: A now points at v2 (the candidate's new current CV); B still points at v1.
         var afterA = await GetApplicationAsync(api, arrangedA.VacancyId, applicationAId);
         Assert.NotNull(afterA.CvDocumentId);
         Assert.NotEqual(v1DocId, afterA.CvDocumentId);
@@ -254,8 +240,6 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
         Assert.Equal(v1FileName, afterB.CvFileName);
         Assert.Equal(v2FileName, afterB.CurrentCandidateCvFileName);
 
-        // UI: B still shows v1 as its Submitted CV, and — because the candidate's current CV (v2)
-        // now differs from B's CV — offers "Use candidate's current CV".
         await reviewB.GoToAsync(AcmeId, arrangedB.VacancyId, applicationBId);
         await AssertShowsSubmittedCvAsync(reviewB, v1FileName);
         Assert.True(await reviewB.IsUseCurrentCvVisibleAsync(),
@@ -269,7 +253,6 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
         var review = await OpenReviewCvFromKanbanAsync(arranged);
         var applicationId = review.GetApplicationIdFromUrl();
 
-        // Candidate CV uploaded directly (not attached to the application).
         using var api = await CreateRecruiterApiClientAsync();
         var before = await GetApplicationAsync(api, arranged.VacancyId, applicationId);
         var fileName = $"e2e-current-cv-{Guid.NewGuid():N}.pdf";
@@ -297,8 +280,6 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
         var review = await OpenReviewCvFromKanbanAsync(arranged);
         var applicationId = review.GetApplicationIdFromUrl();
 
-        // Seed through the real API: upload a Kind=Cv candidate document, then record it as the application's submitted CV with the
-        // application's current Version as ExpectedVersion.
         using var api = await CreateRecruiterApiClientAsync();
         var before = await GetApplicationAsync(api, arranged.VacancyId, applicationId);
         Assert.Null(before.CvDocumentId);
@@ -310,8 +291,6 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
         await review.GoToAsync(AcmeId, arranged.VacancyId, applicationId);
         await AssertShowsSubmittedCvAsync(review, submittedFileName);
 
-        // The candidate later uploads a newer CV — it becomes their CURRENT CV, but the application
-        // must keep pointing at the exact CV submitted with it.
         var newerFileName = $"e2e-newer-cv-{Guid.NewGuid():N}.pdf";
         await UploadCandidateCvAsync(api, before.CandidateId, newerFileName);
 
@@ -350,9 +329,6 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
         await review.ExpectReplaceHeadingAsync(ReviewCvPage.ReplaceHeading);
     }
 
-    // ── API seeding helpers ─────────────────────────────────────────────────────
-    // Thin wrappers over the shared CandidateCvApi: a real Marcus (Recruiter) session via
-    // POST /api/dev/persona/{userId}, then direct calls to the same HR.Api endpoints the web app uses.
 
     private Task<HttpClient> CreateRecruiterApiClientAsync() =>
         CandidateCvApi.CreateRecruiterApiClientAsync(_fixture.ApiBaseUrl);
@@ -367,18 +343,10 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
         HttpClient api, Guid vacancyId, Guid applicationId, Guid cvDocumentId, int expectedVersion) =>
         CandidateCvApi.SetApplicationCvAsync(api, AcmeId, vacancyId, applicationId, cvDocumentId, expectedVersion);
 
-    // ── Arrange helpers ─────────────────────────────────────────────────────────
 
     private sealed record ArrangedApplication(
         string CandidateLast, string CandidateName, string VacancyTitle, Guid VacancyId, VacancyKanbanBoardPage Kanban);
 
-    /// <summary>
-    /// Mirrors VacancyKanbanBoardTests.ArrangeAppliedApplicationAsync: fresh candidate + position
-    /// profile + published vacancy + application (left on <see cref="InitialStage"/>), browser left
-    /// on the vacancy's standalone Kanban board. When <paramref name="sameCandidateAs"/> is given, the
-    /// candidate is NOT created again — the new (fresh) vacancy's application is for that same
-    /// candidate, so one candidate ends up with two applications on two vacancies.
-    /// </summary>
     private async Task<ArrangedApplication> ArrangeApplicationAsync(ArrangedApplication? sameCandidateAs = null)
     {
         var unique         = Guid.NewGuid().ToString("N")[..8];

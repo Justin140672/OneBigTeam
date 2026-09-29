@@ -24,17 +24,12 @@ internal sealed class Endpoint(ApplyForInternalVacancyHandler handler, ICurrentU
         ApplyForInternalVacancyRequest request,
         CancellationToken cancellationToken)
     {
-        // The applicant is always the authenticated user — ICurrentUser.UserId is this app's resolved
-        // user id, which is the employee's id (see GetMyEmployee/Endpoint.cs). No employee id is ever
-        // accepted from the request.
         if (currentUser.UserId is not Guid applicantEmployeeId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
             return;
         }
 
-        // A platform "Login as Customer" support session satisfies the role:employee floor but is not
-        // an employee and must never apply on anyone's behalf.
         if (currentUser.IsSupportSession)
         {
             await Send.ResultAsync(TypedResults.Forbid());

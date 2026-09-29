@@ -48,9 +48,6 @@ public class GetArchivedEmployeeDocumentsEndpointTests
     [Fact]
     public async Task Returns_Forbidden_For_Manager_Who_Can_View_Normal_Documents()
     {
-        // Proves the narrower HR-only scope: a manager (who is allowed through the normal
-        // employee:manage/self-or-manager-hierarchy checks on the *non-archived* document
-        // endpoints) must still be forbidden here.
         var employeeId = Guid.NewGuid();
         using var hrClient = await HrAdminClient();
         var upload = await UploadAndDelete(hrClient, employeeId);
@@ -111,7 +108,7 @@ public class GetArchivedEmployeeDocumentsEndpointTests
     private static MultipartFormDataContent BuildPdfUpload(string title = "Archived Test Doc")
     {
         var pdfBytes = new byte[1024];
-        pdfBytes[0] = 0x25; pdfBytes[1] = 0x50; pdfBytes[2] = 0x44; pdfBytes[3] = 0x46; // %PDF
+        pdfBytes[0] = 0x25; pdfBytes[1] = 0x50; pdfBytes[2] = 0x44; pdfBytes[3] = 0x46;
 
         var content = new MultipartFormDataContent();
         content.Add(new StringContent(title), "Title");

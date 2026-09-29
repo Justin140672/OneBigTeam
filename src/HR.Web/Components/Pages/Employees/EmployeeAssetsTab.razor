@@ -250,10 +250,6 @@ else
 
     private async Task ConfirmReturnAsync()
     {
-        // Without this guard, RequestAssetReturnHandler has no idempotency check against the
-        // assignment (only that it's still active, which stays true until the return is actually
-        // processed later) — a double-click here creates two separate "Return asset" tasks for the
-        // same assignment.
         if (_returnSaving)
             return;
 

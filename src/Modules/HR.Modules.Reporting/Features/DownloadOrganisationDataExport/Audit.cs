@@ -2,9 +2,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Reporting.Features.DownloadOrganisationDataExport;
 
-/// <summary>
-/// Story 2: a company administrator downloaded a completed organisation data export archive.
-/// </summary>
 internal sealed record OrganisationDataExportDownloadedAuditEvent(
     Guid CompanyId,
     Guid ExportId,

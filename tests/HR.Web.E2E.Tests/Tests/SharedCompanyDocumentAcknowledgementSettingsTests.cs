@@ -4,36 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the Shared Company Document acknowledgement-settings feature set added alongside the
-/// audit history dialog:
-/// - The standalone HR Settings page's "Default Acknowledgement Statement" field
-///   (HrSettingsPage.razor — moved off the Company Settings tab, see class doc history).
-/// - UploadSharedCompanyDocumentDialog.razor's auto-populate-from-default, live preview, and
-///   required-when-enabled validation for the Acknowledgement Statement field.
-/// - EditSharedCompanyDocumentAcknowledgementDialog.razor's Draft-editable / Published-locked
-///   behaviour and its "Reset to Default" button.
-/// - SharedCompanyDocumentAuditHistoryDialog.razor, opened from the document detail page's header.
-///
-/// Complements SharedDocumentUploadTests (basic upload flow), CompanyDocumentsTabTests (uses the
-/// same upload-then-publish helper pattern), and HrSettingsPageTests (HR Settings page
-/// conventions) — this file focuses specifically on the acknowledgement-statement and
-/// audit-history additions.
-///
-/// Uses Laura Bennett (HrAdministrator) for both the HR Settings page (hr-settings:manage /
-/// Session.IsHrAdministrator) and the document upload/publish/edit flows
-/// (shared-document:manage) — the "Default Acknowledgement Statement" field used to live on
-/// Company Settings (CompanyAdministrator-only) but has since moved to the standalone HR Settings
-/// page, which only an HrAdministrator can reach.
-///
-/// Only 3 of this class's 7 methods actually mutate the shared Acme CompanySettings row (they call
-/// HrSettingsPage.SetDefaultAcknowledgementStatementAsync + SaveAsync) — the other 4 just
-/// upload/publish/edit documents with unique GUID-suffixed titles and never touch that row. This
-/// class therefore runs as an ordinary parallel-eligible class (not class-level
-/// HrSettingsSerialTestBase) so those 4 aren't forced to queue behind the whole "HrSettingsSerial"
-/// group for no reason; the 3 mutating methods acquire HrSettingsSerialTestBase.GateInstance
-/// directly instead — see CreateEmployeeTests' remarks for the same pattern applied there first.
-/// </summary>
 public sealed class SharedCompanyDocumentAcknowledgementSettingsTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -49,8 +19,6 @@ public sealed class SharedCompanyDocumentAcknowledgementSettingsTests(HrAdminPer
         await login.GoToAsync();
         await login.LoginAsync(HrEmail);
 
-        // Mutates the single shared Acme CompanySettings row — serialize against
-        // HrSettingsSerialTestBase's group for just this section; see this class's remarks.
         await HrSettingsSerialTestBase.GateInstance.WaitAsync();
         try
         {
@@ -63,8 +31,6 @@ public sealed class SharedCompanyDocumentAcknowledgementSettingsTests(HrAdminPer
             Assert.False(await hrSettings.HasErrorAsync(),
                 "Expected no error after saving the default acknowledgement statement");
 
-            // Reload the page for real (re-navigate) to exercise the settings-hydration path, not
-            // just in-memory Blazor state — same pattern as HrSettingsPageTests.
             await hrSettings.GoToAsync(AcmeId);
 
             Assert.Equal(statement, await hrSettings.GetDefaultAcknowledgementStatementAsync());
@@ -85,10 +51,6 @@ public sealed class SharedCompanyDocumentAcknowledgementSettingsTests(HrAdminPer
         await login.GoToAsync();
         await login.LoginAsync(HrEmail);
 
-        // Mutates the single shared Acme CompanySettings row, then reads that same default back via
-        // the upload dialog's auto-populate — held for the whole test (not just the save) so another
-        // concurrent mutator in this group can't change the default in between; see this class's
-        // remarks.
         await HrSettingsSerialTestBase.GateInstance.WaitAsync();
         try
         {
@@ -141,9 +103,6 @@ public sealed class SharedCompanyDocumentAcknowledgementSettingsTests(HrAdminPer
 
             await upload.ClickUploadAsync();
 
-            // ValidateExtra runs client-side and keeps the dialog open (returns the error to
-            // GlobalError) rather than posting to the server — same "blocked, not closed" pattern
-            // as SharedDocumentDetailPage's Archive/Review-notes validation paths.
             Assert.True(await upload.IsOpenAsync(),
                 "Expected the dialog to remain open when the acknowledgement statement is blank while required");
 
@@ -221,9 +180,6 @@ public sealed class SharedCompanyDocumentAcknowledgementSettingsTests(HrAdminPer
         await login.GoToAsync();
         await login.LoginAsync(HrEmail);
 
-        // Mutates the single shared Acme CompanySettings row, then reads that same default back via
-        // "Reset to Default" — held for the whole test (not just the save) so another concurrent
-        // mutator in this group can't change the default in between; see this class's remarks.
         await HrSettingsSerialTestBase.GateInstance.WaitAsync();
         try
         {
@@ -238,8 +194,6 @@ public sealed class SharedCompanyDocumentAcknowledgementSettingsTests(HrAdminPer
             await detail.GoToAsync(AcmeId, documentId);
             await detail.RequireAcknowledgementAsync(DateOnly.FromDateTime(DateTime.UtcNow.AddDays(14)));
 
-            // Set the statement to something other than the default first, so the reset is a
-            // meaningful assertion rather than a no-op.
             await detail.OpenEditAcknowledgementDialogAsync();
             await detail.FillAcknowledgementStatementAsync($"Custom statement {Guid.NewGuid():N}");
             await detail.SaveEditAcknowledgementDialogAsync();
@@ -277,10 +231,6 @@ public sealed class SharedCompanyDocumentAcknowledgementSettingsTests(HrAdminPer
         Assert.True(rowCount >= 1,
             $"Expected at least one audit history entry after uploading and publishing, got {rowCount}");
 
-        // Both the "created" and "published" events reference the document's title
-        // (SharedCompanyDocumentPublishedAuditEvent.Summary = "Document '{Title}' published") —
-        // filtering the row by the unique title, rather than the action text itself, keeps this
-        // resilient to that exact wording.
         await detail.ClickViewAuditHistoryRowAsync(title);
         Assert.True(await detail.IsAuditDetailDialogOpenAsync());
 
@@ -294,13 +244,6 @@ public sealed class SharedCompanyDocumentAcknowledgementSettingsTests(HrAdminPer
         Assert.False(await detail.IsAuditHistoryDialogOpenAsync());
     }
 
-    /// <summary>
-    /// Uploads a shared document via the list page's "Upload Document" dialog (no acknowledgement
-    /// requirement, no publish) and returns its Id. Assumes the caller is already logged in as an
-    /// HrAdministrator. Same upload mechanics as CompanyDocumentsTabTests.UploadAndPublishDocumentAsync,
-    /// but stops after upload rather than also publishing, since several tests here need to drive
-    /// the acknowledgement-settings dialog on a still-Draft document first.
-    /// </summary>
     private async Task<Guid> UploadDraftDocumentAsync(string? title = null)
     {
         title ??= $"Test Policy {Guid.NewGuid():N}";
@@ -327,7 +270,6 @@ public sealed class SharedCompanyDocumentAcknowledgementSettingsTests(HrAdminPer
         }
     }
 
-    // %PDF- followed by padding, so magic-byte content validation passes.
     private static byte[] BuildTestPdf()
     {
         var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };

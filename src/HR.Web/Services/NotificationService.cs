@@ -6,8 +6,6 @@ public sealed class NotificationService(HrApiHttpClientFactory httpClientFactory
 {
     private HttpClient Http => httpClientFactory.CreateClient();
 
-    // NOT-06: pageNumber/pageSize support the notification dropdown's "load more" button —
-    // each call fetches one page, which the caller appends to the previously loaded items.
     public async Task<NotificationsResponse?> GetAsync(
         Guid companyId, int pageNumber = 1, int pageSize = 20, CancellationToken cancellationToken = default)
     {

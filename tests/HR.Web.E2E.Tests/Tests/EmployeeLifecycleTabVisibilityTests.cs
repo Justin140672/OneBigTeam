@@ -4,36 +4,16 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Cross-cutting coverage for lifecycle tab visibility (Onboarding/Probation/Offboarding tabs on
-/// the employee edit page) that spans more than one lifecycle module at once. Single-module
-/// scenarios — tab visible while active, hidden once completed, hidden when no record ever
-/// existed — are covered in EmployeeOnboardingTabTests.cs, EmployeeProbationTabTests.cs, and
-/// EmployeeOffboardingTabTests.cs respectively.
-/// </summary>
 public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    // Sarah Chen — seeded CTO with no manager (EmployeesModule.SeedEmployeesAsync). Seeded
-    // directly into the database rather than through CreateEmployeeHandler, so she never fired
-    // the EmployeeCreated integration event: no onboarding plan, no probation record (no manager
-    // to attach one to), and no offboarding plan has ever been started for her.
     private static readonly Guid SarahChen = Guid.Parse("30000000-0000-0000-0000-000000000001");
 
-    // Laura Bennett — HR Manager, logged in throughout; also who claims/completes offboarding
-    // tasks in the completion test below.
     private static readonly Guid LauraId = Guid.Parse("30000000-0000-0000-0000-000000000005");
 
     private const string LauraEmail = "laura.bennett@acme.example";
 
-    /// <summary>
-    /// Drives the (already-open-via-OpenAsync) Start Leaving Process wizard end to end, exactly
-    /// mirroring EmployeeLeavingProcessTests.StartLeavingProcessViaWizardAsync. Offboarding no
-    /// longer has a manual trigger — it's only ever started as a side effect of confirming this
-    /// wizard (StartLeavingProcessHandler calls IOffboardingPlanCoordinator.StartAsync
-    /// internally), so this is used purely to reach an active-offboarding-plan state.
-    /// </summary>
     private async Task StartLeavingProcessViaWizardAsync(
         StartLeavingProcessDialog dialog, string resignationDdMMyyyy, string reasonLabel)
     {
@@ -57,17 +37,9 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
         Assert.False(await dialog.IsVisibleAsync(),
             "Expected the Start Leaving Process dialog to close after a successful submission");
 
-        // StartLeavingProcessDialog's OnCompleted callback force-navigates the parent page to
-        // "?tab=leaving" — wait for the resulting full page reload to reconnect before the caller
-        // reads anything else off the page.
         await _page.WaitForSelectorAsync("[role='tablist']", new() { Timeout = 20_000 });
     }
 
-    // Uses a dedicated pre-seeded pool employee instead of the full New Employee form. Each pool
-    // member already has a NotStarted onboarding plan (so the Onboarding tab is visible, exactly
-    // as for a freshly-created employee), no manager (so no probation record) and no offboarding
-    // plan — the same starting state the old form-creation flow produced. Both consuming tests
-    // start a leaving process on their employee, so each gets its own dedicated row.
     private async Task<Guid> CreateEmployeeAsync(
         EmployeeListPage empList, EmployeeEditPage empEdit, string suffix)
     {
@@ -100,8 +72,6 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
             await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Offboarding"),
             "Expected no 'Offboarding' tab for an employee who never had a plan");
 
-        // There is no manual entry point to start offboarding anywhere in the UI anymore —
-        // offboarding only ever starts as a side effect of the Start Leaving Process wizard.
         Assert.False(
             await _page.GetByRole(AriaRole.Button, new() { Name = "Start Offboarding" }).IsVisibleAsync(),
             "Expected no manual 'Start Offboarding' entry point anywhere");
@@ -120,9 +90,6 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
 
         await CreateEmployeeAsync(empList, empEdit, "Multi");
 
-        // Freshly created: onboarding is auto-created (NotStarted) and immediately visible; no
-        // manager was set on the New Employee form, so probation never gets created; offboarding
-        // hasn't started yet.
         Assert.True(
             await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Onboarding"),
             "Expected the Onboarding tab to already be visible on a freshly created employee");
@@ -130,10 +97,6 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
             await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Offboarding"),
             "Expected no Offboarding tab yet");
 
-        // Drive the Start Leaving Process wizard — offboarding only ever starts as a side effect
-        // of it (StartLeavingProcessHandler calls IOffboardingPlanCoordinator.StartAsync
-        // internally) — Onboarding and Offboarding should now both be visible at once for the
-        // same employee.
         await StartLeavingProcessViaWizardAsync(startDialog, "01/09/2026", "Resignation");
 
         Assert.True(
@@ -160,26 +123,11 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
 
         var employeeId = await CreateEmployeeAsync(empList, empEdit, "OffComplete");
 
-        // Offboarding no longer has a manual trigger — it only ever starts as a side effect of
-        // confirming the Start Leaving Process wizard.
         await StartLeavingProcessViaWizardAsync(startDialog, "01/09/2026", "Resignation");
 
         Assert.True(await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Offboarding"),
             "Expected the Offboarding tab to be visible once started");
 
-        // No manager and no assets, so StartOffboardingHandler generates exactly 5 unassigned
-        // tasks: 1 HR document-review + 4 manager exit-checklist (see
-        // StartOffboarding_ForEmployeeWithNoAssets_GeneratesExpectedFixedChecklistTasks in
-        // EmployeeOffboardingTabTests.cs). Claim each from the HR Inbox, then complete it from
-        // Laura's own My Profile Tasks tab (mirroring ProfileTasksTabTests.cs's View-button
-        // flow) — there's no offboarding-specific dashboard widget the way Onboarding has one.
-        //
-        // "Review outstanding documents for employee exit" is a fixed title with no employee
-        // name suffix (unlike the other four), so other tests in this collection that start
-        // offboarding without completing it (e.g. StartOffboarding_WithValidLastWorkingDay_...
-        // in EmployeeOffboardingTabTests.cs) can leave same-titled stray cards sitting unclaimed
-        // in the same shared Acme HR Inbox. Draining every card that matches each fragment
-        // (rather than assuming exactly one) guarantees ours gets claimed regardless of leftovers.
         string[] taskFragments =
         [
             "Review outstanding documents for employee exit",
@@ -205,18 +153,11 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
                 await profile.GoToAsync(AcmeId, LauraId);
                 await profile.OpenTasksTabAsync();
 
-                // The Tasks tab shows every task ever assigned to Laura, completed ones included
-                // (EmployeeTasksTab.razor applies no status filter) — since the HR document-review
-                // title repeats across duplicate claims, excluding rows already marked "Completed"
-                // picks out the one just claimed rather than an earlier, already-finished one.
                 var claimedRow = _page.Locator(".e-row")
                     .Filter(new() { HasText = claimedTitle })
                     .Filter(new() { HasNotText = "Completed" })
                     .First;
 
-                // OpenTasksTabAsync's own wait only proves *some* row/empty-row rendered, not that
-                // this specific just-claimed row has landed yet — same race MyProfilePage's own
-                // ClickTaskAsync guards against for the identical reason.
                 await claimedRow.WaitForAsync(new() { Timeout = 15_000 });
                 await claimedRow.Locator("button[title='View']").ClickAsync();
 
@@ -235,18 +176,10 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
         // anywhere in the UI regardless of tab visibility.
         await empEdit.GoToAsync(AcmeId, employeeId);
 
-        // Same race documented on EmployeeOnboardingTabTests's equivalent post-completion check:
-        // GoToAsync's own wait condition (the Details tab's combobox) can resolve on an earlier
-        // render pass than this tab's own visibility, which depends on its own async plan-status
-        // load — a bare IsSectionTabPresentAsync() snapshot right after navigation can catch that
-        // transient state. Use an auto-retrying assertion instead of a one-shot check.
         await EmployeeEditPage.SelectOwningGroupAsync(_page, "Offboarding");
         await Assertions.Expect(EmployeeEditPage.SectionTab(_page, "Offboarding"))
             .ToBeVisibleAsync(new() { Timeout = 15_000 });
 
-        // Its content should reflect the completed/historical state, not an active offboarding —
-        // EmployeeLeavingTab.razor labels a Completed/Cancelled process "isHistorical" and shows a
-        // "Completed" status badge rather than the in-progress checklist.
         await EmployeeEditPage.SectionTab(_page, "Offboarding").ClickAsync();
         await Assertions.Expect(_page.GetByText("Completed", new() { Exact = false }).First)
             .ToBeVisibleAsync(new() { Timeout = 15_000 });

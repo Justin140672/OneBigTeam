@@ -5,7 +5,6 @@ using HR.SharedKernel;
 
 namespace HR.Web.Models;
 
-// ── GET ──────────────────────────────────────────────────────────────────────
 
 public record GetCompanyResponse(
     Guid Id,
@@ -32,7 +31,6 @@ public record GetCompanyAddressResponse(
     string? PostalCode,
     string? CountryCode);
 
-// ── UPDATE COMPANY ────────────────────────────────────────────────────────────
 
 public record UpdateCompanyRequest(
     Guid Id,
@@ -50,10 +48,8 @@ public record UpdateCompanyAddressRequest(
     string? PostalCode,
     string? CountryCode);
 
-// Generic response envelope used for PUT /api/companies/{id}
 public record UpdateCompanyResponse(Guid Id, string Name, bool IsActive, int Version = 0);
 
-// ── SETTINGS (Company Administrator territory — profile/regional only) ────────
 
 public record GetCompanySettingsResponse(
     Guid CompanyId,
@@ -75,7 +71,6 @@ public record UpdateCompanySettingsResponse(
     string? Locale,
     DateTime UpdatedAt);
 
-// ── HR SETTINGS (HR Administrator territory — HR policy fields) ──────────────
 
 public record GetHrSettingsResponse(
     Guid CompanyId,
@@ -103,9 +98,6 @@ public record GetHrSettingsResponse(
     int NextAssetNumber,
     int AssetNumberMinimumLength,
     DateTime UpdatedAt,
-    // SET-03 optimistic-concurrency counter shared with Company Settings (both slices mutate the
-    // same CompanySettings row). Must be round-tripped back on save or the server rejects every
-    // save after the first with a phantom "changed by someone else" conflict.
     int Version);
 
 public record UpdateHrSettingsRequest(
@@ -127,8 +119,6 @@ public record UpdateHrSettingsRequest(
     bool AutoDisableAccessOnLeavingDate,
     EmployeeNumberMode EmployeeNumberMode,
     string? EmployeeNumberPrefix,
-    // Null = not changed on this form: the API keeps the live counter (see HR.Modules.Companies'
-    // UpdateHrSettingsRequest.NextEmployeeNumber) instead of rewinding it to the loaded value.
     int? NextEmployeeNumber,
     int EmployeeNumberMinimumLength,
     AssetNumberMode AssetNumberMode,
@@ -161,7 +151,6 @@ public record UpdateHrSettingsResponse(
     DateTime UpdatedAt,
     int Version);
 
-// ── LOGO UPLOAD ───────────────────────────────────────────────────────────────
 
 public record UploadCompanyLogoResponse(
     Guid CompanyId,

@@ -97,8 +97,6 @@ internal sealed class Compensation : IVersionedAggregate
         UpdatedAt = now;
     }
 
-    // Standard 5-day working week * 52 weeks; Hourly needs HoursPerWeek to annualise and returns
-    // null without it rather than guessing a working pattern.
     private const int WorkingDaysPerYear = 260;
 
     public decimal? CalculateAnnualisedSalary() => SalaryType switch

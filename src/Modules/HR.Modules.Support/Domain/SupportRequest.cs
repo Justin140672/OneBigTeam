@@ -72,10 +72,6 @@ internal sealed class SupportRequest : IVersionedAggregate
         };
     }
 
-    /// <summary>
-    /// Applies a staff-driven status transition. Pragmatic guardrail: a closed request cannot be
-    /// silently reopened back to Submitted (it must go through UnderReview or a similar active state).
-    /// </summary>
     public bool CanTransitionTo(SupportRequestStatus newStatus)
     {
         if (Status == SupportRequestStatus.Closed && newStatus == SupportRequestStatus.Submitted)

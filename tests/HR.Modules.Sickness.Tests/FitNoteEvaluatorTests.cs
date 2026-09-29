@@ -17,7 +17,6 @@ public class FitNoteEvaluatorTests
     [Fact]
     public void EvaluateOnCreate_Returns_Pending_When_Ongoing_No_EndDate()
     {
-        // Open record — no end date yet, duration unknown → Pending by default
         var result = FitNoteEvaluator.EvaluateOnCreate(fitNoteRequiredAfterDays: 7, startDate: StartDate, endDate: null);
         Assert.Equal(SicknessEvidenceStatus.Pending, result);
     }
@@ -25,7 +24,6 @@ public class FitNoteEvaluatorTests
     [Fact]
     public void EvaluateOnCreate_Returns_NotRequired_When_CalendarDays_Below_Threshold()
     {
-        // 2026-06-01 to 2026-06-03 = 3 calendar days elapsed, threshold 7 → NotRequired
         var result = FitNoteEvaluator.EvaluateOnCreate(fitNoteRequiredAfterDays: 7, startDate: StartDate, endDate: StartDate.AddDays(2));
         Assert.Equal(SicknessEvidenceStatus.NotRequired, result);
     }
@@ -33,7 +31,6 @@ public class FitNoteEvaluatorTests
     [Fact]
     public void EvaluateOnCreate_Returns_Pending_When_CalendarDays_Equals_Threshold()
     {
-        // Inclusive semantics: start date + 6 = 7 calendar days elapsed
         var result = FitNoteEvaluator.EvaluateOnCreate(fitNoteRequiredAfterDays: 7, startDate: StartDate, endDate: StartDate.AddDays(6));
         Assert.Equal(SicknessEvidenceStatus.Pending, result);
     }
@@ -41,7 +38,6 @@ public class FitNoteEvaluatorTests
     [Fact]
     public void EvaluateOnCreate_Returns_NotRequired_OneDayBeforeThreshold()
     {
-        // start date + 5 = 6 calendar days elapsed, threshold 7 → still NotRequired (boundary case)
         var result = FitNoteEvaluator.EvaluateOnCreate(fitNoteRequiredAfterDays: 7, startDate: StartDate, endDate: StartDate.AddDays(5));
         Assert.Equal(SicknessEvidenceStatus.NotRequired, result);
     }
@@ -56,14 +52,12 @@ public class FitNoteEvaluatorTests
     [Fact]
     public void EvaluateOnCreate_Counts_Weekends_Toward_Threshold()
     {
-        // 2026-06-01 (Mon) to 2026-06-07 (Sun), spanning a full weekend = 7 calendar days elapsed
         var start = new DateOnly(2026, 6, 1);
         var end = new DateOnly(2026, 6, 7);
         var result = FitNoteEvaluator.EvaluateOnCreate(fitNoteRequiredAfterDays: 7, startDate: start, endDate: end);
         Assert.Equal(SicknessEvidenceStatus.Pending, result);
     }
 
-    // EvaluateOnClose
 
     [Fact]
     public void EvaluateOnClose_Does_Not_Override_Received_Status()
@@ -97,7 +91,6 @@ public class FitNoteEvaluatorTests
         Assert.Equal(SicknessEvidenceStatus.NotRequired, result);
     }
 
-    // CalculateCalendarDaysElapsed / IsThresholdReached
 
     [Fact]
     public void CalculateCalendarDaysElapsed_StartDate_Counts_As_Day_One()

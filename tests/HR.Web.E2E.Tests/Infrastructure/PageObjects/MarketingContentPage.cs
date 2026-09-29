@@ -2,23 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for HR.Admin.Web's MarketingContent.razor (/marketing-content) — the platform-admin
-/// page for managing the public marketing site's product features and roadmap items via
-/// MarketingContentAdminService (endpoints /api/marketing/admin/*, policy "platform:admin").
-///
-/// The page renders two "admin-table" tables (Features first, Roadmap second), each row carrying
-/// ↑/↓ reorder SfButtons plus "Edit" and a "Publish"/"Unpublish" toggle SfButton. "+ Add feature" /
-/// "+ Add roadmap item" open an inline edit section (SfTextBox fields; a plain HTML
-/// &lt;select class="admin-select"&gt; for delivery status, so Playwright's SelectOptionAsync is
-/// used rather than the DropDownSelector helper) with a primary "Save feature" / "Save roadmap item"
-/// button. On success MarketingContent.razor shows &lt;p class="admin-action-success"&gt;Saved.&lt;/p&gt;
-/// and reloads the tables in-place; errors render &lt;ul class="admin-action-error"&gt;.
-///
-/// SfTextBox's server-side bound value only round-trips over the Blazor Server circuit on
-/// blur/change, not on FillAsync's raw "input" DOM event alone (same convention documented on
-/// AdminLoginPage.LoginAsync / SettingsPage), so every fill here is followed by a Tab.
-/// </summary>
 public sealed class MarketingContentPage(IPage page, string baseUrl)
 {
     private const string SettledSelector = ".dashboard-error, table.admin-table";
@@ -32,7 +15,6 @@ public sealed class MarketingContentPage(IPage page, string baseUrl)
     public Task<bool> IsErrorBannerVisibleAsync() =>
         page.Locator(".dashboard-error").IsVisibleAsync();
 
-    // Features table is the first .admin-table, Roadmap the second.
     private ILocator FeaturesTable => page.Locator("table.admin-table").Nth(0);
 
     private ILocator RoadmapTable => page.Locator("table.admin-table").Nth(1);
@@ -57,14 +39,12 @@ public sealed class MarketingContentPage(IPage page, string baseUrl)
         return await RoadmapRow(title).First.IsVisibleAsync();
     }
 
-    // Features columns: Order, Title, Slug, Delivery, Published, actions.
     private ILocator FeaturePublishedCell(string title) =>
         FeatureRow(title).First.Locator("td").Nth(4);
 
     public Task<string?> GetFeaturePublishedTextAsync(string title) =>
         FeaturePublishedCell(title).TextContentAsync();
 
-    // Roadmap columns: Order, Title, Delivery, Published, actions.
     private ILocator RoadmapPublishedCell(string title) =>
         RoadmapRow(title).First.Locator("td").Nth(3);
 
@@ -81,7 +61,6 @@ public sealed class MarketingContentPage(IPage page, string baseUrl)
         return titles;
     }
 
-    // --- Inline edit form ---
 
     private ILocator EditField(string label) =>
         page.Locator(".admin-action-field").Filter(new() { Has = page.Locator("label", new() { HasText = label }) });
@@ -111,7 +90,6 @@ public sealed class MarketingContentPage(IPage page, string baseUrl)
         await page.GetByRole(AriaRole.Heading, new() { Name = "Edit feature" }).WaitForAsync(new() { Timeout = 10_000 });
     }
 
-    /// <summary>Fills the feature edit form. Only pass the fields you want to set.</summary>
     public async Task FillFeatureFormAsync(
         string? slug = null,
         string? title = null,
@@ -140,11 +118,6 @@ public sealed class MarketingContentPage(IPage page, string baseUrl)
             await page.Locator("select.admin-select").First.SelectOptionAsync(new SelectOptionValue { Value = deliveryStatus });
     }
 
-    // On a successful save MarketingContent.razor closes the inline edit section (sets
-    // _editingFeature/_editingRoadmap = null); on failure the section stays open and renders
-    // <ul class="admin-action-error">. Waiting on the shared success banner is unreliable here
-    // because a prior action's "Saved." banner is still in the DOM (SaveFeature/SaveRoadmap don't
-    // reset it), so a stale banner would satisfy the wait immediately.
     public async Task SaveFeatureAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save feature", Exact = true }).ClickAsync();
@@ -171,19 +144,12 @@ public sealed class MarketingContentPage(IPage page, string baseUrl)
         }
     }
 
-    // --- Row toggles / reorder ---
 
-    // The Published cell flip is the authoritative signal that the mutation round-tripped and the
-    // table reloaded in-place. The shared "Saved."/error banner can't be used to wait here: the
-    // razor page's ToggleFeaturePublication resets the banner and re-adds it after the round-trip,
-    // but a stale "Saved." <p> from the previous step stays in the DOM long enough to satisfy a
-    // plain WaitForAsync before the click even registers.
     public async Task ToggleFeaturePublicationAsync(string title)
     {
         var cell = FeaturePublishedCell(title);
         var before = ((await cell.TextContentAsync()) ?? "").Trim();
         var row = FeatureRow(title).First;
-        // "Unpublish" also matches a substring "Publish" search, so resolve by exact accessible name.
         var unpublish = row.GetByRole(AriaRole.Button, new() { Name = "Unpublish", Exact = true });
         if (await unpublish.CountAsync() > 0)
             await unpublish.ClickAsync();
@@ -210,7 +176,6 @@ public sealed class MarketingContentPage(IPage page, string baseUrl)
         var before = await GetFeatureTitlesInOrderAsync();
         var startIndex = before.FindIndex(t => t == title);
         await FeatureRow(title).First.GetByRole(AriaRole.Button, new() { Name = "↑" }).ClickAsync();
-        // Wait for the in-place table reload to actually move the row up one position.
         for (var attempt = 0; attempt < 150; attempt++)
         {
             var now = await GetFeatureTitlesInOrderAsync();

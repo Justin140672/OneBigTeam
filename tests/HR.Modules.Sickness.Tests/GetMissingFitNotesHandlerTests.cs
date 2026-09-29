@@ -145,7 +145,6 @@ public class GetMissingFitNotesHandlerTests
         db.SicknessEvidenceRequests.Add(request);
         await db.SaveChangesAsync();
 
-        // Reader returns an empty map — no open Upload task resolved for this request.
         var handler = new GetMissingFitNotesHandler(db, new FakeOpenTaskBySourceEntityReader());
         var result = await handler.HandleAsync(new GetMissingFitNotesRequest(companyId), null, CancellationToken.None);
 

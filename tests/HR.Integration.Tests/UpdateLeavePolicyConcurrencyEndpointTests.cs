@@ -94,8 +94,6 @@ public class UpdateLeavePolicyConcurrencyEndpointTests
             name,
             carryOverDays = carryOver,
             allowNegativeBalance = false,
-            // The first policy created for a fresh company is that company's default; UpdateLeavePolicy
-            // rejects a request that would unset the only default, so echo it back as true.
             isDefault = true,
             requiresApproval = true,
             expectedVersion

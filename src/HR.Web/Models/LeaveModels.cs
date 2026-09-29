@@ -23,7 +23,6 @@ public sealed record LeaveBalanceItemModel(
     decimal? RemainingHours,
     decimal PendingHours);
 
-// ── Leave balance adjustment ─────────────────────────────────────────────
 
 public enum LeaveBalanceAdjustmentReason { Correction, CarryOver, ManualAward, ManualDeduction, Other }
 
@@ -49,18 +48,12 @@ public sealed record AdjustLeaveBalanceResponse(
     Guid AdjustedByEmployeeId,
     DateTimeOffset AdjustedAt);
 
-// ── Leave balance history ────────────────────────────────────────────────
 
 public sealed record LeaveBalanceHistoryResponse(
     Guid EmployeeId,
     Guid LeaveTypeId,
     IReadOnlyList<LeaveBalanceHistoryItemModel> Items);
 
-/// <param name="Category">"ApprovedLeave" | "CancelledLeave" | "ToilAward" | "ManualAdjustment" | "CarryOver".</param>
-/// <param name="Change">Signed hours: negative when the event consumed balance, positive when it added to it.</param>
-/// <param name="Reason">Adjustment reason enum name for manual adjustments/carry-over, or a fixed label
-/// ("Leave Taken"/"Leave Cancelled"/"TOIL Award") for the other categories.</param>
-/// <param name="BalanceAfter">Running balance in hours immediately after this event.</param>
 public sealed record LeaveBalanceHistoryItemModel(
     string Category,
     DateTimeOffset Date,
@@ -71,7 +64,6 @@ public sealed record LeaveBalanceHistoryItemModel(
     string CreatedBy,
     string Description);
 
-// ── Leave request ─────────────────────────────────────────────────────
 
 public enum LeaveDayPart { FullDay, Morning, Afternoon }
 
@@ -108,7 +100,6 @@ public sealed record SubmitLeaveRequestModel(
 
 public sealed record SubmitLeaveResponse(Guid Id, string Status, decimal TotalDays);
 
-// ── Leave policies ─────────────────────────────────────────────────────
 
 public sealed record ListLeavePoliciesResponse(List<LeavePolicyListItemModel> Items);
 
@@ -189,7 +180,6 @@ public sealed class LeavePolicyEditModel : IHasVersion
     public bool IsDefault { get; set; }
 }
 
-// ── Leave request list ─────────────────────────────────────────────────────
 
 public sealed record LeaveRequestListResponse(IReadOnlyList<LeaveRequestListItem> Items);
 
@@ -221,7 +211,6 @@ public sealed record GetLeaveRequestResponse(
     string? RejectionReason,
     DateTimeOffset CreatedAt);
 
-// ── DASHBOARD: RECENT LEAVE REQUESTS ────────────────────────────────────────────
 
 public sealed record GetRecentLeaveRequestsResponse(IReadOnlyList<RecentLeaveRequestItem> Items);
 

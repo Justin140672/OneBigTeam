@@ -3,11 +3,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Companies.Features.GetHrSettingsHistory;
 
-/// <summary>
-/// SET-02 counterpart to GetCompanySettingsHistory, scoped to HR Administrators and restricted to
-/// the "hr-settings.updated" event type so it never surfaces company-profile (time zone/locale)
-/// changes owned by the Company Administrator area.
-/// </summary>
 internal sealed class GetHrSettingsHistoryHandler(
     IAuditHistoryReader auditHistoryReader,
     IUserEmailDirectoryReader userEmailDirectoryReader)

@@ -3,17 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Split out of BulkEmployeeInvitationTests for real cross-test parallelism — see
-/// BulkEmployeeInvitationGettingStartedTests' remarks.
-///
-/// Best-effort coverage of the "Retry failed invitations" control's own visibility contract: it
-/// is rendered only once a batch shows Failed &gt; 0 (see InvitationBatchProgressPanel.razor).
-/// Since a real Failed outcome depends on the (non-deterministic in this environment) email
-/// sender genuinely failing, this asserts the negative/default case deterministically — no Retry
-/// button while Failed == 0 — which is exercised by every other invite-sending test in this suite
-/// that reaches a Completed batch with 0 failures.
-/// </summary>
 public sealed class BulkEmployeeInvitationRetryButtonTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -49,8 +38,5 @@ public sealed class BulkEmployeeInvitationRetryButtonTests(HrAdminPersonaFixture
             Assert.False(await progressPanel.HasRetryButtonAsync(),
                 "Expected no 'Retry failed invitations' button while the batch has 0 Failed recipients");
         }
-        // If the environment's email sender happens to genuinely fail for this recipient, Failed
-        // will be > 0 and the button is expected to show — nothing further to assert here without
-        // faking the send outcome (see this class's own remarks above).
     }
 }

@@ -5,12 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Probation.Services;
 
-/// <summary>
-/// DSH-05 implementation of <see cref="IEmployeesInProbationReader"/>. "In probation" = an active
-/// probation record (Active / ReviewDue / Extended). NotStarted, Passed, Failed and NotApplicable
-/// are excluded — see the interface doc for why a review being due is not the same as being in
-/// probation.
-/// </summary>
 internal sealed class EmployeesInProbationReader(ProbationDbContext dbContext) : IEmployeesInProbationReader
 {
     private static readonly ProbationStatus[] ActiveStatuses =

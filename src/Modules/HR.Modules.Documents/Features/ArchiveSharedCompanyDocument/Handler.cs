@@ -58,15 +58,8 @@ internal sealed class ArchiveSharedCompanyDocumentHandler(
         var reason = request.Reason.Trim();
         document.Archive(archivedBy, reason, now);
 
-        // Cancelling happens after the archive save below (it's a separate call against the Tasks
-        // module, not part of this DbContext's unit of work), so the cancelled-task count can't be
-        // known before the save. Response therefore can't be built purely from in-memory values
-        // ahead of the save for this handler — persisted first, then finalised.
         await db.SaveChangesAsync(cancellationToken);
 
-        // Cancelling is safe/correct regardless of RequiresAcknowledgement's current value — a
-        // document could have had acknowledgement required at some point with tasks still
-        // outstanding, even if the setting was later toggled off. No-op if nothing is open.
         var cancelledCount = await taskCanceller.CancelAllBySourceEntityAsync(
             request.CompanyId,
             document.Id,
@@ -85,12 +78,6 @@ internal sealed class ArchiveSharedCompanyDocumentHandler(
 
         if (request.IdempotencyKey is { } key)
         {
-            // The business save already happened above; this call only persists the idempotency
-            // record itself (with the final response, including the task-cancellation count) so a
-            // retry of the same key can be replayed. A concurrent same-key racer would already have
-            // failed the earlier precheck or hit the unique-key insert below and rolled back
-            // *its own* record — the archive itself was already committed by whichever request won
-            // the underlying document-status check, so there is no risk of double-archiving.
             await db.SaveIdempotentAsync(db.IdempotencyRecords,
             scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
         }

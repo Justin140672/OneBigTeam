@@ -8,12 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Proves GetMyProbationStatus is reachable by a plain, authenticated Employee — resolving the
-/// employee purely from the caller's own "sub" claim — unlike the HR-only
-/// GetProbationRecordByEmployee endpoint ("probation:manage") which 403s a real employee viewing
-/// their own profile.
-/// </summary>
 [Collection("Integration")]
 public class GetMyProbationStatusEndpointTests
 {

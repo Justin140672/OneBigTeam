@@ -19,11 +19,8 @@ public sealed class EmployeeProfilePermissionsTests(PriyaShahPersonaFixture fixt
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    // Marcus Diallo — seeded HR Advisor (also used by EmployeeEditCloseBehaviorTests/AssignManagerTests).
     private static readonly Guid MarcusId = Guid.Parse("30000000-0000-0000-0000-000000000006");
 
-    // Priya has the CompanyAdministrator role only — CanManageEmployees is false, CanManageCompany
-    // is true (see CompanyAdministratorAccessTests).
     private const string CompanyAdminEmail = "priya.shah@acme.example";
 
     [Fact]
@@ -43,8 +40,6 @@ public sealed class EmployeeProfilePermissionsTests(PriyaShahPersonaFixture fixt
             $"Expected Priya (CompanyAdministrator-only, no CanManageEmployees) to be redirected away from " +
             $"another employee's profile view route, but ended up at: {finalUrl}");
 
-        // Never even reaches the DOM with an "Edit details" button / "Users & Access" card to
-        // probe for — the whole page is gated server-side, not merely a hidden button.
         Assert.False(await _page.Locator("[data-testid='edit-details-button']").IsVisibleAsync(),
             "Expected no 'Edit details' button to ever render for a user without CanManageEmployees");
     }

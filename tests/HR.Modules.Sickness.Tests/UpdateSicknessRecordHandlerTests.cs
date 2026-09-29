@@ -88,7 +88,7 @@ public class UpdateSicknessRecordHandlerTests
         Assert.Equal(new DateOnly(2026, 7, 2), result.Value.StartDate);
         Assert.Equal(SicknessDayPart.HalfDayAM, result.Value.StartDayPart);
         Assert.Equal("Updated notes", result.Value.Notes);
-        Assert.Null(result.Value.TotalDays); // still open
+        Assert.Null(result.Value.TotalDays);
     }
 
     [Fact]
@@ -100,7 +100,6 @@ public class UpdateSicknessRecordHandlerTests
         var categoryId = await SeedCategory(db, companyId);
         var record = await SeedClosedRecord(db, companyId, employeeId, categoryId);
 
-        // Change startDate to 2026-07-02 (Thu), endDate stays 2026-07-03 (Fri) = 2 days
         var result = await BuildHandler(db).HandleAsync(new UpdateSicknessRecordRequest
         {
             CompanyId = companyId,
@@ -151,7 +150,7 @@ public class UpdateSicknessRecordHandlerTests
             CompanyId = companyId,
             EmployeeId = employeeId,
             Id = record.Id,
-            CategoryId = Guid.NewGuid(), // non-existent category
+            CategoryId = Guid.NewGuid(),
             StartDate = StartDate,
             StartDayPart = SicknessDayPart.FullDay
         }, CancellationToken.None);
@@ -208,8 +207,6 @@ public class UpdateSicknessRecordHandlerTests
         Assert.Empty(auditPublisher.PublishedEvents);
     }
 
-    // SICK-06: actor is the caller who submitted the update (manager/HR via ICurrentUser),
-    // threaded via UpdateSicknessRecordRequest.ActorEmployeeId.
     [Fact]
     public async Task HandleAsync_Audit_ActorEmployeeId_Reflects_Authenticated_Caller_Not_Employee()
     {
@@ -270,8 +267,6 @@ public class UpdateSicknessRecordHandlerTests
         Assert.Equal(new DateOnly(2026, 7, 5), auditEvent.StartDate);
     }
 
-    // SICK-06: Notes is free-text and must never appear in the serialized audit event, whether
-    // supplied as the pre-existing value or the new value being set.
     [Fact]
     public async Task HandleAsync_Audit_Event_Does_Not_Contain_Notes_Free_Text()
     {

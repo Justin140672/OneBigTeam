@@ -77,11 +77,6 @@ public class GetOffboardingStatusEndpointTests
         var employeeId = await CreateEmployeeAsync(client, companyId);
         await StartOffboardingAsync(client, companyId, employeeId, DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30), "Resigned.");
 
-        // No manager and no assets were set, so StartOffboardingHandler generates exactly 5
-        // tasks — 1 HR document-review task (always unassigned) + 4 manager exit-checklist
-        // tasks (fall back to unassigned since there's no manager to assign them to) — none of
-        // which are assigned to the employee themselves, so they must be fetched via the
-        // unassigned-tasks inbox rather than GET /employees/{employeeId}/tasks.
         var listResp = await client.GetAsync($"/api/companies/{companyId}/tasks/unassigned");
         listResp.EnsureSuccessStatusCode();
         var tasks = (await listResp.Content.ReadFromJsonAsync<UnassignedTasksPayload>())!.Items
@@ -108,7 +103,6 @@ public class GetOffboardingStatusEndpointTests
         Assert.Equal("Completed", payload.Status);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AdminClient(Guid companyId)
     {

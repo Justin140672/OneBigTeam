@@ -8,17 +8,10 @@ internal sealed record ListVacanciesRequest
     public Guid CompanyId { get; init; }
     public VacancyStatus? Status { get; init; }
 
-    // Direct filter — matches Vacancy.PositionProfileId exactly.
     public Guid? PositionProfileId { get; init; }
 
-    // Indirect filter — Vacancy has no department column of its own (department comes exclusively
-    // from the linked Position Profile), so the handler first resolves the set of Position Profile IDs
-    // belonging to this department (via IPositionProfileReader.GetIdsByDepartmentAsync) and then
-    // filters vacancies whose PositionProfileId is in that set.
     public Guid? DepartmentId { get; init; }
 
-    // "Show Active"/"Show Inactive" toggle — matches ListDepartmentsRequest's own ShowInactive
-    // convention. Pushed to SQL (a real Vacancy.Status column comparison), unlike Search below.
     public bool ExcludeClosed { get; init; }
 
     // Matched against EffectiveTitle (AdvertTitle, falling back to the linked Position Profile's
@@ -33,13 +26,5 @@ internal sealed record ListVacanciesRequest
     // other SearchPageBase list page (see VacancyList.razor's own remarks on the bug this fixes).
     public string? Search { get; init; }
 
-    // Optional/backward-compatible — omitted by every existing caller (VacancyList.razor's admin
-    // grid needs the full company set for its own client-side paging), so their behavior is
-    // unchanged. Added for callers that only need a bounded, type-to-search dropdown (see
-    // RecruitmentDashboard.razor's vacancy picker) — the "vacancy counts per company are small"
-    // assumption behind Search's own in-memory filtering above stopped holding once a long-lived
-    // shared company accumulates vacancies across hundreds of E2E test runs that each create a
-    // fresh one and never close/clean it up, which is exactly the same shape of real,
-    // user-observed slow-dropdown regression already found and fixed for Position Profiles.
     public int? PageSize { get; init; }
 }

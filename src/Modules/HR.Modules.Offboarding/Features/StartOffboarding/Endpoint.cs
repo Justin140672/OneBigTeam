@@ -17,8 +17,6 @@ internal sealed class Endpoint(StartOffboardingHandler handler, ICurrentUser cur
     {
         var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
 
-        // OFF-08: resolved server-side from the authenticated user, never bound from the client
-        // body — identifies the human HR actor who manually started this plan.
         var result = await handler.HandleAsync(
             request with
             {

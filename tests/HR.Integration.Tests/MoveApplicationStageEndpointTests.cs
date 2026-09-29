@@ -77,7 +77,6 @@ public class MoveApplicationStageEndpointTests
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
         var (vacancyId, applicationId, _, cvReviewStageId, _) = await SeedApplicationAsync(companyId, referenceData.PositionProfileId);
 
-        // Plain Employee holds recruitment:view but not recruitment:manage (ticket #68).
         using var client = await AuthenticatedClient(PlainEmployeeUser, companyId);
 
         var response = await client.PostAsJsonAsync(

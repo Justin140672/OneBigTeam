@@ -20,7 +20,6 @@ internal sealed class Endpoint(
         CancelLeaveRequestRequest request,
         CancellationToken cancellationToken)
     {
-        // LEAVE-01: cancel is self-service only, same scope as submit/preview.
         if (currentUser.UserId is not { } callerId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
@@ -41,8 +40,6 @@ internal sealed class Endpoint(
 
         if (result.IsFailure)
         {
-            // P1 #4: routes "concurrency" (as well as "conflict") to 409, matching every other
-            // versioned-aggregate endpoint (see ProblemResults.FromError).
             await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }

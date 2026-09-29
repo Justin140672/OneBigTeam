@@ -82,8 +82,8 @@ public class DynamicRegexAttributeTests
     }
 
     [Theory]
-    [InlineData("07700 900000")] // matches mobile pattern
-    [InlineData("01234 567890")] // matches telephone pattern
+    [InlineData("07700 900000")]
+    [InlineData("01234 567890")]
     public void IsValid_When_Value_Matches_Any_Of_Multiple_Patterns(string phoneNumber)
     {
         var model = new DualPatternModel

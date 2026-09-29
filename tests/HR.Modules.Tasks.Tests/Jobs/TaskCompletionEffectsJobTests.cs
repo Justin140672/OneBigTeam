@@ -119,7 +119,6 @@ public class TaskCompletionEffectsJobTests
         var companyId = Guid.NewGuid();
         var completedBy = Guid.NewGuid();
 
-        // No TaskItem seeded — it no longer exists.
         var operation = TaskCompletionOperation.CreatePending(
             Guid.NewGuid(), companyId, Guid.NewGuid(), completedBy, null, null, DateTimeOffset.UtcNow);
         operation.MarkDispatchApplied(DateTimeOffset.UtcNow);
@@ -170,9 +169,6 @@ public class TaskCompletionEffectsJobTests
         await using var context = BuildContext();
         var (companyId, employeeId, completedBy, task, operation) = await SeedDispatchAppliedOperationAsync(context);
 
-        // Simulate a prior attempt that already wrote the notification (e.g. the inline write in
-        // CompleteTaskHandler actually succeeded, but the subsequent audit publish failed) —
-        // ExistsAsync now returns true for this (employeeId, taskId, TaskCompleted) triple.
         var notif = new FakeNotificationWriter();
         await notif.WriteAsync(
             Guid.NewGuid(), companyId, employeeId, "Task completed: Onboarding checklist", null,
@@ -184,10 +180,8 @@ public class TaskCompletionEffectsJobTests
 
         await job.ProcessAsync(operation.Id, companyId);
 
-        // No duplicate write — count unchanged.
         Assert.Equal(preExistingCount, notif.Written.Count);
 
-        // Audit is still published on a retry (no natural dedupe key for it).
         Assert.Single(audit.Published);
 
         var reloaded = await context.TaskCompletionOperations.AsNoTracking().SingleAsync(o => o.Id == operation.Id);

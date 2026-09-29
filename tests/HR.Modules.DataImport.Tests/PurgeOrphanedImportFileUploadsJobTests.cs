@@ -10,13 +10,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Modules.DataImport.Tests;
 
-/// <summary>
-/// Security/code review finding #3: PurgeOrphanedImportFileUploadsJob is the durable safety-net
-/// sweep for import workbook blobs uploaded to storage whose owning ImportSession row then failed
-/// to save (and the handler's own immediate compensating delete also failed — see
-/// Features/UploadImportFile/Handler.cs). Mirrors PurgeImportSessionFilesJobTests' shape (finding
-/// #2) since the job itself mirrors PurgeImportSessionFilesJob.
-/// </summary>
 public class PurgeOrphanedImportFileUploadsJobTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 22, 9, 0, 0, TimeSpan.Zero);
@@ -28,18 +21,12 @@ public class PurgeOrphanedImportFileUploadsJobTests
         ExhaustedAttemptThreshold = 3,
     };
 
-    private static readonly DateTimeOffset InsideRetryGrace = Now.AddMinutes(-30); // < 1 hour
-    private static readonly DateTimeOffset PastRetryGrace = Now.AddHours(-2); // > 1 hour
+    private static readonly DateTimeOffset InsideRetryGrace = Now.AddMinutes(-30);
+    private static readonly DateTimeOffset PastRetryGrace = Now.AddHours(-2);
 
-    // All BuildContext(dbName) calls within a single test must share the same in-memory database
-    // name so the seed/run/verify phases (each opening their own DbContext, mirroring a real
-    // scoped-per-request/per-job-run lifetime) actually observe each other's writes.
     private static DataImportDbContext BuildContext(string databaseName)
     {
         var builder = new DbContextOptionsBuilder<DataImportDbContext>();
-        // Wires VersionAdvancingSaveChangesInterceptor — required for OrphanedImportFileUpload.Version
-        // to actually advance across separate DbContext instances, matching production wiring
-        // (DataImportModule.cs) and what the concurrency-race test below relies on.
         builder.UseVersionedAggregates().UseInMemoryDatabase(databaseName);
         return new DataImportDbContext(builder.Options);
     }
@@ -97,7 +84,7 @@ public class PurgeOrphanedImportFileUploadsJobTests
         var dbName = Guid.NewGuid().ToString("N");
         var storage = new FakeImportFileStorageService();
         var orphan = CreateOrphan(companyId, "companies/c2/upload.xlsx", PastRetryGrace);
-        orphan.RecordAttemptFailed(PastRetryGrace); // earlier attempt failed
+        orphan.RecordAttemptFailed(PastRetryGrace);
         storage.SeedContent(orphan.StorageKey, [1, 2, 3]);
 
         await using (var seed = BuildContext(dbName))
@@ -114,7 +101,7 @@ public class PurgeOrphanedImportFileUploadsJobTests
         await using var verify = BuildContext(dbName);
         var saved = await verify.OrphanedImportFileUploads.SingleAsync(o => o.Id == orphan.Id);
         Assert.NotNull(saved.DeletedAt);
-        Assert.Equal(1, saved.AttemptCount); // unchanged by a successful delete
+        Assert.Equal(1, saved.AttemptCount);
     }
 
     [Fact]
@@ -134,7 +121,6 @@ public class PurgeOrphanedImportFileUploadsJobTests
 
         await using (var db = BuildContext(dbName))
         {
-            // Should not throw despite the storage failure.
             await BuildJob(db, storage).ExecuteAsync();
         }
 
@@ -154,7 +140,7 @@ public class PurgeOrphanedImportFileUploadsJobTests
         var dbName = Guid.NewGuid().ToString("N");
         var storage = new FakeImportFileStorageService();
         var orphan = CreateOrphan(companyId, "companies/c4/upload.xlsx", Now.AddDays(-1));
-        orphan.RecordAttemptFailed(InsideRetryGrace); // last attempt too recent to retry yet
+        orphan.RecordAttemptFailed(InsideRetryGrace);
         storage.SeedContent(orphan.StorageKey, [1, 2, 3]);
 
         await using (var seed = BuildContext(dbName))
@@ -173,7 +159,7 @@ public class PurgeOrphanedImportFileUploadsJobTests
         await using var verify = BuildContext(dbName);
         var saved = await verify.OrphanedImportFileUploads.SingleAsync(o => o.Id == orphan.Id);
         Assert.Null(saved.DeletedAt);
-        Assert.Equal(1, saved.AttemptCount); // unchanged — not retried this tick
+        Assert.Equal(1, saved.AttemptCount);
     }
 
     [Fact]
@@ -212,8 +198,6 @@ public class PurgeOrphanedImportFileUploadsJobTests
         var storage = new FakeImportFileStorageService { ThrowOnNextDeleteAttempts = 1 };
         var alerts = new FakeAdministrativeAlertWriter();
         var orphan = CreateOrphan(companyId, "companies/c6/upload.xlsx", Now.AddDays(-1));
-        // Two prior failed attempts already recorded; ExhaustedAttemptThreshold is 3, so this
-        // sweep's failure will bring the count to 3 and should raise the alert.
         orphan.RecordAttemptFailed(PastRetryGrace);
         orphan.RecordAttemptFailed(PastRetryGrace);
         storage.SeedContent(orphan.StorageKey, [1, 2, 3]);
@@ -247,7 +231,7 @@ public class PurgeOrphanedImportFileUploadsJobTests
         var dbName = Guid.NewGuid().ToString("N");
         var storage = new FakeImportFileStorageService { ThrowOnNextDeleteAttempts = 1 };
         var alerts = new FakeAdministrativeAlertWriter();
-        var orphan = CreateOrphan(companyId, "companies/c7/upload.xlsx", PastRetryGrace); // first-ever attempt: 0 -> 1
+        var orphan = CreateOrphan(companyId, "companies/c7/upload.xlsx", PastRetryGrace);
         storage.SeedContent(orphan.StorageKey, [1, 2, 3]);
 
         await using (var seed = BuildContext(dbName))
@@ -308,14 +292,11 @@ public class PurgeOrphanedImportFileUploadsJobTests
             await seed.SaveChangesAsync();
         }
 
-        // First run: deletes the file.
         await using (var db = BuildContext(dbName))
         {
             await BuildJob(db, storage).ExecuteAsync();
         }
 
-        // Second run against a fresh DbContext: DeletedAt is already set, so the row is no longer
-        // an eligible candidate at all — a row with DeletedAt set is never touched again.
         await using (var db = BuildContext(dbName))
         {
             await BuildJob(db, storage).ExecuteAsync();
@@ -348,9 +329,6 @@ public class PurgeOrphanedImportFileUploadsJobTests
         Assert.Empty(storage.Deletions);
     }
 
-    // --- P1 fix (Sept 2026): the deletion phase must never reach a row that is still inside the
-    // upload-intent grace period, regardless of whether an object already exists in storage. See
-    // Domain/OrphanedImportFileUpload.cs (DeletionEligibleAt) and the job's DeleteConfirmedOrphansAsync.
 
     [Fact]
     public async Task Recent_Reserved_Intent_With_An_Existing_Object_Is_Not_Deleted()
@@ -358,7 +336,6 @@ public class PurgeOrphanedImportFileUploadsJobTests
         var companyId = Guid.NewGuid();
         var dbName = Guid.NewGuid().ToString("N");
         var storage = new FakeImportFileStorageService();
-        // Reserved moments ago — an upload could still genuinely be in flight for this key.
         var intent = CreateOrphan(companyId, "companies/c11/upload.xlsx", Now.AddMinutes(-1));
         storage.SeedContent(intent.StorageKey, [1, 2, 3]);
 
@@ -379,7 +356,7 @@ public class PurgeOrphanedImportFileUploadsJobTests
         var saved = await verify.OrphanedImportFileUploads.SingleAsync(o => o.Id == intent.Id);
         Assert.Null(saved.DeletedAt);
         Assert.Null(saved.ClearedAt);
-        Assert.Null(saved.DeletionEligibleAt); // still Reserved — resolution never even looked at it
+        Assert.Null(saved.DeletionEligibleAt);
     }
 
     [Fact]
@@ -387,7 +364,7 @@ public class PurgeOrphanedImportFileUploadsJobTests
     {
         var companyId = Guid.NewGuid();
         var dbName = Guid.NewGuid().ToString("N");
-        var storage = new FakeImportFileStorageService(); // nothing seeded — object never existed
+        var storage = new FakeImportFileStorageService();
         var intent = CreateOrphan(companyId, "companies/c12/upload.xlsx", Now.AddMinutes(-1));
 
         await using (var seed = BuildContext(dbName))
@@ -403,7 +380,7 @@ public class PurgeOrphanedImportFileUploadsJobTests
 
         await using var verify = BuildContext(dbName);
         var saved = await verify.OrphanedImportFileUploads.SingleAsync(o => o.Id == intent.Id);
-        Assert.Null(saved.ClearedAt); // too recent to resolve either way — left untouched
+        Assert.Null(saved.ClearedAt);
         Assert.Null(saved.DeletionEligibleAt);
     }
 
@@ -413,7 +390,7 @@ public class PurgeOrphanedImportFileUploadsJobTests
         var companyId = Guid.NewGuid();
         var dbName = Guid.NewGuid().ToString("N");
         var storage = new FakeImportFileStorageService();
-        var intent = CreateOrphan(companyId, "companies/c13/upload.xlsx", Now.AddHours(-2)); // past the 1h default grace
+        var intent = CreateOrphan(companyId, "companies/c13/upload.xlsx", Now.AddHours(-2));
         storage.SeedContent(intent.StorageKey, [1, 2, 3]);
 
         await using (var seed = BuildContext(dbName))
@@ -440,7 +417,7 @@ public class PurgeOrphanedImportFileUploadsJobTests
     {
         var companyId = Guid.NewGuid();
         var dbName = Guid.NewGuid().ToString("N");
-        var storage = new FakeImportFileStorageService(); // nothing seeded
+        var storage = new FakeImportFileStorageService();
         var intent = CreateOrphan(companyId, "companies/c14/upload.xlsx", Now.AddHours(-2));
 
         await using (var seed = BuildContext(dbName))
@@ -466,16 +443,10 @@ public class PurgeOrphanedImportFileUploadsJobTests
     [Fact]
     public async Task Upload_Paused_After_Reservation_While_Reconciliation_Runs_Leaves_The_Intent_Untouched()
     {
-        // Controlled interleaving: an UploadImportFileHandler request has just reserved its intent
-        // (step 1 of the ticket's failure sequence) and is still mid-upload when the reconciliation
-        // sweep fires concurrently (step 3) — before this fix, DeleteConfirmedOrphansAsync had no
-        // grace check at all and could delete the object out from under the in-flight upload.
         var companyId = Guid.NewGuid();
         var dbName = Guid.NewGuid().ToString("N");
         var storage = new FakeImportFileStorageService();
-        var intent = CreateOrphan(companyId, "companies/c15/upload.xlsx", Now); // reserved this instant
-        // The object may or may not exist yet depending on exactly how far the upload has
-        // progressed — assert the same "untouched" outcome either way.
+        var intent = CreateOrphan(companyId, "companies/c15/upload.xlsx", Now);
         storage.SeedContent(intent.StorageKey, [1, 2, 3]);
 
         await using (var seed = BuildContext(dbName))
@@ -502,11 +473,6 @@ public class PurgeOrphanedImportFileUploadsJobTests
     [Fact]
     public async Task Confirmation_Racing_Ahead_Of_The_Deletion_Phase_Prevents_Deletion_And_Leaves_The_File_In_Place()
     {
-        // A confirmed request must never end up pointing at a deleted file. This simulates the
-        // job's deletion-phase query having already loaded a deletion-eligible candidate (a stale
-        // in-memory snapshot with ConfirmedAt still null) when a confirming request commits
-        // ConfirmedAt concurrently, immediately before the job's claim step. The job must detect
-        // this via its optimistic-concurrency token and skip storage.DeleteAsync entirely.
         var companyId = Guid.NewGuid();
         var dbName = Guid.NewGuid().ToString("N");
         var storage = new FakeImportFileStorageService();
@@ -519,18 +485,12 @@ public class PurgeOrphanedImportFileUploadsJobTests
             await seed.SaveChangesAsync();
         }
 
-        // First sweep resolves the intent to deletion-eligible but we intercede before a second
-        // sweep would delete it: load it into a job-owned context (as DeleteConfirmedOrphansAsync's
-        // own query would), simulating "the job has this row's stale, pre-confirmation snapshot".
         await using var jobDb = BuildContext(dbName);
         var job = BuildJob(jobDb, storage);
-        await job.ExecuteAsync(); // resolves -> DeletionEligibleAt set, then deletes immediately (no race yet)
+        await job.ExecuteAsync();
 
         Assert.Contains(intent.StorageKey, storage.Deletions);
 
-        // Re-seed a second, independent eligible orphan to exercise the actual race window: load it
-        // into the job's context first (stale snapshot), THEN confirm it via a separate context,
-        // THEN let the job's own claim step run against its stale snapshot.
         var raceIntent = CreateOrphan(companyId, "companies/c17/upload.xlsx", Now.AddHours(-2));
         storage.SeedContent(raceIntent.StorageKey, [4, 5, 6]);
 
@@ -541,13 +501,10 @@ public class PurgeOrphanedImportFileUploadsJobTests
         }
 
         await using var raceJobDb = BuildContext(dbName);
-        // Mirrors DeleteConfirmedOrphansAsync's own resolution step run just before deletion: mark
-        // eligible and load it into raceJobDb's change tracker, exactly as the job would.
         var tracked = await raceJobDb.OrphanedImportFileUploads.SingleAsync(o => o.Id == raceIntent.Id);
         tracked.MarkDeletionEligible(Now.AddHours(-1));
         await raceJobDb.SaveChangesAsync();
 
-        // Confirmation wins the race, via a completely independent context/connection.
         await using (var confirmingDb = BuildContext(dbName))
         {
             var confirming = await confirmingDb.OrphanedImportFileUploads.SingleAsync(o => o.Id == raceIntent.Id);
@@ -555,9 +512,6 @@ public class PurgeOrphanedImportFileUploadsJobTests
             await confirmingDb.SaveChangesAsync();
         }
 
-        // The job's claim step (the exact mechanism DeleteConfirmedOrphansAsync uses immediately
-        // before calling storage.DeleteAsync) must now detect the stale Version and refuse to
-        // proceed to the destructive call.
         tracked.BeginDeletionAttempt(Now);
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => raceJobDb.SaveChangesAsync());
 
@@ -566,6 +520,6 @@ public class PurgeOrphanedImportFileUploadsJobTests
         await using var verify = BuildContext(dbName);
         var saved = await verify.OrphanedImportFileUploads.SingleAsync(o => o.Id == raceIntent.Id);
         Assert.NotNull(saved.ConfirmedAt);
-        Assert.Null(saved.DeletedAt); // confirmed session's file was never touched
+        Assert.Null(saved.DeletedAt);
     }
 }

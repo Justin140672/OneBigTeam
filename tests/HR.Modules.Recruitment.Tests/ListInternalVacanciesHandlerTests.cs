@@ -249,7 +249,6 @@ public class ListInternalVacanciesHandlerTests
         var colleagueVacancy = OpenAdvertised(companyId, Guid.NewGuid(), "Colleague Role");
         var externalVacancy = OpenAdvertised(companyId, Guid.NewGuid(), "External Role");
         var colleague = Candidate.CreateForEmployee(Guid.NewGuid(), companyId, colleagueId, "Tom", "Baker", "tom.baker@acme.example", null, Now);
-        // An unlinked external candidate that happens to share the employee's email.
         var external = Candidate.Create(Guid.NewGuid(), companyId, "Priya", "Shah", "priya.shah@acme.example", null, null, Now);
 
         db.Vacancies.AddRange(colleagueVacancy, externalVacancy);

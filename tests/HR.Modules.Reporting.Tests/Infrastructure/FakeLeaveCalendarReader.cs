@@ -2,11 +2,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Reporting.Tests.Infrastructure;
 
-/// <summary>
-/// Hand-rolled fake for <see cref="ILeaveCalendarReader"/> — records the arguments it was called
-/// with and returns a pre-configured, unpaged set of items (matching the real reader's contract of
-/// returning unpaged rows for the requested month, with row-cap enforcement left to the caller).
-/// </summary>
 internal sealed class FakeLeaveCalendarReader : ILeaveCalendarReader
 {
     private readonly IReadOnlyList<LeaveCalendarReportItem> _items;

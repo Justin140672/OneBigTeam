@@ -8,8 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Tests;
 
-// Unit tests for EmployeePromotionFinalizer in isolation, exercised directly rather than through
-// PromoteEmployeeHandler or ProcessPromotionsJob that also call it.
 public class EmployeePromotionFinalizerTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 7, 25, 8, 0, 0, DateTimeKind.Utc);

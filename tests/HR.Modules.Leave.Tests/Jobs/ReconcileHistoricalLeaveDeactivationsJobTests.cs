@@ -8,10 +8,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Leave.Tests.Jobs;
 
-// Round 3 reliability fix (Gap-2 follow-up): ReconcileMissingLeaveDeactivationsJob's 30-day lookback
-// can never see a stranded departure finalised further back than that — this job walks the ENTIRE
-// finalised-departure history in bounded, paginated batches, resuming from a durably persisted
-// cursor, and is rehire-safe (skips employees who are current/non-former again).
 public class ReconcileHistoricalLeaveDeactivationsJobTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 15, 9, 0, 0, TimeSpan.Zero);
@@ -40,7 +36,6 @@ public class ReconcileHistoricalLeaveDeactivationsJobTests
     [Fact]
     public async Task ExecuteAsync_Repairs_Departure_Finalised_More_Than_30_Days_Ago()
     {
-        // The exact case ReconcileMissingLeaveDeactivationsJob's 30-day lookback can never reach.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -63,7 +58,7 @@ public class ReconcileHistoricalLeaveDeactivationsJobTests
         Assert.Single(jobClient.CreatedJobs, j => j.Type == typeof(LeavePolicyDeactivationJob));
 
         var progress = await db.HistoricalLeaveDeactivationRepairProgress.SingleAsync();
-        Assert.True(progress.IsComplete); // page returned fewer than BatchSize -> sweep complete
+        Assert.True(progress.IsComplete);
         Assert.Equal(1, progress.TotalRepaired);
     }
 
@@ -83,7 +78,7 @@ public class ReconcileHistoricalLeaveDeactivationsJobTests
         var reader = new FakeFinalisedEmployeeDeparturesReader();
         reader.Add(Departure(companyId, employeeId, Now.AddDays(-400)));
 
-        var currentEmployeeReader = new FakeCurrentEmployeeReader([employeeId]); // rehired: current again
+        var currentEmployeeReader = new FakeCurrentEmployeeReader([employeeId]);
         var jobClient = new RecordingBackgroundJobClient();
         var job = BuildJob(db, reader, jobClient, currentEmployeeReader);
 
@@ -141,7 +136,7 @@ public class ReconcileHistoricalLeaveDeactivationsJobTests
         var rows = await db.LeavePolicyDeactivationsOnDeparture
             .Where(d => d.CompanyId == companyId && d.EmployeeId == employeeId)
             .ToListAsync();
-        Assert.Single(rows); // no duplicate
+        Assert.Single(rows);
         Assert.Empty(jobClient.CreatedJobs);
     }
 
@@ -162,8 +157,6 @@ public class ReconcileHistoricalLeaveDeactivationsJobTests
         var jobClient = new RecordingBackgroundJobClient();
 
         await BuildJob(db, reader, jobClient).ExecuteAsync();
-        // Second run: the first run already marked the sweep complete (single small page), so this
-        // must be a cheap permanent no-op — the defining behaviour of IsComplete.
         await BuildJob(db, reader, jobClient).ExecuteAsync();
 
         var rows = await db.LeavePolicyDeactivationsOnDeparture
@@ -198,8 +191,6 @@ public class ReconcileHistoricalLeaveDeactivationsJobTests
 
         await job.ExecuteAsync();
 
-        // Even though a "missing" departure exists in the reader, the sweep is already marked
-        // complete and must never process anything further.
         Assert.Empty(await db.LeavePolicyDeactivationsOnDeparture.ToListAsync());
         Assert.Empty(jobClient.CreatedJobs);
     }
@@ -244,9 +235,6 @@ public class ReconcileHistoricalLeaveDeactivationsJobTests
     }
 }
 
-/// <summary>Test-only access to HistoricalLeaveDeactivationRepairProgress's internal factory, since
-/// the job type itself only ever creates one via CreateNew — tests need to seed an already-complete
-/// row directly to exercise the "permanent no-op" path without needing 200+ departure rows.</summary>
 internal static class HistoricalLeaveDeactivationRepairProgressTestHelper
 {
     public static HistoricalLeaveDeactivationRepairProgress CreateComplete(DateTimeOffset now)

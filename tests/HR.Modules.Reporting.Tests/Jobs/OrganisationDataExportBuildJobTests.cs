@@ -65,10 +65,6 @@ public class OrganisationDataExportBuildJobTests
 
         var clock = new FakeClock(Now);
 
-        // The production build job renews its lease on a separate DbContext scope, so the worker and the
-        // renewal loop never touch one EF context concurrently. In this harness both paths share the
-        // single in-memory ReportingDbContext, so serialise every store call to model that isolation and
-        // keep the renewal-loop tests deterministic at high parallelism.
         IOrganisationDataExportJobStore store = new SerializingJobStore(new OrganisationDataExportJobStore(db, clock));
         if (decorateStore is not null)
             store = decorateStore(store);
@@ -79,9 +75,6 @@ public class OrganisationDataExportBuildJobTests
         var alerts = new CapturingAdministrativeAlertWriter();
         var sources = new EmptyExportSources();
 
-        // Follow-up G: the renewal loop renews on a distinct code path from the worker's own store.
-        // This fake delegates to the (possibly decorated) shared store's RenewLeaseAsync but can be
-        // told to force a takeover or to throw transiently.
         var renewer = new FakeLeaseRenewer(store);
         configureRenewer?.Invoke(renewer);
 
@@ -127,7 +120,6 @@ public class OrganisationDataExportBuildJobTests
         Assert.Single(h.Publisher.Published.OfType<OrganisationDataExportCompletedIntegrationEvent>());
         Assert.Empty(h.Alerts.Commands);
 
-        // Follow-up D: the published key is a per-attempt object under .../{exportId}/...
         var publishedKey = (await h.Store.GetAsync(export.Id, CancellationToken.None))!.StorageKey!;
         Assert.Contains($"/{export.Id}/", publishedKey);
         Assert.Equal(new[] { publishedKey }, h.Storage.Keys.ToArray());
@@ -301,8 +293,6 @@ public class OrganisationDataExportBuildJobTests
         Assert.Equal(AdministrativeAlertCategory.ReportGeneration, alert.Category);
         Assert.Equal(AdministrativeAlertSeverity.Warning, alert.Severity);
         Assert.Equal($"organisation-data-export-missing-documents:{export.CompanyId}", alert.DedupKey);
-        // Follow-up F: the missing-documents alert is the one failure reason that queues an
-        // internal-operations notification email.
         Assert.Equal(AdministrativeAlertReason.MissingDocumentExport, alert.Reason);
         Assert.Equal(2, alert.AffectedItemCount);
 
@@ -344,7 +334,6 @@ public class OrganisationDataExportBuildJobTests
         Assert.Empty(h.Publisher.Published);
     }
 
-    // ----- Ticket G: continuous background lease renewal -----
 
     [Fact]
     public async Task Build_That_Runs_Past_The_Lease_Window_Keeps_Ownership_And_Still_Completes()
@@ -372,8 +361,6 @@ public class OrganisationDataExportBuildJobTests
         var h = CreateHarness(out var export, storage: storage, manifest: manifest);
         await using var _ = h.Db;
 
-        // Hold the upload open until the renewal loop has ticked at least twice — a deterministic
-        // handshake rather than a fixed delay racing the timer on a busy CI host.
         storage.ReleaseWhen = () => h.Renewer.CallCount > 1;
 
         await h.Job.RunAsync(export.Id, export.CompanyId, export.RequestedByUserId, CancellationToken.None);
@@ -430,8 +417,6 @@ public class OrganisationDataExportBuildJobTests
 
         await h.Job.RunAsync(export.Id, export.CompanyId, export.RequestedByUserId, CancellationToken.None);
 
-        // Every renewal observed by the store arrived via the renewer abstraction (separate scope in
-        // production), and the renewer was exercised more than once.
         Assert.True(h.Renewer.CallCount > 1);
         Assert.True(counting!.RenewCount > 1);
         Assert.Equal(h.Renewer.RenewsDelegatedToStore, counting.RenewCount);
@@ -527,7 +512,6 @@ public class OrganisationDataExportBuildJobTests
             await seedDb.SaveChangesAsync();
         }
 
-        // The worker uses its own DbContext/store, distinct from the renewer's per-tick scope.
         await using var workerDb = new ReportingDbContext(
             new DbContextOptionsBuilder<ReportingDbContext>().UseInMemoryDatabase(dbName).Options);
         var workerStore = new OrganisationDataExportJobStore(workerDb, clock);
@@ -576,10 +560,6 @@ public class OrganisationDataExportBuildJobTests
         Assert.Single(h.Publisher.Published.OfType<OrganisationDataExportCompletedIntegrationEvent>());
         Assert.Equal(5_000, audit.Yielded);
 
-        // Behavioural: the job pulls the audit stream one row at a time — it never asks for all rows
-        // up front. This is not a retained-memory guarantee on its own; the retained-bytes proof is
-        // Archive_File_Grows_Substantially_While_The_Audit_Source_Is_Still_Yielding_Its_Prefix below,
-        // which measures what actually lands in the archive while the source is parked mid-yield.
         Assert.True(audit.MaxLive <= 2, $"job requested audit rows ahead of writing them: max concurrently-live was {audit.MaxLive}");
     }
 
@@ -603,8 +583,6 @@ public class OrganisationDataExportBuildJobTests
             Assert.False(run.IsCompleted, "the job finished before the audit source was released");
             Assert.True(audit.BaselineAtFirstRow >= 0, "the audit source never produced its first row");
 
-            // What reached the archive FileStream (through the budget-enforcing write stream the job
-            // wraps it in) while the source was parked mid-yield — must be far more than ZIP headers.
             var grownWhileParked = probe.ArchiveBytesWritten - audit.BaselineAtFirstRow;
             Assert.True(grownWhileParked >= 64 * 1024,
                 $"only {grownWhileParked} bytes past the first-row baseline reached the archive while the audit " +
@@ -667,10 +645,6 @@ public class OrganisationDataExportBuildJobTests
         }
     }
 
-    /// <summary>
-    /// Wraps the real workspace factory and counts every byte the build job writes through the
-    /// budget-enforcing archive write stream (i.e. everything that lands in the archive file).
-    /// </summary>
     private sealed class ProbeWorkspaceFactory(OrganisationDataExportWorkspaceFactory inner)
         : IOrganisationDataExportWorkspaceFactory
     {
@@ -758,8 +732,6 @@ public class OrganisationDataExportBuildJobTests
 
             protected override void Dispose(bool disposing)
             {
-                // Mirrors the budget stream: does not dispose the underlying archive FileStream
-                // (the build job owns it for the subsequent upload).
             }
 
             public override ValueTask DisposeAsync() => ValueTask.CompletedTask;
@@ -795,7 +767,6 @@ public class OrganisationDataExportBuildJobTests
         }
     }
 
-    // ----- fakes -----
 
     /// <summary>
     /// Ticket 3J: simulates a heartbeat that commits <i>after</i> the store has captured its expected
@@ -865,13 +836,10 @@ public class OrganisationDataExportBuildJobTests
         public int CallCount => Volatile.Read(ref _calls);
         public int RenewsDelegatedToStore => Volatile.Read(ref _delegated);
 
-        /// <summary>Force every renewal to report a takeover.</summary>
         public bool ForceTakeover { get; set; }
 
-        /// <summary>Report a takeover from the Nth renewal onwards.</summary>
         public int ForceTakeoverAfter { get; set; } = int.MaxValue;
 
-        /// <summary>Throw a transient error for the next N renewals before behaving normally.</summary>
         public int TransientThrowsRemaining { get; set; }
 
         public async Task<bool> RenewAsync(Guid exportId, Guid ownerToken, CancellationToken cancellationToken)
@@ -907,7 +875,6 @@ public class OrganisationDataExportBuildJobTests
 
         public List<string> InvokedMethods { get; } = [];
 
-        /// <summary>Ticket G: slows each document read so the background renewal loop ticks during the build.</summary>
         public TimeSpan OpenDelay { get; set; } = TimeSpan.Zero;
 
         public void AddFile(string zipPath, string storageKey, byte[]? content)
@@ -940,25 +907,18 @@ public class OrganisationDataExportBuildJobTests
 
     private sealed class FakeExportStorage : IOrganisationDataExportStorage
     {
-        // Follow-up D: per-attempt key convention organisation-exports/{companyId}/{exportId}/{attemptToken}.zip
         private readonly HashSet<string> _keys = new(StringComparer.Ordinal);
 
         public int UploadCount { get; private set; }
         public int FailuresBeforeSuccess { get; init; }
         public bool AlwaysThrow { get; init; }
 
-        /// <summary>Ticket G: slows the upload so the background renewal loop ticks during it.</summary>
         public TimeSpan UploadDelay { get; init; } = TimeSpan.Zero;
 
-        /// <summary>
-        /// When set, the upload blocks until this predicate returns true (polled), instead of racing a
-        /// fixed <see cref="UploadDelay"/> against the renewal timer on a thread-starved CI host.
-        /// </summary>
         public Func<bool>? ReleaseWhen { get; set; }
 
         public IReadOnlyCollection<string> Keys => _keys;
 
-        /// <summary>Pre-seed an orphan attempt archive left behind by a superseded worker.</summary>
         public void SeedKey(string key) => _keys.Add(key);
 
         public static string KeyFor(Guid companyId, Guid exportId, Guid attemptToken) =>
@@ -998,12 +958,6 @@ public class OrganisationDataExportBuildJobTests
         }
     }
 
-    /// <summary>
-    /// Follow-up D: decorates a real job store, counts <see cref="RenewLeaseAsync"/> calls and can be
-    /// told to fail the Nth renewal (simulating a replacement worker taking over mid-build) and/or to
-    /// force the ownership-guarded <see cref="MarkFailedAsync(Guid,Guid,string,CancellationToken)"/>
-    /// to return false (simulating a superseded worker that can no longer record a failure).
-    /// </summary>
     private sealed class HeartbeatCountingJobStore(
         IOrganisationDataExportJobStore inner,
         int? failRenewOnCall = null,
@@ -1124,11 +1078,6 @@ public class OrganisationDataExportBuildJobTests
             inner.RecordLateUploadRecheckAsync(exportId, succeeded, cancellationToken);
     }
 
-    /// <summary>
-    /// Serialises every call to the inner store behind a single gate. Models the production separation
-    /// of the worker's DbContext scope from the renewal loop's, which EF Core's in-memory provider
-    /// (no concurrent operations on one context) does not tolerate when both share one context here.
-    /// </summary>
     private sealed class SerializingJobStore(IOrganisationDataExportJobStore inner) : IOrganisationDataExportJobStore
     {
         private readonly SemaphoreSlim _gate = new(1, 1);

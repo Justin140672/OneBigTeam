@@ -5,11 +5,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Employees.Services;
 
-// Extracted from PromoteEmployeeHandler so the exact same finalisation steps (apply the new
-// position/location/manager to the employee, complete the promotion, publish the completion audit
-// event + integration event) run whether triggered immediately by the handler (same-day/backdated
-// effective date) or later by ProcessPromotionsJob. EmployeePromotion.Complete guards its own state
-// transition (throws unless still pending), which is what keeps repeated calls safe.
 internal sealed class EmployeePromotionFinalizer(
     EmployeesDbContext dbContext,
     IAuditEventPublisher auditEventPublisher,

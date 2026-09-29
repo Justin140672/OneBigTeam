@@ -4,22 +4,8 @@ using System.Text.Json;
 
 namespace HR.SharedKernel.Http;
 
-/// <summary>
-/// Shared, typed HTTP response reader for HR.Web and HR.Admin.Web service classes. Centralises
-/// status-code interpretation, error-envelope parsing and network/cancellation handling so
-/// individual services stop reimplementing (and disagreeing about) this logic.
-///
-/// Callers are still responsible for issuing the HttpClient call itself (GET/POST/PUT/DELETE) —
-/// this type only interprets the resulting HttpResponseMessage/exception.
-/// </summary>
 public static class ApiResponseReader
 {
-    /// <summary>
-    /// Reads a response expected to carry a JSON body on success. On failure, classifies the
-    /// response using the shared error/validation envelopes. Does not catch network or
-    /// cancellation exceptions raised while sending the request — wrap the send itself with
-    /// <see cref="ExecuteAsync{T}"/> if that protection is also needed.
-    /// </summary>
     public static async Task<ApiResult<T>> ReadJsonAsync<T>(
         HttpResponseMessage response,
         JsonSerializerOptions? jsonOptions = null,
@@ -47,10 +33,6 @@ public static class ApiResponseReader
         return await ReadFailureAsync<T>(response, cancellationToken);
     }
 
-    /// <summary>
-    /// Reads a response expected to carry no meaningful body on success (e.g. 204, or a 2xx whose
-    /// body isn't needed). On failure, classifies the response the same way as <see cref="ReadJsonAsync{T}"/>.
-    /// </summary>
     public static async Task<ApiResult<Unit>> ReadNoContentAsync(
         HttpResponseMessage response,
         CancellationToken cancellationToken = default)
@@ -65,9 +47,6 @@ public static class ApiResponseReader
         HttpResponseMessage response,
         CancellationToken cancellationToken)
     {
-        // Caller-driven cancellation takes priority over failure classification — a cancelled
-        // operation is never reported as a failed API call. Checked explicitly because content
-        // already buffered in memory (e.g. in tests) may not itself observe the token.
         cancellationToken.ThrowIfCancellationRequested();
 
         var status = response.StatusCode;
@@ -114,27 +93,18 @@ public static class ApiResponseReader
             if (errorEnvelope?.Error is not null)
                 return ApiResult<T>.Fail(ApiFailureKind.Validation, errorEnvelope.Error);
 
-            // Neither envelope shape actually carried a recognisable error/validation payload —
-            // the body parsed (or failed to parse) into something we cannot act on.
             return ApiResult<T>.Fail(ApiFailureKind.InvalidResponse, "The server returned an unreadable response.");
         }
 
         if ((int)status >= 500)
             return ApiResult<T>.Fail(ApiFailureKind.Server, errorEnvelope?.Error ?? $"The server encountered an error ({(int)status}).");
 
-        // Any other unmapped non-success status: still surface as a controlled failure, never null.
         return ApiResult<T>.Fail(
             ApiFailureKind.Server,
             errorEnvelope?.Error ?? $"Request failed ({(int)status} {status}).",
             errorEnvelope?.Code);
     }
 
-    /// <summary>
-    /// Executes an HTTP call and interprets its result end-to-end, including network failures
-    /// (HttpRequestException, TaskCanceledException caused by a client-side *timeout* rather than
-    /// caller cancellation). Preserves <see cref="OperationCanceledException"/> when the supplied
-    /// token was actually cancelled by the caller — that is not reported as a failed API call.
-    /// </summary>
     public static async Task<ApiResult<T>> ExecuteAsync<T>(
         Func<CancellationToken, Task<HttpResponseMessage>> send,
         JsonSerializerOptions? jsonOptions = null,
@@ -147,7 +117,6 @@ public static class ApiResponseReader
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            // Caller-driven cancellation (e.g. component disposal/navigation) is not an API failure.
             throw;
         }
         catch (HttpRequestException)
@@ -156,7 +125,6 @@ public static class ApiResponseReader
         }
         catch (OperationCanceledException)
         {
-            // A timeout that did not originate from the caller's own token — treat as network failure.
             return ApiResult<T>.Fail(ApiFailureKind.Network, "The request timed out. Please try again.");
         }
 
@@ -166,12 +134,6 @@ public static class ApiResponseReader
         }
     }
 
-    /// <summary>
-    /// Executes an HTTP call expected to carry no meaningful success body (e.g. 204) and interprets
-    /// its result end-to-end, including network failures — the no-content sibling of
-    /// <see cref="ExecuteAsync{T}"/>. Use this instead of <c>ExecuteAsync&lt;Unit&gt;</c>, which would
-    /// incorrectly try to JSON-deserialize an empty 204 body and misclassify it as InvalidResponse.
-    /// </summary>
     public static async Task<ApiResult<Unit>> ExecuteNoContentAsync(
         Func<CancellationToken, Task<HttpResponseMessage>> send,
         CancellationToken cancellationToken = default)
@@ -216,7 +178,6 @@ public static class ApiResponseReader
     private static readonly JsonSerializerOptions DefaultJsonOptions = new(JsonSerializerDefaults.Web);
 }
 
-/// <summary>Marker type for <see cref="ApiResult{T}"/> when there is no meaningful success value.</summary>
 public readonly struct Unit
 {
     public static readonly Unit Value = default;

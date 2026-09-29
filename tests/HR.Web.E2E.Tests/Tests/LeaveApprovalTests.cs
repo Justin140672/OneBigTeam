@@ -6,7 +6,6 @@ namespace HR.Web.E2E.Tests.Tests;
 
 public sealed class LeaveApprovalTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
-    // ── Well-known seed GUIDs ─────────────────────────────────────────────────
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId   = Guid.Parse("30000000-0000-0000-0000-000000000004");
     private static readonly Guid JamesId = Guid.Parse("30000000-0000-0000-0000-000000000002");
@@ -14,9 +13,8 @@ public sealed class LeaveApprovalTests(CrossUserFixture fixture) : RoleE2ETestBa
     private const string TomEmail   = "tom.williams@acme.example";
     private const string JamesEmail = "james.okafor@acme.example";
 
-    // ── Leave dates (mid-July 2026 — no UK bank holidays) ────────────────────
     private const string StartDate = "06/07/2026";
-    private const string EndDate   = "10/07/2026"; // Mon–Fri = 5 working days
+    private const string EndDate   = "10/07/2026";
 
     [Fact]
     public async Task SubmittingLeave_ThenApprovingAsManager_UpdatesStatusAndBalance()
@@ -28,7 +26,6 @@ public sealed class LeaveApprovalTests(CrossUserFixture fixture) : RoleE2ETestBa
         var notif   = new NotificationPanel(_page);
         var task    = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
-        // ── Step 1: Login as Tom and record his current annual leave balance ──
         await login.GoToAsync();
         await login.LoginAsync(TomEmail);
 
@@ -38,35 +35,25 @@ public sealed class LeaveApprovalTests(CrossUserFixture fixture) : RoleE2ETestBa
         var initialBalance = await profile.GetAnnualLeaveRemainingAsync();
         Assert.NotNull(initialBalance);
 
-        // ── Step 2: Submit a 5-day annual leave request ───────────────────────
         await profile.ClickRequestLeaveAsync();
         await profile.FillLeaveRequestAsync("Annual Leave", StartDate, EndDate, reason);
         await profile.SubmitLeaveRequestAsync();
 
-        // ── Step 3: Verify the request appears as Pending ─────────────────────
-        // Page refreshes automatically after submit.
         await _page.WaitForSelectorAsync("table tbody tr", new() { Timeout = 15_000 });
         var pendingStatus = await profile.GetLeaveRequestStatusAsync(reason);
         Assert.Equal("Pending", pendingStatus);
 
-        // Annual leave balance should now show pending days.
         var pendingBalance = await profile.GetAnnualLeaveRemainingAsync();
-        Assert.Equal(initialBalance, pendingBalance); // remaining unchanged until approved
+        Assert.Equal(initialBalance, pendingBalance);
 
-        // ── Step 4: Switch to James (Tom's manager) ───────────────────────────
         await login.SwitchAccountAsync(JamesEmail);
 
-        // ── Step 5: James's own Tasks tab shows the leave review task ─────────
-        // The old dashboard "My Tasks" widget (MyTasksWidget.razor) this used to check is dead
-        // code — no longer rendered anywhere. James's own profile Tasks tab is the current,
-        // role-agnostic place to find his full assigned-task list.
         await profile.GoToAsync(AcmeId, JamesId);
         await profile.OpenTasksTabAsync();
         var taskTitles = await profile.GetTaskTitlesAsync();
         Assert.Contains(taskTitles, t => t.Contains("Tom Williams", StringComparison.OrdinalIgnoreCase)
                                       || t.Contains("leave", StringComparison.OrdinalIgnoreCase));
 
-        // ── Step 6: Notification bell shows an unread notification ────────────
         var unread = await notif.GetUnreadCountAsync();
         Assert.True(unread > 0, $"Expected at least 1 unread notification, got {unread}");
 
@@ -75,11 +62,9 @@ public sealed class LeaveApprovalTests(CrossUserFixture fixture) : RoleE2ETestBa
         Assert.Contains(notifTitles, t => t.Contains("Tom Williams", StringComparison.OrdinalIgnoreCase)
                                        || t.Contains("leave", StringComparison.OrdinalIgnoreCase));
 
-        // ── Step 7: Click notification to navigate to the task view ───────────
         await notif.ClickNotificationAsync("Tom Williams");
         await task.WaitForLoadedAsync();
 
-        // ── Step 8: Verify task details ───────────────────────────────────────
         var taskTitle = await task.GetTitleAsync();
         Assert.Contains("Tom Williams", taskTitle, StringComparison.OrdinalIgnoreCase);
 
@@ -92,7 +77,6 @@ public sealed class LeaveApprovalTests(CrossUserFixture fixture) : RoleE2ETestBa
         var status = await task.GetStatusAsync();
         Assert.Equal("Not Started", status);
 
-        // ── Step 9: Approve the leave request ─────────────────────────────────
         await task.ApproveAsync();
 
         var statusAfter = await task.GetStatusAsync();
@@ -101,7 +85,6 @@ public sealed class LeaveApprovalTests(CrossUserFixture fixture) : RoleE2ETestBa
         Assert.False(await task.HasLeaveReviewPanelAsync(),
             "Review Leave Request panel should be hidden after approval");
 
-        // ── Step 10: Switch back to Tom and verify approved status + balance ──
         await login.SwitchAccountAsync(TomEmail);
 
         await profile.GoToAsync(AcmeId, TomId);

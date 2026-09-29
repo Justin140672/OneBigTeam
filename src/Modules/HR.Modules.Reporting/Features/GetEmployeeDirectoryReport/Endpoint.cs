@@ -9,10 +9,6 @@ internal sealed class Endpoint(GetEmployeeDirectoryReportHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/reporting/employee-directory");
-        // This report returns every employee company-wide including email address and manager
-        // assignment — HR-territory PII, not something a Manager or Recruiter should see
-        // company-wide just because they have baseline reporting access. Same category
-        // precedent as reporting:view-hr / reporting:view-recruitment on GetReportCatalog.
         Policies("reporting:view-hr");
     }
 

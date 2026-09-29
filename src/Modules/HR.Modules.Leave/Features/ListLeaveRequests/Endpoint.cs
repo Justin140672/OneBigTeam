@@ -20,7 +20,6 @@ internal sealed class Endpoint(
         ListLeaveRequestsRequest request,
         CancellationToken cancellationToken)
     {
-        // LEAVE-01: self, manager-in-hierarchy, or HR Administrator may view.
         if (currentUser.UserId is not { } callerId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());

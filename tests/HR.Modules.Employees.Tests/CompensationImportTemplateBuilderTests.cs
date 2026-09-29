@@ -58,7 +58,6 @@ public class CompensationImportTemplateBuilderTests
         Assert.True(sheet.Cell(3, 3).IsEmpty());
         Assert.True(sheet.Cell(3, 4).IsEmpty());
 
-        // Entry columns (New Salary, Effective Date, Reason, Notes) are left blank for every row.
         for (var col = 5; col <= CompensationImportTemplateBuilder.Headers.Length; col++)
         {
             Assert.True(sheet.Cell(2, col).IsEmpty());
@@ -79,12 +78,9 @@ public class CompensationImportTemplateBuilderTests
 
         Assert.True(sheet.Protection.IsProtected);
 
-        // Header row is locked in full (including the entry-column headers) so column titles
-        // themselves can never be edited — only the entry columns' data rows are unlocked below.
         for (var col = 1; col <= CompensationImportTemplateBuilder.Headers.Length; col++)
             Assert.True(sheet.Cell(1, col).Style.Protection.Locked);
 
-        // Data row: reference columns locked, entry columns unlocked.
         for (var col = 1; col <= 4; col++)
             Assert.True(sheet.Cell(2, col).Style.Protection.Locked);
         for (var col = 5; col <= CompensationImportTemplateBuilder.Headers.Length; col++)

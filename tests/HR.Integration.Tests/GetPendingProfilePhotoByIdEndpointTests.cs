@@ -42,7 +42,7 @@ public class GetPendingProfilePhotoByIdEndpointTests
         var pendingPhotoId = Guid.NewGuid();
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ManagerUser.ToString());
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString()); // different company
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/profile-photo/pending/{pendingPhotoId}");
@@ -68,8 +68,6 @@ public class GetPendingProfilePhotoByIdEndpointTests
     [Fact]
     public async Task Get_Returns_Forbidden_When_Caller_Is_The_Employee_Themself_Without_EmployeeManage()
     {
-        // GetPendingProfilePhotoById has no "self" bypass in the endpoint — it strictly requires
-        // the employee:manage policy, even when the caller is the target employee themself.
         var companyId      = Guid.NewGuid();
         var employeeId     = Guid.NewGuid();
         var pendingPhotoId = Guid.NewGuid();
@@ -99,7 +97,6 @@ public class GetPendingProfilePhotoByIdEndpointTests
     [Fact]
     public async Task Get_Returns_NotFound_When_PendingPhotoId_Belongs_To_Different_Company()
     {
-        // The employee (and their pending photo) genuinely belong to Company B.
         var companyB   = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
@@ -112,10 +109,6 @@ public class GetPendingProfilePhotoByIdEndpointTests
             Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
         }
 
-        // Uploads are scanned asynchronously via a Hangfire job (ScanUploadedFileJob) that never
-        // actually runs inside this integration test — simulate a completed Clean scan directly so
-        // this read test doesn't need to know about ScanStatusAccessGuard (that guard itself is
-        // covered by dedicated tests).
         await MarkPendingPhotoScanCleanAsync(companyB, employeeId);
 
         using (var managerClientB = await ManagerClient(companyB))
@@ -127,8 +120,6 @@ public class GetPendingProfilePhotoByIdEndpointTests
             pendingPhotoId = payload!.Id;
         }
 
-        // An HR caller genuinely belonging to Company A (their own claim matches the route) tries
-        // to fetch Company B's pending photo by id via Company A's route — must 404, never leak.
         var companyA = Guid.NewGuid();
         using var clientA = await ManagerClient(companyA);
 
@@ -152,10 +143,6 @@ public class GetPendingProfilePhotoByIdEndpointTests
             Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
         }
 
-        // Uploads are scanned asynchronously via a Hangfire job (ScanUploadedFileJob) that never
-        // actually runs inside this integration test — simulate a completed Clean scan directly so
-        // this read test doesn't need to know about ScanStatusAccessGuard (that guard itself is
-        // covered by dedicated tests).
         await MarkPendingPhotoScanCleanAsync(companyId, employeeId);
 
         using var client = await ManagerClient(companyId);
@@ -180,7 +167,6 @@ public class GetPendingProfilePhotoByIdEndpointTests
         Assert.False(string.IsNullOrWhiteSpace(payload.DownloadUrl));
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> SelfClient(Guid companyId, Guid employeeId)
     {
@@ -223,18 +209,16 @@ public class GetPendingProfilePhotoByIdEndpointTests
         return form;
     }
 
-    // Builds a minimal-but-valid PNG byte stream: signature + IHDR chunk carrying the given
-    // width/height at the big-endian offsets ImageUploadValidator reads (16/20).
     private static byte[] BuildPngBytes(int width, int height)
     {
         var bytes = new List<byte>();
-        bytes.AddRange(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }); // signature
-        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x0D }); // IHDR chunk data length
+        bytes.AddRange(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
+        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x0D });
         bytes.AddRange("IHDR"u8.ToArray());
         bytes.AddRange(BigEndianUInt32(width));
         bytes.AddRange(BigEndianUInt32(height));
-        bytes.AddRange(new byte[] { 0x08, 0x06, 0x00, 0x00, 0x00 }); // bit depth, color type, compression, filter, interlace
-        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 }); // dummy CRC (not validated)
+        bytes.AddRange(new byte[] { 0x08, 0x06, 0x00, 0x00, 0x00 });
+        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 });
         return [.. bytes];
     }
 

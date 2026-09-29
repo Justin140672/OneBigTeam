@@ -1,5 +1,3 @@
-// SEA-08: Search security matrix — employee search cross-company isolation,
-// consistent out-of-range page behaviour and search term validation.
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
 using HR.Modules.Employees.Domain;
@@ -15,7 +13,6 @@ public class EmployeeSearchSecurityTests
     private static readonly DateTimeOffset Now = new(2026, 8, 28, 9, 0, 0, TimeSpan.Zero);
     private static readonly DateOnly StartDate = new(2026, 7, 1);
 
-    // ── Cross-company isolation ────────────────────────────────────────────
 
     [Fact]
     public async Task ListEmployees_Returns_Only_Requested_Company_Records()
@@ -46,7 +43,6 @@ public class EmployeeSearchSecurityTests
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
 
-        // Company B has 5 employees; Company A has 2.
         for (var i = 0; i < 5; i++)
             ctx.Employees.Add(MakeEmployee(companyB, $"User{i}", "B"));
 
@@ -71,7 +67,7 @@ public class EmployeeSearchSecurityTests
 
         ctx.Employees.AddRange(
             MakeEmployee(companyA, "Alice", "Smith"),
-            MakeEmployee(companyB, "Alice", "Jones"));  // same first name, different company
+            MakeEmployee(companyB, "Alice", "Jones"));
         await ctx.SaveChangesAsync();
 
         var result = await Handler(ctx).HandleAsync(
@@ -82,7 +78,6 @@ public class EmployeeSearchSecurityTests
         Assert.Equal("Smith", result.Value.Items[0].LastName);
     }
 
-    // ── Out-of-range page behaviour ────────────────────────────────────────
 
     [Fact]
     public async Task ListEmployees_Out_Of_Range_Page_Returns_Empty_Items_With_Correct_TotalCount()
@@ -102,7 +97,6 @@ public class EmployeeSearchSecurityTests
         Assert.Empty(result.Value.Items);
     }
 
-    // ── Search term validation ─────────────────────────────────────────────
 
     [Fact]
     public void ListEmployees_Validator_Rejects_Oversized_Search_Term()
@@ -133,7 +127,6 @@ public class EmployeeSearchSecurityTests
         Assert.True(result.IsValid);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────
 
     private static Employee MakeEmployee(Guid companyId, string first, string last) =>
         Employee.Create(

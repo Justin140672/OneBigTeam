@@ -114,7 +114,6 @@ public class RetireAssetEndpointTests
         var categoryId = await CreateActiveCategoryAsync(client, companyId);
         var assetId = await CreateAssetAsync(client, companyId, categoryId);
 
-        // Assign the asset
         var assignResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/assets/{assetId}/assignments", new
             {

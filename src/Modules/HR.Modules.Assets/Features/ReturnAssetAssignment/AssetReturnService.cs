@@ -47,10 +47,6 @@ internal sealed class AssetReturnService(
         if (assignment is null)
             return AssetReturnResult.NotFound;
 
-        // OFF-04: an offboarding (or other cross-module) caller supplies the employee it believes
-        // owns this assignment — e.g. the employee being offboarded. Rejecting a mismatch here is
-        // what prevents a task/checklist item from ever being able to close out an assignment
-        // belonging to someone else, without duplicating this check in every caller.
         if (expectedEmployeeId.HasValue && assignment.EmployeeId != expectedEmployeeId.Value)
             return AssetReturnResult.EmployeeMismatch;
 

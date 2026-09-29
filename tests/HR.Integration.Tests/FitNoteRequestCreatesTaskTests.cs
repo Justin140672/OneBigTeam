@@ -9,12 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Verifies the cross-module side effect: when FitNoteRequestJob creates a
-/// SicknessEvidenceRequest it publishes a SicknessEvidenceRequestedIntegrationEvent
-/// which is handled by SicknessEvidenceRequestedHandler in the Tasks module,
-/// creating an Upload task assigned to the employee.
-/// </summary>
 [Collection("Integration")]
 public class FitNoteRequestCreatesTaskTests
 {
@@ -25,10 +19,6 @@ public class FitNoteRequestCreatesTaskTests
     public FitNoteRequestCreatesTaskTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
-        // CompanyAdministrator is required for UpdateCompanySettings (company:manage is
-        // CompanyAdministrator-only). HrAdministrator is required for employee/sickness
-        // category/sickness record creation (employee:manage / sickness:manage) — Company
-        // Administrator no longer holds those permissions.
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, CompanyAdminUser, SystemRoles.CompanyAdministrator);
@@ -45,23 +35,17 @@ public class FitNoteRequestCreatesTaskTests
         using var _1 = companyAdminClient;
         using var _2 = hrClient;
 
-        // 1. Create company settings with FitNoteRequiredAfterDays = 1
         await SetFitNoteThresholdAsync(hrClient, companyId, fitNoteRequiredAfterDays: 1);
 
-        // 2. Create an employee
         var employeeId = await CreateEmployeeAsync(hrClient, companyId);
 
-        // 3. Create a sickness category and record
         var categoryId = await CreateSicknessCategoryAsync(hrClient, companyId);
         await CreateSicknessRecordAsync(hrClient, companyId, employeeId, categoryId);
 
-        // 4. Directly set TotalDays >= threshold via the DbContext (bypass private setter)
         await SetSicknessRecordTotalDaysAsync(companyId, employeeId, totalDays: 3m);
 
-        // 5. Run the FitNoteRequestJob
         await RunFitNoteRequestJobAsync();
 
-        // 6. Assert an upload task was created for the employee
         var tasks = await GetSicknessTasksForEmployeeAsync(hrClient, companyId, employeeId);
         var fitNoteTask = Assert.Single(tasks);
         Assert.Equal("Upload fit note", fitNoteTask.Title);
@@ -83,11 +67,9 @@ public class FitNoteRequestCreatesTaskTests
         await CreateSicknessRecordAsync(hrClient, companyId, employeeId, categoryId);
         await SetSicknessRecordTotalDaysAsync(companyId, employeeId, totalDays: 3m);
 
-        // Run the job twice
         await RunFitNoteRequestJobAsync();
         await RunFitNoteRequestJobAsync();
 
-        // Should still only have one evidence request (idempotent) and one task
         var tasks = await GetSicknessTasksForEmployeeAsync(hrClient, companyId, employeeId);
         Assert.Single(tasks);
     }
@@ -95,9 +77,6 @@ public class FitNoteRequestCreatesTaskTests
     [Fact]
     public async Task FitNoteRequestJob_Does_Not_Create_Task_When_CalendarDaysElapsed_Below_Threshold()
     {
-        // SICK-01: the threshold is evaluated in calendar days elapsed since StartDate, not the
-        // TotalDays (working-day) total — see FitNoteEvaluator. StartDate = 2 days before "today"
-        // → 3 calendar days elapsed (inclusive), which is below a threshold of 5.
         var (companyAdminClient, hrClient, companyId) = await CreateAuthenticatedClientWithCompanyAsync();
         using var _1 = companyAdminClient;
         using var _2 = hrClient;
@@ -150,18 +129,16 @@ public class FitNoteRequestCreatesTaskTests
         var categoryId = await CreateSicknessCategoryAsync(hrClient, companyId);
 
         var startDate = new DateOnly(2026, 6, 1);
-        var endDate = new DateOnly(2026, 6, 10); // 10 calendar days elapsed, threshold 3 → met
+        var endDate = new DateOnly(2026, 6, 10);
         var recordId = await CreateSicknessRecordAsync(hrClient, companyId, employeeId, categoryId, startDate);
         await CloseSicknessRecordAsync(hrClient, companyId, employeeId, recordId, startDate, endDate);
 
-        // No FitNoteRequestJob run — the handler itself must have created the request/task.
         var tasks = await GetSicknessTasksForEmployeeAsync(hrClient, companyId, employeeId);
         var fitNoteTask = Assert.Single(tasks);
         Assert.Equal("Upload fit note", fitNoteTask.Title);
         Assert.Equal(endDate.AddDays(7), fitNoteTask.DueDate);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> ClientFor(Guid userId, Guid tenantId)
     {
@@ -172,19 +149,10 @@ public class FitNoteRequestCreatesTaskTests
         return client;
     }
 
-    /// <summary>
-    /// Creates a real Company row (UpdateCompanySettings requires one to exist) and returns
-    /// a CompanyAdministrator client (for settings management) and an HrAdministrator client
-    /// (for employee/sickness setup), both scoped to the new company. Uses CompanyAdminUser's
-    /// own id as a placeholder tenant header for the initial creation call, then swaps to the
-    /// real company id.
-    /// </summary>
     private async Task<(HttpClient CompanyAdminClient, HttpClient HrClient, Guid CompanyId)> CreateAuthenticatedClientWithCompanyAsync()
     {
         var companyAdminClient = await ClientFor(CompanyAdminUser, CompanyAdminUser);
 
-        // POST /api/companies (CreateCompany) was removed in 78a43344; seed the company directly
-        // via CompaniesDbContext instead, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
         var companyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"FitNote Test {Guid.NewGuid():N}");
 
         companyAdminClient.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
@@ -195,10 +163,6 @@ public class FitNoteRequestCreatesTaskTests
         return (companyAdminClient, hrClient, companyId);
     }
 
-    // fitNoteRequiredAfterDays lives on HR settings, not company settings — PUT .../settings
-    // (UpdateCompanySettingsHandler) only persists TimeZone/Locale and silently ignores this
-    // field while still returning 200 OK. HR settings are gated by hr-settings:manage, which
-    // is HrAdministrator-only, so the caller must be the HR admin client, not company admin.
     private async Task SetFitNoteThresholdAsync(HttpClient client, Guid companyId, int fitNoteRequiredAfterDays)
     {
         var resp = await client.PutAsJsonAsync(
@@ -206,7 +170,7 @@ public class FitNoteRequestCreatesTaskTests
             new
             {
                 id                             = companyId,
-                workingDays                    = 31, // Monday|Tuesday|Wednesday|Thursday|Friday
+                workingDays                    = 31,
                 hoursPerDay                    = 8m,
                 leaveYearStartMonth            = 1,
                 defaultHolidayAllowance        = 25m,
@@ -329,12 +293,6 @@ public class FitNoteRequestCreatesTaskTests
         resp.EnsureSuccessStatusCode();
     }
 
-    /// <summary>
-    /// Sets TotalDays directly on the sickness record via raw SQL, bypassing the
-    /// private setter. This is necessary because the EF change tracker cannot set
-    /// private properties, and the domain model has no public mutation for TotalDays
-    /// on open records.
-    /// </summary>
     private async Task SetSicknessRecordTotalDaysAsync(Guid companyId, Guid employeeId, decimal totalDays)
     {
         using var scope = _factory.Services.CreateScope();

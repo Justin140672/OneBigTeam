@@ -58,7 +58,6 @@ public class AuditHistoryServiceTests
         Assert.Empty(result);
     }
 
-    // ── Fake handlers ────────────────────────────────────────────────────────────
 
     private sealed class JsonResponseHandler(HttpStatusCode statusCode, object payload) : HttpMessageHandler
     {

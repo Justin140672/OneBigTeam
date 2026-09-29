@@ -233,7 +233,7 @@ public class CreateAssetHandlerTests
 
         var result = await handler.HandleAsync(new CreateAssetRequest
         {
-            CompanyId = Guid.NewGuid(), // different company
+            CompanyId = Guid.NewGuid(),
             AssetNumber = "ASSET-007",
             CategoryId = categoryId,
             Name = "Cross-tenant Asset"

@@ -1,6 +1,5 @@
 namespace HR.Web.Models;
 
-// ── EMPLOYEE DIRECTORY (employee-facing) ──────────────────────────────────────
 
 public record EmployeeDirectoryListResponse(
     List<EmployeeDirectoryListItem> Items,

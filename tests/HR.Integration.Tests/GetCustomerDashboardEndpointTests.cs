@@ -9,16 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// The "platform:admin" endpoint policy only requires RequireAuthenticatedUser (no
-/// tenant/company header needed to satisfy it), so these tests never send
-/// TestAuthHandler.TenantHeader. The handler's own allow-list check requires the caller's
-/// email to match "PlatformAdmin:AllowedEmails" in configuration; appsettings.Development.json
-/// (loaded automatically because ApiWebApplicationFactory/WebApplicationFactory defaults to the
-/// Development environment) already seeds "priya.shah@acme.example" into that list, so tests use
-/// that address for the allow-listed caller and rely on TestAuthHandler.EmailHeader to put the
-/// email onto the authenticated principal's "email" claim.
-/// </summary>
 [Collection("Integration")]
 public class GetCustomerDashboardEndpointTests
 {
@@ -101,8 +91,6 @@ public class GetCustomerDashboardEndpointTests
 
         var response = await client.GetAsync("/api/companies/admin/customer-dashboard");
 
-        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
-        // is Forbidden (403), not Unauthorized (401).
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -111,15 +99,6 @@ public class GetCustomerDashboardEndpointTests
     {
         var now = DateTimeOffset.UtcNow;
 
-        // GetCustomerDashboardHandler's "recent" lists are Take(10) most-recent-first across the
-        // *entire* shared integration-test database (Collection("Integration") reuses one
-        // Postgres container for the whole run), with no scoping to companies this test itself
-        // created. A few minutes into the future used to be enough to guarantee these three sort
-        // above anything else — but under a full ~2000-test run (~5+ minutes wall-clock), heavy
-        // Testcontainers/DB contention can delay this test's own seeding-to-assertion window enough
-        // for real "now"-timestamped rows from other, concurrently-running test classes to catch up
-        // to and exceed a few-minutes offset. A full year ahead is immune to any realistic delay,
-        // while AddMinutes(3/4/5) preserves the three companies' relative ordering.
         var activeCompany = await SeedCompanyAsync("Active Co", CompanyStatus.Active, now.AddYears(1).AddMinutes(3));
         await SeedActiveSubscriptionAsync(activeCompany.Id, now.AddYears(1).AddMinutes(3));
 
@@ -132,12 +111,6 @@ public class GetCustomerDashboardEndpointTests
         var userId = Guid.NewGuid();
         using var client = ClientFor(userId, AllowListedEmail);
 
-        // PendingPermanentDeletions is likewise a global count across the whole shared database,
-        // not scoped to companies this test created — this test schedules none itself, but other
-        // test classes elsewhere in the suite legitimately do (and may not have cleaned up by the
-        // time this runs), so asserting it's exactly 0 breaks under real parallel/shared-DB
-        // execution the same way the unscoped "recent" lists above do. Assert it doesn't increase
-        // as a result of anything this test did, rather than asserting a global absolute.
         var baselineResponse = await client.GetAsync("/api/companies/admin/customer-dashboard");
         baselineResponse.EnsureSuccessStatusCode();
         var baselinePayload = await baselineResponse.Content.ReadFromJsonAsync<CustomerDashboardPayload>();

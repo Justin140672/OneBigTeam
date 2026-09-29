@@ -37,8 +37,6 @@ public class DownloadEmployeeDocumentHandlerTests
             docType.Id, "contract.pdf", 1024, "application/pdf",
             $"{companyId}/{employeeId}/abc/contract.pdf",
             null, Guid.NewGuid(), DateTimeOffset.UtcNow);
-        // Default download-success fixtures assume a clean scan — tests that specifically exercise
-        // ScanStatusAccessGuard construct their own Document with a different ScanStatus.
         doc.MarkScanClean(DateTimeOffset.UtcNow);
         db.Documents.Add(doc);
 
@@ -193,8 +191,6 @@ public class DownloadEmployeeDocumentHandlerTests
         Assert.Empty(audit.Published);
     }
 
-    // Theory parameters must be a publicly accessible type (xUnit requires public test methods),
-    // but FileScanStatus is internal — pass the enum's underlying int value instead and cast.
     [Theory]
     [InlineData((int)FileScanStatus.Pending, "This document is currently being security checked.")]
     [InlineData((int)FileScanStatus.Scanning, "This document is currently being security checked.")]
@@ -225,8 +221,6 @@ public class DownloadEmployeeDocumentHandlerTests
         Assert.Equal(expectedMessage, result.Error.Message);
     }
 
-    // Document.Create defaults to Pending, so the only status that needs an explicit Mark* call
-    // is anything other than Pending.
     private static async Task<(DocumentType docType, Document doc, EmployeeDocument empDoc)> SeedWithScanStatus(
         DocumentsDbContext db,
         Guid companyId,
@@ -245,7 +239,7 @@ public class DownloadEmployeeDocumentHandlerTests
         switch (status)
         {
             case FileScanStatus.Pending:
-                break; // already Pending by default
+                break;
             case FileScanStatus.Scanning:
                 doc.MarkScanning(DateTimeOffset.UtcNow);
                 break;
@@ -266,8 +260,6 @@ public class DownloadEmployeeDocumentHandlerTests
         return (docType, doc, empDoc);
     }
 
-    // DOC-04: archived (soft-deleted) employee documents must behave as not-found through the
-    // download endpoint.
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Document_Is_Archived()
     {

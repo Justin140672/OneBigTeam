@@ -8,13 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Verifies CompleteProfilePhotoReviewFromTaskAction is actually wired into the generic Tasks
-/// "Complete task" endpoint for (Source: Document, ActionType: Review). Before this fix, no
-/// ITaskCompletionAction was registered for that pair, so a caller could complete a profile-photo
-/// review task via the generic endpoint with zero business effect — no approval/rejection, pending
-/// submission left dangling forever, task vanishing from the HR queue as if reviewed.
-/// </summary>
 [Collection("Integration")]
 public class CompleteProfilePhotoReviewTaskEndpointTests
 {
@@ -63,8 +56,6 @@ public class CompleteProfilePhotoReviewTaskEndpointTests
     [Fact]
     public async Task Completing_Review_Task_Via_Generic_Endpoint_Without_OutcomeDecision_Fails_And_Leaves_Pending_Untouched()
     {
-        // Proves the generic-endpoint bypass no longer works: with no (or an invalid)
-        // outcomeDecision, the completion must fail and the pending submission must remain intact.
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         await SeedManagerAsync(companyId);
@@ -94,7 +85,6 @@ public class CompleteProfilePhotoReviewTaskEndpointTests
         var liveRows = await db.EmployeeProfilePhotos.Where(p => p.EmployeeId == employeeId).ToListAsync();
         Assert.Empty(liveRows);
 
-        // Retry with a real decision must still succeed afterward.
         var retryResp = await managerClient.PostAsync(
             $"/api/companies/{companyId}/tasks/{task.Id}/complete",
             Json(new { outcomeDecision = "Approve" }));
@@ -160,7 +150,6 @@ public class CompleteProfilePhotoReviewTaskEndpointTests
         Assert.Empty(await db.EmployeeProfilePhotos.Where(p => p.EmployeeId == employeeId).ToListAsync());
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private async Task SeedManagerAsync(Guid companyId)
     {
@@ -217,13 +206,13 @@ public class CompleteProfilePhotoReviewTaskEndpointTests
     private static byte[] BuildPngBytes(int width, int height)
     {
         var bytes = new List<byte>();
-        bytes.AddRange(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }); // signature
-        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x0D }); // IHDR chunk data length
+        bytes.AddRange(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
+        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x0D });
         bytes.AddRange("IHDR"u8.ToArray());
         bytes.AddRange(BigEndianUInt32(width));
         bytes.AddRange(BigEndianUInt32(height));
-        bytes.AddRange(new byte[] { 0x08, 0x06, 0x00, 0x00, 0x00 }); // bit depth, color type, compression, filter, interlace
-        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 }); // dummy CRC (not validated)
+        bytes.AddRange(new byte[] { 0x08, 0x06, 0x00, 0x00, 0x00 });
+        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 });
         return [.. bytes];
     }
 

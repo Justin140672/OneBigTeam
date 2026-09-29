@@ -288,8 +288,6 @@ public class CreatePlatformAdministratorHandlerTests(IdentityDatabaseFixture fix
         await SeedOwnerAsync(ownerEmail);
 
         var auditPublisher = new FakeAuditEventPublisher();
-        // If the provider lookup were reached it would throw and surface as "unexpected" — so a
-        // work_email_required result proves the policy ran before any provider interaction.
         var gateway = new FakeSupabaseAuthGateway { ShouldThrowOnGetUserIdByEmail = true };
         var handler = BuildHandler(auditPublisher, gateway);
         var actorId = Guid.NewGuid();
@@ -322,8 +320,6 @@ public class CreatePlatformAdministratorHandlerTests(IdentityDatabaseFixture fix
     [Fact]
     public async Task HandleAsync_Public_Email_Matching_An_Existing_Administrator_Returns_WorkEmailRequired_Not_Conflict()
     {
-        // The policy check precedes the existing-administrator lookup, so the response never
-        // reveals whether an administrator already exists for a public address.
         var ownerEmail = $"owner-{Guid.NewGuid():N}@test.com";
         await SeedOwnerAsync(ownerEmail);
 
@@ -362,8 +358,6 @@ public class CreatePlatformAdministratorHandlerTests(IdentityDatabaseFixture fix
     [Fact]
     public async Task HandleAsync_Existing_Owner_On_A_Public_Domain_Can_Still_Create_An_Org_Domain_Administrator()
     {
-        // Existing accounts on public domains are unaffected by the policy — only the NEW
-        // administrator's address is evaluated.
         var ownerEmail = $"owner-{Guid.NewGuid():N}@gmail.com";
         await SeedOwnerAsync(ownerEmail);
 

@@ -43,7 +43,6 @@ internal sealed class GetLeavingProcessHistoryHandler(
             })
             .ToListAsync(cancellationToken);
 
-        // If there are any replacement manager IDs, fetch the manager names
         var replacementManagerIds = leavingProcesses
             .Where(p => p.ReplacementManagerEmployeeId.HasValue)
             .Select(p => p.ReplacementManagerEmployeeId!.Value)

@@ -71,7 +71,6 @@ public class OrganisationDataExportResourceLimitsTests
                 var bytes = buffer.ToArray();
                 Assert.Equal(fileSizeBytes, bytes.Length);
 
-                // A malformed archive throws here.
                 using var zip = new ZipArchive(new MemoryStream(bytes), ZipArchiveMode.Read);
                 Assert.NotNull(zip.Entries);
             }

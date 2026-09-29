@@ -30,7 +30,6 @@ public class ExportSicknessReportHandlerTests
         var row = Assert.Single(exporter.LastData.Rows);
         Assert.Equal("1", row[1]);
         Assert.Equal("2", row[2]);
-        // SICK-04: Bradford Factor = S^2 * D = 1^2 * 2 = 2.
         Assert.Equal("2", row[3]);
     }
 

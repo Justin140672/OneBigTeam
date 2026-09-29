@@ -60,10 +60,6 @@ public class GetUpcomingInterviewsEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // candidate:view is Recruiter-only by design (see IdentityModule.AddRolePolicies) — this
-    // endpoint returns CandidateName, real candidate PII, so an HR Administrator does not
-    // automatically get access without also holding the Recruiter role. HrAdminUser here holds
-    // only the HrAdministrator role, so Forbidden is the correct, intended result.
     [Fact]
     public async Task Get_UpcomingInterviews_Returns_Forbidden_For_HrAdministrator_Without_Recruiter_Role()
     {
@@ -115,7 +111,6 @@ public class GetUpcomingInterviewsEndpointTests
             db.Applications.Add(application);
             db.Interviews.Add(futureInterview);
 
-            // Noise: a past interview and a cancelled future interview should not appear.
             var pastInterview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(-2), 30, null, Now);
             var cancelledInterview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(3), 30, null, Now);
             cancelledInterview.Cancel(Now);

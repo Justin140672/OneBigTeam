@@ -4,16 +4,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Authorization;
 
-/// <summary>
-/// IAM-02: shared "would this leave the company with zero active holders of a lockout-protected
-/// role?" check, used both when removing a role directly (Features/UpdateUserRoles) and when
-/// disabling a user's account outright (Features/DisableUser) — either action can accidentally
-/// strand a company with no active Company Administrator or HR Administrator.
-///
-/// "Active" mirrors ListUsersHandler's existing convention: an ApplicationUser (local-auth account)
-/// is active when IsActive is true; a Supabase-backed UserProfile has no local disable concept, so
-/// its mere existence counts as active.
-/// </summary>
 internal sealed class LastActiveAdministratorGuard(IdentityDbContext db, IEmployeeAudienceReader employeeAudienceReader)
 {
     public async Task<bool> HasOtherActiveHolderAsync(

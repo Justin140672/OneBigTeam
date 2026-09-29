@@ -2,10 +2,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Reporting.Tests.Infrastructure;
 
-/// <summary>
-/// Hand-rolled fake for <see cref="ICompanyDocumentAcknowledgementReportReader"/> — always returns
-/// the pre-configured, company-wide item set.
-/// </summary>
 internal sealed class FakeCompanyDocumentAcknowledgementReportReader : ICompanyDocumentAcknowledgementReportReader
 {
     private readonly IReadOnlyList<CompanyDocumentAcknowledgementReportItem> _items;

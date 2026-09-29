@@ -51,8 +51,6 @@ public class SetDefaultLeavePolicyEndpointTests
         using var client = HrAdminClient(newCompanyId);
         var now = DateTimeOffset.UtcNow;
 
-        // Seed an inactive, non-default policy directly via the DbContext — no deactivate
-        // endpoint exists yet for LeavePolicy.
         Guid inactivePolicyId;
         using (var scope = _factory.Services.CreateScope())
         {

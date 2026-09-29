@@ -42,9 +42,6 @@ internal sealed class GetEmployeeTeamViewHandler
         GetEmployeeTeamViewRequest request,
         CancellationToken cancellationToken)
     {
-        // Authorization is resolved before any employee data is queried — a caller who isn't a
-        // manager anywhere in this employee's reporting hierarchy never reaches the projection
-        // below at all.
         var isAuthorized = await _resourceAuthorizer.CanViewAsManagerAsync(
             request.CompanyId, request.CallerEmployeeId, request.Id, cancellationToken);
         if (!isAuthorized)
@@ -101,10 +98,6 @@ internal sealed class GetEmployeeTeamViewHandler
                 Error.NotFound($"Employee with id '{request.Id}' was not found."));
         }
 
-        // A former employee is not discoverable through the manager team-view, regardless of
-        // hierarchy — narrowing resource authorization itself (not just the UI list) per the
-        // agreed status scope: managers see Draft/Active/Suspended/Leaving reports, never
-        // FormerEmployee ones. See 26-permissions-access-ux.md's field-level access matrix.
         if (result.Status == EmploymentStatus.FormerEmployee)
         {
             return Result.Failure<GetEmployeeTeamViewResponse>(
@@ -167,10 +160,6 @@ internal sealed class GetEmployeeTeamViewHandler
             showLeavingTab));
     }
 
-    // Mirrors GetEmployeeHandler.BuildReportingChainAsync — the reporting chain contains only
-    // names/job titles, none of which are restricted fields, so this duplication (rather than a
-    // shared private method across features) keeps each handler's own dependency set minimal and
-    // independently auditable.
     private async Task<IReadOnlyList<ReportingChainItem>> BuildReportingChainAsync(
         Guid companyId, Guid employeeId, Guid? managerId, CancellationToken cancellationToken)
     {

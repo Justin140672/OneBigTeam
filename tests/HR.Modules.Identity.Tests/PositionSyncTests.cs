@@ -107,7 +107,7 @@ public class PositionSyncTests(IdentityDatabaseFixture fixture)
     {
         var companyId = Guid.NewGuid();
         var positionProfileId = Guid.NewGuid();
-        var reader = new FakePositionProfileReader(summaries: null); // GetSummaryAsync -> null for everything
+        var reader = new FakePositionProfileReader(summaries: null);
 
         await using var db = fixture.BuildContext();
         var sync = new PositionSync(db, reader);
@@ -136,13 +136,13 @@ public class PositionSyncTests(IdentityDatabaseFixture fixture)
         {
             var sync = new PositionSync(db, reader);
             var result = await sync.EnsureExistsAsync(companyId, positionProfileId, Later, CancellationToken.None);
-            Assert.NotNull(result); // returns the existing row unchanged
+            Assert.NotNull(result);
             await db.SaveChangesAsync();
         }
 
         await using var db2 = fixture.BuildContext();
         var saved = await db2.Positions.SingleAsync(p => p.Id == positionProfileId);
         Assert.Equal("Untouched", saved.Name);
-        Assert.Equal(Now, saved.UpdatedAt); // not touched by the second call
+        Assert.Equal(Now, saved.UpdatedAt);
     }
 }

@@ -6,9 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Tests;
 
-// DOC-04: "delete" now archives (soft-deletes) the employee-document record instead of hard
-// deleting it — no DB row is removed and no file is deleted from storage. Permanent deletion is
-// now the exclusive responsibility of PurgeEligibleArchivedEmployeeDocumentsHandler.
 public class DeleteEmployeeDocumentHandlerTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 18, 10, 0, 0, DateTimeKind.Utc);
@@ -84,7 +81,6 @@ public class DeleteEmployeeDocumentHandlerTests
         Assert.Equal(FixedUtcNow, stored.ArchivedAt!.Value.UtcDateTime);
         Assert.Equal("No longer required", stored.ArchiveReason);
 
-        // The row and its Document remain in the database — archive is recoverable, not a delete.
         Assert.Single(await db.EmployeeDocuments.ToListAsync());
         Assert.Single(await db.Documents.ToListAsync());
     }

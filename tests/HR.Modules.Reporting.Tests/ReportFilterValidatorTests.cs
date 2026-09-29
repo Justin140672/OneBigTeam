@@ -80,7 +80,6 @@ public class ReportFilterValidatorTests
     public void Validate_Succeeds_At_Exactly_Max_Length()
     {
         var definition = GetDefinition("employee-directory");
-        // Build a JSON string of exactly MaxFilterCriteriaJsonLength characters using a known field.
         var prefix = "{\"DepartmentId\":\"";
         var suffix = "\"}";
         var padding = ReportFilterValidator.MaxFilterCriteriaJsonLength - prefix.Length - suffix.Length;

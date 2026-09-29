@@ -78,11 +78,8 @@ internal sealed class AssignLeavePolicyToEmployeeHandler(
             dbContext.EmployeeLeavePolicyAssignments.Add(assignment);
         }
 
-        // Initialise leave balances when assigning a policy to an employee for the first time,
-        // matching the behaviour of EmployeeCreatedHandler which runs at employee creation.
         if (isNewAssignment)
         {
-            // Only balance-tracked leave types get a LeaveBalance row (see LeaveType.HasBalance).
             var activeLeaveTypes = await dbContext.LeaveTypes
                 .Where(lt => lt.CompanyId == request.CompanyId && lt.IsActive && lt.HasBalance)
                 .ToListAsync(cancellationToken);
@@ -93,9 +90,6 @@ internal sealed class AssignLeavePolicyToEmployeeHandler(
                 var policyYear = LeaveYearCalculator.GetPolicyYear(now, leaveSettings.LeaveYearStartMonth);
                 var (policyYearStart, _) = LeaveYearCalculator.GetPolicyYearBounds(policyYear, leaveSettings.LeaveYearStartMonth);
 
-                // Accrual (Monthly/Fortnightly - LEAVE-04) is paced from the later of the policy
-                // year start and the date this assignment takes effect (mirrors
-                // EmployeeCreatedHandler's equivalent joiner logic).
                 var accrualStartDate = request.EffectiveFrom < policyYearStart ? policyYearStart : request.EffectiveFrom;
 
                 var existingLeaveTypeIds = await dbContext.LeaveBalances

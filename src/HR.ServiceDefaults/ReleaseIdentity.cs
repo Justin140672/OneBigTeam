@@ -28,7 +28,6 @@ namespace Microsoft.Extensions.Hosting;
 /// </summary>
 public static class ReleaseIdentity
 {
-    /// <summary>UTC instant this process started — a cheap "is this a fresh instance?" signal.</summary>
     public static readonly DateTimeOffset StartedAtUtc =
         Process.GetCurrentProcess().StartTime.ToUniversalTime();
 
@@ -82,11 +81,6 @@ public static class ReleaseIdentity
         return (assembly ?? EntryAssembly())?.GetName().Version?.ToString() ?? "unknown";
     }
 
-    /// <summary>
-    /// Maps the running assembly name to the Railway service slug used by the deploy pipeline.
-    /// <c>RELEASE_SERVICE</c> overrides it for any host whose assembly name does not follow the
-    /// <c>HR.*</c> convention.
-    /// </summary>
     public static string Service(string? applicationName = null)
     {
         var overridden = Environment.GetEnvironmentVariable("RELEASE_SERVICE");
@@ -107,13 +101,6 @@ public static class ReleaseIdentity
         };
     }
 
-    /// <summary>
-    /// The <c>/health/release</c> payload. <c>service</c>/<c>sha</c>/<c>version</c>/<c>environment</c>
-    /// are mutable display labels the pipeline injects. <c>deploymentId</c>/<c>railwayServiceId</c>/
-    /// <c>railwayEnvironmentId</c>/<c>railwayCommit</c> are Railway-injected immutable identity — the
-    /// deploy pipeline never sets them — and are the fields recovery correlates against the Railway
-    /// API's serving-deployment record. <c>railwayCommit</c> may be null (non-git deploys).
-    /// </summary>
     public static object Payload(string environmentName, string? applicationName = null, Assembly? assembly = null) => new
     {
         service = Service(applicationName),
@@ -127,14 +114,12 @@ public static class ReleaseIdentity
         railwayCommit = RailwayCommit(),
     };
 
-    /// <summary>The <c>{ sha, version }</c> sub-object embedded in other health payloads (e.g. startup-migrations).</summary>
     public static object ReleaseTag(Assembly? assembly = null) => new
     {
         sha = Sha(assembly),
         version = Version(assembly),
     };
 
-    /// <summary>Extracts the git commit SHA embedded in an <c>AssemblyInformationalVersion</c> string, or <c>null</c>.</summary>
     public static string? ShaFromInformationalVersion(string? informationalVersion)
     {
         if (string.IsNullOrWhiteSpace(informationalVersion))
@@ -142,10 +127,6 @@ public static class ReleaseIdentity
             return null;
         }
 
-        // Deterministic CI builds stamp AssemblyInformationalVersion as
-        //   "<version>+<sha>"   or   "<version-with-build-metadata>.<sha>"
-        // when the supplied Version already carries "+<short_sha>" build metadata. Take the trailing
-        // token after the last '+' and, if that still contains '.', its last dotted segment.
         var afterPlus = informationalVersion.Contains('+')
             ? informationalVersion[(informationalVersion.LastIndexOf('+') + 1)..]
             : informationalVersion;
@@ -156,10 +137,6 @@ public static class ReleaseIdentity
 
         candidate = candidate.Trim();
 
-        // Only accept a full 40-hex git SHA. A local build with no SourceRevisionId leaves just the
-        // short build-metadata token (e.g. "abc1234") or a version segment ("123") — neither can be
-        // safely compared against the full-SHA release target, so report nothing and let the
-        // RELEASE_SHA env override (which CI always sets) be the source of truth instead.
         var looksLikeSha = candidate.Length == 40
             && candidate.All(Uri.IsHexDigit);
 

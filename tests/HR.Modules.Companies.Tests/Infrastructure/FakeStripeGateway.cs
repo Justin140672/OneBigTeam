@@ -2,10 +2,6 @@ using HR.Modules.Companies.Services;
 
 namespace HR.Modules.Companies.Tests.Infrastructure;
 
-/// <summary>
-/// Test double for <see cref="IStripeGateway"/> — never calls real Stripe. Lets handler tests
-/// control the checkout URL returned and the webhook event parsed from a raw payload.
-/// </summary>
 internal sealed class FakeStripeGateway : IStripeGateway
 {
     public string CheckoutUrlToReturn { get; set; } = "https://checkout.stripe.com/test-session";

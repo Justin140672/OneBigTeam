@@ -61,15 +61,8 @@ internal sealed class ExpireSharedCompanyDocumentHandler(
         var now = clock.UtcNowOffset();
         document.MarkExpired(expiredBy, now);
 
-        // Cancelling happens after the save below (it's a separate call against the Tasks module,
-        // not part of this DbContext's unit of work), so the cancelled-task count can't be known
-        // before the save — the response therefore can't be built purely from in-memory values
-        // ahead of the save for this handler, unlike CreateAsset/AdjustLeaveBalance.
         await db.SaveChangesAsync(cancellationToken);
 
-        // An open "please review this" task makes no sense once the document is expired and
-        // won't be renewed — same rationale/pattern as ArchiveSharedCompanyDocumentHandler
-        // cancelling open Acknowledge tasks when archiving. No-op if nothing is open.
         var cancelledCount = await taskCanceller.CancelAllBySourceEntityAsync(
             request.CompanyId,
             document.Id,
@@ -87,10 +80,6 @@ internal sealed class ExpireSharedCompanyDocumentHandler(
 
         if (request.IdempotencyKey is { } key)
         {
-            // The business save already happened above; this only persists the idempotency record
-            // itself (with the final response, including the task-cancellation count) so a retry of
-            // the same key can be replayed — the status-check guards above already prevent
-            // double-expiry regardless of the key.
             await db.SaveIdempotentAsync(db.IdempotencyRecords,
             scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
         }

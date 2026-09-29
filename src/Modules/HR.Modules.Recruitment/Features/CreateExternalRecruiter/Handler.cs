@@ -36,7 +36,6 @@ internal sealed class CreateExternalRecruiterHandler(
             }
         }
 
-        // Duplicate agency names are explicitly allowed — no uniqueness validation performed here.
         var now = clock.UtcNowOffset();
 
         var recruiter = ExternalRecruiter.Create(

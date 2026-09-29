@@ -34,7 +34,6 @@
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public RenderFragment? FooterContent { get; set; }
 
-    // Soft-cancel via close icon/Escape/backdrop click, same as the other shared dialogs.
     [Parameter] public EventCallback OnCancelled { get; set; }
 
     private Task HandleClosed() => Busy ? Task.CompletedTask : OnCancelled.InvokeAsync();

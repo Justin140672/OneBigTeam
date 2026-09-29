@@ -5,10 +5,6 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 public sealed class SicknessCategoryListPage(IPage page, string baseUrl)
 {
-    // ".e-grid" alone doesn't prove rows are queryable — Syncfusion's EJ2 grid populates
-    // ".e-row"/".e-rowcell" on its own JS render tick after the Blazor component mounts, so the
-    // row selector (or its empty-state/error siblings) is the only wait actually tied to data
-    // being present.
     private const string RowsRenderedSelector = ".e-grid .e-row, .e-grid .e-emptyrow, .alert-danger";
 
     public async Task GoToAsync(Guid companyId)
@@ -44,11 +40,6 @@ public sealed class SicknessCategoryListPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
     }
 
-    /// <summary>
-    /// "Delete" is actually a soft-deactivate (DeactivateSicknessCategory sets IsActive=false).
-    /// The list defaults to active-only, so the row disappears from view after this call unless
-    /// <see cref="ShowInactiveAsync"/> has been used to reveal inactive categories too.
-    /// </summary>
     public async Task DeleteAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });

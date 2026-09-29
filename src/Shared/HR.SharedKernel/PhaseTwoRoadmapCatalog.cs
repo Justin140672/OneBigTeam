@@ -1,7 +1,5 @@
 namespace HR.SharedKernel;
 
-// Shared by the database seed and the marketing site's offline fallback.
-// Ease and customer value are planning scores out of five, not public marketing copy.
 public sealed record PhaseTwoRoadmapItem(Guid Id, string IconName, string Title, string Description,
     int Ease, int CustomerValue, string? LegacyTitle = null);
 

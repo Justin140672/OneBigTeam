@@ -5,11 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Unlike the other platform-administrator endpoints, ListPlatformAdministrators only requires the
-/// caller to be ANY enabled PlatformAdministrator (SupportStaff or PlatformOwner) — see
-/// ListPlatformAdministratorsHandler.IsEnabledPlatformAdministratorAsync.
-/// </summary>
 [Collection("Integration")]
 public class ListPlatformAdministratorsEndpointTests
 {
@@ -37,8 +32,6 @@ public class ListPlatformAdministratorsEndpointTests
 
         var response = await client.GetAsync("/api/platform-administrators");
 
-        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
-        // is Forbidden (403), not Unauthorized (401).
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -51,8 +44,6 @@ public class ListPlatformAdministratorsEndpointTests
 
         var response = await client.GetAsync("/api/platform-administrators");
 
-        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
-        // is Forbidden (403), not Unauthorized (401).
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 

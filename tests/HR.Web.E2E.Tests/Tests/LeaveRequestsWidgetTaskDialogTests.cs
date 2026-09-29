@@ -43,8 +43,6 @@ public sealed class LeaveRequestsWidgetTaskDialogTests(CrossUserFixture fixture)
         var dashboard = new ManagerDashboardPage(_page, _fixture.WebBaseUrl);
         var task      = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
-        // ── Step 1: Tom submits a pending leave request — creates an open review task
-        // assigned to James, his manager. ───────────────────────────────────────────────
         await login.GoToAsync();
         await login.LoginAsync(TomEmail);
 
@@ -57,24 +55,14 @@ public sealed class LeaveRequestsWidgetTaskDialogTests(CrossUserFixture fixture)
         await _page.WaitForSelectorAsync("table tbody tr", new() { Timeout = 15_000 });
         Assert.Equal("Pending", await profile.GetLeaveRequestStatusAsync(reason));
 
-        // ── Step 2: Switch to James (Tom's manager) and go to the Manager Dashboard. ────
         await login.SwitchAccountAsync(JamesEmail);
         await dashboard.GoToAsync();
 
-        // ── Step 3: Click Tom's row in the combined "Requires your attention" queue —
-        // LeaveRequestsWidget's standalone card was folded into ManagerAttentionQueueWidget by
-        // the Manager Dashboard redesign, so leave-request rows now live there, filterable by
-        // the "Leave request" category text rendered in each row's ".task-widget-meta". ───────
         var namesBeforeClick = await dashboard.GetAttentionQueueEmployeeNamesAsync("Leave request");
         Assert.Contains(namesBeforeClick, n => n.Contains("Tom Williams", StringComparison.OrdinalIgnoreCase));
 
-        // Scope the click to the "Leave request" row specifically — Tom may also have other
-        // open attention-queue items (onboarding, fit notes, etc.) that would otherwise win the
-        // single-fragment ".First" match just by sorting ahead of the leave request row.
         await dashboard.ClickAttentionQueueItemAsync("Tom Williams", "Leave request");
 
-        // ── Step 4: The Task view dialog opens in place — no navigation away from the
-        // dashboard, unlike the "already actioned" fallback. ────────────────────────────
         await task.WaitForLoadedAsync();
         Assert.Contains("/dashboard/manager", _page.Url);
 
@@ -98,7 +86,6 @@ public sealed class LeaveRequestsWidgetTaskDialogTests(CrossUserFixture fixture)
         var hrDash    = new HrDashboardPage(_page, _fixture.WebBaseUrl);
         var task      = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
-        // ── Step 1: Tom submits a pending leave request. ────────────────────────────────
         await login.GoToAsync();
         await login.LoginAsync(TomEmail);
 
@@ -111,9 +98,6 @@ public sealed class LeaveRequestsWidgetTaskDialogTests(CrossUserFixture fixture)
         await _page.WaitForSelectorAsync("table tbody tr", new() { Timeout = 15_000 });
         Assert.Equal("Pending", await profile.GetLeaveRequestStatusAsync(reason));
 
-        // ── Step 2: James (Tom's manager) approves it via his own Tasks tab — closing the
-        // review task, matching the "Completing" flow used elsewhere in this suite (see
-        // LeaveApprovalTests, ManagerDashboardTests.CompletingOnboardingTask...). ─────────
         await login.SwitchAccountAsync(JamesEmail);
 
         var jamesId = Guid.Parse("30000000-0000-0000-0000-000000000002");
@@ -161,7 +145,6 @@ public sealed class LeaveRequestsWidgetTaskDialogTests(CrossUserFixture fixture)
         var rows = await _page.Locator(".attention-queue-card .attention-queue-item").AllInnerTextsAsync();
         Assert.DoesNotContain(rows, r => r.Contains("14 Sep", StringComparison.OrdinalIgnoreCase));
 
-        // And nothing that would open a dialog exists for it.
         Assert.False(await task.IsVisibleAsync(),
             "Did not expect any task dialog to be open for an already-actioned leave request");
     }

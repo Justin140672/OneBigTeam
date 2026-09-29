@@ -41,12 +41,6 @@ internal sealed class SqlCommandBarrier : IObserver<DiagnosticListener>, IObserv
 
     private sealed record ArmedEntry(string CommandVerb, Barrier Barrier);
 
-    /// <summary>
-    /// Arms the barrier: <paramref name="participantCount"/> commands whose text contains both
-    /// <paramref name="commandVerb"/> and <paramref name="tableNameSubstring"/>, and which carry a
-    /// parameter with value <paramref name="id"/>, must arrive before any of them is released to
-    /// execute. Dispose the result once the race is over (always, even on assertion failure).
-    /// </summary>
     public static IDisposable Arm(string tableNameSubstring, Guid id, int participantCount = 2, string commandVerb = "UPDATE")
     {
         Instance.EnsureSubscribed();
@@ -68,8 +62,6 @@ internal sealed class SqlCommandBarrier : IObserver<DiagnosticListener>, IObserv
                 return;
         }
 
-        // By the time a test disposes its ArmScope, the race has already been awaited (both
-        // responses received), so no thread can still be blocked in SignalAndWait for this key.
         entry.Barrier.Dispose();
     }
 

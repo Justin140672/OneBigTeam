@@ -39,8 +39,6 @@ internal sealed class ListInvitableEmployeesHandler(
                 && i.CancelledAt == null)
             .ToListAsync(cancellationToken);
 
-        // An actionable (still-pending, not expired) invite blocks a new one; an expired invite
-        // does not — the employee can be re-invited, which supersedes the stale row.
         var pendingInviteEmployeeIds = openInvites
             .Where(i => !i.IsExpired)
             .Select(i => i.EmployeeId)

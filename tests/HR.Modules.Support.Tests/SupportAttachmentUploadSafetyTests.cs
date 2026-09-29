@@ -33,15 +33,6 @@ public class SupportAttachmentUploadSafetyTests
         return new SupportDbContext(builder.Options);
     }
 
-    /// <summary>
-    /// Security review finding #4 (P1): builds an IServiceScopeFactory around a brand-new, minimal
-    /// DI container whose only registration is a SupportDbContext pointed at the SAME in-memory
-    /// database name as the test's ambient `db` handle. The in-memory provider shares state across
-    /// every context instance opened against the same database name, so the test can assert on
-    /// pending-deletion rows written by the independent scope through the original `db` handle.
-    /// This mirrors exactly what UploadedAttachmentCleanupScope does in production: it never
-    /// reuses the failed request's own context, only a freshly resolved one from its own scope.
-    /// </summary>
     private static IServiceScopeFactory BuildScopeFactory(string dbName) =>
         new ServiceCollection()
             .AddDbContext<SupportDbContext>(o => o.UseInMemoryDatabase(dbName))
@@ -95,10 +86,6 @@ public class SupportAttachmentUploadSafetyTests
         }
     }
 
-    /// <summary>Reliability review issue 4 (P1): forces SaveChangesAsync to throw after uploads have
-    /// already succeeded, to prove cleanup still runs for a genuine persistence failure (as opposed
-    /// to disposing the context, which would fail earlier at db.SupportRequests.Add and never reach
-    /// the upload phase at all).</summary>
     private sealed class ThrowingSaveChangesInterceptor : SaveChangesInterceptor
     {
         public override ValueTask<InterceptionResult<int>> SavingChangesAsync(
@@ -196,10 +183,6 @@ public class SupportAttachmentUploadSafetyTests
         Assert.True(result.IsFailure);
         Assert.Empty(await db.SupportAttachments.ToListAsync());
 
-        // Reliability review issue 4 (P1): the fake now actually tracks delete calls/active keys,
-        // so this proves the handler genuinely issued a DeleteAsync for "first.png"'s key — the old
-        // assertion (empty SupportAttachments table) passed even with zero cleanup, since nothing
-        // was ever persisted either way.
         Assert.Single(storage.Uploads);
         Assert.Single(storage.DeleteAttempts);
         Assert.Empty(storage.ActiveKeys);
@@ -277,7 +260,6 @@ public class SupportAttachmentUploadSafetyTests
         Assert.Empty(await db.SupportResponseAttachments.ToListAsync());
     }
 
-    // ── Reliability review issue 4 (P1) ─────────────────────────────────────────────────────
 
     [Fact]
     public async Task SubmitSupportRequest_Cleans_Up_First_Upload_When_Second_Upload_Throws()
@@ -289,8 +271,6 @@ public class SupportAttachmentUploadSafetyTests
         storage.FailUploadForFileNames.Add("second.png");
         var handler = BuildSubmitHandler(db, storage, new FakeUploadedFileScanner(), dbName);
 
-        // The second upload throws, not a Result failure — the ownership scope must still clean
-        // up the first file even though the exception propagates out of the handler entirely.
         await Assert.ThrowsAsync<InvalidOperationException>(() => handler.HandleAsync(
             ValidRequest(companyId, TestFile.Create("first.png"), TestFile.Create("second.png")),
             Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None));
@@ -323,8 +303,6 @@ public class SupportAttachmentUploadSafetyTests
     [Fact]
     public async Task SubmitSupportRequest_Cleans_Up_Uploads_When_SaveChanges_Fails()
     {
-        // SaveChangesAsync is forced to throw only after the upload has already happened, proving
-        // cleanup runs for a genuine persistence failure specifically (not just an upload-phase one).
         var dbName = Guid.NewGuid().ToString("N");
         await using var db = BuildContext(dbName, failOnSaveChanges: true);
         var companyId = Guid.NewGuid();
@@ -353,8 +331,6 @@ public class SupportAttachmentUploadSafetyTests
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        // Must propagate as OperationCanceledException, not be swallowed into a generic
-        // "scanning is temporarily unavailable" Result failure.
         await Assert.ThrowsAsync<OperationCanceledException>(() => handler.HandleAsync(
             ValidRequest(companyId, TestFile.Create("photo.png")),
             Guid.NewGuid(), Guid.NewGuid(), cts.Token));
@@ -383,10 +359,6 @@ public class SupportAttachmentUploadSafetyTests
 
         var uploadedKey = storage.Uploads.Single().StorageKey;
 
-        // Simulate the immediate cleanup delete having failed (e.g. a transient network error) by
-        // re-adding the key as active and configuring the fake to fail once more, then run the
-        // durable retry job directly — this proves issue 4's "delete failure followed by retry"
-        // requirement end-to-end rather than only inside the ownership scope.
         storage.FailDeleteForKeys.Add(uploadedKey);
         var pending = HR.Modules.Support.Domain.SupportAttachmentPendingDeletion.Create(
             Guid.NewGuid(), uploadedKey, "Simulated initial failure.", new DateTimeOffset(FixedUtcNow, TimeSpan.Zero));
@@ -397,13 +369,11 @@ public class SupportAttachmentUploadSafetyTests
             db, storage, new FakeClock(FixedUtcNow.AddMinutes(5)),
             NullLogger<HR.Modules.Support.Jobs.SupportAttachmentPendingDeletionRetryJob>.Instance);
 
-        // First sweep: still configured to fail — attempt count increments, stays unresolved.
         await retryJob.ExecuteAsync();
         var afterFirstRetry = await db.SupportAttachmentPendingDeletions.SingleAsync(d => d.StorageKey == uploadedKey);
         Assert.Null(afterFirstRetry.ResolvedAt);
         Assert.True(afterFirstRetry.AttemptCount >= 2);
 
-        // Second sweep: storage recovers — the pending deletion resolves.
         storage.FailDeleteForKeys.Remove(uploadedKey);
         await retryJob.ExecuteAsync();
         var afterSecondRetry = await db.SupportAttachmentPendingDeletions.SingleAsync(d => d.StorageKey == uploadedKey);
@@ -430,17 +400,7 @@ public class SupportAttachmentUploadSafetyTests
         Assert.Single(await db.SupportAttachments.ToListAsync());
     }
 
-    // ── Security review finding #4 (P1): cleanup bookkeeping isolation ─────────────────────────
 
-    /// <summary>
-    /// Core regression this finding fixes: before the fix, the pending-deletion bookkeeping save
-    /// ran through the same, already-populated <see cref="SupportDbContext"/> as the failed
-    /// request — so saving the pending-deletion row could also silently commit the still-tracked
-    /// failed <c>SupportRequest</c>/<c>SupportAttachment</c> entities as a side effect. This proves
-    /// that no longer happens: when the compensating delete also fails after a validation failure,
-    /// exactly one pending-deletion row is recorded and nothing from the failed business graph is
-    /// persisted.
-    /// </summary>
     [Fact]
     public async Task SubmitSupportRequest_Isolates_PendingDeletion_From_Failed_Request_Graph_When_Compensating_Delete_Also_Fails()
     {
@@ -464,16 +424,10 @@ public class SupportAttachmentUploadSafetyTests
         Assert.Equal(uploadedKey, pendingDeletions[0].StorageKey);
         Assert.Null(pendingDeletions[0].ResolvedAt);
 
-        // The failed business graph must never have been committed as a side effect of the
-        // isolated cleanup save.
         Assert.Empty(await db.SupportRequests.ToListAsync());
         Assert.Empty(await db.SupportAttachments.ToListAsync());
     }
 
-    /// <summary>
-    /// Mirrors the above but for a thrown upload exception (rather than a validation-Result
-    /// failure) triggering cleanup, with the compensating delete also failing.
-    /// </summary>
     [Fact]
     public async Task SubmitSupportRequest_Records_PendingDeletion_When_Upload_Throws_And_Compensating_Delete_Also_Fails()
     {
@@ -497,14 +451,6 @@ public class SupportAttachmentUploadSafetyTests
         Assert.Empty(await db.SupportAttachments.ToListAsync());
     }
 
-    /// <summary>
-    /// Direct proof of genuine isolation: the request's own <see cref="SupportDbContext"/> has
-    /// <c>SaveChangesAsync</c> wired to always throw (simulating a persistent database failure),
-    /// and the compensating delete also fails. The pending-deletion record must still be durably
-    /// saved — because it goes through a completely different <see cref="SupportDbContext"/>
-    /// instance resolved from an independent DI scope, a permanently-broken ambient context cannot
-    /// prevent the cleanup bookkeeping from landing.
-    /// </summary>
     [Fact]
     public async Task SubmitSupportRequest_Records_PendingDeletion_Via_Separate_Context_Even_When_Ambient_Context_Always_Fails()
     {
@@ -520,10 +466,6 @@ public class SupportAttachmentUploadSafetyTests
 
         var uploadedKey = storage.Uploads.Single().StorageKey;
 
-        // Query through a brand-new context instance against the same in-memory database name —
-        // the ambient `db` handle's own SaveChangesAsync is permanently broken, so reading via it
-        // is fine (reads don't call SaveChanges), but this also proves the record is durably
-        // visible from an entirely independent context, not just the one that wrote it.
         await using var verifyDb = BuildContext(dbName);
         var pendingDeletions = await verifyDb.SupportAttachmentPendingDeletions.ToListAsync();
         Assert.Single(pendingDeletions);
@@ -564,8 +506,6 @@ public class SupportAttachmentUploadSafetyTests
             NullLogger<UploadedAttachmentCleanupScope>.Instance))
         {
             cleanupScope.Track(storageKey);
-            // Never committed — DisposeAsync below runs the delete-fails -> record-pending-deletion
-            // path, which must swallow the simulated DbUpdateException as a duplicate no-op.
         }
 
         await using var assertDb = BuildContext(dbName);

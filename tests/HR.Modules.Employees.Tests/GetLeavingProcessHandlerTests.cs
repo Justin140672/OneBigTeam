@@ -23,9 +23,6 @@ public class GetLeavingProcessHandlerTests
 
         if (status != LeavingProcessStatus.InProgress)
         {
-            // EmployeeLeavingProcess has no domain mutator for Status yet (that arrives with the
-            // "Cancel Leaving Process" slice) — reflection mirrors EmployeeTestExtensions'
-            // SetStatusForTesting pattern used elsewhere in this project for the same reason.
             typeof(EmployeeLeavingProcess).GetProperty(nameof(EmployeeLeavingProcess.Status), BindingFlags.Public | BindingFlags.Instance)!
                 .SetValue(leavingProcess, status);
         }
@@ -101,8 +98,6 @@ public class GetLeavingProcessHandlerTests
         var earlier = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
         var later = earlier.AddDays(30);
 
-        // An earlier, cancelled leaving process for the same employee — GetLeavingProcess should
-        // surface the most recent one regardless of status.
         var older = CreateLeavingProcess(companyId, employeeId, earlier, LeavingProcessStatus.Cancelled);
         var newer = CreateLeavingProcess(companyId, employeeId, later);
         context.EmployeeLeavingProcesses.AddRange(older, newer);

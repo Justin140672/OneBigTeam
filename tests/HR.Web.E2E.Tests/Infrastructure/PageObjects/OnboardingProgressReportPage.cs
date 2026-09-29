@@ -2,13 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the Onboarding Progress report
-/// (/companies/{companyId}/reporting/onboarding-progress — OnboardingProgressReportPage.razor).
-/// Has a single "Overdue only" checkbox filter + "Apply" button (no ReportFilterPanel), three
-/// summary stat cards (Total Employees / Total Outstanding Tasks / Overdue Employees) above the
-/// grid, and export via the same SfDropDownButton pattern as the other report pages.
-/// </summary>
 public sealed class OnboardingProgressReportPage(IPage page, string baseUrl)
 {
     private const string RowsRenderedSelector = ".e-grid .e-row, .e-grid .e-emptyrow";
@@ -36,7 +29,6 @@ public sealed class OnboardingProgressReportPage(IPage page, string baseUrl)
         return await page.Locator(".e-grid .e-row").CountAsync();
     }
 
-    // ── Summary stat cards ─────────────────────────────────────────────────────
 
     private ILocator StatCard(string labelText) =>
         page.Locator(".card").Filter(new() { HasText = labelText }).First;
@@ -47,7 +39,6 @@ public sealed class OnboardingProgressReportPage(IPage page, string baseUrl)
         return int.TryParse(text?.Trim(), out var value) ? value : -1;
     }
 
-    // ── Filter ─────────────────────────────────────────────────────────────────
 
     private ILocator OverdueOnlyCheckbox => page.Locator(".e-checkbox-wrapper").Filter(new() { HasText = "Overdue only" }).First;
 
@@ -61,14 +52,10 @@ public sealed class OnboardingProgressReportPage(IPage page, string baseUrl)
     public async Task ApplyAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Apply" }).ClickAsync();
-        // RowsRenderedSelector can resolve against rows/emptyrow still left over from before the
-        // click — same stale-content race already fixed on WorkloadActionsReportPage/
-        // LeaveSummaryReportPage's equivalent Apply flows.
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
         await page.WaitForTimeoutAsync(300);
     }
 
-    // ── Export ─────────────────────────────────────────────────────────────────
 
     public async Task<IDownload> ExportAsync(string formatLabel)
     {

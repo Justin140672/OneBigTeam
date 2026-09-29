@@ -14,18 +14,8 @@ internal sealed class SicknessEvidenceRequest
     public SicknessEvidenceRequestStatus Status { get; private set; }
     public DateTimeOffset? FulfilledAt { get; private set; }
 
-    /// <summary>
-    /// OBT-REM-10: independent, durable progress marker for the overdue in-app notification —
-    /// tracked separately from <see cref="OverdueEventPublishedAt"/> so a partial failure (e.g.
-    /// notification written but event publication fails) can be repaired on retry without
-    /// re-notifying or silently losing the event. Set once, on first successful write.
-    /// </summary>
     public DateTimeOffset? OverdueNotifiedAt { get; private set; }
 
-    /// <summary>
-    /// OBT-REM-10: independent, durable progress marker for overdue integration-event
-    /// publication. See <see cref="OverdueNotifiedAt"/>.
-    /// </summary>
     public DateTimeOffset? OverdueEventPublishedAt { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
@@ -74,7 +64,6 @@ internal sealed class SicknessEvidenceRequest
         UpdatedAt = now;
     }
 
-    /// <summary>Idempotent: safe to call even if already marked (no-op on second call).</summary>
     public void MarkOverdueNotified(DateTimeOffset now)
     {
         if (OverdueNotifiedAt is not null) return;
@@ -82,7 +71,6 @@ internal sealed class SicknessEvidenceRequest
         UpdatedAt = now;
     }
 
-    /// <summary>Idempotent: safe to call even if already marked (no-op on second call).</summary>
     public void MarkOverdueEventPublished(DateTimeOffset now)
     {
         if (OverdueEventPublishedAt is not null) return;
@@ -90,11 +78,6 @@ internal sealed class SicknessEvidenceRequest
         UpdatedAt = now;
     }
 
-    /// <summary>
-    /// SICK-01: re-anchors the fit-note deadline once the absence's authoritative end date is
-    /// known (i.e. when the record is closed). Only meaningful while the request is still Pending
-    /// or Overdue — a fulfilled/cancelled request keeps its history.
-    /// </summary>
     public bool Reschedule(DateOnly newDueDate, DateTimeOffset now)
     {
         if (Status != SicknessEvidenceRequestStatus.Pending &&
@@ -108,8 +91,6 @@ internal sealed class SicknessEvidenceRequest
         if (Status == SicknessEvidenceRequestStatus.Overdue && newDueDate >= DateOnly.FromDateTime(now.UtcDateTime))
         {
             Status = SicknessEvidenceRequestStatus.Pending;
-            // Re-anchoring back into the future means a subsequent overdue transition is a new
-            // occurrence — reset the progress markers so it is notified/published again.
             OverdueNotifiedAt = null;
             OverdueEventPublishedAt = null;
         }

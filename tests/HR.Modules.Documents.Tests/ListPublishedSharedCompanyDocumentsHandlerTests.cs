@@ -154,7 +154,6 @@ public class ListPublishedSharedCompanyDocumentsHandlerTests
             Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Employee, caller));
         await db.SaveChangesAsync();
 
-        // No profile seeded for the caller at all — the employee-id rule must match regardless.
         var result = await Handler(db).HandleAsync(
             new ListPublishedSharedCompanyDocumentsRequest { CompanyId = companyId }, caller,
             CancellationToken.None);
@@ -327,8 +326,6 @@ public class ListPublishedSharedCompanyDocumentsHandlerTests
         var yesterday  = Now.AddDays(-1);
         var today      = Now;
 
-        // Titles are chosen so that alphabetical order disagrees with publish-date order — this
-        // proves PublishedAt is the primary sort key, not merely a tiebreaker for Title.
         var publishedYesterday = CreateDoc(companyId, "A Policy", category.Id, "key/a.pdf", "a.pdf", Guid.NewGuid());
         publishedYesterday.Publish(Guid.NewGuid(), yesterday);
 

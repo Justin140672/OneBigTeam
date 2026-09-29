@@ -218,21 +218,15 @@
 }
 
 @code {
-    // Guarded like CompanyEdit.razor: URL-typing into this dashboard without the
-    // Recruiter role bounces to MyProfileUrl. The switcher/redirect only pick a default.
     private bool _ready;
 
     private enum DashboardTab { Pipeline, Activity, Insights }
     private DashboardTab _tab = DashboardTab.Pipeline;
 
-    // DSH-07: WAI-ARIA tabs keyboard support. Roving tabindex + Arrow/Home/End move selection
-    // and DOM focus together; the pure next-index maths lives in DashboardTabKeyboard.
     private static readonly DashboardTab[] _tabs = [DashboardTab.Pipeline, DashboardTab.Activity, DashboardTab.Insights];
     private readonly ElementReference[] _tabRefs = new ElementReference[3];
     private int? _pendingFocusIndex;
 
-    // DSH-07: single polite live-region message, announced when the summary finishes loading
-    // or is retried.
     private string? _announcement;
 
     private static string TabIcon(DashboardTab tab) => tab switch
@@ -252,14 +246,6 @@
         _pendingFocusIndex = n;
     }
 
-    // Judgement call ("remembers filters"): the Kanban board is per-vacancy (see
-    // GetRecruitmentKanban's contract), so the dashboard needs a vacancy picker above it. Tab
-    // selection, Board/List toggle state, the selected vacancy, the board's search text, and the
-    // terminal-stage toggle are all held here as plain in-memory fields — scoped to this component
-    // instance's circuit lifetime, same as any other Blazor Server page state. No new persistence
-    // mechanism (session storage, cookies, etc.) exists elsewhere in this codebase for "remember
-    // during session" UI state, so none was introduced here; navigating away and back within the
-    // same circuit keeps the selection (including which tab was active), a full reload resets it.
     private enum PipelineView { Board, List }
     private PipelineView _view = PipelineView.Board;
     private List<VacancyListItemModel> _vacancies = [];
@@ -268,9 +254,6 @@
     private string _boardSearchText = string.Empty;
     private bool _showTerminalStages;
 
-    // ── Summary row state ───────────────────────────────────────────────────
-    // DSH-03: each tile's underlying source is tracked as a WidgetResult so a failed source shows
-    // "—" + an inline retry rather than a misleading 0.
     private const string SrcVacancies = "Open vacancies";
     private const string SrcPipeline = "New applications";
     private const string SrcCandidates = "Candidates in progress";
@@ -284,9 +267,6 @@
 
     private bool _summaryLoading = true;
 
-    // DSH-04: every recruitment-summary tile now maps to an authoritative server metric endpoint
-    // ({ count, items[] }, count == items.Count) rather than inferring meaning from stage ordering.
-    // Each endpoint is its own tracked source so one failure can't blank the whole row or the header.
     private WidgetResult<ListVacanciesResponse?> _vacanciesRes = WidgetResult<ListVacanciesResponse?>.Loading(SrcVacancies);
     private WidgetResult<NewApplicationsMetricResponse?> _newApplicationsRes = WidgetResult<NewApplicationsMetricResponse?>.Loading(SrcPipeline);
     private WidgetResult<CandidatesInProgressMetricResponse?> _candidatesRes = WidgetResult<CandidatesInProgressMetricResponse?>.Loading(SrcCandidates);
@@ -295,7 +275,6 @@
     private WidgetResult<GetStaleVacanciesResponse?> _staleRes = WidgetResult<GetStaleVacanciesResponse?>.Loading(SrcStale);
     private bool _offerStageConfigured = true;
 
-    // Drill-down dialog state — always shows exactly the items the metric endpoint returned.
     private bool _drillDownVisible;
     private string _drillDownTitle = string.Empty;
     private string _drillDownDateHeader = "Applied";
@@ -377,24 +356,18 @@
                 break;
 
             case SrcPipeline:
-                // DSH-04: authoritative "new applications" — live applications whose current stage
-                // carries purpose = NewApplication (time-based fallback server-side when none does).
                 _newApplicationsRes = await SourceLoader.LoadAsync(SummaryWidgetName, name,
                     () => VacancyService.GetNewApplicationsMetricOrThrowAsync(Session.CompanyId));
                 _newApplications = _newApplicationsRes.IsLoaded ? _newApplicationsRes.Value?.Count ?? 0 : 0;
                 break;
 
             case SrcCandidates:
-                // DSH-04: authoritative "candidates in progress" — live applications in any
-                // non-terminal stage. Own tracked source so a failure doesn't break the header line.
                 _candidatesRes = await SourceLoader.LoadAsync(SummaryWidgetName, name,
                     () => VacancyService.GetCandidatesInProgressMetricOrThrowAsync(Session.CompanyId));
                 _candidatesInProgress = _candidatesRes.IsLoaded ? _candidatesRes.Value?.Count ?? 0 : 0;
                 break;
 
             case SrcInterviews:
-                // DSH-04: authoritative "interviews requiring action" — interviews with a Pending
-                // outcome scheduled at or before end of today (overdue + today's already-happened).
                 _interviewsRes = await SourceLoader.LoadAsync(SummaryWidgetName, name,
                     () => InterviewService.GetInterviewsRequiringActionMetricOrThrowAsync(Session.CompanyId));
                 _interviewsRequiringAction = _interviewsRes.IsLoaded ? _interviewsRes.Value?.Count ?? 0 : 0;
@@ -407,10 +380,6 @@
                 break;
 
             case SrcOffers:
-                // DSH-04: authoritative "offers awaiting response" — live applications whose current
-                // stage carries purpose = Offer (summed across every Offer-purpose stage). No
-                // order-based fallback: if no stage has that purpose the count is 0 and the tile is
-                // rendered muted with a "No offer stage configured" hint.
                 _offersRes = await SourceLoader.LoadAsync(SummaryWidgetName, name,
                     () => VacancyService.GetOffersAwaitingResponseMetricOrThrowAsync(Session.CompanyId));
                 _offersAwaitingResponse = _offersRes.IsLoaded ? _offersRes.Value?.Count ?? 0 : 0;
@@ -472,8 +441,6 @@
         $"{Pluralize(_openVacancies, "open vacancy", "open vacancies")} · " +
         $"{Pluralize(_candidatesInProgress, "candidate", "candidates")} in progress";
 
-    // Small pluralization helper (matches ManagerDashboard.razor's ActivitySummary pattern) — avoids
-    // grammatically wrong copy like "1 open vacancies" on the header summary line.
     private static string Pluralize(int count, string singular, string plural) =>
         count == 1 ? $"1 {singular}" : $"{count} {plural}";
 

@@ -106,7 +106,7 @@ public class RequestPersonalDetailsChangeHandlerTests
         var result = await handler.HandleAsync(
             new RequestPersonalDetailsChangeRequest
             {
-                CompanyId = Guid.NewGuid(), // different company
+                CompanyId = Guid.NewGuid(),
                 EmployeeId = employee.Id,
                 Notes = "Some notes"
             },

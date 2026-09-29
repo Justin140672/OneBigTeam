@@ -9,7 +9,6 @@ namespace HR.Modules.Identity.Tests.AccountEmailPolicy;
 /// </summary>
 public class AccountEmailDomainTests
 {
-    // ── Extraction + normalisation ──────────────────────────────────────────────
 
     [Theory]
     [InlineData("person@gmail.com", "gmail.com")]
@@ -49,9 +48,6 @@ public class AccountEmailDomainTests
     [Fact]
     public void TryExtractDomain_Full_Width_Gmail_Is_Either_Mapped_To_Gmail_Or_Rejected_As_Malformed()
     {
-        // UTS #46 maps full-width Latin letters to their ASCII equivalents, so this is expected to
-        // normalise to "gmail.com". The only outcome that would be a security hole is normalising to
-        // some OTHER domain — so assert "gmail.com or malformed", never anything else.
         var ok = AccountEmailDomain.TryExtractDomain("person@ｇｍａｉｌ.com", out var domain);
 
         if (ok)
@@ -60,7 +56,6 @@ public class AccountEmailDomainTests
             Assert.Equal(string.Empty, domain);
     }
 
-    // ── Malformed input ─────────────────────────────────────────────────────────
 
     [Theory]
     [InlineData(null)]
@@ -93,7 +88,6 @@ public class AccountEmailDomainTests
         Assert.Equal(string.Empty, domain);
     }
 
-    // ── Boundaries ──────────────────────────────────────────────────────────────
 
     [Fact]
     public void TryNormalizeDomain_Accepts_Minimum_Two_Label_Domain()
@@ -128,7 +122,6 @@ public class AccountEmailDomainTests
     [Fact]
     public void TryNormalizeDomain_Accepts_Domain_Of_Exactly_253_Characters()
     {
-        // 3 x (63 + '.') = 192, + 57 + ".com" (4) = 253.
         var label = new string('a', 63);
         var value = $"{label}.{label}.{label}.{new string('b', 57)}.com";
         Assert.Equal(253, value.Length);
@@ -148,9 +141,9 @@ public class AccountEmailDomainTests
     }
 
     [Theory]
-    [InlineData("123.example", "123.example")]   // numeric label that is NOT the TLD is fine
-    [InlineData("example.c0m", "example.c0m")]   // TLD with a digit but not all-numeric is fine
-    [InlineData("a-b.com", "a-b.com")]           // inner hyphen is fine
+    [InlineData("123.example", "123.example")]
+    [InlineData("example.c0m", "example.c0m")]
+    [InlineData("a-b.com", "a-b.com")]
     public void TryNormalizeDomain_Numeric_And_Hyphen_Rules_Only_Reject_The_Disallowed_Positions(string value, string expected)
     {
         Assert.True(AccountEmailDomain.TryNormalizeDomain(value, out var domain));

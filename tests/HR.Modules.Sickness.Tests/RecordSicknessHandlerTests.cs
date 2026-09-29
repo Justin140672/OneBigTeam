@@ -15,7 +15,6 @@ public class RecordSicknessHandlerTests
     private static readonly DateTime FixedUtcNow = new(2026, 7, 1, 9, 0, 0, DateTimeKind.Utc);
     private static readonly DateOnly StartDate = new(2026, 7, 1);
 
-    // Mon–Fri, 7.5h/day
     private static readonly WorkingPattern DefaultPattern = WorkingPattern.Default;
 
     private static SicknessDbContext BuildContext() =>
@@ -89,9 +88,6 @@ public class RecordSicknessHandlerTests
         Assert.Equal(SicknessStatus.Active, result.Value.Status);
         Assert.Equal(StartDate, result.Value.StartDate);
         Assert.Equal(SicknessDayPart.FullDay, result.Value.StartDayPart);
-        // Fit note requirement is mandatory now (default 7 days — see
-        // CompanySettings.FitNoteRequiredAfterDays), and with no end date yet we can't tell if
-        // the threshold will be met, so this defaults to Pending rather than NotRequired.
         Assert.Equal(SicknessEvidenceStatus.Pending, result.Value.EvidenceStatus);
         Assert.Equal("Feeling unwell", result.Value.Notes);
 
@@ -125,7 +121,6 @@ public class RecordSicknessHandlerTests
     [Fact]
     public async Task HandleAsync_Calculates_TotalDays_For_FullDay_Single_Day()
     {
-        // 2026-07-01 is a Wednesday (working day)
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
@@ -149,7 +144,6 @@ public class RecordSicknessHandlerTests
     [Fact]
     public async Task HandleAsync_Calculates_TotalDays_For_HalfDay()
     {
-        // 2026-07-01 is a Wednesday
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
@@ -173,7 +167,6 @@ public class RecordSicknessHandlerTests
     [Fact]
     public async Task HandleAsync_Calculates_TotalDays_Across_Multiple_Working_Days()
     {
-        // 2026-07-01 (Wed) to 2026-07-03 (Fri) = 3 working days
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
@@ -197,7 +190,6 @@ public class RecordSicknessHandlerTests
     [Fact]
     public async Task HandleAsync_Excludes_Weekend_Days_From_TotalDays()
     {
-        // 2026-07-01 (Wed) to 2026-07-06 (Mon) = 4 working days (Wed, Thu, Fri, Mon)
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
@@ -221,7 +213,6 @@ public class RecordSicknessHandlerTests
     [Fact]
     public async Task HandleAsync_Excludes_Public_Holidays_When_Setting_Is_Enabled()
     {
-        // 2026-07-01 (Wed) to 2026-07-03 (Fri) = 3 working days, but 2026-07-02 is a public holiday
         var publicHolidays = new List<DateOnly> { new(2026, 7, 2) };
 
         await using var db = BuildContext();
@@ -248,7 +239,6 @@ public class RecordSicknessHandlerTests
     [Fact]
     public async Task HandleAsync_Does_Not_Exclude_Public_Holidays_When_Setting_Is_Disabled()
     {
-        // Setting disabled: public holidays still count
         var publicHolidays = new List<DateOnly> { new(2026, 7, 2) };
 
         await using var db = BuildContext();
@@ -275,12 +265,10 @@ public class RecordSicknessHandlerTests
     [Fact]
     public async Task HandleAsync_Respects_Custom_Working_Pattern()
     {
-        // 4-day week (Mon–Thu), 8h/day
         var pattern = new WorkingPattern(
             WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday | WorkingDays.Thursday,
             8m);
 
-        // 2026-07-01 (Wed) to 2026-07-03 (Fri) — Fri is not a working day
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
@@ -298,7 +286,7 @@ public class RecordSicknessHandlerTests
 
         Assert.True(result.IsSuccess);
         var saved = await db.SicknessRecords.SingleAsync();
-        Assert.Equal(2m, saved.TotalDays); // Wed + Thu only
+        Assert.Equal(2m, saved.TotalDays);
     }
 
     [Fact]
@@ -344,7 +332,7 @@ public class RecordSicknessHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Category_Belongs_To_Different_Company()
     {
         await using var db = BuildContext();
-        var categoryId = await SeedCategory(db, Guid.NewGuid()); // different company
+        var categoryId = await SeedCategory(db, Guid.NewGuid());
 
         var result = await BuildHandler(db).HandleAsync(new RecordSicknessRequest
         {
@@ -367,7 +355,6 @@ public class RecordSicknessHandlerTests
         var employeeId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
 
-        // Create the first (open) record
         var firstResult = await BuildHandler(db).HandleAsync(new RecordSicknessRequest
         {
             CompanyId = companyId,
@@ -379,7 +366,6 @@ public class RecordSicknessHandlerTests
 
         Assert.True(firstResult.IsSuccess);
 
-        // Attempt to create a second open record for the same employee
         var secondResult = await BuildHandler(db).HandleAsync(new RecordSicknessRequest
         {
             CompanyId = companyId,
@@ -443,8 +429,6 @@ public class RecordSicknessHandlerTests
         Assert.Equal(StartDate, auditEvent.StartDate);
         Assert.Equal(new DateTimeOffset(FixedUtcNow, TimeSpan.Zero), auditEvent.OccurredAt);
 
-        // The IAuditEvent.EmployeeId interface member must round-trip to the subject employee's ID —
-        // this is what lets the audit history reader find "all events belonging to employee X".
         Assert.Equal(employeeId, ((HR.SharedKernel.IAuditEvent)auditEvent).EmployeeId);
     }
 
@@ -476,7 +460,6 @@ public class RecordSicknessHandlerTests
         var categoryId = await SeedCategory(db, companyId);
         var auditPublisher = new FakeAuditEventPublisher();
 
-        // First record succeeds
         await BuildHandler(db, auditPublisher: auditPublisher).HandleAsync(new RecordSicknessRequest
         {
             CompanyId = companyId,
@@ -488,7 +471,6 @@ public class RecordSicknessHandlerTests
 
         auditPublisher.PublishedEvents.Clear();
 
-        // Second record conflicts
         var result = await BuildHandler(db, auditPublisher: auditPublisher).HandleAsync(new RecordSicknessRequest
         {
             CompanyId = companyId,
@@ -503,14 +485,10 @@ public class RecordSicknessHandlerTests
         Assert.Empty(auditPublisher.PublishedEvents);
     }
 
-    // FitNoteRequiredAfterDays is mandatory now (no opt-out — see
-    // CompanySettings.FitNoteRequiredAfterDays), so the "setting is null, NotRequired" case this
-    // used to cover can no longer occur and has been removed.
 
     [Fact]
     public async Task HandleAsync_Sets_EvidenceStatus_Pending_When_Open_Record_And_FitNote_Setting_Is_Set()
     {
-        // No end date — total_days is null, fit note enabled → Pending
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
@@ -531,7 +509,6 @@ public class RecordSicknessHandlerTests
     [Fact]
     public async Task HandleAsync_Sets_EvidenceStatus_NotRequired_When_TotalDays_Below_Threshold()
     {
-        // 2026-07-01 to 2026-07-03 = 3 days, threshold = 7 → NotRequired
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
@@ -554,9 +531,6 @@ public class RecordSicknessHandlerTests
     [Fact]
     public async Task HandleAsync_Sets_EvidenceStatus_Pending_When_TotalDays_Meets_Threshold()
     {
-        // Mon 2026-06-22 to Mon 2026-06-29 = 6 working days (Mon–Fri = 5, next Mon = 6),
-        // threshold = 5 → Pending
-        // Use 2026-07-07 (Tue) to 2026-07-14 (Tue) = 6 working days (Tue Wed Thu Fri + Mon Tue)
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
@@ -579,15 +553,11 @@ public class RecordSicknessHandlerTests
     [Fact]
     public async Task HandleAsync_CreatesEvidenceRequest_Immediately_ForBackdatedOpenAbsence_AlreadyOverThreshold()
     {
-        // Backdated open (no end date) absence: StartDate far enough in the past relative to
-        // FixedUtcNow (2026-07-01) that calendar days already exceed the threshold. This must be
-        // caught immediately at creation time rather than waiting for the next FitNoteRequestJob run.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
 
-        // 2026-06-20 to 2026-07-01 (FixedUtcNow date) = 12 calendar days elapsed, threshold 7 → met
         var result = await BuildHandler(db, fitNoteRequiredAfterDays: 7).HandleAsync(new RecordSicknessRequest
         {
             CompanyId = companyId,
@@ -606,15 +576,13 @@ public class RecordSicknessHandlerTests
     [Fact]
     public async Task HandleAsync_CreatesEvidenceRequest_Immediately_ForClosedBackdatedImportedAbsence()
     {
-        // Already-closed backdated/imported record: StartDate and EndDate both in the past, span
-        // meets threshold. This must also be caught immediately at creation time.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
 
         var start = new DateOnly(2026, 6, 1);
-        var end = new DateOnly(2026, 6, 10); // 10 calendar days elapsed, threshold 7 → met
+        var end = new DateOnly(2026, 6, 10);
         var result = await BuildHandler(db, fitNoteRequiredAfterDays: 7).HandleAsync(new RecordSicknessRequest
         {
             CompanyId = companyId,
@@ -693,16 +661,13 @@ public class RecordSicknessHandlerTests
         Assert.Empty(notificationWriter.Written);
     }
 
-    // SICK-06: RecordSickness is the manager/HR-initiated path — the actor threaded onto the
-    // audit event is the authenticated caller (may differ from the affected employee), never
-    // implicitly assumed to be the employee.
     [Fact]
     public async Task HandleAsync_Audit_ActorEmployeeId_Reflects_Authenticated_Caller_Not_Employee()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        var actorId = Guid.NewGuid(); // the manager/HR user, distinct from the employee
+        var actorId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
         var auditPublisher = new FakeAuditEventPublisher();
 
@@ -746,9 +711,6 @@ public class RecordSicknessHandlerTests
         Assert.Null(auditEvent.ActorEmployeeIdValue);
     }
 
-    // SICK-06: Notes is free-text and may contain sensitive health content — it must never
-    // appear anywhere in the serialized audit event (checked via full-object JSON serialization
-    // rather than individual property assertions, to catch any accidental future leak).
     [Fact]
     public async Task HandleAsync_Audit_Event_Does_Not_Contain_Notes_Free_Text()
     {

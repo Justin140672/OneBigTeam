@@ -62,7 +62,6 @@ public class CreateCandidateApplicationValidatorTests
         Assert.True(result.IsValid);
     }
 
-    // ----- CompanyId / VacancyId -----
 
     [Fact]
     public void Validate_Fails_When_CompanyId_Is_Empty()
@@ -82,7 +81,6 @@ public class CreateCandidateApplicationValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateCandidateApplicationRequest.VacancyId));
     }
 
-    // ----- FirstName -----
 
     [Theory]
     [InlineData("")]
@@ -121,7 +119,6 @@ public class CreateCandidateApplicationValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateCandidateApplicationRequest.FirstName));
     }
 
-    // ----- LastName -----
 
     [Theory]
     [InlineData("")]
@@ -160,7 +157,6 @@ public class CreateCandidateApplicationValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateCandidateApplicationRequest.LastName));
     }
 
-    // ----- Email -----
 
     [Theory]
     [InlineData("")]
@@ -217,7 +213,6 @@ public class CreateCandidateApplicationValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateCandidateApplicationRequest.Email));
     }
 
-    // ----- Phone -----
 
     [Fact]
     public void Validate_Passes_When_Phone_Is_Exactly_30_Characters()
@@ -236,7 +231,6 @@ public class CreateCandidateApplicationValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateCandidateApplicationRequest.Phone));
     }
 
-    // ----- ResumeUrl -----
 
     [Fact]
     public void Validate_Passes_When_ResumeUrl_Is_Exactly_500_Characters()
@@ -255,7 +249,6 @@ public class CreateCandidateApplicationValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateCandidateApplicationRequest.ResumeUrl));
     }
 
-    // ----- Notes -----
 
     [Fact]
     public void Validate_Passes_When_Notes_Is_Exactly_2000_Characters()
@@ -274,7 +267,6 @@ public class CreateCandidateApplicationValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateCandidateApplicationRequest.Notes));
     }
 
-    // ----- Source / SourceExternalRecruiterId pairing -----
 
     [Fact]
     public void Validate_Passes_When_Source_Is_ExternalRecruiter_With_Recruiter_Id()
@@ -302,8 +294,6 @@ public class CreateCandidateApplicationValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateCandidateApplicationRequest.SourceExternalRecruiterId));
     }
 
-    // ApplicationSource is internal, so a public theory cannot take it as a parameter (CS0051);
-    // rows carry the enum member name and are parsed inside the test.
     [Theory]
     [InlineData(nameof(ApplicationSource.Unspecified))]
     [InlineData(nameof(ApplicationSource.Direct))]
@@ -344,8 +334,6 @@ public class CreateCandidateApplicationValidatorTests
         Assert.True(result.IsValid);
     }
 
-    // Guard: if a new ApplicationSource member is added, both recruiter-id rules must still hold for it
-    // even before the theory rows above are updated.
     [Fact]
     public void Recruiter_Id_Rules_Hold_For_Every_Non_ExternalRecruiter_Source()
     {

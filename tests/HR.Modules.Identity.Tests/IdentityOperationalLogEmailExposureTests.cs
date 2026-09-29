@@ -33,7 +33,6 @@ public class IdentityOperationalLogEmailExposureTests(IdentityDatabaseFixture fi
 
         Assert.DoesNotContain(email, capturedText, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(localPart, capturedText, StringComparison.OrdinalIgnoreCase);
-        // Rules out a masked form such as "pr***@northwind-codeql61.com" as well.
         Assert.DoesNotContain(PrivateDomain, capturedText, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("***@", capturedText, StringComparison.Ordinal);
     }
@@ -77,7 +76,6 @@ public class IdentityOperationalLogEmailExposureTests(IdentityDatabaseFixture fi
         var actorId = Guid.NewGuid();
 
         Result<CreatePlatformAdministratorResponse> result;
-        // An ambient caller scope must be captured too — proving the scope channel is inspected.
         using (logger.BeginScope(new Dictionary<string, object?> { ["Operation"] = "CreatePlatformAdministrator" }))
         {
             result = await BuildCreateHandler(gateway, new FakeAuditEventPublisher(), logger).HandleAsync(
@@ -92,7 +90,6 @@ public class IdentityOperationalLogEmailExposureTests(IdentityDatabaseFixture fi
         AssertNoEmailLeak(logger.AllText, normalizedEmail);
         Assert.Null(entry.ExceptionText);
 
-        // Still diagnosable from non-personal context.
         Assert.Equal("provider_account_lookup", entry.StateValue("FailureStage"));
         Assert.Equal(typeof(InvalidOperationException).FullName, entry.StateValue("ExceptionType"));
         Assert.True(Guid.TryParse(entry.StateValue("CorrelationId"), out var correlationId) && correlationId != Guid.Empty);
@@ -120,7 +117,6 @@ public class IdentityOperationalLogEmailExposureTests(IdentityDatabaseFixture fi
             new FakeCurrentUser(Guid.NewGuid(), ownerEmail),
             CancellationToken.None);
 
-        // The durable local record exists (Failed, retryable), so its id is the log's identifier.
         Assert.True(result.IsSuccess);
         Assert.Equal(PlatformAdministratorProvisioningStatus.Failed, result.Value.ProvisioningStatus);
 

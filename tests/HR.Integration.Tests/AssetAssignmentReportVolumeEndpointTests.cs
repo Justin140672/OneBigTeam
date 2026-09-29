@@ -83,8 +83,6 @@ public class AssetAssignmentReportVolumeEndpointTests
     [Fact]
     public async Task Get_AssetAssignmentReport_Returns_Deterministic_Order_Across_Repeated_Calls()
     {
-        // Proves AssetAssignmentReportReader's `orderby aa.Id` produces a stable, repeatable row
-        // order end-to-end (not just at the unit-test/fake level).
         var companyId = Guid.NewGuid();
         await SeedAssignmentsAsync(companyId, 200);
         using var client = await HrAdminClientFor(companyId);
@@ -118,7 +116,6 @@ public class AssetAssignmentReportVolumeEndpointTests
         var body = await response.Content.ReadAsStringAsync();
         var lineCount = body.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length;
 
-        // +1 for the CSV header row.
         Assert.Equal(DisplayRowLimit + 1, lineCount);
     }
 

@@ -16,9 +16,6 @@ public class LeaveYearRolloverServiceTests
 
     private static LeaveDbContext BuildContext()
     {
-        // Rollover wraps its save in an explicit transaction; InMemory provider doesn't support
-        // transactions and raises a warning-as-error for it by default (same accommodation used
-        // by AdjustLeaveBalanceHandlerTests — a test-provider limitation only).
         var options = new DbContextOptionsBuilder<LeaveDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
@@ -48,11 +45,6 @@ public class LeaveYearRolloverServiceTests
     private static LeavePolicy CreatePolicy(Guid companyId, int carryOverDays) =>
         LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, carryOverDays, false, false, Now);
 
-    // An active EmployeeLeavePolicyAssignment is now required for rollover eligibility (see
-    // LeaveYearRolloverService — "no active assignment" is itself the signal that an employee has
-    // left and should not be rolled over). Real usage always creates a LeaveBalance alongside an
-    // assignment (EmployeeCreatedHandler / AssignLeavePolicyToEmployeeHandler), so tests that only
-    // set up a LeaveBalance also need this to represent a currently-active employee.
     private static EmployeeLeavePolicyAssignment CreateAssignment(Guid companyId, Guid employeeId, Guid leavePolicyId) =>
         EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, leavePolicyId, new DateOnly(2026, 1, 1), Now);
 
@@ -79,9 +71,6 @@ public class LeaveYearRolloverServiceTests
 
         var leaveType = CreateLeaveType(companyId, defaultEntitlementDays: 25);
         var policy = CreatePolicy(companyId, carryOverDays: 5);
-        // Fully used — remaining is exactly zero, so this scenario is a genuine "no carry-over"
-        // case (the CarryOverDays=5 limit still allows carry-over, but there is nothing left to
-        // carry). The zero-limit and exhausted/negative-remaining cases are covered separately.
         var previousBalance = CreateBalance(companyId, employeeId, leaveType.Id, policy.Id, 2026, 25m, usedDays: 25m);
 
         context.LeaveTypes.Add(leaveType);
@@ -103,8 +92,6 @@ public class LeaveYearRolloverServiceTests
         Assert.Equal(leaveType.Id, newBalance.LeaveTypeId);
         Assert.Equal(policy.Id, newBalance.LeavePolicyId);
         Assert.Empty(context.LeaveBalanceAdjustments);
-        // A continuing employee's new policy-year balance accrues (for Monthly/Fortnightly leave
-        // types) from the new policy year's own start date - see LeaveYearRolloverService (LEAVE-04).
         Assert.Equal(new DateOnly(2027, 1, 1), newBalance.AccrualStartDate);
     }
 
@@ -141,7 +128,6 @@ public class LeaveYearRolloverServiceTests
 
         var leaveType = CreateLeaveType(companyId, defaultEntitlementDays: 25);
         var policy = CreatePolicy(companyId, carryOverDays: 5);
-        // Remaining = 25 - 10 used = 15, but CarryOverDays limit is 5.
         var previousBalance = CreateBalance(companyId, employeeId, leaveType.Id, policy.Id, 2026, 25m, usedDays: 10m);
 
         context.LeaveTypes.Add(leaveType);
@@ -159,7 +145,7 @@ public class LeaveYearRolloverServiceTests
 
         var newBalance = await context.LeaveBalances.SingleAsync(b => b.PolicyYear == 2027);
         Assert.Equal(25m, newBalance.EntitlementDays);
-        Assert.Equal(5m, newBalance.AdjustmentDays); // capped at policy's CarryOverDays
+        Assert.Equal(5m, newBalance.AdjustmentDays);
         Assert.Equal(30m, newBalance.RemainingDays);
 
         var adjustment = await context.LeaveBalanceAdjustments.SingleAsync();
@@ -193,7 +179,6 @@ public class LeaveYearRolloverServiceTests
 
         var leaveType = CreateLeaveType(companyId, defaultEntitlementDays: 25);
         var policy = CreatePolicy(companyId, carryOverDays: 10);
-        // Remaining = 25 - 22 used = 3, which is below the CarryOverDays limit of 10.
         var previousBalance = CreateBalance(companyId, employeeId, leaveType.Id, policy.Id, 2026, 25m, usedDays: 22m);
 
         context.LeaveTypes.Add(leaveType);
@@ -357,12 +342,10 @@ public class LeaveYearRolloverServiceTests
         var employeeId = Guid.NewGuid();
 
         var leaveType = CreateLeaveType(companyId, defaultEntitlementDays: 25);
-        var oldPolicy = CreatePolicy(companyId, carryOverDays: 2); // previous balance's policy
-        var newPolicy = CreatePolicy(companyId, carryOverDays: 20); // employee's current assignment
+        var oldPolicy = CreatePolicy(companyId, carryOverDays: 2);
+        var newPolicy = CreatePolicy(companyId, carryOverDays: 20);
 
         var previousBalance = CreateBalance(companyId, employeeId, leaveType.Id, oldPolicy.Id, 2026, 25m, usedDays: 15m);
-        // Remaining = 10, would be capped to 2 under the old policy but should use the new policy's
-        // 20-day limit since the employee has since been reassigned.
         var assignment = EmployeeLeavePolicyAssignment.Create(
             Guid.NewGuid(), companyId, employeeId, newPolicy.Id, new DateOnly(2027, 1, 1), Now);
 
@@ -377,16 +360,12 @@ public class LeaveYearRolloverServiceTests
 
         var newBalance = await context.LeaveBalances.SingleAsync(b => b.PolicyYear == 2027);
         Assert.Equal(newPolicy.Id, newBalance.LeavePolicyId);
-        Assert.Equal(10m, newBalance.AdjustmentDays); // full remaining, under the new policy's 20-day limit
+        Assert.Equal(10m, newBalance.AdjustmentDays);
     }
 
     [Fact]
     public async Task RolloverCompanyAsync_Skips_Employee_When_No_Active_Assignment_Exists()
     {
-        // Superseded behaviour: this used to fall back to the previous balance's own policy when no
-        // current assignment existed. Now "no active assignment" (never assigned, or deactivated
-        // because the employee's departure was finalised) is itself the eligibility signal — such
-        // employees are skipped entirely rather than defaulted to their old policy.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -398,7 +377,6 @@ public class LeaveYearRolloverServiceTests
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
         context.LeaveBalances.Add(previousBalance);
-        // No EmployeeLeavePolicyAssignment row for this employee.
         await context.SaveChangesAsync();
 
         var service = BuildService(context);
@@ -446,11 +424,6 @@ public class LeaveYearRolloverServiceTests
     [Fact]
     public async Task RolloverCompanyAsync_Does_Not_Alter_Existing_NewYear_Balance_When_Assignment_Deactivated_After_Rollover_Already_Ran()
     {
-        // The employee had already rolled over into 2027 (still active at that point) — their
-        // departure is only finalised afterwards. A subsequent rerun of RolloverCompanyAsync for
-        // 2027 must be a no-op for them: the idempotency guard (existing new-year balance already
-        // present) is checked before the active-assignment check, so their existing balance is left
-        // untouched rather than retroactively removed or altered.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -462,7 +435,6 @@ public class LeaveYearRolloverServiceTests
 
         var assignment = EmployeeLeavePolicyAssignment.Create(
             Guid.NewGuid(), companyId, employeeId, policy.Id, new DateOnly(2026, 1, 1), Now);
-        // Deactivated after the 2027 balance already exists.
         assignment.Deactivate(Now);
 
         context.LeaveTypes.Add(leaveType);
@@ -508,11 +480,9 @@ public class LeaveYearRolloverServiceTests
 
         var service = BuildService(context);
 
-        // First run: both employees still active — both get a new-year balance.
         var firstRun = await service.RolloverCompanyAsync(companyId, 2027, CancellationToken.None);
         Assert.Equal(2, firstRun.BalancesCreated);
 
-        // Employee is terminated between the two runs.
         terminatedAssignment.Deactivate(Now.AddDays(1));
         await context.SaveChangesAsync();
 
@@ -554,25 +524,20 @@ public class LeaveYearRolloverServiceTests
         Assert.Equal(0, secondRun.BalancesCreated);
         Assert.Equal(0, secondRun.CarryOverAdjustmentsCreated);
 
-        // Still exactly one new-year balance and one adjustment — no duplicates from the rerun.
         Assert.Single(await context.LeaveBalances.Where(b => b.PolicyYear == 2027).ToListAsync());
         Assert.Single(context.LeaveBalanceAdjustments);
-        Assert.Single(auditPublisher.Published); // only published once, on the first run
+        Assert.Single(auditPublisher.Published);
     }
 
     [Fact]
     public async Task RolloverCompanyAsync_Computes_PreviousPolicyYear_Label_Correctly_For_NonJanuary_LeaveYear()
     {
-        // Only the numeric label matters here (bounds/date-gating is the job's responsibility) —
-        // confirms newPolicyYear - 1 is used verbatim regardless of the company's start month.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
         var leaveType = CreateLeaveType(companyId, defaultEntitlementDays: 25);
         var policy = CreatePolicy(companyId, carryOverDays: 5);
-        // Previous policy year for an April-start company that just entered policy year 2027
-        // (Apr 2027 - Mar 2028) is 2026 (Apr 2026 - Mar 2027).
         var previousBalance = CreateBalance(companyId, employeeId, leaveType.Id, policy.Id, 2026, 25m, usedDays: 10m);
 
         context.LeaveTypes.Add(leaveType);

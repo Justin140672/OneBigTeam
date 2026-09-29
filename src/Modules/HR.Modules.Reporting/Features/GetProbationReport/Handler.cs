@@ -15,10 +15,6 @@ internal sealed class GetProbationReportHandler(
         Guid callerEmployeeId,
         CancellationToken cancellationToken)
     {
-        // Row-level manager scoping: a non-HR caller (Manager only, per reporting:view-probation
-        // policy) is restricted to their complete reporting hierarchy — every employee beneath them
-        // at any depth, not just direct reports — and never to company-wide data, regardless of any
-        // filter supplied. Mirrors GetLeaveSummaryReport/Handler.cs exactly.
         IReadOnlyCollection<Guid>? employeeIds = null;
         if (!callerIsHr)
         {
@@ -38,9 +34,6 @@ internal sealed class GetProbationReportHandler(
             ? await employeeDepartmentReader.GetDepartmentsAsync(request.CompanyId, allEmployeeIds, cancellationToken)
             : new Dictionary<Guid, EmployeeDepartmentInfo>();
 
-        // Employees who have already passed probation are no longer relevant to this report's
-        // purpose (tracking *current/outstanding* probation) — excluded from the row list, but
-        // still counted in the summary card below (passedCount) for context.
         var rows = items
             .Where(i => i.Status != "Passed")
             .Select(i => new ProbationReportRow(

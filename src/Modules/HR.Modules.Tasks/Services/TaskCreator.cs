@@ -61,10 +61,6 @@ internal sealed class TaskCreator(
             var created = await TrySaveIdempotentlyAsync(task, cancellationToken);
             if (!created)
             {
-                // A concurrent or retried caller already won the (company_id, idempotency_key)
-                // race — treat this as a successful idempotent replay: no duplicate task, no
-                // duplicate notification, no duplicate audit event. Return the winner's Id so
-                // callers see a consistent result either way.
                 var winnerId = await dbContext.TaskItems
                     .AsNoTracking()
                     .Where(t => t.CompanyId == companyId && t.IdempotencyKey == idempotencyKey)
@@ -80,10 +76,6 @@ internal sealed class TaskCreator(
 
         if (assignedEmployeeId.HasValue && notifyAssignee)
         {
-            // NOT-03: TaskAssigned is one of the six template-backed notification types (see
-            // NotificationTemplateCatalogue). The rendered in-app title/body reproduce exactly what
-            // the previous inline "$New task assigned: {task.Title}$" / task.Description strings
-            // produced.
             var tokens = new Dictionary<string, string> { ["TaskTitle"] = task.Title };
             if (!string.IsNullOrWhiteSpace(task.Description))
                 tokens["TaskDescription"] = task.Description;
@@ -97,8 +89,6 @@ internal sealed class TaskCreator(
                 clock.UtcNowOffset(),
                 cancellationToken);
 
-            // TaskTitle is always present (see above), so this should never actually fail — but
-            // surface it loudly rather than silently swallowing a template regression.
             if (writeResult.IsFailure)
                 throw new InvalidOperationException($"Failed to write TaskAssigned notification: {writeResult.Error.Message}");
         }
@@ -134,8 +124,6 @@ internal sealed class TaskCreator(
         }
         catch (DbUpdateException exception) when (PostgresUniqueViolation.Is(exception, IdempotencyIndexName))
         {
-            // Detach the entity this losing caller tried (and failed) to insert so the shared
-            // scoped DbContext remains safe to reuse for the lookup below and any later use.
             var entry = dbContext.Entry(task);
             if (entry.State != EntityState.Detached)
                 entry.State = EntityState.Detached;

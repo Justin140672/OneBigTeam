@@ -57,13 +57,6 @@ public class LoginHandlerTests(IdentityDatabaseFixture fixture)
         Assert.True(result.IsSuccess);
     }
 
-    /// <summary>
-    /// A UserProfile can exist with a real, working Supabase Auth identity but hold no roles at
-    /// all in this app — e.g. an account that's actually a platform administrator (Admin
-    /// Portal-only, see PlatformAdministrator) rather than a real company-app user. Without this
-    /// rejection, such an account would "successfully" log in to HR.Web with no roles to land on
-    /// any page with, rather than a clear "you can't use this app" outcome.
-    /// </summary>
     [Fact]
     public async Task HandleAsync_Returns_Failure_For_User_With_No_Roles()
     {

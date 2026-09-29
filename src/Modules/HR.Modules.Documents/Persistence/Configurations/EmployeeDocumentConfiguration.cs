@@ -64,9 +64,6 @@ internal sealed class EmployeeDocumentConfiguration : IEntityTypeConfiguration<E
             .HasColumnName("updated_at")
             .IsRequired();
 
-        // DOC-04: recoverable soft-delete/archive state. IsArchived defaults to false so the
-        // migration adding these columns is purely additive — every pre-existing row becomes
-        // IsArchived = false with no other changes.
         builder.Property(ed => ed.IsArchived)
             .HasColumnName("is_archived")
             .IsRequired()
@@ -88,9 +85,6 @@ internal sealed class EmployeeDocumentConfiguration : IEntityTypeConfiguration<E
         builder.Property(ed => ed.RestoredAt)
             .HasColumnName("restored_at");
 
-        // DOC-05: version lineage. IsLatestVersion defaults to true so the migration adding it
-        // is purely additive — every pre-existing row (all of which are, by definition, the only
-        // version that exists) becomes IsLatestVersion = true with no other changes.
         builder.Property(ed => ed.PreviousVersionId)
             .HasColumnName("previous_version_id");
 
@@ -104,11 +98,6 @@ internal sealed class EmployeeDocumentConfiguration : IEntityTypeConfiguration<E
             .HasForeignKey(ed => ed.DocumentId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Self-referencing FK for version lineage. Restrict (not Cascade) — deleting an
-        // EmployeeDocument row is not a supported operation in this module (archive is used
-        // instead), so there is no scenario where cascading a delete through the version chain
-        // should ever be needed; Restrict makes an accidental hard-delete of a linked row fail
-        // loudly instead of silently orphaning/cascading the chain.
         builder.HasOne<EmployeeDocument>()
             .WithMany()
             .HasForeignKey(ed => ed.PreviousVersionId)
@@ -120,10 +109,6 @@ internal sealed class EmployeeDocumentConfiguration : IEntityTypeConfiguration<E
         builder.HasIndex(ed => new { ed.CompanyId, ed.EmployeeId, ed.IsLatestVersion });
         builder.HasIndex(ed => ed.PreviousVersionId).IsUnique();
 
-        // DOC-06: search/filter support. CreatedAt (upload-date range + default result ordering)
-        // and ExpiryDate (expiry-date range) are both filtered on directly in
-        // SearchEmployeeDocuments, always scoped by company_id first per the standing
-        // "company_id + <filter column>" composite-index convention.
         builder.HasIndex(ed => new { ed.CompanyId, ed.CreatedAt });
         builder.HasIndex(ed => new { ed.CompanyId, ed.ExpiryDate });
     }

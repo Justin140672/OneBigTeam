@@ -46,8 +46,6 @@ public sealed class SharedDocumentArchiveTests(HrAdminPersonaFixture fixture) : 
             Assert.True(await detail.IsArchiveButtonVisibleAsync(),
                 "Expected the Archive button to be visible for a Draft document");
 
-            // Clicking Archive with an empty reason must show the inline validation message and
-            // keep the dialog open, without calling the backend.
             await detail.OpenArchiveDialogAsync();
             await detail.ClickArchiveConfirmAsync();
 
@@ -56,7 +54,6 @@ public sealed class SharedDocumentArchiveTests(HrAdminPersonaFixture fixture) : 
                 "Expected the Archive dialog to stay open when the reason is blank");
             Assert.Equal("Draft", await detail.GetStatusAsync());
 
-            // Now supply a reason and confirm.
             var reason = "No longer applicable";
             await detail.FillArchiveReasonAsync(reason);
             await detail.ClickArchiveConfirmAsync();
@@ -96,8 +93,6 @@ public sealed class SharedDocumentArchiveTests(HrAdminPersonaFixture fixture) : 
 
             await detail.PublishAsync();
             Assert.Equal("Published", await detail.GetStatusAsync());
-            // Publish is only offered while Draft, so it must be gone now — but Archive stays
-            // available (archiving is allowed from both Draft and Published).
             Assert.False(await detail.IsPublishButtonVisibleAsync());
             Assert.True(await detail.IsArchiveButtonVisibleAsync(),
                 "Expected the Archive button to remain visible for a Published document");
@@ -112,7 +107,6 @@ public sealed class SharedDocumentArchiveTests(HrAdminPersonaFixture fixture) : 
             var footerSummary = await detail.GetFooterSummaryTextAsync();
             Assert.Contains("Archived by", footerSummary);
             Assert.Contains($"reason: {reason}", footerSummary);
-            // The Published-state summary segment should still be present alongside Archived.
             Assert.Contains("Published by", footerSummary);
         }
         finally
@@ -121,10 +115,6 @@ public sealed class SharedDocumentArchiveTests(HrAdminPersonaFixture fixture) : 
         }
     }
 
-    // Uploads a shared document from the Shared Documents list page (same flow as
-    // SharedDocumentUploadTests / SharedDocumentVersionHistoryTests) and leaves the browser on
-    // that list, with the new title visible in the grid so its row's href can be read to
-    // discover the generated document id.
     private async Task UploadDocumentAsync(string title, string filePath)
     {
         await _page.GotoAsync(_fixture.WebBaseUrl + $"/companies/{AcmeId}/shared-documents");
@@ -137,7 +127,6 @@ public sealed class SharedDocumentArchiveTests(HrAdminPersonaFixture fixture) : 
 
         await dialog.GetByPlaceholder("Document title").FillAsync(title);
 
-        // Select a category via the shared Syncfusion SfDropDownList helper.
         var categoryGroup = dialog.Locator(".col-md-6").Filter(new() { HasText = "Category" });
         await DropDownSelector.SelectAsync(_page, categoryGroup, "Policy");
 
@@ -150,9 +139,6 @@ public sealed class SharedDocumentArchiveTests(HrAdminPersonaFixture fixture) : 
         await _page.WaitForSelectorAsync($"text={title}", new() { Timeout = 15_000 });
     }
 
-    // Reads the document id straight from the list row's link href, avoiding a separate
-    // click+navigate+wait round trip (same pattern as e.g. EmploymentTypeEditCloseBehaviorTests
-    // and SharedDocumentVersionHistoryTests).
     private async Task<Guid> GetUploadedDocumentIdAsync(string title)
     {
         var href = await _page.Locator(".e-rowcell a").Filter(new() { HasText = title }).First.GetAttributeAsync("href");
@@ -160,7 +146,6 @@ public sealed class SharedDocumentArchiveTests(HrAdminPersonaFixture fixture) : 
         return Guid.Parse(href.Split('/').Last());
     }
 
-    // %PDF- followed by padding, so magic-byte content validation passes.
     private static byte[] BuildTestPdf()
     {
         var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };

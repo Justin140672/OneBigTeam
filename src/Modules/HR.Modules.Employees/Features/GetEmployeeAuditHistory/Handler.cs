@@ -13,21 +13,12 @@ internal sealed class GetEmployeeAuditHistoryHandler(
     IEmployeeNameReader employeeNameReader,
     EmployeesDbContext dbContext)
 {
-    // Snapshot fields that carry a raw foreign-key Guid rather than a human-readable value.
-    // Resolved to display names below so the Before/After table never leaks a bare ID.
     private const string DepartmentIdField = "DepartmentId";
     private const string PositionProfileIdField = "PositionProfileId";
     private const string LocationIdField = "LocationId";
 
-    // ManagerId is resolved to "{FirstName} {LastName}" the same way Department/PositionProfile/
-    // Location Guids are, via a batched lookup against Employees below — a raw Guid is never
-    // useful to a reader of audit history. Null is a valid value ("No Manager") and is already
-    // rendered as "—" by FormatValue's existing null handling, so no special casing is needed there.
     private const string ManagerIdField = "ManagerId";
 
-    // Compensation's Reason snapshot field carries a PascalCase enum value (e.g. "AnnualReview")
-    // rather than a human-readable one — reuse the same Humanize() already applied to field names
-    // below rather than hardcoding a separate value-to-label table.
     private const string ReasonField = "Reason";
 
     private static readonly IReadOnlyDictionary<string, string> ModuleMap = new Dictionary<string, string>
@@ -54,10 +45,6 @@ internal sealed class GetEmployeeAuditHistoryHandler(
         ["UserInvite"] = "Identity",
     };
 
-    // AUD-06: security/identity event types whose before/after payload should not be
-    // surfaced to non-HR callers (employee self-view or manager view). The event itself
-    // (type, module, actor, timestamp) remains visible — only the before/after snapshot
-    // is redacted at the presentation layer so the audit trail is still useful.
     private static readonly FrozenSet<string> SecurityEventPrefixes =
         FrozenSet.ToFrozenSet(["user.", "platform-administrator.", "access-review."],
             StringComparer.OrdinalIgnoreCase);
@@ -65,13 +52,10 @@ internal sealed class GetEmployeeAuditHistoryHandler(
     public async Task<Result<GetEmployeeAuditHistoryResponse>> HandleAsync(
         Guid companyId,
         Guid employeeId,
-        // AUD-06: caller context drives scope check and security-event filtering.
         Guid? callerId,
         bool callerIsHr,
         CancellationToken cancellationToken)
     {
-        // AUD-06: scope check — determine whether the caller is allowed to view this employee's
-        // history and, if so, at what detail level.
         if (!callerIsHr)
         {
             var isSelf   = callerId.HasValue && callerId.Value == employeeId;
@@ -89,8 +73,6 @@ internal sealed class GetEmployeeAuditHistoryHandler(
 
             if (!isSelf && !isManager)
             {
-                // Caller has no relationship to the target employee — return empty (not an error)
-                // following the same convention as GetEmployeeTimeline.
                 return Result.Success(new GetEmployeeAuditHistoryResponse([]));
             }
         }
@@ -105,12 +87,6 @@ internal sealed class GetEmployeeAuditHistoryHandler(
 
         var names = await employeeNameReader.GetNamesAsync(companyId, actorEmployeeIds, cancellationToken);
 
-        // Parse each entry's Before/After JSON once up front so we can (a) collect every
-        // DepartmentId/PositionProfileId/LocationId referenced anywhere in the history and
-        // resolve them to display names in a single batched query per entity type, then
-        // (b) reuse the already-parsed dictionaries to build the change rows below.
-        // AUD-06: for non-HR callers, strip before/after from security/identity events so
-        // account-level detail is never surfaced to employees or managers.
         var parsed = entries
             .Select(e =>
             {
@@ -172,12 +148,6 @@ internal sealed class GetEmployeeAuditHistoryHandler(
         return Result.Success(new GetEmployeeAuditHistoryResponse(items));
     }
 
-    // Ticket: "merge Employee + Employment tab audit entries when saved together". Entries sharing
-    // a non-null CorrelationId (set by EmployeeEdit.razor's combined Save action — see
-    // UpdateEmployeeProfileRequest/UpdateEmploymentDetailsRequest.CorrelationId) are combined into
-    // one AuditHistoryItem so the reader sees a single "Employee profile and employment details
-    // updated" entry rather than two separate rows for what was really one save. Entries with a
-    // null CorrelationId, or a CorrelationId not shared by any other entry, pass through unchanged.
     private static List<AuditHistoryItem> MergeCorrelatedItems(
         IReadOnlyList<(AuditHistoryEntry Entry, AuditHistoryItem Item)> candidates)
     {
@@ -200,7 +170,7 @@ internal sealed class GetEmployeeAuditHistoryHandler(
             }
 
             if (!mergedCorrelationIds.Add(correlationId.Value))
-                continue; // Already merged and added when we encountered the first member of this group.
+                continue;
 
             var group = candidates.Where(c => c.Entry.CorrelationId == correlationId.Value).ToList();
 
@@ -307,9 +277,6 @@ internal sealed class GetEmployeeAuditHistoryHandler(
         return element.ToString();
     }
 
-    // Fields carrying a raw foreign-key Guid are resolved to a display name (see FormatValue) so
-    // their label should read as the plain entity name too, not "<Entity> Id" — Humanize alone
-    // would otherwise leave the "Id" suffix in place (e.g. "Location Id").
     private static readonly IReadOnlyDictionary<string, string> FriendlyFieldLabels = new Dictionary<string, string>
     {
         [DepartmentIdField] = "Department",

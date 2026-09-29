@@ -1,6 +1,5 @@
 namespace HR.Admin.Web.Models;
 
-/// <summary>Mirrors ListMarketingContentResponse from HR.Modules.Marketing.</summary>
 public sealed record AdminMarketingContentModel(
     AdminMarketingProductModel Product,
     IReadOnlyList<AdminMarketingFeatureModel> Features,

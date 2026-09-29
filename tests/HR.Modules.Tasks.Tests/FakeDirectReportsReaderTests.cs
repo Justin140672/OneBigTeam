@@ -2,12 +2,6 @@ using HR.Modules.Tasks.Tests.Infrastructure;
 
 namespace HR.Modules.Tasks.Tests;
 
-/// <summary>
-/// DSH-02: the test double's hierarchy mode must be a real BFS closure with a visited-set so that
-/// cyclic / self-referential reporting-line inputs terminate, and re-parenting is reflected on the
-/// next read. Identical coverage exists per module because each has its own copy of the fake.
-/// See specifications/architecture/11-manager-hierarchy-scope.md.
-/// </summary>
 public class FakeDirectReportsReaderTests
 {
     private static readonly Guid Company = Guid.NewGuid();
@@ -47,7 +41,6 @@ public class FakeDirectReportsReaderTests
 
         var all = await reader.GetAllDescendantIdsAsync(Company, a, CancellationToken.None);
 
-        // b is yielded exactly once; a (the traversal root) is never re-yielded.
         Assert.Equal(new[] { b }, all);
     }
 

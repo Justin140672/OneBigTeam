@@ -107,10 +107,6 @@ internal sealed class CompleteProbationReviewFromTaskAction(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        // PROB-07: same distinct Pass/Fail/Extend/checkpoint-completed event split as the direct
-        // API path (CompleteProbationReviewHandler) — see ProbationAudit.cs remarks. Actor is
-        // context.CompletedBy — the person who actually completed the task, never assumed to be
-        // the affected employee.
         var hasNotes = !string.IsNullOrWhiteSpace(review.Notes);
 
         if (outcome == ProbationOutcome.Pass)
@@ -160,9 +156,6 @@ internal sealed class CompleteProbationReviewFromTaskAction(
                 cancellationToken);
         }
 
-        // PROB-04: same employee-facing "outcome recorded" notification as the direct API path.
-        // Extend is handled separately by extensionService.ApplyAsync above, which sends its own
-        // notification.
         if (outcome is ProbationOutcome.Pass or ProbationOutcome.Fail)
         {
             await ProbationOutcomeNotifier.NotifyAsync(
@@ -188,7 +181,6 @@ internal sealed class CompleteProbationReviewFromTaskAction(
         TaskCompletionContext context,
         CancellationToken cancellationToken)
     {
-        // Cancelled (superseded-by-extension) reviews were never meant to complete — nothing owed.
         if (review.Status != ProbationReviewStatus.Completed)
             return;
 
@@ -228,11 +220,6 @@ internal sealed class CompleteProbationReviewFromTaskAction(
         // short-circuit gave every caller in that situation.
         if (outcome == ProbationOutcome.Extend && context.DispatchOperationId != Guid.Empty)
         {
-            // previousExpectedEndDate can no longer be recovered exactly (record.ExpectedEndDate
-            // already reflects the applied extension) — harmless: ApplyAsync's audit event dedupes
-            // on a deterministic EventId, so a recovery call's payload is only ever used the FIRST
-            // time this exact extension is applied (already accurate then); any later recovery call
-            // is a guaranteed no-op at the publish layer regardless of this field's value.
             await extensionService.ApplyAsync(
                 record,
                 review,
@@ -266,7 +253,6 @@ internal sealed class CompleteProbationReviewFromTaskAction(
         }
     }
 
-    // OutcomeDecision is "Pass", "Fail", or "Extend|yyyy-MM-dd".
     private static (ProbationOutcome? outcome, DateOnly? extensionEndDate) ParseOutcome(string? outcomeDecision)
     {
         if (outcomeDecision is null) return (null, null);

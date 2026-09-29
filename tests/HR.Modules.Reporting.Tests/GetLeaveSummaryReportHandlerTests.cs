@@ -10,11 +10,6 @@ public class GetLeaveSummaryReportHandlerTests
     [Fact]
     public async Task HandleAsync_Without_LeaveTypeId_Reflects_Annual_Leave_Only_When_Grouped_By_Employee()
     {
-        // Regression test for the real bug: grouping by Employee with no LeaveTypeId filter used
-        // to sum EntitlementDays across EVERY balance-tracked leave type for that employee
-        // (25 Annual + 10 Sick + 5 Compassionate + 52 Parental = 92) — a meaningless combined
-        // figure, not a genuine entitlement anyone has. Fixed to restrict to Annual Leave (the
-        // one entitlement-bearing "headline" leave type) when no explicit filter narrows it.
         var employeeId = Guid.NewGuid();
         var annualTypeId = Guid.NewGuid();
         var sickTypeId = Guid.NewGuid();
@@ -91,7 +86,6 @@ public class GetLeaveSummaryReportHandlerTests
         Assert.True(result.IsSuccess);
         var row = Assert.Single(result.Value!.Items);
         Assert.Equal(employeeId.ToString(), row.GroupKey);
-        // Only Annual Leave's entitlement (25 days) should be reflected — not the 92 combined total.
         Assert.Equal(25m, row.EntitlementDays);
         Assert.Equal(5m, row.BookedDays);
         Assert.Equal(5m, row.ApprovedDays);

@@ -35,9 +35,6 @@ internal sealed class UpdateVacancyHandler(
         if (request.PositionProfileId is { } requestedPositionProfileId
             && requestedPositionProfileId != vacancy.PositionProfileId)
         {
-            // Baseline change-control check: a Position Profile may only be swapped post-creation
-            // while the vacancy is still Draft and has received zero applications. See
-            // CanChangePositionProfile's remarks.
             var applicationCount = await db.Applications
                 .CountAsync(a => a.VacancyId == vacancy.Id, cancellationToken);
 
@@ -61,10 +58,6 @@ internal sealed class UpdateVacancyHandler(
                 isAuthorisedCorrection = true;
             }
 
-            // Cross-module validation: PositionProfile is owned by HR.Modules.Employees, so existence
-            // and company-ownership are verified through the narrow IPositionProfileReader contract
-            // rather than a direct module reference or a database foreign key — same pattern as
-            // CreateVacancyHandler.
             var positionProfileExists = await positionProfileReader.ExistsAsync(
                 request.CompanyId, requestedPositionProfileId, cancellationToken);
 
@@ -72,8 +65,6 @@ internal sealed class UpdateVacancyHandler(
                 return Result.Failure<UpdateVacancyResponse>(
                     Error.NotFound($"Position profile '{requestedPositionProfileId}' was not found."));
 
-            // Same "one live vacancy per position profile" rule as CreateVacancyHandler — excludes
-            // this vacancy itself so re-saving without actually changing the profile can't self-block.
             var hasConcurrentVacancy = await db.Vacancies
                 .AsNoTracking()
                 .AnyAsync(
@@ -94,10 +85,6 @@ internal sealed class UpdateVacancyHandler(
             vacancy.ChangePositionProfile(requestedPositionProfileId, now);
         }
 
-        // Ticket #81: AssignedRecruiterId is now an optional FK to ExternalRecruiter (the external
-        // agency), not an Employee — existence/company-ownership/active checks happen here via direct
-        // EF Core access, since ExternalRecruiter lives in this same module/schema (unlike
-        // PositionProfileId, which requires the cross-module IPositionProfileReader contract).
         if (request.AssignedRecruiterId is { } requestedRecruiterId
             && requestedRecruiterId != vacancy.AssignedRecruiterId)
         {

@@ -97,9 +97,6 @@ internal sealed class HireCandidateHandler(
             return Result.Failure<HireCandidateResponse>(
                 Error.NotFound($"Recruitment stage '{application.CurrentStageId}' was not found."));
 
-        // Ticket #99: since the pipeline is now fully data-driven, "eligible to be hired from" is
-        // simply "not already on a terminal stage" — the old fixed rule (must be Interviewed) no
-        // longer applies once companies can freely insert/reorder stages ahead of Offer.
         if (currentStage.IsTerminal)
             return Result.Failure<HireCandidateResponse>(
                 Error.Validation($"Cannot hire an application already on the terminal stage '{currentStage.Name}'."));
@@ -125,12 +122,6 @@ internal sealed class HireCandidateHandler(
             return Result.Failure<HireCandidateResponse>(
                 Error.Conflict("This candidate is already linked to an employee."));
 
-        // The hired employee is assigned to the Vacancy's own Position Profile — never to an
-        // independently-entered value — so Department and Location are both derived here via the
-        // narrow IPositionProfileReader contract, the same cross-module read pattern
-        // CreateVacancyHandler already uses for Department. Vacancy.PositionProfileId is mandatory
-        // (non-nullable), so this always resolves to a real Position Profile; if it can no longer be
-        // found (e.g. hard-deleted out from under an existing Vacancy), hiring cannot proceed.
         var positionProfileSummary = await positionProfileReader.GetSummaryAsync(
             request.CompanyId, vacancy.PositionProfileId, cancellationToken);
 
@@ -177,11 +168,6 @@ internal sealed class HireCandidateHandler(
                 request.City,
                 request.County,
                 request.PostCode,
-                // NFR-08: hiring provisions the employee in the Employees module (its own DbContext /
-                // transaction) BEFORE this handler commits application.RecordHire + candidate.LinkToEmployee
-                // to the Recruitment schema. If the process dies between those two commits, retrying the
-                // hire would otherwise create a second employee (candidate.EmployeeId is still null).
-                // This stable key makes CreateEmployeeHandler return the already-provisioned employee.
                 SourceReference: $"recruitment:application:{application.Id}",
                 // Ticket 2: forward the agreed offer compensation so the Employees module seeds the
                 // new hire's first Compensation record — HR doesn't re-enter it. Null when no offer
@@ -230,9 +216,6 @@ internal sealed class HireCandidateHandler(
                 db.IdempotencyRecords, application, expectedVersion, scope, key, fingerprint!,
                 StatusCodes.Status200OK, response, now, cancellationToken);
 
-            // Lost a race against a concurrent duplicate under the same key - this attempt's
-            // RecordHire/LinkToEmployee changes were rolled back along with it, so skip the
-            // integration/audit event publishes and hand back the winner's result untouched.
             switch (outcome.Kind)
             {
                 case IdempotencyOutcomeKind.Replayed:

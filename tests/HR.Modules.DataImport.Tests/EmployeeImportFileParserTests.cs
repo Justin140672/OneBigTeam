@@ -49,18 +49,12 @@ public class EmployeeImportFileParserTests
     [Fact]
     public void Parse_Xlsx_Formats_Native_Date_Cells_As_Yyyy_MM_Dd_Regardless_Of_Excel_Display_Format()
     {
-        // Regression test: a genuine Excel date cell (as opposed to a plain text cell) previously
-        // came back from ClosedXML's GetString() with a trailing time component (e.g.
-        // "01/08/2026 00:00:00") that neither of EmployeeStagingRowValidator's expected date
-        // formats (yyyy-MM-dd / dd/MM/yyyy) could parse, incorrectly rejecting a legitimately
-        // entered date. The parser must normalize any date/time-typed cell to yyyy-MM-dd itself,
-        // rather than trusting the cell's raw display string.
         var mapping = new ColumnMappingProfile(new Dictionary<string, string> { ["StartDate"] = "Start Date" });
 
         using var workbook = new XLWorkbook();
         var worksheet = workbook.Worksheets.Add("Sheet1");
         worksheet.Cell(1, 1).Value = "Start Date";
-        worksheet.Cell(2, 1).Value = new DateTime(2026, 8, 1); // a real Excel date cell, not text
+        worksheet.Cell(2, 1).Value = new DateTime(2026, 8, 1);
         worksheet.Cell(2, 1).Style.DateFormat.Format = "dd/mm/yyyy hh:mm:ss";
 
         var stream = new MemoryStream();
@@ -91,7 +85,7 @@ public class EmployeeImportFileParserTests
         Assert.Equal(2, result.Rows.Count);
 
         var row1 = result.Rows[0];
-        Assert.Equal(2, row1.RowNumber); // header is row 1, first data row is row 2
+        Assert.Equal(2, row1.RowNumber);
         Assert.Equal("Alice", row1.Fields["FirstName"]);
         Assert.Equal("Smith", row1.Fields["LastName"]);
         Assert.Equal("alice@example.com", row1.Fields["WorkEmail"]);
@@ -108,7 +102,6 @@ public class EmployeeImportFileParserTests
     [Fact]
     public void Parse_Xlsx_Column_Missing_From_Header_Is_Absent_From_MappedFields_And_Every_Row()
     {
-        // "Work Email" and "Notes" headers are not present anywhere in the file.
         var stream = ToXlsxStream(
             ["First Name", "Last Name"],
             [
@@ -157,7 +150,6 @@ public class EmployeeImportFileParserTests
         worksheet.Cell(2, 2).Value = "Smith";
         worksheet.Cell(2, 3).Value = "alice@example.com";
 
-        // Row 3 is entirely blank.
 
         worksheet.Cell(4, 1).Value = "Bob";
         worksheet.Cell(4, 2).Value = "Jones";

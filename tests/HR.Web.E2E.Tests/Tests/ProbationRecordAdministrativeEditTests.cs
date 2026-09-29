@@ -19,8 +19,6 @@ public sealed class ProbationRecordAdministrativeEditTests(HrAdminPersonaFixture
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid CarlosRivera = Guid.Parse("30000000-0000-0000-0000-000000000010");
 
-    // James Okafor: seeded with only a Passed (terminal) probation record — see
-    // EmployeeProbationTabTests' remarks. Used here to confirm no Edit button is rendered.
     private static readonly Guid JamesOkafor = Guid.Parse("30000000-0000-0000-0000-000000000002");
 
     private const string LauraEmail = "laura.bennett@acme.example";
@@ -69,7 +67,6 @@ public sealed class ProbationRecordAdministrativeEditTests(HrAdminPersonaFixture
 
         Assert.False(await panel.IsConflictBannerVisibleAsync());
 
-        // Reload the page entirely to confirm the new values actually persisted server-side.
         await empEdit.GoToAsync(AcmeId, CarlosRivera);
         await empEdit.OpenProbationTabAsync();
 
@@ -92,11 +89,9 @@ public sealed class ProbationRecordAdministrativeEditTests(HrAdminPersonaFixture
         await empEdit.OpenProbationTabAsync();
         await panel.ClickEditAsync();
 
-        // ── Tab 1: open the editor, make a change, but don't save yet (loads Version v1) ──
         var tab1Notes = $"Tab1 unsaved notes {Guid.NewGuid():N}".Substring(0, 30);
         await panel.SetNotesAsync(tab1Notes);
 
-        // ── Tab 2 (same persona/context): load the same record and save first, bumping its Version ──
         var otherPage = await _context.NewPageAsync();
         try
         {
@@ -123,19 +118,16 @@ public sealed class ProbationRecordAdministrativeEditTests(HrAdminPersonaFixture
             await otherPage.CloseAsync();
         }
 
-        // ── Tab 1: saving now is stale → conflict banner, unsaved value preserved ──
         await panel.SaveExpectingConflictAsync();
 
         Assert.True(await panel.IsConflictBannerVisibleAsync(),
             "Expected the optimistic-concurrency conflict banner after a stale save");
 
-        // ── Tab 1: "Reload latest values" adopts tab 2's winning values while staying in the edit form ──
         await panel.ClickReloadLatestValuesAsync();
 
         Assert.False(await panel.IsConflictBannerVisibleAsync(),
             "Expected the conflict banner to clear after reloading latest values");
 
-        // ── Tab 1: save again against the fresh version — must succeed ──
         var finalNotes = $"Tab1 final notes {Guid.NewGuid():N}".Substring(0, 30);
         await panel.SetNotesAsync(finalNotes);
         await panel.SaveExpectingSuccessAsync();
@@ -199,11 +191,9 @@ public sealed class ProbationRecordAdministrativeEditTests(HrAdminPersonaFixture
         await panel.ClickReloadLatestValuesAsync();
         Assert.False(await panel.IsConflictBannerVisibleAsync());
 
-        // The reloaded expected end date field should now show the winning tab's value, not Tab
-        // 1's original stale value.
         var reloadedEndDate = await panel.GetExpectedEndDateFieldValueAsync();
         Assert.False(string.IsNullOrWhiteSpace(reloadedEndDate));
-        Assert.Contains(winningEndDateText[..2], reloadedEndDate); // day component sanity check
+        Assert.Contains(winningEndDateText[..2], reloadedEndDate);
 
         var finalNotes = $"Tab1 post-reload save {Guid.NewGuid():N}".Substring(0, 30);
         await panel.SetNotesAsync(finalNotes);
@@ -225,8 +215,6 @@ public sealed class ProbationRecordAdministrativeEditTests(HrAdminPersonaFixture
     private static readonly Guid MarcusDiallo = Guid.Parse("30000000-0000-0000-0000-000000000006");
     private static readonly Guid MarcusFinalDecisionTaskId = Guid.Parse("a0000000-0000-0000-0000-00000000002c");
 
-    // Laura Bennett's own employee id — both FinalDecision review tasks above are assigned to her,
-    // and TaskViewPage.GoToAsync is a self-service route (the logged-in user's own Tasks tab).
     private static readonly Guid LauraBennett = Guid.Parse("30000000-0000-0000-0000-000000000005");
 
     /// <summary>
@@ -269,7 +257,6 @@ public sealed class ProbationRecordAdministrativeEditTests(HrAdminPersonaFixture
         await empEdit.OpenProbationTabAsync();
         await panel.ClickEditAsync();
 
-        // Tab 1: an unsaved in-progress edit (loads Version v1).
         var tab1StaleNotes = $"Tab1 stale notes {Guid.NewGuid():N}".Substring(0, 30);
         await panel.SetNotesAsync(tab1StaleNotes);
 
@@ -300,14 +287,10 @@ public sealed class ProbationRecordAdministrativeEditTests(HrAdminPersonaFixture
             await otherPage.CloseAsync();
         }
 
-        // Tab 1: saving now is stale -> genuine concurrency conflict banner (record is still
-        // non-terminal at this point).
         await panel.SaveExpectingConflictAsync();
         Assert.True(await panel.IsConflictBannerVisibleAsync(),
             "Expected the optimistic-concurrency conflict banner after a stale save");
 
-        // Step 2: independently, BEFORE Tab 1 reloads, complete the pending FinalDecision review —
-        // transitioning the record to the terminal "Passed" status (and bumping its Version again).
         var terminalPage = await _context.NewPageAsync();
         try
         {
@@ -318,8 +301,6 @@ public sealed class ProbationRecordAdministrativeEditTests(HrAdminPersonaFixture
             await terminalPage.CloseAsync();
         }
 
-        // Tab 1: "Reload latest values" now discovers a TERMINAL record — the editor must exit
-        // rather than stay open with refreshed values.
         await panel.ClickReloadLatestValuesExpectingTerminalExitAsync();
 
         Assert.True(await panel.IsTerminalWhileEditingWarningVisibleAsync(),
@@ -348,13 +329,8 @@ public sealed class ProbationRecordAdministrativeEditTests(HrAdminPersonaFixture
         await empEdit.OpenProbationTabAsync();
         await panel.ClickEditAsync();
 
-        // Tab 1: an unsaved in-progress edit (loads Version v1) — never saved before the
-        // independent terminal transition below.
         await panel.SetNotesAsync($"Tab1 notes {Guid.NewGuid():N}".Substring(0, 30));
 
-        // Independently, in a second tab, complete the pending FinalDecision review — transitions
-        // Marcus's record straight to the terminal "Passed" status without Tab 1 ever having
-        // observed an intermediate non-terminal version bump.
         var otherPage = await _context.NewPageAsync();
         try
         {
@@ -365,9 +341,6 @@ public sealed class ProbationRecordAdministrativeEditTests(HrAdminPersonaFixture
             await otherPage.CloseAsync();
         }
 
-        // Tab 1: Save now hits the terminal-status check in the handler BEFORE the version check,
-        // so this is a business-rule "conflict", not a "concurrency" rejection — regardless of
-        // Tab 1's own (still v1) ExpectedVersion.
         await panel.SaveExpectingBusinessErrorAsync();
 
         Assert.False(await panel.IsConflictBannerVisibleAsync(),
@@ -388,11 +361,6 @@ public sealed class ProbationRecordAdministrativeEditTests(HrAdminPersonaFixture
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // James Okafor's only probation record is Passed — the Probation tab itself is hidden for
-        // any employee with only a terminal record (see EmployeeProbationTabTests
-        // .ProbationTab_IsHidden_ForEmployeeWithOnlyAPassedRecord), so there is no route to a
-        // visible terminal-status Edit-button check via this seeded employee. Skipped rather than
-        // forcing a fragile new seed — see report for details.
         await empEdit.GoToAsync(AcmeId, JamesOkafor);
 
         Assert.False(

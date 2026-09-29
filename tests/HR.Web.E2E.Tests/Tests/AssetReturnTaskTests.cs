@@ -4,23 +4,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the asset return task panel on the Task View page.
-///
-/// Uses seeded data:
-///   - Sarah Chen (30000000-0000-0000-0000-000000000001) has a seeded asset
-///     return task (a0000000-0000-0000-0000-000000000022) linked to
-///     AssetAssignment (c0000000-0000-0000-0000-000000000005) for a Dell UltraSharp 27".
-/// Tom's acknowledgement task is used for the "wrong panel" assertion (read-only).
-///
-/// AssetReturnTask_ConfirmReturn_CompletesTask below is the one mutating test in this class —
-/// completing a return task is irreversible (no "un-return" action), so it no longer touches
-/// Sarah's shared seeded task (that used to permanently flip it to Completed for whichever test
-/// happened to run second under parallel execution, and AssetReturnTask_ShowsReturnPanel /
-/// AssetReturnTask_ShowsAssetDetails above both expect it to still be Not Started). It creates and
-/// logs in as its own fresh employee via EnsureEmployeeLoginAsync instead — see that helper's
-/// remarks for how a freshly-created employee gets a real, working login.
-/// </summary>
 public sealed class AssetReturnTaskTests(EmployeePersonaFixture fixture) : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId             = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -32,7 +15,6 @@ public sealed class AssetReturnTaskTests(EmployeePersonaFixture fixture) : RoleE
     private const string SarahEmail = "sarah.chen@acme.example";
     private const string TomEmail   = "tom.williams@acme.example";
     private const string HrAdminEmail = "laura.bennett@acme.example";
-    // Seeded asset category for Acme (see AssetsModule.cs seed data / AssetEditCloseBehaviorTests).
     private const string SeededCategory = "IT Equipment";
 
     [Fact]
@@ -79,40 +61,16 @@ public sealed class AssetReturnTaskTests(EmployeePersonaFixture fixture) : RoleE
         Assert.Contains("ASSET-0002", assetNumber, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// Returns the dedicated pre-seeded pool employee for this class (SeededE2eEmployees.AssetReturn).
-    /// Its Employee row exists but has no Supabase login until <see cref="EnsureEmployeeLoginAsync"/>
-    /// provisions one at runtime.
-    /// </summary>
     private static (Guid EmployeeId, string Email, string LastName) CreateEmployeeAsync()
     {
         var seeded = SeededE2eEmployees.AssetReturn;
         return (seeded.EmployeeId, seeded.Email, seeded.LastName);
     }
 
-    /// <summary>
-    /// Gives a freshly-created employee a real, working Supabase login via the dev-only
-    /// POST /api/dev/ensure-employee-login endpoint (HR.Modules.Identity's DevEnsureEmployeeLogin
-    /// feature), which idempotently calls the same IdentityModule.EnsureDevSupabaseUserAsync
-    /// building block used to seed the four canonical dev personas (Laura Bennett, James Okafor,
-    /// Marcus Diallo, Tom Williams) — see DevPersonaStore.Personas and
-    /// IdentityModule.SeedDevSupabaseUsersAsync. A brand-new Employee row has no linked UserProfile
-    /// by construction (employee creation alone never provisions one; only a completed invite
-    /// does), so without this call there would be no way to log in AS this employee at all short of
-    /// driving the full invite-accept-password-setup UI flow, which doesn't exist in this suite.
-    /// 404s outside Development, matching every other /api/dev/* endpoint.
-    /// </summary>
     private async Task EnsureEmployeeLoginAsync(Guid employeeId, string email, string lastName)
     {
         using var http = new HttpClient { BaseAddress = new Uri(_fixture.ApiBaseUrl) };
 
-        // This endpoint's EnsureDevSupabaseUserAsync makes a real, network-dependent call to
-        // Supabase's Admin API (unlike most other E2E auth paths, which are faked under
-        // E2E_TESTING=true — see FakeSupabaseAuthGateway's own remarks) — a genuine transient
-        // failure/rate-limit response under this suite's concurrency can surface as a 500 here.
-        // Retry a couple of times before failing outright, and capture the response body on
-        // failure so a real, non-transient error (e.g. a genuine server bug) is immediately
-        // diagnosable instead of just "500, no further detail" the next time this happens.
         HttpResponseMessage? response = null;
         string? body = null;
         for (var attempt = 1; attempt <= 3; attempt++)
@@ -144,9 +102,6 @@ public sealed class AssetReturnTaskTests(EmployeePersonaFixture fixture) : RoleE
         var assetEdit = new AssetEditPage(_page, _fixture.WebBaseUrl);
         var taskView  = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
-        // Arrange (as HR admin): the dedicated pool employee and a fresh available asset (avoids
-        // contending with the single shared seeded ASSET-0003 that other tests permanently
-        // consume), then assign it — which auto-creates the "Acknowledge receipt of asset" task.
         await login.GoToAsync();
         await login.LoginAsync(HrAdminEmail);
 
@@ -167,9 +122,6 @@ public sealed class AssetReturnTaskTests(EmployeePersonaFixture fixture) : RoleE
 
         await EnsureEmployeeLoginAsync(employeeId, email, lastName);
 
-        // A "Return Asset" request can only target an already-acknowledged assignment (see
-        // EmployeeAssetsTab.razor's _returnableAssets filter / the Return Asset button's Disabled
-        // binding) — log in as the fresh employee first and acknowledge receipt.
         await login.LoginAsync(email);
         await taskView.GoToByTitleAsync(AcmeId, employeeId, "Acknowledge receipt of asset");
         Assert.True(await taskView.HasAssetAcknowledgementPanelAsync(),
@@ -178,14 +130,12 @@ public sealed class AssetReturnTaskTests(EmployeePersonaFixture fixture) : RoleE
         Assert.Equal("Completed", await taskView.GetStatusAsync());
         await taskView.CloseAsync();
 
-        // Back as HR admin: request the return, which creates the "Return asset" task.
         await login.LoginAsync(HrAdminEmail);
         await empAdmin.GoToAsync(AcmeId, employeeId);
         await empAdmin.OpenAssetsTabAsync();
         await empAdmin.OpenReturnAssetDialogAsync();
         await empAdmin.SelectAssetAndConfirmReturnAsync(assetNumber);
 
-        // Act: log in AS the fresh employee and confirm the return.
         await login.LoginAsync(email);
         await taskView.GoToByTitleAsync(AcmeId, employeeId, "Return asset");
 

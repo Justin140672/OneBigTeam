@@ -89,7 +89,6 @@ public sealed class InternalApplicationReportFilterTests(RecruiterPersonaFixture
         await report.ExpectRenderedWithoutErrorAsync();
         await report.ExpectApplicationTypeAsync(ReportApplicationTypeFilter.Internal);
 
-        // Changing Group by reloads the grid again; the Applications selection must survive it.
         await report.SelectGroupByAsync("Vacancy");
         await report.ExpectRenderedWithoutErrorAsync();
         await report.ExpectApplicationTypeAsync(ReportApplicationTypeFilter.Internal);

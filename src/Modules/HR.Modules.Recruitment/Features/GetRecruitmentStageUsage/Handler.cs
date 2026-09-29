@@ -7,8 +7,6 @@ namespace HR.Modules.Recruitment.Features.GetRecruitmentStageUsage;
 
 internal sealed class GetRecruitmentStageUsageHandler(RecruitmentDbContext db)
 {
-    // Cap the labels returned to keep the confirmation dialog readable — the count above already
-    // conveys the true scale for larger numbers.
     private const int MaxVacancyLabels = 5;
 
     public async Task<Result<GetRecruitmentStageUsageResponse>> HandleAsync(

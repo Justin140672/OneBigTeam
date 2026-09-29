@@ -5,11 +5,6 @@ using HR.Modules.Documents.Tests.Infrastructure;
 
 namespace HR.Modules.Documents.Tests;
 
-/// <summary>
-/// OBT-721 workload action provider tests for employee documents expiring soon. HR-only, one
-/// summary WorkloadAction per affected employee (see xmldoc on the provider for why a summary
-/// rather than one-per-document is used here).
-/// </summary>
 public class EmployeeDocumentsExpiringSoonWorkloadActionProviderTests
 {
     private static ClaimsPrincipal AnyCaller() => new(new ClaimsIdentity());

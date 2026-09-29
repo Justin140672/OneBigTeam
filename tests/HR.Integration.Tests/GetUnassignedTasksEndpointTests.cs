@@ -11,9 +11,6 @@ public class GetUnassignedTasksEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid AdminUser       = Guid.Parse("11100005-0000-0000-0000-000000000001");
-    // A dedicated company id: the shared well-known 00000000-…-0001 accumulates hundreds of
-    // onboarding-generated unassigned tasks suite-wide, and GetUnassignedTasks caps its result at
-    // 200 (priority-ordered), which pushed this class's freshly-seeded probe task off the end.
     private static readonly Guid SeededCompanyId = Guid.Parse("11100005-0000-0000-0000-0000000000c0");
 
     public GetUnassignedTasksEndpointTests(ApiWebApplicationFactory factory)
@@ -22,8 +19,6 @@ public class GetUnassignedTasksEndpointTests
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.HrAdministrator);
-            // Ensure the dedicated company (and its active subscription) exists for the
-            // anonymous/forbidden cases that never call AdminClient.
             await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.HrAdministrator, SeededCompanyId);
         }).GetAwaiter().GetResult();
     }
@@ -52,7 +47,6 @@ public class GetUnassignedTasksEndpointTests
     {
         using var client = await AdminClient();
 
-        // Seed a task WITH an assignee to ensure it does not pollute unassigned results
         var uniqueEmployee = Guid.NewGuid();
         await TaskSeeder.SeedAsync(_factory, SeededCompanyId,
             title: "Assigned task — should not appear",
@@ -97,7 +91,6 @@ public class GetUnassignedTasksEndpointTests
         Assert.Contains(payload.Items, t => t.Title == unassignedTitle);
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AdminClient()
     {

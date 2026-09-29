@@ -56,7 +56,6 @@ public class GetRecentEmployeeChangesHandlerTests
         var reader = new FakeAuditHistoryReader([
             new AuditHistoryEntry(Now, "EmployeeUpdated", "Employee", null, null, "Something changed", null, null, employeeId)
         ]);
-        // No names configured — employeeId will not resolve.
         var handler = new GetRecentEmployeeChangesHandler(reader, new FakeEmployeeNameReader());
 
         var result = await handler.HandleAsync(companyId, CancellationToken.None);

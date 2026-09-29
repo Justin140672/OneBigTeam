@@ -9,11 +9,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Modules.DataImport.Tests;
 
-/// <summary>
-/// Security review finding #2: PurgeImportSessionFilesJob is the durable safety-net sweep for raw
-/// import workbook files that were not (or could not be) deleted inline by
-/// ValidateImportSessionHandler. See PurgeImportSessionFilesJob for the full eligibility rules.
-/// </summary>
 public class PurgeImportSessionFilesJobTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 22, 9, 0, 0, TimeSpan.Zero);
@@ -25,14 +20,11 @@ public class PurgeImportSessionFilesJobTests
         ExhaustedAttemptThreshold = 3,
     };
 
-    private static readonly DateTimeOffset InsideRetryGrace = Now.AddMinutes(-30); // < 1 hour
-    private static readonly DateTimeOffset PastRetryGrace = Now.AddHours(-2); // > 1 hour
-    private static readonly DateTimeOffset InsideAbandonedWindow = Now.AddDays(-3); // < 7 days
-    private static readonly DateTimeOffset PastAbandonedWindow = Now.AddDays(-10); // > 7 days
+    private static readonly DateTimeOffset InsideRetryGrace = Now.AddMinutes(-30);
+    private static readonly DateTimeOffset PastRetryGrace = Now.AddHours(-2);
+    private static readonly DateTimeOffset InsideAbandonedWindow = Now.AddDays(-3);
+    private static readonly DateTimeOffset PastAbandonedWindow = Now.AddDays(-10);
 
-    // All BuildContext(dbName) calls within a single test must share the same in-memory database name
-    // so the seed/run/verify phases (each opening their own DbContext, mirroring a real
-    // scoped-per-request/per-job-run lifetime) actually observe each other's writes.
     private static DataImportDbContext BuildContext(string databaseName) =>
         new(new DbContextOptionsBuilder<DataImportDbContext>()
             .UseInMemoryDatabase(databaseName)
@@ -104,8 +96,8 @@ public class PurgeImportSessionFilesJobTests
         var storage = new FakeImportFileStorageService();
         var session = CreateSession(companyId, "sessions/s2/employees.xlsx");
         session.Start(Now.AddDays(-1));
-        session.Confirm(createdCount: 8, failedCount: 2, Now.AddDays(-1)); // CompletedWithErrors
-        session.RecordFileDeletionAttemptFailed(PastRetryGrace); // earlier inline attempt failed
+        session.Confirm(createdCount: 8, failedCount: 2, Now.AddDays(-1));
+        session.RecordFileDeletionAttemptFailed(PastRetryGrace);
         storage.SeedContent(session.StorageKey, [1, 2, 3]);
 
         await using (var seed = BuildContext(dbName))
@@ -124,7 +116,7 @@ public class PurgeImportSessionFilesJobTests
         await using var verify = BuildContext(dbName);
         var saved = await verify.ImportSessions.SingleAsync(s => s.Id == session.Id);
         Assert.NotNull(saved.FileDeletedAt);
-        Assert.Equal(1, saved.FileDeletionAttemptCount); // unchanged by a successful delete
+        Assert.Equal(1, saved.FileDeletionAttemptCount);
     }
 
     [Fact]
@@ -136,7 +128,7 @@ public class PurgeImportSessionFilesJobTests
         var session = ImportSession.Create(
             Guid.NewGuid(), companyId, "Employees", "employees.xlsx", 10, Guid.NewGuid(),
             "sessions/s3/employees.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            PastAbandonedWindow); // Create() also sets UpdatedAt = now
+            PastAbandonedWindow);
         storage.SeedContent(session.StorageKey, [1, 2, 3]);
 
         await using (var seed = BuildContext(dbName))
@@ -167,7 +159,7 @@ public class PurgeImportSessionFilesJobTests
             Guid.NewGuid(), companyId, "Employees", "employees.xlsx", 10, Guid.NewGuid(),
             "sessions/s4/employees.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             InsideAbandonedWindow);
-        session.Start(InsideAbandonedWindow); // status = Processing, UpdatedAt = InsideAbandonedWindow
+        session.Start(InsideAbandonedWindow);
         storage.SeedContent(session.StorageKey, [1, 2, 3]);
 
         await using (var seed = BuildContext(dbName))
@@ -261,14 +253,11 @@ public class PurgeImportSessionFilesJobTests
             await seed.SaveChangesAsync();
         }
 
-        // First run: deletes the file.
         await using (var db = BuildContext(dbName))
         {
             await BuildJob(db, storage).ExecuteAsync();
         }
 
-        // Second run against a fresh DbContext: FileDeletedAt is already set, so the session is
-        // no longer an eligible candidate at all.
         await using (var db = BuildContext(dbName))
         {
             await BuildJob(db, storage).ExecuteAsync();
@@ -296,7 +285,6 @@ public class PurgeImportSessionFilesJobTests
 
         await using (var db = BuildContext(dbName))
         {
-            // Should not throw despite the storage failure.
             await BuildJob(db, storage).ExecuteAsync();
         }
 
@@ -318,8 +306,6 @@ public class PurgeImportSessionFilesJobTests
         var alerts = new FakeAdministrativeAlertWriter();
         var session = CreateSession(companyId, "sessions/s9/employees.xlsx");
         session.Cancel(Now.AddDays(-1));
-        // Two prior failed attempts already recorded; ExhaustedAttemptThreshold is 3, so this
-        // sweep's failure will bring the count to 3 and should raise the alert.
         session.RecordFileDeletionAttemptFailed(PastRetryGrace);
         session.RecordFileDeletionAttemptFailed(PastRetryGrace);
         storage.SeedContent(session.StorageKey, [1, 2, 3]);
@@ -354,7 +340,7 @@ public class PurgeImportSessionFilesJobTests
         var storage = new FakeImportFileStorageService { ThrowOnNextDeleteAttempts = 1 };
         var alerts = new FakeAdministrativeAlertWriter();
         var session = CreateSession(companyId, "sessions/s10/employees.xlsx");
-        session.Cancel(PastRetryGrace); // first-ever attempt: 0 -> 1, well below threshold of 3
+        session.Cancel(PastRetryGrace);
         storage.SeedContent(session.StorageKey, [1, 2, 3]);
 
         await using (var seed = BuildContext(dbName))

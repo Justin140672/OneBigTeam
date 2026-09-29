@@ -88,8 +88,6 @@
         }
     }
 
-    // Called by the parent page immediately after a batch is successfully queued, so progress
-    // starts showing without waiting for a page refresh.
     public async Task ShowBatchAsync(Guid batchId)
     {
         var (result, error) = await InvitationBatchService.GetStatusAsync(CompanyId, batchId);
@@ -166,7 +164,6 @@
         }
         catch (OperationCanceledException)
         {
-            // Expected on dispose/navigation — nothing to do.
         }
     }
 
@@ -189,8 +186,6 @@
         _            => status,
     };
 
-    // Backend statuses (InvitationBatch.StatusQueued/StatusProcessing/StatusCompleted) are stored
-    // and returned lowercase; compare case-insensitively rather than assuming any particular casing.
     private static bool IsActiveStatus(string status) =>
         string.Equals(status, "Queued", StringComparison.OrdinalIgnoreCase) ||
         string.Equals(status, "Processing", StringComparison.OrdinalIgnoreCase);

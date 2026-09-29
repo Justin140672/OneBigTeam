@@ -15,8 +15,6 @@ internal sealed class GetTeamOnboardingHandler(
         GetTeamOnboardingRequest request,
         CancellationToken cancellationToken)
     {
-        // DSH-02: dashboard "my team" = the manager's entire reporting sub-tree (direct and
-        // indirect reports). See specifications/architecture/11-manager-hierarchy-scope.md.
         var teamIds = await directReportsReader.GetAllDescendantIdsAsync(
             request.CompanyId,
             request.ManagerId,

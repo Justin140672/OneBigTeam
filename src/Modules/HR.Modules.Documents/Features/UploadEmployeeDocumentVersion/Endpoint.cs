@@ -5,10 +5,6 @@ using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Documents.Features.UploadEmployeeDocumentVersion;
 
-// DOC-05: mirrors UploadEmployeeDocument's manager/HR-only upload gate (via "employee:manage")
-// plus DocumentResourceAuthorizer's self/manager-hierarchy/HR-administrator scope check — a new
-// version is a document-management action, so it is held to the same authorization bar as the
-// original upload, not the narrower rule that gates read-only access.
 internal sealed class Endpoint(
     UploadEmployeeDocumentVersionHandler handler,
     ICurrentUser currentUser,
@@ -37,9 +33,6 @@ internal sealed class Endpoint(
             return;
         }
 
-        // Only an HR administrator or a manager in the target employee's reporting hierarchy (or
-        // the employee themselves, in line with CanAccessEmployeeDocumentsAsync's existing scope)
-        // may upload a replacement version.
         if (!await authorizer.CanAccessEmployeeDocumentsAsync(
                 request.CompanyId, uploadedBy, request.EmployeeId, cancellationToken))
         {

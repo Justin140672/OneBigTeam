@@ -86,9 +86,6 @@ public class UploadSharedCompanyDocumentValidatorTests
         Assert.True(result.IsValid);
     }
 
-    // InlineData can't reference the internal SharedCompanyDocumentReviewFrequency enum directly on
-    // a public Theory method, so the non-Custom values are passed as their underlying int and cast
-    // back inside the method body.
     [Theory]
     [InlineData((int)SharedCompanyDocumentReviewFrequency.None)]
     [InlineData((int)SharedCompanyDocumentReviewFrequency.Monthly)]

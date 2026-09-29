@@ -8,11 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.AssignVacancyPositionProfile;
 
-/// <summary>
-/// Manual HR-review action: assigns (or re-assigns) the position profile for a single vacancy.
-/// This is how ambiguous/unmatched rows surfaced by GetVacanciesNeedingPositionProfileReview get
-/// resolved when VacancyPositionProfileMatcher cannot safely auto-assign one.
-/// </summary>
 internal sealed class AssignVacancyPositionProfileHandler(
     RecruitmentDbContext db,
     IClock clock,
@@ -52,9 +47,6 @@ internal sealed class AssignVacancyPositionProfileHandler(
             return Result.Failure<AssignVacancyPositionProfileResponse>(
                 Error.NotFound($"Vacancy '{request.VacancyId}' was not found."));
 
-        // Cross-module validation: PositionProfile is owned by HR.Modules.Employees, so existence
-        // and company-ownership are verified through the narrow IPositionProfileReader contract
-        // rather than a direct module reference or a database foreign key.
         var positionProfileExists = await positionProfileReader.ExistsAsync(
             request.CompanyId, request.PositionProfileId, cancellationToken);
 
@@ -62,8 +54,6 @@ internal sealed class AssignVacancyPositionProfileHandler(
             return Result.Failure<AssignVacancyPositionProfileResponse>(
                 Error.NotFound($"Position profile '{request.PositionProfileId}' was not found."));
 
-        // Same "one live vacancy per position profile" rule as CreateVacancyHandler/UpdateVacancyHandler
-        // — excludes this vacancy itself, and only applies when actually changing the profile.
         if (request.PositionProfileId != vacancy.PositionProfileId)
         {
             var hasConcurrentVacancy = await db.Vacancies

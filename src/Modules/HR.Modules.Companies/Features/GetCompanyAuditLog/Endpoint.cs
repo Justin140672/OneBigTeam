@@ -3,11 +3,6 @@ using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Companies.Features.GetCompanyAuditLog;
 
-/// <summary>
-/// AUD-05: GET /api/companies/{companyId}/audit-log
-/// Accessible to HR Administrators (employee:manage policy).
-/// Query parameters: employeeId, eventType, fromDate, toDate, pageNumber, pageSize.
-/// </summary>
 internal sealed class Endpoint(
     GetCompanyAuditLogHandler handler) : Endpoint<GetCompanyAuditLogRequest, GetCompanyAuditLogResponse>
 {

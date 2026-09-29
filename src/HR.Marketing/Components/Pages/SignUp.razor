@@ -170,9 +170,6 @@
 
     private const string FallbackWebAppBaseUrl = "http://localhost:5157";
 
-    // Rendered server-side into hidden <dialog> markup below (see LegalDocumentModal) so the
-    // Terms/Privacy links can open in-page instead of navigating away from the signup form —
-    // losing progress here is exactly what we don't want a visitor to risk mid-signup.
     private readonly MarkdownDocument _termsOfService = MarkdownDocumentLoader.Load("terms-of-service");
     private readonly MarkdownDocument _privacyPolicy = MarkdownDocumentLoader.Load("privacy-policy");
 

@@ -54,11 +54,6 @@ internal sealed class ApplicationSaveBarrier : IObserver<DiagnosticListener>, IO
     {
     }
 
-    /// <summary>
-    /// Arms the barrier for <paramref name="applicationId"/>, requiring <paramref name="participantCount"/>
-    /// (2 for a two-way race) UPDATE commands against <c>recruitment.applications</c> carrying this id
-    /// to arrive before either is released to execute. Dispose the result once the race is over.
-    /// </summary>
     public static IDisposable Arm(Guid applicationId, int participantCount = 2)
     {
         Instance.EnsureSubscribed();
@@ -80,12 +75,6 @@ internal sealed class ApplicationSaveBarrier : IObserver<DiagnosticListener>, IO
                 return;
         }
 
-        // Release anyone still (unexpectedly) waiting rather than leaving them blocked forever, then
-        // dispose. RemoveParticipants throws if nobody is waiting, so guard with the barrier's own
-        // count; simplest safe option is just to dispose - Barrier.Dispose while a thread is inside
-        // SignalAndWait is documented as unsupported, but by the time a test disposes its ArmScope the
-        // race has already been awaited (both responses received), so no thread can still be blocked
-        // in SignalAndWait for this id.
         barrier.Dispose();
     }
 
@@ -114,9 +103,6 @@ internal sealed class ApplicationSaveBarrier : IObserver<DiagnosticListener>, IO
 
         var commandText = data.Command.CommandText;
 
-        // Cheap pre-filter before touching parameters: only the batched SaveChanges command that
-        // updates the applications table is of interest here (skip plain SELECTs, and INSERTs into
-        // idempotency_records / application_stage_history_entries that carry no matching UPDATE).
         if (commandText.IndexOf("UPDATE", StringComparison.Ordinal) < 0 ||
             commandText.IndexOf("applications", StringComparison.OrdinalIgnoreCase) < 0)
         {

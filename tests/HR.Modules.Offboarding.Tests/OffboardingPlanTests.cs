@@ -88,7 +88,6 @@ public class OffboardingPlanTests
         Assert.Null(plan.Notes);
     }
 
-    // OFF-02
     [Fact]
     public void Reschedule_Updates_LastWorkingDay_And_UpdatedAt_When_Date_Changes()
     {
@@ -119,7 +118,6 @@ public class OffboardingPlanTests
         Assert.Equal(FixedNow, plan.UpdatedAt);
     }
 
-    // ---- OFF-05 ----
 
     [Fact]
     public void Create_Defaults_IsBackdated_False_And_RequiresHrReconciliation_False_When_Not_Specified()
@@ -180,11 +178,9 @@ public class OffboardingPlanTests
         plan.ResolveHrReconciliation(later);
 
         Assert.False(plan.RequiresHrReconciliation);
-        // Guard returns early without touching UpdatedAt when the flag was already false.
         Assert.Equal(FixedNow, plan.UpdatedAt);
     }
 
-    // ---- OFF-07: CanComplete ----
 
     [Fact]
     public void CanComplete_Returns_False_For_Empty_Task_List()
@@ -237,7 +233,6 @@ public class OffboardingPlanTests
         Assert.False(OffboardingPlan.CanComplete([mandatoryTask, optionalPending]));
     }
 
-    // ---- SPEC-OFF-01: Waived/Cancelled mandatory tasks now satisfy completion ----
 
     [Fact]
     public void CanComplete_Returns_True_When_A_Mandatory_Task_Is_Waived_Rather_Than_Completed()
@@ -281,7 +276,6 @@ public class OffboardingPlanTests
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Optional task", null,
             OffboardingTaskAssignTo.Employee, null, FixedNow, isMandatory: false);
 
-    // ---- OFF-07: HasIncompleteOffboardingAtDeparture ----
 
     [Fact]
     public void MarkIncompleteOffboardingAtDeparture_Sets_Flag_And_Bumps_UpdatedAt()
@@ -307,7 +301,7 @@ public class OffboardingPlanTests
         plan.MarkIncompleteOffboardingAtDeparture(FixedNow.AddDays(5));
 
         Assert.True(plan.HasIncompleteOffboardingAtDeparture);
-        Assert.Equal(firstCallAt, plan.UpdatedAt); // No spurious UpdatedAt bump on the repeat call.
+        Assert.Equal(firstCallAt, plan.UpdatedAt);
     }
 
     [Fact]
@@ -337,7 +331,6 @@ public class OffboardingPlanTests
         Assert.Equal(FixedNow, plan.UpdatedAt);
     }
 
-    // ---- OFF-07: TryClaimFinalReviewTaskCreation ----
 
     [Fact]
     public void TryClaimFinalReviewTaskCreation_Returns_True_And_Sets_Timestamp_On_First_Call()

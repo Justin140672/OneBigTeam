@@ -190,7 +190,6 @@ public class CreateApplicationSubmittedCvEndpointTests
     [Fact]
     public async Task Two_Applications_For_The_Same_Candidate_On_Different_Vacancies_Keep_Their_Own_Cvs()
     {
-        // Acceptance: each application fixes the exact CV it was submitted with.
         var companyId = Guid.NewGuid();
         var vacancyA = await RecruitmentTestSeeder.SeedVacancyAsync(_factory, companyId, Now, "Backend Engineer");
         var vacancyB = await RecruitmentTestSeeder.SeedVacancyAsync(_factory, companyId, Now, "Product Designer");

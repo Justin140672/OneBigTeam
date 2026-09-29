@@ -51,7 +51,6 @@ public class SensitiveEmailLoggingTests
         Assert.DoesNotContain(InviteUrlWithToken, logger.Text);
         Assert.DoesNotContain("inv_9f8e7d6c5b4a3210deadbeef", logger.Text);
         Assert.DoesNotContain("new.hire@example.com", logger.Text);
-        // still useful: delivery attempt is recorded
         Assert.Contains("INVITATION EMAIL (stub)", logger.Text);
     }
 
@@ -82,7 +81,7 @@ public class SensitiveEmailLoggingTests
         Assert.DoesNotContain(RecoveryUrlWithToken, logger.Text);
         Assert.DoesNotContain("pkce_1122334455", logger.Text);
         Assert.DoesNotContain("ada@example.com", logger.Text);
-        Assert.DoesNotContain("Reset your password", logger.Text); // subject is caller-controlled — not logged
+        Assert.DoesNotContain("Reset your password", logger.Text);
         Assert.Contains("EMAIL (stub)", logger.Text);
     }
 
@@ -170,8 +169,6 @@ public class SensitiveEmailLoggingTests
         Assert.DoesNotContain("eyJhbGciOiJIUzI1NiJ9", logger.Text);
         Assert.DoesNotContain("leaked_token", logger.Text);
         Assert.DoesNotContain("ada@customer-mail.co", logger.Text);
-        // still useful for diagnosis: Postmark's error code and a bounded category survive; the
-        // free-form message does not (it can echo the recipient address)
         Assert.Contains("406", logger.Text);
         Assert.Contains("InactiveRecipient", logger.Text);
         Assert.DoesNotContain("Inactive recipient", logger.Text);

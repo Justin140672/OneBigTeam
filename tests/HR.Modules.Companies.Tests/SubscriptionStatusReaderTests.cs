@@ -46,7 +46,6 @@ public class SubscriptionStatusReaderTests
         Assert.True(snapshot.IsReadOnly);
         Assert.Equal(0, snapshot.TrialDaysRemaining);
 
-        // Confirm the transition was actually persisted, not just computed in-memory.
         var persisted = await context.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
         Assert.Equal(SubscriptionStatus.TrialExpired, persisted.Status);
     }

@@ -11,7 +11,6 @@ public sealed class ProfilePhotoService(HrApiHttpClientFactory httpClientFactory
 {
     private HttpClient Http => httpClientFactory.CreateClient();
 
-    // ── Self-service ────────────────────────────────────────────────────────
 
     public async Task<GetMyProfilePhotoResponse?> GetMyProfilePhotoAsync(
         Guid companyId, CancellationToken cancellationToken = default)
@@ -24,7 +23,6 @@ public sealed class ProfilePhotoService(HrApiHttpClientFactory httpClientFactory
         catch { return null; }
     }
 
-    // Returns null on success, or an error message string on failure.
     public async Task<string?> UploadMyProfilePhotoAsync(
         Guid companyId, IBrowserFile file, CancellationToken cancellationToken = default)
     {
@@ -63,9 +61,7 @@ public sealed class ProfilePhotoService(HrApiHttpClientFactory httpClientFactory
         catch { return false; }
     }
 
-    // ── HR-facing ────────────────────────────────────────────────────────────
 
-    // Returns null on success, or an error message string on failure.
     public async Task<string?> UploadEmployeeProfilePhotoAsync(
         Guid companyId, Guid employeeId, IBrowserFile file, CancellationToken cancellationToken = default)
     {
@@ -149,7 +145,6 @@ public sealed class ProfilePhotoService(HrApiHttpClientFactory httpClientFactory
         catch { return null; }
     }
 
-    // Returns null on success, or an error message string on failure.
     public async Task<string?> ApproveProfilePhotoAsync(
         Guid companyId, Guid employeeId, CancellationToken cancellationToken = default)
     {
@@ -170,7 +165,6 @@ public sealed class ProfilePhotoService(HrApiHttpClientFactory httpClientFactory
         }
     }
 
-    // Returns null on success, or an error message string on failure.
     public async Task<string?> RejectProfilePhotoAsync(
         Guid companyId, Guid employeeId, string? rejectionReason, CancellationToken cancellationToken = default)
     {

@@ -37,8 +37,6 @@ public class GetOffboardingProgressReportEndpointTests
     [Fact]
     public async Task Get_OffboardingProgressReport_Returns_Forbidden_For_Manager()
     {
-        // reporting:view-hr only — sensitive HR data (access/asset return status), no manager
-        // scoping, unlike GetOnboardingProgressReport/GetProbationReport.
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Manager);

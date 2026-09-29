@@ -475,10 +475,6 @@
 
     private int _employeeFilterRequestId;
 
-    // Requests aren't guaranteed to resolve in the order they were fired — applying every response
-    // unconditionally means a late-arriving response for an earlier keystroke can land after the
-    // user already picked an employee from a later, faster response, visibly clearing their
-    // selection. Only the most recently issued request's response is applied.
     private async Task OnEmployeeFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
     {
         args.PreventDefaultAction = true;
@@ -522,23 +518,6 @@
 
     private async Task OnGroupByChangedAsync(WorkloadActionsGroupBy? value)
     {
-        // GroupBy is also sent to the server as a request filter (affects urgency/summary
-        // computation ordering upstream), so a full reload keeps this consistent with every other
-        // filter change on this page, even though the actual grouped *rendering* itself is now
-        // entirely client-side (Syncfusion's native Group By via GroupColumns).
-        //
-        // NOTE (investigation left open): an earlier attempt here explicitly drove Syncfusion's
-        // ClearGroupingAsync/GroupColumnAsync grid API after every load, on the theory that handing
-        // <GridGroupSettings Columns="@GroupColumns" /> a new array reference on re-render isn't
-        // reliably enough on its own to make the grid re-group already-rendered rows. That was
-        // reverted — it was unverified (this environment's Aspire/DCP orchestrator cannot allocate
-        // ports for any service, blocking every attempt to actually run the E2E suite here, so the
-        // theory was never confirmed against a live browser) and plausibly *worse*: if a reload
-        // yields zero rows, RenderGrid never runs and the @ref field would be left pointing at an
-        // unmounted grid instance, so calling grid API methods on it could throw and crash the
-        // whole page. Reverted to the plain reactive Columns binding, which is Syncfusion's
-        // documented supported pattern for runtime grouping changes, rather than layering another
-        // unverified guess on top. See WorkloadActionsReportTests.GroupByActionType_RendersGroupedSections.
         _groupBy = value;
         await LoadAsync();
     }
@@ -612,18 +591,10 @@
         }
         else
         {
-            // response.Items is always the full flat row set regardless of GroupBy (see
-            // GetWorkloadActionsHandler — "rows" is unconditionally returned; "groups" is only an
-            // additional, now-unused-by-this-page pre-split projection of the same rows). A single
-            // grid with Syncfusion's native Group By (see RenderGrid/GroupColumns below) replaces
-            // what used to be a separate <HrGrid> rendered per server-computed group.
             _items = response.Items;
             _summary = response.Summary;
             _totalItemCount = _items.Count;
 
-            // Populate filter dropdown options from the loaded data set when not yet populated,
-            // so Action Type / Department / Status filters offer real values without a dedicated
-            // lookup endpoint (none exists in the workload-actions backend contract).
             _actionTypeOptions = _items.Select(r => r.ActionType).Distinct().OrderBy(x => x).ToList();
             _departmentOptions = _items.Select(r => r.Department).Where(d => !string.IsNullOrWhiteSpace(d)).Distinct().OrderBy(x => x).ToList()!;
             _statusOptions = _items.Select(r => r.Status).Distinct().OrderBy(x => x).ToList();
@@ -646,18 +617,9 @@
 
     private void GoToAction(WorkloadActionRowModel row)
     {
-        // Actionability is scoped to the workspace this report is being viewed under (HR vs
-        // Manager, resolved server-side) — a row can be visible for oversight (e.g. HR seeing a
-        // manager-owned leave approval, or a manager seeing an employee's own sickness evidence
-        // follow-up) without being something the current viewer should open/act on from here, even
-        // though a server-side HR-administrator override would separately allow it.
         if (!row.IsOwnerActionable)
             return;
 
-        // Task-backed rows (e.g. Leave/Sickness — see LeavePendingApprovalsWorkloadActionProvider,
-        // SicknessPendingActionsWorkloadActionProvider) carry TaskId directly rather than a deep
-        // link into /companies/{companyId}/tasks/{taskId}; open those via the standard
-        // TaskViewDialog in place rather than requiring a synthetic deep link URL.
         if (row.TaskId is { } taskId)
         {
             _selectedTaskId = taskId;
@@ -668,9 +630,6 @@
         if (string.IsNullOrWhiteSpace(row.DeepLinkUrl))
             return;
 
-        // Some providers (e.g. the Tasks module's own overdue-task providers) still construct a
-        // /companies/{companyId}/tasks/{taskId} deep link directly — keep that in-place-open
-        // behaviour too, alongside genuine external deep links.
         var taskLinkPrefix = $"/companies/{CompanyId}/tasks/";
         if (row.DeepLinkUrl.StartsWith(taskLinkPrefix, StringComparison.OrdinalIgnoreCase)
             && Guid.TryParse(row.DeepLinkUrl[taskLinkPrefix.Length..], out var legacyTaskId))
@@ -689,16 +648,6 @@
         await LoadAsync();
     }
 
-    /// <summary>
-    /// Splits <see cref="_items"/> into one section per distinct value of the selected GroupBy
-    /// field, each rendered as its own heading ("&lt;value&gt; (&lt;count&gt;)") followed by its
-    /// own grid — restored explicit per-group rendering (see
-    /// WorkloadActionsReportTests.GroupByActionType_RendersGroupedSections, which asserts on
-    /// these headings) rather than relying on Syncfusion's native single-grid Group By, whose
-    /// runtime column-change behaviour via a plain reactive parameter binding was unverified
-    /// (this environment cannot run the E2E suite) and did not reliably re-group already-rendered
-    /// rows.
-    /// </summary>
     private List<(string Label, List<WorkloadActionRowModel> Items)> GroupedRows()
     {
         Func<WorkloadActionRowModel, string> keySelector = _groupBy switch

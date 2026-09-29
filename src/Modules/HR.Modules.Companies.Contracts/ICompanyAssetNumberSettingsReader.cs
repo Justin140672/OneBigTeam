@@ -1,7 +1,5 @@
 namespace HR.Modules.Companies.Contracts;
 
-// Read-only projection of the current asset-number sequence state for a company. Mirrors
-// ICompanyEmployeeNumberSettingsReader/EmployeeNumberSequencePreview — see that type's remarks.
 public sealed record AssetNumberSequencePreview(string? Prefix, int NextNumber, int MinimumLength);
 
 public interface ICompanyAssetNumberSettingsReader

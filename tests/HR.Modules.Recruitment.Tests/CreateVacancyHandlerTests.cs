@@ -39,7 +39,6 @@ public class CreateVacancyHandlerTests
 
         var saved = await db.Vacancies.SingleAsync();
         Assert.Equal(result.Value.Id, saved.Id);
-        // Round-trip through the (InMemory) RecruitmentDbContext, not just the handler's response DTO.
         Assert.Equal(positionProfileId, saved.PositionProfileId);
     }
 
@@ -49,9 +48,6 @@ public class CreateVacancyHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
 
-        // Ticket #81: AssignedRecruiterId now references ExternalRecruiter (in this same module/schema)
-        // rather than an unvalidated Employee id, so the handler validates existence/company-ownership —
-        // a real, active ExternalRecruiter row must exist for this to succeed.
         var recruiter = ExternalRecruiter.Create(Guid.NewGuid(), companyId, "Acme Recruiting", null, null, null, null, null, FixedUtcNow);
         db.ExternalRecruiters.Add(recruiter);
         await db.SaveChangesAsync();
@@ -202,7 +198,7 @@ public class CreateVacancyHandlerTests
         var positionProfileId = Guid.NewGuid();
 
         var reader = new FakePositionProfileReader(
-            matchingCompanyId: Guid.NewGuid(), // a different company than the request below
+            matchingCompanyId: Guid.NewGuid(),
             matchingPositionProfileId: positionProfileId);
 
         var result = await handler(db, reader).HandleAsync(
@@ -349,9 +345,6 @@ public class CreateVacancyHandlerTests
     [Fact]
     public void CreateVacancyRequest_Has_No_Location_Field()
     {
-        // Location was removed entirely from the domain — assert (via reflection, so this test would
-        // fail loudly if the field were ever reintroduced) that CreateVacancyRequest has no Location
-        // member of any kind, rather than relying solely on compile-time enforcement.
         var members = typeof(CreateVacancyRequest).GetMembers()
             .Select(m => m.Name);
 
@@ -361,9 +354,6 @@ public class CreateVacancyHandlerTests
     [Fact]
     public async Task HandleAsync_PositionProfileId_Persists_And_Reads_Back_As_A_Valid_NonNullable_Guid()
     {
-        // Proves the NOT NULL PositionProfileId migration/config doesn't break the normal Create flow:
-        // a vacancy created via the handler round-trips through the DbContext with a valid,
-        // non-nullable PositionProfileId, with no exception thrown reading it back.
         await using var db = BuildContext();
         var positionProfileId = Guid.NewGuid();
 

@@ -3,15 +3,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Companies.Features.GetCompanyAuditLog;
 
-/// <summary>
-/// AUD-05: tenant-scoped audit search for HR Administrators.
-/// Returns all audit events recorded against the company, with optional filtering by
-/// employee, event type, and date range. The companyId isolation is enforced at the
-/// IAuditHistoryReader.GetCompanyAuditLogAsync level — results are always bounded to a
-/// single tenant.
-/// Actor user IDs are resolved to display names (email) via IUserEmailDirectoryReader so
-/// the caller never has to make a second round-trip.
-/// </summary>
 internal sealed class GetCompanyAuditLogHandler(
     IAuditHistoryReader auditHistoryReader,
     IUserEmailDirectoryReader userEmailDirectoryReader)
@@ -31,7 +22,6 @@ internal sealed class GetCompanyAuditLogHandler(
             pagination,
             cancellationToken);
 
-        // Batch-resolve actor emails so the response carries display-ready actor names.
         var actorUserIds = page.Items
             .Where(e => e.ActorUserId.HasValue)
             .Select(e => e.ActorUserId!.Value)

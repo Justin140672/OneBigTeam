@@ -37,9 +37,6 @@ internal sealed class GetSharedCompanyDocumentHandler(
             .OrderByDescending(v => v.VersionNumber)
             .ToListAsync(cancellationToken);
 
-        // ThenByDescending(CreatedAt) breaks ties deterministically when two reviews are completed
-        // on the same calendar day (ReviewDate has only day granularity) — without it, "newest
-        // first" would be unspecified/non-deterministic for same-day reviews.
         var reviewHistoryRows = await db.SharedCompanyDocumentReviewHistories
             .AsNoTracking()
             .Where(h => h.SharedCompanyDocumentId == document.Id)
@@ -105,9 +102,6 @@ internal sealed class GetSharedCompanyDocumentHandler(
                 .Select(a => a.EmployeeId)
                 .ToListAsync(cancellationToken);
 
-            // Only count acknowledgements from employees who are still within the current
-            // audience — someone who acknowledged before being moved out of scope shouldn't
-            // inflate the progress count.
             var relevantAcknowledgedIds = acknowledgedEmployeeIds.Intersect(eligibleIds).ToList();
             var acknowledgedNames = await employeeNameReader.GetNamesAsync(request.CompanyId, relevantAcknowledgedIds, cancellationToken);
 

@@ -21,8 +21,6 @@ internal sealed class GetInternalVacancyHandler(RecruitmentDbContext db, IPositi
                     && v.IsAdvertisedInternally,
                 cancellationToken);
 
-        // A draft/closed/non-advertised/cross-company vacancy is simply "not found" to employees —
-        // no information disclosure.
         if (vacancy is null)
             return Result.Failure<GetInternalVacancyResponse>(
                 Error.NotFound($"Vacancy '{request.VacancyId}' was not found."));

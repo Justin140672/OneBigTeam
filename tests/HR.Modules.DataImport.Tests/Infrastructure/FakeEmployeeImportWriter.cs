@@ -3,12 +3,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.DataImport.Tests.Infrastructure;
 
-/// <summary>
-/// Test double for <see cref="IEmployeeImportWriter"/>. Records every call so
-/// ConfirmImportSessionHandler tests can assert on what was requested, without needing a live
-/// EmployeesDbContext. Supports seeding per-row failures (to exercise the handler's per-row
-/// exception handling) and per-employee TryAssignManagerAsync outcomes.
-/// </summary>
 internal sealed class FakeEmployeeImportWriter : IEmployeeImportWriter
 {
     private readonly HashSet<string> _workEmailsThatThrow = new(StringComparer.OrdinalIgnoreCase);
@@ -22,19 +16,10 @@ internal sealed class FakeEmployeeImportWriter : IEmployeeImportWriter
     public List<(Guid CompanyId, Guid EmployeeId, EmployeeImportCompensation Compensation)> CompensationCalls { get; } = [];
     public List<(Guid CompanyId, Guid EmployeeId, Guid ManagerId)> ManagerAssignmentAttempts { get; } = [];
 
-    /// <summary>
-    /// OBT-REM-08: number of times the resume path (GetImportSnapshotAsync) was called, so tests
-    /// can assert a retry read back an already-created employee instead of recreating it.
-    /// </summary>
     public int GetImportSnapshotCalls { get; private set; }
 
     public void FailCreationFor(string workEmail) => _workEmailsThatThrow.Add(workEmail.Trim());
 
-    /// <summary>
-    /// Seeds a snapshot for an employee that was "already created by a previous attempt" without
-    /// going through CreateEmployeeAsync in this test run - mirrors the resume path where
-    /// ConfirmImportSessionHandler finds a staging row with CreatedEmployeeId already set.
-    /// </summary>
     public void SeedSnapshot(Guid employeeId, EmployeeImportCreateResult result) => _snapshots[employeeId] = result;
 
     public void FailManagerAssignmentFor(Guid employeeId) => _managerAssignmentsThatFail.Add(employeeId);

@@ -181,9 +181,6 @@
 
     private bool CanSubmit => !_submitting;
 
-    // Syncfusion's SfDropDownList doesn't get Blazor's automatic aria-invalid/is-invalid wiring
-    // (that only applies to InputBase-derived components), so this is set manually from the
-    // EditContext's current validation state for the Leave Type field.
     private Dictionary<string, object> LeaveTypeHtmlAttributes =>
         new()
         {

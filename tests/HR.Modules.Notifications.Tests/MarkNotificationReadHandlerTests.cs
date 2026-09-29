@@ -32,7 +32,6 @@ public class MarkNotificationReadHandlerTests
         var saved = await ctx.Notifications.FindAsync(notification.Id);
         Assert.True(saved!.IsRead);
 
-        // NOT-05: audit
         var evt = Assert.Single(auditPublisher.Published);
         var read = Assert.IsType<NotificationReadAuditEvent>(evt);
         Assert.Equal(companyId,       read.CompanyId);
@@ -94,7 +93,6 @@ public class MarkNotificationReadHandlerTests
         var saved = await ctx.Notifications.FindAsync(notification.Id);
         Assert.True(saved!.IsRead);
 
-        // NOT-05: no duplicate audit event on a no-op mark-read of an already-read notification.
         Assert.Empty(auditPublisher.Published);
     }
 

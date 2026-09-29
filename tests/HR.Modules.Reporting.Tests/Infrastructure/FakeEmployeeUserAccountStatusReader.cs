@@ -3,9 +3,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Reporting.Tests.Infrastructure;
 
-// Simple in-memory stand-in for the Identity-module-backed IEmployeeUserAccountStatusReader,
-// following the same "not found = absent" convention as the real implementation. Mirrors
-// HR.Modules.Employees.Tests.Infrastructure.FakeEmployeeUserAccountStatusReader.
 internal sealed class FakeEmployeeUserAccountStatusReader : IEmployeeUserAccountStatusReader
 {
     public Dictionary<Guid, EmployeeUserAccountSummary> Statuses { get; } = new();

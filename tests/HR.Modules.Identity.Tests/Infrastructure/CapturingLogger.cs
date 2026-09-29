@@ -4,22 +4,12 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Identity.Tests.Infrastructure;
 
-/// <summary>
-/// CodeQL #61: a stricter capture than <see cref="ListLogger{T}"/> for asserting that personal
-/// data (e.g. an email address) never reaches operational logs by ANY channel. For every entry it
-/// records the formatted message, every structured state key/value (including the raw
-/// <c>{OriginalFormat}</c> template), the full exception text (<c>ToString()</c>, which includes
-/// inner exceptions) plus exception <c>Data</c> and public property values, and every active
-/// scope's state — so a value hidden in a destructured property, a scope, or an exception
-/// message is still caught by <see cref="AllText"/>.
-/// </summary>
 internal sealed class CapturingLogger<T> : ILogger<T>
 {
     private readonly List<object?> _activeScopes = [];
 
     public List<CapturedLogEntry> Entries { get; } = [];
 
-    /// <summary>Every captured string from every channel, newline-joined.</summary>
     public string AllText => string.Join("\n", Entries.Select(e => e.AllText));
 
     public IDisposable BeginScope<TState>(TState state) where TState : notnull
@@ -75,8 +65,6 @@ internal sealed class CapturingLogger<T> : ILogger<T>
             foreach (DictionaryEntry entry in current.Data)
                 text.Append('\n').Append(entry.Key).Append('=').Append(entry.Value);
 
-            // Structured exception destructurers (e.g. Serilog.Exceptions) emit public properties,
-            // so an address held in a property such as EmailAlreadyRegisteredException.Email counts.
             foreach (var property in current.GetType().GetProperties())
             {
                 if (property.GetIndexParameters().Length > 0 || property.Name is nameof(Exception.TargetSite))
@@ -87,7 +75,6 @@ internal sealed class CapturingLogger<T> : ILogger<T>
                 }
                 catch
                 {
-                    // A throwing property getter is irrelevant to what would be logged.
                 }
             }
         }

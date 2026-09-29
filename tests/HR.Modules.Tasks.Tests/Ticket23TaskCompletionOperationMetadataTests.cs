@@ -34,7 +34,6 @@ public class Ticket23TaskCompletionOperationMetadataTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
 
-    // ── CreatePending: stamping from a supplied IExecutionContext ───────────────────────────────
 
     [Fact]
     public void CreatePending_With_Supplied_Context_Stamps_CorrelationId_From_Context_CorrelationId_And_CausationId_From_Context_MessageId()
@@ -63,7 +62,6 @@ public class Ticket23TaskCompletionOperationMetadataTests
         Assert.NotEqual(Guid.Empty, operation.MessageId!.Value);
     }
 
-    // ── CompleteTaskHandler: reference wiring picks up the ambient context ──────────────────────
 
     private static CompleteTaskHandler BuildHandler(
         TasksDbContext context,
@@ -129,11 +127,7 @@ public class Ticket23TaskCompletionOperationMetadataTests
         Assert.NotNull(operation.MessageId);
     }
 
-    // ── TaskCompletionEffectsJob: restores persisted metadata as the ambient context ────────────
 
-    // Captures whatever execution context is ambient (via the supplied accessor) at the moment the
-    // audit event is about to be published — used to observe what the job restored as ambient for
-    // the duration of its resumed work.
     private sealed class ContextCapturingAuditPublisher(IExecutionContextAccessor accessor) : IAuditEventPublisher
     {
         public IExecutionContext? ObservedDuringPublish { get; private set; }
@@ -196,7 +190,6 @@ public class Ticket23TaskCompletionOperationMetadataTests
         var task = MakeCompletedTask(companyId, completedBy);
         context.TaskItems.Add(task);
 
-        // Simulate a row written before the metadata columns existed — no supplied context.
         var operation = TaskCompletionOperation.CreatePending(
             Guid.NewGuid(), companyId, task.Id, completedBy, null, null, Now);
         operation.MarkDispatchApplied(Now);

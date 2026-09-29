@@ -64,7 +64,6 @@ public class AdministrativeAlertWriterTests
             .Select(j => (Guid)j.Args[0]!)
             .ToList();
 
-    // ---- existing behaviour (unchanged) -------------------------------------------------------
 
     [Fact]
     public async Task First_Raise_Creates_One_Row_And_Publishes_NonRecurrence_Audit()
@@ -158,10 +157,6 @@ public class AdministrativeAlertWriterTests
         Assert.Equal(AdministrativeAlertSeverity.Critical, row.Severity);
     }
 
-    // ---- Follow-up F: operations-email is gated on Reason == MissingDocumentExport -----------
-    // A new alert queues the internal-operations notification email ONLY when the command carries
-    // Reason == MissingDocumentExport. The broad Category (ReportGeneration etc.) no longer triggers
-    // the email on its own — an ordinary report-export failure carries no Reason and sends nothing.
 
     private static RaiseAdministrativeAlertCommand MissingDocumentCommand(
         Guid companyId,
@@ -174,7 +169,6 @@ public class AdministrativeAlertWriterTests
             affectedItemCount: affectedItemCount,
             reason: AdministrativeAlertReason.MissingDocumentExport);
 
-    // (a) one missing-document failure queues exactly one notification
     [Fact]
     public async Task New_MissingDocument_Alert_Creates_One_Pending_Delivery_Row_And_Enqueues_Send_Job()
     {
@@ -195,7 +189,6 @@ public class AdministrativeAlertWriterTests
         Assert.Equal(new[] { alert.Id }, EnqueuedAlertIds(jobs));
     }
 
-    // (b) an ordinary report-export failure (ReportGeneration, no reason) queues none
     [Fact]
     public async Task New_ReportGeneration_Alert_Without_A_Reason_Creates_No_Delivery_Row_And_Enqueues_Nothing()
     {
@@ -223,7 +216,6 @@ public class AdministrativeAlertWriterTests
         Assert.Empty(EnqueuedAlertIds(jobs));
     }
 
-    // (c) repeated missing-document failures while the alert is open queue no additional notifications
     [Fact]
     public async Task Recurrence_Of_An_Open_MissingDocument_Alert_Adds_No_Delivery_Row_And_No_Extra_Enqueue()
     {
@@ -241,7 +233,6 @@ public class AdministrativeAlertWriterTests
         Assert.Single(EnqueuedAlertIds(jobs));
     }
 
-    // (d) a missing-document failure after resolution queues a new notification
     [Fact]
     public async Task Identical_MissingDocument_Failure_After_Resolution_Opens_New_Alert_With_New_Delivery_And_New_Enqueue()
     {
@@ -264,7 +255,6 @@ public class AdministrativeAlertWriterTests
         Assert.Contains(openAlert.Id, enqueued);
     }
 
-    // ---- Follow-up C: ActionUrl enrichment --------------------------------------------------
 
     [Fact]
     public async Task ActionUrl_Is_Enriched_From_AdminAppBaseUrl_When_Command_Supplies_None()

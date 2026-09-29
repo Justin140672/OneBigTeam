@@ -3,7 +3,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Identity;
 
-// Published when an employee is invited to become a system user (Features/InviteEmployeeUser).
 internal sealed record UserInvitedAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,
@@ -26,10 +25,6 @@ internal sealed record UserInvitedAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
-// Published when an administrator queues a bulk invitation batch (Features/QueueInvitationBatch).
-// No raw email list here (see 05-database-standards.md, sensitive/PII payload minimisation) —
-// only the recipient count and their employee ids, matching UserInvitedAuditEvent's own per-invite
-// email publication once each recipient is actually processed by ProcessInvitationBatchJob.
 internal sealed record InvitationBatchQueuedAuditEvent(
     Guid CompanyId,
     Guid BatchId,
@@ -49,7 +44,6 @@ internal sealed record InvitationBatchQueuedAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
-// Published when a pending invite is resent (Features/ResendInvite) — token/expiry regenerated.
 internal sealed record UserInviteResentAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,
@@ -71,7 +65,6 @@ internal sealed record UserInviteResentAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
-// Published when a pending invite is cancelled (Features/CancelInvite).
 internal sealed record UserInviteCancelledAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,
@@ -93,7 +86,6 @@ internal sealed record UserInviteCancelledAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
-// Published when a user's role set changes (Features/UpdateUserRoles).
 internal sealed record UserRolesChangedAuditEvent(
     Guid CompanyId,
     Guid UserId,
@@ -144,7 +136,6 @@ internal sealed record RoleChangeRejectedAuditEvent(
     object? IAuditEvent.Metadata       => new { Reason };
 }
 
-// Published when a user account is manually disabled by an administrator (Features/DisableUser).
 internal sealed record UserDisabledAuditEvent(
     Guid CompanyId,
     Guid UserId,
@@ -165,12 +156,6 @@ internal sealed record UserDisabledAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
-// P1 fix: published only once an employee's departure-triggered ApplicationUser disablement has
-// actually succeeded (Features/OnEmployeeDepartureFinalised + Jobs/AccountDisablementJob) — never
-// published optimistically at request/enqueue time. Replaces the former
-// UserAutoDisabledOnOffboardingAuditEvent, which incorrectly tied disablement to offboarding-plan
-// completion rather than the authoritative departure-finalisation decision (Employees'
-// HasSystemAccess + the company's auto-disable-on-leaving-date setting).
 internal sealed record UserAutoDisabledOnDepartureAuditEvent(
     Guid CompanyId,
     Guid UserId,
@@ -183,7 +168,6 @@ internal sealed record UserAutoDisabledOnDepartureAuditEvent(
     Guid?  IAuditEvent.EmployeeId      => EmployeeId;
     Guid?  IAuditEvent.ActorUserId     => null;
     Guid?  IAuditEvent.ActorEmployeeId => null;
-    // AUD-04: triggered by an integration event from Employees (departure finalisation) — no human actor.
     AuditActorType IAuditEvent.ActorType => AuditActorType.IntegrationHandler;
     Guid?  IAuditEvent.CorrelationId   => null;
     string? IAuditEvent.Summary        => "User account automatically disabled — employee departure finalised";
@@ -192,10 +176,6 @@ internal sealed record UserAutoDisabledOnDepartureAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
-// P1 fix: published when a departure-triggered ApplicationUser disablement permanently fails
-// after exhausting retries (Jobs/AccountDisablementJob) — makes the failure visible in the audit
-// trail (in addition to the persisted, queryable AccountDisablement.Status = Failed row and the
-// structured error logs), rather than leaving a former employee's account silently still active.
 internal sealed record UserAccountDisablementFailedAuditEvent(
     Guid CompanyId,
     Guid UserId,
@@ -280,7 +260,6 @@ internal sealed record InviteAcceptancePendingCancelledAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
-// Published when a user account is re-enabled by an administrator (Features/EnableUser).
 internal sealed record UserEnabledAuditEvent(
     Guid CompanyId,
     Guid UserId,
@@ -301,8 +280,6 @@ internal sealed record UserEnabledAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
-// IAM-03: published when an administrator changes a position's default role set
-// (Features/SetPositionRoleDefaults). EntityId is the Position (== owning PositionProfile) id.
 internal sealed record PositionRoleDefaultsChangedAuditEvent(
     Guid CompanyId,
     Guid PositionId,
@@ -323,12 +300,6 @@ internal sealed record PositionRoleDefaultsChangedAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
-// IAM-03: published when an employee's position assignment changes (new hire or transfer) and the
-// resulting change in inherited roles is applied to identity.user_positions. ActorUserId is always
-// null — the triggering integration events (EmployeeCreatedIntegrationEvent,
-// EmployeePositionChangedIntegrationEvent) do not carry the acting HR administrator's id; that
-// attribution already exists on the Employees module's own audit trail for the profile/create
-// action (EmployeeProfileUpdatedAuditEvent etc.) and can be cross-referenced by EmployeeId + time.
 internal sealed record EmployeeInheritedRolesRecalculatedAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,
@@ -344,7 +315,6 @@ internal sealed record EmployeeInheritedRolesRecalculatedAuditEvent(
     Guid?  IAuditEvent.EmployeeId      => EmployeeId;
     Guid?  IAuditEvent.ActorUserId     => null;
     Guid?  IAuditEvent.ActorEmployeeId => null;
-    // AUD-04: triggered by integration events (EmployeeCreated/EmployeePositionChanged) — no human actor.
     AuditActorType IAuditEvent.ActorType => AuditActorType.IntegrationHandler;
     Guid?  IAuditEvent.CorrelationId   => null;
     string? IAuditEvent.Summary        => "Inherited roles recalculated following a position assignment change";
@@ -353,8 +323,6 @@ internal sealed record EmployeeInheritedRolesRecalculatedAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
-// IAM-04: published when an administrator creates (or replaces) an employee-level role override
-// (Features/AddEmployeeRoleOverride).
 internal sealed record EmployeeRoleOverrideCreatedAuditEvent(
     Guid CompanyId,
     Guid UserId,
@@ -375,13 +343,10 @@ internal sealed record EmployeeRoleOverrideCreatedAuditEvent(
     Guid?  IAuditEvent.CorrelationId   => null;
     string? IAuditEvent.Summary        => $"Created {OverrideType} override for role {RoleId}: {Reason}";
     object? IAuditEvent.Before         => null;
-    // AUD-03: Reason is free-text and prohibited in the payload; it is captured in Summary only.
     object? IAuditEvent.After          => new { RoleId, OverrideType, ExpiresAt };
     object? IAuditEvent.Metadata       => null;
 }
 
-// IAM-04: published when an administrator removes an employee-level role override
-// (Features/RemoveEmployeeRoleOverride).
 internal sealed record EmployeeRoleOverrideRemovedAuditEvent(
     Guid CompanyId,
     Guid UserId,
@@ -404,10 +369,6 @@ internal sealed record EmployeeRoleOverrideRemovedAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
-// IAM-04: published by the daily sweep (Jobs/ExpireEmployeeRoleOverridesJob) when a temporary
-// override's ExpiresAt has passed and it is cleared out — distinct from a manual removal so audit
-// history can tell the two apart. ActorUserId is always null (system-driven, not an administrator
-// action).
 internal sealed record EmployeeRoleOverrideExpiredAuditEvent(
     Guid CompanyId,
     Guid UserId,
@@ -422,7 +383,6 @@ internal sealed record EmployeeRoleOverrideExpiredAuditEvent(
     Guid?  IAuditEvent.EmployeeId      => UserId;
     Guid?  IAuditEvent.ActorUserId     => null;
     Guid?  IAuditEvent.ActorEmployeeId => null;
-    // AUD-04: triggered by the daily expiry sweep job — no human actor.
     AuditActorType IAuditEvent.ActorType => AuditActorType.ScheduledJob;
     Guid?  IAuditEvent.CorrelationId   => null;
     string? IAuditEvent.Summary        => $"{OverrideType} override for role {RoleId} expired";
@@ -462,13 +422,6 @@ internal sealed record PermissionDeniedAuditEvent(
     object? IAuditEvent.Metadata       => new { PermissionId, DenialCountInWindow, IsRepeatedEscalation };
 }
 
-// IAM-08: published on every access-review report export (success and failure), same
-// success/failure auditing convention HR.Modules.Reporting.Services.ReportExportAuditor uses for
-// Export*Report handlers — kept as an Identity-owned event (not a call into the Reporting module,
-// which would be a forbidden cross-module reference) since this report is Identity-owned
-// operational data, not part of the Reporting module's formal report catalogue. Carries only row
-// count and format — never the exported rows themselves — so no employee-level access detail ends
-// up duplicated into the audit payload.
 internal sealed record AccessReviewExportedAuditEvent(
     Guid CompanyId,
     string Format,
@@ -492,11 +445,7 @@ internal sealed record AccessReviewExportedAuditEvent(
     object? IAuditEvent.Metadata       => new { Format, RowCount, Success, FailureReason };
 }
 
-// Platform administrator management (Admin Portal "administrator management" screen). These
-// events cover a platform-level concept with no company relationship — CompanyId is always
-// Guid.Empty since IAuditEvent requires a non-nullable CompanyId.
 
-// Published when a new platform administrator account is created (Features/CreatePlatformAdministrator).
 internal sealed record PlatformAdministratorCreatedAuditEvent(
     Guid AdministratorId,
     string Email,
@@ -517,7 +466,6 @@ internal sealed record PlatformAdministratorCreatedAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
-// Published when a platform administrator account is disabled (Features/DisablePlatformAdministrator).
 internal sealed record PlatformAdministratorDisabledAuditEvent(
     Guid AdministratorId,
     string Email,
@@ -537,7 +485,6 @@ internal sealed record PlatformAdministratorDisabledAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
-// Published when a platform administrator account is re-enabled (Features/EnablePlatformAdministrator).
 internal sealed record PlatformAdministratorEnabledAuditEvent(
     Guid AdministratorId,
     string Email,
@@ -557,7 +504,6 @@ internal sealed record PlatformAdministratorEnabledAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
-// Published when a platform administrator's role changes (Features/AssignPlatformAdministratorRole).
 internal sealed record PlatformAdministratorRoleAssignedAuditEvent(
     Guid AdministratorId,
     string Email,
@@ -579,8 +525,6 @@ internal sealed record PlatformAdministratorRoleAssignedAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
-// Published when a password reset email is requested for a platform administrator
-// (Features/ResetPlatformAdministratorPassword).
 internal sealed record PlatformAdministratorPasswordResetRequestedAuditEvent(
     Guid AdministratorId,
     string Email,
@@ -600,10 +544,6 @@ internal sealed record PlatformAdministratorPasswordResetRequestedAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
-// ADM-06: published for every platform-administrator MFA reset attempt — success and failure alike
-// (Features/ResetPlatformAdministratorMfa). Records the requester (ActorUserId), the target
-// (EntityId/Email), the time (OccurredAt), the administrative reason and the outcome. Reason is
-// free-text and, per AUD-03, is carried in Summary only — never in the structured payload.
 internal sealed record PlatformAdministratorMfaResetAuditEvent(
     Guid AdministratorId,
     string Email,
@@ -630,10 +570,6 @@ internal sealed record PlatformAdministratorMfaResetAuditEvent(
     object? IAuditEvent.Metadata       => new { Succeeded, FactorsRemoved, NotificationDelivered, FailureReason };
 }
 
-// P1: published when the identity-provider side of platform-administrator provisioning
-// (account creation, or link-verification email delivery for an already-existing provider
-// account) fails durably. The local record remains visible and retryable — never a silent
-// dead end.
 internal sealed record PlatformAdministratorProvisioningFailedAuditEvent(
     Guid AdministratorId,
     string Email,
@@ -654,8 +590,6 @@ internal sealed record PlatformAdministratorProvisioningFailedAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
-// P1: published when a platform administrator successfully activates — proving control of the
-// identity-provider account by authenticating as it (see ActivatePlatformAdministratorHandler).
 internal sealed record PlatformAdministratorActivatedAuditEvent(
     Guid AdministratorId,
     string Email,
@@ -675,8 +609,6 @@ internal sealed record PlatformAdministratorActivatedAuditEvent(
     object? IAuditEvent.Metadata       => null;
 }
 
-// P1: published when a platform owner retries a failed/pending provisioning attempt
-// (Features/RetryPlatformAdministratorProvisioning).
 internal sealed record PlatformAdministratorProvisioningRetriedAuditEvent(
     Guid AdministratorId,
     string Email,

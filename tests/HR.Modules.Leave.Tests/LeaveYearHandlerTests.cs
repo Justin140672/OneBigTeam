@@ -14,21 +14,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Tests;
 
-/// <summary>
-/// Verifies that all leave handlers use LeaveYearStartMonth when resolving policy years,
-/// so companies with non-January leave years (e.g. April) get the correct balance.
-/// </summary>
 public class LeaveYearHandlerTests
 {
-    // Employee created in January 2027; company leave year starts in April.
-    // GetPolicyYear(Jan 2027, startMonth=4) = 2026 — still in the 2026 leave year.
     private static readonly DateTime JanuaryClockUtc = new(2027, 1, 15, 9, 0, 0, DateTimeKind.Utc);
     private static readonly DateTimeOffset JanuaryNow = new(JanuaryClockUtc, TimeSpan.Zero);
 
     private static readonly FakeCompanyLeaveSettingsReader AprilStartSettings =
         new(CompanyLeaveSettings.Default with { LeaveYearStartMonth = 4 });
 
-    // Leave request dates: 19-21 Jan 2027 (Tue–Thu) — in policy year 2026 under April start
     private static readonly DateOnly LeaveStartDate = new(2027, 1, 19);
     private static readonly DateOnly LeaveEndDate = new(2027, 1, 21);
 
@@ -40,7 +33,6 @@ public class LeaveYearHandlerTests
         return new LeaveDbContext(options);
     }
 
-    // ── SubmitLeaveRequest ──────────────────────────────────────────────────────
 
     [Fact]
     public async Task Submit_Finds_Policy_Year_2026_Balance_When_Leave_Year_Starts_In_April_And_Date_Is_January_2027()
@@ -54,9 +46,6 @@ public class LeaveYearHandlerTests
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Policy", null, 0, allowNegativeBalance: false, false, JanuaryNow);
         var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
             new DateOnly(2026, 4, 1), JanuaryNow);
-        // Balance in policy year 2026 — the correct year for Jan 2027 with April start.
-        // AccrualStartDate is the policy year's own April 1 2026 start, so ~9 months of Monthly
-        // accrual have elapsed by Jan 2027 — comfortably enough to cover the 3-day request.
         var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
             2026, 25m, new DateOnly(2026, 4, 1), JanuaryNow);
 
@@ -96,7 +85,6 @@ public class LeaveYearHandlerTests
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Policy", null, 0, allowNegativeBalance: false, false, JanuaryNow);
         var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
             new DateOnly(2026, 4, 1), JanuaryNow);
-        // Balance incorrectly stored in calendar year 2027 — handler should look in 2026 and not find it
         var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
             2027, 25m, new DateOnly(2027, 4, 1), JanuaryNow);
 
@@ -121,12 +109,10 @@ public class LeaveYearHandlerTests
             EndPart = LeaveDayPart.FullDay
         }, CancellationToken.None);
 
-        // Balance in year 2027 not found; 0 remaining → insufficient
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
     }
 
-    // ── ApproveLeaveRequest ─────────────────────────────────────────────────────
 
     [Fact]
     public async Task Approve_Deducts_Policy_Year_2026_Balance_When_Leave_Year_Starts_In_April_And_Start_Date_Is_January_2027()
@@ -167,7 +153,6 @@ public class LeaveYearHandlerTests
         Assert.Equal(22m, savedBalance.RemainingDays);
     }
 
-    // ── CancelLeaveRequest ──────────────────────────────────────────────────────
 
     [Fact]
     public async Task Cancel_Restores_Policy_Year_2026_Balance_When_Leave_Year_Starts_In_April_And_Start_Date_Is_January_2027()
@@ -208,7 +193,6 @@ public class LeaveYearHandlerTests
         Assert.Equal(25m, savedBalance.RemainingDays);
     }
 
-    // ── RejectLeaveRequest ──────────────────────────────────────────────────────
 
     [Fact]
     public async Task Reject_Restores_Policy_Year_2026_Balance_When_Leave_Year_Starts_In_April_And_Start_Date_Is_January_2027()
@@ -252,7 +236,6 @@ public class LeaveYearHandlerTests
         Assert.Equal(25m, savedBalance.RemainingDays);
     }
 
-    // ── EmployeeCreatedHandler ──────────────────────────────────────────────────
 
     [Fact]
     public async Task EmployeeCreated_Initialises_Balance_In_Policy_Year_2026_When_Leave_Year_Starts_In_April_And_Created_In_January_2027()
@@ -275,9 +258,6 @@ public class LeaveYearHandlerTests
 
         var balance = await context.LeaveBalances.SingleAsync();
         Assert.Equal(2026, balance.PolicyYear);
-        // Leave year for policy year 2026 (April start) runs 2026-04-01 to 2027-03-31. StartDate
-        // 2026-06-01 is mid-year, so entitlement is pro-rated: 25 * 304/365 = 20.8219, rounded to
-        // the nearest half day = 21.0.
         Assert.Equal(21.0m, balance.EntitlementDays);
     }
 }

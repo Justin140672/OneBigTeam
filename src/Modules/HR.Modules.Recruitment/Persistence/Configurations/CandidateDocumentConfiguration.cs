@@ -63,9 +63,6 @@ internal sealed class CandidateDocumentConfiguration : IEntityTypeConfiguration<
             .HasColumnName("created_at")
             .IsRequired();
 
-        // [P1] Candidate CV malware scanning. The database default is Pending so any row inserted
-        // without an explicit status — and every row that existed before this column was added — is
-        // treated as unscanned (never downloadable) until ScanCandidateDocumentJob records a result.
         builder.Property(cd => cd.ScanStatus)
             .HasColumnName("scan_status")
             .HasConversion<string>()
@@ -73,8 +70,6 @@ internal sealed class CandidateDocumentConfiguration : IEntityTypeConfiguration<
             .HasDefaultValue(CandidateDocumentScanStatus.Pending)
             .IsRequired();
 
-        // Doubles as the optimistic-concurrency token for scan claims: every claim increments it, so
-        // two workers racing to claim the same document cannot both succeed.
         builder.Property(cd => cd.ScanAttemptCount)
             .HasColumnName("scan_attempt_count")
             .HasDefaultValue(0)
@@ -90,7 +85,6 @@ internal sealed class CandidateDocumentConfiguration : IEntityTypeConfiguration<
         builder.Property(cd => cd.ScanCompletedAt)
             .HasColumnName("scan_completed_at");
 
-        // Only closed-set categories or a sanitised threat name — never raw exception text.
         builder.Property(cd => cd.ScanFailureReason)
             .HasColumnName("scan_failure_reason")
             .HasMaxLength(200);
@@ -120,7 +114,6 @@ internal sealed class CandidateDocumentConfiguration : IEntityTypeConfiguration<
         builder.HasIndex(cd => cd.CandidateId);
         builder.HasIndex(cd => new { cd.CandidateId, cd.Kind });
 
-        // Drives ReconcileCandidateDocumentScansJob's cross-company sweep for Pending/Scanning rows.
         builder.HasIndex(cd => new { cd.ScanStatus, cd.CreatedAt })
             .HasDatabaseName("ix_candidate_documents_scan_status_created_at");
     }

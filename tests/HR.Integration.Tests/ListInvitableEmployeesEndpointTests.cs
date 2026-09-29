@@ -132,7 +132,6 @@ public class ListInvitableEmployeesEndpointTests
         var otherCompanyId = Guid.NewGuid();
         await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, otherCompanyId, "Other", "Tenant");
 
-        // client authenticated against ownCompanyId, but requesting otherCompanyId's roster
         using var client = AuthenticatedClient(ownCompanyId);
 
         var response = await client.GetAsync(Url(otherCompanyId));

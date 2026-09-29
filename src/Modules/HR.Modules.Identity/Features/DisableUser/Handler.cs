@@ -8,11 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Features.DisableUser;
 
-// Manual counterpart to the automatic disable wired up in Features/OnOffboardingPlanCompleted.
-// ApplicationUser.Deactivate() previously existed in the domain but had no caller anywhere in the
-// codebase — this endpoint is the first place it's actually invoked for a manual admin action.
-// Disabling only flips IsActive; no related data (roles, invites, historical records) is touched
-// or cascade-deleted.
 internal sealed class DisableUserHandler(
     IdentityDbContext db,
     IClock clock,
@@ -47,7 +42,6 @@ internal sealed class DisableUserHandler(
             }
         }
 
-        // IAM-01: confirm the target user belongs to the route company before touching account status.
         var isMember = await targetUserCompanyGuard.IsMemberAsync(request.CompanyId, request.UserId, cancellationToken);
         if (!isMember)
             return Result.Failure<DisableUserResponse>(Error.NotFound("User was not found."));
@@ -69,12 +63,6 @@ internal sealed class DisableUserHandler(
 
         var now = clock.UtcNow;
 
-        // IAM-02: disabling the account of the last active holder of a lockout-protected role
-        // (Company Administrator, HR Administrator) would silently lock the company out of that
-        // administration capability just as effectively as removing the role directly — apply the
-        // same safeguard as Features/UpdateUserRoles, evaluated per role independently so a
-        // multi-role holder can still be disabled as long as someone else actively holds each of
-        // their protected roles.
         var protectedRoleIds = (await db.UserRoles
             .Where(ur => ur.UserId == request.UserId)
             .Select(ur => ur.RoleId)

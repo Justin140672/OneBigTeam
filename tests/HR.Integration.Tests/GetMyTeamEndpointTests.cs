@@ -5,12 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Integration coverage for the GetMyTeam self-service slice
-/// (GET /api/companies/{companyId}/employees/me/team). The team is always scoped to the
-/// caller's OWN resolved employee id — a caller can never see another manager's team.
-/// Only Active reports are included.
-/// </summary>
 [Collection("Integration")]
 public class GetMyTeamEndpointTests
 {
@@ -141,7 +135,7 @@ public class GetMyTeamEndpointTests
 
         await ActivateAsync(admin, companyId, activeReportId);
         await AssignManagerAsync(admin, companyId, activeReportId, managerId);
-        await AssignManagerAsync(admin, companyId, draftReportId, managerId); // left as Draft
+        await AssignManagerAsync(admin, companyId, draftReportId, managerId);
 
         using var client = AsEmployee(managerId, companyId);
         var payload = await client.GetFromJsonAsync<TeamPayload>(

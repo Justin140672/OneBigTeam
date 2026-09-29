@@ -85,7 +85,6 @@ public class GetMyOnboardingStatusHandlerTests
         Assert.Equal(3, result.TotalTasks);
         Assert.Equal(1, result.CompletedTasks);
 
-        // Ordered by DueDate ascending: completed (7/2), pending (7/3), skipped (7/5).
         Assert.Equal(
             [completed.Id, pending.Id, skipped.Id],
             result.Tasks.Select(t => t.Id).ToArray());

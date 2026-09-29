@@ -9,7 +9,6 @@ public class LeavePolicyServiceTests
 {
     private static LeavePolicyEditModel SampleModel() => new() { Name = "Standard Policy" };
 
-    // ── UpdateAsync(ApiSaveResult) ────────────────────────────────────────────────
 
     [Fact]
     public async Task UpdateAsync_Returns_Ok_When_Api_Returns_Success()
@@ -84,7 +83,6 @@ public class LeavePolicyServiceTests
         Assert.NotNull(result.ErrorMessage);
     }
 
-    // ── GetLeavePolicyAsync (representative read) ────────────────────────────────
 
     [Fact]
     public async Task GetLeavePolicyAsync_Returns_Value_When_Api_Returns_Ok()
@@ -109,7 +107,6 @@ public class LeavePolicyServiceTests
         Assert.Null(result);
     }
 
-    // ── SetDefaultLeavePolicyAsync ────────────────────────────────────────────────
 
     [Fact]
     public async Task SetDefaultLeavePolicyAsync_Returns_Null_When_Api_Returns_NoContent()

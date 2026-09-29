@@ -8,11 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// LEAVE-01: GET .../employees/{employeeId}/leave-requests/{id}. Resource-authorization
-/// (self / manager-in-hierarchy / HR-admin) is covered by <see cref="LeaveResourceAuthorizationTests"/>;
-/// this class pins the handler's projection, tenant/employee scoping and 404 behaviour.
-/// </summary>
 [Collection("Integration")]
 public class GetLeaveRequestEndpointTests
 {
@@ -94,8 +89,6 @@ public class GetLeaveRequestEndpointTests
 
         using var client = await AuthenticatedClient(caller);
 
-        // Passes the self authorizer (route employeeId == caller) but the handler's EmployeeId
-        // predicate excludes the row -> 404.
         var response = await client.GetAsync(Url(SeededCompanyId, caller, id));
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -113,15 +106,12 @@ public class GetLeaveRequestEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, otherCompany.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, employee, SystemRoles.Employee, otherCompany);
 
-        // Self authorizer still passes (caller id == route employeeId), but the leave request row
-        // is scoped to SeededCompanyId, so the cross-company lookup misses -> 404.
         var response = await client.GetAsync(Url(otherCompany, employee, id));
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         client.Dispose();
     }
 
-    // ── helpers ──────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId, bool hrAdministrator = false)
     {

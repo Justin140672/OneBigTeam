@@ -3,11 +3,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Employees.Tests;
 
-/// <summary>
-/// NFR-01: the compensation audit events must never serialise a monetary amount. The bulk-applied
-/// event records only the direction of the change; the other compensation events record no amount
-/// at all.
-/// </summary>
 public class CompensationAuditRedactionTests
 {
     private static readonly DateTimeOffset Now = new(2026, 6, 8, 10, 0, 0, TimeSpan.Zero);
@@ -45,7 +40,7 @@ public class CompensationAuditRedactionTests
         Assert.DoesNotContain("50000", json);
         Assert.DoesNotContain("55000", json);
         Assert.DoesNotContain("Salary\":", json);          // no "Salary" / "PreviousSalary" amount property
-        Assert.DoesNotContain("Annual review", json);       // free-text reason excluded
+        Assert.DoesNotContain("Annual review", json);
     }
 
     [Fact]
@@ -85,7 +80,6 @@ public class CompensationAuditRedactionTests
         Assert.DoesNotContain("55000", json);
     }
 
-    /// <summary>Belt-and-braces: none of the compensation payloads trip the value scrubber either.</summary>
     [Fact]
     public void No_compensation_payload_contains_a_sensitive_value_token()
     {

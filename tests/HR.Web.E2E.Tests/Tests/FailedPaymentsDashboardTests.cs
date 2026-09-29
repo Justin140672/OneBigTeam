@@ -21,9 +21,6 @@ namespace HR.Web.E2E.Tests.Tests;
 /// </summary>
 public sealed class FailedPaymentsDashboardTests(EmployeePersonaFixture fixture) : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
-    // Seeded platform-admin allow-listed persona — see appsettings.Development.json's
-    // "PlatformAdmin:AllowedEmails" and DevPersonaStore, and AdminLoginPage's remarks on the
-    // dev-login stub vs. server-side platform-admin authorisation being separate checks.
     private const string AllowListedAdminEmail = "priya.shah@acme.example";
 
     // Seeded plain-Employee persona (no platform-admin allow-list entry) — valid dev-login
@@ -39,12 +36,6 @@ public sealed class FailedPaymentsDashboardTests(EmployeePersonaFixture fixture)
         await login.GoToAsync();
         await login.LoginAsync(AllowListedAdminEmail);
 
-        // LoginAsync only waits for the URL to leave /login — on this Blazor Server layout, the
-        // nav (inside <AuthorizeView><Authorized>) renders after an additional async round trip
-        // to resolve auth state, which can land a beat after the URL has already changed. Reading
-        // IsVisibleAsync() immediately (it doesn't auto-wait/retry the way Playwright's action
-        // methods do) can sample the DOM before that content has rendered at all — wait for the
-        // link the same way navLink.ClickAsync() below already implicitly does.
         var navLink = _page.GetByRole(AriaRole.Link, new() { Name = "Failed Payments" });
         await navLink.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
 
@@ -56,9 +47,6 @@ public sealed class FailedPaymentsDashboardTests(EmployeePersonaFixture fixture)
     [Fact]
     public async Task DirectUrl_AllowListedAdmin_ShowsStripeNotConfiguredState()
     {
-        // No live Stripe key is configured in this dev/test environment, so
-        // GetFailedPaymentsResponse.StripeConfigured is expected to be false — see
-        // FailedPayments.razor's remarks and the class summary above.
         var login = new AdminLoginPage(_page, _fixture.AdminWebBaseUrl);
         var dashboard = new FailedPaymentsPage(_page, _fixture.AdminWebBaseUrl);
 
@@ -130,13 +118,6 @@ public sealed class FailedPaymentsDashboardTests(EmployeePersonaFixture fixture)
     [Fact]
     public async Task AnonymousAccess_RedirectsToLogin()
     {
-        // No login at all — unlike NonAllowListedPersona above (an authenticated caller the
-        // server-side "PlatformAdmin:AllowedEmails" check rejects, surfaced as this page's own
-        // dashboard-error banner), a genuinely anonymous visitor never gets that far:
-        // Routes.razor's AuthorizeRouteView redirects to /login at the router level before
-        // FailedPayments.razor — or its API call — ever runs. Navigate directly rather than via
-        // FailedPaymentsPage.GoToAsync, which waits for that page's own settled-state selectors
-        // and would time out here since none of them exist on /login.
         await _page.GotoAsync($"{_fixture.AdminWebBaseUrl}/failed-payments");
 
         await _page.WaitForURLAsync(url => url.ToString().Contains("/login"), new() { Timeout = 20_000 });

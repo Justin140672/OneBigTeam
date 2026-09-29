@@ -38,12 +38,6 @@ internal sealed class StartupMigrationRunner(ILogger<StartupMigrationRunner> log
         get { lock (_gate) { return _results.Where(r => r.Status != "succeeded").Select(r => r.Module).ToArray(); } }
     }
 
-    /// <summary>
-    /// Executes one required migration step. Ordering matters, so callers must await each call in
-    /// sequence. A failure is logged (with the affected module and the exception) and recorded, but
-    /// does not throw — the caller inspects <see cref="AllSucceeded"/> afterwards and decides not to
-    /// build the normal request pipeline.
-    /// </summary>
     public async Task RunAsync(string module, IServiceProvider services, Func<IServiceProvider, Task> migrateAndSeed)
     {
         try
@@ -118,10 +112,6 @@ internal sealed class StartupMigrationRunner(ILogger<StartupMigrationRunner> log
     }
 }
 
-/// <summary>
-/// Readiness health check (tagged <c>critical</c>) so <c>/health/ready</c> returns 503 while any
-/// required migration is unresolved. Never discloses the underlying exception detail.
-/// </summary>
 internal sealed class StartupMigrationHealthCheck(StartupMigrationRunner runner) : IHealthCheck
 {
     public Task<HealthCheckResult> CheckHealthAsync(

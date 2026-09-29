@@ -8,11 +8,6 @@ internal sealed record CompensationImportTemplateRow(
     decimal? CurrentSalary,
     string? SalaryFrequency);
 
-/// <summary>
-/// Builds the downloadable compensation-import .xlsx template: a main sheet pre-populated with
-/// read-only reference data (Employee Number/Name/Current Salary/Salary Frequency) plus blank
-/// entry columns (New Salary/Effective Date/Reason/Notes), and a second Instructions sheet.
-/// </summary>
 internal static class CompensationImportTemplateBuilder
 {
     public const string SheetName = "Compensation Import";
@@ -62,9 +57,6 @@ internal static class CompensationImportTemplateBuilder
 
         sheet.Columns(1, Headers.Length).AdjustToContents();
 
-        // ClosedXML cells are locked by default; sheet protection only takes effect once
-        // explicitly enabled below, and the entry columns must be explicitly unlocked so they
-        // remain editable while the reference columns (1-4, including the header row) stay locked.
         sheet.Range(1, 1, lastDataRow, 4).Style.Protection.SetLocked(true);
 
         if (lastDataRow >= 2)

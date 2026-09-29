@@ -11,7 +11,6 @@ public class EmployeeDocumentTests
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
             CreatedAt, issueDate: null, expiryDate: expiryDate);
 
-    // ── MarkExpiryReminderSent ──────────────────────────────────────────────────
 
     [Fact]
     public void MarkExpiryReminderSent_NinetyDays_Sets_Only_ExpiryReminder90SentAt()
@@ -71,7 +70,6 @@ public class EmployeeDocumentTests
         Assert.Equal(second, doc.UpdatedAt);
     }
 
-    // ── UpdateExpiryDate ─────────────────────────────────────────────────────────
 
     [Fact]
     public void UpdateExpiryDate_Resets_All_Reminder_State_When_All_Were_Previously_Set()

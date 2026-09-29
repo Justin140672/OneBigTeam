@@ -20,11 +20,9 @@ namespace HR.Web.E2E.Tests.Tests;
 /// </summary>
 public sealed class ProfilePhotoTaskTenantIsolationTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
-    // ── Company 1 — Acme Corporation ─────────────────────────────────────────
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-    private const string LauraEmail = "laura.bennett@acme.example"; // Acme HR Administrator
+    private const string LauraEmail = "laura.bennett@acme.example";
 
-    // ── Company 2 — Beta Corp ────────────────────────────────────────────────
     private static readonly Guid BetaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
     private static readonly Guid BobId      = Guid.Parse("30000000-0000-0000-0000-000000000012");
     private const string BobEmail = "bob.taylor@betacorp.example";
@@ -41,9 +39,6 @@ public sealed class ProfilePhotoTaskTenantIsolationTests(CrossUserFixture fixtur
         {
             await File.WriteAllBytesAsync(tempFile, BuildTestPng());
 
-            // ── Step 1: Bob (Beta Corp employee) submits a profile photo for review. ──
-            // This creates a PendingProfilePhoto and an unassigned HR-inbox task
-            // (TaskSource.Document / TaskActionType.Review) scoped to BetaCorpId.
             await login.GoToAsync();
             await login.LoginAsync(BobEmail);
 
@@ -72,21 +67,16 @@ public sealed class ProfilePhotoTaskTenantIsolationTests(CrossUserFixture fixtur
         }
     }
 
-    /// <summary>
-    /// Builds a minimal-but-valid PNG (signature + IHDR chunk carrying width/height) at the
-    /// dimensions ImageUploadValidator requires — mirrors the identical helper already used in
-    /// EmployeeCurrentProfilePhotoTests.cs and the UploadEmployeeProfilePhoto integration tests.
-    /// </summary>
     private static byte[] BuildTestPng(int width = 400, int height = 300)
     {
         var bytes = new List<byte>();
-        bytes.AddRange(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }); // signature
-        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x0D }); // IHDR chunk data length
+        bytes.AddRange(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
+        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x0D });
         bytes.AddRange("IHDR"u8.ToArray());
         bytes.AddRange(BigEndianUInt32(width));
         bytes.AddRange(BigEndianUInt32(height));
-        bytes.AddRange(new byte[] { 0x08, 0x06, 0x00, 0x00, 0x00 }); // bit depth, color type, compression, filter, interlace
-        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 }); // dummy CRC (not validated)
+        bytes.AddRange(new byte[] { 0x08, 0x06, 0x00, 0x00, 0x00 });
+        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 });
         return [.. bytes];
     }
 

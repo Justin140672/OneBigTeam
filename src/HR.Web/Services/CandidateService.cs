@@ -23,18 +23,11 @@ public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
         return result.Success ? result.Value : null;
     }
 
-    /// <summary>
-    /// Every candidate matching the filter, fetched page-by-page at the API's maximum page size
-    /// (ListCandidatesValidator caps PageSize at 100). For callers that bind the whole set to a
-    /// client-paged grid or build a lookup from it — a single pageSize=100 request silently dropped
-    /// every candidate past the 100th (ordered by last name), and a pageSize above 100 fails
-    /// validation and returns nothing at all. Returns null only if the first page fails.
-    /// </summary>
     public async Task<IReadOnlyList<CandidateListItemModel>?> ListAllCandidatesAsync(
         Guid companyId, string? search = null, bool includeInactive = false)
     {
         const int maxPageSize = 100;
-        const int maxPages = 1000; // Defensive bound against a malformed TotalPages.
+        const int maxPages = 1000;
 
         var first = await ListCandidatesAsync(companyId, search, 1, maxPageSize, includeInactive);
         if (first is null)
@@ -89,7 +82,6 @@ public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
         return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to reactivate candidate."));
     }
 
-    // ── DOCUMENTS (Ticket #1) ──────────────────────────────────────────────────
 
     public async Task<ListCandidateDocumentsResponse?> ListCandidateDocumentsAsync(Guid companyId, Guid candidateId)
     {
@@ -98,19 +90,15 @@ public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
         return result.Success ? result.Value : null;
     }
 
-    // Relative URL of the web-side authenticated proxy that streams a candidate document inline
-    // (see Program.cs) — safe to bind straight to an <a href> / <iframe src>.
     public static string GetCandidateDocumentProxyUrl(Guid companyId, Guid candidateId, Guid documentId) =>
         $"/companies/{companyId}/candidates/{candidateId}/cv/{documentId}";
 
     public const long MaxCandidateDocumentBytes = 20 * 1024 * 1024;
 
-    // Returns the created document on success, or an error message on failure. Pass kind "Cv" for a CV upload.
     public async Task<(UploadedCandidateDocumentModel? Document, string? Error)> UploadCandidateDocumentAsync(
         Guid companyId, Guid candidateId, string title, string kind, IBrowserFile file,
         CancellationToken cancellationToken = default)
     {
-        // OpenReadStream throws for anything over maxAllowedSize — report it instead of faulting the circuit.
         if (file.Size > MaxCandidateDocumentBytes)
             return (null, "The file is larger than the 20 MB limit.");
 
@@ -132,7 +120,6 @@ public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
             : (null, result.DisplayMessage ?? "Upload failed.");
     }
 
-    // ── IEditService<CandidateEditModel, Guid> ──────────────────────────────────
 
     async Task<CandidateEditModel?> IEditService<CandidateEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
     {
@@ -166,8 +153,6 @@ public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
         if (result.Success)
             return ApiSaveResult.Ok(result.Value?.Version);
 
-        // The recruitment API returns no "code" on its 409 body, so ANY 409 (Concurrency or plain
-        // Conflict) from this endpoint is treated as a save conflict.
         var isConflict = result.FailureKind is ApiFailureKind.Concurrency or ApiFailureKind.Conflict;
         return ApiSaveResult.Fail(
             result.DisplayMessage ?? (isConflict

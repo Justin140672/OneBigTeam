@@ -4,25 +4,17 @@ using Markdig;
 
 namespace HR.Marketing.Services;
 
-/// <summary>An H2 heading extracted from a rendered document, used to build a simple table of contents.</summary>
 public sealed record MarkdownHeading(string Id, string Text);
 
-/// <summary>Parsed result of a Documents/*.md file: its front-matter metadata plus rendered HTML body.</summary>
 public sealed record MarkdownDocument(string Title, string LastUpdated, string Html, IReadOnlyList<MarkdownHeading> Headings);
 
-/// <summary>
-/// Loads the legal/product markdown files embedded from Documents/*.md (see HR.Marketing.csproj)
-/// and renders them to HTML. Each file starts with a small "title" / "lastUpdated" front-matter
-/// block (not full YAML — just two known keys) followed by the markdown body.
-/// </summary>
 public static class MarkdownDocumentLoader
 {
     private static readonly MarkdownPipeline Pipeline = new MarkdownPipelineBuilder()
         .UseAdvancedExtensions()
-        .UseAutoLinks() // ensures bare email addresses (e.g. security@onebigteam.co.uk) render as clickable mailto: links
+        .UseAutoLinks()
         .Build();
 
-    /// <summary>Loads Documents/{slug}.md, e.g. slug "privacy-policy" for Documents/privacy-policy.md.</summary>
     public static MarkdownDocument Load(string slug)
     {
         var resourceName = $"HR.Marketing.Documents.{slug}.md";
@@ -67,8 +59,6 @@ public static class MarkdownDocumentLoader
             }
         }
 
-        // The body's own leading "# Title" heading duplicates the page's <h1> (rendered
-        // separately from the front-matter title above it), so drop it before rendering.
         body = body.TrimStart('\r', '\n');
         if (body.StartsWith("# ", StringComparison.Ordinal))
         {
@@ -81,9 +71,6 @@ public static class MarkdownDocumentLoader
         return new MarkdownDocument(title, lastUpdated, html, headings);
     }
 
-    // Markdig's advanced-extensions bundle auto-generates a slug "id" attribute on every heading
-    // (the auto-identifiers extension), so H2s can be turned into a simple anchor-link table of
-    // contents for longer documents without any extra authoring in the .md files themselves.
     private static readonly Regex H2Pattern = new("""<h2 id="([^"]+)">(.*?)</h2>""", RegexOptions.Compiled | RegexOptions.Singleline);
 
     private static IReadOnlyList<MarkdownHeading> ExtractH2Headings(string html) =>

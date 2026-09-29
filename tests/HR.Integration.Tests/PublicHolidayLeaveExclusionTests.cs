@@ -18,11 +18,6 @@ public class PublicHolidayLeaveExclusionTests
     public PublicHolidayLeaveExclusionTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
-        // CompanyAdministrator is required for UpdateCompanySettings (company:manage is
-        // CompanyAdministrator-only). HrAdministrator is required for public holiday
-        // creation, leave policy creation/assignment, employee creation, and leave request
-        // submission (leave:manage / employee:manage / leave:request) — Company
-        // Administrator no longer holds those permissions.
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, CompanyAdminUserId, SystemRoles.CompanyAdministrator);
@@ -37,7 +32,6 @@ public class PublicHolidayLeaveExclusionTests
     {
         var (client, companyId, leaveTypeId) = await SetupCompanyAsync(excludePublicHolidays: true);
 
-        // Seed a public holiday on Monday 2026-09-07 (within the 5-day Mon–Fri request)
         await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/public-holidays",
             new { companyId, date = "2026-09-07", name = "Test Holiday", countryCode = "GB" });
@@ -67,7 +61,6 @@ public class PublicHolidayLeaveExclusionTests
     {
         var (client, companyId, leaveTypeId) = await SetupCompanyAsync(excludePublicHolidays: false);
 
-        // Seed a public holiday on Monday 2026-10-05 (within the 5-day Mon–Fri request)
         await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/public-holidays",
             new { companyId, date = "2026-10-05", name = "Test Holiday", countryCode = "GB" });
@@ -103,20 +96,13 @@ public class PublicHolidayLeaveExclusionTests
 
     private async Task<(HttpClient Client, Guid CompanyId, Guid LeaveTypeId)> SetupCompanyAsync(bool excludePublicHolidays)
     {
-        // Create company — route has no {companyId}, so any tenant is fine here
         var bootstrapClient = _factory.CreateClient();
         bootstrapClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, CompanyAdminUserId.ToString());
         bootstrapClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, CompanyAdminUserId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, CompanyAdminUserId, SystemRoles.CompanyAdministrator, CompanyAdminUserId);
 
-        // POST /api/companies (CreateCompany) was removed in 78a43344; seed the company directly
-        // via CompaniesDbContext instead, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
         var companyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"PH Test {Guid.NewGuid():N}");
 
-        // excludePublicHolidaysFromLeave lives on HR settings, not company settings — PUT
-        // .../settings (UpdateCompanySettingsHandler) only persists TimeZone/Locale and
-        // silently ignores this field while still returning 200 OK. HR settings are gated by
-        // hr-settings:manage, which is HrAdministrator-only (not CompanyAdministrator).
         var hrSettingsClient = await ClientForCompany(companyId, HrAdminUserId);
         var settingsResp = await hrSettingsClient.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
         {
@@ -130,7 +116,6 @@ public class PublicHolidayLeaveExclusionTests
         });
         settingsResp.EnsureSuccessStatusCode();
 
-        // Seed a leave type directly — no API endpoint exists for this
         var leaveTypeId = Guid.NewGuid();
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
@@ -139,8 +124,6 @@ public class PublicHolidayLeaveExclusionTests
             AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, DateTimeOffset.UtcNow));
         await db.SaveChangesAsync();
 
-        // All subsequent calls (public holidays, leave policies, employees, leave requests)
-        // require leave:manage / employee:manage / leave:request — HrAdministrator only.
         var hrAdminClient = await ClientForCompany(companyId, HrAdminUserId);
         return (hrAdminClient, companyId, leaveTypeId);
     }

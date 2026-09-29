@@ -26,9 +26,6 @@ internal sealed class MarkAllNotificationsReadHandler(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        // NOT-05: one event per notification transitioned, mirroring the per-entity audit
-        // convention used elsewhere in this session rather than a single aggregated "N marked
-        // read" event. Nothing is published above when there was nothing unread to begin with.
         var now = clock.UtcNowOffset();
         foreach (var n in unread)
         {

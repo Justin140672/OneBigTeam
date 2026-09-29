@@ -46,8 +46,6 @@ internal sealed class InviteEmployeeUserHandler(
             }
         }
 
-        // Employee must belong to this company (per the shared name-reader port — employees not
-        // found in the company simply won't appear in the returned dictionary).
         var names = await employeeNameReader.GetNamesAsync(request.CompanyId, [request.EmployeeId], cancellationToken);
         if (!names.ContainsKey(request.EmployeeId))
             return Result.Failure<InviteEmployeeUserResponse>(
@@ -62,9 +60,6 @@ internal sealed class InviteEmployeeUserHandler(
         if (emailPolicy.IsFailure)
             return Result.Failure<InviteEmployeeUserResponse>(emailPolicy.Error);
 
-        // No existing linked account — ApplicationUser.Id == EmployeeId by convention (see
-        // UserInvite.EmployeeId). Real Supabase-backed accounts (self-service SignUp, AcceptInvite)
-        // live in UserProfiles rather than Users, so both must be checked (ADM-01).
         var hasLinkedUser = await db.Users.AnyAsync(u => u.Id == request.EmployeeId, cancellationToken)
             || await db.UserProfiles.AnyAsync(p => p.Id == request.EmployeeId, cancellationToken);
         if (hasLinkedUser)
@@ -73,9 +68,6 @@ internal sealed class InviteEmployeeUserHandler(
 
         var now = clock.UtcNow;
 
-        // ADM-01: an actionable (still-pending, not expired) invitation must be resent or cancelled
-        // via its own actions rather than silently replaced from here. An expired or cancelled
-        // invite is not actionable, so it can be superseded by a fresh one.
         var existing = await db.UserInvites
             .Where(i => i.EmployeeId == request.EmployeeId && i.ClaimedAt == null)
             .ToListAsync(cancellationToken);
@@ -117,10 +109,6 @@ internal sealed class InviteEmployeeUserHandler(
 
         if (emailSent)
         {
-            // Drives CompanyOnboarding's "Invite your team" completion rule (spec section 7) —
-            // completion no longer waits for the invitee to accept. The idempotent-save branch
-            // above already committed the invite row itself; this is an additional save for the
-            // EmailSentAt flag, set only once the sender has actually accepted the email.
             invite.MarkEmailSent(now);
             await db.SaveChangesAsync(cancellationToken);
         }

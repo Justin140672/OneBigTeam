@@ -3,51 +3,25 @@ using HR.Web.E2E.Tests.Infrastructure;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the position profile list page (/companies/{companyId}/position-profiles).
-/// </summary>
 public sealed class PositionProfileListPage(IPage page, string baseUrl)
 {
     public async Task GoToAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/position-profiles");
-        // With prerender disabled the page is blank until the interactive circuit connects — gate
-        // on the authenticated shell first so the render budget isn't partly consumed by circuit
-        // establishment on a cold shared E2E app.
         await page.WaitForSelectorAsync(".app-shell", new() { Timeout = 30_000 });
         await page.WaitForSelectorAsync(".e-grid, .spinner-border, .alert-danger",
             new() { Timeout = 30_000 });
         await page.WaitForSpinnerToClearAsync();
-        // Don't return while the grid is still mounting — the toolbar "Add" button the callers
-        // click next only renders once the grid component itself has rendered.
         await page.WaitForSelectorAsync(".e-grid .e-row, .e-grid .e-emptyrow, .alert-danger",
             new() { Timeout = 30_000 });
     }
 
     public async Task ClickNewPositionProfileAsync()
     {
-        // See LocatorExtensions.ClickGridAddAndWaitForCreateRouteAsync: the toolbar's click handling
-        // is wired after the rows paint, so a first click can be dropped (the long-undiagnosed
-        // "waiting for navigation to **/position-profiles/new**" timeouts). Waits on Commit, and on
-        // failure reports the page's actual URL.
         await page.ClickGridAddAndWaitForCreateRouteAsync("**/position-profiles/new**");
     }
 
-    /// <summary>
-    /// Returns true if a row containing <paramref name="titleFragment"/> exists ANYWHERE in the
-    /// grid, not just on the currently displayed page. The grid pages client-side at 20 rows
-    /// (GridPageSettings PageSize="20" in PositionProfileList.razor) over the full, alphabetically
-    /// title-sorted result set (ListPositionProfiles orders by Title) — this suite has accumulated
-    /// enough "E2E ..."-titled profiles created by other test classes (never cleaned up) that a
-    /// seeded profile sorting after them (e.g. "Software Engineer") can now land past page 1. A
-    /// bare current-page-only check here is a real, growing flakiness source as the suite grows,
-    /// not a one-off data collision — paginate through the grid instead of assuming page 1 is
-    /// exhaustive.
-    /// </summary>
     public Task<bool> HasPositionProfileAsync(string titleFragment) =>
-        // Shared helper waits for each page swap to actually land. The previous inline loop only
-        // slept 200ms after clicking "next" (client-side paging shows no spinner), so under load it
-        // could re-read the stale page, click "next" again and skip the page holding the match.
         page.HasGridCellOnAnyPageAsync(titleFragment);
 
     public async Task<IReadOnlyList<string>> GetPositionProfileTitlesAsync()
@@ -61,10 +35,6 @@ public sealed class PositionProfileListPage(IPage page, string baseUrl)
 
     public async Task OpenPositionProfileAsync(string title)
     {
-        // Page to the row first: titles sort alphabetically and the suite's accumulated "E2E ..."
-        // profiles push seeded ones like "QA Engineer" past page 1, where a bare click just
-        // auto-waited out the 30s default timeout. HasGridCellOnAnyPageAsync leaves the grid on the
-        // page that contains the match.
         if (!await page.HasGridCellOnAnyPageAsync(title))
             throw new InvalidOperationException($"Position profile '{title}' was not found on any page of the list.");
 
@@ -72,29 +42,18 @@ public sealed class PositionProfileListPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
     }
 
-    /// <summary>
-    /// Deactivates the position profile whose row contains <paramref name="title"/>
-    /// by clicking the deactivate toolbar action.
-    /// </summary>
     public async Task DeactivateAsync(string title)
     {
-        // Select the row first, then click the deactivate toolbar button.
         var row = page.Locator(".e-row")
             .Filter(new() { HasText = title })
             .First;
         await row.ClickAsync();
-        // Blazor re-renders the toolbar after row selection; wait for the button to be enabled
-        // (same pattern as DepartmentListPage.DeactivateDepartmentAsync).
         var btn = page.GetByRole(AriaRole.Button, new() { Name = "Deactivate" });
         await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await btn.ClickAsync();
-        // Opens a confirmation dialog (HrConfirmDialog) rather than deactivating immediately —
-        // scoped to the dialog since its own confirm button shares the "Deactivate" label with
-        // the toolbar button just clicked above.
         var confirmButton = page.GetByRole(AriaRole.Dialog).GetByRole(AriaRole.Button, new() { Name = "Deactivate", Exact = true });
         await confirmButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await confirmButton.ClickAsync();
-        // Wait for the grid to refresh.
         await page.WaitForSpinnerToClearAsync();
     }
 

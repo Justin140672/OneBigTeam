@@ -43,14 +43,9 @@ public class GetHrSettingsEndpointTests
     [Fact]
     public async Task Get_Hr_Settings_Returns_OK_For_Employee_Role_Reading_Own_Company()
     {
-        // The route companyId must match the caller's resolved tenant (UserProfile.CompanyId),
-        // which TenantRouteAuthorizationMiddleware now enforces — seed the company under the
-        // same fresh tenant id the caller is synced to, rather than an unrelated random id.
         var tenantId = Guid.NewGuid();
         using var client = await AuthenticatedClient(tenantId);
 
-        // POST /api/companies (CreateCompany) was removed in 78a43344; seed the company directly
-        // via CompaniesDbContext instead, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
         var createdCompanyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Hr Settings Test {Guid.NewGuid():N}", companyId: tenantId);
 
         var response = await client.GetAsync($"/api/companies/{createdCompanyId}/hr-settings");
@@ -63,8 +58,6 @@ public class GetHrSettingsEndpointTests
         Assert.Equal("Automatic", payload.EmployeeNumberMode);
         Assert.Equal(1, payload.NextEmployeeNumber);
 
-        // SET-04: newly-provisioned companies retain the CompanySettings.CreateDefault checkpoint
-        // and threshold defaults until explicitly changed.
         Assert.Equal(30, payload.ProbationCheckpointDay1);
         Assert.Equal(60, payload.ProbationCheckpointDay2);
         Assert.Equal(90, payload.ProbationCheckpointDay3);
@@ -78,9 +71,6 @@ public class GetHrSettingsEndpointTests
     [Fact]
     public async Task Get_Hr_Settings_Returns_NotFound_For_Unknown_Id()
     {
-        // Route companyId must match the caller's resolved tenant to pass tenant-route
-        // authorization; sync the caller to a fresh tenant id for which no Company row was ever
-        // seeded, so the request is authorized but the endpoint's own lookup 404s.
         var tenantId = Guid.NewGuid();
         using var client = await AuthenticatedClient(tenantId, ensureActiveSubscription: false);
 

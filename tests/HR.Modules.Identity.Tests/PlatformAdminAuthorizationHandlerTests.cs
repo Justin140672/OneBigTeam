@@ -8,13 +8,6 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace HR.Modules.Identity.Tests;
 
-/// <summary>
-/// Unit tests for <see cref="PlatformAdminAuthorizationHandler"/> (SEC-002's real DB-backed
-/// enforcement point for the "platform:admin" policy). The critical case here is the P1
-/// "Login as Customer" anti-escalation guardrail: a support session's token carries the acting
-/// admin's own real email (for display/audit) and would otherwise satisfy this policy's
-/// email-fallback lookup — it must be denied regardless.
-/// </summary>
 [Collection("IdentityDatabase")]
 public class PlatformAdminAuthorizationHandlerTests(IdentityDatabaseFixture fixture)
 {

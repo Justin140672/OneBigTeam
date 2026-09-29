@@ -66,7 +66,6 @@ internal sealed class CreateCandidateApplicationHandler(CandidateApplicationInta
     }
 }
 
-/// <summary>Success, a duplicate-email match (409 carrying the existing candidate), or any other error.</summary>
 internal sealed record CreateCandidateApplicationResult(
     Result<CreateCandidateApplicationResponse> Result,
     CreateCandidateApplicationDuplicateCandidateResponse? DuplicateCandidate)

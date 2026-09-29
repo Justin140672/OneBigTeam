@@ -50,8 +50,6 @@ internal sealed class CancelLeaveRequestHandler(LeaveDbContext dbContext, IClock
             return Result.Failure<CancelLeaveRequestResponse>(
                 Error.Validation($"Cannot cancel a leave request with status '{leaveRequest.Status}'."));
 
-        // LEAVE-07: a Draft was never submitted, so "cancel" is not a meaningful action - use
-        // DeleteLeaveRequestDraft instead.
         if (leaveRequest.Status is LeaveRequestStatus.Draft)
             return Result.Failure<CancelLeaveRequestResponse>(
                 Error.Validation("Cannot cancel a draft leave request - delete the draft instead."));
@@ -66,9 +64,6 @@ internal sealed class CancelLeaveRequestHandler(LeaveDbContext dbContext, IClock
 
             if (leaveType?.Behaviour == LeaveTypeBehaviour.Toil)
             {
-                // Reverses every Used ledger transaction recorded against this leave request,
-                // restoring each specific bucket it drew from - not a lump sum credit - so future
-                // FIFO consumption ordering stays correct. See ToilLedgerService.ReverseAsync.
                 await toilLedgerService.ReverseAsync(
                     leaveRequest.CompanyId,
                     leaveRequest.EmployeeId,

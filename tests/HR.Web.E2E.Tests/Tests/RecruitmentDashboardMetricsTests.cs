@@ -3,24 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// DSH-04: the Recruiter-only dashboard's summary row
-/// (src/HR.Web/Components/Pages/Dashboards/RecruitmentDashboard.razor) now feeds each metric tile
-/// from an authoritative server metric endpoint that returns { count, items[] } with
-/// count == items.Count, and every drillable tile opens RecruitmentMetricDrillDownDialog.razor
-/// listing exactly those items. So the drill-down row count must always equal the number shown on
-/// the tile.
-///
-/// Drillable tiles: "New applications", "Candidates in progress" (new tile), "Interviews requiring
-/// action", "Offers awaiting response". "Open vacancies" and "Stale vacancies" navigate to the
-/// vacancies list instead of opening a drill-down and are covered by RecruitmentDashboardTests /
-/// RecruitmentDashboardRedesignTests.
-///
-/// Uses the seeded Acme company and Marcus Diallo (the only seeded Recruiter persona), consistent
-/// with the other RecruitmentDashboard* test classes. Counts are not asserted to exact values
-/// (other tests mutate the shared Acme recruitment data) — only tile/drill-down agreement and
-/// non-negativity.
-/// </summary>
 public sealed class RecruitmentDashboardMetricsTests(RecruiterPersonaFixture fixture)
     : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
@@ -67,8 +49,6 @@ public sealed class RecruitmentDashboardMetricsTests(RecruiterPersonaFixture fix
     [Fact]
     public async Task OffersAwaitingResponseTile_DrillDown_RowCountEqualsTileCount()
     {
-        // If the seeded pipeline has no Offer-purpose stage the tile renders muted at 0 and its
-        // drill-down is empty — that is still valid tile/drill-down agreement (0 == 0).
         await AssertTileDrillDownAgreesAsync("Offers awaiting response");
     }
 
@@ -82,10 +62,6 @@ public sealed class RecruitmentDashboardMetricsTests(RecruiterPersonaFixture fix
         await login.LoginAsync(MarcusEmail);
         await dashboard.GoToAsync();
 
-        // Open every drillable tile in turn. Any tile currently at 0 must still open a dialog that
-        // shows the empty state (0 rows) rather than erroring; a non-zero tile must still agree with
-        // its drill-down. Covers the zero branch whichever tile happens to be empty on this run
-        // against the shared Acme data.
         foreach (var tile in DrillableTiles)
         {
             var value = await dashboard.GetSummaryTileValueAsync(tile);

@@ -33,9 +33,6 @@ internal sealed class SupportAttachmentValidator : ISupportAttachmentValidator
             return Result.Failure(Error.Validation($"File size exceeds the maximum allowed size of {maxMb:0.##} MB."));
         }
 
-        // Path.GetExtension on a caller-supplied name is safe (pure string parsing, no filesystem
-        // access) — this is only ever used to check the extension allow-list; the sanitised name
-        // used for storage/display is derived separately (see SubmitSupportRequestHandler).
         var extension = Path.GetExtension(fileName);
         if (string.IsNullOrEmpty(extension)
             || !SupportAttachmentPolicy.AllowedExtensions.Contains(extension.ToLowerInvariant()))
@@ -59,7 +56,7 @@ internal sealed class SupportAttachmentValidator : ISupportAttachmentValidator
         var normalizedContentType = contentType.Split(';')[0].Trim();
 
         if (!SupportAttachmentPolicy.MagicBytes.TryGetValue(normalizedContentType, out var signatures))
-            return Result.Success(); // no known signature for this type (e.g. text/plain); defer to other checks
+            return Result.Success();
 
         if (!content.CanSeek)
             return Result.Failure(Error.Validation("File content could not be verified."));

@@ -6,13 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Features.GetAccessReview;
 
-/// <summary>
-/// IAM-08: builds the access-review report — every user who holds a privileged role (any role
-/// other than the baseline Employee role) via direct assignment, position inheritance, or an
-/// active Grant override, together with the source of each. Reuses the same
-/// direct/inherited/override resolution GetEffectiveAccessHandler performs for a single user
-/// (IAM-05), batched for the whole company instead of one authorization-service call per employee.
-/// </summary>
 internal sealed class GetAccessReviewHandler(
     IdentityDbContext db,
     IEmployeeNameReader employeeNameReader,
@@ -61,7 +54,6 @@ internal sealed class GetAccessReviewHandler(
             .Where(o => o.CompanyId == request.CompanyId && employeeIds.Contains(o.UserId)
                 && o.OverrideType == EmployeeRoleOverrideType.Grant && o.RoleId != SystemRoles.Employee)
             .ToListAsync(cancellationToken);
-        // Active-only: an expired grant override no longer confers any privilege.
         grantOverrides = grantOverrides.Where(o => o.IsActive(now)).ToList();
 
         var allRoleIds = new HashSet<Guid>(directRoles.Select(r => r.RoleId));
@@ -100,7 +92,7 @@ internal sealed class GetAccessReviewHandler(
                     o.ExpiresAt, o.ExpiresAt is not null && o.ExpiresAt <= expiringSoonCutoff)));
 
             if (privileges.Count == 0)
-                continue; // Not a privileged user — baseline Employee access only.
+                continue;
 
             var name = names.TryGetValue(employeeId, out var employeeName)
                 ? employeeName

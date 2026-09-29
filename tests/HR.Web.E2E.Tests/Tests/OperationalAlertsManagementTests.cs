@@ -94,20 +94,16 @@ public sealed class OperationalAlertsManagementTests(EmployeePersonaFixture fixt
         await list.GotoAsync();
         await list.SetCompanyIdFilterAsync(AcmeCompanyId);
 
-        // Status defaults to "open". Filter to the Compliance category — every visible row must be
-        // Compliance, and the one seeded open Compliance alert must be present.
         await list.SetCategoryFilterAsync("Compliance");
         var complianceCategories = await list.ColumnValuesAsync("Category");
         Assert.NotEmpty(complianceCategories);
         Assert.All(complianceCategories, c => Assert.Equal("Compliance", c));
 
-        // Switch to ReportGeneration — a different, non-empty result set (8 seeded open alerts).
         await list.SetCategoryFilterAsync("ReportGeneration");
         var reportCategories = await list.ColumnValuesAsync("Category");
         Assert.NotEmpty(reportCategories);
         Assert.All(reportCategories, c => Assert.Equal("ReportGeneration", c));
 
-        // status=resolved (all categories) surfaces the seeded resolved alert and only resolved rows.
         await list.SetCategoryFilterAsync("");
         await list.SetStatusFilterAsync("resolved");
         var resolvedStatuses = await list.ColumnValuesAsync("Status");
@@ -153,9 +149,6 @@ public sealed class OperationalAlertsManagementTests(EmployeePersonaFixture fixt
 
         if (!await details.ResolveButtonVisibleAsync())
         {
-            // Already resolved by a previous run against this long-lived fixture — the resolve path
-            // is not reachable from the UI. Assert the terminal state instead of depending on
-            // unseeded state (same convention as BackgroundJobsAdminTests).
             Assert.Equal("Resolved", await details.StatusAsync());
             return;
         }
@@ -167,7 +160,6 @@ public sealed class OperationalAlertsManagementTests(EmployeePersonaFixture fixt
         Assert.False(await details.ResolveButtonVisibleAsync(),
             "The Resolve button must disappear once the alert is Resolved");
 
-        // Re-navigating to the now-resolved alert offers no Resolve action.
         await details.GotoAsync(alertId);
         Assert.False(await details.ResolveButtonVisibleAsync());
         Assert.Equal("Resolved", await details.StatusAsync());
@@ -190,7 +182,6 @@ public sealed class OperationalAlertsManagementTests(EmployeePersonaFixture fixt
 
         await details.OpenResolveDialogAsync();
 
-        // Empty note -> min-length guard, dialog stays open, no result message.
         await details.ClickResolveConfirmAsync();
         var validation = await details.DialogValidationErrorAsync() ?? "";
         Assert.Contains("reason", validation, StringComparison.OrdinalIgnoreCase);

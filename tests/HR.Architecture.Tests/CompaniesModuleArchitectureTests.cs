@@ -102,7 +102,6 @@ public class CompaniesModuleArchitectureTests
             $"Column names must be snake_case. Violations: {string.Join(", ", violations)}");
     }
 
-    // ── OBT-REM-07: ProcessedStripeEvent entity ──────────────────────────
 
     private static Type ProcessedStripeEventType => ModuleAssembly
         .GetTypes()

@@ -41,7 +41,6 @@ internal sealed class Endpoint(
 
         var now = clock.UtcNow;
 
-        // Cancel any existing pending invites for this employee
         var existing = await db.UserInvites
             .Where(i => i.EmployeeId == req.EmployeeId && i.ClaimedAt == null)
             .ToListAsync(ct);
@@ -61,8 +60,6 @@ internal sealed class Endpoint(
 
         if (!emailSent)
         {
-            // CodeQL #61: the recipient address is never logged; the employee, company and invite
-            // ids identify the failed delivery without exposing personal data.
             logger.LogWarning(
                 "Invitation email could not be sent. EmployeeId={EmployeeId} CompanyId={CompanyId} InviteId={InviteId}",
                 req.EmployeeId,

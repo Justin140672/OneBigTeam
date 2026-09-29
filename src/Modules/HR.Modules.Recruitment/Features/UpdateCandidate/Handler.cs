@@ -31,9 +31,6 @@ internal sealed class UpdateCandidateHandler(RecruitmentDbContext db, IClock clo
         var newNormalisedEmail = CandidateEmail.Normalise(newEmail);
         var duplicateEmailError = Error.Conflict($"A candidate with email '{newEmail}' already exists in this company.");
 
-        // Uniqueness is on the normalised email (see CandidateEmailUniqueness), so a case-only change
-        // to this candidate's own email is never a conflict, and another candidate differing only in
-        // case/whitespace always is.
         if (!string.Equals(candidate.NormalisedEmail, newNormalisedEmail, StringComparison.Ordinal))
         {
             var existing = await CandidateEmailUniqueness.FindExistingAsync(
@@ -71,7 +68,6 @@ internal sealed class UpdateCandidateHandler(RecruitmentDbContext db, IClock clo
         }
         catch (DbUpdateException ex) when (CandidateEmailUniqueness.IsViolation(ex))
         {
-            // Final safeguard: another writer claimed the new email after the check above.
             return Result.Failure<UpdateCandidateResponse>(duplicateEmailError);
         }
 

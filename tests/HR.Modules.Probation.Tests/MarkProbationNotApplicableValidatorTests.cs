@@ -100,7 +100,6 @@ public class MarkProbationNotApplicableValidatorTests
         Assert.True(result.IsValid);
     }
 
-    // -------- Conditional "required together" rules: partial supply of Manager/Start/End --------
 
     [Fact]
     public async Task Only_ManagerEmployeeId_Supplied_Fails_Validation_For_StartDate_And_ExpectedEndDate()

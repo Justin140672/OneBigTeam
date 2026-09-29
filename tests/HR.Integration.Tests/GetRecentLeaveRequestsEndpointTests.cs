@@ -22,9 +22,6 @@ public class GetRecentLeaveRequestsEndpointTests
     {
         _factory = factory;
 
-        // The existing tests in this file exercise the company-wide, all-statuses view that
-        // predates viewer scoping — seed UserId as HR Administrator so that behavior is preserved
-        // (mirrors AuditHistoryIntegrationTests/GetTeamTasksEndpointTests constructors).
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.HrAdministrator);
@@ -109,7 +106,6 @@ public class GetRecentLeaveRequestsEndpointTests
         Assert.NotNull(payload);
         Assert.Equal(10, payload!.Items.Count);
         Assert.True(payload.Items.SequenceEqual(payload.Items.OrderByDescending(i => i.CreatedAt)));
-        // The 10 most recently created requests are indices 0..9 (smallest AddDays offset).
         Assert.Equal(createdIds.Take(10).ToHashSet(), payload.Items.Select(i => i.LeaveRequestId).ToHashSet());
     }
 
@@ -174,7 +170,6 @@ public class GetRecentLeaveRequestsEndpointTests
         Assert.Empty(payload!.Items);
     }
 
-    // ── Manager scoping ────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_RecentLeaveRequests_Manager_Sees_Only_Direct_Reports_Pending_Requests()
@@ -211,8 +206,6 @@ public class GetRecentLeaveRequestsEndpointTests
     [Fact]
     public async Task Get_RecentLeaveRequests_Manager_Sees_Indirect_Reports_Pending_Requests()
     {
-        // DSH-02: a manager's non-HR dashboard scope is their entire reporting sub-tree, so a
-        // skip-level manager sees a pending request from an indirect report.
         var companyId = Guid.NewGuid();
         using var hrAdminClient = await AuthenticatedClient(companyId);
 
@@ -249,9 +242,6 @@ public class GetRecentLeaveRequestsEndpointTests
         var leaveTypeId = await SeedLeaveTypeAsync(companyId);
 
         await SeedLeaveRequestAsync(companyId, employeeAId, leaveTypeId, Now);
-        // Approved but not yet started, so it's still expected to show — see
-        // Get_RecentLeaveRequests_HrAdministrator_Hides_Approved_Requests_Once_Started for the
-        // other side of this rule.
         var today = DateOnly.FromDateTime(Now.UtcDateTime);
         var approvedId = await SeedLeaveRequestAsync(
             companyId, employeeBId, leaveTypeId, Now.AddDays(-1),
@@ -266,17 +256,10 @@ public class GetRecentLeaveRequestsEndpointTests
         Assert.Equal(2, payload!.Items.Count);
     }
 
-    // ── TaskId for a genuinely-submitted request ──────────────────────────────────
 
     [Fact]
     public async Task Get_RecentLeaveRequests_HrAdministrator_Sees_TaskId_For_Pending_Request_With_Open_Task()
     {
-        // Unlike SeedLeaveRequestAsync (writes LeaveRequest rows directly to the DbContext, which
-        // never fires LeaveRequestedIntegrationEvent and so never creates a real task), this goes
-        // through the actual submit-leave-request endpoint — the same path LeaveSubmittedCreatesTaskTests
-        // uses — so the leave-approval task genuinely exists via LeaveRequestedHandler, the same way
-        // it would for a real user. Regression coverage for: an HR administrator's dashboard widget
-        // failing to open the task dialog for a still-pending request.
         var companyId = Guid.NewGuid();
         using var client = await AuthenticatedClient(companyId);
 
@@ -336,9 +319,6 @@ public class GetRecentLeaveRequestsEndpointTests
     [Fact]
     public async Task Get_RecentLeaveRequests_HrAdministrator_Sees_TaskId_For_Pending_Request_With_No_Manager()
     {
-        // Same as the sibling test above, but the requesting employee has no manager assigned —
-        // checking whether TaskCreator still creates an (unassigned) open task in that case, since
-        // that's the one variable the reported "clicking doesn't show the task" bug could hinge on.
         var companyId = Guid.NewGuid();
         using var client = await AuthenticatedClient(companyId);
 

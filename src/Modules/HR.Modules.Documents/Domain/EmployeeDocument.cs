@@ -15,9 +15,6 @@ internal sealed class EmployeeDocument
     public DateTimeOffset? ExpiringSoonNotifiedAt { get; private set; }
     public DateTimeOffset? ExpiredNotifiedAt { get; private set; }
 
-    // DOC-03: three independent, one-shot reminder stages fired as the expiry date approaches.
-    // Each is set once (when the corresponding day-threshold is first crossed by the daily job)
-    // and never re-set unless UpdateExpiryDate restarts the schedule against a new expiry date.
     public DateTimeOffset? ExpiryReminder90SentAt { get; private set; }
     public DateTimeOffset? ExpiryReminder30SentAt { get; private set; }
     public DateTimeOffset? ExpiryReminder7SentAt { get; private set; }
@@ -25,14 +22,6 @@ internal sealed class EmployeeDocument
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    // DOC-04: recoverable soft-delete/archive state. Normal deletion (DeleteEmployeeDocument)
-    // now archives instead of hard-deleting; ArchivedBy/ArchivedAt/ArchiveReason are a permanent
-    // record of who archived, when and why — the same "never overwritten by later edits"
-    // convention as SharedCompanyDocument.ArchivedBy/ArchivedAt/ArchiveReason. RestoredBy/
-    // RestoredAt capture the most recent restore for symmetry with the acceptance criteria
-    // ("archive and restore capture actor, timestamp and reason where applicable") — full
-    // archive/restore history lives in the audit trail (EmployeeDocumentArchivedAuditEvent /
-    // EmployeeDocumentRestoredAuditEvent), these fields just reflect current/most-recent state.
     public bool IsArchived { get; private set; }
     public Guid? ArchivedByUserId { get; private set; }
     public DateTimeOffset? ArchivedAt { get; private set; }
@@ -40,17 +29,6 @@ internal sealed class EmployeeDocument
     public Guid? RestoredByUserId { get; private set; }
     public DateTimeOffset? RestoredAt { get; private set; }
 
-    // DOC-05: version lineage. PreviousVersionId links a replacement upload back to the
-    // EmployeeDocument row it supersedes (null for the first version of a lineage).
-    // IsLatestVersion is a persisted flag (per the standing "prefer a real column over a
-    // computed property" preference) rather than derived by absence of a "next version" FK,
-    // because deriving it would require either a reverse-navigation query per row or a
-    // NextVersionId column maintained on the OLD row at the moment a new version is created —
-    // this is simpler and lets normal list/get queries filter with a single indexed boolean.
-    // A new version never mutates or archives the row it replaces; the old row stays exactly as
-    // it was (IsArchived unchanged, its own audit trail untouched) with only IsLatestVersion
-    // flipped to false, so "previous versions remain immutable and available" holds by
-    // construction — nothing about the previous row's content ever changes here.
     public Guid? PreviousVersionId { get; private set; }
     public bool IsLatestVersion { get; private set; }
 
@@ -118,12 +96,6 @@ internal sealed class EmployeeDocument
         UpdatedAt         = now;
     }
 
-    /// <summary>
-    /// DOC-03: marks the given upcoming-expiry reminder stage as sent. Each stage is independent
-    /// and idempotent — calling this again for a stage that has already fired is a safe no-op at
-    /// the call site (callers should check the corresponding *SentAt property first), and the
-    /// value is never overwritten once set except via <see cref="UpdateExpiryDate"/>.
-    /// </summary>
     public void MarkExpiryReminderSent(ExpiryReminderStage stage, DateTimeOffset now)
     {
         switch (stage)
@@ -144,13 +116,6 @@ internal sealed class EmployeeDocument
         UpdatedAt = now;
     }
 
-    /// <summary>
-    /// DOC-03: updates the tracked expiry date and resets all reminder state (the three upcoming
-    /// -expiry stages plus the legacy expiring-soon/expired flags) so the notification schedule
-    /// restarts cleanly against the new date. Callers must always go through this method rather
-    /// than setting ExpiryDate directly, so the reset can never be forgotten at a future call
-    /// site (e.g. a document re-issue/edit handler).
-    /// </summary>
     public void UpdateExpiryDate(DateOnly? newExpiryDate, DateTimeOffset now)
     {
         ExpiryDate = newExpiryDate;
@@ -164,14 +129,6 @@ internal sealed class EmployeeDocument
         UpdatedAt = now;
     }
 
-    /// <summary>
-    /// DOC-04: recoverable soft-delete. Replaces the previous hard-delete behaviour of
-    /// DeleteEmployeeDocumentHandler — no database row is removed and no stored file is deleted;
-    /// the record simply becomes excluded from normal list/get/download queries until restored.
-    /// Reason is optional (the acceptance criteria says "capture actor, timestamp and reason
-    /// where applicable" — a caller may not always supply one), matching DeleteEmployeeDocument's
-    /// existing request shape which never required a reason before this ticket.
-    /// </summary>
     public void Archive(Guid archivedBy, string? reason, DateTimeOffset now)
     {
         IsArchived       = true;

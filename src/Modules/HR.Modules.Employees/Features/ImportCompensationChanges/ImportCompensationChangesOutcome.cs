@@ -7,11 +7,6 @@ internal enum ImportCompensationOutcomeType
     ValidationFailed
 }
 
-/// <summary>
-/// The Result&lt;T&gt; pattern used elsewhere in this codebase carries a single Error message,
-/// which isn't expressive enough for "return every row-level error found in the file" — so this
-/// import handler returns a small dedicated outcome type instead of Result&lt;T&gt;.
-/// </summary>
 internal sealed record ImportCompensationChangesOutcome(
     ImportCompensationOutcomeType Type,
     ImportCompensationChangesResponse? Response,

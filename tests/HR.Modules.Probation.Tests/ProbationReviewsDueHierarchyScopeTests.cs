@@ -8,13 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Probation.Tests;
 
-/// <summary>
-/// DSH-02: the Probation Reviews Due and Overdue Probation Reviews workload providers scope a
-/// manager caller to their entire reporting sub-tree (direct and indirect reports) via
-/// <c>GetAllDescendantIdsAsync</c>; HR administrators keep the company-wide view. A peer /
-/// unrelated manager's reviews are excluded. See
-/// specifications/architecture/11-manager-hierarchy-scope.md.
-/// </summary>
 public class ProbationReviewsDueHierarchyScopeTests
 {
     private static readonly DateOnly Today = new(2026, 7, 29);

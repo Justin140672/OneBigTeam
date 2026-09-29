@@ -51,12 +51,8 @@
 }
 
 @code {
-    // Guarded like CompanyEdit.razor: URL-typing into this dashboard without the
-    // HR Administrator role bounces to MyProfileUrl. The switcher/redirect only pick a default.
     private bool _ready;
 
-    // DSH-07: child widgets self-contain their own failure/retry messaging, so a simple
-    // load-complete announcement is enough here.
     private string? _announcement;
 
     protected override async Task OnInitializedAsync()

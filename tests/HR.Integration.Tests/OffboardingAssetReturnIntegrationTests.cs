@@ -4,11 +4,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-// OFF-04: integrates the Assets lifecycle with offboarding — completing an offboarding asset-return
-// checklist item (via the Tasks module's generic /complete endpoint) must actually return the real
-// Assets-module assignment, an outstanding/unresolved asset-return task must keep blocking plan
-// completion, and cancelling the offboarding plan (via leaving-process cancellation) must never touch
-// the underlying asset assignment.
 [Collection("Integration")]
 public class OffboardingAssetReturnIntegrationTests
 {
@@ -69,7 +64,6 @@ public class OffboardingAssetReturnIntegrationTests
         return (asset.Id, assignment!.Id);
     }
 
-    // Relative to "today" so this test never becomes "backdated" as time passes.
     private static readonly DateOnly LeavingDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
     private static readonly DateOnly LastWorkingDay = LeavingDate.AddDays(-1);
 
@@ -89,10 +83,6 @@ public class OffboardingAssetReturnIntegrationTests
         response.EnsureSuccessStatusCode();
     }
 
-    // Manager-checklist and document-review tasks are created unassigned (no manager set up in
-    // these tests) and surface via /tasks/unassigned, but the asset-return task is created with
-    // AssignedEmployeeId == the employee being offboarded (see StartOffboardingHandler.
-    // CreateAssetReturnTasksAsync) and therefore only shows up via the employee's own task list.
     private static async Task<Guid> FindTaskItemIdBySourceEntityAsync(
         HttpClient client, Guid companyId, Guid employeeId, Guid sourceEntityId)
     {
@@ -202,7 +192,6 @@ public class OffboardingAssetReturnIntegrationTests
         var overviewStillOpen = await GetOverviewAsync(client, companyId, employeeId);
         Assert.Equal("InProgress", overviewStillOpen.PlanStatus);
 
-        // Now resolve the last outstanding task — the plan must complete.
         var assetTaskItemId = await FindTaskItemIdBySourceEntityAsync(client, companyId, employeeId, assetReturnTask.Id);
         var completeAssetResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/tasks/{assetTaskItemId}/complete",
@@ -235,13 +224,8 @@ public class OffboardingAssetReturnIntegrationTests
         var overviewAfter = await GetOverviewAsync(client, companyId, employeeId);
         Assert.Equal("Cancelled", overviewAfter.PlanStatus);
         var assetReturnTaskAfter = Assert.Single(overviewAfter.Tasks, t => t.Id == assetReturnTask.Id);
-        // OffboardingTask.CancelBecauseLeavingProcessCancelled (see "Unify Leaving and Offboarding
-        // into one employee workspace") reports a distinct "Cancelled" status for tasks resolved by
-        // a withdrawn leaving process, separate from "Skipped".
         Assert.Equal("Cancelled", assetReturnTaskAfter.Status);
 
-        // The core assertion: the underlying Assets-module assignment must be completely untouched —
-        // still assigned/active, not silently returned as a side effect of cancellation.
         var assetAfter = await client.GetFromJsonAsync<AssetPayload>($"/api/companies/{companyId}/assets/{assetId}");
         Assert.Equal("Assigned", assetAfter!.Status);
 

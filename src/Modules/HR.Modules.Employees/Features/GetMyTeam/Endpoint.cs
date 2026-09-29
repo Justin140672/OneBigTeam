@@ -14,10 +14,6 @@ internal sealed class Endpoint(GetMyTeamHandler handler, ICurrentUser currentUse
 
     public override async Task HandleAsync(GetMyTeamRequest request, CancellationToken cancellationToken)
     {
-        // Self-scoped by the caller's own resolved user id (== Employee.Id, same convention as
-        // GetMyEmployee / GetMyOnboardingStatus / GetMyProbationStatus) — no role check needed
-        // since a non-manager simply gets an empty team back. NOT User.FindFirst("sub"): see
-        // GetMyEmployee/Endpoint.cs for why the raw Supabase claim is wrong here.
         if (currentUser.UserId is not { } managerId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());

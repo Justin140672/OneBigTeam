@@ -200,7 +200,6 @@ public class TaskItemTests
         Assert.Equal(later, task.UpdatedAt);
     }
 
-    // OFF-02
     [Fact]
     public void Reschedule_Updates_DueDate_And_UpdatedAt_When_Date_Changes()
     {

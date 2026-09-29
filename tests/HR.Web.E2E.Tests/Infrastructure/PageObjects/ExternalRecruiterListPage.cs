@@ -3,16 +3,8 @@ using HR.Web.E2E.Tests.Infrastructure;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the External Recruiter admin list page
-/// (/companies/{companyId}/external-recruiters, ExternalRecruiterList.razor). Follows the same
-/// SearchPageBase-driven grid/toolbar conventions as EmploymentTypeListPage — a row must be
-/// selected before the "Activate"/"Deactivate" toolbar buttons act on it.
-/// </summary>
 public sealed class ExternalRecruiterListPage(IPage page, string baseUrl)
 {
-    // ".e-grid" alone doesn't prove rows are queryable — see EmploymentTypeListPage's identical
-    // reasoning; Syncfusion's EJ2 grid populates rows on its own JS tick after Blazor mounts.
     private const string RowsRenderedSelector = ".e-grid .e-row, .e-grid .e-emptyrow, .alert-danger";
 
     public async Task GoToAsync(Guid companyId)
@@ -23,11 +15,6 @@ public sealed class ExternalRecruiterListPage(IPage page, string baseUrl)
 
     public async Task ClickNewAsync()
     {
-        // The "Add" toolbar button is part of the Syncfusion grid toolbar, whose @onclick handler is
-        // wired over a separate SignalR render pass after the grid rows first paint (GoToAsync only
-        // waits for the rows). A click dispatched before that handler is attached is silently lost
-        // and no navigation happens — the bare single click then times out at 30s. Wait for the
-        // button to be actionable, and if the URL hasn't changed shortly after, click once more.
         var addButton = page.GetByRole(AriaRole.Button, new() { Name = "Add" });
         await addButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
 
@@ -41,7 +28,6 @@ public sealed class ExternalRecruiterListPage(IPage page, string baseUrl)
             }
             catch (TimeoutException) when (attempt < 2)
             {
-                // Circuit wasn't ready for that click — retry.
             }
         }
 
@@ -75,9 +61,6 @@ public sealed class ExternalRecruiterListPage(IPage page, string baseUrl)
         var btn = page.GetByRole(AriaRole.Button, new() { Name = "Deactivate" });
         await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await btn.ClickAsync();
-        // Opens a confirmation dialog (HrConfirmDialog) rather than deactivating immediately —
-        // scoped to the dialog since its own confirm button shares the "Deactivate" label with
-        // the toolbar button just clicked above.
         var confirmButton = page.GetByRole(AriaRole.Dialog).GetByRole(AriaRole.Button, new() { Name = "Deactivate", Exact = true });
         await confirmButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await confirmButton.ClickAsync();
@@ -89,9 +72,6 @@ public sealed class ExternalRecruiterListPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
         await Row(agencyNameFragment).ClickAsync();
-        // Exact = true: Playwright's accessible-name matching is substring-based by default, and
-        // "Activate" is a substring of "Deactivate" — without this the locator resolves to both
-        // toolbar buttons (strict-mode violation) whenever a Deactivate button is also present.
         var btn = page.GetByRole(AriaRole.Button, new() { Name = "Activate", Exact = true });
         await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await btn.ClickAsync();
@@ -104,7 +84,6 @@ public sealed class ExternalRecruiterListPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 
-    /// <summary>Clicks the given recruiter's agency-name link, navigating to its view/edit page.</summary>
     public async Task ClickRecruiterAsync(string agencyNameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });

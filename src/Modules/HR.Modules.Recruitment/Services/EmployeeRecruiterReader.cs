@@ -17,10 +17,6 @@ internal sealed class EmployeeRecruiterReader(RecruitmentDbContext dbContext, IE
         if (ids.Count == 0)
             return new Dictionary<Guid, string>();
 
-        // Candidate.EmployeeId is set by HireCandidateHandler when hiring; join through to the
-        // Vacancy that was hired into for its assigned recruiter/hiring manager. An employee may
-        // have more than one Application historically (rare) — take the one tied to the
-        // candidate row that actually links to them, there is exactly one per hired candidate.
         var hires = await dbContext.Candidates
             .AsNoTracking()
             .Where(c => c.CompanyId == companyId && c.EmployeeId != null && ids.Contains(c.EmployeeId!.Value))

@@ -9,11 +9,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Features.CreateLeaveRequestDraft;
 
-// LEAVE-07: creating a draft never touches LeaveBalance/ToilTransaction, never creates a Tasks
-// approval task and never publishes a notification or integration event - it is purely a saved,
-// editable, not-yet-submitted leave request owned by the employee. Only field-level validation
-// applies (see CreateLeaveRequestDraftValidator); business checks (cross-year, balance, conflicts)
-// are deferred to submission.
 internal sealed class CreateLeaveRequestDraftHandler(
     LeaveDbContext dbContext,
     IClock clock,
@@ -72,7 +67,6 @@ internal sealed class CreateLeaveRequestDraftHandler(
             publicHolidayDates = holidays.Select(h => h.Date).ToList();
         }
 
-        // Computed for display only - not a blocking check, unlike SubmitLeaveRequestHandler.
         var totalDays = LeaveCalculator.CalculateTotalDays(
             request.StartDate, request.StartPart, request.EndDate, request.EndPart, workingPattern, publicHolidayDates);
 

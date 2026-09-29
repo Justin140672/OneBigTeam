@@ -5,13 +5,6 @@ using HR.SharedKernel.Html;
 
 namespace HR.SharedKernel.Tests;
 
-/// <summary>
-/// P1 "Prevent stored XSS in administrator support conversations": the shared allow-list used
-/// before persistence and at render time in HR.Web and HR.Admin.Web. Malicious cases are asserted
-/// STRUCTURALLY (the output is re-parsed as HTML and every element/attribute/href is checked
-/// against the allow-list) rather than by substring alone, so a payload that survives in a
-/// differently-spelled form still fails the test.
-/// </summary>
 public class SupportHtmlSanitizerTests
 {
     [Theory]
@@ -120,22 +113,15 @@ public class SupportHtmlSanitizerTests
         Assert.DoesNotContain("<script", result, StringComparison.OrdinalIgnoreCase);
     }
 
-    // ── Structural allow-list assertion ─────────────────────────────────────────────────────────
 
     private static readonly Regex SchemePrefix = new(@"^[a-zA-Z][a-zA-Z0-9+.\-]*:", RegexOptions.Compiled);
 
-    /// <summary>
-    /// Re-parses <paramref name="output"/> as HTML (the way a browser would when it is rendered as
-    /// raw markup) and asserts every element and attribute is on the allow-list and every href is
-    /// either relative or an allowed https:/mailto: URL.
-    /// </summary>
     private static void AssertStructurallySafe(string output)
     {
         var document = new HtmlParser().ParseDocument(output);
         var body = document.Body;
         Assert.NotNull(body);
 
-        // Nothing may be hoisted into <head> either (e.g. <base>, <meta>, <link>, <style>).
         Assert.Empty(document.Head!.Children);
 
         foreach (var element in body!.QuerySelectorAll("*"))
@@ -168,12 +154,10 @@ public class SupportHtmlSanitizerTests
 
     private static void AssertHrefIsSafe(string href, string output)
     {
-        // Browsers strip leading/trailing C0 control characters and spaces, and ignore embedded
-        // tab/newline characters, when resolving a URL scheme — normalise the same way.
         var normalised = new string(href.Trim().Where(c => c is not ('\t' or '\n' or '\r')).ToArray());
 
         if (!SchemePrefix.IsMatch(normalised))
-            return; // relative URL (path, query or fragment)
+            return;
 
         Assert.True(
             normalised.StartsWith("https:", StringComparison.OrdinalIgnoreCase)
@@ -234,9 +218,6 @@ public class SupportHtmlSanitizerTests
     [InlineData("<textarea>alert(1)</textarea>")]
     public void Sanitize_discards_script_and_raw_text_element_content_entirely(string malicious)
     {
-        // Unlike harmless unlisted wrappers (whose visible text is kept), the content of script,
-        // raw-text and embedded-content elements is code/foreign markup, not reply text — it must
-        // be dropped, never surfaced as text.
         var result = SupportHtmlSanitizer.Sanitize(malicious);
 
         AssertStructurallySafe(result);
@@ -272,7 +253,7 @@ public class SupportHtmlSanitizerTests
         AssertStructurallySafe(result);
         Assert.Contains(">text<", result);
         Assert.DoesNotContain("alert", result, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("=", result); // no attribute of any kind survives on these elements
+        Assert.DoesNotContain("=", result);
     }
 
     [Fact]
@@ -305,11 +286,9 @@ public class SupportHtmlSanitizerTests
         var result = SupportHtmlSanitizer.Sanitize(malicious);
 
         AssertStructurallySafe(result);
-        // The dangerous href is removed entirely; with no href there is no forced rel/target either.
         Assert.Equal("<a>x</a>", result);
     }
 
-    // ── Malformed / mutation-XSS cases ───────────────────────────────────────────────────────────
 
     [Theory]
     [InlineData("<b>bold <i>and italic <script>bad")]
@@ -326,8 +305,6 @@ public class SupportHtmlSanitizerTests
 
         AssertStructurallySafe(result);
 
-        // The output must also remain safe after a second parse/serialise round trip (the browser
-        // re-parses whatever the page renders).
         AssertStructurallySafe(SupportHtmlSanitizer.Sanitize(result));
     }
 
@@ -353,7 +330,6 @@ public class SupportHtmlSanitizerTests
         Assert.Equal(input, SupportHtmlSanitizer.Sanitize(input));
     }
 
-    // ── Allowed / preserved content ──────────────────────────────────────────────────────────────
 
     [Theory]
     [InlineData("<p>para</p>")]
@@ -470,7 +446,6 @@ public class SupportHtmlSanitizerTests
         Assert.Equal(string.Empty, result);
     }
 
-    // ── Idempotency ──────────────────────────────────────────────────────────────────────────────
 
     public static TheoryData<string> IdempotencyInputs => new()
     {
@@ -504,7 +479,6 @@ public class SupportHtmlSanitizerTests
         AssertStructurallySafe(once);
     }
 
-    // ── Thread safety ────────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public void Sanitize_is_safe_to_call_concurrently_and_always_yields_the_same_result()

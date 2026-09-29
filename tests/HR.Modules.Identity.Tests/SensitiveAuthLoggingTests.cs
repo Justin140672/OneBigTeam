@@ -21,7 +21,6 @@ public class SensitiveAuthLoggingTests(IdentityDatabaseFixture fixture)
     private static readonly DateTime Now = new(2026, 8, 31, 12, 0, 0, DateTimeKind.Utc);
     private static readonly FakeClock Clock = new(Now);
 
-    // Representative token-shaped values — a JWT, an opaque refresh token and a recovery URL.
     private const string TokenShapedPassword = "eyJhbGciOiJIUzI1NiJ9.eyJwd2QiOiJzZWNyZXQifQ.sig-value-123";
     private const string RecoveryUrlWithToken =
         "https://proj.supabase.co/auth/v1/verify?token=pkce_9f8e7d6c5b4a3210deadbeef&type=recovery";

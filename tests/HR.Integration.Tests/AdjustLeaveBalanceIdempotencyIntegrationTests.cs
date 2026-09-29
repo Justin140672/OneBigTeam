@@ -43,13 +43,10 @@ public class AdjustLeaveBalanceIdempotencyIntegrationTests
         var idempotencyKey = Guid.NewGuid();
         var payload = AdjustmentPayload(companyId, employeeId, leaveTypeId, 2m, "Correction");
 
-        // First delivery: the mutation, idempotency record and audit outbox entry all commit.
         var first = await SendAdjustmentAsync(client, companyId, employeeId, payload, idempotencyKey);
         Assert.Equal(HttpStatusCode.Created, first.StatusCode);
         var firstBody = await first.Content.ReadFromJsonAsync<AdjustmentPayloadResponse>();
 
-        // Simulate losing that response and the caller (same unchanged request, same key) resending
-        // through a BRAND NEW HttpRequestMessage - not a re-read of the first response.
         var second = await SendAdjustmentAsync(client, companyId, employeeId, payload, idempotencyKey);
         Assert.Equal(HttpStatusCode.Created, second.StatusCode);
         var secondBody = await second.Content.ReadFromJsonAsync<AdjustmentPayloadResponse>();
@@ -57,15 +54,12 @@ public class AdjustLeaveBalanceIdempotencyIntegrationTests
         Assert.Equal(firstBody!.AdjustmentId, secondBody!.AdjustmentId);
         Assert.Equal(firstBody.NewRemainingHours, secondBody.NewRemainingHours);
 
-        // Verify via a FRESH scope/DbContext (not any tracked entity from the calls above) that the
-        // balance changed exactly once, one adjustment row exists, one idempotency record exists in
-        // the correct scope, and one audit outbox entry exists.
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
 
         var balance = await db.LeaveBalances.SingleAsync(
             b => b.CompanyId == companyId && b.EmployeeId == employeeId && b.LeaveTypeId == leaveTypeId);
-        Assert.Equal(27m, balance.RemainingDays); // 25 entitlement + 2 adjustment, applied ONCE
+        Assert.Equal(27m, balance.RemainingDays);
 
         Assert.Single(await db.LeaveBalanceAdjustments
             .Where(a => a.CompanyId == companyId && a.EmployeeId == employeeId).ToListAsync());
@@ -107,7 +101,7 @@ public class AdjustLeaveBalanceIdempotencyIntegrationTests
         var db = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
         var balance = await db.LeaveBalances.SingleAsync(
             b => b.CompanyId == companyId && b.EmployeeId == employeeId && b.LeaveTypeId == leaveTypeId);
-        Assert.Equal(27m, balance.RemainingDays); // only the first (2-day) adjustment applied
+        Assert.Equal(27m, balance.RemainingDays);
         Assert.Single(await db.LeaveBalanceAdjustments
             .Where(a => a.CompanyId == companyId && a.EmployeeId == employeeId).ToListAsync());
     }
@@ -152,9 +146,6 @@ public class AdjustLeaveBalanceIdempotencyIntegrationTests
         var response = await SendAdjustmentAsync(client, companyId, employeeId, payload, idempotencyKey);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        // The handler's own inline dispatch (immediately after commit, via the real publisher)
-        // already delivered this successfully - rewind it to "never delivered" so the failure
-        // scenario below exercises genuine recovery rather than a no-op on an already-empty batch.
         using (var rewindScope = _factory.Services.CreateScope())
         {
             var db = rewindScope.ServiceProvider.GetRequiredService<LeaveDbContext>();
@@ -166,8 +157,6 @@ public class AdjustLeaveBalanceIdempotencyIntegrationTests
             await db.SaveChangesAsync();
         }
 
-        // Run the dispatcher with a publisher that always fails - via a fresh scope/DbContext, so
-        // this proves database durability rather than tracked-entity behaviour.
         using (var failScope = _factory.Services.CreateScope())
         {
             var db = failScope.ServiceProvider.GetRequiredService<LeaveDbContext>();
@@ -186,15 +175,10 @@ public class AdjustLeaveBalanceIdempotencyIntegrationTests
             Assert.NotNull(entry.NextAttemptAt);
             Assert.False(entry.IsTerminallyFailed);
 
-            // The mutation itself must remain single despite the audit failure.
             Assert.Single(await db.LeaveBalanceAdjustments
                 .Where(a => a.CompanyId == companyId && a.EmployeeId == employeeId).ToListAsync());
         }
 
-        // Now let delivery succeed, ignoring the backoff (NextAttemptAt) by passing "now" far
-        // enough in the future - the dispatcher only cares that now >= NextAttemptAt. This batch
-        // may also pick up other tests' pending rows (the outbox table is shared across this whole
-        // collection's Postgres fixture), so isolate on CompanyId - not a global publish count.
         var publishedCompanyIds = new List<Guid>();
         using (var successScope = _factory.Services.CreateScope())
         {
@@ -209,7 +193,6 @@ public class AdjustLeaveBalanceIdempotencyIntegrationTests
                 NullLogger.Instance, CancellationToken.None);
         }
 
-        // Published exactly once for THIS test's own company in this pass.
         Assert.Single(publishedCompanyIds, id => id == companyId);
 
         using (var finalScope = _factory.Services.CreateScope())
@@ -228,7 +211,6 @@ public class AdjustLeaveBalanceIdempotencyIntegrationTests
         }
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────────────
 
     private static Task<HttpResponseMessage> SendAdjustmentAsync(
         HttpClient client, Guid companyId, Guid employeeId, object payload, Guid idempotencyKey)

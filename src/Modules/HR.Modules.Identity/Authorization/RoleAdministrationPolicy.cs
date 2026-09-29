@@ -26,8 +26,6 @@ internal static class RoleAdministrationPolicy
     private static readonly IReadOnlyDictionary<Guid, IReadOnlySet<Guid>> AdministrableRolesByHeldRole =
         new Dictionary<Guid, IReadOnlySet<Guid>>
         {
-            // Company Administrator administers the general workforce roles plus its own role,
-            // but never HR Administrator.
             [SystemRoles.CompanyAdministrator] = new HashSet<Guid>
             {
                 SystemRoles.Employee,
@@ -36,8 +34,6 @@ internal static class RoleAdministrationPolicy
                 SystemRoles.CompanyAdministrator,
             },
 
-            // HR Administrator administers the general workforce roles plus its own role, but
-            // never Company Administrator.
             [SystemRoles.HrAdministrator] = new HashSet<Guid>
             {
                 SystemRoles.Employee,
@@ -47,10 +43,6 @@ internal static class RoleAdministrationPolicy
             },
         };
 
-    /// <summary>
-    /// Roles the actor is permitted to add or remove on any target user (including themselves),
-    /// given the full set of the actor's own effective roles.
-    /// </summary>
     public static IReadOnlySet<Guid> GetAdministrableRoles(IReadOnlySet<Guid> actorEffectiveRoles)
     {
         var administrable = new HashSet<Guid>();
@@ -65,16 +57,8 @@ internal static class RoleAdministrationPolicy
         return administrable;
     }
 
-    /// <summary>
-    /// Roles that must always remain assigned to a user and can never be removed through the API —
-    /// currently just the mandatory Employee floor role that core session endpoints depend on.
-    /// </summary>
     public static bool IsMandatory(Guid roleId) => roleId == SystemRoles.Employee;
 
-    /// <summary>
-    /// Roles for which the platform enforces a "cannot remove the last active holder in the
-    /// company" lockout safeguard.
-    /// </summary>
     public static bool IsLockoutProtected(Guid roleId) =>
         roleId == SystemRoles.CompanyAdministrator || roleId == SystemRoles.HrAdministrator;
 }

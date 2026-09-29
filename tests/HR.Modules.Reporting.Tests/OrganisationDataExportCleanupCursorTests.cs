@@ -31,7 +31,6 @@ public class OrganisationDataExportCleanupCursorTests
         return export;
     }
 
-    // ----- DeferArtefactCleanup -----
 
     [Fact]
     public void DeferArtefactCleanup_From_Non_Terminal_Is_Conflict()
@@ -106,7 +105,6 @@ public class OrganisationDataExportCleanupCursorTests
         Assert.Equal("boom", export.FailureReason);
     }
 
-    // ----- MarkAttemptFilesCleaned cursor reset -----
 
     [Fact]
     public void MarkAttemptFilesCleaned_Resets_The_Deferred_Cleanup_Cursor()
@@ -125,7 +123,6 @@ public class OrganisationDataExportCleanupCursorTests
         Assert.Equal("boom", export.FailureReason);
     }
 
-    // ----- RecordLateUploadRecheck -----
 
     [Fact]
     public void RecordLateUploadRecheck_With_No_Completed_Cleanup_Is_Conflict()
@@ -145,7 +142,7 @@ public class OrganisationDataExportCleanupCursorTests
     {
         var export = FailedExport();
         export.MarkAttemptFilesCleaned(Now.AddDays(-5));
-        export.RecordLateUploadRecheck(succeeded: false, Now); // bump the failure count first
+        export.RecordLateUploadRecheck(succeeded: false, Now);
 
         var result = export.RecordLateUploadRecheck(succeeded: true, Now);
 
@@ -195,7 +192,7 @@ public class OrganisationDataExportCleanupCursorTests
     public void RecordLateUploadRecheck_Failure_Increments_Count_And_Backs_Off_Keeping_Cursor_Set()
     {
         var export = FailedExport();
-        export.MarkAttemptFilesCleaned(Now.AddDays(-20)); // already past the window
+        export.MarkAttemptFilesCleaned(Now.AddDays(-20));
 
         var first = export.RecordLateUploadRecheck(succeeded: false, Now);
         Assert.True(first.IsSuccess);

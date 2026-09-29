@@ -4,19 +4,8 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the employee list page (/companies/{companyId}/employees).
-/// </summary>
 public sealed class EmployeeListPage(IPage page, string baseUrl)
 {
-    /// <summary>
-    /// Builds a word-order-agnostic matcher for a "First Last" name fragment. EmployeeList.razor's
-    /// grid renders Last Name before First Name (see the GridColumns order), so a row/cell's text
-    /// reads "Bennett Laura ..." — a plain HasText substring match on "Laura Bennett" (First-Last
-    /// order) never matches. This requires every whitespace-separated word in
-    /// <paramref name="nameFragment"/> to appear somewhere in the target's text, in any order —
-    /// works whether given a single word (e.g. just a last name) or a full "First Last" name.
-    /// </summary>
     private static Regex NameMatcher(string nameFragment)
     {
         var words = nameFragment.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -24,53 +13,17 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         return new Regex(lookaheads, RegexOptions.Singleline);
     }
 
-    // Waiting for ".e-grid" alone is NOT sufficient to guarantee rows are queryable: Syncfusion's
-    // EJ2 grid does its own JS render pass to populate ".e-row"/".e-rowcell" into the DOM on a
-    // separate tick after the Blazor component itself has mounted. Waiting for the row selector
-    // (or its empty-state sibling) directly is the only wait that's actually tied to data being
-    // present — see the same pattern in VacancyListPage etc.
     private const string RowsRenderedSelector = ".e-grid .e-row, .e-grid .e-emptyrow";
 
     public async Task GoToAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees");
-        // Previously this tried to confirm the circuit had connected by watching for a
-        // spinner→grid transition via a MutationObserver installed with page.EvaluateAsync
-        // *after* navigation. That's a race: if Blazor's prerender→interactive spinner cycle
-        // finishes before the observer script gets installed (routine on a fast/local run),
-        // the transition is never observed, window._listReady never flips true, and the wait
-        // times out — which made most tests starting with GoToAsync fail. RowsRenderedSelector
-        // alone is sufficient and race-free: Syncfusion can only populate real ".e-row"/
-        // ".e-rowcell" data via its JS interop once the interactive circuit is connected and
-        // the component's data fetch has completed, so waiting for it already proves both.
-        // Same pattern as VacancyListPage/PublicHolidayListPage etc.
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 20_000 });
     }
 
     public async Task ClickNewEmployeeAsync()
     {
-        // Renamed from the generic "Add" to "Add employee" so the primary toolbar action reads
-        // unambiguously (see SearchPageBase.AddButtonText / EmployeeList.AddButtonText override).
-        //
-        // The button's own Disabled state (SearchPageBase's IsAddDisabled) is bound to
-        // Session.IsReadOnly, NOT to whether the click actually does anything — EmployeeList's
-        // GetAddUrl() separately gates on "_canCreateEmployee", set by its own independent async
-        // permission check (UserService.HasPermissionAsync) in OnInitializedAsync. GoToAsync above
-        // only waits for the grid's own rows to render, an unrelated async path — if the
-        // permission check hasn't resolved by the time this click fires, SearchPageBase's "hr-add"
-        // handler silently no-ops (GetAddUrl() returns null, nothing navigates, no error). Confirmed
-        // via a fully isolated single-test run still failing deterministically — not a load/timing
-        // flake, a genuine race between two independent OnInitializedAsync tasks that this page
-        // object's wait condition doesn't cover. Retry the click rather than trusting one attempt.
-        // Headless Chromium's slower JS interop/round-trip timing (documented at the top of this
-        // file's namespace and in DropDownSelector) can leave that permission check pending for
-        // noticeably longer than a headed run — widen both the attempt count and the per-attempt
-        // budget rather than assuming 5 short attempts always outlast the race.
         var button = page.GetByRole(AriaRole.Button, new() { Name = "Add employee" });
-        // On a cold server run the toolbar can take noticeably longer than Playwright's default
-        // actionability timeout to paint (first-hit JIT + circuit connect), so the very first
-        // ClickAsync below would otherwise fail outright "waiting for GetByRole(...Add employee)".
-        // Wait for the button to attach explicitly, with a budget that covers a cold start.
         await button.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 60_000 });
         const int maxAttempts = 8;
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
@@ -83,41 +36,20 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
             }
             catch (TimeoutException) when (attempt < maxAttempts)
             {
-                // Permission check likely still pending when we clicked — try again.
             }
         }
     }
 
-    /// <summary>
-    /// Returns true if an employee matching <paramref name="nameFragment"/> exists, searching for
-    /// it via the page's own search box rather than scanning whatever's on the current unfiltered
-    /// page. EmployeeList.razor loads an unfiltered page capped at 100 rows sorted by last name —
-    /// on this shared, long-lived E2E database that cap is easy to exceed, so a specific employee
-    /// (e.g. one a test just created) can silently fall outside it with no indication why. The
-    /// search box round-trips to the server (SearchPageBase.OnSearchChanged), so it finds the
-    /// employee regardless of how many others sort before them.
-    /// </summary>
     public async Task<bool> HasEmployeeAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
         var searchInput = page.GetByPlaceholder("Search by name, email or employee number");
         await searchInput.FillAsync(nameFragment);
-        // HrTextBox (SfTextBox) only raises ValueChanged on blur/change, not on the "input" event
-        // Playwright's FillAsync dispatches — without an explicit Enter/blur here,
-        // SearchPageBase.OnSearchChanged never actually fires and the grid silently keeps showing
-        // the unfiltered rows.
         await searchInput.PressAsync("Enter");
-        // OnSearchChanged debounces 300ms before reloading — wait past that, then for the grid to
-        // settle on the filtered result (row or empty state) rather than the pre-search rows.
         await page.WaitForTimeoutAsync(400);
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
-        // The search box already narrowed the grid server-side to rows matching nameFragment
-        // (name/email/employee number) — a single ".e-rowcell" can never contain a full "First
-        // Last" name anyway (Last Name and First Name are separate columns; see NameMatcher's
-        // doc comment), so just confirm at least one real data row came back rather than the
-        // empty-state row.
         return await page.Locator(".e-grid .e-row").CountAsync() > 0;
     }
 
@@ -130,29 +62,10 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         return names;
     }
 
-    /// <summary>
-    /// Checks the row-selection checkbox (GridColumn Type="CheckBox") for the employee whose row
-    /// contains <paramref name="nameFragment"/>. Clicking the Syncfusion checkbox's own wrapper
-    /// span (rather than the underlying hidden native input) mirrors a real user click and is the
-    /// documented way to toggle a grid checkbox column.
-    /// </summary>
     public async Task CheckEmployeeRowAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
-        // The unfiltered page is capped at 100 rows sorted by last name (same reasoning as
-        // HasEmployeeAsync/GetUserAccountStatusTextAsync above) — a just-created employee (e.g.
-        // BulkEmployeeInvitationTests' freshly-created candidates) can easily fall outside that cap
-        // on this shared, long-lived E2E database, leaving the row locator below waiting forever
-        // for a row that's never going to render (surfacing downstream as an unrelated-looking
-        // timeout/retry cascade). Unlike the other helpers below, this one is also used to check
-        // MULTIPLE distinct rows in sequence after the caller already ran its own SearchAsync (e.g.
-        // MultiRowSelection_ShowsCorrectCountOnUpdateSelectedButton, which searches once for a
-        // shared name prefix then checks two different rows within that result set) — always
-        // re-searching by this call's own single nameFragment would narrow the grid down to just
-        // that one row and drop the previously-checked row(s) out of the (reloaded, selection-
-        // resetting) result set entirely. So only fall back to searching when the row genuinely
-        // isn't present in whatever's currently rendered.
         var row = page.Locator(".e-grid .e-row").Filter(new() { HasTextRegex = NameMatcher(nameFragment) }).First;
         if (await row.CountAsync() == 0)
         {
@@ -165,44 +78,17 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
 
         await checkbox.ClickAsync();
 
-        // The click itself only updates Syncfusion's client-side checkbox state immediately —
-        // SelectedCount/_hasSelection and the "Update selected (N)" button text are updated by
-        // SearchPageBase.OnRowSelected/OnRowDeselected on the SERVER, over a Blazor Server
-        // round-trip that isn't guaranteed to have completed by the time ClickAsync returns. A
-        // caller checking a second row immediately after (e.g.
-        // MultiRowSelection_ShowsCorrectCountOnUpdateSelectedButton) can otherwise read a stale
-        // count from before this row's round-trip lands. Wait for the checkbox to actually flip
-        // (this method also backs UncheckEmployeeRowAsync, so the target state can be either way)
-        // as a proxy for that round-trip having landed.
         var deadline = DateTime.UtcNow.AddSeconds(5);
         while (await input.IsCheckedAsync() == wasChecked && DateTime.UtcNow < deadline)
             await page.WaitForTimeoutAsync(100);
     }
 
-    /// <summary>
-    /// Returns true if the "Bulk Update" dropdown's own "Selected Employees" menu item is
-    /// currently disabled (BulkUpdateMenu's HasSelection parameter, wired from EmployeeList's
-    /// _hasSelection) — not the dropdown button itself, which always stays enabled since its other
-    /// two items ("Import", "Download Template") don't require any row selection. Opens the
-    /// dropdown to inspect the item, then closes it again (Escape) so the grid is left as this
-    /// method found it.
-    /// </summary>
     public async Task<bool> IsBulkUpdateButtonDisabledAsync()
     {
-        // Renamed from "Bulk Update" to "Update selected" (optionally suffixed with the selected
-        // count, e.g. "Update selected (2)" — see BulkUpdateMenu.ButtonText). Playwright's Name
-        // matching is substring by default, so this still matches with or without the count.
         await page.GetByRole(AriaRole.Button, new() { Name = "Update selected" }).ClickAsync();
-        // Id-based, not role+name — matches ClickBulkUpdateAsync's own "#hr-bulk-selected" lookup
-        // just below, for the same reason (see that method's remarks: a just-rebuilt Items list can
-        // render a transient stale/empty popup that a role+name query can miss).
         var item = page.Locator("#hr-bulk-selected");
         await item.WaitForAsync(new() { Timeout = 10_000 });
 
-        // BulkUpdateMenu's HasSelection is wired from a separate async computation off the grid's
-        // checkbox state (see ClickBulkUpdateAsync's remarks) — poll briefly rather than reading a
-        // single instant snapshot, so a caller who just checked/unchecked a row an instant ago
-        // doesn't observe the menu's stale pre-update disabled state under headless timing.
         string? ariaDisabled = null;
         bool hasDisabledClass = false;
         var deadline = DateTime.UtcNow.AddSeconds(3);
@@ -218,9 +104,6 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         }
 
         await page.Keyboard.PressAsync("Escape");
-        // Leave the menu in a definitively-closed state — the very next caller
-        // (ClickBulkUpdateAsync) re-opens the same SfDropDownButton, and re-clicking its trigger
-        // while Syncfusion still thinks the popup is open just toggles it shut again.
         try
         {
             await page.Locator(".e-dropdown-popup").WaitForAsync(
@@ -245,15 +128,8 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     {
         var button = page.GetByRole(AriaRole.Button, new() { Name = "Update selected" });
         var popup = page.Locator(".e-dropdown-popup");
-        // Target the item by its stable DOM id rather than role+name — a just-rebuilt
-        // SfDropDownButton Items list (HasSelection flipped as the two rows were checked) can leave
-        // the popup rendering with a stale/empty item set for a beat, and #id resolves against
-        // whichever render eventually wins. See OpenBulkUpdateMenuItemAsync's remarks.
         var item = page.Locator("#hr-bulk-selected");
 
-        // Start from a definitively-closed menu: a re-click on an SfDropDownButton Syncfusion still
-        // considers open just toggles it shut, and the previous IsBulkUpdateButtonDisabledAsync
-        // call left it mid-close.
         if (await popup.IsVisibleAsync())
         {
             await page.Keyboard.PressAsync("Escape");
@@ -272,21 +148,11 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
             }
             catch (TimeoutException) when (attempt < 5)
             {
-                // Popup never opened (listener not bound yet) or opened with an empty/stale item
-                // list (Items rebuild race) — reset to closed and try again.
                 await page.Keyboard.PressAsync("Escape");
                 await page.WaitForTimeoutAsync(400);
             }
         }
 
-        // BulkUpdateMenu's HasSelection is set from EmployeeList's own _hasSelection, computed
-        // asynchronously off the grid's row-checkbox state — the menu popup itself can render (and
-        // this item paint) a tick before that computation catches up with a selection the test just
-        // made, leaving the item genuinely "e-disabled" for a brief window even though the caller
-        // has already selected rows. Wait for the disabled class to clear before clicking rather
-        // than racing it — clicking a still-disabled/still-settling item is what surfaces as
-        // Playwright's "<ul role='menu'> intercepts pointer events" (the disabled item's own
-        // pointer-events:none defers hit-testing to its parent).
         var deadline = DateTime.UtcNow.AddSeconds(5);
         while (DateTime.UtcNow < deadline)
         {
@@ -304,12 +170,9 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
             }
             catch (PlaywrightException) when (attempt < 3)
             {
-                // Menu/animation still settling — retry against the freshly re-resolved locator.
             }
         }
 
-        // The page now reports an empty selection instead of silently doing nothing — surface that
-        // as the failure reason rather than a bare dialog timeout.
         var dialog = page.Locator("[role='dialog'].bulk-compensation-update-dialog");
         var selectionError = page.Locator(".alert-danger").Filter(new() { HasText = "Select at least one employee" });
         await dialog.Or(selectionError).First.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
@@ -318,31 +181,18 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
                 "Bulk update did not open: the employee grid had no selected rows when 'Selected Employees' was clicked.");
     }
 
-    /// <summary>
-    /// The page's own success banner (_actionSuccess), shown after a bulk update dialog applies
-    /// successfully and closes (see EmployeeList.HandleBulkUpdateApplied).
-    /// </summary>
     public async Task<string?> GetActionSuccessMessageAsync()
     {
         var banner = page.Locator(".alert-success");
         return await banner.WaitUntilVisibleAsync() ? (await banner.TextContentAsync())?.Trim() : null;
     }
 
-    /// <summary>
-    /// The page's own error banner (_actionError), e.g. shown if downloading the compensation
-    /// import template fails.
-    /// </summary>
     public async Task<string?> GetActionErrorMessageAsync()
     {
         var banner = page.Locator(".alert-danger");
         return await banner.WaitUntilVisibleAsync() ? (await banner.TextContentAsync())?.Trim() : null;
     }
 
-    /// <summary>
-    /// Opens the "Bulk Update" toolbar dropdown (BulkUpdateMenu) and clicks "Download Template",
-    /// triggering a browser download of the compensation import template — mirrors
-    /// BulkCompensationUpdatePage.ClickDownloadTemplateAsync for the full-page equivalent.
-    /// </summary>
     public async Task<string> ClickDownloadTemplateAsync()
     {
         var downloadTask = page.WaitForDownloadAsync();
@@ -351,11 +201,6 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         return download.SuggestedFilename;
     }
 
-    /// <summary>
-    /// Opens the "Bulk Update" toolbar dropdown and clicks "Import", reaching
-    /// BulkCompensationImportDialog (identified by its own CssClass,
-    /// "bulk-compensation-import-dialog") for the Import from Excel flow.
-    /// </summary>
     public async Task ClickBulkImportAsync()
     {
         await OpenBulkUpdateMenuItemAsync("hr-bulk-import");
@@ -364,32 +209,6 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
             new() { Timeout = 15_000 });
     }
 
-    /// <summary>
-    /// Clicks the "Bulk Update" toolbar button (BulkUpdateMenu.razor's SfDropDownButton) and then
-    /// the named menu item within the popup it opens, targeted by <paramref name="itemId"/> — the
-    /// item's own DropDownMenuItem.Id (e.g. "hr-bulk-import", "hr-bulk-download-template",
-    /// "hr-bulk-selected" — see BulkUpdateMenu.razor's BuildItems), which Syncfusion renders as the
-    /// real "id" HTML attribute on the item's own &lt;li&gt;. Previously targeted by accessible
-    /// role+name instead, scoped to the ".e-dropdown-popup" container that was just confirmed
-    /// open — but EmployeeList.razor's toolbar also mounts a second SfDropDownButton (ExportMenu),
-    /// each with its own ".e-dropdown-popup", and that scoping still couldn't reliably prove which
-    /// popup instance was actually open when more than one such container exists in the DOM
-    /// (Syncfusion popups are commonly pre-rendered closed, not lazily created on first open) —
-    /// observed as "Import" never becoming visible even though its popup and item genuinely exist.
-    /// An id is unique across the whole document by definition, so targeting it directly sidesteps
-    /// the ambiguity entirely rather than needing to first prove which popup is which.
-    ///
-    /// A single click on a just-mounted SfDropDownButton can land before Syncfusion's JS interop
-    /// has attached its click listener — the click is silently swallowed, no popup ever opens, and
-    /// the follow-up item click then waits the full default timeout for an item that will never
-    /// appear (same class of race DropDownSelector.SelectAsync guards against for SfDropDownList
-    /// combo boxes). Retries the button click a few times, but only when the popup itself never
-    /// opened at all — checked via its own ".e-dropdown-popup" container rather than the specific
-    /// item, since re-clicking the trigger while the popup IS already open toggles a
-    /// SfDropDownButton closed again (unlike SfDropDownList's combobox, which stays open on a
-    /// same-target re-click) — retrying past that point would just flap the menu open/closed and
-    /// never let a genuinely-slow-to-render item catch up.
-    /// </summary>
     private async Task OpenBulkUpdateMenuItemAsync(string itemId)
     {
         var button = page.GetByRole(AriaRole.Button, new() { Name = "Update selected" });
@@ -408,7 +227,6 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
             }
             catch (TimeoutException) when (attempt < 3)
             {
-                // Popup never opened — listener likely wasn't bound yet. Try again.
             }
         }
 
@@ -421,16 +239,8 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
-        // The unfiltered page is capped at 100 rows sorted by last name (same reasoning as
-        // HasEmployeeAsync above) — a just-created employee can easily fall outside that cap on
-        // this shared, long-lived E2E database, leaving the row locator below waiting forever.
-        // Search first so the target row is guaranteed to be on the (now filtered) page.
         await SearchAsync(nameFragment);
 
-        // The combined "Employee" column (avatar + full name + employee number, see
-        // EmployeeList.razor's Employee GridColumn Template) renders as a single <a> per row.
-        // Find the row first (order-agnostic across its rendered text — see NameMatcher), then
-        // click that row's link rather than filtering the link itself by the full nameFragment.
         var link = page.Locator(".e-grid .e-row")
             .Filter(new() { HasTextRegex = NameMatcher(nameFragment) })
             .First
@@ -438,37 +248,15 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
             .First;
         await link.ClickAsync();
         await page.WaitForURLAsync("**/employees/**", new() { Timeout = 15_000 });
-        // The edit page shows a spinner while its LoadAsync() runs; without this wait, callers
-        // that immediately assert on page content (e.g. tab visibility) can race the load and
-        // observe the page still in its loading state.
         await page.WaitForSelectorAsync("[role='tablist']", new() { Timeout = 15_000 });
     }
 
     public async Task SearchAsync(string query)
     {
-        // EmployeeList.razor's search placeholder is "Search by name, email or employee number"
-        // (see EmployeeList.razor) — matches HasEmployeeAsync's placeholder text above.
         var searchInput = page.GetByPlaceholder("Search by name, email or employee number");
         await searchInput.ClearAsync();
         await searchInput.FillAsync(query);
-        // HrTextBox (SfTextBox) only raises ValueChanged on blur/change, not on the "input" event
-        // Playwright's FillAsync dispatches — without an explicit Enter/blur here,
-        // SearchPageBase.OnSearchChanged never actually fires and the grid silently keeps showing
-        // the unfiltered rows (same reasoning as HasEmployeeAsync above).
         await searchInput.PressAsync("Enter");
-        // OnSearchChanged debounces 300ms before reloading — wait past that, then for the grid to
-        // settle on the filtered result (row or empty state) rather than the pre-search rows.
-        //
-        // RowsRenderedSelector (".e-grid .e-row, .e-grid .e-emptyrow") matches the STALE,
-        // pre-search rows just as readily as freshly-filtered ones — the selector was already
-        // satisfied before this method was ever called, so a bare WaitForSelectorAsync against it
-        // resolves instantly and proves nothing about whether the debounced reload has actually
-        // landed yet. Under headless timing that reload can genuinely take longer than the fixed
-        // 400ms sleep above, leaving callers (e.g. GetResultSummaryTextAsync right after this
-        // returns) reading the unfiltered result set/count. Poll instead until every currently
-        // rendered row's text actually contains the search query (or the grid is showing its empty
-        // state) — the same "wait for the actual outcome, not just element presence" fix applied
-        // elsewhere in this suite (see EqualityDiversityTab.ClearAnswersAsync).
         var deadline = DateTime.UtcNow.AddSeconds(15);
         while (true)
         {
@@ -477,16 +265,6 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
             if (await page.Locator(".e-grid .e-emptyrow").CountAsync() > 0)
                 break;
 
-            // One atomic snapshot of every rendered row's text — NOT CountAsync() followed by
-            // rows.Nth(i).TextContentAsync() per index. The debounced server-side search reload
-            // re-renders the grid at an arbitrary moment, typically shrinking it (e.g. 20 unfiltered
-            // rows -> 1 match): an index taken from the pre-reload count then points at a row that
-            // no longer exists, and TextContentAsync's default 30s auto-wait for it hung the caller
-            // ("Timeout 30000ms waiting for Locator(\".e-grid .e-row\").Nth(1)"). AllTextContentsAsync
-            // never waits for a specific index, so a mid-loop re-render just means the next poll
-            // iteration sees the new rows.
-            // Word-by-word (order-agnostic) rather than one Contains(query): a multi-word query such
-            // as "E2E SeedListUiA" matches rows whose name parts render with other text between them.
             var queryWords = query.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             var rowTexts = await page.Locator(".e-grid .e-row").AllTextContentsAsync();
             if (rowTexts.Count > 0 && rowTexts.All(t =>
@@ -500,44 +278,19 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         }
     }
 
-    // ── User Account column (tickets #90/#91 — "User Account" status + Quick Invite) ──────────
 
-    /// <summary>
-    /// Returns the row matching <paramref name="nameFragment"/> across the separate Last Name/
-    /// First Name cells (see NameMatcher) — used as the anchor for all of the User-Account-column
-    /// helpers below.
-    /// </summary>
     private ILocator Row(string nameFragment) =>
         page.Locator(".e-grid .e-row").Filter(new() { HasTextRegex = NameMatcher(nameFragment) }).First;
 
-    /// <summary>
-    /// The "User Account" column cell (its <c>.user-account-cell</c> wrapper) for the row matching
-    /// <paramref name="nameFragment"/>. Targeted by its own marker class rather than by cell index
-    /// (<c>.e-rowcell:last</c>) — the grid also carries a hidden "Start Date" column after it, so a
-    /// positional lookup lands on the wrong (empty) cell.
-    /// </summary>
     private ILocator AccountStatusLabel(string nameFragment) =>
         Row(nameFragment).Locator("span.user-account-status-label").First;
 
-    /// <summary>
-    /// Returns the trimmed rendered status label (e.g. "Active" / "Invited" / "No account") of the
-    /// "User Account" column's cell for the row matching <paramref name="nameFragment"/>. Searches
-    /// first via <see cref="SearchAsync"/> — same reasoning as HasEmployeeAsync: the unfiltered
-    /// page is capped, so a specific employee can silently fall outside it on this shared,
-    /// long-lived E2E database.
-    /// </summary>
     public async Task<string?> GetUserAccountStatusTextAsync(string nameFragment)
     {
         await SearchAsync(nameFragment);
         return (await AccountStatusLabel(nameFragment).InnerTextAsync())?.Trim();
     }
 
-    /// <summary>
-    /// Returns the CSS class of the &lt;i&gt; icon rendered inside the "User Account" cell's status
-    /// label for the row matching <paramref name="nameFragment"/> (e.g. "fa-solid fa-circle-check
-    /// me-1" for Active) — see EmployeeList.AccountStateDisplay for the icon/status mapping this
-    /// proves. Searches first via <see cref="SearchAsync"/> — same reasoning as HasEmployeeAsync.
-    /// </summary>
     public async Task<string?> GetUserAccountStatusIconClassAsync(string nameFragment)
     {
         await SearchAsync(nameFragment);
@@ -545,30 +298,13 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         return await icon.GetAttributeAsync("class");
     }
 
-    /// <summary>
-    /// The per-row "User Account" actions dropdown button (⋮). Rendered only when the viewer can
-    /// manage user accounts (EmployeeList._canManageUserAccounts) and the row has at least one
-    /// applicable action — see EmployeeList.AccountMenuItems.
-    /// </summary>
     private ILocator AccountActionsButton(string nameFragment) =>
         Row(nameFragment).Locator(".user-account-actions-btn");
 
-    /// <summary>
-    /// Returns true if the row matching <paramref name="nameFragment"/> offers an "Invite" action
-    /// — the redesigned User Account column (commit a80960cc) moved the old inline "Invite User"
-    /// link into the ⋮ actions menu, where "Invite" appears only for "No account" rows (see
-    /// EmployeeList.AccountMenuItems). Opens the menu, checks, then dismisses it. Searches first
-    /// via <see cref="SearchAsync"/> — same reasoning as HasEmployeeAsync.
-    /// </summary>
     public async Task<bool> HasInviteUserLinkAsync(string nameFragment)
     {
         await SearchAsync(nameFragment);
 
-        // The ⋮ actions button/its applicable-actions set (EmployeeList.AccountMenuItems) depends on
-        // the row's User Account status, which — like the status label itself (see
-        // GetUserAccountStatusTextAsync's own remarks) — can still be resolving a moment after the
-        // row itself has rendered. A bare instant IsVisibleAsync() here can read "not yet rendered"
-        // as "not applicable" under headless timing. Poll briefly instead of a single snapshot.
         try
         {
             await AccountActionsButton(nameFragment).First.WaitForAsync(
@@ -596,13 +332,6 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         return present;
     }
 
-    /// <summary>
-    /// Opens the row's ⋮ User Account actions menu and clicks its "Invite" item (present only on
-    /// "No account" rows), then waits for the resulting InviteUserDialog to open.
-    /// EmployeeList.OnInviteUserClicked pre-populates PreselectedEmployeeId/Name/Email, so the
-    /// dialog opens directly on its single Roles + Confirm screen — there is no employee-picker
-    /// step. Searches first via <see cref="SearchAsync"/> — same reasoning as HasEmployeeAsync.
-    /// </summary>
     public async Task ClickInviteUserLinkAsync(string nameFragment)
     {
         await SearchAsync(nameFragment);
@@ -614,18 +343,9 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         await InviteUserDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
     }
 
-    /// <summary>
-    /// The InviteUserDialog opened via <see cref="ClickInviteUserLinkAsync"/> — a single-screen
-    /// dialog (no wizard steps) that always requires a pre-selected employee.
-    /// </summary>
     public ILocator InviteUserDialog =>
         page.GetByRole(AriaRole.Dialog, new() { Name = "Invite Employee" });
 
-    /// <summary>
-    /// Completes the Quick Invite flow: selects the given additional role(s) (beyond the
-    /// always-applied, non-selectable "Employee" role — see InviteUserDialog.razor's fixed badge)
-    /// via the plain checkbox table, then confirms. Waits for the dialog to close.
-    /// </summary>
     public async Task CompleteQuickInviteAsync(IReadOnlyList<string> additionalRoleNames)
     {
         foreach (var roleName in additionalRoleNames)
@@ -641,11 +361,6 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         await InviteUserDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
     }
 
-    /// <summary>
-    /// Returns the trimmed "Employee" summary value shown on the dialog — used to assert the
-    /// pre-selected employee's name is what's actually being invited. Call after
-    /// <see cref="ClickInviteUserLinkAsync"/> but before <see cref="CompleteQuickInviteAsync"/> submits.
-    /// </summary>
     public async Task<string?> GetInviteDialogConfirmEmployeeNameAsync()
     {
         var dd = InviteUserDialog.Locator("dl.row dd").First;
@@ -653,16 +368,9 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     }
 
 
-    // ── Search box clear / result summary ─────────────────────────────────────
 
-    /// <summary>The "Clear search" button (only rendered while the search box has text).</summary>
     public ILocator ClearSearchButton => page.GetByRole(AriaRole.Button, new() { Name = "Clear search" });
 
-    // A bare instant IsVisibleAsync() races the Blazor round-trip that actually renders this button
-    // once the search box's bound value has committed (same class of gap fixed elsewhere in this
-    // page object) — poll briefly for a "should now be visible" check rather than a single snapshot.
-    // When asserting it's ABSENT (e.g. before any search), the short bounded wait below simply times
-    // out and correctly reports false — it never renders regardless of how long this waits.
     public async Task<bool> IsClearSearchButtonVisibleAsync()
     {
         try
@@ -676,19 +384,9 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>
-    /// Clicks the "Clear search" button and waits for the debounced reload (mirrors SearchAsync's
-    /// own wait reasoning) so the grid settles back onto the unfiltered result set.
-    /// </summary>
     public async Task ClickClearSearchAsync()
     {
         await ClearSearchButton.ClickAsync();
-        // A fixed 400ms sleep assumed the Blazor ValueChanged round-trip that actually clears the
-        // search box's own bound value always lands within that window — under headless timing it
-        // can genuinely take longer, leaving GetSearchBoxValueAsync callers reading the stale
-        // pre-clear text. Poll for the input to actually become empty instead of trusting a fixed
-        // wait (same "wait for the round-trip, not just a timeout" fix applied elsewhere in this
-        // suite — see DropDownSelector/FillLeaveRequestAsync's own remarks).
         await Assertions.Expect(page.GetByPlaceholder("Search by name, email or employee number"))
             .ToHaveValueAsync("", new() { Timeout = 5_000 });
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
@@ -697,7 +395,6 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     public async Task<string> GetSearchBoxValueAsync() =>
         await page.GetByPlaceholder("Search by name, email or employee number").InputValueAsync();
 
-    /// <summary>The result-count summary line above the grid (EmployeeList._totalCount/ResultSummaryText).</summary>
     public async Task<string?> GetResultSummaryTextAsync()
     {
         var summary = page.Locator(".employee-list-summary");
@@ -705,7 +402,6 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         return (await summary.TextContentAsync())?.Trim();
     }
 
-    // ── Filters panel (Department / Status) ─────────────────────────────────────
 
     public ILocator FiltersToggleButton => page.GetByRole(AriaRole.Button, new() { Name = "Filters" });
 
@@ -728,10 +424,6 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         await FiltersToggleButton.ClickAsync();
     }
 
-    /// <summary>
-    /// Selects a department in the native (non-Syncfusion) Department filter &lt;select&gt; by its
-    /// visible option label, and waits for the resulting reload (OnFilterChangedAsync -> LoadAsync).
-    /// </summary>
     public async Task SelectDepartmentFilterAsync(string departmentName)
     {
         await OpenFiltersPanelAsync();
@@ -740,10 +432,6 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 
-    /// <summary>
-    /// Selects a status in the native (non-Syncfusion) Status filter &lt;select&gt; — options are the
-    /// raw enum values ("Active", "Suspended", "Leaving", "FormerEmployee"), not display labels.
-    /// </summary>
     public async Task SelectStatusFilterAsync(string status)
     {
         await OpenFiltersPanelAsync();
@@ -774,31 +462,17 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 
-    // ── Employee identity cell / row click navigation ────────────────────────────
 
-    /// <summary>
-    /// Clicks the combined "Employee" identity cell (avatar + name + number, a single &lt;a&gt; per
-    /// EmployeeList.razor's Employee GridColumn Template) for the row matching
-    /// <paramref name="nameFragment"/>, and waits for navigation to that employee's profile. Distinct
-    /// from clicking elsewhere in the row (see <see cref="ClickRowOutsideIdentityCellAsync"/>) so
-    /// tests can independently prove both trigger navigation (OnRecordClick fires row-wide) while the
-    /// checkbox column alone does not.
-    /// </summary>
     public async Task ClickEmployeeIdentityCellAsync(string nameFragment)
     {
         await Row(nameFragment).Locator("a.employee-cell").First.ClickAsync();
         await page.WaitForURLAsync("**/employees/**", new() { Timeout = 15_000 });
     }
 
-    /// <summary>
-    /// Clicks a non-identity, non-checkbox cell (e.g. the "Work Email" cell) in the row matching
-    /// <paramref name="nameFragment"/> to prove EmployeeList.OnRecordClick navigates from anywhere in
-    /// the row, not just its own "Employee" identity link.
-    /// </summary>
     public async Task ClickRowWorkEmailCellAsync(string nameFragment)
     {
         var row = Row(nameFragment);
-        var cell = row.Locator(".e-rowcell").Nth(2); // 0: checkbox, 1: Employee, 2: Work Email
+        var cell = row.Locator(".e-rowcell").Nth(2);
         await cell.ClickAsync();
         await page.WaitForURLAsync("**/employees/**", new() { Timeout = 15_000 });
     }
@@ -812,27 +486,16 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         await Row(nameFragment).Locator(".e-checkbox-wrapper").First.ClickAsync();
     }
 
-    // ── Selected-count label on "Update selected" ───────────────────────────────
 
-    /// <summary>Reads the accessible name of the "Update selected" toolbar button, e.g. "Update selected (2)".</summary>
     public async Task<string?> GetUpdateSelectedButtonTextAsync()
     {
         var button = page.Locator("button").Filter(new() { HasText = "Update selected" }).First;
         return (await button.TextContentAsync())?.Trim();
     }
 
-    /// <summary>Unchecks a previously-checked row's checkbox (same click target as CheckEmployeeRowAsync).</summary>
     public async Task UncheckEmployeeRowAsync(string nameFragment) => await CheckEmployeeRowAsync(nameFragment);
 
-    // ── Bulk invitations ─────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Navigates directly to the employee list in invitation mode (<c>?mode=invite</c>), optionally
-    /// with a <c>returnUrl</c> (e.g. from the Getting Started checklist's "Invite your team" task
-    /// card — see OnboardingTaskCard.ResolvedLinkUrl). Waits for either the invite-mode candidate
-    /// grid or its empty state to render (EmployeeList.razor renders InviteModeCandidateGrid in
-    /// place of the normal HrGrid while <c>_isInviteMode</c> is true).
-    /// </summary>
     public async Task GoToInviteModeAsync(Guid companyId, string? returnUrl = null)
     {
         var url = $"{baseUrl}/companies/{companyId}/employees?mode=invite";
@@ -844,31 +507,18 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
             new() { Timeout = 20_000 });
     }
 
-    /// <summary>The invitation-mode banner ("Invitation mode — reviewing who to invite.") shown only while <c>_isInviteMode</c> is true.</summary>
     public ILocator InviteModeBanner => page.Locator(".invite-mode-banner");
 
     public Task<bool> IsInviteModeBannerVisibleAsync() => InviteModeBanner.IsVisibleAsync();
 
-    /// <summary>The banner's "Back to employee list" link — honours ReturnUrl when supplied.</summary>
     public async Task<string?> GetBackToListLinkHrefAsync() =>
         await InviteModeBanner.GetByRole(AriaRole.Link, new() { Name = "Back to employee list" }).GetAttributeAsync("href");
 
-    /// <summary>
-    /// The normal (non-invite-mode) grid's own "Invite selected (N)" toolbar action — works on a
-    /// manual multi-row selection, distinct from the dedicated invitation-mode grid's own button
-    /// of the same name (see InviteModeCandidateGridPage.InviteSelectedButton).
-    /// </summary>
     public ILocator InviteSelectedToolbarButton =>
         page.GetByRole(AriaRole.Button, new() { Name = "Invite selected" });
 
     public Task<bool> IsInviteSelectedToolbarButtonDisabledAsync() => InviteSelectedToolbarButton.IsDisabledAsync();
 
-    /// <summary>
-    /// Waits for "Invite selected" to become enabled after a row is ticked. Enablement is applied by
-    /// SearchPageBase.OnRowSelected (server round-trip) + EnableToolbarItemsAsync interop, which lands
-    /// after the checkbox has already flipped client-side — an instant IsDisabledAsync() check there
-    /// can read the pre-round-trip state.
-    /// </summary>
     public async Task<bool> WaitForInviteSelectedToolbarButtonEnabledAsync()
     {
         try
@@ -890,7 +540,6 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
     /// </summary>
     public ILocator InviteBatchExcludedAlert => page.Locator("[data-testid='invite-batch-excluded']");
 
-    /// <summary>One row per server-excluded employee inside <see cref="InviteBatchExcludedAlert"/>.</summary>
     public ILocator InviteBatchExcludedRows =>
         InviteBatchExcludedAlert.Locator("[data-testid='invite-batch-excluded-row']");
 }

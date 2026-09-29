@@ -10,14 +10,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Offboarding.Tests;
 
-// OFF-07: note on concurrency coverage — TryCompletePlanAsync's row-lock guarantee (`SELECT ... FOR
-// UPDATE` inside an explicit transaction) is a Postgres-specific mechanism. This test class uses
-// EF Core's InMemory provider (see BuildContext below), which does not support transactions or raw
-// SQL statements like FOR UPDATE, so the actual "two concurrent completions of a plan's last two
-// mandatory tasks only complete the plan once" guarantee cannot be exercised here. That scenario is
-// covered instead by the Aspire/Postgres integration test in
-// HR.Integration.Tests/OffboardingCompletionRulesIntegrationTests.cs, which runs against a real
-// Postgres instance.
 public class CompleteOffboardingTaskFromTaskActionTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 25, 10, 0, 0, DateTimeKind.Utc);
@@ -148,7 +140,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var seedAt = Now.AddDays(-1);
         var plan = SeedPlan(dbContext, companyId, seedAt, OffboardingStatus.InProgress);
         var taskToComplete = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
-        SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task B"); // still Pending afterwards
+        SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task B");
         await dbContext.SaveChangesAsync();
 
         var (action, _, taskCreator, _, _) = BuildAction(dbContext);
@@ -194,10 +186,6 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var plan = SeedPlan(dbContext, companyId, seedAt, OffboardingStatus.InProgress);
         var taskToComplete = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
         SeedTask(dbContext, companyId, plan.Id, seedAt, OffboardingTaskStatus.Completed, "Task B");
-        // OFF-07: Task C is explicitly non-mandatory here — a Skipped *mandatory* task would keep
-        // the plan from completing (see ExecuteAsync_Completing_Optional_Tasks_Does_Not_Complete_Plan_While_Mandatory_Task_Outstanding
-        // and the sibling test below), so this test only proves "final task completion" once every
-        // remaining task is legitimately resolvable.
         SeedTask(dbContext, companyId, plan.Id, seedAt, OffboardingTaskStatus.Skipped, "Task C", isMandatory: false);
         await dbContext.SaveChangesAsync();
 
@@ -206,9 +194,6 @@ public class CompleteOffboardingTaskFromTaskActionTests
 
         await action.ExecuteAsync(context, CancellationToken.None);
 
-        // OFF-08: completing the final task now publishes two audit entries — the task-level
-        // OffboardingTaskCompletedAuditEvent (every completion) and the plan-level
-        // OffboardingPlanCompletedAuditEvent (only when this was the resolving task).
         Assert.Equal(2, auditPublisher.Published.Count);
 
         var taskEvent = Assert.Single(auditPublisher.Published, e => e.EventType == "offboarding-task.completed");
@@ -222,8 +207,6 @@ public class CompleteOffboardingTaskFromTaskActionTests
         Assert.Equal("OffboardingPlan", planEvent.EntityType);
         Assert.Equal(plan.Id, planEvent.EntityId);
         Assert.Equal(plan.EmployeeId, planEvent.EmployeeId);
-        // The person whose action resolved the plan's last task is attributed as the plan-completed
-        // actor too — never assumed to be the leaving employee themself.
         Assert.Equal(context.CompletedBy, planEvent.ActorEmployeeId);
     }
 
@@ -236,7 +219,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var seedAt = Now.AddDays(-1);
         var plan = SeedPlan(dbContext, companyId, seedAt, OffboardingStatus.InProgress);
         var taskToComplete = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
-        SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task B"); // still Pending afterwards
+        SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task B");
         await dbContext.SaveChangesAsync();
 
         var (action, _, _, auditPublisher, _) = BuildAction(dbContext);
@@ -244,8 +227,6 @@ public class CompleteOffboardingTaskFromTaskActionTests
 
         await action.ExecuteAsync(context, CancellationToken.None);
 
-        // OFF-08: a per-task audit entry is always published on completion, even when it doesn't
-        // resolve the whole plan — only the plan-level event is conditional on that.
         var published = Assert.Single(auditPublisher.Published);
         Assert.Equal("offboarding-task.completed", published.EventType);
         Assert.Equal(taskToComplete.Id, published.EntityId);
@@ -281,7 +262,6 @@ public class CompleteOffboardingTaskFromTaskActionTests
         Assert.Equal(plan.Id, created.SourceEntityId);
         Assert.Contains(employeeName, created.Title);
 
-        // The action does not send notifications on task completion — only StartOffboarding does.
         Assert.Empty(notifications.Written);
     }
 
@@ -445,7 +425,6 @@ public class CompleteOffboardingTaskFromTaskActionTests
         Assert.Empty(taskCreator.Created);
     }
 
-    // ---- OFF-04: asset-return task completion ----
 
     [Fact]
     public async Task ExecuteAsync_AssetReturnTask_Calls_VerifiedReturn_With_Plan_EmployeeId_And_Completes_On_Success()
@@ -497,7 +476,6 @@ public class CompleteOffboardingTaskFromTaskActionTests
             Guid.NewGuid(), companyId, employeeId, DateOnly.FromDateTime(seedAt.Date), null, seedAt);
         plan.Start(seedAt);
         dbContext.OffboardingPlans.Add(plan);
-        // This is the last outstanding task — if it were completed, the plan would complete too.
         var task = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Return asset: Laptop", assetAssignmentId: assignmentId);
         await dbContext.SaveChangesAsync();
 
@@ -591,7 +569,7 @@ public class CompleteOffboardingTaskFromTaskActionTests
 
         var seedAt = Now.AddDays(-1);
         var plan = SeedPlan(dbContext, companyId, seedAt, OffboardingStatus.InProgress);
-        var task = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Return badge"); // no AssetAssignmentId
+        var task = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Return badge");
         await dbContext.SaveChangesAsync();
 
         var assetReturnService = new FakeAssetReturnService();
@@ -607,7 +585,6 @@ public class CompleteOffboardingTaskFromTaskActionTests
         Assert.Equal(OffboardingTaskStatus.Completed, savedTask.Status);
     }
 
-    // ---- OFF-05: HR reconciliation flag clearing ----
 
     [Fact]
     public async Task ExecuteAsync_Completing_The_Sole_Outstanding_ReconciliationTask_Clears_RequiresHrReconciliation()
@@ -672,14 +649,12 @@ public class CompleteOffboardingTaskFromTaskActionTests
         var (action, _, taskCreator, auditPublisher, _) = BuildAction(dbContext);
         var context = BuildTaskContext(companyId, reconciliationTask.Id);
 
-        // First completion clears the flag and (since this is the plan's only task) completes the plan.
         await action.ExecuteAsync(context, CancellationToken.None);
 
         var afterFirst = await dbContext.OffboardingPlans.SingleAsync(p => p.Id == plan.Id);
         Assert.False(afterFirst.RequiresHrReconciliation);
         Assert.Equal(OffboardingStatus.Completed, afterFirst.Status);
         Assert.Single(taskCreator.Created);
-        // OFF-08: task-level + plan-level audit entries for this single resolving completion.
         Assert.Equal(2, auditPublisher.Published.Count);
 
         // Replaying the same completion (e.g. a retried Tasks-module callback) hits the
@@ -694,7 +669,6 @@ public class CompleteOffboardingTaskFromTaskActionTests
         Assert.Equal(2, auditPublisher.Published.Count);
     }
 
-    // ---- OFF-07: "Skip" outcome decision ----
 
     [Fact]
     public async Task ExecuteAsync_Skip_OutcomeDecision_With_Reason_Skips_The_Task_Instead_Of_Completing_It()
@@ -812,7 +786,6 @@ public class CompleteOffboardingTaskFromTaskActionTests
         Assert.Single(taskCreator.Created);
     }
 
-    // ---- OFF-07: mandatory-vs-optional completion gating ----
 
     [Fact]
     public async Task ExecuteAsync_Completing_Optional_Tasks_Does_Not_Complete_Plan_While_Mandatory_Task_Outstanding()
@@ -871,7 +844,6 @@ public class CompleteOffboardingTaskFromTaskActionTests
         Assert.Single(taskCreator.Created);
     }
 
-    // ---- OFF-07: HR completion-review task assignment ----
 
     [Fact]
     public async Task ExecuteAsync_Completing_Final_Task_Assigns_Review_Task_To_Lowest_Guid_HR_Administrator_With_HighPriority_And_DueDate()
@@ -903,7 +875,6 @@ public class CompleteOffboardingTaskFromTaskActionTests
         Assert.Equal(TaskPriority.High, created.Priority);
         Assert.Equal(lastWorkingDay.AddDays(3), created.DueDate);
 
-        // Every other HR administrator (not the assignee) gets an in-app notification.
         var notification = Assert.Single(notifications.Written);
         Assert.Equal(higherGuidAdmin, notification.EmployeeId);
         Assert.Equal(NotificationType.OffboardingCompleted, notification.Type);
@@ -935,10 +906,6 @@ public class CompleteOffboardingTaskFromTaskActionTests
         Assert.Empty(notifications.Written);
     }
 
-    // OFF-08: task-level completion audit — actor must be the person who completed the
-    // Tasks-module TaskItem (TaskCompletionContext.CompletedBy), never assumed to be the plan's
-    // employee, and the event must carry the OffboardingTaskId/OffboardingPlanId/AssetAssignmentId
-    // cross-module correlation fields.
     [Fact]
     public async Task ExecuteAsync_Publishes_OffboardingTaskCompletedAuditEvent_With_Correct_Actor_And_Ids()
     {
@@ -954,8 +921,6 @@ public class CompleteOffboardingTaskFromTaskActionTests
         dbContext.OffboardingPlans.Add(plan);
         var task = SeedTask(
             dbContext, companyId, plan.Id, seedAt, title: "Return laptop", assetAssignmentId: assetAssignmentId);
-        // A second outstanding mandatory task so completing the first does not also complete the plan
-        // — keeps this test focused on the task-level event only.
         SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Other task");
         await dbContext.SaveChangesAsync();
 
@@ -1009,8 +974,6 @@ public class CompleteOffboardingTaskFromTaskActionTests
         Assert.Equal("Not required.", skippedEvent.SkipReason);
     }
 
-    // OFF-08: plan-completed event's actor must be whoever completed the final task, not the
-    // affected (departing) employee.
     [Fact]
     public async Task ExecuteAsync_Completing_Final_Task_Publishes_PlanCompleted_With_Completer_As_Actor()
     {

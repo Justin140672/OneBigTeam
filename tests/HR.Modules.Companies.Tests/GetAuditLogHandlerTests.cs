@@ -9,12 +9,6 @@ using Microsoft.Extensions.Configuration;
 
 namespace HR.Modules.Companies.Tests;
 
-/// <summary>
-/// Same "platform-wide admin dashboard with allow-list gate" shape as GetFailedPaymentsHandlerTests /
-/// ListCustomersHandlerTests — see their remarks. Uses an in-memory CompaniesDbContext (for company
-/// name resolution) plus FakeAuditHistoryReader/FakeUserEmailDirectoryReader in place of the real
-/// cross-cutting AuditDbContext / IdentityDbContext-backed readers.
-/// </summary>
 public class GetAuditLogHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 6, 30, 10, 0, 0, TimeSpan.Zero);

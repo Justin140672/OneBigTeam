@@ -13,7 +13,6 @@ public class ProbationRecordTests
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
             StartDate, ExpectedEndDate, null, DateOnly.FromDateTime(Now.UtcDateTime), Now);
 
-    // -------- Status transition table --------
 
     [Fact]
     public void Active_Can_Transition_To_ReviewDue()
@@ -203,7 +202,6 @@ public class ProbationRecordTests
         Assert.Throws<InvalidOperationException>(() => record.Fail(Guid.NewGuid(), ExpectedEndDate, null, Now));
     }
 
-    // -------- Extend() date validation --------
 
     [Fact]
     public void Extend_With_NewEndDate_Equal_To_Current_ExpectedEndDate_Throws()
@@ -345,7 +343,6 @@ public class ProbationRecordTests
             record.ApplyAdministrativeCorrection(Guid.NewGuid(), ExpectedEndDate.AddDays(1), "Attempted edit.", Now));
     }
 
-    // -------- PROB-06: Create() initial status (NotStarted vs Active) --------
 
     [Fact]
     public void Create_With_Today_Before_StartDate_Produces_NotStarted()
@@ -377,7 +374,6 @@ public class ProbationRecordTests
         Assert.Equal(ProbationStatus.Active, record.Status);
     }
 
-    // -------- PROB-06: ActivateIfDue --------
 
     [Fact]
     public void ActivateIfDue_When_NotStarted_And_Today_Equals_StartDate_Transitions_To_Active()
@@ -426,7 +422,6 @@ public class ProbationRecordTests
         Assert.Equal(ProbationStatus.Active, record.Status);
     }
 
-    // -------- PROB-06: MarkNotApplicable --------
 
     [Fact]
     public void MarkNotApplicable_From_NotStarted_Succeeds()
@@ -497,9 +492,7 @@ public class ProbationRecordTests
         Assert.Throws<InvalidOperationException>(() => record.MarkNotApplicable("Second reason.", Now));
     }
 
-    // -------- PROB-06: CreateNotApplicable --------
 
-    // -------- Round 3: ApplyManagerChangeFromEvent --------
 
     [Fact]
     public void ApplyManagerChangeFromEvent_First_Event_Applies_New_Manager_And_Returns_True()
@@ -537,12 +530,11 @@ public class ProbationRecordTests
         var managerA = Guid.NewGuid();
         record.ApplyManagerChangeFromEvent(managerB, Now, Now);
 
-        // A stale event with an OccurredAt older than the last applied change.
         var changed = record.ApplyManagerChangeFromEvent(managerA, Now.AddMinutes(-5), Now.AddMinutes(1));
 
         Assert.False(changed);
-        Assert.Equal(managerB, record.ManagerEmployeeId); // unchanged — never regresses
-        Assert.Equal(Now, record.ManagerChangeSourceOccurredAt); // cursor itself also unchanged
+        Assert.Equal(managerB, record.ManagerEmployeeId);
+        Assert.Equal(Now, record.ManagerChangeSourceOccurredAt);
     }
 
     [Fact]
@@ -552,10 +544,9 @@ public class ProbationRecordTests
         var newManagerId = Guid.NewGuid();
         record.ApplyManagerChangeFromEvent(newManagerId, Now, Now);
 
-        // Exact same event (same OccurredAt, same manager) replayed.
         var changed = record.ApplyManagerChangeFromEvent(newManagerId, Now, Now.AddMinutes(1));
 
-        Assert.False(changed); // no field actually changed
+        Assert.False(changed);
         Assert.Equal(newManagerId, record.ManagerEmployeeId);
     }
 
@@ -578,8 +569,6 @@ public class ProbationRecordTests
     [Fact]
     public void ApplyManagerChangeFromEvent_Same_Manager_Different_OccurredAt_Advances_Cursor_But_Returns_False()
     {
-        // The manager field itself is unchanged (no-op for the field), but a newer OccurredAt should
-        // still be recorded as the latest-applied cursor.
         var record = CreateActiveRecord();
         var managerId = Guid.NewGuid();
         record.ApplyManagerChangeFromEvent(managerId, Now, Now);

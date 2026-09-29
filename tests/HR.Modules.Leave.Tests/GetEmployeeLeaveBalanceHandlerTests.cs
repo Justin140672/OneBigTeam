@@ -45,7 +45,6 @@ public class GetEmployeeLeaveBalanceHandlerTests
         Assert.Equal(2026, result.Value.PolicyYear);
         Assert.Equal(2, result.Value.Balances.Count);
 
-        // Ordered by LeaveTypeName: Annual Leave < Sick Leave
         var annual = result.Value.Balances[0];
         Assert.True(annual.HasBalance);
         Assert.Equal("Annual Leave", annual.LeaveTypeName);
@@ -53,7 +52,7 @@ public class GetEmployeeLeaveBalanceHandlerTests
         Assert.Equal(25m, annual.EntitlementDays);
         Assert.Equal(0m, annual.UsedDays);
         Assert.Equal(0m, annual.AdjustmentDays);
-        Assert.Equal(25m, annual.RemainingDays); // 25 + 0 - 0
+        Assert.Equal(25m, annual.RemainingDays);
         Assert.Equal(25m * WorkingPattern.Default.HoursPerDay, annual.EntitlementHours);
         Assert.Equal(25m * WorkingPattern.Default.HoursPerDay, annual.RemainingHours);
 
@@ -64,7 +63,7 @@ public class GetEmployeeLeaveBalanceHandlerTests
         Assert.Equal(10m, sick.EntitlementDays);
         Assert.Equal(0m, sick.UsedDays);
         Assert.Equal(0m, sick.AdjustmentDays);
-        Assert.Equal(10m, sick.RemainingDays); // 10 + 0 - 0
+        Assert.Equal(10m, sick.RemainingDays);
     }
 
     [Fact]
@@ -157,8 +156,8 @@ public class GetEmployeeLeaveBalanceHandlerTests
             LeaveType.Create(typeId, companyId, "Annual Leave", "ANNUAL", 25, AccrualMethod.None, LeaveTypeBehaviour.Standard, now));
 
         var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, typeId, policyId, 2026, 25m, PolicyYearStart, now);
-        balance.Adjust(2m, now);       // +2 carry-over adjustment
-        balance.RecordUsage(5m, now);  // 5 days used
+        balance.Adjust(2m, now);
+        balance.RecordUsage(5m, now);
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
@@ -173,7 +172,7 @@ public class GetEmployeeLeaveBalanceHandlerTests
         Assert.Equal(25m, item.EntitlementDays);
         Assert.Equal(2m, item.AdjustmentDays);
         Assert.Equal(5m, item.UsedDays);
-        Assert.Equal(22m, item.RemainingDays); // 25 + 2 - 5
+        Assert.Equal(22m, item.RemainingDays);
         Assert.Equal(22m * WorkingPattern.Default.HoursPerDay, item.RemainingHours);
     }
 
@@ -203,18 +202,13 @@ public class GetEmployeeLeaveBalanceHandlerTests
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Balances);
-        Assert.Equal(160m, item.EntitlementHours); // 20 days * 8 hours/day
+        Assert.Equal(160m, item.EntitlementHours);
         Assert.Equal(160m, item.RemainingHours);
     }
 
     [Fact]
     public async Task HandleAsync_Reports_AccruedDays_Less_Than_EntitlementDays_And_Bases_RemainingDays_On_Accrued_For_Monthly_Type()
     {
-        // LEAVE-04 wiring: Monthly accrual with an accrual start date of Feb 1 2026 means, by
-        // FixedUtcNow (Jun 8 2026), only complete monthly periods Feb1->Mar1->Apr1->May1->Jun1 = 4
-        // of the 10 total periods (Feb1..Dec1) have elapsed. AccruedDays = 24 * 4/10 = 9.60, floored
-        // to the nearest half day = 9.5, and RemainingDays/RemainingHours must be derived from that
-        // accrued figure, not the raw 24-day EntitlementDays.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -241,7 +235,7 @@ public class GetEmployeeLeaveBalanceHandlerTests
         Assert.Equal(24m, item.EntitlementDays);
         Assert.Equal(9.5m, item.AccruedDays);
         Assert.True(item.AccruedDays < item.EntitlementDays);
-        Assert.Equal(9.5m, item.RemainingDays); // accrued + 0 adjustment - 0 used
+        Assert.Equal(9.5m, item.RemainingDays);
         Assert.Equal(9.5m * WorkingPattern.Default.HoursPerDay, item.RemainingHours);
     }
 

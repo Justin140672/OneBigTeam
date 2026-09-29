@@ -7,13 +7,6 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace HR.Modules.Companies.Tests.Features.GetSystemHealth;
 
-/// <summary>
-/// HealthCheckService isn't practically mockable (it's a sealed framework implementation resolved
-/// from DI), so these tests build a minimal ServiceCollection with fake IHealthCheck implementations
-/// registered under the exact category keys the handler looks up ("database", "storage", "auth",
-/// "email", "stripe", "hangfire") and resolve the real HealthCheckService from it, mirroring the
-/// standard approach for testing code that depends on the ASP.NET Core health checks aggregator.
-/// </summary>
 public class GetSystemHealthHandlerTests
 {
     [Fact]
@@ -78,7 +71,6 @@ public class GetSystemHealthHandlerTests
     [Fact]
     public async Task HandleAsync_Reports_Unregistered_Category_As_Unhealthy_With_Explanatory_Description()
     {
-        // Register everything except "stripe" to exercise the missing-key branch.
         var healthCheckService = BuildHealthCheckService(registerAll: false);
         var handler = BuildHandler(
             new FakeCurrentUser(Guid.NewGuid(), email: "admin@example.com"),

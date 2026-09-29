@@ -9,10 +9,6 @@ using Microsoft.Extensions.Configuration;
 
 namespace HR.Modules.Companies.Features.LiftCompanyLegalHold;
 
-/// <summary>
-/// NFR-07: same defense-in-depth allow-list gate as ScheduleCustomerDeletionHandler. Lifts an
-/// active company-wide legal hold.
-/// </summary>
 internal sealed class LiftCompanyLegalHoldHandler(
     CompaniesDbContext dbContext,
     ICurrentUser currentUser,

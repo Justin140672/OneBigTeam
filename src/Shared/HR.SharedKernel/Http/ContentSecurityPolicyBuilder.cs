@@ -20,13 +20,11 @@ public sealed partial class ContentSecurityPolicyBuilder
 {
     private readonly List<KeyValuePair<string, string[]>> _directives = [];
 
-    /// <summary>Appends a directive. Throws if the directive already exists or any source is malformed.</summary>
     public ContentSecurityPolicyBuilder Add(string directive, params IEnumerable<string> sources)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(directive);
         ArgumentNullException.ThrowIfNull(sources);
 
-        // Normalize to lowercase for consistent storage and comparison (CSP directives are case-insensitive).
         directive = directive.ToLowerInvariant();
 
         if (!DirectiveName().IsMatch(directive))
@@ -46,14 +44,11 @@ public sealed partial class ContentSecurityPolicyBuilder
         return this;
     }
 
-    /// <summary>Serialises the directives in the order they were added: <c>name src src; name src</c>.</summary>
     public string Build() =>
         string.Join("; ", _directives.Select(d => d.Value.Length == 0 ? d.Key : $"{d.Key} {string.Join(' ', d.Value)}"));
 
-    /// <summary>A fresh 128-bit, base64-encoded nonce from the platform CSPRNG.</summary>
     public static string CreateNonce() => Convert.ToBase64String(RandomNumberGenerator.GetBytes(16));
 
-    /// <summary>The <c>'nonce-…'</c> source expression for <paramref name="nonce"/>.</summary>
     public static string NonceSource(string nonce)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(nonce);
@@ -62,10 +57,6 @@ public sealed partial class ContentSecurityPolicyBuilder
         return $"'nonce-{nonce}'";
     }
 
-    /// <summary>
-    /// Parses a serialised policy into <c>directive → sources</c> (directive names lower-cased).
-    /// Throws <see cref="FormatException"/> for a repeated directive, which browsers would ignore.
-    /// </summary>
     public static IReadOnlyDictionary<string, IReadOnlyList<string>> Parse(string policy)
     {
         ArgumentNullException.ThrowIfNull(policy);

@@ -63,8 +63,6 @@ public class AppointInternalCandidateIdempotencyEndpointTests
         var s = await SeedAsync(_factory, companyId);
         var employeesBefore = await CountEmployeesAsync(_factory, companyId);
 
-        // 1. Simulate the interrupted request: Recruitment saved Pending, then Employees recorded and
-        //    applied the change, then the process died before Recruitment completed.
         await MarkAppointmentPendingAsync(_factory, s.ApplicationId, s.EmployeeId, DateTimeOffset.UtcNow.AddMinutes(-1));
 
         InternalAppointmentResult recorded;
@@ -86,7 +84,6 @@ public class AppointInternalCandidateIdempotencyEndpointTests
         Assert.Equal(InternalAppointmentStatus.Pending, pending.AppointmentStatus);
         Assert.Equal(s.OfferStageId, pending.CurrentStageId);
 
-        // 2. HR retries (even with different values): the recorded change is completed as recorded.
         var response = await client.PostAsJsonAsync(AppointUrl(s), AppointBody(s, noManager: true, effectiveDate: Today.AddDays(5)));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -110,8 +107,6 @@ public class AppointInternalCandidateIdempotencyEndpointTests
     [Fact]
     public async Task Pending_Without_A_Recorded_Change_Is_Appointed_Normally_Exactly_Once()
     {
-        // Interrupted before the Employees module was reached: nothing recorded, so the retry performs
-        // the appointment itself.
         var companyId = Guid.NewGuid();
         using var client = await RecruiterHrClientAsync(_factory, companyId);
         var s = await SeedAsync(_factory, companyId);
@@ -166,7 +161,6 @@ public class AppointInternalCandidateIdempotencyEndpointTests
             $"/api/companies/{companyId}/reporting/recruitment-pipeline?groupBy=Vacancy&isInternal=false");
         Assert.Equal(0, externalReport!.Items.Sum(i => i.Hires));
 
-        // The pipeline summary shows the internal application sitting on the Hired stage.
         var summary = await client.GetFromJsonAsync<SummaryPayload>(
             $"/api/companies/{companyId}/reporting/recruitment-pipeline-summary?includeClosed=true&isInternal=true");
         var summaryRow = Assert.Single(summary!.Vacancies, v => v.VacancyId == s.VacancyId);

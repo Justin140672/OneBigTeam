@@ -122,8 +122,6 @@
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
 
-    /// <summary>Raised whenever the latest-export status is (re)loaded, so a host page can, e.g.,
-    /// soft-block an account-closure confirmation while an export is Pending/InProgress.</summary>
     [Parameter] public EventCallback<OrganisationDataExportLatest?> OnLatestChanged { get; set; }
 
     private OrganisationDataExportLatest? _latest;

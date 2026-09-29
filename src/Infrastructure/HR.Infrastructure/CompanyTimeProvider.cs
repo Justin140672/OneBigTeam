@@ -44,8 +44,6 @@ internal sealed class CompanyTimeProvider(
 
     private DateOnly GetTodaySync(Guid companyId)
     {
-        // Blocking call to GetTimeZoneAsync for synchronous property access.
-        // This is necessary because Today property must be synchronous.
         var task = Task.Run(() => companyTimeZoneReader.GetTimeZoneAsync(companyId, CancellationToken.None));
         var ianaTimeZoneId = task.GetAwaiter().GetResult();
         var timeZone = TimeZoneInfo.FindSystemTimeZoneById(ianaTimeZoneId);
@@ -55,8 +53,6 @@ internal sealed class CompanyTimeProvider(
 
     private TimeZoneInfo GetTimeZoneSync(Guid companyId)
     {
-        // Blocking call to GetTimeZoneAsync for synchronous property access.
-        // This is necessary because TimeZone property must be synchronous.
         var task = Task.Run(() => companyTimeZoneReader.GetTimeZoneAsync(companyId, CancellationToken.None));
         var ianaTimeZoneId = task.GetAwaiter().GetResult();
         return TimeZoneInfo.FindSystemTimeZoneById(ianaTimeZoneId);

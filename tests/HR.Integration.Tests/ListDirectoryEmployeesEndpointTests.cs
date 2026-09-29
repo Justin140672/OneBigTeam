@@ -8,11 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Employee-facing directory list: GET /api/companies/{companyId}/employees/directory
-/// Gated to <c>role:employee</c> — a plain Employee (with no employee:read / employee:manage
-/// permission) must be authorized here, unlike the HR administration list.
-/// </summary>
 [Collection("Integration")]
 public class ListDirectoryEmployeesEndpointTests
 {

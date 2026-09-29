@@ -14,8 +14,6 @@ internal sealed class Endpoint(GetMyContactDetailsHandler handler, ICurrentUser 
 
     public override async Task HandleAsync(CancellationToken cancellationToken)
     {
-        // NOT User.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's resolved
-        // Employee/UserId (see GetMyEmployee/Endpoint.cs for the rationale).
         if (currentUser.UserId is not { } userId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());

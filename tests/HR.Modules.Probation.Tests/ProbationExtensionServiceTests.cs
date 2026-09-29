@@ -137,12 +137,9 @@ public class ProbationExtensionServiceTests
         var previousEndDate = new DateOnly(2026, 9, 15);
         var newEndDate = new DateOnly(2026, 12, 1);
 
-        // sourceReview is the one being completed with Extend (e.g. an earlier HrReview).
         var (record, sourceReview) = await SeedRecordAndReview(
             context, companyId, managerId, ProbationReviewType.HrReview, previousEndDate);
 
-        // Simulate the daily scheduling job already having created a Pending FinalDecision review
-        // for the pre-extension expected end date.
         var otherFinalReview = ProbationReview.Create(
             Guid.NewGuid(), companyId, record.Id, ProbationReviewType.FinalDecision, previousEndDate, Now);
         context.ProbationReviews.Add(otherFinalReview);
@@ -177,7 +174,6 @@ public class ProbationExtensionServiceTests
         var notificationWriter = new FakeNotificationWriter();
         var service = TestProbationExtensionServiceFactory.Build(context, notificationWriter: notificationWriter);
 
-        // Manager is also the decision maker.
         await service.ApplyAsync(
             record, sourceReview, previousEndDate, newEndDate, "Needs more time.",
             managerId, new DateOnly(2026, 9, 1), Now, CancellationToken.None);
@@ -186,9 +182,6 @@ public class ProbationExtensionServiceTests
             .Where(n => n.EmployeeId == managerId && n.Type == NotificationType.ProbationExtended)
             .ToList();
 
-        // Manager still receives an employee-role notification if they are also the employee
-        // being reviewed, but here manager != employee so they should receive exactly zero
-        // manager-specific notifications (the dedup guard skips them as decision maker).
         Assert.Empty(managerNotifications);
     }
 
@@ -267,7 +260,6 @@ public class ProbationExtensionServiceTests
 
         var service = TestProbationExtensionServiceFactory.Build(context);
 
-        // First extension cycle.
         await service.ApplyAsync(
             record, firstSourceReview, firstPreviousEndDate, firstNewEndDate, "First extension.",
             decisionMakerId, new DateOnly(2026, 9, 1), Now, CancellationToken.None);
@@ -277,9 +269,6 @@ public class ProbationExtensionServiceTests
                 && r.Id != firstSourceReview.Id
                 && r.Status == ProbationReviewStatus.Pending);
 
-        // Second extension: the newly created FinalDecision review is completed (with Extend)
-        // and becomes the sourceReview for the second cycle. The handler would normally call
-        // review.Complete(...) before invoking ApplyAsync; mirror that here.
         firstFinalReview.Complete(decisionMakerId, ProbationOutcome.Extend, "Needs even more time.", Now);
         await context.SaveChangesAsync();
 
@@ -301,9 +290,6 @@ public class ProbationExtensionServiceTests
         Assert.Single(pendingFinalReviews);
         Assert.Equal(secondNewEndDate, pendingFinalReviews[0].DueDate);
 
-        // The first FinalDecision review created by the first extension is Completed (driven
-        // explicitly above), not Cancelled — ApplyAsync only cancels *other* still-Pending
-        // FinalDecision reviews, and this one was already completed before the second call.
         var reloadedFirstFinal = await context.ProbationReviews.SingleAsync(r => r.Id == firstFinalReview.Id);
         Assert.Equal(ProbationReviewStatus.Completed, reloadedFirstFinal.Status);
     }

@@ -13,7 +13,6 @@ namespace HR.Infrastructure.Abstractions;
 /// </summary>
 public interface IEmployeesInProbationReader
 {
-    /// <summary>Returns the subset of <paramref name="employeeIds"/> with an active probation record.</summary>
     Task<IReadOnlySet<Guid>> GetEmployeeIdsInProbationAsync(
         Guid companyId,
         IEnumerable<Guid> employeeIds,

@@ -23,9 +23,6 @@ public sealed class ContactEndpointTests : IClassFixture<ContactApiWebApplicatio
 {
     private readonly ContactApiWebApplicationFactory _factory;
 
-    // ApiWebApplicationFactory is injected only to force collection ordering: the shared collection
-    // fixture has already started the Postgres container and set ConnectionStrings__hr by the time
-    // this runs.
     public ContactEndpointTests(ContactApiWebApplicationFactory factory, ApiWebApplicationFactory _)
     {
         _factory = factory;
@@ -136,9 +133,6 @@ public sealed class ContactEndpointTests : IClassFixture<ContactApiWebApplicatio
     [InlineData("   ")]
     public async Task Post_Contact_Returns_Ok_When_Company_Is_Blank(string? company)
     {
-        // Company name is marked "(optional)" on the marketing form (Contact.razor) and
-        // Program.cs's ValidateContactRequest only rejects it for exceeding the max length, never
-        // for being blank — this mirrors that intentional design.
         using var client = _factory.CreateClient();
 
         var response = await client.PostAsJsonAsync("/api/contact", ValidContactRequest(company: company!));
@@ -175,9 +169,6 @@ public sealed class ContactEndpointTests : IClassFixture<ContactApiWebApplicatio
     [Fact]
     public async Task Post_Contact_Returns_Ok_When_EmployeeCount_Is_Null()
     {
-        // Approximate employee count is marked "(optional)" on the marketing form (Contact.razor) —
-        // Program.cs's ValidateContactRequest only rejects it when provided and < 1, never for
-        // being absent.
         using var client = _factory.CreateClient();
 
         var response = await client.PostAsJsonAsync("/api/contact", ValidContactRequest(employeeCount: null));
@@ -272,9 +263,6 @@ public sealed class ContactEndpointNotConfiguredTests
     public async Task Post_Contact_Returns_ServiceUnavailable_When_RecipientEmail_Is_Not_Configured()
     {
         using var client = _factory.CreateClient();
-        // The shared factory's FakeEmailSender is a singleton accumulating across the whole
-        // assembly (other tests in this collection send emails too), so compare counts before/after
-        // rather than asserting an empty collection outright.
         var sentCountBefore = _factory.EmailSender.Sent.Count;
 
         var response = await client.PostAsJsonAsync("/api/contact", new

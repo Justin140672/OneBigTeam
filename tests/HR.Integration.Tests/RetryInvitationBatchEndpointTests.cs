@@ -89,7 +89,7 @@ public class RetryInvitationBatchEndpointTests
         var sentRecipient = await db.InvitationBatchRecipients.SingleAsync(r => r.Id == sentRecipientId);
 
         Assert.Equal(InvitationBatchRecipient.StatusWaiting, failedRecipient.Status);
-        Assert.Equal(InvitationBatchRecipient.StatusSent, sentRecipient.Status); // untouched
+        Assert.Equal(InvitationBatchRecipient.StatusSent, sentRecipient.Status);
     }
 
     [Fact]
@@ -127,14 +127,6 @@ public class RetryInvitationBatchEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    /// <summary>
-    /// Exercises a real failing send through the real <see cref="ProcessInvitationBatchJob"/>
-    /// (rather than seeding a StatusFailed recipient directly via MarkFailed, as
-    /// <see cref="SeedBatchWithFailedRecipientAsync"/> does), by queuing a real batch via the
-    /// QueueInvitationBatch endpoint and then running the job exactly as
-    /// FakeBackgroundJobClient's recorded job args describe — Hangfire itself never executes jobs
-    /// in this test harness, so the job must be invoked directly.
-    /// </summary>
     [Fact]
     public async Task ProcessInvitationBatchJob_Marks_Only_The_Configured_Recipient_Failed_When_Its_Send_Fails()
     {
@@ -182,8 +174,6 @@ public class RetryInvitationBatchEndpointTests
         }
         finally
         {
-            // The fake is a singleton shared across the whole "Integration" collection — always
-            // clear any configured failures so they can never leak into a later test.
             _factory.InvitationEmailSender.Reset();
         }
     }

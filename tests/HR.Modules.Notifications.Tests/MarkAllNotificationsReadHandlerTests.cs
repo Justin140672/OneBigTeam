@@ -43,8 +43,6 @@ public class MarkAllNotificationsReadHandlerTests
             .ToListAsync();
         Assert.All(all, n => Assert.True(n.IsRead));
 
-        // NOT-05: one NotificationReadAuditEvent per notification actually transitioned from
-        // unread to read — the already-read notification does not produce a duplicate event.
         Assert.Equal(2, auditPublisher.Published.Count);
         var readEvents = auditPublisher.Published.Cast<NotificationReadAuditEvent>().ToList();
         var publishedIds = readEvents.Select(e => e.NotificationId).OrderBy(id => id).ToList();
@@ -112,7 +110,6 @@ public class MarkAllNotificationsReadHandlerTests
                 CancellationToken.None));
 
         Assert.Null(ex);
-        // NOT-05: nothing unread => nothing published.
         Assert.Empty(auditPublisher.Published);
     }
 

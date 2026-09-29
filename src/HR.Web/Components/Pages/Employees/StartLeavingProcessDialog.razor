@@ -159,8 +159,6 @@
     private EditContext _editContext = default!;
     private bool _leavingDateManuallyEdited;
 
-    // Maps each wizard step to the model fields validated before advancing past it, so "Next"
-    // gates on DataAnnotations/IValidatableObject messages rather than imperative if-checks.
     private static readonly Dictionary<int, string[]> _stepFields = new()
     {
         [1] = [nameof(StartLeavingProcessFormModel.ResignationReceivedDate)],
@@ -172,9 +170,6 @@
     private static readonly List<string> _stepLabels =
         ["Resignation Date", "Leaving Date", "Last Working Day", "Reason & Notes", "Confirm"];
 
-    // No clear button and no "None" item, per this codebase's convention for required dropdowns
-    // (see Model.Gender in EmployeeEdit.razor) — the empty default simply shows the Placeholder
-    // until the user picks one.
     private static readonly LeavingReasonOption[] _leavingReasonOptions =
     [
         new("Resignation",     EmployeeLeavingTab.LeavingReasonLabel("Resignation")),
@@ -214,8 +209,6 @@
         _editContext = new EditContext(_model);
     }
 
-    // SPEC-OFF-01 §Leaving routes: tailored per-reason wording rather than generic
-    // resignation-flavoured copy regardless of the reason actually selected.
     private static string ReasonConfirmationWording(string? reason) => reason switch
     {
         "Resignation" => "This employee has resigned. Confirming records their resignation and starts the leaving process.",
@@ -238,7 +231,6 @@
         _model.LeavingDate = value;
         _leavingDateManuallyEdited = true;
 
-        // Don't let a stale confirmation silently carry over once the date no longer needs it.
         if (!IsBackdated(_model.LeavingDate))
             _model.ConfirmBackdatedLeavingDate = false;
     }
@@ -249,9 +241,6 @@
     {
         _globalError = null;
 
-        // Auto-calculate a proposed leaving date the first time step 1 is completed (or any time
-        // it's revisited without the user having amended it themselves) — step 2's own editable
-        // picker lets HR override this before continuing.
         if (_step == 1 && _model.ResignationReceivedDate is { } received && !_leavingDateManuallyEdited)
             _model.LeavingDate = ComputeProposedLeavingDate(received);
 
@@ -259,14 +248,6 @@
 
         if (_stepFields.TryGetValue(_step, out var fields))
         {
-            // Merge EditContext's per-property (DataAnnotations attribute) messages with the
-            // model's own IValidatableObject checks run directly. Validator.TryValidateObject
-            // (which backs EditContext.Validate()) silently skips IValidatableObject.Validate
-            // whenever *any* other property on the model fails attribute validation — which is
-            // always true on an early wizard step, since later steps' [Required] fields (e.g.
-            // LastWorkingDay, LeavingReason) are still unset. That gate would otherwise make the
-            // backdating-confirmation check on step 2 never run. Calling Validate() directly
-            // sidesteps it.
             var customMessages = _model.Validate(new ValidationContext(_model))
                 .Where(r => r.MemberNames.Any(fields.Contains))
                 .Select(r => r.ErrorMessage);

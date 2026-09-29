@@ -298,9 +298,6 @@
 @code {
     [Parameter] public Guid Id { get; set; }
 
-    // Selected tab persists across a hard page refresh via this query param (see
-    // SyncActiveTabFromQuery/OnAfterRenderAsync below) — 1-based in the URL for readability,
-    // 0-based internally to match SfTab's SelectedItem index.
     [SupplyParameterFromQuery(Name = "tab")]
     [Parameter]
     public int? Tab { get; set; }
@@ -350,19 +347,11 @@
     private string PreviewAssetNumber =>
         $"{Model.AssetNumberPrefix}{Model.NextAssetNumber.ToString().PadLeft(Model.AssetNumberMinimumLength, '0')}";
 
-    // ── Tabs ─────────────────────────────────────────────────────────────────────────────────
 
     private int _activeTabIndex;
 
-    // Guards against EditPageBase's OnParametersSetAsync re-running LoadAsync() (which would
-    // overwrite in-progress edits with server data) every time we update the "?tab=" query
-    // string ourselves after a tab switch. LoadAsync() should only ever run once per real page
-    // visit — a fresh navigation to this route (including a hard refresh) — not on every
-    // parameter set caused by our own replace-navigation below.
     private bool _initialised;
 
-    // Maps each validated field to the tab it lives on, so the tab header can show an error
-    // badge and a failed save can jump to the first tab containing an invalid field.
     private static readonly (int Tab, string Field)[] TabFieldMap =
     [
         (0, nameof(HrSettingsEditModel.HoursPerDay)),
@@ -415,9 +404,6 @@
         _lastSyncedTabIndex = _activeTabIndex;
     }
 
-    // Tracks the last tab index reflected in the URL, so OnAfterRenderAsync only pushes a new
-    // "?tab=" query value when the user actually switches tabs (SfTab's @bind-SelectedItem),
-    // not on every render.
     private int _lastSyncedTabIndex;
 
     protected override Task OnAfterRenderAsync(bool firstRender)
@@ -448,10 +434,6 @@
 
     private bool _showRenumberWarning;
 
-    // True when the user has changed the Employee or Asset numbering FORMAT (prefix or minimum
-    // length) while staying in Automatic mode — a Manual<->Automatic mode switch alone doesn't
-    // count. The backend performs the actual renumber of existing records synchronously on save,
-    // so this is purely a confirmation gate in front of that existing behaviour.
     private bool IsRenumberingFormatChange() =>
         (Model.EmployeeNumberMode == EmployeeNumberMode.Automatic
             && Model.EmployeeNumberOriginalMode == EmployeeNumberMode.Automatic
@@ -485,17 +467,12 @@
     {
         await SaveAsync();
 
-        // On failure, jump to the first tab (in tab order) containing an invalid field so the
-        // user immediately sees the problem. If the failure was a server-side error with no
-        // associated field (GlobalError set but no field-level messages), leave the tab as-is.
         if (GlobalError is not null && _tabsWithErrors.Count > 0)
             _activeTabIndex = _tabsWithErrors.Min();
     }
 
     protected override async Task LoadAsync()
     {
-        // HR-policy settings are HR Administrator territory only, matching the "hr-settings:manage"
-        // policy that guards the underlying save endpoint.
         await Session.InitialiseAsync();
         if (!Session.CanManageHrSettings)
         {
@@ -580,23 +557,12 @@
         if (result is null)
             return "Failed to save HR settings.";
 
-        // Keep the concurrency token current so a second save without leaving the page succeeds.
         Model.Version = result.Version;
         Model.NextEmployeeNumber = result.NextEmployeeNumber;
         Model.NextEmployeeNumberOriginal = result.NextEmployeeNumber;
         return null;
     }
 
-    // Save navigates to the HR Dashboard — this page is only ever reachable by an HR
-    // Administrator (see the IsHrAdministrator guard above), so the target is unambiguous. Left as
-    // EditPageBase's default OnSavedAsync (navigate to TargetListUrl via NavigateToList()) rather
-    // than a raw Navigation.NavigateTo call here: ConfirmSaveAndCloseAsync (the "unsaved changes"
-    // dialog's Save option) always issues its own follow-up NavigateToList() call after SaveAsync
-    // succeeds, targeting ListUrl — bypassing that mechanism with a direct call risked two
-    // stacked forceLoad navigations to two different URLs on that path (see the
-    // _navigatedThisSave fix elsewhere in EditPageBase for the general form of this bug). Routing
-    // both Save and Close to the dashboard keeps this page's navigation behaviour uniform and safe
-    // regardless of which path triggered it.
     protected override string? ListUrl => "/dashboard/hr";
 
     private void ToggleDay(string day, bool isChecked)

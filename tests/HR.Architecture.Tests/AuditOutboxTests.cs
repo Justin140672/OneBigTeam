@@ -8,17 +8,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Architecture.Tests;
 
-/// <summary>
-/// AUD-01: unit tests for the audit outbox state machine and publisher behaviour.
-/// No database required — AuditPendingItem state transitions are pure C#, and
-/// DbAuditEventPublisher failure-handling is tested via a Npgsql context with a dummy
-/// connection string (save attempt fails at the transport layer, not the guard layer).
-/// </summary>
 public class AuditOutboxTests
 {
     private const string DummyConnectionString = "Host=localhost;Database=audit_outbox_unit_test";
 
-    // ── AuditPendingItem state machine ────────────────────────────────────────────
 
     [Fact]
     public void From_Captures_EventId_And_Status_Pending()
@@ -38,7 +31,7 @@ public class AuditOutboxTests
         item.MarkProcessing();
         item.MarkFailed("something went wrong");
 
-        item.MarkProcessing(); // second attempt
+        item.MarkProcessing();
         Assert.Equal(AuditPendingItem.StatusProcessing, item.Status);
         Assert.Equal(2, item.AttemptCount);
         Assert.Null(item.ErrorMessage);
@@ -99,13 +92,10 @@ public class AuditOutboxTests
         Assert.Throws<InvalidOperationException>(() => item.ResetForRetry());
     }
 
-    // ── DbAuditEventPublisher ────────────────────────────────────────────────────
 
     [Fact]
     public async Task PublishAsync_Does_Not_Throw_When_Save_Fails()
     {
-        // Arrange — context with a dummy connection string; SaveChangesAsync will throw at the
-        // transport layer (cannot connect), not at the EnforceAppendOnly layer.
         var options = new DbContextOptionsBuilder<AuditDbContext>()
             .UseNpgsql(DummyConnectionString)
             .Options;
@@ -129,7 +119,6 @@ public class AuditOutboxTests
         await using var ctx = new AuditDbContext(options);
         var publisher = new DbAuditEventPublisher(ctx, NullLogger<DbAuditEventPublisher>.Instance, new HR.SharedKernel.ExecutionContext.ExecutionContextAccessor());
 
-        // A type that does NOT implement IAuditEvent — publisher should silently no-op.
         var exception = await Record.ExceptionAsync(
             () => publisher.PublishAsync("not an audit event", CancellationToken.None));
 
@@ -154,17 +143,13 @@ public class AuditOutboxTests
     // value persisted unchanged — DbAuditEventPublisher never touches CorrelationId at all now.
 }
 
-/// <summary>
-/// Audit event with a stable, fixed EventId suitable for idempotency tests.
-/// </summary>
 internal sealed class StableAuditEvent : IAuditEvent
 {
-    public Guid EventId        { get; } = Guid.NewGuid(); // fixed per instance
+    public Guid EventId        { get; } = Guid.NewGuid();
     public Guid CompanyId      { get; } = Guid.NewGuid();
     public string EventType    => "test.aud01";
     public string EntityType   => "TestEntity";
     public Guid EntityId       { get; } = Guid.NewGuid();
-    // AUD-04: test fixture uses a fixed actor so the attribution guard passes.
     public Guid? ActorUserId   => Guid.Parse("00000000-0000-0000-0000-000000000001");
     public Guid? ActorEmployeeId => null;
     public DateTimeOffset OccurredAt => DateTimeOffset.UtcNow;
@@ -175,8 +160,6 @@ internal sealed class StableAuditEvent : IAuditEvent
     public object? Metadata    => null;
 }
 
-/// <summary>Audit event fixture with an explicit, non-null CorrelationId already set — used to
-/// document that <see cref="DbAuditEventPublisher"/> must never override it.</summary>
 internal sealed class ExplicitCorrelationAuditEvent(Guid correlationId) : IAuditEvent
 {
     public Guid EventId        { get; } = Guid.NewGuid();

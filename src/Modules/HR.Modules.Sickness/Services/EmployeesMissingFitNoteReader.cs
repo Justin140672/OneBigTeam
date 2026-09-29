@@ -5,11 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Services;
 
-/// <summary>
-/// DSH-05 implementation of <see cref="IEmployeesMissingFitNoteReader"/>. Uses the same
-/// Pending/Overdue evidence-request predicate as the Sickness module's own GetMissingFitNotes
-/// feature so the manager team-status summary count and that feature's drill-down list agree.
-/// </summary>
 internal sealed class EmployeesMissingFitNoteReader(SicknessDbContext dbContext) : IEmployeesMissingFitNoteReader
 {
     public async Task<IReadOnlySet<Guid>> GetEmployeeIdsMissingFitNotesAsync(

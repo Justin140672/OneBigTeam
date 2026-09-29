@@ -57,7 +57,6 @@ public class SearchApplicationsValidatorTests
         Assert.True(_validator.Validate(Valid() with { IsInternal = isInternal }).IsValid);
     }
 
-    // ----- Existing rules: boundaries -----
 
     [Fact]
     public void Validate_Passes_When_Search_Is_Exactly_200_Characters()

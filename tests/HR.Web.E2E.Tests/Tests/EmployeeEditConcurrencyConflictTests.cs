@@ -39,11 +39,9 @@ public sealed class EmployeeEditConcurrencyConflictTests(HrAdminPersonaFixture f
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // ── Tab 1: open the employee editor and start editing the Preferred Name ──
         await empEdit.GoToAsync(AcmeId, EmployeeId);
         await empEdit.FillPreferredNameAsync(firstTabValue);
 
-        // ── Tab 2 (same context / persona): load the same employee and save a change first ──
         var otherPage    = await _context.NewPageAsync();
         try
         {
@@ -57,7 +55,6 @@ public sealed class EmployeeEditConcurrencyConflictTests(HrAdminPersonaFixture f
             await otherPage.CloseAsync();
         }
 
-        // ── Tab 1: saving now is stale → warning banner, no navigation, input preserved ──
         await empEdit.ClickSaveExpectingConflictAsync();
 
         Assert.True(await empEdit.IsConcurrencyWarningVisibleAsync(),
@@ -66,14 +63,12 @@ public sealed class EmployeeEditConcurrencyConflictTests(HrAdminPersonaFixture f
         Assert.DoesNotContain("/view", _page.Url);
         Assert.Equal(firstTabValue, await empEdit.GetPreferredNameValueAsync());
 
-        // ── Tab 1: "Reload latest values" clears the banner and shows the other actor's value ──
         await empEdit.ClickReloadLatestValuesAsync();
 
         Assert.False(await empEdit.IsConcurrencyWarningVisibleAsync(),
             "Expected the warning banner to clear after reloading latest values");
         Assert.Equal(otherTabValue, await empEdit.GetPreferredNameValueAsync());
 
-        // ── Tab 1: re-edit against the fresh version and save successfully ──
         await empEdit.FillPreferredNameAsync(finalValue);
         await empEdit.ClickSaveChangesAsync();
 
@@ -109,13 +104,11 @@ public sealed class EmployeeEditConcurrencyConflictTests(HrAdminPersonaFixture f
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // ── Tab 1: open the employee, capture the original Notes, edit BOTH tabs, don't save ──
         await empEdit.GoToAsync(AcmeId, EmployeeId);
         var originalNotes = await empEdit.GetEmploymentNotesValueAsync();
         await empEdit.FillEmploymentNotesAsync(firstNotes);
         await empEdit.FillPreferredNameAsync(firstPreferredName);
 
-        // ── Tab 2 (same context / persona): change Preferred Name and save first, bumping Version ──
         var otherPage = await _context.NewPageAsync();
         try
         {
@@ -129,7 +122,6 @@ public sealed class EmployeeEditConcurrencyConflictTests(HrAdminPersonaFixture f
             await otherPage.CloseAsync();
         }
 
-        // ── Tab 1: the combined save is now stale → warning banner, no navigation ──
         await empEdit.ClickSaveExpectingConflictAsync();
 
         Assert.True(await empEdit.IsConcurrencyWarningVisibleAsync(),
@@ -137,39 +129,25 @@ public sealed class EmployeeEditConcurrencyConflictTests(HrAdminPersonaFixture f
         Assert.Contains("/employees/", _page.Url);
         Assert.DoesNotContain("/view", _page.Url);
 
-        // Atomic: nothing was applied, so BOTH inputs still hold Tab 1's unsaved values.
         Assert.Equal(firstPreferredName, await empEdit.GetPreferredNameValueAsync());
         Assert.Equal(firstNotes, await empEdit.GetEmploymentNotesValueAsync());
 
-        // ── Tab 1: "Reload latest values" → banner clears, form shows fresh server state ──
         await empEdit.ClickReloadLatestValuesAsync();
 
         Assert.False(await empEdit.IsConcurrencyWarningVisibleAsync(),
             "Expected the warning banner to clear after reloading latest values");
         Assert.Equal(otherPreferredName, await empEdit.GetPreferredNameValueAsync());
-        // The explicit reload discards Tab 1's local Notes edit — back to the original server value.
         Assert.Equal(originalNotes, await empEdit.GetEmploymentNotesValueAsync());
 
-        // ── Tab 1: re-edit both against the fresh version and save atomically ──
         await empEdit.FillEmploymentNotesAsync(finalNotes);
         await empEdit.FillPreferredNameAsync(finalPreferredName);
-        // ClickSaveChangesAsync throws on any error banner and waits for the post-save navigation
-        // away from the edit route — a successful atomic save.
         await empEdit.ClickSaveChangesAsync();
 
-        // ── Reload and assert both fields persisted ──
         await empEdit.GoToAsync(AcmeId, EmployeeId);
         Assert.Equal(finalPreferredName, await empEdit.GetPreferredNameValueAsync());
         Assert.Equal(finalNotes, await empEdit.GetEmploymentNotesValueAsync());
     }
 
-    /// <summary>
-    /// Bug (b): once a concurrency banner is showing, editing a field to an invalid value (here:
-    /// clearing the required "Last Name") must clear the stale banner so it doesn't linger next to
-    /// the new validation errors. Driven by EditPageBase.OnValidationStateChanged.
-    /// Shares the pool employee with the test above — xUnit runs the two serially (no intra-class
-    /// parallelism), and each test starts from a fresh page load, so there is no shared mutable state.
-    /// </summary>
     [Fact]
     public async Task Editor_MakingFieldInvalidAfterConflict_ClearsWarningBanner()
     {
@@ -201,7 +179,6 @@ public sealed class EmployeeEditConcurrencyConflictTests(HrAdminPersonaFixture f
         await empEdit.ClickSaveExpectingConflictAsync();
         Assert.True(await empEdit.IsConcurrencyWarningVisibleAsync());
 
-        // Make the form invalid — the banner should disappear.
         await empEdit.MakeDetailsFormInvalidAsync();
 
         Assert.False(await empEdit.IsConcurrencyWarningVisibleAsync(),

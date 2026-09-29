@@ -29,12 +29,6 @@ public interface IOpenTaskBySourceEntityReader
         CancellationToken cancellationToken,
         TaskActionType? actionType = null);
 
-    /// <summary>
-    /// Resolves the open (Open/InProgress) task id for a single assignee against a given source
-    /// entity id and action type — needed when a single source entity (e.g. a Shared Company
-    /// Document) fans out to many per-employee tasks that all share the same SourceEntityId, so
-    /// <see cref="GetOpenTaskIdsAsync"/> alone cannot disambiguate between employees.
-    /// </summary>
     Task<Guid?> GetOpenTaskIdForAssigneeAsync(
         Guid companyId,
         Guid sourceEntityId,
@@ -42,14 +36,6 @@ public interface IOpenTaskBySourceEntityReader
         TaskActionType actionType,
         CancellationToken cancellationToken);
 
-    /// <summary>
-    /// Returns a taskId -&gt; effective assignee map (AssignedEmployeeId, falling back to
-    /// AssignedUserId; null when the task is unassigned) for the given task ids — the same
-    /// "effective assignee" GetTask authorizes against. Lets a caller that surfaces a task-backed
-    /// row (e.g. a manager's dashboard attention queue) mark it actionable only when the viewer
-    /// will actually be allowed to open that task, instead of offering an "Open task" action that
-    /// GetTask then rejects. Unknown ids are omitted.
-    /// </summary>
     Task<IReadOnlyDictionary<Guid, Guid?>> GetTaskAssigneesAsync(
         Guid companyId,
         IEnumerable<Guid> taskIds,

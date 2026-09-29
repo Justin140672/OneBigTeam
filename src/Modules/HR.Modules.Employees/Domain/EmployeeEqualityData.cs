@@ -1,11 +1,5 @@
 namespace HR.Modules.Employees.Domain;
 
-/// <summary>
-/// Voluntary employee equality monitoring data. Zero-or-one record per employee.
-/// Answer values are stored as the string name of the corresponding enum member (or free text
-/// for the self-described / impact fields). All answer columns are special-category personal
-/// data and are encrypted at rest by the application layer.
-/// </summary>
 internal sealed class EmployeeEqualityData
 {
     private EmployeeEqualityData() { }

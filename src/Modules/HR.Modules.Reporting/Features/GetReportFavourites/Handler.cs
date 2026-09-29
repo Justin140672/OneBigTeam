@@ -19,10 +19,6 @@ internal sealed class GetReportFavouritesHandler(ReportingDbContext dbContext)
             .Select(f => f.ReportId)
             .ToListAsync(cancellationToken);
 
-        // REP-03: omit favourites for reports removed from the catalogue, or that the caller can
-        // no longer access (e.g. a permission revoked after the favourite was saved), rather than
-        // erroring — existing favourites created before this change continue to work as long as
-        // access remains valid.
         var visibleReportIds = reportIds
             .Where(reportId => ReportCatalog.TryGet(reportId, out var definition) && accessGates.IsAuthorized(definition.AccessGate))
             .ToList();

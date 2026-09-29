@@ -52,7 +52,6 @@ internal sealed class UpdateEmployeeProfileAndEmploymentHandler
         Result<UpdateEmployeeProfileAndEmploymentResponse> Fail(Error error) =>
             Result.Failure<UpdateEmployeeProfileAndEmploymentResponse>(error);
 
-        // ---- Profile: contact-format validation -------------------------------------------------
         var contactRules = await _contactValidationReader.GetContactValidationRulesAsync(request.CompanyId, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(request.PostCode) &&
@@ -73,7 +72,6 @@ internal sealed class UpdateEmployeeProfileAndEmploymentHandler
         if (employee is null)
             return Fail(Error.NotFound($"Employee with id '{request.Id}' was not found."));
 
-        // ---- Profile: work email uniqueness ----------------------------------------------------
         var newEmail = request.WorkEmail.Trim().ToLowerInvariant();
 
         if (!string.Equals(employee.WorkEmail, newEmail, StringComparison.Ordinal))
@@ -86,7 +84,6 @@ internal sealed class UpdateEmployeeProfileAndEmploymentHandler
                 return Fail(Error.Conflict($"An employee with work email '{request.WorkEmail.Trim()}' already exists in this company."));
         }
 
-        // ---- Employment: employee number mode + uniqueness -----------------------------------
         var employeeNumberMode = await _employeeNumberSettingsReader.GetModeAsync(request.CompanyId, cancellationToken);
 
         var normalizedEmployeeNumber = employeeNumberMode == EmployeeNumberMode.Automatic
@@ -110,7 +107,6 @@ internal sealed class UpdateEmployeeProfileAndEmploymentHandler
                 return Fail(Error.Conflict($"An employee with employee number '{request.EmployeeNumber}' already exists in this company."));
         }
 
-        // ---- Employment: referenced entity existence ------------------------------------------
         if (request.DepartmentId.HasValue)
         {
             var deptExists = await _dbContext.Departments.AnyAsync(
@@ -168,7 +164,6 @@ internal sealed class UpdateEmployeeProfileAndEmploymentHandler
                 return Fail(Error.NotFound($"Employment type '{request.EmploymentTypeId}' was not found or is inactive."));
         }
 
-        // ---- Employment: status transition guards --------------------------------------------
         if (request.Status == EmploymentStatus.Draft && employee.Status != EmploymentStatus.Draft)
             return Fail(Error.Validation("Cannot set employment status to Draft."));
 
@@ -180,7 +175,6 @@ internal sealed class UpdateEmployeeProfileAndEmploymentHandler
             employee.LeavingDate is null)
             return Fail(Error.Validation("Cannot set employment status to Leaving without a leaving date. Use the Start Leaving Process action instead."));
 
-        // ---- Apply mutations -----------------------------------------------------------------
         var now = _clock.UtcNowOffset();
 
         var profileBefore = SnapshotProfile(employee);
@@ -189,7 +183,6 @@ internal sealed class UpdateEmployeeProfileAndEmploymentHandler
         var overallLocationBefore = employee.LocationId;
         var overallManagerBefore = employee.ManagerId;
 
-        // Profile mutations first; the employment block has the final say over the shared fields.
         employee.UpdateProfile(
             request.FirstName.Trim(),
             request.LastName.Trim(),
@@ -220,7 +213,6 @@ internal sealed class UpdateEmployeeProfileAndEmploymentHandler
 
         employee.SetSystemAccess(request.HasSystemAccess, now);
 
-        // Employment status transitions.
         if (employee.Status != request.Status)
         {
             switch (request.Status)
@@ -252,7 +244,6 @@ internal sealed class UpdateEmployeeProfileAndEmploymentHandler
 
         employee.SetWorkingPattern(request.WorkingDaysOverride, request.HoursPerDayOverride, now);
 
-        // Seed-admin completion: the one automatic Draft -> Active transition in the system.
         if (employee.IsInitialCompanyAdmin && employee.Status == EmploymentStatus.Draft)
             employee.Activate(now);
 
@@ -269,7 +260,6 @@ internal sealed class UpdateEmployeeProfileAndEmploymentHandler
                 employee.CompanyId, now);
         }
 
-        // ---- Single guarded commit ----------------------------------------------------------
         var saveResult = await _dbContext.SaveChangesWithConcurrencyAsync(
             employee,
             request.ExpectedVersion,
@@ -294,7 +284,6 @@ internal sealed class UpdateEmployeeProfileAndEmploymentHandler
             }
         }
 
-        // ---- Post-commit: merged audit + integration events --------------------------------
         var correlationId = request.CorrelationId ?? Guid.NewGuid();
         var profileAfter = SnapshotProfile(employee);
         var employmentAfter = SnapshotEmployment(employee);

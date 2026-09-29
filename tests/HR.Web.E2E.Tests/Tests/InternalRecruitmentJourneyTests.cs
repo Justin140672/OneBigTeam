@@ -40,7 +40,6 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
 {
     private static readonly Guid AcmeId = InternalVacancyApplyApi.AcmeId;
 
-    // RecruitmentStageSeeder.BuildDefaultStages.
     private const string InitialStage = "Application Received";
     private const string OfferStage = "Offer";
     private const string HiredStage = "Hired";
@@ -49,7 +48,6 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
 
     private static DateOnly Today => DateOnly.FromDateTime(DateTime.Today);
 
-    /// <summary>Signs the browser in as <paramref name="email"/>.</summary>
     private async Task SignInAsAsync(LoginPage login, string email, bool switchAccount)
     {
         if (switchAccount)
@@ -66,7 +64,6 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
     [Fact]
     public async Task InternalRecruitment_FullJourney_AdvertiseApplyReviewInterviewOfferAppoint_UpdatesTheExistingEmployee()
     {
-        // ── Arrange (API): own vacancy (Open, NOT yet advertised), own manager, own applicant ──────
         using var hrAdminApi = await InternalVacancyApplyApi.CreateHrAdminApiClientAsync(_fixture.ApiBaseUrl);
         using var recruiterApi = await CandidateCvApi.CreateRecruiterApiClientAsync(_fixture.ApiBaseUrl);
 
@@ -96,7 +93,6 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
         var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
         var advertiseCheckbox = _page.Locator("#isAdvertisedInternally");
 
-        // ── 1. Recruiter advertises the Open vacancy internally ────────────────────────────────
         await SignInAsAsync(login, InternalAppointmentApi.RecruiterEmail, switchAccount: false);
 
         await vacancyDetail.GoToAsync(AcmeId, vacancy.Id);
@@ -107,7 +103,6 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
         await vacancyDetail.GoToAsync(AcmeId, vacancy.Id);
         await Assertions.Expect(advertiseCheckbox).ToBeCheckedAsync(new() { Timeout = 15_000 });
 
-        // ── 2. The plain employee sees the vacancy and applies with a required CV ──────────────
         await SignInAsAsync(login, applicant.WorkEmail, switchAccount: true);
 
         var internalVacancies = new InternalVacanciesPage(_page, _fixture.WebBaseUrl);
@@ -120,7 +115,6 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
         await internalVacancies.OpenCardAsync(vacancy.Title);
         await internalVacancies.ClickApplyAsync();
 
-        // CV is required: submitting without one keeps the employee on the form.
         await internalVacancies.SubmitApplicationAsync();
         await internalVacancies.WaitForCvErrorAsync("Please choose a CV file to upload.");
 
@@ -133,13 +127,11 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
         Assert.True(await internalVacancies.IsAppliedButtonDisabledAsync(), "Expected a disabled Applied button after submitting.");
         Assert.Equal(0, await internalVacancies.ApplyButtonCountAsync());
 
-        // Applied comes back from the server after a reload.
         await internalVacancies.GoToAsync(AcmeId);
         await internalVacancies.SearchAsync(vacancy.Title);
         Assert.True(await internalVacancies.HasAppliedBadgeAsync(vacancy.Title),
             "Expected the vacancy card to show Applied after a reload");
 
-        // A duplicate submission (a second POST as the same employee) is refused server-side.
         var employeeApi = await InternalVacancyApplyApi.CreateEmployeeApiClientAsync(_fixture.ApiBaseUrl, applicant.WorkEmail);
         using (employeeApi)
         {
@@ -150,7 +142,6 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
             Assert.Equal("already_applied", await InternalRecruitmentJourneyApi.ReadRejectionCodeAsync(duplicate));
         }
 
-        // ── 3. Candidate linked to the existing employee; application references the uploaded CV ──
         var listed = Assert.Single(await CandidateCvApi.ListApplicationsForVacancyAsync(recruiterApi, AcmeId, vacancy.Id));
         Assert.Equal(applicant.WorkEmail, listed.CandidateEmail, ignoreCase: true);
         var applicationId = listed.Id;
@@ -167,7 +158,6 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
             ?? throw new InvalidOperationException("The internal application has no submitted CV document.");
         Assert.Equal(submittedCvId, applied.CurrentCandidateCvDocumentId);
 
-        // ── 4. Recruiter sees the Internal badge in the Applications list and on the Kanban board ──
         await SignInAsAsync(login, InternalAppointmentApi.RecruiterEmail, switchAccount: true);
 
         await vacancyDetail.GoToAsync(AcmeId, vacancy.Id);
@@ -182,7 +172,6 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
         var (_, kanbanColumn) = await kanban.GetColumnOfCardAsync(applicationId);
         Assert.Equal(InitialStage, kanbanColumn);
 
-        // ── 5. Review CV (from the Applications list) shows the exact submitted CV ─────────────
         await vacancyDetail.GoToAsync(AcmeId, vacancy.Id);
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickReviewCvForAsync(applicant.LastName);
@@ -196,7 +185,6 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
         Assert.False(await review.IsNoSubmittedCvBannerVisibleAsync(),
             "An internal application always carries its submitted CV — no 'No CV was captured' banner");
 
-        // ── 6. Replacing the candidate's CURRENT CV does not change the application's CV ────────
         var candidatePage = new CandidateEditPage(_page, _fixture.WebBaseUrl);
         await candidatePage.GoToAsync(AcmeId, candidateId);
         var candidateCvs = new CandidateCvDocumentsSection(_page);
@@ -223,7 +211,6 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
         Assert.True(await review.IsUseCurrentCvVisibleAsync(),
             "Expected 'Use candidate's current CV' once the current CV differs from the submitted CV");
 
-        // ── 7. Progress through the stages: interview → outcome → offer ────────────────────────
         await vacancyDetail.GoToAsync(AcmeId, vacancy.Id);
         await vacancyDetail.OpenApplicationsTabAsync();
 
@@ -247,18 +234,15 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
         await vacancyDetail.ClickOfferForAsync(applicant.LastName);
         await vacancyDetail.ExpectApplicationStatusAsync(applicant.LastName, OfferStage);
 
-        // An internal application is completed by Appoint, never by Hire.
         await vacancyDetail.ExpectToolbarItemEnabledForRowAsync(applicant.LastName, "Appoint");
         await vacancyDetail.ExpectToolbarItemDisabledAsync("Hire");
 
-        // ── 8. Appoint the existing employee ───────────────────────────────────────────────────
         await vacancyDetail.ClickAppointForAsync(applicant.LastName);
         var dialog = new InternalAppointmentDialog(_page);
         await dialog.WaitForOpenAsync();
 
         await dialog.ExpectExistingEmployeeNoticeAsync(applicant.FullName);
         await dialog.ExpectDerivedFieldsAsync(newProfileTitle, newDepartmentName, newLocationName);
-        // The offer was made without a proposed start date, so the appointment defaults to today.
         await dialog.ExpectEffectiveDateAsync(Today);
 
         await dialog.SelectManagerAsync(newManager.LastName);
@@ -266,11 +250,8 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
         await dialog.SubmitExpectingSuccessAsync();
 
         await dialog.ExpectAppliedSuccessBannerAsync();
-        // The recruiter cannot open the full employee record, so the banner names the employee
-        // rather than linking to a page that would deny access.
         await dialog.ExpectEmployeeNameWithoutLinkAsync(applicant.FullName);
 
-        // ── 9. Application reaches Hired ──────────────────────────────────────────────────────
         await vacancyDetail.ExpectApplicationStatusAsync(applicant.LastName, HiredStage);
         await vacancyDetail.ExpectAppointmentPendingHintAsync(applicationId, visible: false);
 
@@ -278,7 +259,6 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
         Assert.Equal(HiredStage, hired.CurrentStageName);
         Assert.Equal(submittedCvId, hired.CvDocumentId);
 
-        // ── 10. The EXISTING employee was updated; no second employee was created ────────────────
         var after = await InternalRecruitmentJourneyApi.GetEmployeeRecordAsync(hrAdminApi, applicant.Id);
         Assert.Equal(InternalRecruitmentJourneyApi.SalesDepartmentId, after.DepartmentId);
         Assert.Equal(vacancyInfo.PositionProfileId, after.PositionProfileId);
@@ -298,7 +278,5 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
 
         var candidateAfter = await InternalRecruitmentJourneyApi.GetCandidateAsync(recruiterApi, candidateId);
         Assert.Equal(applicant.Id, candidateAfter.EmployeeId);
-        // Following the banner's profile link (HR Administrator + Recruiter appointer) is covered by
-        // InternalAppointmentTests.Appoint_WithSelectedManagerToday_...
     }
 }

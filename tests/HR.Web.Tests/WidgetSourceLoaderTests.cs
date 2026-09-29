@@ -4,11 +4,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Web.Tests;
 
-/// <summary>
-/// DSH-03 — <see cref="WidgetSourceLoader"/> wraps a single widget data-source fetch so the caller
-/// only ever sees Loaded / Failed: a throwing fetch is logged (with correlation context) and
-/// swallowed, never rethrown and never surfaced with exception detail.
-/// </summary>
 public class WidgetSourceLoaderTests
 {
     [Fact]
@@ -38,13 +33,12 @@ public class WidgetSourceLoaderTests
                 "Open vacancies",
                 () => throw new InvalidOperationException("boom - upstream API 500")));
 
-        Assert.Null(ex); // never rethrown
+        Assert.Null(ex);
         Assert.True(result.IsFailed);
         Assert.Equal("Open vacancies", result.SourceName);
 
         var errorEntry = Assert.Single(logger.Entries, e => e.Level == LogLevel.Error);
         Assert.IsType<InvalidOperationException>(errorEntry.Exception);
-        // Correlation context is logged; the raw exception message is not part of the formatted text.
         Assert.Contains("Widget", errorEntry.Message);
         Assert.Contains("Source", errorEntry.Message);
         Assert.Contains("CorrelationId", errorEntry.Message);

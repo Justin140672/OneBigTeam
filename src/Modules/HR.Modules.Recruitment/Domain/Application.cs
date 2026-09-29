@@ -18,9 +18,6 @@ internal sealed class Application : HR.SharedKernel.IVersionedAggregate
     public Guid VacancyId { get; private set; }
     public Guid CandidateId { get; private set; }
 
-    // Ticket #99: replaces the fixed ApplicationStatus enum entirely. References a per-company
-    // configurable RecruitmentStage row (see RecruitmentStage.cs). Never null after creation — every
-    // Application always sits on exactly one stage.
     public Guid CurrentStageId { get; private set; }
 
     public InterviewOutcome? InterviewOutcome { get; private set; }
@@ -42,9 +39,6 @@ internal sealed class Application : HR.SharedKernel.IVersionedAggregate
     // WithdrawApplicationHandler and GetRecruitmentKanbanHandler.
     public DateTimeOffset? WithdrawnAt { get; private set; }
 
-    // SET-05: when the company's OfferApprovalRequired setting is on, an offer must be approved
-    // (see ApproveOffer()) before OfferCandidateHandler will move the application to the offer
-    // stage. Null means "not yet approved" — always null for companies that never require approval.
     public DateTimeOffset? OfferApprovedAt { get; private set; }
     public Guid? OfferApprovedByUserId { get; private set; }
 
@@ -68,10 +62,6 @@ internal sealed class Application : HR.SharedKernel.IVersionedAggregate
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    // Ticket #78: how this candidate/application originated. Nullable for backward compatibility —
-    // existing applications created before this concept existed have Source == null. Set together
-    // with SourceExternalRecruiterId as a validated pair (see CreateApplicationValidator): the
-    // recruiter id is required if and only if Source == ExternalRecruiter.
     public ApplicationSource? Source { get; private set; }
 
     // Deliberately references the ExternalRecruiter row directly (never the VacancyRecruiterAssignment
@@ -102,7 +92,6 @@ internal sealed class Application : HR.SharedKernel.IVersionedAggregate
     public Guid? AppointmentRequestedByUserId { get; private set; }
     public DateTimeOffset? AppointmentRequestedAt { get; private set; }
 
-    // Set on completion: the Employees-module promotion holding the change, and its effective date.
     public Guid? AppointmentPromotionId { get; private set; }
     public DateOnly? AppointmentEffectiveDate { get; private set; }
     public DateTimeOffset? AppointmentCompletedAt { get; private set; }
@@ -112,7 +101,6 @@ internal sealed class Application : HR.SharedKernel.IVersionedAggregate
     public const string InternalAppointmentInProgressMessage =
         "An internal appointment is being completed for this application. Wait for it to finish, then reload.";
 
-    /// <summary>The Employees-module idempotency key for this application's internal appointment.</summary>
     public string InternalAppointmentSourceReference => $"recruitment:application:{Id}";
 
     public static Application Create(
@@ -139,13 +127,6 @@ internal sealed class Application : HR.SharedKernel.IVersionedAggregate
         SourceExternalRecruiterId = source == ApplicationSource.ExternalRecruiter ? sourceExternalRecruiterId : null,
     };
 
-    /// <summary>
-    /// Sets (or changes) the recorded source of this application. Kept as a distinct method from
-    /// Create so that source can also be attached/corrected after creation via a dedicated endpoint.
-    /// Callers (validator/handler) must enforce that sourceExternalRecruiterId is supplied if and only
-    /// if source == ExternalRecruiter — this method trusts that pairing has already been validated and
-    /// simply guards against storing an orphaned recruiter id for a non-ExternalRecruiter source.
-    /// </summary>
     public void SetSource(ApplicationSource? source, Guid? sourceExternalRecruiterId, DateTimeOffset now)
     {
         Source = source;
@@ -211,14 +192,6 @@ internal sealed class Application : HR.SharedKernel.IVersionedAggregate
         return true;
     }
 
-    /// <summary>
-    /// Records (or updates) the interview outcome mirrored onto the application for cheap
-    /// list/kanban display, independent of the stage the application currently sits on. Ticket #99
-    /// judgement call: interview sub-states (Screening/InterviewScheduled/Interviewed) no longer
-    /// exist as separate pipeline stages — "Interview" is just one configurable stage — so scheduling
-    /// an interview or recording its outcome is metadata only and never itself changes
-    /// CurrentStageId. See ScheduleInterviewHandler/InterviewOutcomeRecorder.
-    /// </summary>
     public void SetInterviewOutcome(InterviewOutcome outcome, DateTimeOffset now)
     {
         InterviewOutcome = outcome;
@@ -358,16 +331,6 @@ internal sealed class Application : HR.SharedKernel.IVersionedAggregate
         UpdatedAt           = now;
     }
 
-    /// <summary>
-    /// Flags this application as withdrawn by the candidate, orthogonal to CurrentStageId (see the
-    /// WithdrawnAt remarks above). Does not change CurrentStageId — the stage the application was at
-    /// when withdrawn is preserved.
-    /// </summary>
-    /// <summary>
-    /// SET-05: records that making an offer for this application has been approved. Only meaningful
-    /// when the company's OfferApprovalRequired setting is on — OfferCandidateHandler enforces that
-    /// OfferApprovedAt is set before allowing the application to move to the offer stage in that case.
-    /// </summary>
     public void ApproveOffer(Guid approvedByUserId, DateTimeOffset now)
     {
         OfferApprovedAt = now;
@@ -397,11 +360,6 @@ internal sealed class Application : HR.SharedKernel.IVersionedAggregate
 
     public void Withdraw(DateTimeOffset now)
     {
-        // A scheduled-but-not-yet-resolved interview shouldn't linger as "Pending" once the
-        // candidate has withdrawn — mirror the same Cancelled outcome onto this display field that
-        // WithdrawApplicationHandler applies to the real Interview row(s) via Interview.Cancel().
-        // Any already-resolved outcome (Passed/Failed/NoShow) is left untouched — that's a genuine
-        // historical fact, not something withdrawal should overwrite.
         if (InterviewOutcome == Domain.InterviewOutcome.Pending)
             InterviewOutcome = Domain.InterviewOutcome.Cancelled;
 

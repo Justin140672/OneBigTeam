@@ -3,10 +3,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Identity.Tests.Infrastructure;
 
-/// <summary>
-/// Minimal test double for <see cref="IEmployeeAudienceReader"/> — only <see cref="GetAllEmployeeIdsAsync"/>
-/// is used by InviteAdditionalUsersTask, so every other member is left unimplemented.
-/// </summary>
 internal sealed class FakeEmployeeAudienceReader : IEmployeeAudienceReader
 {
     private readonly IReadOnlyList<Guid> _employeeIds;
@@ -23,7 +19,6 @@ internal sealed class FakeEmployeeAudienceReader : IEmployeeAudienceReader
         _audienceProfiles = audienceProfiles ?? new Dictionary<Guid, EmployeeAudienceProfile>();
     }
 
-    /// <summary>Captures the (companyId, employeeId) pair passed to the most recent <see cref="EmployeeExistsAsync"/> call.</summary>
     public (Guid CompanyId, Guid EmployeeId)? LastEmployeeExistsCall { get; private set; }
 
     public Task<EmployeeAudienceProfile?> GetEmployeeAudienceAsync(Guid companyId, Guid employeeId, CancellationToken cancellationToken)

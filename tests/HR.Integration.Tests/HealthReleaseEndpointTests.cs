@@ -33,8 +33,6 @@ public sealed class HealthReleaseEndpointTests
             new[] { "deploymentId", "environment", "railwayCommit", "railwayEnvironmentId", "railwayServiceId", "service", "sha", "startedAt", "version" },
             names);
         Assert.Equal("api", doc.RootElement.GetProperty("service").GetString());
-        // Railway-injected immutable identity fields are present (null in the test host, which has no
-        // Railway env vars) and are separate from the mutable display 'sha'/'version'.
         Assert.True(doc.RootElement.TryGetProperty("deploymentId", out _));
 
         var body = await response.Content.ReadAsStringAsync();
@@ -50,7 +48,6 @@ public sealed class HealthReleaseEndpointTests
         var response = await client.GetAsync("/health/startup-migrations");
         using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
 
-        // Back-compat: module names are still top-level keys with the {status,...} shape.
         Assert.True(doc.RootElement.TryGetProperty("companies", out var companies));
         Assert.True(companies.TryGetProperty("status", out _));
 

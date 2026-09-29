@@ -9,13 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Customer Release Notifications: POST /api/notifications/admin/product-updates, gated by the
-/// "platform:admin" policy (see PlatformSettingsAuthorizationTests for the authorization matrix
-/// this mirrors). Verifies the send fans out real per-recipient Notification rows reusing the
-/// exact same in-app notification infrastructure (GetMyNotifications / unread-count) as every
-/// other notification type — see NotificationsEndpointTests / GetUnreadNotificationCountEndpointTests.
-/// </summary>
 [Collection("Integration")]
 public class SendProductUpdateEndpointTests
 {
@@ -110,18 +103,10 @@ public class SendProductUpdateEndpointTests
     [Fact]
     public async Task Post_Sends_Notification_To_Eligible_Company_Administrator_And_It_Is_Visible_Via_Existing_Endpoints()
     {
-        // Seeding a Company Administrator for a brand new company also provisions that company
-        // (Active) and an active trial CustomerSubscription (see
-        // TestRoleSeeder.EnsureActiveSubscriptionAsync) — exactly the eligibility this send relies
-        // on to actually reach this recipient.
         var recipientCompanyId = Guid.NewGuid();
         var recipientUserId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(
             _factory, recipientUserId, SystemRoles.CompanyAdministrator, recipientCompanyId);
-        // Every real user carries the Employee role as a floor (see
-        // IdentityModule.AddRolePolicies / "role:employee") — required to satisfy the
-        // GetMyNotifications/unread-count endpoints' own policy below, independent of the
-        // CompanyAdministrator role this recipient is resolved by.
         await TestRoleSeeder.AssignRoleAsync(
             _factory, recipientUserId, SystemRoles.Employee, recipientCompanyId);
 
@@ -136,7 +121,6 @@ public class SendProductUpdateEndpointTests
         Assert.True(payload!.RecipientCount >= 1);
         Assert.True(payload.CompanyCount >= 1);
 
-        // Verify the recipient actually got a real Notification row, matching Title/Message/ActionUrl.
         using var scope = _factory.Services.CreateScope();
         var notificationsDb = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
         var notification = await notificationsDb.Notifications
@@ -150,8 +134,6 @@ public class SendProductUpdateEndpointTests
         Assert.Equal("We've shipped an improved reporting dashboard for all customers.", notification.Body);
         Assert.Equal("/reports/recruitment-pipeline", notification.ActionUrl);
 
-        // Same notification is visible to the recipient via the ordinary in-app notification
-        // endpoints, exactly like every other notification type.
         using var recipientClient = _factory.CreateClient();
         recipientClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, recipientUserId.ToString());
         recipientClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, recipientCompanyId.ToString());

@@ -4,7 +4,6 @@ namespace HR.Web.Tests;
 
 public class FormTextTests
 {
-    // ── Required ────────────────────────────────────────────────────────────
 
     [Fact]
     public void Required_Trims_Surrounding_Spaces()
@@ -30,7 +29,6 @@ public class FormTextTests
         Assert.Equal("Café   Noir", FormText.Required("  Café   Noir  "));
     }
 
-    // ── Optional ────────────────────────────────────────────────────────────
 
     [Fact]
     public void Optional_Null_Returns_Null()
@@ -77,7 +75,6 @@ public class FormTextTests
         Assert.Equal("Café   Noir", FormText.Optional("  Café   Noir  "));
     }
 
-    // ── OptionalSearch (delegates to Optional) ─────────────────────────────
 
     [Fact]
     public void OptionalSearch_Null_Returns_Null()

@@ -9,11 +9,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Employees.Jobs;
 
-// Daily job that applies promotions whose effective date has arrived. Scans across all companies
-// in one query (no per-tenant loop), mirroring ProcessLeavingEmployeesJob. The actual application
-// (position/location/manager reassignment, completion, audit + integration events) is delegated to
-// IEmployeePromotionFinalizer so PromoteEmployeeHandler can trigger the exact same idempotent path
-// immediately when the effective date is today or backdated.
 internal sealed class ProcessPromotionsJob(
     EmployeesDbContext dbContext,
     IClock clock,
@@ -38,8 +33,6 @@ internal sealed class ProcessPromotionsJob(
             .Where(e => employeeIds.Contains(e.Id))
             .ToDictionaryAsync(e => e.Id);
 
-        // Companies may each have their own configured time zone, so "today" (used as the
-        // effective-date due boundary) must be resolved per company rather than once globally.
         var todayByCompany = new Dictionary<Guid, DateOnly>();
 
         foreach (var promotion in pendingPromotions)

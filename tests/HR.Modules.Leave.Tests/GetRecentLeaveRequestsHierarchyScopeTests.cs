@@ -9,13 +9,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Tests;
 
-/// <summary>
-/// DSH-02: for a non-HR (manager) viewer, GetRecentLeaveRequests and the Pending Leave Approvals
-/// workload provider scope to the viewer's entire reporting sub-tree (direct and indirect reports)
-/// via <c>GetAllDescendantIdsAsync</c>; HR administrators keep the company-wide view. A peer /
-/// unrelated manager's requests are excluded. See
-/// specifications/architecture/11-manager-hierarchy-scope.md.
-/// </summary>
 public class GetRecentLeaveRequestsHierarchyScopeTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 9, 9, 0, 0, TimeSpan.Zero);

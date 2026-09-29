@@ -109,8 +109,6 @@
     private readonly AmendLeavingProcessFormModel _model = new();
     private EditContext _editContext = default!;
 
-    // Same 7 options as StartLeavingProcessDialog._leavingReasonOptions — no clear button/"None"
-    // item since this is a required field (see this codebase's convention noted there).
     private static readonly LeavingReasonOption[] _leavingReasonOptions =
     [
         new("Resignation",     EmployeeLeavingTab.LeavingReasonLabel("Resignation")),
@@ -135,9 +133,6 @@
         _wasOpen = IsOpen;
     }
 
-    // Unlike StartLeavingProcessDialog (which always starts blank), Amend needs to be pre-populated
-    // with the leaving process' current values — fetch them fresh every time the dialog opens rather
-    // than relying on values the parent tab may have loaded earlier.
     private async Task LoadCurrentValuesAsync()
     {
         _loading = true;
@@ -169,7 +164,6 @@
     {
         _model.LeavingDate = value;
 
-        // Don't let a stale confirmation silently carry over once the date no longer needs it.
         if (!IsBackdated(_model.LeavingDate))
             _model.ConfirmBackdatedLeavingDate = false;
     }

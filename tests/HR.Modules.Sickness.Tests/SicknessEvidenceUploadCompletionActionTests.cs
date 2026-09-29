@@ -122,7 +122,6 @@ public class SicknessEvidenceUploadCompletionActionTests
 
         var updatedRequest = await db.SicknessEvidenceRequests.FindAsync(evidenceRequest.Id);
         Assert.Equal(SicknessEvidenceRequestStatus.Fulfilled, updatedRequest!.Status);
-        // FulfilledAt should not have changed
         Assert.Equal(originalFulfilledAt, updatedRequest.FulfilledAt);
     }
 
@@ -189,7 +188,7 @@ public class SicknessEvidenceUploadCompletionActionTests
         var (_, evidenceRequest) = await SeedData(db);
         var auditPublisher = new FakeAuditEventPublisher();
         var action = BuildAction(db, auditPublisher: auditPublisher);
-        var completedByHrUser = Guid.NewGuid(); // distinct from EmployeeId — uploaded on the employee's behalf
+        var completedByHrUser = Guid.NewGuid();
 
         var context = new TaskCompletionContext(
             CompanyId, Guid.NewGuid(), "Upload fit note", null,

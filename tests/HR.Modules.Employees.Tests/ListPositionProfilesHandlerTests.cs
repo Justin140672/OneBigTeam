@@ -43,7 +43,6 @@ public class ListPositionProfilesHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(2, result.Value!.Items.Count);
-        // Alphabetical order
         Assert.Equal("Developer", result.Value.Items[0].Title);
         Assert.Equal("Manager", result.Value.Items[1].Title);
     }

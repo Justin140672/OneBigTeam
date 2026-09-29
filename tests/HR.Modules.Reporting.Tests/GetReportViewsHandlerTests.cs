@@ -10,8 +10,6 @@ public class GetReportViewsHandlerTests
 {
     private static readonly DateTimeOffset FixedNow = new(2026, 7, 29, 10, 0, 0, TimeSpan.Zero);
 
-    // "employee-directory" and "sickness-report" (used throughout this test file) both require
-    // reporting:view-hr access in the ReportRegistry.
     private static readonly ReportAccessGates AuthorizedGates = new(
         CanViewRecruitment: false,
         CanViewHr: true,

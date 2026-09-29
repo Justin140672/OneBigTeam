@@ -27,9 +27,6 @@ public class DownloadEmployeeDocumentEndpointTests(ApiWebApplicationFactory fact
     [Fact]
     public async Task Returns_Redirect_For_Seeded_Document()
     {
-        // DOC-01: an unrelated employee is no longer authorized to download Sarah's document
-        // (see DocumentsResourceAuthorizationTests for the full matrix), so this "does a
-        // successful download actually redirect" check now uses an HR administrator caller.
         using var client = await NoRedirectAdminClient(AcmeCompanyId);
         var response     = await client.GetAsync(DownloadUrl(AcmeCompanyId, SarahEmployeeId, SarahContractDocId));
         Assert.Equal(HttpStatusCode.Redirect, response.StatusCode);
@@ -55,9 +52,6 @@ public class DownloadEmployeeDocumentEndpointTests(ApiWebApplicationFactory fact
     [Fact]
     public async Task Successful_Download_Publishes_DocumentDownloadedAuditEvent()
     {
-        // DOC-02 acceptance criteria: a successful (clean-scan) download must record an audit
-        // trail. See DocumentDownloadedAuditEvent ("document.downloaded") in DocumentsAudit.cs,
-        // published from DownloadEmployeeDocument's handler.
         var userId = Guid.NewGuid();
         using var client = await NoRedirectAdminClientWithUser(AcmeCompanyId, userId);
 

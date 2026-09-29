@@ -5,11 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Services;
 
-// Gap-2 reliability fix: implementation of the port consuming modules (e.g. Leave) use to
-// reconcile "a departure Employees considers fully finalised has no corresponding required record
-// of my own" — see IFinalisedEmployeeDeparturesReader for why this class of gap exists and why a
-// consumer's own existing pending/failed-record retry sweep can never catch it. Mirrors
-// ActiveLeavingProcessReader's cross-company scan shape (OFF-03).
 internal sealed class FinalisedEmployeeDeparturesReader(EmployeesDbContext dbContext) : IFinalisedEmployeeDeparturesReader
 {
     public async Task<IReadOnlyList<FinalisedEmployeeDeparture>> GetFinalisedDeparturesSinceAsync(
@@ -23,10 +18,6 @@ internal sealed class FinalisedEmployeeDeparturesReader(EmployeesDbContext dbCon
             .ToListAsync(cancellationToken);
     }
 
-    // Round 3 reliability fix (Gap-2 follow-up): keyset pagination on (FinalisationCompletedAt,
-    // EmployeeId) — stable under concurrent inserts (new finalisations always sort after any cursor
-    // already handed out) and avoids the "skipped/duplicated row on shifting offset" failure mode of
-    // OFFSET/LIMIT paging.
     public async Task<IReadOnlyList<FinalisedEmployeeDeparture>> GetFinalisedDeparturesPageAsync(
         DateTimeOffset? afterFinalisationCompletedAt,
         Guid? afterEmployeeId,

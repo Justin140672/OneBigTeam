@@ -63,7 +63,6 @@ else
     private async Task CloseTaskDialogAsync()
     {
         _dialogOpen = false;
-        // Refresh in case the task was actioned (completed/approved/etc.) while the dialog was open.
         await LoadTasksAsync();
     }
 }

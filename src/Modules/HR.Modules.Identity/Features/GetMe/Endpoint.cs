@@ -33,14 +33,6 @@ internal sealed class Endpoint(
             return;
         }
 
-        // P1 "Login as Customer": a support session has no identity.user_profiles /
-        // identity.users / role-assignment rows to query (and must never be given any — see
-        // SupabaseCurrentUserResolutionMiddleware's remarks), so it short-circuits here with its
-        // own fixed, narrow, read-only permission grant instead of going through the normal
-        // DB-driven role/permission lookups below (which would simply return "no permissions" and
-        // leave every capability flag false, breaking the app shell for no security benefit — the
-        // actual enforcement point is PermissionAuthorizationHandler's identical allow-list, not
-        // this response).
         if (currentUser.IsSupportSession)
         {
             await Send.ResultAsync(TypedResults.Ok(new GetMeResponse(
@@ -59,20 +51,11 @@ internal sealed class Endpoint(
 
         var permissions = await authorizationService.GetEffectivePermissionsAsync(userId.Value, ct);
 
-        // Mirrors the "company:manage" policy roles exactly (HR.Modules.Identity.IdentityModule.AddRolePolicies)
-        // so the Company Settings UI gate matches what the update/read endpoints actually allow.
         var roles = await authorizationService.GetEffectiveRolesAsync(userId.Value, ct);
         var canManageCompany = roles.Contains(SystemRoles.CompanyAdministrator);
 
-        // IAM-08: expose the full effective role-id set so callers (and tests) can verify a
-        // "Company Administrator only" account really holds only that role and has not silently
-        // retained HrAdministrator / a position-derived role / a Grant override. This mirrors the
-        // same live computation used for PermissionIds — there is no server-side cache, so a role
-        // change is reflected on the next api/me call / fresh Blazor circuit with no stale state.
         var roleIds = roles.ToList();
 
-        // Role-derived landing/nav flags, additive to CanManageCompany above — CanManageEmployees
-        // (computed client-side from PermissionIds) still drives all existing widget gates unchanged.
         var isHrAdministrator = roles.Contains(SystemRoles.HrAdministrator);
         var isManager = roles.Contains(SystemRoles.Manager);
         var isRecruiter = roles.Contains(SystemRoles.Recruiter);

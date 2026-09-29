@@ -3,7 +3,6 @@ using HR.Web.Services;
 
 namespace HR.Web.Models;
 
-// ── LIST ──────────────────────────────────────────────────────────────────────
 
 public record ListCandidatesResponse(
     List<CandidateListItemModel> Items,
@@ -24,7 +23,6 @@ public record CandidateListItemModel(
     public string FullName => $"{FirstName} {LastName}";
 }
 
-// ── GET ───────────────────────────────────────────────────────────────────────
 
 public record GetCandidateResponse(
     Guid Id,
@@ -44,7 +42,6 @@ public record GetCandidateResponse(
     // Ticket 2: optimistic-concurrency token.
     int Version = 0);
 
-// ── DEACTIVATE / REACTIVATE ─────────────────────────────────────────────────
 
 public record DeactivateCandidateRequest(
     Guid CompanyId,
@@ -72,7 +69,6 @@ public record ReactivateCandidateResponse(
     Guid? ReactivatedByUserId,
     DateTimeOffset UpdatedAt);
 
-// ── CREATE ────────────────────────────────────────────────────────────────────
 
 public record CreateCandidateRequest(
     Guid CompanyId,
@@ -93,7 +89,6 @@ public record CreateCandidateResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
-// ── UPDATE ────────────────────────────────────────────────────────────────────
 
 public record UpdateCandidateRequest(
     Guid CompanyId,
@@ -118,17 +113,12 @@ public record UpdateCandidateResponse(
     DateTimeOffset UpdatedAt,
     int Version = 0);
 
-// ── DOCUMENTS (Ticket #1) ─────────────────────────────────────────────────────
 
 public record ListCandidateDocumentsResponse(List<CandidateDocumentListItemModel> Items);
 
-// Mirrors the API's list item. Newest first. IsCurrentCv is server-computed (true only for the
-// newest Kind = "Cv" document) — never re-derive it client-side. ReferencingApplicationCount is the
-// number of applications whose submitted CV is this document.
 public record CandidateDocumentListItemModel(
     Guid Id,
     string Title,
-    // Ticket #1: "Cv" or "Other".
     string Kind,
     string FileName,
     long FileSize,
@@ -136,12 +126,9 @@ public record CandidateDocumentListItemModel(
     DateTimeOffset CreatedAt,
     bool IsCurrentCv = false,
     int ReferencingApplicationCount = 0,
-    // Malware-scan gate: "Pending" / "Scanning" / "Clean" / "Infected" / "Failed". IsDownloadable is
-    // server-computed (true only for Clean). Defaults fail closed — a missing value is NOT downloadable.
     string? ScanStatus = null,
     bool IsDownloadable = false);
 
-// 201 body of POST .../candidates/{candidateId}/documents.
 public record UploadedCandidateDocumentModel(
     Guid Id,
     Guid CompanyId,
@@ -152,11 +139,8 @@ public record UploadedCandidateDocumentModel(
     long FileSize,
     string ContentType,
     DateTimeOffset CreatedAt,
-    // Always "Pending" on upload — the malware scan runs asynchronously afterwards.
     string? ScanStatus = null);
 
-// Display helpers for the candidate-document malware-scan state. Anything other than an explicit
-// "Clean" is treated as not viewable (fail closed); the API remains the real enforcement point.
 public static class CandidateDocumentScanStatuses
 {
     public const string Pending = "Pending";
@@ -176,7 +160,6 @@ public static class CandidateDocumentScanStatuses
         string.Equals(status, Infected, StringComparison.OrdinalIgnoreCase);
 }
 
-// ── EDIT MODEL ────────────────────────────────────────────────────────────────
 
 public sealed class CandidateEditModel : IHasVersion
 {

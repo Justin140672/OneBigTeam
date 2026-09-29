@@ -3,11 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// NFR-05: applies the shared <see cref="AccessibilityScan"/> axe-core WCAG 2.0 A/AA gate to the
-/// employee self-service journeys as Tom Williams — his My Profile main (Overview) tab, the Leave
-/// tab, and the Request Leave dialog open with its form visible.
-/// </summary>
 public sealed class EmployeeSelfServiceAccessibilityScanTests(EmployeePersonaFixture fixture)
     : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {

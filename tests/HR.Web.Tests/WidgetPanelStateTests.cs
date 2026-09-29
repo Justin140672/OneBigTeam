@@ -72,14 +72,12 @@ public class WidgetPanelStateTests
         Assert.True(summary.HasPartialFailure);
         Assert.False(summary.TotalFailure);
         Assert.Contains("Document reviews", summary.FailedSources);
-        // Failed source contributes nothing — only the two loaded sources are counted.
         Assert.Equal(5, summary.TotalActionableCount);
     }
 
     [Fact]
     public void PartialFailure_NonFailedSourcesAllEmpty_StillNotAllClear()
     {
-        // A failed source must never yield an all-clear even when everything that DID load was empty.
         var summary = WidgetPanelState.Summarise(
         [
             Ok("Leave requests", 0),
@@ -106,7 +104,6 @@ public class WidgetPanelStateTests
         Assert.False(summary.ShowAllClear);
         Assert.True(summary.AnyFailed);
         Assert.False(summary.AllRequiredLoaded);
-        // No source succeeded, so this is a total (not partial) failure.
         Assert.False(summary.HasPartialFailure);
         Assert.Equal(2, summary.FailedSources.Count);
     }
@@ -114,9 +111,6 @@ public class WidgetPanelStateTests
     [Fact]
     public void NonRequiredSourceFailed_AllRequiredLoadedAndEmpty_StillNotAllClear()
     {
-        // Ticket asked us to confirm-and-pin the actual behaviour here: the implementation's
-        // ShowAllClear guard is `!AnyFailed`, which a non-required failure still trips. So even
-        // though every REQUIRED source loaded and was empty, ShowAllClear is false.
         var summary = WidgetPanelState.Summarise(
         [
             Ok("Leave requests", 0),
@@ -143,7 +137,6 @@ public class WidgetPanelStateTests
         Assert.False(beforeRetry.ShowAllClear);
         Assert.True(beforeRetry.HasPartialFailure);
 
-        // Same source set, the previously-failed source now succeeds with a count.
         var afterRetry = WidgetPanelState.Summarise(
         [
             Ok("Leave requests", 2),
@@ -155,7 +148,6 @@ public class WidgetPanelStateTests
         Assert.True(afterRetry.AllRequiredLoaded);
         Assert.False(afterRetry.HasPartialFailure);
         Assert.Equal(5, afterRetry.TotalActionableCount);
-        // Still not all-clear because there are now actionable records, but the failure state cleared.
         Assert.False(afterRetry.ShowAllClear);
     }
 
@@ -180,7 +172,6 @@ public class WidgetPanelStateTests
         Assert.False(summary.TotalFailure);
         Assert.False(summary.AnyFailed);
         Assert.True(summary.AllRequiredLoaded);
-        // No sources at all: TotalActionableCount == 0 and !AnyFailed, so ShowAllClear is true.
         Assert.True(summary.ShowAllClear);
     }
 }

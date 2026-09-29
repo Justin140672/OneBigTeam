@@ -51,7 +51,6 @@ public class DataImportModuleArchitectureTests
         Assert.Equal("data_import", context.Model.GetDefaultSchema());
     }
 
-    // ── ImportSession ────────────────────────────────────────────────────────────
 
     [Fact]
     public void ImportSession_Entity_Is_Not_Public()
@@ -86,7 +85,6 @@ public class DataImportModuleArchitectureTests
         AssertSnakeCase(context.Model.FindEntityType(typeof(ImportSession))!);
     }
 
-    // ── ImportRowError ───────────────────────────────────────────────────────────
 
     [Fact]
     public void ImportRowError_Entity_Is_Not_Public()
@@ -121,7 +119,6 @@ public class DataImportModuleArchitectureTests
         AssertSnakeCase(context.Model.FindEntityType(typeof(ImportRowError))!);
     }
 
-    // ── ImportStagingEmployee ────────────────────────────────────────────────────
 
     [Fact]
     public void ImportStagingEmployee_Entity_Is_Not_Public()
@@ -156,7 +153,6 @@ public class DataImportModuleArchitectureTests
         AssertSnakeCase(context.Model.FindEntityType(typeof(ImportStagingEmployee))!);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private static void AssertSnakeCase(Microsoft.EntityFrameworkCore.Metadata.IEntityType entityType)
     {

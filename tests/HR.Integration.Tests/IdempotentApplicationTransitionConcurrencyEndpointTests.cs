@@ -199,8 +199,6 @@ public class IdempotentApplicationTransitionConcurrencyEndpointTests
         Assert.Equal(1, succeeded);
         Assert.Equal(1, conflicted);
 
-        // The barrier guarantees a real version conflict (never a validation-shaped rejection): the
-        // loser must be a clean 409 "concurrency", not e.g. a 400 for hitting the terminal-stage guard.
         var hireWon = hireResponse.StatusCode == HttpStatusCode.OK;
         var loserResponse = hireWon ? rejectResponse : hireResponse;
         Assert.Equal(HttpStatusCode.Conflict, loserResponse.StatusCode);
@@ -263,10 +261,6 @@ public class IdempotentApplicationTransitionConcurrencyEndpointTests
         var keyOffer = $"idem-offer-{Guid.NewGuid():N}";
         var keyMove = $"idem-move-{Guid.NewGuid():N}";
 
-        // Both are independently valid from the seeded starting stage ("CV Review", non-terminal):
-        // OfferCandidateHandler resolves its own target stage (the company's Purpose == Offer stage)
-        // internally, and MoveApplicationStage targets "Interview" — a distinct, active, non-terminal
-        // stage — so neither request depends on the other's outcome to be individually legal.
         var offerRequest = BuildIdempotentPostRequest(
             $"/api/companies/{companyId}/vacancies/{seeded.VacancyId}/applications/{seeded.ApplicationId}/offer",
             new { companyId, vacancyId = seeded.VacancyId, applicationId = seeded.ApplicationId }, keyOffer);
@@ -314,12 +308,6 @@ public class IdempotentApplicationTransitionConcurrencyEndpointTests
         Assert.False(await verifyDb.IdempotencyRecords.AnyAsync(r => r.Key == loserKey));
     }
 
-    /// <summary>
-    /// Proves the documented "same key safely reusable after a concurrency conflict" policy (see
-    /// DbContextIdempotencyExtensions.SaveIdempotentWithConcurrencyAsync's doc comment): a
-    /// ConcurrencyConflict commits nothing, including no idempotency record, so a caller may reload and
-    /// retry with the SAME Idempotency-Key rather than having to mint a new one.
-    /// </summary>
     [Fact]
     public async Task Losing_Key_Can_Be_Safely_Reused_For_A_Corrected_Retry_After_Reload()
     {
@@ -372,9 +360,6 @@ public class IdempotentApplicationTransitionConcurrencyEndpointTests
             Assert.False(await db.IdempotencyRecords.AnyAsync(r => r.Key == loserKey));
         }
 
-        // "Reload" - re-read current state - then build a corrected retry that is valid against it:
-        // the application is now on whichever stage won, so move it on to "Hired"'s sibling non-terminal
-        // stage ("Interview" if Offer won, "Offer" if Interview won) using the SAME (losing) key.
         Guid retryTargetStageId;
         using (var scope = _factory.Services.CreateScope())
         {
@@ -458,9 +443,6 @@ public class IdempotentApplicationTransitionConcurrencyEndpointTests
             rejectResponse = responses[1];
         }
 
-        // Regardless of which won, the Employee was already provisioned (the very first thing
-        // HireCandidateHandler does, in a separate module/transaction, before either save branch
-        // races) - so exactly one Employee row must exist for this SourceReference either way.
         using (var scope = _factory.Services.CreateScope())
         {
             var employeesDb = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
@@ -472,7 +454,6 @@ public class IdempotentApplicationTransitionConcurrencyEndpointTests
 
         if (hireWon)
         {
-            // Hire committed outright - nothing further to retry; the Employee is linked as expected.
             using var scope = _factory.Services.CreateScope();
             var recruitmentDb = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
             var savedCandidate = await recruitmentDb.Candidates.AsNoTracking().SingleAsync(c => c.Id == seeded.CandidateId);
@@ -498,8 +479,6 @@ public class IdempotentApplicationTransitionConcurrencyEndpointTests
         {
             var recruitmentDb = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
             var savedCandidate = await recruitmentDb.Candidates.AsNoTracking().SingleAsync(c => c.Id == seeded.CandidateId);
-            // Never linked - the orphaned pre-provisioned Employee stays orphaned; this is the
-            // documented reconciliation state, not something this test invents.
             Assert.Null(savedCandidate.EmployeeId);
         }
 

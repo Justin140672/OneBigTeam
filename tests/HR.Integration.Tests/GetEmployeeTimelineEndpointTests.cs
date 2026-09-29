@@ -22,10 +22,6 @@ public class GetEmployeeTimelineEndpointTests
     {
         _factory = factory;
 
-        // "role:employee" requires the Employee role specifically (see IdentityModule.AddRolePolicies -
-        // RolePolicy(SystemRoles.Employee) is exact-match, not hierarchical), so HR Administrator
-        // callers also need the Employee role assigned, matching how dev/seed personas always carry
-        // both roles together (see IdentityModule.SeedDevUserAsync).
         Task.Run(async () =>
         {
             foreach (var admin in new[] { AdminUser1, AdminUser2, AdminUser3, AdminUser4, AdminUser5 })
@@ -86,7 +82,6 @@ public class GetEmployeeTimelineEndpointTests
 
         var employee = await CreateEmployeeAsync(client, companyId);
 
-        // Caller's tenant claim (companyId) does not match the route's companyId.
         var response = await client.GetAsync(
             $"/api/companies/{otherCompanyId}/employees/{employee}/timeline");
 
@@ -96,9 +91,6 @@ public class GetEmployeeTimelineEndpointTests
     [Fact]
     public async Task Get_Timeline_Returns_Ok_With_EmployeeJoined_Entry_Only_Right_After_Creating_An_Employee()
     {
-        // Wave 2a populates the timeline from real events — a freshly created employee is no
-        // longer an empty timeline, it has exactly one EmployeeJoined entry from the
-        // EmployeeCreatedIntegrationEvent handler.
         var companyId = Guid.NewGuid();
         using var client = await AdminClient(AdminUser3, companyId);
 
@@ -124,9 +116,6 @@ public class GetEmployeeTimelineEndpointTests
 
         var employee = await CreateEmployeeAsync(adminClient, companyId);
 
-        // The created employee's own Id is used as the caller identity — mirrors
-        // SelfServiceReadEndpointTests' "employee.Id is the sub claim" convention. It needs the
-        // Employee role assigned to satisfy the "role:employee" policy at the endpoint layer.
         await TestRoleSeeder.AssignRoleAsync(_factory, employee, SystemRoles.Employee);
         using var selfClient = await ClientFor(employee, companyId);
 
@@ -147,7 +136,6 @@ public class GetEmployeeTimelineEndpointTests
         var employee = await CreateEmployeeAsync(adminClient, companyId);
         var unrelatedEmployee = await CreateEmployeeAsync(adminClient, companyId);
 
-        // unrelatedEmployee is neither HR, nor self, nor the target's manager.
         await TestRoleSeeder.AssignRoleAsync(_factory, unrelatedEmployee, SystemRoles.Employee);
         using var unrelatedClient = await ClientFor(unrelatedEmployee, companyId);
 
@@ -192,9 +180,6 @@ public class GetEmployeeTimelineEndpointTests
     [Fact]
     public async Task Get_Timeline_Returns_EmployeeJoined_Entry_After_Creating_An_Employee()
     {
-        // Wave 2a: creating an employee publishes EmployeeCreatedIntegrationEvent, which
-        // EmployeeCreatedHandler (in-process, synchronous) turns into an EmployeeJoined timeline
-        // entry. HR admin should see it show up immediately on GET.
         var companyId = Guid.NewGuid();
         using var client = await AdminClient(AdminUser4, companyId);
 
@@ -229,9 +214,6 @@ public class GetEmployeeTimelineEndpointTests
         createResponse.EnsureSuccessStatusCode();
         var employee = (await createResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
 
-        // A second position profile to promote into, created via the real endpoint so a genuine
-        // PositionProfile row exists for EmployeePromotedHandler's title lookup. Needs its own real
-        // leave policy — CreatePositionProfile validates the FK exists.
         var leavePolicyResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/leave-policies", new
         {
             companyId,

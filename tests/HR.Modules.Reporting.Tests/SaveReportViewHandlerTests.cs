@@ -10,8 +10,6 @@ public class SaveReportViewHandlerTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 7, 29, 10, 0, 0, DateTimeKind.Utc);
 
-    // "employee-directory" and "sickness-report" (used throughout this test file) both require
-    // reporting:view-hr access in the ReportRegistry.
     private static readonly ReportAccessGates AuthorizedGates = new(
         CanViewRecruitment: false,
         CanViewHr: true,
@@ -147,7 +145,6 @@ public class SaveReportViewHandlerTests
         await using var db = BuildContext();
         var handler = new SaveReportViewHandler(db, new FakeClock(FixedUtcNow));
 
-        // "recruitment-pipeline-summary" requires CanViewRecruitment, which AuthorizedGates leaves false.
         var request = new SaveReportViewRequest(Guid.NewGuid(), "recruitment-pipeline-summary", "My View", "{}", false);
 
         var result = await handler.HandleAsync(request, Guid.NewGuid(), AuthorizedGates, CancellationToken.None);

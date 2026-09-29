@@ -191,8 +191,6 @@ public class CreateDepartmentHandlerTests
     [Fact]
     public async Task HandleAsync_Without_IdempotencyKey_Creates_Separate_Departments_For_Repeated_Calls()
     {
-        // Regression: no Idempotency-Key supplied means no dedup at all — two calls with the same
-        // (valid, non-conflicting) payload each create their own department, exactly as before.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var handler = new CreateDepartmentHandler(context, new FakeClock(FixedUtcNow));

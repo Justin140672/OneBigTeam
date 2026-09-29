@@ -18,7 +18,5 @@ internal sealed record UpdateLeaveTypeRequest
     // Ticket 2 (optimistic concurrency) — see UpdateEmployeeProfileRequest.ExpectedVersion.
     public int? ExpectedVersion { get; init; }
 
-    // Populated by the endpoint from the authenticated user's "sub" claim — never bound from the
-    // client body (internal properties are not touched by FastEndpoints' JSON model binding).
     internal Guid? ActorEmployeeId { get; init; }
 }

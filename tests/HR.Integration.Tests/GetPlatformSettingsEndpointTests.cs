@@ -7,14 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// The "platform:admin" FastEndpoints policy now enforces a real DB-backed check (SEC-002 fix —
-/// see PlatformAdminAuthorizationHandler) on top of RequireAuthenticatedUser: the caller must match
-/// an enabled identity.platform_administrators row. See PlatformSettingsAuthorizationTests for the
-/// full authorization matrix (anonymous / no-role / employee / company admin / hr admin / disabled
-/// admin / enabled admin). This file only seeds a platform administrator for its own
-/// success-path/business-behaviour assertions.
-/// </summary>
 [Collection("Integration")]
 public class GetPlatformSettingsEndpointTests
 {
@@ -49,13 +41,6 @@ public class GetPlatformSettingsEndpointTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    /// <summary>
-    /// PlatformSettings is a true singleton row (fixed id), so — unlike the per-entity
-    /// Guid.NewGuid() rows most other integration tests create — it is shared/mutated across every
-    /// test method in this xUnit collection. Deleting it first makes this test's "first call sees
-    /// the lazy-seeded default" assertion independent of execution order relative to
-    /// UpdatePlatformSettingsEndpointTests (which mutates the same row).
-    /// </summary>
     private async Task ResetSingletonRowAsync()
     {
         using var scope = _factory.Services.CreateScope();

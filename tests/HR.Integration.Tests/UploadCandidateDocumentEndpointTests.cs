@@ -9,13 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Postgres integration coverage for POST /candidates/{c}/documents (multipart upload). See
-/// UploadCandidateDocumentHandlerTests / UploadCandidateDocumentValidatorTests in
-/// HR.Modules.Recruitment.Tests for the unit-level equivalent.
-/// Covers: anonymous 401, wrong-role 403, happy 201 + persisted row, unknown candidate 404,
-/// cross-company 404, disallowed file type 422, empty file 422, missing title 422.
-/// </summary>
 [Collection("Integration")]
 public class UploadCandidateDocumentEndpointTests
 {
@@ -188,8 +181,6 @@ public class UploadCandidateDocumentEndpointTests
 
         var response = await client.PostAsync(Url(companyId, candidateId), BuildUpload());
 
-        // This endpoint maps every non-not_found handler failure to 422 (see Endpoint.cs) — there is
-        // no distinct 409 branch, unlike some other endpoints in this codebase.
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
 
         using var verifyScope = _factory.Services.CreateScope();

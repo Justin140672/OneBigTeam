@@ -8,10 +8,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Employees.Tests.Jobs;
 
-// P1 fix (departure access disablement): unit tests for the one-off backfill/reconciliation sweep
-// that republishes EmployeeDepartureFinalisedIntegrationEvent for former employees whose access was
-// already recorded as disabled (HasSystemAccess=false) before Identity started consuming that event
-// to actually disable the linked ApplicationUser.
 public class ReconcileFormerEmployeeAccessJobTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 9, 11, 8, 0, 0, DateTimeKind.Utc);

@@ -10,12 +10,6 @@ using Microsoft.Extensions.Configuration;
 
 namespace HR.Modules.Companies.Features.GetCustomerBillingBreakdown;
 
-/// <summary>
-/// Same defense-in-depth allow-list gate as GetCustomerDetailsHandler/GetCustomerDashboardHandler/
-/// ListCustomersHandler (see their remarks) — no first-class platform-administrator identity model
-/// exists yet, so the caller's email must additionally appear in the "PlatformAdmin:AllowedEmails"
-/// configuration allow-list.
-/// </summary>
 internal sealed class GetCustomerBillingBreakdownHandler(
     CompaniesDbContext companiesDbContext,
     PlatformDbContext platformDbContext,
@@ -50,13 +44,6 @@ internal sealed class GetCustomerBillingBreakdownHandler(
 
         var today = DateOnly.FromDateTime(clock.UtcNow);
 
-        // Sequential, not Task.WhenAll — employeeDirectoryReader and employeeStarterReader are
-        // both backed by the same scoped (request-shared) EmployeesDbContext, and EF Core's
-        // DbContext is not safe for concurrent operations on the same instance. Running these
-        // "in parallel" throws "A second operation was started on this context instance before
-        // a previous operation completed" — see GetCustomerDetailsHandler's matching fix/remarks
-        // for the full explanation, including why this surfaced as a misleading "not authorised"
-        // banner on the frontend rather than an obvious crash.
         var activeEmployees = (await employeeDirectoryReader.GetEmployeeDirectoryAsync(
             company.Id,
             new ReportFilterCriteria(EmployeeStatus: "Active"),
@@ -81,29 +68,17 @@ internal sealed class GetCustomerBillingBreakdownHandler(
             sortDescending: false,
             cancellationToken)).TotalCount;
 
-        // Employees currently on the books being billed this period; future starters are not yet
-        // chargeable since they haven't started, and former employees have already left and are
-        // excluded from both the Active and Leaving statuses.
         var chargeableEmployees = activeEmployees + leavers;
 
-        // Story 4 — the monthly charge now comes from the single authoritative configurable
-        // progressive pricing model (PlatformSettings singleton), not a flat per-employee rate.
-        // Falls back to the built-in default when the singleton has never been seeded (e.g. tests).
         var platformSettings = await _platformDbContext.PlatformSettings
             .AsNoTracking()
             .SingleOrDefaultAsync(s => s.Id == PlatformSettings.SingletonId, cancellationToken);
         var pricingConfig = platformSettings?.GetPricingConfig() ?? SubscriptionPricingConfig.Default;
         var breakdown = SubscriptionPricingCalculator.Calculate(chargeableEmployees, pricingConfig);
 
-        // No discount/promotional-pricing concept exists anywhere in the codebase yet (verified —
-        // StripeOptions, CustomerSubscription and Company all lack one), so this is hardcoded to
-        // zero rather than inventing a discount system. The API/UI must present this honestly
-        // rather than imply real discount data exists.
         var discounts = 0m;
         var monthlyTotal = breakdown.FinalMonthlyCharge - discounts;
 
-        // The snapshot/response keeps a single pricePerEmployee field for backwards compatibility;
-        // under progressive pricing it is the effective (blended) rate for this employee count.
         var pricePerEmployee = chargeableEmployees > 0
             ? breakdown.FinalMonthlyCharge / chargeableEmployees
             : 0m;

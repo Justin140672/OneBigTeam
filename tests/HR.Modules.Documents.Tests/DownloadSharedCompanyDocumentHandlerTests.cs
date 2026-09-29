@@ -22,7 +22,6 @@ public class DownloadSharedCompanyDocumentHandlerTests
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
             null, null, SharedCompanyDocumentReviewFrequency.None, null, null, false, null, null, Guid.NewGuid(), Now);
-        // Default download-success fixtures assume a clean scan.
         doc.MarkScanClean(Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
@@ -44,7 +43,6 @@ public class DownloadSharedCompanyDocumentHandlerTests
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
             null, null, SharedCompanyDocumentReviewFrequency.None, null, null, false, null, null, Guid.NewGuid(), Now);
-        // Default download-success fixtures assume a clean scan.
         doc.MarkScanClean(Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
@@ -102,7 +100,6 @@ public class DownloadSharedCompanyDocumentHandlerTests
             Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Department, departmentId));
         await db.SaveChangesAsync();
 
-        // Caller has no seeded audience entry, so their department is null — doesn't match.
         var result = await Handler(db).HandleAsync(
             new DownloadSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id },
             caller, callerCanManage: false, CancellationToken.None);
@@ -134,7 +131,6 @@ public class DownloadSharedCompanyDocumentHandlerTests
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Remote Working Policy", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
             null, null, SharedCompanyDocumentReviewFrequency.None, null, null, false, null, null, Guid.NewGuid(), Now);
-        // Default download-success fixtures assume a clean scan.
         doc.MarkScanClean(Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
@@ -162,7 +158,6 @@ public class DownloadSharedCompanyDocumentHandlerTests
         var doc = SharedCompanyDocument.Create(
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
             null, null, SharedCompanyDocumentReviewFrequency.None, null, null, false, null, null, Guid.NewGuid(), Now);
-        // Default download-success fixtures assume a clean scan.
         doc.MarkScanClean(Now);
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
@@ -170,13 +165,11 @@ public class DownloadSharedCompanyDocumentHandlerTests
         var audit = new FakeAuditPublisher();
         await Handler(db, auditPublisher: audit).HandleAsync(
             new DownloadSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id },
-            Guid.NewGuid(), callerCanManage: false, CancellationToken.None); // draft, not a manager
+            Guid.NewGuid(), callerCanManage: false, CancellationToken.None);
 
         Assert.Empty(audit.Published);
     }
 
-    // Theory parameters must be a publicly accessible type (xUnit requires public test methods),
-    // but FileScanStatus is internal — pass the enum's underlying int value instead and cast.
     [Theory]
     [InlineData((int)FileScanStatus.Pending, "This document is currently being security checked.")]
     [InlineData((int)FileScanStatus.Scanning, "This document is currently being security checked.")]
@@ -194,7 +187,7 @@ public class DownloadSharedCompanyDocumentHandlerTests
             null, null, SharedCompanyDocumentReviewFrequency.None, null, null, false, null, null, Guid.NewGuid(), Now);
         switch (status)
         {
-            case FileScanStatus.Pending: break; // Create() defaults to Pending
+            case FileScanStatus.Pending: break;
             case FileScanStatus.Scanning: doc.MarkScanning(Now); break;
             case FileScanStatus.Infected: doc.MarkScanInfected("EICAR.Test.File", Now); break;
             case FileScanStatus.Failed: doc.MarkScanFailed("scanner unreachable", Now); break;

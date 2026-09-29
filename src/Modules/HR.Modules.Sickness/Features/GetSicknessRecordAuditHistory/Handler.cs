@@ -4,10 +4,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Sickness.Features.GetSicknessRecordAuditHistory;
 
-/// <summary>
-/// AUD-07: entity activity history for a specific sickness record.
-/// Accessible to HR Administrators and Sickness Managers (sickness:manage policy).
-/// </summary>
 internal sealed class GetSicknessRecordAuditHistoryHandler(
     IAuditHistoryReader auditHistoryReader,
     IEmployeeNameReader employeeNameReader)

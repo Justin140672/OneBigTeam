@@ -11,9 +11,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// NFR-07. Follows the ScheduleCustomerDeletionEndpointTests platform-admin allow-list pattern.
-/// </summary>
 [Collection("Integration")]
 public class PlaceCompanyLegalHoldEndpointTests
 {

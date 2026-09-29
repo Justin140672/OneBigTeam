@@ -2,11 +2,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Companies.Tests.Infrastructure;
 
-/// <summary>
-/// Minimal test double for <see cref="IBackgroundJobStatusReader"/> — returns a pre-configured
-/// summary so GetCustomerSupportViewHandler tests can assert the mapped background-job fields
-/// without a real Hangfire JobStorage.
-/// </summary>
 internal sealed class FakeBackgroundJobStatusReader : IBackgroundJobStatusReader
 {
     public BackgroundJobStatusSummary SummaryToReturn { get; set; } =

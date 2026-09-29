@@ -5,10 +5,6 @@ using Microsoft.AspNetCore.Components.Forms;
 
 namespace HR.Web.Components.Controls;
 
-// Blazor's built-in DataAnnotationsValidator only validates the properties declared directly on
-// EditContext.Model — it doesn't descend into nested objects or collection items (e.g.
-// CompanyDetailsEditModel.Addresses, a List<CompanyAddressEditModel>). This walks the object graph
-// so attributes like [DynamicRegex]/[Required] on nested list items are enforced too.
 public sealed class NestedDataAnnotationsValidator : ComponentBase, IDisposable
 {
     [CascadingParameter] private EditContext CurrentEditContext { get; set; } = default!;
@@ -20,10 +16,6 @@ public sealed class NestedDataAnnotationsValidator : ComponentBase, IDisposable
         _messageStore = new ValidationMessageStore(CurrentEditContext);
         CurrentEditContext.OnValidationRequested += OnValidationRequested;
 
-        // Blazor's built-in DataAnnotationsValidator also revalidates on every field change (not
-        // just on submit) so a corrected field's message disappears immediately rather than
-        // sticking around until the next full submit — this component only had the submit-time
-        // half of that, which is why fixed address fields kept showing stale errors.
         CurrentEditContext.OnFieldChanged += OnFieldChanged;
     }
 

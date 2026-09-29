@@ -8,12 +8,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Companies.Features.GetCustomerBillingHistory;
 
-/// <summary>
-/// Same defense-in-depth allow-list gate as GetCustomerDetailsHandler/GetCustomerBillingBreakdownHandler
-/// (see their remarks). Unlike the billing breakdown, this feature never invents or computes local
-/// data — it either calls the real Stripe Invoices API for the customer's StripeCustomerId, or
-/// reports plainly (via StripeConfigured/HasStripeCustomer) why it can't.
-/// </summary>
 internal sealed class GetCustomerBillingHistoryHandler(
     CompaniesDbContext dbContext,
     ICurrentUser currentUser,
@@ -64,9 +58,6 @@ internal sealed class GetCustomerBillingHistoryHandler(
             subscription!.StripeCustomerId!,
             cancellationToken);
 
-        // Employee count per invoice is not tracked by Stripe (checkout always uses a fixed
-        // line-item quantity of 1 regardless of headcount), so it is approximated from the most
-        // recent CustomerBillingSnapshot recorded at or before the invoice date, when one exists.
         var snapshots = await _dbContext.CustomerBillingSnapshots
             .AsNoTracking()
             .Where(s => s.CompanyId == request.CompanyId)

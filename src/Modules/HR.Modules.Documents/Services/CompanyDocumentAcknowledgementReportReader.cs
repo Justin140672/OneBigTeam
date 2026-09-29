@@ -9,13 +9,6 @@ internal sealed class CompanyDocumentAcknowledgementReportReader(
     DocumentsDbContext dbContext,
     SharedCompanyDocumentAudienceMatcher audienceMatcher) : ICompanyDocumentAcknowledgementReportReader
 {
-    // Row cap (OBT-720 perf pass) — see HR.Modules.Sickness.Services.SicknessReportReader.MaxRows
-    // for rationale. This report's row count is document-count x eligible-employee-count, which
-    // can't be bounded with a single Take at the DB query level (the eligible-employee set for
-    // each document comes from SharedCompanyDocumentAudienceMatcher, not this reader's own query).
-    // A final in-memory cap is applied instead as a defense-in-depth safety bound; the realistic
-    // ceiling here (published/ack-required documents x company headcount) is far below this in
-    // virtually every tenant, so this is not expected to trigger in practice.
     private const int MaxRows = 50_000;
 
     public async Task<IReadOnlyList<CompanyDocumentAcknowledgementReportItem>> GetAcknowledgementReportAsync(

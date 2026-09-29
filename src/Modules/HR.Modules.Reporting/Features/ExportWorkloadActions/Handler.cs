@@ -7,12 +7,6 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace HR.Modules.Reporting.Features.ExportWorkloadActions;
 
-/// <summary>
-/// Exports the Workload &amp; HR Actions Report (OBT-721), respecting the same filters and
-/// per-provider row-level scoping as GetWorkloadActionsHandler — this handler delegates to it
-/// rather than re-implementing aggregation/filtering, matching every other Export*Report handler's
-/// "delegate to the paired Get* handler" pattern (see ExportAssetAssignmentReport/Handler.cs).
-/// </summary>
 internal sealed class ExportWorkloadActionsHandler(
     GetWorkloadActionsHandler getHandler,
     IReportExporter reportExporter,
@@ -31,9 +25,6 @@ internal sealed class ExportWorkloadActionsHandler(
         ClaimsPrincipal caller,
         CancellationToken cancellationToken)
     {
-        // For audit purposes only: whether the caller was restricted to manager-scoped (per-provider
-        // row-level scoped) results rather than company-wide HR access. Business scoping itself
-        // still happens inside each IWorkloadActionProvider — see GetWorkloadActionsHandler.
         var callerIsHr = (await authorizationService.AuthorizeAsync(caller, "reporting:view-hr")).Succeeded;
         var managerScopeApplied = !callerIsHr;
 

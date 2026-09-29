@@ -16,9 +16,6 @@ internal sealed class EmployeeRoleOverrideConfiguration : IEntityTypeConfigurati
             .HasColumnName("id")
             .IsRequired();
 
-        // IAM-04: company_id is required on every tenant-owned table per the database standards
-        // (05-database-standards.md) — also lets override administration/search/reporting (IAM-05,
-        // IAM-08) filter by company without joining through UserProfile.
         builder.Property(e => e.CompanyId)
             .HasColumnName("company_id")
             .IsRequired();
@@ -55,7 +52,6 @@ internal sealed class EmployeeRoleOverrideConfiguration : IEntityTypeConfigurati
         builder.Property(e => e.AssignedBy)
             .HasColumnName("assigned_by");
 
-        // A user may only have one override per role (Grant or Deny, not both).
         builder.HasIndex(e => new { e.UserId, e.RoleId })
             .IsUnique()
             .HasDatabaseName("ix_employee_role_overrides_user_role");

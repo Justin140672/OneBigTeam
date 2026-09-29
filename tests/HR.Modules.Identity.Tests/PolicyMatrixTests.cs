@@ -5,34 +5,14 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Tests;
 
-/// <summary>
-/// IAM-06: the core regression guard for the permission-based authorization mechanism. Enumerates
-/// every (role, named policy) pair — every <see cref="SystemRoles"/> value crossed with every entry
-/// in <see cref="PolicyCatalog.PermissionPolicies"/> — and asserts against the real migration-seeded
-/// IdentityDbContext RolePermissions data (ground truth:
-/// Persistence/Configurations/RolePermissionConfiguration.cs) whether that role satisfies that
-/// policy. This proves the permission-based mechanism (PolicyCatalog + PermissionAuthorizationHandler)
-/// reproduces exactly the same effective-authorization outcomes the old inline per-policy role lists
-/// had, and that a future change to either RolePermissionConfiguration or PolicyCatalog can never
-/// silently drift the API from what the UI's GetEffectiveAccess view reports (both read from the
-/// same RolePermission data).
-/// </summary>
-// Ground-truth cross-reference: HR.Modules.Identity.Persistence.IdentityDbContext,
-// HR.Modules.Identity.Persistence.Configurations.RolePermissionConfiguration.
 [Collection("IdentityDatabase")]
 public class PolicyMatrixTests(IdentityDatabaseFixture fixture)
 {
-    // Ground truth access matrix: policy name -> set of roles that hold the backing permission.
-    // Derived from RolePermissionConfiguration.cs. Any role not listed for a given policy is
-    // expected to fail that policy.
     private static readonly Dictionary<string, HashSet<Guid>> ExpectedGrantees = new()
     {
         ["employee:manage"] = [SystemRoles.HrAdministrator],
         ["employee:read"] = [SystemRoles.Manager, SystemRoles.Recruiter, SystemRoles.HrAdministrator],
         ["company:manage"] = [SystemRoles.CompanyAdministrator],
-        // OBT-IAM-09: support:manage / onboarding:view / onboarding:manage narrowed to HR
-        // Administrator only — a Company-Administrator-only account is limited to company settings
-        // and subscription administration (see RolePermissionConfiguration remarks).
         ["support:manage"] = [SystemRoles.HrAdministrator],
         ["support:request"] = [SystemRoles.Employee, SystemRoles.HrAdministrator],
         ["hr-settings:manage"] = [SystemRoles.HrAdministrator],

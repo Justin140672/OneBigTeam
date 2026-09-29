@@ -48,11 +48,8 @@ public static class SupportModule
         services.AddScoped<IValidator<AddSupportResponseRequest>, AddSupportResponseValidator>();
         services.AddScoped<GetSupportDashboardHandler>();
         services.AddScoped<SupportNotificationRetryJob>();
-        // Reliability review issue 4 (P1): durable retry for attachment blobs that failed
-        // best-effort delete during cleanup-on-failure.
         services.AddScoped<Jobs.SupportAttachmentPendingDeletionRetryJob>();
         services.AddScoped<Jobs.IdempotencyMaintenanceJob>();
-        // P1 stored-XSS fix: idempotent backfill that re-sanitises historical support response bodies.
         services.AddScoped<Jobs.SupportResponseBodySanitisationJob>();
     }
 
@@ -65,8 +62,6 @@ public static class SupportModule
             "support-notification-retries",
             job => job.ExecuteAsync(),
             Cron.Hourly());
-        // Reliability review issue 4 (P1): sweep for orphaned attachment blobs that failed
-        // immediate best-effort deletion.
         jobManager.AddOrUpdate<Jobs.SupportAttachmentPendingDeletionRetryJob>(
             "support-attachment-pending-deletion-retries",
             job => job.ExecuteAsync(),
@@ -76,11 +71,6 @@ public static class SupportModule
             "support-idempotency-maintenance",
             job => job.ExecuteAsync(),
             "*/5 * * * *");
-        // P1 stored-XSS fix: one-off backfill of historical support response bodies. Registered with
-        // no schedule (Cron.Never) so it can also be re-run by hand from the Hangfire dashboard, and
-        // triggered once per API startup so every deploy converges existing rows. The job is
-        // idempotent and writes nothing once the table is clean, so repeated or concurrent runs
-        // (multiple instances/restarts) are safe.
         jobManager.AddOrUpdate<Jobs.SupportResponseBodySanitisationJob>(
             SupportResponseBodySanitisationJobId,
             job => job.ExecuteAsync(CancellationToken.None),
@@ -107,7 +97,7 @@ public static class SupportModule
 
         var now = DateTimeOffset.UtcNow;
         var companyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-        var sarahId = Guid.Parse("30000000-0000-0000-0000-000000000001"); // Sarah Chen
+        var sarahId = Guid.Parse("30000000-0000-0000-0000-000000000001");
 
         var request1Id = Guid.Parse("d0000000-0000-0000-0000-000000000001");
         var request2Id = Guid.Parse("d0000000-0000-0000-0000-000000000002");

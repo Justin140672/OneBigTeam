@@ -69,7 +69,6 @@ public class UpdateEmployeeProfileConcurrencyEndpointTests
         var loaded = await GetEmployeeAsync(client, companyId, employee.Id);
         var version = loaded.Version;
 
-        // Editor B saves employment details against the shared Employee.Version token.
         var editorB = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employee.Id}/employment",
             new
@@ -84,7 +83,6 @@ public class UpdateEmployeeProfileConcurrencyEndpointTests
             });
         Assert.Equal(HttpStatusCode.OK, editorB.StatusCode);
 
-        // Editor A, still on the old screen, saves the profile with the now-stale version.
         var editorA = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employee.Id}/profile",
             ProfileBody(companyId, employee.Id, firstName: "EditorA", workEmail: $"a.{Guid.NewGuid():N}@example.com", expectedVersion: version));
@@ -155,7 +153,6 @@ public class UpdateEmployeeProfileConcurrencyEndpointTests
             $"/api/companies/{companyId}/employees/{employee.Id}/profile",
             ProfileBody(companyId, employee.Id, firstName: "", workEmail: "not-an-email", expectedVersion: null));
 
-        // FastEndpoints request-validation failures surface as 422, not 400.
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 

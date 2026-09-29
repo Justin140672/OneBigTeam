@@ -29,7 +29,6 @@ internal sealed class DueSoonNotifier(IServiceScopeFactory scopeFactory) : Backg
             }
             catch
             {
-                // swallow — will retry next interval
             }
 
             await Task.Delay(CheckInterval, stoppingToken);

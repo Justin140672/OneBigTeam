@@ -6,13 +6,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Dedicated security-boundary tests for the "users:view"/"users:manage" policies introduced by
-/// User Administration. Uses the same dev-persona ids as HR.Modules.Identity's
-/// IdentityModule.SeedDevUserAsync (Tom Williams = Employee-only, Laura Bennett = HrAdministrator)
-/// seeded directly via TestRoleSeeder, since the dev seeder itself only runs in the real
-/// Development-environment host, not the test WebApplicationFactory.
-/// </summary>
 [Collection("Integration")]
 public class UserAdministrationAuthorizationTests
 {
@@ -152,9 +145,6 @@ public class UserAdministrationAuthorizationTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── Cross-company: an HR Administrator for company A cannot act on company B ──────────────
-    // TenantRouteAuthorizationMiddleware rejects any {companyId} route whose GUID isn't the
-    // caller's own tenant with 403, before the endpoint's own policy/handler runs.
 
     [Fact]
     public async Task HrAdministrator_Cannot_List_Invitable_Employees_For_Another_Company()

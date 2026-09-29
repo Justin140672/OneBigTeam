@@ -1,7 +1,5 @@
 namespace HR.Modules.Employees.Domain;
 
-// Append-only log — no update method. See EmployeeTimelineVisibility for the visibility rules
-// that MUST be followed by whoever creates entries (Wave 2/3).
 internal sealed class EmployeeTimelineEntry
 {
     private EmployeeTimelineEntry() { }
@@ -10,8 +8,6 @@ internal sealed class EmployeeTimelineEntry
     public Guid CompanyId { get; private set; }
     public Guid EmployeeId { get; private set; }
 
-    // The date the underlying business event takes effect — may be in the future for scheduled
-    // events (e.g. a future-dated promotion or compensation change).
     public DateOnly EventDate { get; private set; }
     public EmployeeTimelineEventType EventType { get; private set; }
     public EmployeeTimelineCategory Category { get; private set; }
@@ -23,10 +19,6 @@ internal sealed class EmployeeTimelineEntry
     public EmployeeTimelineVisibility Visibility { get; private set; }
     public DateTimeOffset CreatedDate { get; private set; }
 
-    // Null for every entry created via the live integration-event handlers. Set only when an
-    // entry is written by the BackfillEmployeeTimeline feature (or the cross-module history
-    // replayers it drives), so backfilled entries can be distinguished from live ones without
-    // affecting the append-only dedup rules in EmployeeTimelineEntryConfiguration.
     public DateTimeOffset? BackfilledAt { get; private set; }
 
     public static EmployeeTimelineEntry Create(

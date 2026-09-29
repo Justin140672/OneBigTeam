@@ -3,17 +3,11 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the Sickness report page
-/// (/companies/{companyId}/reporting/sickness — SicknessReportPage.razor):
-/// loading, the date-range filter panel, the standalone Group by (Employee/Department) control,
-/// and export. Catalog-page navigation coverage lives in <see cref="ReportCatalogTests"/>.
-/// </summary>
 public sealed class SicknessReportTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    private const string LauraEmail = "laura.bennett@acme.example"; // HR Administrator
+    private const string LauraEmail = "laura.bennett@acme.example";
 
     [Fact]
     public async Task Page_Loads_WithExpectedColumns()

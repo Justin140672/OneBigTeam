@@ -6,11 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Onboarding.Services;
 
-// Historical replay counterpart to CompleteOnboardingTaskFromTaskAction: that handler publishes
-// OnboardingCompletedIntegrationEvent only when an OnboardingPlan transitions to Completed (via
-// OnboardingPlan.Complete). This replayer targets exactly the same condition — every
-// OnboardingPlan currently in the Completed status — for plans that finished before the employee
-// timeline feature existed.
 internal sealed class OnboardingHistoryReplayer(
     OnboardingDbContext dbContext,
     IIntegrationEventPublisher integrationEventPublisher) : IOnboardingHistoryReplayer
@@ -24,8 +19,6 @@ internal sealed class OnboardingHistoryReplayer(
 
         foreach (var plan in completedPlans)
         {
-            // UpdatedAt is bumped by OnboardingPlan.Complete(now) at the moment of completion, the
-            // same `now` the live handler passes as OccurredAt — an exact match, not a fallback.
             await integrationEventPublisher.PublishAsync(
                 new OnboardingCompletedIntegrationEvent(plan.CompanyId, plan.EmployeeId, plan.Id, plan.UpdatedAt),
                 cancellationToken);

@@ -3,16 +3,8 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for HR.Admin.Web's CustomerDetails.razor (/customers/{CompanyId}) — a fully
-/// read-only single-customer view: company information, subscription, current pricing, employee
-/// count / storage usage stat cards, a company settings summary (or a "no settings configured"
-/// fallback), and two explanatory "not yet available" panels for billing/login history. There is
-/// no create/edit/delete affordance on this page — it is view-only by design.
-/// </summary>
 public sealed class CustomerDetailsPage(IPage page, string baseUrl)
 {
-    // Rendered once _loading flips false, whichever branch (details vs. dashboard-error) applies.
     private const string ResolvedSelector = ".details-grid, .dashboard-error";
 
     public async Task GoToAsync(Guid companyId)
@@ -83,11 +75,6 @@ public sealed class CustomerDetailsPage(IPage page, string baseUrl)
 
     public Task ClickBackToCustomersAsync() => BackToCustomersLink.ClickAsync();
 
-    // Subscription management panel — "Schedule deletion" action. Uses its own
-    // AdminActionConfirmDialog instance (shared across all Subscription management buttons:
-    // Extend trial / Cancel at period end / Reinstate / Force read-only / Resume service /
-    // Schedule deletion), addressed here by its per-action dialog title. See CustomerDetails.razor's
-    // DialogTitle switch.
     public ILocator ScheduleDeletionButton =>
         page.GetByRole(AriaRole.Button, new() { Name = "Schedule deletion" });
 
@@ -117,8 +104,6 @@ public sealed class CustomerDetailsPage(IPage page, string baseUrl)
     public Task<bool> IsSubscriptionActionSuccessVisibleAsync() =>
         GetSection("Subscription management").Locator(".admin-action-success").IsVisibleAsync();
 
-    // "Login as customer" support-session action — its own AdminActionConfirmDialog instance,
-    // separate from the Subscription management panel's shared dialog. See CustomerDetails.razor.
     public ILocator LoginAsCustomerButton =>
         page.GetByRole(AriaRole.Button, new() { Name = "Login as customer" });
 
@@ -174,10 +159,6 @@ public sealed class CustomerDetailsPage(IPage page, string baseUrl)
         return (await value.TextContentAsync())?.Trim();
     }
 
-    // Scoped to the top-level stat-cards row specifically (":not(.billing-stat-cards)") — the
-    // Billing breakdown panel further down the page has its own, separate ".stat-cards
-    // billing-stat-cards" row that also includes an "Active employees" card, so an unscoped
-    // ".stat-card" filter matches both and throws a Playwright strict-mode violation.
     private async Task<string?> GetStatCardValueAsync(string label)
     {
         var card = page.Locator(".stat-cards:not(.billing-stat-cards) .stat-card").Filter(new() { HasText = label });

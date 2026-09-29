@@ -68,9 +68,6 @@ internal sealed class AddSupportResponseHandler(
 
         db.SupportResponses.Add(response);
 
-        // Reliability review issue 4 (P1): same ownership-scope guarantee as
-        // SubmitSupportRequestHandler — see its remarks for why this replaces the previous
-        // list-plus-manual-try/catch approach.
         await using var cleanupScope = new UploadedAttachmentCleanupScope(
             attachmentStorage, serviceScopeFactory, clock, executionContextAccessor, logger);
 
@@ -127,8 +124,6 @@ internal sealed class AddSupportResponseHandler(
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                // Reliability review issue 4 (P1): see SubmitSupportRequestHandler's identical
-                // rationale — the caller's cancellation must propagate, not be swallowed.
                 throw;
             }
             catch
@@ -173,8 +168,6 @@ internal sealed class AddSupportResponseHandler(
         {
             try
             {
-                // The title is user-controlled plain text: the shared renderer HTML-encodes it (and
-                // every other dynamic value) and header-sanitises the subject.
                 var email = SupportEmailRenderer.RenderStaffReplyCustomerNotification(
                     supportRequest.ReferenceNumber, supportRequest.Title);
 

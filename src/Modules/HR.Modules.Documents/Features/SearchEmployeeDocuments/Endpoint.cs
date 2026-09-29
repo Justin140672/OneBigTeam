@@ -6,13 +6,6 @@ using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Documents.Features.SearchEmployeeDocuments;
 
-// DOC-06: company-wide document search, distinct from ListEmployeeDocuments (per-employee route).
-// Access scope is resolved here (not trusted from the request) and passed into the handler:
-//   - HR Administrator          -> unrestricted company-wide (allowedEmployeeIds = null)
-//   - Manager                   -> self + complete reporting hierarchy (DirectReportsReader)
-//   - Anyone else (Employee)    -> self only
-// This mirrors DocumentResourceAuthorizer.CanAccessEmployeeDocumentsAsync's per-employee scope
-// rules (DOC-01), applied here across every result row instead of a single target employee.
 internal sealed class Endpoint(
     SearchEmployeeDocumentsHandler handler,
     ICurrentUser currentUser,
@@ -41,9 +34,6 @@ internal sealed class Endpoint(
             return;
         }
 
-        // Same convention as ListEmployeeDocuments/GetArchivedEmployeeDocuments: ICurrentUser.UserId
-        // is used directly as the caller's employee id (DocumentResourceAuthorizer's
-        // "callerEmployeeId" parameter), no separate user-to-employee lookup exists in this module.
         var isHrAdministrator = await authorizer.IsHrAdministratorAsync(callerId, cancellationToken);
 
         IReadOnlyCollection<Guid>? allowedEmployeeIds = null;
@@ -56,9 +46,6 @@ internal sealed class Endpoint(
             allowedEmployeeIds = scope;
         }
 
-        // If a specific employeeId filter was requested, it must itself be within the caller's
-        // access scope — otherwise a manager/employee could probe for another employee's
-        // documents purely via the filter even though the base scope excludes them.
         if (request.EmployeeId is Guid requestedEmployeeId
             && allowedEmployeeIds is not null
             && !allowedEmployeeIds.Contains(requestedEmployeeId))

@@ -73,12 +73,10 @@ public class DbContextConcurrencyExtensionsTests
             await seed.SaveChangesAsync();
         }
 
-        // Context A loads the row at Version 1.
         await using var ctxA = new WidgetContext(Options(dbName));
         var trackedA = await ctxA.Widgets.SingleAsync();
         trackedA.Name = "A wins?";
 
-        // Context B commits first, moving the store to Version 2.
         await using (var ctxB = new WidgetContext(Options(dbName)))
         {
             var trackedB = await ctxB.Widgets.SingleAsync();
@@ -87,7 +85,6 @@ public class DbContextConcurrencyExtensionsTests
             Assert.True(bResult.IsSuccess);
         }
 
-        // Context A now saves with a stale expected version.
         var result = await ctxA.SaveChangesWithConcurrencyAsync(trackedA, expectedVersion: 1, ConflictMessage, CancellationToken.None);
 
         Assert.True(result.IsFailure);

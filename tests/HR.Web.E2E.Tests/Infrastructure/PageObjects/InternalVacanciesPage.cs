@@ -2,13 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the self-service Internal Vacancies list
-/// (src/HR.Web/Components/Pages/Recruitment/InternalVacancies.razor),
-/// route /companies/{companyId}/internal-vacancies. Any authenticated employee of the company can
-/// view it — no recruitment permission required. A vacancy appears here iff it belongs to the same
-/// company AND Status == Open AND IsAdvertisedInternally == true.
-/// </summary>
 public sealed class InternalVacanciesPage(IPage page, string baseUrl)
 {
     private const string CardSelector = "[data-testid='internal-vacancy-card']";
@@ -17,16 +10,10 @@ public sealed class InternalVacanciesPage(IPage page, string baseUrl)
     public async Task GoToAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/internal-vacancies");
-        // With prerender disabled the page is blank until the interactive circuit connects — gate
-        // on the authenticated shell first, then let WaitForInteractiveAsync settle the list.
         await page.WaitForSelectorAsync(".app-shell", new() { Timeout = 30_000 });
         await WaitForInteractiveAsync();
     }
 
-    /// <summary>
-    /// Waits until the page's own heading has rendered and the list has settled onto either a
-    /// populated card grid or the empty state (i.e. the "Loading vacancies…" indicator has gone).
-    /// </summary>
     public async Task WaitForInteractiveAsync()
     {
         await page.GetByRole(AriaRole.Heading, new() { Name = "Internal Vacancies" })
@@ -34,7 +21,6 @@ public sealed class InternalVacanciesPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync($"{CardSelector}, .vacancy-empty", new() { Timeout = 30_000 });
     }
 
-    /// <summary>Reads the page's main heading text.</summary>
     public async Task<string?> GetHeadingAsync()
     {
         var h1 = page.Locator("h1").First;
@@ -50,26 +36,16 @@ public sealed class InternalVacanciesPage(IPage page, string baseUrl)
     public Task<bool> IsEmptyStateVisibleAsync() =>
         page.Locator(".vacancy-empty").WaitUntilVisibleAsync();
 
-    /// <summary>
-    /// Types <paramref name="query"/> into the optional search box and waits for the list to
-    /// re-render. The SfTextBox raises ValueChange on blur/change (not on the "input" event
-    /// FillAsync dispatches), so an explicit blur is needed to actually trigger OnSearchChanged.
-    /// </summary>
     public async Task SearchAsync(string query)
     {
-        // SfTextBox splats data-testid onto its underlying <input> directly (no wrapper), so match
-        // the input itself; keep the descendant form as a fallback.
         var search = page.Locator(
             "input[data-testid='internal-vacancy-search'], [data-testid='internal-vacancy-search'] input").First;
         await search.FillAsync(query);
         await search.PressAsync("Tab");
-        // Give the server round-trip that reloads _items a moment, then wait for the list to
-        // settle again on cards or the empty state.
         await page.WaitForTimeoutAsync(400);
         await page.WaitForSelectorAsync($"{CardSelector}, .vacancy-empty", new() { Timeout = 15_000 });
     }
 
-    /// <summary>Clicks the vacancy card whose title matches <paramref name="title"/> and waits for the read-only detail dialog to open.</summary>
     public async Task OpenCardAsync(string title)
     {
         var card = page.Locator(CardSelector).Filter(new() { HasText = title }).First;
@@ -90,17 +66,9 @@ public sealed class InternalVacanciesPage(IPage page, string baseUrl)
     public async Task<string?> GetDetailDescriptionAsync() =>
         (await page.Locator($"{DetailSelector} .vacancy-detail-description").TextContentAsync())?.Trim();
 
-    /// <summary>
-    /// Count of buttons in the detail dialog whose accessible name matches <paramref name="name"/>
-    /// — used to assert the read-only dialog has no "Apply"/"Save" action.
-    /// </summary>
     public Task<int> DetailButtonCountAsync(string name) =>
         DetailDialog.GetByRole(AriaRole.Button, new() { Name = name }).CountAsync();
 
-    // ── Employee "Apply" flow ──────────────────────────────────────────────────────────────
-    // Every locator below is a data-testid (unique on the page) — never a bare Syncfusion CSS
-    // class, and never an [aria-xxx='true'] attribute match (Blazor bool-bound aria attributes are
-    // unreliable to match on; use IsDisabledAsync / testids instead).
 
     private const int ServerRoundTripTimeoutMs = 20_000;
     private static readonly System.Text.RegularExpressions.Regex NonWhitespace = new(@"\S");
@@ -126,10 +94,6 @@ public sealed class InternalVacanciesPage(IPage page, string baseUrl)
     private ILocator SuccessNotice => ByTestId("internal-apply-success");
     private ILocator AlreadyAppliedNotice => ByTestId("internal-apply-already-applied");
 
-    /// <summary>
-    /// Opens the vacancy card for <paramref name="title"/> via the keyboard (focus the
-    /// role="button" card, press Enter) and waits for the detail dialog.
-    /// </summary>
     public async Task OpenCardWithKeyboardAsync(string title)
     {
         var card = Card(title);
@@ -139,7 +103,6 @@ public sealed class InternalVacanciesPage(IPage page, string baseUrl)
         await Detail.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
     }
 
-    /// <summary>Clicks the detail dialog's Apply button and waits for the apply form.</summary>
     public async Task ClickApplyAsync()
     {
         await ApplyButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
@@ -155,7 +118,6 @@ public sealed class InternalVacanciesPage(IPage page, string baseUrl)
         return ((await ApplicantName.TextContentAsync()) ?? "").Trim();
     }
 
-    /// <summary>Reads the read-only work email once the "Loading…" placeholder has been replaced.</summary>
     public async Task<string> GetApplicantEmailAsync()
     {
         await Assertions.Expect(ApplicantEmail).ToBeVisibleAsync(new() { Timeout = 15_000 });
@@ -163,10 +125,6 @@ public sealed class InternalVacanciesPage(IPage page, string baseUrl)
         return ((await ApplicantEmail.TextContentAsync()) ?? "").Trim();
     }
 
-    /// <summary>
-    /// Number of editable form controls inside the apply form other than the CV file input — the
-    /// applicant's identity is display-only, so this must be 0.
-    /// </summary>
     public async Task<int> CountEditableIdentityInputsAsync()
     {
         await ApplyForm.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
@@ -183,11 +141,6 @@ public sealed class InternalVacanciesPage(IPage page, string baseUrl)
     public Task SelectCvAsync(string fileName, string mimeType, byte[] bytes) =>
         CvInput.SetInputFilesAsync(new FilePayload { Name = fileName, MimeType = mimeType, Buffer = bytes });
 
-    /// <summary>
-    /// Selects a CV the client should accept and waits until the server-side OnChange has recorded
-    /// it (the "selected file" row shows the name) — so a following Submit can't race the upload
-    /// selection and read "no file chosen".
-    /// </summary>
     public async Task SelectValidCvAsync(string fileName, byte[] bytes, string mimeType = "application/pdf")
     {
         await SelectCvAsync(fileName, mimeType, bytes);
@@ -197,25 +150,21 @@ public sealed class InternalVacanciesPage(IPage page, string baseUrl)
 
     public Task<bool> IsCvSelectedVisibleAsync() => CvSelected.IsVisibleAsync();
 
-    /// <summary>Waits until the CV error region shows exactly <paramref name="expected"/>.</summary>
     public Task WaitForCvErrorAsync(string expected) =>
         Assertions.Expect(CvError).ToHaveTextAsync(expected, new() { Timeout = 15_000 });
 
-    /// <summary>Polls until the CV error region is non-empty, then returns its text.</summary>
     public async Task<string> GetCvErrorAsync()
     {
         await Assertions.Expect(CvError).ToHaveTextAsync(NonWhitespace, new() { Timeout = 15_000 });
         return ((await CvError.TextContentAsync()) ?? "").Trim();
     }
 
-    /// <summary>Clicks the apply form's Apply (submit) button. Callers wait for the specific outcome.</summary>
     public async Task SubmitApplicationAsync()
     {
         await SubmitButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
         await SubmitButton.ClickAsync();
     }
 
-    /// <summary>Cancels the apply form and waits until the dialog is back on the vacancy details.</summary>
     public async Task CancelApplyAsync()
     {
         await CancelButton.ClickAsync();
@@ -223,7 +172,6 @@ public sealed class InternalVacanciesPage(IPage page, string baseUrl)
         await Assertions.Expect(Detail).ToBeVisibleAsync(new() { Timeout = 15_000 });
     }
 
-    /// <summary>Polls until the server error region inside the apply form has text, then returns it.</summary>
     public async Task<string> GetServerErrorAsync()
     {
         await Assertions.Expect(ServerError).ToHaveTextAsync(NonWhitespace, new() { Timeout = ServerRoundTripTimeoutMs });
@@ -242,10 +190,8 @@ public sealed class InternalVacanciesPage(IPage page, string baseUrl)
 
     public Task<bool> IsAppliedStateVisibleAsync() => AppliedState.WaitUntilVisibleAsync(ServerRoundTripTimeoutMs);
 
-    /// <summary>Instant (non-waiting) check — call only after the dialog has settled on a known state.</summary>
     public Task<int> AppliedStateCountAsync() => AppliedState.CountAsync();
 
-    /// <summary>Waits for the disabled "Applied" footer button, then reports whether it is disabled.</summary>
     public async Task<bool> IsAppliedButtonDisabledAsync()
     {
         if (!await AppliedButton.WaitUntilVisibleAsync(ServerRoundTripTimeoutMs))
@@ -255,29 +201,20 @@ public sealed class InternalVacanciesPage(IPage page, string baseUrl)
 
     public Task<bool> IsApplyButtonVisibleAsync() => ApplyButton.WaitUntilVisibleAsync();
 
-    /// <summary>Instant (non-waiting) count — call only after the dialog has settled on a known state.</summary>
     public Task<int> ApplyButtonCountAsync() => ApplyButton.CountAsync();
 
     public Task<bool> HasAppliedBadgeAsync(string title) =>
         Card(title).Locator("[data-testid='internal-vacancy-applied-badge']").WaitUntilVisibleAsync(ServerRoundTripTimeoutMs);
 
-    /// <summary>Closes the detail dialog via its Close button and waits for it to go away.</summary>
     public async Task CloseDetailAsync()
     {
         await CloseButton.ClickAsync();
         await Assertions.Expect(Detail).ToBeHiddenAsync(new() { Timeout = 15_000 });
     }
 
-    /// <summary>The data-testid of the currently focused element (instant snapshot).</summary>
     public Task<string?> ActiveElementTestIdAsync() =>
         page.EvaluateAsync<string?>("() => document.activeElement?.getAttribute('data-testid') ?? null");
 
-    /// <summary>
-    /// Polls until the focused element carries <paramref name="testId"/> — focus is moved in the
-    /// component's OnAfterRenderAsync, i.e. after the render patch lands, so an instant read right
-    /// after the triggering action would race it. Returns false on timeout (caller asserts with
-    /// <see cref="ActiveElementTestIdAsync"/> for a clear message).
-    /// </summary>
     public async Task<bool> WaitForFocusAsync(string testId, int timeoutMs = 10_000)
     {
         try

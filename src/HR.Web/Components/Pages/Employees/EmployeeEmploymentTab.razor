@@ -341,11 +341,6 @@ else
 
     protected override object? LoadKey => (CompanyId, EmployeeId);
 
-    // Set by EmployeeEdit.razor's SaveCoreAsync (via its @ref to this component) immediately
-    // before calling SaveAsync(), so this tab's UpdateEmploymentDetailsRequest carries the same
-    // CorrelationId as the Employee Profile tab's own save — letting
-    // GetEmployeeAuditHistoryHandler merge the two resulting audit rows into one entry. Left null
-    // (the default) whenever this tab is saved on its own, so its audit entry stays separate.
     public Guid? CorrelationId { get; set; }
 
     // Ticket 2: optimistic concurrency is handled by EditSectionBase — LoadedVersion is captured
@@ -353,14 +348,6 @@ else
     // the profile save that runs first in the combined Save, SaveConflict is raised by
     // ApplySaveResult, and ReloadLatestValuesAsync(rebaseline: true) is the conflict recovery.
 
-    // Called by EmployeeEdit.razor's SaveCoreAsync (via its @ref to this component) immediately
-    // before calling SaveAsync(), whenever the user also changed Department/Location on the
-    // Employee/Profile tab. Model.DepartmentId/LocationId here are loaded once when this tab
-    // mounts and never refreshed from the sibling tab, so without this sync SaveAsync() would
-    // resubmit these stale values via UpdateEmploymentDetailsRequest and silently revert the
-    // change the Profile tab just saved (bug fix — Department/Location edits were being reverted,
-    // and since EmploymentDetailsSnapshot doesn't audit these fields, the revert never showed up
-    // in Employee Audit History either).
     public void SyncSharedAssignmentFields(Guid? departmentId, Guid? locationId)
     {
         Model.DepartmentId = departmentId;
@@ -392,7 +379,6 @@ else
         new(NoticePeriodUnit.Months, "Months")
     ];
 
-    // Same convention as EmployeeLeavingTab.NoticePeriodSourceLabel.
     private static string NoticePeriodSourceLabel(string source) => source switch
     {
         "Employee"        => "Employee",
@@ -403,7 +389,6 @@ else
 
     private sealed record NoticePeriodUnitChoice(NoticePeriodUnit Value, string Label);
 
-    // Read-only — compensation changes go through Add/Adjust Compensation, not this form.
     private string CurrentSalaryDisplay() =>
         _currentCompensation is not null
             ? $"{_currentCompensation.Salary.ToString("C2", CultureInfo.GetCultureInfo(Session.Locale))} per {SalaryPeriodLabel(_currentCompensation.SalaryType)}"
@@ -416,7 +401,6 @@ else
         _        => "year"
     };
 
-    // Read-only — same source as CurrentSalaryDisplay, sourced from the current compensation record.
     private string CurrentHoursDisplay() =>
         _currentCompensation?.HoursPerWeek is { } hours ? $"{hours:0.##} hrs/week" : "—";
 
@@ -426,7 +410,6 @@ else
     private string CurrentEffectiveFromDisplay() =>
         _currentCompensation is not null ? _currentCompensation.EffectiveFrom.ToString("d MMM yyyy") : "—";
 
-    // Reuses the same company-default-fallback pattern as MyProfileOverviewTab.WorkingPatternSummary.
     private string WorkingPatternSummary()
     {
         if (_employee is null)
@@ -438,26 +421,6 @@ else
         return WorkingPatternFormatter.Summarize(workingDays, hoursPerDay);
     }
 
-    // Draft, Leaving, and FormerEmployee must be real options here even though nobody should ever
-    // *pick* them (a brand-new employee's Employment tab loads with Model.Status == "Draft" — see
-    // PopulateModel below — an employee mid-way through the leaving process loads with
-    // Model.Status == "Leaving", and a former employee's tab loads with Model.Status ==
-    // "FormerEmployee"). If any of those values has no matching item in the dropdown's own
-    // DataSource, the widget clears its selection and, via @bind-Value, silently overwrites
-    // Model.Status back to the client with an empty string. That corrupts the field on first
-    // render, before the user has touched anything, and the empty value then fails server-side
-    // deserialization on save regardless of which field they actually meant to edit.
-    // UpdateEmploymentDetailsHandler still rejects any attempt to actively transition into Draft,
-    // Leaving, or FormerEmployee via this form, so including them here only fixes the
-    // display/round-trip of an already-Draft, already-Leaving, or already-FormerEmployee
-    // employee — it doesn't relax those rules. Leaving is only ever actively entered via the
-    // dedicated Start Leaving Process action, not this generic edit form.
-    // "Leaving" is only offered as a selectable option once the employee already has a
-    // LeavingDate set — UpdateEmploymentDetailsHandler rejects an attempt to actively transition
-    // into "Leaving" via this generic form otherwise (that transition only happens via the
-    // dedicated Start Leaving Process action). Draft/FormerEmployee are still included whenever
-    // that's the employee's current status, purely so the dropdown round-trips that value without
-    // corrupting it (see remarks above) — never as something a user is meant to actively pick.
     private List<Option> _statusOptions =
     [
         new("Draft",          "Draft"),
@@ -485,14 +448,6 @@ else
     {
         var deptTask       = DepartmentService.ListDepartmentsAsync(CompanyId);
         var locationTask   = LocationService.ListLocationsAsync(CompanyId);
-        // Bounded — a long-lived shared company can accumulate far more Position Profiles over
-        // time than any dropdown needs to browse without typing (e.g. this suite's own E2E runs
-        // create a uniquely-named one per test, unbounded, across hundreds of runs). An unbounded
-        // fetch here was a real, user-observed multi-second delay before this field became
-        // interactable at all — see OnPositionProfileFilteringAsync for how the rest of the
-        // company is reached by typing (same pattern as OnManagerFilteringAsync below), and the
-        // explicit merge-in after `employee` loads for why the currently-assigned profile is
-        // never silently missing just because it falls outside this first page.
         var profileTask    = PositionProfileService.ListPositionProfilesAsync(CompanyId, pageSize: 100);
         var empListTask    = EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
         var probationTask  = ProbationService.GetProbationRecordByEmployeeAsync(CompanyId, EmployeeId);
@@ -516,10 +471,6 @@ else
             PopulateModel(employee);
         RebuildStatusOptions();
 
-        // Same "merge in the currently-assigned option even if it fell outside the bounded first
-        // page" pattern as _managerOptions below — otherwise an employee whose Position Profile
-        // happens to sort past the first 100 (alphabetically by Title) would render with a blank
-        // Position Profile field until the user typed something to search for it.
         if (employee?.PositionProfileId is { } currentProfileId &&
             _positionProfiles.All(p => p.Id != currentProfileId))
         {
@@ -534,11 +485,6 @@ else
             }
         }
 
-        // A first page (browsable without typing anything) — same purpose as the initial
-        // pageSize:200 fetch in VacancyApplicationsTab.OpenAddDialog. The rest of the company
-        // is reached by typing, see OnManagerFilteringAsync, so this page doesn't need to be
-        // exhaustive. The currently-assigned manager is merged in explicitly in case they don't
-        // happen to fall within this first page, so their name always renders rather than blank.
         _managerOptions = ((await empListTask)?.Items ?? [])
             .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")
             .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
@@ -552,17 +498,8 @@ else
             .ToList();
     }
 
-    // The manager list can't be preloaded in one bounded page the way _departments/_locations/etc.
-    // are — a company can have far more employees than any reasonable page size, and whoever the
-    // target manager is might sort outside that page (alphabetically, by whatever order), making
-    // them impossible to find no matter what's typed into the filter box. Search server-side as
-    // the user types instead, same pattern as VacancyApplicationsTab's candidate picker.
     private int _managerFilterRequestId;
 
-    // Requests aren't guaranteed to resolve in the order they were fired — applying every response
-    // unconditionally means a late-arriving response for an earlier keystroke can land after the
-    // user already picked a manager from a later, faster response, visibly clearing their
-    // selection. Only the most recently issued request's response is applied.
     private async Task OnManagerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
     {
         args.PreventDefaultAction = true;
@@ -659,8 +596,6 @@ else
         return ApplySaveResult(result, "Failed to save employment details.");
     }
 
-    // Item 5: the Employment tab's current field values, so EmployeeEdit.razor can fold them into a
-    // single atomic profile+employment save. Mirrors exactly what SaveCoreAsync would send.
     public EmploymentPortion GetEmploymentPortion()
     {
         WorkingDays? workingDaysOverride = null;
@@ -693,11 +628,8 @@ else
             FormText.Optional(Model.Notes));
     }
 
-    // Item 5: EmployeeEdit's single Save reads GetEmploymentPortion() directly instead of calling
-    // this section's SaveAsync(), so it must run this section's DataAnnotations validation itself.
     public bool ValidateSection() => EditContext.Validate();
 
-    // Item 5: adopt the version returned by the combined save and clear unsaved-change tracking.
     public void AdoptSavedVersion(int? version)
     {
         LoadedVersion = version;

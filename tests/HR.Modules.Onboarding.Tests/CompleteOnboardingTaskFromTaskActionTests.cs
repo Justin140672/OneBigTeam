@@ -131,7 +131,7 @@ public class CompleteOnboardingTaskFromTaskActionTests
         var seedAt = Now.AddDays(-1);
         var plan = SeedPlan(dbContext, companyId, seedAt, OnboardingStatus.InProgress);
         var taskToComplete = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
-        SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task B"); // still Pending afterwards
+        SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task B");
         await dbContext.SaveChangesAsync();
 
         var (action, _, _, _, integrationPublisher) = BuildActionWithIntegrationEvents(dbContext);
@@ -316,8 +316,6 @@ public class CompleteOnboardingTaskFromTaskActionTests
     [Fact]
     public async Task ExecuteAsync_Is_Idempotent_When_Task_Already_Skipped()
     {
-        // Mirrors the already-Completed idempotency test, but exercises the other terminal
-        // branch of the "Completed or Skipped" check.
         await using var dbContext = BuildContext();
         var companyId = Guid.NewGuid();
 
@@ -346,8 +344,6 @@ public class CompleteOnboardingTaskFromTaskActionTests
     [Fact]
     public async Task ExecuteAsync_Completes_Task_And_Saves_When_Owning_Plan_Is_Missing()
     {
-        // Orphaned task (its OnboardingPlanId does not resolve to a plan): the task must still be
-        // completed and saved, and the method must return early without throwing on the null plan.
         await using var dbContext = BuildContext();
         var companyId = Guid.NewGuid();
 
@@ -394,7 +390,6 @@ public class CompleteOnboardingTaskFromTaskActionTests
         Assert.Equal(seedAt, savedPlan.UpdatedAt);
     }
 
-    // ── Notifications on plan start, HR review task on plan completion ────────
 
     [Fact]
     public async Task ExecuteAsync_Completing_First_Task_Notifies_Employee()
@@ -405,7 +400,7 @@ public class CompleteOnboardingTaskFromTaskActionTests
         var seedAt = Now.AddDays(-1);
         var plan = SeedPlan(dbContext, companyId, seedAt);
         var task = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
-        SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task B"); // still Pending afterwards
+        SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task B");
         await dbContext.SaveChangesAsync();
 
         var (action, notifications, taskCreator, _) = BuildAction(dbContext);
@@ -451,7 +446,7 @@ public class CompleteOnboardingTaskFromTaskActionTests
         var seedAt = Now.AddDays(-1);
         var plan = SeedPlan(dbContext, companyId, seedAt, OnboardingStatus.InProgress);
         var taskToComplete = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
-        SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task B"); // still Pending afterwards
+        SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task B");
         await dbContext.SaveChangesAsync();
 
         var (action, notifications, taskCreator, _) = BuildAction(dbContext, Guid.NewGuid());
@@ -487,8 +482,6 @@ public class CompleteOnboardingTaskFromTaskActionTests
         Assert.Null(created.AssignedUserId);
         Assert.Equal(plan.Id, created.SourceEntityId);
 
-        // The plan was already InProgress, so completing its last task does not re-trigger the
-        // "onboarding started" notifications — only the HR review task is created.
         Assert.Empty(notifications.Written);
     }
 
@@ -526,7 +519,7 @@ public class CompleteOnboardingTaskFromTaskActionTests
         var seedAt = Now.AddDays(-1);
         var plan = SeedPlan(dbContext, companyId, seedAt, OnboardingStatus.InProgress);
         var taskToComplete = SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task A");
-        SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task B"); // still Pending afterwards
+        SeedTask(dbContext, companyId, plan.Id, seedAt, title: "Task B");
         await dbContext.SaveChangesAsync();
 
         var (action, _, _, auditPublisher) = BuildAction(dbContext);

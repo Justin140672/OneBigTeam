@@ -7,19 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Jobs;
 
-/// <summary>
-/// Daily job (SICK-04) that runs the deterministic <see cref="AttendanceAlertEvaluationService"/>
-/// against every employee with sickness history, per company, and persists any newly-firing rule as
-/// an <see cref="AttendanceAlert"/>. Mirrors FitNoteRequestJob/ReturnToWorkReminderJob's shape:
-/// company-scoped batches, evaluated against "today".
-///
-/// Entirely idempotent: before inserting, each candidate is checked against existing alerts for the
-/// same employee+rule+evidence window (also enforced by a unique database index — see
-/// AttendanceAlertConfiguration), so re-running this job — including a Hangfire retry after a
-/// partial failure — never creates duplicate alerts. Purely additive: this job only ever inserts
-/// AttendanceAlert rows; it never mutates SicknessRecord, ReturnToWorkReview, employment or
-/// disciplinary state.
-/// </summary>
 internal sealed class AttendanceAlertEvaluationJob(
     SicknessDbContext db,
     ICompanySicknessSettingsReader sicknessSettingsReader,
@@ -80,7 +67,7 @@ internal sealed class AttendanceAlertEvaluationJob(
             {
                 var key = (employeeId, candidate.Rule, candidate.EvidencePeriodStart, candidate.EvidencePeriodEnd);
                 if (!existingKeySet.Add(key))
-                    continue; // duplicate of an existing alert or of another candidate this run — skip.
+                    continue;
 
                 db.AttendanceAlerts.Add(AttendanceAlert.Create(
                     Guid.NewGuid(),

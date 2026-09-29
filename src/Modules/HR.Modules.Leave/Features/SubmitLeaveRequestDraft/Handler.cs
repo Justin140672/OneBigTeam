@@ -109,7 +109,6 @@ internal sealed class SubmitLeaveRequestDraftHandler(
             return Result.Failure<SubmitLeaveRequestDraftResponse>(
                 Error.Validation("The requested date range contains no working days."));
 
-        // Mirrors SubmitLeaveRequestHandler's cross-year rule - see its comment.
         if (leaveType.Behaviour != LeaveTypeBehaviour.Toil)
         {
             var startPolicyYear = LeaveYearCalculator.GetPolicyYear(draft.StartDate, leaveSettings.LeaveYearStartMonth);
@@ -167,8 +166,6 @@ internal sealed class SubmitLeaveRequestDraftHandler(
             .Select(r => new SubmitDraftConflictWarning(r.Id, r.LeaveTypeId, r.StartDate, r.EndDate, r.Status.ToString()))
             .ToListAsync(cancellationToken);
 
-        // LEAVE-08: mirrors SubmitLeaveRequestHandler/PreviewLeaveRequestHandler so this warning
-        // is consistent across preview and both submission paths.
         var excludedHolidays = (await warningCalculator.GetExcludedPublicHolidaysAsync(
                 request.CompanyId, draft.StartDate, draft.EndDate, workingPattern,
                 leaveSettings.ExcludePublicHolidaysFromLeave, cancellationToken))
@@ -177,8 +174,6 @@ internal sealed class SubmitLeaveRequestDraftHandler(
 
         var now = clock.UtcNowOffset();
 
-        // Still Draft at this point - UpdateDraftDetails refreshes TotalDays/AssignLeavePolicy
-        // resolves the (possibly now-available) policy before the status transition below.
         draft.UpdateDraftDetails(
             draft.LeaveTypeId, draft.StartDate, draft.StartPart, draft.EndDate, draft.EndPart,
             totalDays, draft.Reason, now);
@@ -192,8 +187,6 @@ internal sealed class SubmitLeaveRequestDraftHandler(
         }
         else
         {
-            // Reviewed-by defaults to the requesting employee - there is no separate approver for
-            // policies that skip manual review. See LeaveApprovalEffectsService.
             var effectResult = await approvalEffects.ApplyBalanceEffectsAndApproveAsync(
                 draft, leaveType, request.EmployeeId, now, cancellationToken);
 

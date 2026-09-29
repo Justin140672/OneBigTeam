@@ -16,9 +16,6 @@ public class ToilExpiryServiceTests
 
     private static LeaveDbContext BuildContext()
     {
-        // ExpireCompanyAsync wraps its save in an explicit transaction; the InMemory provider
-        // doesn't support transactions and raises a warning-as-error for it by default (same
-        // accommodation used by LeaveYearRolloverServiceTests / AdjustLeaveBalanceHandlerTests).
         var options = new DbContextOptionsBuilder<LeaveDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
@@ -124,7 +121,6 @@ public class ToilExpiryServiceTests
         var leaveType = CreateToilLeaveType(companyId);
         var balance = CreateBalance(companyId, employeeId, leaveType.Id, 10m);
         var bucket = EarnedBucket(balance, 10m, expiresOn: AsOf.AddDays(-1));
-        // Used 6, then 1 of that usage reversed => remaining = 10 - 6 + 1 = 5.
         var used = UsedDrawdown(bucket, 6m);
         var reversal = ReversalDrawdown(bucket, 1m);
         balance.RecordUsage(6m, Now);
@@ -252,7 +248,6 @@ public class ToilExpiryServiceTests
 
         var leaveType = CreateToilLeaveType(companyId, toilExpiryDays: null);
         var balance = CreateBalance(companyId, employeeId, leaveType.Id, 2m);
-        // Bucket has an ExpiresOn even though the type isn't currently expiry-configured.
         var bucket = EarnedBucket(balance, 2m, expiresOn: AsOf.AddDays(-1));
 
         context.LeaveTypes.Add(leaveType);

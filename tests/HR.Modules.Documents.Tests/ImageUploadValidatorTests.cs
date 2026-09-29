@@ -13,7 +13,6 @@ public class ImageUploadValidatorTests
         return new ImageUploadValidator(Options.Create(options));
     }
 
-    // --- Validate (metadata: extension/content-type/size) ---
 
     [Fact]
     public void Validate_ValidJpeg_ReturnsSuccess()
@@ -83,7 +82,6 @@ public class ImageUploadValidatorTests
     [Fact]
     public void Validate_DisallowedContentType_ReturnsFailure()
     {
-        // Extension is allowed but content type is spoofed.
         var result = CreateValidator().Validate("photo.png", "text/html", 1024);
 
         Assert.True(result.IsFailure);
@@ -105,7 +103,6 @@ public class ImageUploadValidatorTests
         Assert.True(result.IsSuccess);
     }
 
-    // --- ValidateImageContent (magic bytes + dimensions) ---
 
     [Fact]
     public void ValidateImageContent_ValidPng_WithinBounds_ReturnsSuccess()
@@ -152,7 +149,6 @@ public class ImageUploadValidatorTests
     [Fact]
     public void ValidateImageContent_Png_SpoofedContent_ReturnsFailure()
     {
-        // Declares PNG but the bytes are just zeros (renamed/tampered file).
         var content = new MemoryStream([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
         var result = CreateValidator().ValidateImageContent(content, "image/png");
@@ -165,7 +161,6 @@ public class ImageUploadValidatorTests
     [Fact]
     public void ValidateImageContent_Jpeg_SpoofedContent_ReturnsFailure()
     {
-        // Declares JPEG but the bytes are actually a PNG signature.
         var content = new MemoryStream(ImageTestBytes.BuildPng(400, 300));
 
         var result = CreateValidator().ValidateImageContent(content, "image/jpeg");
@@ -178,7 +173,7 @@ public class ImageUploadValidatorTests
     [Fact]
     public void ValidateImageContent_TooShortToBeAnImage_ReturnsFailure()
     {
-        var content = new MemoryStream([0x89, 0x50, 0x4E]); // fewer than 8 bytes
+        var content = new MemoryStream([0x89, 0x50, 0x4E]);
 
         var result = CreateValidator().ValidateImageContent(content, "image/png");
 

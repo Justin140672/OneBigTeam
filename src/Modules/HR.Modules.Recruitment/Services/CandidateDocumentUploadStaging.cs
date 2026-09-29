@@ -8,12 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Recruitment.Services;
 
-/// <summary>
-/// A candidate document blob that has been uploaded under a durable, already-persisted Reserved
-/// upload intent (<see cref="CandidateDocumentDeletionOperation"/>). The caller must either confirm
-/// <see cref="Intent"/> in the same SaveChangesAsync call that inserts the owning
-/// <see cref="CandidateDocument"/>, or call <see cref="CandidateDocumentUploadStaging.CompensateAsync"/>.
-/// </summary>
 internal sealed record StagedCandidateDocumentUpload(
     Guid CompanyId,
     Guid CandidateId,
@@ -45,8 +39,6 @@ internal sealed class CandidateDocumentUploadStaging(
     ILogger logger,
     IExecutionContextAccessor? executionContextAccessor = null)
 {
-    /// <summary>Bounded independently of the request's own cancellation — a cancelled/timed-out
-    /// request must never prevent compensating cleanup of a blob that was already uploaded.</summary>
     private static readonly TimeSpan CleanupTimeout = TimeSpan.FromSeconds(30);
 
     /// <summary>
@@ -77,13 +69,6 @@ internal sealed class CandidateDocumentUploadStaging(
             companyId, candidateId, storageKey, file.FileName, file.Length, file.ContentType, intent);
     }
 
-    /// <summary>
-    /// Best-effort optimisation only — NOT the source of durability (the Reserved intent persisted
-    /// before the upload is). Deletes the uploaded blob and marks the intent resolved. Callers must
-    /// clear the change tracker (and dispose any open transaction) first, so this method's own save
-    /// cannot re-attempt persisting whatever failed. Uses an independently-bounded token, never the
-    /// request's own, which may already be cancelled.
-    /// </summary>
     public async Task CompensateAsync(StagedCandidateDocumentUpload staged)
     {
         using var cleanupCts = new CancellationTokenSource(CleanupTimeout);
@@ -114,21 +99,12 @@ internal sealed class CandidateDocumentUploadStaging(
         }
         catch (Exception ex)
         {
-            // Marking the intent resolved is itself best-effort — if this fails, the row remains
-            // unconfirmed, so the reconciliation sweep will find the object already gone from
-            // storage (DeleteAsync is idempotent) and clear it on its next pass.
             logger.LogWarning(ex,
                 "Candidate document upload: failed to mark the upload-intent record resolved after a successful compensating delete (company {CompanyId}, candidate {CandidateId}, storage key suffix {StorageKeySuffix}). The reconciliation sweep will reconcile it on its next pass.",
                 staged.CompanyId, staged.CandidateId, RedactStorageKey(staged.StorageKey));
         }
     }
 
-    /// <summary>Storage keys are prefixed with "{companyId}/{candidateId}/..." — never log the full
-    /// key. Only the trailing filename/extension segment is retained for diagnostic value. Keys are
-    /// always "{companyId}/{candidateId}/{server GUID}{allow-listed extension}" (ValidateFile runs
-    /// before GenerateStorageKey on every upload path), so the retained tail is already safe; as
-    /// defence in depth (CodeQL #66) any character outside [A-Za-z0-9._-] is still replaced with '?',
-    /// so no control character can reach a log.</summary>
     internal static string RedactStorageKey(string storageKey)
     {
         var lastSlash = storageKey.LastIndexOf('/');
@@ -141,7 +117,6 @@ internal sealed class CandidateDocumentUploadStaging(
         });
     }
 
-    /// <summary>Size, extension and content-type rules for any candidate document upload.</summary>
     internal static Result ValidateFile(string fileName, string contentType, long fileSize, CandidateDocumentUploadOptions options)
     {
         if (fileSize <= 0)

@@ -4,9 +4,6 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace HR.Modules.Identity.Persistence.Configurations;
 
-// Deliberate exception to the usual company_id-on-every-table rule: platform administrators are
-// a platform-level/system concept with no company relationship at all (see 05-database-standards.md
-// "Global/system tables may omit company_id").
 internal sealed class PlatformAdministratorConfiguration : IEntityTypeConfiguration<PlatformAdministrator>
 {
     public void Configure(EntityTypeBuilder<PlatformAdministrator> builder)
@@ -24,7 +21,6 @@ internal sealed class PlatformAdministratorConfiguration : IEntityTypeConfigurat
         builder.Property(a => a.DisabledAt).HasColumnName("disabled_at");
         builder.Property(a => a.DisabledByUserId).HasColumnName("disabled_by_user_id");
 
-        // P1: durable provisioning-workflow state — see PlatformAdministratorProvisioningStatus.
         builder.Property(a => a.ProvisioningStatus)
             .HasColumnName("provisioning_status")
             .HasMaxLength(32)
@@ -48,10 +44,6 @@ internal sealed class PlatformAdministratorConfiguration : IEntityTypeConfigurat
 
         builder.HasIndex(a => a.Email).IsUnique();
 
-        // P1: DB-level guarantee that two local rows can never point at the same identity-provider
-        // account — the application-level checks in CreatePlatformAdministratorHandler /
-        // ActivatePlatformAdministratorHandler are defence-in-depth on top of this, not a
-        // substitute for it. Filtered so multiple NULLs (not-yet-linked rows) are allowed.
         builder.HasIndex(a => a.SupabaseAuthUserId)
             .IsUnique()
             .HasFilter("supabase_auth_user_id IS NOT NULL")

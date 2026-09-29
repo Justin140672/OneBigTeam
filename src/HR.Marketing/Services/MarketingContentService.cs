@@ -4,11 +4,6 @@ using Microsoft.Extensions.Caching.Memory;
 
 namespace HR.Marketing.Services;
 
-/// <summary>
-/// Managed marketing content (product features + roadmap) surfaced from the central
-/// <c>HR.Modules.Marketing</c> database via the public <c>GET /api/marketing/content</c> endpoint,
-/// which only ever returns published rows.
-/// </summary>
 public sealed record MarketingContent(
     string ProductName,
     string? ProductTagline,
@@ -82,7 +77,6 @@ public sealed class MarketingContentService(IHttpClientFactory httpClientFactory
                 return fetched;
             }
 
-            // Endpoint unavailable — serve the last good copy, or the compiled-in seed data.
             return _lastKnownGood ?? SeedFallback;
         }
         finally

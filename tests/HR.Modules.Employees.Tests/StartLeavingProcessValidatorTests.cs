@@ -185,7 +185,6 @@ public class StartLeavingProcessValidatorTests
         Assert.True(result.IsValid);
     }
 
-    // ---- Spec SPEC-OFF-01: Notes required when LeavingReason == Other ----
 
     [Fact]
     public void Validate_Fails_When_LeavingReason_Is_Other_And_Notes_Is_Null()
@@ -211,8 +210,6 @@ public class StartLeavingProcessValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(StartLeavingProcessRequest.Notes));
     }
 
-    // NotEmpty() treats whitespace-only strings as invalid, distinct from a bare length check —
-    // pinned explicitly rather than relying on the null/empty cases above alone.
     [Fact]
     public void Validate_Fails_When_LeavingReason_Is_Other_And_Notes_Is_Whitespace_Only()
     {

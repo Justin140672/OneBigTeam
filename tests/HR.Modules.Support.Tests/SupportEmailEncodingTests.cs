@@ -14,14 +14,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Support.Tests;
 
-/// <summary>
-/// [P2] HTML-encode support request titles in notification emails. Captures the email each send
-/// path produces for hostile titles and parses the HTML with AngleSharp: the element/attribute
-/// structure must be identical to the one produced for a benign title (so no element or attribute
-/// can be introduced), the title must round-trip as literal text, and subjects must never carry
-/// CR/LF. Covers both the submission (admin alert) and staff-reply (customer) paths, which share
-/// <see cref="SupportEmailRenderer"/>.
-/// </summary>
 public class SupportEmailEncodingTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 9, 27, 10, 0, 0, DateTimeKind.Utc);
@@ -32,33 +24,25 @@ public class SupportEmailEncodingTests
 
     public static TheoryData<string> HostileTitles => new()
     {
-        // Script and image payloads
         "<script>alert(1)</script>",
         "<img src=x onerror=alert(1)>",
         "<svg/onload=alert(1)>",
-        // Links and event attributes
         "<a href=\"javascript:alert(1)\">click</a>",
         "<a href='https://evil.example/'>Reset password</a>",
         "<p onclick=alert(1)>hi</p>",
-        // Quote-breaking
         "\"><script>alert(1)</script>",
         "' onmouseover='alert(1)",
         "\" style=\"background:url(x)",
-        // Ampersands and existing entities
         "Tom & Sons <support@example.com>",
         "Already encoded &lt;b&gt;bold&lt;/b&gt; &amp; &quot;quoted&quot; &#60;script&#62;",
         "&lt;img src=x onerror=alert(1)&gt;",
-        // Comment / CDATA / closing-tag breakouts
         "--><script>alert(1)</script><!--",
         "</strong></p><h1>Injected</h1>",
-        // Unicode
         "Zoë's café — naïve résumé “smart quotes” 日本語 Привет 😀",
-        // CR/LF and other control characters
         "Line one\r\nBcc: attacker@example.com",
         "Tab\tand" + LineSeparator + "LS" + ParagraphSeparator + "PS",
     };
 
-    // --- Submission path (new-request admin alert) ------------------------------------------
 
     [Theory]
     [MemberData(nameof(HostileTitles))]
@@ -75,7 +59,6 @@ public class SupportEmailEncodingTests
         Assert.Equal("Title: " + title, titleParagraph.TextContent);
     }
 
-    // --- Staff-reply path (customer notification) -------------------------------------------
 
     [Theory]
     [MemberData(nameof(HostileTitles))]
@@ -101,8 +84,6 @@ public class SupportEmailEncodingTests
 
         foreach (var body in new[] { submitted.HtmlBody, replied.HtmlBody })
         {
-            // Letters stay literal; only HTML-significant characters (here the apostrophe) are
-            // escaped, so the raw HTML remains human-readable.
             Assert.Contains("Zoë", body, StringComparison.Ordinal);
             Assert.Contains("café — “quoted” 日本語", body, StringComparison.Ordinal);
             Assert.DoesNotContain("Zoë's", body, StringComparison.Ordinal);
@@ -131,7 +112,6 @@ public class SupportEmailEncodingTests
         AssertSubjectIsHeaderSafe(sent.Subject);
     }
 
-    // --- Shared policy ----------------------------------------------------------------------
 
     [Theory]
     [InlineData("Subject\r\nBcc: attacker@example.com", "Subject Bcc: attacker@example.com")]
@@ -177,15 +157,9 @@ public class SupportEmailEncodingTests
         Assert.DoesNotContain('\'', encoded);
     }
 
-    // --- Helpers ----------------------------------------------------------------------------
 
     private static IDocument Parse(string html) => new HtmlParser().ParseDocument(html);
 
-    /// <summary>
-    /// Every element (tag name) and every attribute (name and value), in document order, must be
-    /// identical to the benign baseline — a payload that introduced or altered any element or
-    /// attribute would change this signature.
-    /// </summary>
     private static void AssertSameStructure(string baselineHtml, string actualHtml)
     {
         static List<string> Signature(string html) =>

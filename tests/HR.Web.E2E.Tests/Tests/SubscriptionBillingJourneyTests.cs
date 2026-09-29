@@ -59,50 +59,29 @@ namespace HR.Web.E2E.Tests.Tests;
 public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixture)
     : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
-    // ── Companies ──────────────────────────────────────────────────────────────
 
-    // Acme Corporation — seeded with active subscription, used for access control tests.
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    // Beta Corp — seeded with active subscription, used for subscription lifecycle tests.
     private static readonly Guid BetaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
 
-    // Gamma Industries — seeded with active subscription, dedicated to
-    // ActiveSubscription_Cancel_ShowsConfirmation_AndSchedulesCancellation only (see
-    // CompaniesModule.SeedCompaniesAsync's remarks: this test kept racing on the shared Beta Corp
-    // company even behind the semaphore, because a Blazor Server page doesn't auto-update when a
-    // different test's circuit mutates the same company concurrently).
     private static readonly Guid GammaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000003");
 
-    // ── Personas ───────────────────────────────────────────────────────────────
 
-    // Priya Shah — seeded Company Administrator persona for Acme Corporation.
-    // See CompanyAdministratorAccessTests for context on her role setup.
     private const string AcmeCompanyAdminEmail = "priya.shah@acme.example";
 
-    // Laura Bennett — seeded HR Administrator persona (Acme).
-    // She has HR permissions but NOT company administration (CanManageCompany = false).
     private const string AcmeHrAdminEmail = "laura.bennett@acme.example";
 
-    // James Okafor — seeded Manager persona (Acme), no company admin role.
     private const string AcmeManagerEmail = "james.okafor@acme.example";
 
-    // Marcus Diallo — seeded Recruiter persona (Acme), no company admin role.
     private const string AcmeRecruiterEmail = "marcus.diallo@acme.example";
 
-    // Tom Williams — seeded plain Employee persona (Acme), no admin roles.
     private const string AcmePlainEmployeeEmail = "tom.williams@acme.example";
 
-    // Beta Corp admin — for isolated active subscription tests.
-    // Charlie Wilson is seeded as Beta Corp's Company Administrator.
     private const string BetaCompanyAdminEmail = "charlie.wilson@betacorp.example";
 
-    // Gamma Industries admin — dedicated to ActiveSubscription_Cancel_ShowsConfirmation_... only.
-    // Diana Chen is seeded as Gamma Industries' Company Administrator.
     private const string GammaCompanyAdminEmail = "diana.chen@gamma.example";
     private const string GammaCompanyAdminUserId = "30000000-0000-0000-0000-000000000019";
 
-    // ── Access Control Tests ───────────────────────────────────────────────────
 
     [Fact]
     public async Task CompanyAdministrator_CanAccess_SubscriptionBillingPage()
@@ -113,17 +92,13 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         await login.GoToAsync();
         await login.LoginAsync(AcmeCompanyAdminEmail);
 
-        // Verify company ID matches expected tenant to catch persona errors early
         await VerifyCompanyIdAfterLoginAsync(AcmeId, AcmeCompanyAdminEmail);
 
-        // Navigation should not throw — the page loads successfully for this role.
         await subscription.GoToAsync();
 
-        // The page should render with subscription details visible.
         Assert.False(await subscription.IsLoadingAsync(),
             "Expected subscription page to finish loading for Company Administrator");
 
-        // At minimum, the subscription status should be readable (not an error page).
         var status = await subscription.GetSubscriptionStatusAsync();
         Assert.False(string.IsNullOrWhiteSpace(status),
             "Expected subscription status to be displayed");
@@ -134,19 +109,12 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
 
-        // ── Step 1: Login as Laura (HrAdministrator, CanManageCompany = false) ──
         await login.GoToAsync();
         await login.LoginAsync(AcmeHrAdminEmail);
 
-        // ── Step 2: Attempt to navigate directly to /subscription ───────────────
-        // The page guard (Session.CanManageCompany) should redirect away because
-        // Laura is HrAdministrator-only, not CompanyAdministrator. The subscription:manage
-        // API policy no longer grants HR Administrator access (see
-        // 30-administrative-role-separation-matrix.md).
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/subscription");
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
 
-        // ── Step 3: Must be redirected away from /subscription ─────────────────
         var finalUrl = _page.Url;
         Assert.False(finalUrl.TrimEnd('/').EndsWith("/subscription", StringComparison.OrdinalIgnoreCase),
             $"Expected HR Administrator to be redirected away from /subscription, but ended up at: {finalUrl}");
@@ -157,15 +125,12 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
 
-        // ── Step 1: Login as James (Manager, CanManageCompany = false) ─────────
         await login.GoToAsync();
         await login.LoginAsync(AcmeManagerEmail);
 
-        // ── Step 2: Attempt to navigate directly to /subscription ───────────────
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/subscription");
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
 
-        // ── Step 3: Must be redirected away from /subscription ─────────────────
         var finalUrl = _page.Url;
         Assert.False(finalUrl.TrimEnd('/').EndsWith("/subscription", StringComparison.OrdinalIgnoreCase),
             $"Expected Manager to be redirected away from /subscription, but ended up at: {finalUrl}");
@@ -176,15 +141,12 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
 
-        // ── Step 1: Login as Marcus (Recruiter, CanManageCompany = false) ──────
         await login.GoToAsync();
         await login.LoginAsync(AcmeRecruiterEmail);
 
-        // ── Step 2: Attempt to navigate directly to /subscription ───────────────
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/subscription");
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
 
-        // ── Step 3: Must be redirected away from /subscription ─────────────────
         var finalUrl = _page.Url;
         Assert.False(finalUrl.TrimEnd('/').EndsWith("/subscription", StringComparison.OrdinalIgnoreCase),
             $"Expected Recruiter to be redirected away from /subscription, but ended up at: {finalUrl}");
@@ -198,18 +160,14 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         await login.GoToAsync();
         await login.LoginAsync(AcmePlainEmployeeEmail);
 
-        // Attempt to navigate directly to /subscription.
-        // The page guard (Session.CanManageCompany) should redirect to a permitted page.
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/subscription");
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
 
-        // Verify we were redirected away (AppSession.GuardAccess redirects via NavigateTo).
         var finalUrl = _page.Url;
         Assert.False(finalUrl.TrimEnd('/').EndsWith("/subscription", StringComparison.OrdinalIgnoreCase),
             $"Expected plain employee to be redirected away from /subscription, but ended up at: {finalUrl}");
     }
 
-    // ── Subscription State Display Tests ──────────────────────────────────────
 
     [Fact]
     public async Task TrialSubscription_DisplaysCorrectState()
@@ -222,25 +180,21 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
         await subscription.GoToAsync();
 
-        // Acme seeds with a trial subscription, so status should be "Trial".
         var status = await subscription.GetSubscriptionStatusAsync();
         Assert.NotNull(status);
         Assert.True(
             status.Equals("Trial", StringComparison.OrdinalIgnoreCase),
             $"Expected subscription status to be 'Trial', but got '{status}'");
 
-        // Trial subscriptions should display trial days remaining.
         var trialDays = await subscription.GetTrialDaysRemainingAsync();
         Assert.NotNull(trialDays);
         Assert.True(int.TryParse(trialDays, out var days) && days > 0,
             $"Expected trial days to be a positive integer, but got '{trialDays}'");
 
-        // Plan name should be readable (e.g., "Starter", "Professional").
         var plan = await subscription.GetPlanAsync();
         Assert.False(string.IsNullOrWhiteSpace(plan),
             "Expected plan name to be displayed");
 
-        // Active employee count should be shown.
         var empCount = await subscription.GetActiveEmployeeCountAsync();
         Assert.False(string.IsNullOrWhiteSpace(empCount),
             "Expected active employee count to be displayed");
@@ -260,13 +214,11 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         Assert.True(await subscription.HasStartSubscriptionButtonAsync(),
             "Expected 'Start subscription' button to be visible for trial subscription");
 
-        // The Manage billing button should NOT be visible during trial.
         var manageBillingVisible = await subscription.HasManageBillingButtonAsync();
         Assert.False(manageBillingVisible,
             "Expected 'Manage billing' button to be disabled for trial subscription");
     }
 
-    // ── Subscription Workflow Tests ────────────────────────────────────────────
 
     [Fact]
     public async Task StartSubscriptionButton_InitiatesCheckout()
@@ -279,20 +231,15 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
         await subscription.GoToAsync();
 
-        // Capture the current URL to verify it changes when checkout initiates.
         var subscriptionUrl = _page.Url;
         Assert.Contains("/subscription", subscriptionUrl);
 
-        // Click "Start subscription" — this should call the API and navigate to Stripe checkout.
-        // The navigation happens with forceLoad: true, so it's a full page reload away from /subscription.
         await subscription.ClickStartSubscriptionAsync();
 
-        // The page navigates away to a Stripe URL (stubbed as https://checkout.stripe.com/... in E2E).
         var checkoutUrl = _page.Url;
         Assert.False(checkoutUrl.Contains("/subscription"),
             $"Expected to navigate away from /subscription to Stripe checkout, but ended at: {checkoutUrl}");
 
-        // The URL should be the Stripe stub checkout URL from FakeStripeGateway.
         Assert.True(checkoutUrl.Contains("checkout.stripe.com") || checkoutUrl.Contains("stripe"),
             $"Expected Stripe checkout URL, but got: {checkoutUrl}");
     }
@@ -308,22 +255,18 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
         await subscription.GoToAsync();
 
-        // During trial, only "Start subscription" is shown.
         Assert.True(await subscription.HasStartSubscriptionButtonAsync(),
             "Expected 'Start subscription' button for trial");
 
-        // Cancel button should not be available (trial subscriptions cannot be cancelled).
         var hasCancelButton = await subscription.HasCancelButtonAsync();
         Assert.False(hasCancelButton,
             "Expected 'Cancel subscription' button to be unavailable during trial");
 
-        // Resume button should not be shown (only shown when CancelAtPeriodEnd = true).
         var hasResumeButton = await subscription.HasResumeButtonAsync();
         Assert.False(hasResumeButton,
             "Expected 'Resume subscription' button to not be visible during trial");
     }
 
-    // ── Subscription State Persistence Tests ───────────────────────────────────
 
     [Fact]
     public async Task SubscriptionPage_ReloadsAndPersistsState()
@@ -336,16 +279,13 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
         await subscription.GoToAsync();
 
-        // Capture initial state.
         var initialStatus = await subscription.GetSubscriptionStatusAsync();
         var initialPlan = await subscription.GetPlanAsync();
         var initialEmpCount = await subscription.GetActiveEmployeeCountAsync();
 
-        // Reload the page.
         await _page.ReloadAsync();
         await _page.WaitForSelectorAsync(".card-header h5", new() { Timeout = 20_000 });
 
-        // Verify state persisted server-side.
         var reloadedStatus = await subscription.GetSubscriptionStatusAsync();
         var reloadedPlan = await subscription.GetPlanAsync();
         var reloadedEmpCount = await subscription.GetActiveEmployeeCountAsync();
@@ -366,12 +306,10 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
         await subscription.GoToAsync();
 
-        // Active employee count should be a numeric value, not null or empty.
         var empCount = await subscription.GetActiveEmployeeCountAsync();
         Assert.False(string.IsNullOrWhiteSpace(empCount),
             "Expected active employee count to be displayed");
 
-        // It should be parseable as a number (zero or positive).
         Assert.True(int.TryParse(empCount, out var count) && count >= 0,
             $"Expected active employee count to be a non-negative integer, but got '{empCount}'");
     }
@@ -387,13 +325,11 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
         await subscription.GoToAsync();
 
-        // Next billing date should be readable (either a date or "Not yet billed").
         var billingDate = await subscription.GetNextBillingDateAsync();
         Assert.False(string.IsNullOrWhiteSpace(billingDate),
             "Expected next billing date to be displayed");
     }
 
-    // ── Page Navigation Tests ──────────────────────────────────────────────────
 
     [Fact]
     public async Task CompanyAdministrator_CanReachSubscriptionPageFromNavigation()
@@ -404,30 +340,19 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         await login.GoToAsync();
         await login.LoginAsync(AcmeCompanyAdminEmail);
 
-        // The subscription page should be reachable via direct navigation.
         await subscription.GoToAsync();
 
-        // Verify we're on the subscription page by checking for the page-specific content.
         Assert.True(await _page.Locator("h1:has-text('Subscription')").IsVisibleAsync(),
             "Expected 'Subscription' heading to be visible on the subscription page");
 
-        // The subscription details card should also be visible.
         Assert.True(await _page.Locator(".card-header h5:has-text('Subscription Details')").IsVisibleAsync(),
             "Expected 'Subscription Details' card heading to be visible");
     }
 
-    // ── Subscription Lifecycle Tests (Isolated Test Companies) ─────────────────────
 
-    /// <summary>
-    /// Tests the complete active subscription lifecycle:
-    /// - Verify Active subscription displays correct state and buttons
-    /// - Click "Manage Billing" and verify navigation to Stripe portal
-    /// - Return to page and verify state persistence
-    /// </summary>
     [Fact]
     public async Task ActiveSubscription_DisplaysManageBillingButton_AndNavigatesToPortal()
     {
-        // Use Beta Corp (seeded with Active subscription) as the isolated test company.
 
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
@@ -439,7 +364,6 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
         await subscription.GoToAsync();
 
-        // Step 2: Verify the subscription is Active
         var status = await subscription.GetSubscriptionStatusAsync();
         Assert.NotNull(status);
         // Note: Beta Corp is seeded with an Active subscription
@@ -447,19 +371,15 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
             status.Equals("Active", StringComparison.OrdinalIgnoreCase),
             $"Expected subscription status to be 'Active', but got '{status}'");
 
-        // Step 3: Verify "Manage Billing" button is visible (only for Active subscriptions)
         Assert.True(await subscription.HasManageBillingButtonAsync(),
             "Expected 'Manage billing' button to be visible for Active subscription");
 
-        // Verify "Start subscription" button is NOT visible (only for Trial)
         Assert.False(await subscription.HasStartSubscriptionButtonAsync(),
             "Expected 'Start subscription' button to be hidden for Active subscription");
 
-        // Verify "Cancel" button IS visible (only for Active subscriptions)
         Assert.True(await subscription.HasCancelButtonAsync(),
             "Expected 'Cancel subscription' button to be visible for Active subscription");
 
-        // Step 4: Click "Manage Billing" and verify navigation to Stripe billing portal
         var currentUrl = _page.Url;
         await subscription.ClickManageBillingAsync();
 
@@ -470,8 +390,6 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
             billingPortalUrl.Contains("stripe") || billingPortalUrl.Contains("billing"),
             $"Expected Stripe billing portal URL, but got: {billingPortalUrl}");
 
-        // Step 5: Verify state persists if we navigate back (user would manually navigate back)
-        // Navigate back to subscription page
         await _page.GoBackAsync();
         await subscription.GoToAsync();
 
@@ -479,24 +397,6 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         Assert.Equal(status ?? "", persistedStatus ?? "");
     }
 
-    /// <summary>
-    /// Tests the subscription cancellation workflow:
-    /// - Active subscription shows "Cancel" button
-    /// - Clicking Cancel shows confirmation dialog
-    /// - Confirming transition shows warning that subscription will end at period end
-    /// - Subscription status becomes "Scheduled for cancellation"
-    ///
-    /// Uses try/finally to guarantee cleanup: the subscription is restored to Active state
-    /// regardless of assertion failures, so a repeat run of just this test still starts clean.
-    ///
-    /// Runs against Gamma Industries, a company dedicated to this test alone (see the field
-    /// remarks on GammaCorpId) — this test used to share Beta Corp with the other cancel/resume
-    /// mutation tests behind BetaCorpCleanupSemaphore, but kept flaking even after the semaphore
-    /// and the arrange-step reload were both fixed: this app is Blazor Server, so this test's own
-    /// page (navigated to before acquiring the semaphore) is a live circuit that can hold a stale
-    /// DOM snapshot from whatever the previous semaphore-holder left behind. Giving this one test
-    /// its own never-contended company removes that race entirely rather than trying to out-time it.
-    /// </summary>
     [Fact]
     public async Task ActiveSubscription_Cancel_ShowsConfirmation_AndSchedulesCancellation()
     {
@@ -506,21 +406,10 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         await login.GoToAsync();
         await login.LoginAsync(GammaCompanyAdminEmail);
 
-        // Verify company ID matches expected tenant to catch persona errors early
         await VerifyCompanyIdAfterLoginAsync(GammaCorpId, GammaCompanyAdminEmail);
 
         await subscription.GoToAsync();
 
-        // ── ARRANGE: Ensure Gamma Industries is in Active state (only matters if a previous run
-        // of just this test failed before its own cleanup ran). Resume() is an unconditional,
-        // unguarded flag-flip (CustomerSubscription.Resume) — safe to call even when already
-        // Active — so call it unconditionally instead of gating on a UI IsVisibleAsync() snapshot
-        // first. A prior version of this gate checked subscription.HasResumeButtonAsync() before
-        // restoring, which depends on Blazor having actually rendered the current server state
-        // into this exact page load; if that read anything other than the true state for any
-        // reason, the restore never ran and the test then failed waiting for a Cancel button that
-        // was never coming. Always restoring and always reloading afterwards removes that
-        // dependency entirely — this test drives off confirmed server state, not a UI guess.
         await RestoreSubscriptionToActiveInternalAsync(
             GammaCompanyAdminUserId, "Diana Chen",
             "ActiveSubscription_Cancel_ShowsConfirmation_AndSchedulesCancellation (arrange)");
@@ -532,64 +421,42 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
         try
         {
-                // ── ACT & ASSERT ──
-                // Verify we start with an Active subscription
                 var initialStatus = await subscription.GetSubscriptionStatusAsync();
                 Assert.True(
                     initialStatus?.Equals("Active", StringComparison.OrdinalIgnoreCase) ?? false,
                     $"Expected initial status to be 'Active', but got '{initialStatus}'");
 
-                // Step 1: Click "Cancel subscription" button
                 await subscription.ClickCancelAsync();
 
-                // Step 2: Verify confirmation dialog appears
                 Assert.True(await subscription.IsCancelConfirmDialogVisibleAsync(),
                     "Expected cancel confirmation dialog to be visible");
 
-                // Step 3: Confirm the cancellation
                 await subscription.ConfirmCancelAsync();
 
-                // Step 4: Verify success message appears
                 var successMessage = await subscription.GetSuccessMessageAsync();
                 Assert.False(string.IsNullOrWhiteSpace(successMessage),
                     "Expected success message after cancellation");
 
-                // Step 5: Scheduling a cancellation does NOT change the Status field — that's real
-                // Stripe semantics (ConfirmCancelAsync in SubscriptionOverview.razor only updates
-                // CancelAtPeriodEnd on _details; the "Status" label is driven by a separate _status
-                // object that ConfirmCancelAsync never touches). The subscription stays "Active"
-                // until the billing period actually ends; the scheduled-cancellation state is
-                // surfaced instead via the cancellation warning and Resume button, asserted below.
-                // Wait a moment for state to update.
                 await _page.WaitForTimeoutAsync(500);
 
                 var newStatus = await subscription.GetSubscriptionStatusAsync();
                 Assert.Equal(initialStatus ?? "", newStatus ?? "");
 
-                // Step 6: Verify cancellation warning is now visible
                 Assert.True(await subscription.HasCancellationWarningAsync(),
                     "Expected cancellation warning to appear after scheduling cancellation");
 
-                // Step 7: Verify that "Resume" button is now visible (only after CancelAtPeriodEnd = true)
                 Assert.True(await subscription.HasResumeButtonAsync(),
                     "Expected 'Resume subscription' button to be visible after scheduling cancellation");
 
-                // Verify "Cancel" button is now hidden (cannot cancel an already-cancelled subscription)
                 Assert.False(await subscription.HasCancelButtonAsync(),
                     "Expected 'Cancel subscription' button to be hidden after scheduling cancellation");
             }
             catch (Exception ex)
             {
-                // Capture original test failure for dual-failure reporting in cleanup
                 scenarioException = ex;
             }
             finally
             {
-                // ───────────────────────────────────────────────────────────────────────────────
-                // CLEANUP: Restore Gamma Industries' subscription to Active state so a repeat run
-                // of just this test starts clean. No other test touches this company, so this is
-                // purely for this test's own idempotency, not parallel-test safety.
-                // ───────────────────────────────────────────────────────────────────────────────
                 try
                 {
                     await RestoreSubscriptionToActiveInternalAsync(
@@ -598,12 +465,9 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
                 }
                 catch (Exception cleanupEx)
                 {
-                    // Capture cleanup failure for dual-failure reporting
                     cleanupException = cleanupEx;
                 }
 
-                // Report failures with clarity: scenario failure takes precedence, but cleanup
-                // failure is also visible so it doesn't go unnoticed.
                 if (scenarioException is not null && cleanupException is not null)
                 {
                     throw new AggregateException(
@@ -624,37 +488,22 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
             }
     }
 
-    /// <summary>
-    /// Tests the subscription resumption workflow:
-    /// - Cancelled-at-period-end subscription shows "Resume" button
-    /// - Clicking Resume transitions back to Active
-    /// - Warning disappears and "Cancel" button returns
-    ///
-    /// Uses try/finally to guarantee cleanup: Beta Corp is restored to Active state
-    /// regardless of assertion failures, ensuring subsequent tests receive a predictable state.
-    ///
-    /// Concurrency protection: semaphore covers entire test (arrange → act → verify → cleanup).
-    /// </summary>
     [Fact]
     public async Task CancelledSubscription_Resume_RestoresActiveState()
     {
-        // Use Beta Corp (shared active subscription) for this mutation test
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(BetaCompanyAdminEmail);
 
-        // Verify company ID matches expected tenant to catch persona errors early
         await VerifyCompanyIdAfterLoginAsync(BetaCorpId, BetaCompanyAdminEmail);
 
         await subscription.GoToAsync();
 
-        // ── ACQUIRE SEMAPHORE: Protect entire test from arrange through cleanup ──
         await BetaCorpCleanupSemaphore.WaitAsync();
         try
         {
-            // ── ARRANGE: Ensure Beta Corp is in Active state ──
             await EnsureBetaCorpActiveSubscriptionAsync();
 
             Exception? scenarioException = null;
@@ -662,15 +511,8 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
             try
             {
-                // ── ACT & ASSERT ──
-                // Establish the scheduled-cancellation state needed for this test. The "Status"
-                // field never becomes "Scheduled for cancellation" — it stays "Active" throughout
-                // (see the comment in ActiveSubscription_Cancel_ShowsConfirmation... above) — so
-                // detect the already-cancelled case via the Resume button instead, the same
-                // real indicator the assertions below use.
                 if (!await subscription.HasResumeButtonAsync())
                 {
-                    // If not already cancelled, cancel it first
                     if (await subscription.HasCancelButtonAsync())
                     {
                         await subscription.ClickCancelAsync();
@@ -679,75 +521,52 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
                             await subscription.ConfirmCancelAsync();
                         }
                     }
-                    // Wait for state to update
                     await _page.WaitForTimeoutAsync(1000);
                     await _page.ReloadAsync();
                     await _page.WaitForSelectorAsync(".card-header h5", new() { Timeout = 20_000 });
                 }
 
-                // Now we should be in cancelled-at-period-end state
                 var cancelledStatus = await subscription.GetSubscriptionStatusAsync();
 
-                // Verify we have the Resume button
                 Assert.True(await subscription.HasResumeButtonAsync(),
                     "Expected 'Resume subscription' button to be visible for cancelled subscription");
 
-                // Verify cancellation warning is shown
                 Assert.True(await subscription.HasCancellationWarningAsync(),
                     "Expected cancellation warning for cancelled subscription");
 
-                // Step 1: Click "Resume subscription"
                 await subscription.ClickResumeAsync();
 
-                // Step 2: Verify success message appears
                 var successMessage = await subscription.GetSuccessMessageAsync();
                 Assert.False(string.IsNullOrWhiteSpace(successMessage),
                     "Expected success message after resuming subscription");
 
-                // Step 3: The Status field never left "Active" (see the comment above and in
-                // ActiveSubscription_Cancel_ShowsConfirmation... — it's driven by a separate
-                // _status object that neither ConfirmCancelAsync nor ResumeAsync touch), so verify
-                // it's unchanged rather than expecting it to differ. The real before/after signal
-                // is the Resume button and cancellation warning, asserted in Steps 4-5 below.
                 var resumedStatus = await subscription.GetSubscriptionStatusAsync();
                 Assert.Equal(cancelledStatus ?? "", resumedStatus ?? "");
 
-                // Step 4: Verify cancellation warning is gone
                 Assert.False(await subscription.HasCancellationWarningAsync(),
                     "Expected cancellation warning to disappear after resuming");
 
-                // Step 5: Verify "Resume" button is hidden again
                 Assert.False(await subscription.HasResumeButtonAsync(),
                     "Expected 'Resume subscription' button to be hidden after resuming");
 
-                // Verify "Cancel" button is visible again
                 Assert.True(await subscription.HasCancelButtonAsync(),
                     "Expected 'Cancel subscription' button to return after resuming");
             }
             catch (Exception ex)
             {
-                // Capture original test failure for dual-failure reporting in cleanup
                 scenarioException = ex;
             }
             finally
             {
-                // ───────────────────────────────────────────────────────────────────────────────
-                // CLEANUP: Restore subscription to Active state for parallel test safety.
-                // This runs regardless of assertion failures above, ensuring Beta Corp is ready
-                // for the next test (or the next run of this test).
-                // ───────────────────────────────────────────────────────────────────────────────
                 try
                 {
                     await RestoreBetaCorpToActiveInternalAsync("CancelledSubscription_Resume_RestoresActiveState");
                 }
                 catch (Exception cleanupEx)
                 {
-                    // Capture cleanup failure for dual-failure reporting
                     cleanupException = cleanupEx;
                 }
 
-                // Report failures with clarity: scenario failure takes precedence, but cleanup
-                // failure is also visible so it doesn't go unnoticed.
                 if (scenarioException is not null && cleanupException is not null)
                 {
                     throw new AggregateException(
@@ -769,7 +588,6 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         }
         finally
         {
-            // ── RELEASE SEMAPHORE ──
             BetaCorpCleanupSemaphore.Release();
         }
     }
@@ -791,17 +609,14 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
-        // Use Beta Corp (Active subscription) for this test, not Acme (Trial)
         await login.GoToAsync();
         await login.LoginAsync(BetaCompanyAdminEmail);
 
         await subscription.GoToAsync();
 
-        // ── ACQUIRE SEMAPHORE: Protect entire test from arrange through cleanup ──
         await BetaCorpCleanupSemaphore.WaitAsync();
         try
         {
-            // ── ARRANGE: Ensure Beta Corp is in Active state ──
             await EnsureBetaCorpActiveSubscriptionAsync();
 
             Exception? scenarioException = null;
@@ -809,26 +624,19 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
             try
             {
-                // ── ACT & ASSERT ──
-                // Verify starting state
                 var initialStatus = await subscription.GetSubscriptionStatusAsync();
                 var initialHasCancelWarning = await subscription.HasCancellationWarningAsync();
 
-                // Step 1: Click "Cancel subscription"
                 await subscription.ClickCancelAsync();
 
-                // Step 2: Verify dialog is visible
                 Assert.True(await subscription.IsCancelConfirmDialogVisibleAsync(),
                     "Expected cancel confirmation dialog to be visible");
 
-                // Step 3: Click "Keep subscription" (dismissal)
                 await subscription.CancelCancelAsync();
 
-                // Step 4: Verify dialog is dismissed
                 Assert.False(await subscription.IsCancelConfirmDialogVisibleAsync(),
                     "Expected cancel dialog to be dismissed");
 
-                // Step 5: Verify state unchanged
                 var newStatus = await subscription.GetSubscriptionStatusAsync();
                 Assert.Equal(initialStatus ?? "", newStatus ?? "");
 
@@ -837,28 +645,19 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
             }
             catch (Exception ex)
             {
-                // Capture original test failure for dual-failure reporting in cleanup
                 scenarioException = ex;
             }
             finally
             {
-                // ───────────────────────────────────────────────────────────────────────────────
-                // CLEANUP: Restore subscription to Active state for consistency.
-                // Even though this test doesn't mutate state (cancellation is dismissed),
-                // cleanup ensures Beta Corp is in predictable state if any assertion fails.
-                // ───────────────────────────────────────────────────────────────────────────────
                 try
                 {
                     await RestoreBetaCorpToActiveInternalAsync("CancelDialog_DismissBySaying_KeepSubscription_DoesNotChange");
                 }
                 catch (Exception cleanupEx)
                 {
-                    // Capture cleanup failure for dual-failure reporting
                     cleanupException = cleanupEx;
                 }
 
-                // Report failures with clarity: scenario failure takes precedence, but cleanup
-                // failure is also visible so it doesn't go unnoticed.
                 if (scenarioException is not null && cleanupException is not null)
                 {
                     throw new AggregateException(
@@ -880,18 +679,10 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         }
         finally
         {
-            // ── RELEASE SEMAPHORE ──
             BetaCorpCleanupSemaphore.Release();
         }
     }
 
-    /// <summary>
-    /// Tests state persistence across page reload:
-    /// - Navigate to subscription page
-    /// - Capture subscription state
-    /// - Reload the page
-    /// - Verify all displayed state matches original
-    /// </summary>
     [Fact]
     public async Task SubscriptionState_PersistsAcrossPageReload()
     {
@@ -903,7 +694,6 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
         await subscription.GoToAsync();
 
-        // Capture initial state
         var initialStatus = await subscription.GetSubscriptionStatusAsync();
         var initialPlan = await subscription.GetPlanAsync();
         var initialNextBilling = await subscription.GetNextBillingDateAsync();
@@ -912,11 +702,9 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var initialHasCancelButton = await subscription.HasCancelButtonAsync();
         var initialHasResumeButton = await subscription.HasResumeButtonAsync();
 
-        // Reload page
         await _page.ReloadAsync();
         await _page.WaitForSelectorAsync(".card-header h5", new() { Timeout = 20_000 });
 
-        // Capture state after reload
         var reloadedStatus = await subscription.GetSubscriptionStatusAsync();
         var reloadedPlan = await subscription.GetPlanAsync();
         var reloadedNextBilling = await subscription.GetNextBillingDateAsync();
@@ -925,7 +713,6 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var reloadedHasCancelButton = await subscription.HasCancelButtonAsync();
         var reloadedHasResumeButton = await subscription.HasResumeButtonAsync();
 
-        // Verify all state persisted
         Assert.Equal(initialStatus ?? "", reloadedStatus ?? "");
         Assert.Equal(initialPlan ?? "", reloadedPlan ?? "");
         Assert.Equal(initialNextBilling ?? "", reloadedNextBilling ?? "");
@@ -935,12 +722,6 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         Assert.Equal(initialHasResumeButton, reloadedHasResumeButton);
     }
 
-    /// <summary>
-    /// Tests sidebar navigation link visibility:
-    /// - For Active subscription: sidebar has "Subscription" link
-    /// - Link is visible and clickable
-    /// - Clicking navigates to subscription page
-    /// </summary>
     [Fact]
     public async Task SidebarSubscriptionLink_VisibleOnActiveSubscription()
     {
@@ -951,51 +732,24 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         await login.GoToAsync();
         await login.LoginAsync(AcmeCompanyAdminEmail);
 
-        // Navigate to a default page (e.g., dashboard)
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/dashboard");
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 20_000 });
 
-        // The old "nav" / "a[href*='subscription']" locators never matched anything — MainLayout's
-        // sidebar has no <nav> element at all (it's an SfSidebar/SfMenu with CssClass="app-nav-menu",
-        // see SidebarPage) — so both checks always failed regardless of subscription state. The
-        // sidebar item is also role-gated on CanManageCompany, not on the subscription being
-        // Active (see AdminNavigation.cs's "Subscription & Billing" destination), so this test's
-        // name is a slight misnomer, but it's still a real, correct check for a Company
-        // Administrator persona.
         Assert.True(await sidebar.HasTopLevelMenuItemAsync("Subscription & Billing"),
             "Expected 'Subscription & Billing' to be visible in the sidebar for a Company Administrator");
 
         await sidebar.ClickTopLevelMenuItemAsync("Subscription & Billing");
 
-        // Verify we're on the subscription page
         await _page.WaitForURLAsync(url => url.Contains("/subscription"), new() { Timeout = 15_000 });
 
         var finalUrl = _page.Url;
         Assert.True(finalUrl.Contains("/subscription"),
             $"Expected to navigate to subscription page, but ended at: {finalUrl}");
 
-        // Extra validation: verify we can see subscription page content
         Assert.False(await subscription.IsLoadingAsync(),
             "Expected subscription page to finish loading");
     }
 
-    /// <summary>
-    /// Tests all SubscriptionBillingPage methods are exercised:
-    /// - IsLoadingAsync
-    /// - GetSubscriptionStatusAsync
-    /// - GetPlanAsync
-    /// - GetNextBillingDateAsync
-    /// - GetActiveEmployeeCountAsync
-    /// - GetTrialDaysRemainingAsync
-    /// - HasStartSubscriptionButtonAsync
-    /// - HasManageBillingButtonAsync
-    /// - HasResumeButtonAsync
-    /// - HasCancelButtonAsync
-    /// - IsCancelConfirmDialogVisibleAsync
-    /// - GetSuccessMessageAsync
-    /// - GetErrorMessageAsync
-    /// - HasCancellationWarningAsync
-    /// </summary>
     [Fact]
     public async Task AllSubscriptionBillingPageMethods_AreExercised()
     {
@@ -1007,7 +761,6 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
         await subscription.GoToAsync();
 
-        // Exercise all "Get" methods
         var isLoading = await subscription.IsLoadingAsync();
         Assert.False(isLoading, "Page should not be loading");
 
@@ -1023,34 +776,25 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var empCount = await subscription.GetActiveEmployeeCountAsync();
         Assert.NotNull(empCount);
 
-        // GetTrialDaysRemainingAsync may return null if not in trial
         var trialDays = await subscription.GetTrialDaysRemainingAsync();
-        // No assertion — depends on subscription state
 
-        // Exercise all "Has" methods
         var hasStart = await subscription.HasStartSubscriptionButtonAsync();
         var hasManage = await subscription.HasManageBillingButtonAsync();
         var hasResume = await subscription.HasResumeButtonAsync();
         var hasCancel = await subscription.HasCancelButtonAsync();
 
-        // At least one button should be visible (depending on subscription state)
         Assert.True(
             hasStart || hasManage || hasResume || hasCancel,
             "Expected at least one action button to be visible");
 
         var hasCancelDialog = await subscription.IsCancelConfirmDialogVisibleAsync();
-        // Dialog visibility depends on whether Cancel was clicked
 
         var successMsg = await subscription.GetSuccessMessageAsync();
-        // Success message may be null if no action was taken
 
         var errorMsg = await subscription.GetErrorMessageAsync();
-        // Error message may be null if no error occurred
 
         var hasWarning = await subscription.HasCancellationWarningAsync();
-        // Warning depends on subscription state
 
-        // All methods executed without throwing
         Assert.True(true, "All SubscriptionBillingPage methods exercised successfully");
     }
 
@@ -1094,7 +838,6 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
             http.DefaultRequestHeaders.Authorization =
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", session!.AccessToken);
 
-            // The api/me endpoint returns the current user's profile, including companyId
             var apiResponse = await http.GetAsync("/api/me");
             Assert.True(apiResponse.IsSuccessStatusCode,
                 $"Expected /api/me to return 200, but got {apiResponse.StatusCode} for {email}");
@@ -1120,46 +863,17 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     private sealed record DevPersonaLookup(string UserId, string CompanyId, string Name, string JobTitle, string Email);
     private sealed record DevPersonaSessionResult(string AccessToken, string RefreshToken, int ExpiresIn);
 
-    /// <summary>
-    /// Ensures Beta Corp's subscription is in Active state, idempotently restoring it
-    /// if a previous test left it in Cancelled state. Called at the start of each
-    /// state-mutating subscription test to establish a predictable starting state.
-    ///
-    /// Uses the REST API (not browser UI) to resume subscription for reliability —
-    /// works regardless of UI state and defers browser navigation to the test itself.
-    ///
-    /// Assumes semaphore already acquired by the test method.
-    /// </summary>
     private async Task EnsureBetaCorpActiveSubscriptionAsync()
     {
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
-        // This app is Blazor Server — the page this test navigated to (before acquiring
-        // BetaCorpCleanupSemaphore, at the top of each caller) is a live circuit that only
-        // re-renders on ITS OWN interactions. It does not auto-update when a different test's
-        // circuit cancels/resumes Beta Corp's subscription concurrently. So the DOM snapshot this
-        // test is holding by the time it actually acquires the semaphore can be stale relative to
-        // whatever the previous semaphore-holder left behind — reload unconditionally here, right
-        // as we get exclusive access, so every check below reads genuinely current server state
-        // rather than whatever happened to be true when GoToAsync ran.
         await _page.ReloadAsync();
         await _page.WaitForSelectorAsync(".card-header h5", new() { Timeout = 20_000 });
 
-        // The "Status" field never becomes "Scheduled for cancellation" — it stays "Active" right
-        // up until the billing period actually ends (see the comments in
-        // ActiveSubscription_Cancel_ShowsConfirmation... and CancelledSubscription_Resume... above:
-        // ConfirmCancelAsync only ever sets CancelAtPeriodEnd on _details, never _status). Checking
-        // for that string was always false, so this restoration step silently did nothing whenever
-        // a previous test left Beta Corp with CancelAtPeriodEnd still true — leaving only the
-        // Resume button visible and no Cancel button for this test to click. Detect the real
-        // scheduled-cancellation state via the Resume button instead.
         if (await subscription.HasResumeButtonAsync())
         {
-            // Subscription is cancelled — use API to resume it for reliability
-            // Use internal method (assumes semaphore already acquired by test)
             await RestoreBetaCorpToActiveInternalAsync("EnsureBetaCorpActiveSubscriptionAsync");
 
-            // Reload to see fresh state
             await _page.ReloadAsync();
             await _page.WaitForSelectorAsync(".card-header h5", new() { Timeout = 20_000 });
         }
@@ -1174,20 +888,11 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
             "Expected Beta Corp subscription to not be scheduled for cancellation after restoring to Active");
     }
 
-    /// <summary>
-    /// Restores Beta Corp's subscription to Active state via authenticated API call.
-    /// This is the public method that acquires the semaphore. Use this for cleanup
-    /// operations that need to serialize across parallel tests.
-    ///
-    /// For operations within a test method that already holds the semaphore,
-    /// use RestoreBetaCorpToActiveInternalAsync instead.
-    /// </summary>
     private static readonly SemaphoreSlim BetaCorpCleanupSemaphore = new(1, 1);
     private const string CharlieWilsonUserId = "30000000-0000-0000-0000-000000000018";
 
     private async Task RestoreBetaCorpToActiveAsync(string callerContext)
     {
-        // Public method: acquire semaphore for exclusive access
         await BetaCorpCleanupSemaphore.WaitAsync();
         try
         {
@@ -1199,50 +904,12 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         }
     }
 
-    /// <summary>
-    /// Internal restoration method that assumes the semaphore is already acquired.
-    /// Used by test methods that wrap their entire test logic (arrange → act/assert → cleanup)
-    /// inside a semaphore guard to ensure exclusive access to Beta Corp's subscription state.
-    ///
-    /// Safe to invoke after:
-    /// - Failed assertions (UI state may be partial or corrupted)
-    /// - Closed dialogs or navigations
-    /// - Any browser operation errors
-    ///
-    /// Uses POST /api/companies/subscription/resume which should be idempotent:
-    /// calling it on an already-Active subscription should succeed without Stripe invocations.
-    ///
-    /// Authentication:
-    /// - Obtains access token via /api/dev/persona/{charlieWilsonUserId}
-    /// - Sends Authorization: Bearer {token} header with resume request
-    /// - Fails test visibly if 401/403/400/timeout/connection errors occur
-    ///
-    /// State Verification:
-    /// - Confirms via GET /api/companies/subscription-details that Status=Active, CancelAtPeriodEnd=false
-    /// - Fails test if final state cannot be verified
-    /// - Independent of UI reload, proving server-side restoration
-    ///
-    /// Failure Reporting:
-    /// - Captures original test exception (if any) before cleanup
-    /// - Returns cleanup result to caller
-    /// - If both scenario and cleanup fail, test output includes both exceptions
-    /// - Cleanup failures are visible, not swallowed
-    /// </summary>
     private Task RestoreBetaCorpToActiveInternalAsync(string callerContext) =>
         RestoreSubscriptionToActiveInternalAsync(CharlieWilsonUserId, "Charlie Wilson", callerContext);
 
-    /// <summary>
-    /// Generalized version of the original Beta-Corp-only restore, parameterized by persona so
-    /// GammaCompanyAdminUserId/Diana Chen (ActiveSubscription_Cancel_ShowsConfirmation_...'s
-    /// dedicated, never-contended company) can reuse the same resume-and-verify logic without a
-    /// second near-identical copy of it.
-    /// </summary>
     private async Task RestoreSubscriptionToActiveInternalAsync(string userId, string personaName, string callerContext)
     {
-        // Assumes semaphore already acquired by caller (where the persona's company is one that
-        // needs cross-test serialization at all — Gamma's dedicated persona doesn't).
 
-        // Step 1: Obtain authenticated access token via /api/dev/persona endpoint
         var token = await GetAuthenticatedTokenForUserAsync(userId, personaName);
         if (string.IsNullOrEmpty(token))
         {
@@ -1250,7 +917,6 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
                 $"[RestoreSubscriptionToActiveInternalAsync] Failed to obtain access token for {personaName} from {callerContext}");
         }
 
-        // Step 2: Resume subscription with Authorization header
         var resumeUrl = $"{_fixture.ApiBaseUrl}/api/companies/subscription/resume";
         var apiResponse = await _page.Context.APIRequest.PostAsync(
             resumeUrl,
@@ -1262,7 +928,6 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
                 }
             });
 
-        // Step 3: Validate resume response — any non-2xx is a failure
         if (!apiResponse.Ok)
         {
             var errorBody = await apiResponse.TextAsync();
@@ -1271,7 +936,6 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
                 $"from {callerContext}. URL: {resumeUrl}\nResponse: {errorBody}");
         }
 
-        // Step 4: Verify final state via GET /api/companies/subscription-details (correct endpoint)
         var stateUrl = $"{_fixture.ApiBaseUrl}/api/companies/subscription-details";
         var stateResponse = await _page.Context.APIRequest.GetAsync(
             stateUrl,
@@ -1291,7 +955,6 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
                 $"from {callerContext}. URL: {stateUrl}\nResponse: {errorBody}");
         }
 
-        // Step 5: Parse response and confirm Status=Active and CancelAtPeriodEnd=false
         var json = await stateResponse.JsonAsync();
         if (!json.HasValue)
         {
@@ -1299,7 +962,6 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
                 $"[RestoreSubscriptionToActiveInternalAsync] State verification returned no JSON from {callerContext}");
         }
 
-        // Validate Status field
         if (!json.Value.TryGetProperty("status", out var statusElement))
         {
             throw new InvalidOperationException(
@@ -1316,7 +978,6 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
                 $"Full response: {json.Value}");
         }
 
-        // Validate CancelAtPeriodEnd field
         if (!json.Value.TryGetProperty("cancelAtPeriodEnd", out var cancelAtPeriodEndElement))
         {
             throw new InvalidOperationException(
@@ -1338,17 +999,11 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
                 $"Full response: {json.Value}");
         }
 
-        // Success: restoration verified
         System.Diagnostics.Debug.WriteLine(
             $"[RestoreSubscriptionToActiveInternalAsync] Successfully restored {personaName}'s subscription from {callerContext}: " +
             $"Status=Active, CancelAtPeriodEnd=false confirmed");
     }
 
-    /// <summary>
-    /// Obtains an access token for the given persona via the /api/dev/persona/{userId} endpoint.
-    /// Used by RestoreSubscriptionToActiveInternalAsync to authenticate subscription resume
-    /// operations in cleanup code.
-    /// </summary>
     private async Task<string> GetAuthenticatedTokenForUserAsync(string userId, string personaName)
     {
         try

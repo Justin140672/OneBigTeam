@@ -9,7 +9,6 @@ public class LeaveTypeServiceTests
 {
     private static LeaveTypeEditModel SampleModel() => new() { Name = "Sick Leave", Code = "SICK" };
 
-    // ── UpdateAsync(ApiSaveResult) ────────────────────────────────────────────────
 
     [Fact]
     public async Task UpdateAsync_Returns_Ok_When_Api_Returns_Success()
@@ -84,7 +83,6 @@ public class LeaveTypeServiceTests
         Assert.NotNull(result.ErrorMessage);
     }
 
-    // ── CreateAsync ───────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task CreateAsync_Returns_ValidationMessage_When_Api_Returns_BadRequest()
@@ -98,7 +96,6 @@ public class LeaveTypeServiceTests
         Assert.Equal("Code is required.", error);
     }
 
-    // ── DeactivateAsync ───────────────────────────────────────────────────────────
 
     [Fact]
     public async Task DeactivateAsync_Returns_Null_When_Api_Returns_NoContent()
@@ -114,7 +111,6 @@ public class LeaveTypeServiceTests
     [Fact]
     public async Task DeactivateAsync_Returns_Error_When_Api_Returns_Conflict_For_System_Type()
     {
-        // Guards against deactivating the platform-provisioned "Annual Leave" system type.
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.Conflict, new { error = "System leave types cannot be deactivated." }));
         var service = new LeaveTypeService(factory);
 
@@ -123,7 +119,6 @@ public class LeaveTypeServiceTests
         Assert.Equal("System leave types cannot be deactivated.", error);
     }
 
-    // ── ListLeaveTypesAsync (representative read) ────────────────────────────────
 
     [Fact]
     public async Task ListLeaveTypesAsync_Returns_Value_When_Api_Returns_Ok()

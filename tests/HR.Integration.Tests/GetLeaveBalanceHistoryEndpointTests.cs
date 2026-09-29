@@ -9,11 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// leave:manage is granted to HrAdministrator only (see LeavePolicyCrudEndpointTests;
-/// CompanyAdministrator is scoped to company profile/settings and does not hold it) —
-/// Manager has leave:approve but NOT leave:manage.
-/// </summary>
 [Collection("Integration")]
 public class GetLeaveBalanceHistoryEndpointTests
 {
@@ -28,10 +23,6 @@ public class GetLeaveBalanceHistoryEndpointTests
 
         Task.Run(async () =>
         {
-            // GetLeaveBalanceHistory's endpoint-level policy is "role:employee" (LEAVE-01/LEAVE-08 —
-            // resource scope is enforced separately by LeaveResourceAuthorizer), so the HR admin
-            // caller also needs the Employee role claim, not just HrAdministrator, to pass the
-            // endpoint policy gate — mirrors LeavingDateChangeRecalculatesLeaveBalanceEndpointTests.
             await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUser, SystemRoles.HrAdministrator);
             await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUser, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, ManagerUser, SystemRoles.Manager);
@@ -81,9 +72,6 @@ public class GetLeaveBalanceHistoryEndpointTests
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/leave-types/{leaveTypeId}/balance-history");
 
-        // Consistent with GetEmployeeLeaveBalance, which returns 200 with empty/partial data
-        // rather than 404 for a combination with no history records once the leave type itself
-        // is confirmed to exist.
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<HistoryPayload>();
         Assert.NotNull(payload);
@@ -115,7 +103,6 @@ public class GetLeaveBalanceHistoryEndpointTests
         Assert.True(payload.Items.SequenceEqual(payload.Items.OrderByDescending(i => i.Date)));
         Assert.All(payload.Items, i => Assert.Equal("Annual Leave", i.LeaveTypeName));
 
-        // Approved leave consumes balance -> negative Change; the other two categories add to it.
         var approved = payload.Items.Single(i => i.Category == "ApprovedLeave");
         Assert.True(approved.Change < 0);
         Assert.Equal("Leave Taken", approved.Reason);
@@ -129,7 +116,6 @@ public class GetLeaveBalanceHistoryEndpointTests
         Assert.Equal("ManualAward", manual.Reason);
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)
     {
@@ -180,9 +166,6 @@ public class GetLeaveBalanceHistoryEndpointTests
             1m, new DateOnly(2026, 2, 1), null, "Overtime", new DateTimeOffset(2026, 2, 2, 9, 0, 0, TimeSpan.Zero));
         db.ToilTransactions.Add(toilTransaction);
 
-        // 2 days at the default 7.5 hours/day working pattern (no employee/company override
-        // exists for this ad-hoc test data) converts to 15 hours, matching this test's
-        // Change == 15m assertion below.
         var manualAdjustment = LeaveBalanceAdjustment.Create(
             Guid.NewGuid(), companyId, employeeId, leaveTypeId,
             2m, null, LeaveBalanceAdjustmentReason.ManualAward, "Bonus days", Guid.NewGuid(),

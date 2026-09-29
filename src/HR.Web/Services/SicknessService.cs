@@ -172,7 +172,6 @@ public sealed class SicknessService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    // DSH-03: non-swallowing siblings.
     public Task<GetMissingFitNotesResponseModel?> GetMissingFitNotesOrThrowAsync(
         Guid companyId, CancellationToken cancellationToken = default) =>
         Http.GetFromJsonAsync<GetMissingFitNotesResponseModel>(

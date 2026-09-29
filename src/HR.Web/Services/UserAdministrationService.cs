@@ -20,11 +20,6 @@ public sealed class UserAdministrationService(HrApiHttpClientFactory httpClientF
         return result.Success ? result.Value : null;
     }
 
-    /// <summary>
-    /// Fetches every page of the user list and returns the full set. The list endpoint is paged
-    /// (server default/cap applies), so a single request silently drops anyone past the first page —
-    /// this loops until the collected count reaches the reported TotalCount.
-    /// </summary>
     public async Task<ListUsersResponse?> ListAllUsersAsync(Guid companyId, string? search = null)
     {
         const int pageSize = 500;

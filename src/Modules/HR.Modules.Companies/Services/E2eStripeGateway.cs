@@ -1,15 +1,5 @@
 namespace HR.Modules.Companies.Services;
 
-// Mirrors HR.Modules.Identity.Services.FakeSupabaseAuthGateway's rationale/DI-swap pattern exactly
-// (see CompaniesModule.AddCompaniesModule's E2E_TESTING branch) — E2E tests run the real,
-// Aspire-hosted app rather than a WebApplicationFactory, so there is no in-memory DI seam to swap
-// in a per-test double the way tests/HR.Integration.Tests/Infrastructure/FakeStripeGateway.cs does
-// for integration tests. Before this existed, IStripeGateway was unconditionally the real
-// Stripe-backed gateway even under E2E_TESTING, so any E2E-reachable code path that actually calls
-// Stripe (e.g. GetCustomerBillingHistoryHandler listing invoices for a seeded company's
-// "dev-stub-customer" — never a real Stripe customer) made a genuine outbound call to Stripe's API,
-// which could hang or fail unpredictably depending on the test environment's network reachability
-// and Stripe's response to a nonexistent customer id.
 internal sealed class E2eStripeGateway : IStripeGateway
 {
     public Task<string> CreateCheckoutSessionAsync(

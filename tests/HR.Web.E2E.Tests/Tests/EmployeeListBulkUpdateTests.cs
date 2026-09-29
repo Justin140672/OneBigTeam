@@ -4,32 +4,12 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the Employee List's multi-row selection + "Bulk Update" toolbar button
-/// (Components/Pages/Employees/EmployeeList.razor), which opens BulkCompensationUpdateDialog.razor
-/// wrapping the shared BulkCompensationAdjustmentPanel.razor for compensation bulk adjustments, and
-/// the "Import" dropdown item which opens BulkCompensationImportDialog.razor wrapping
-/// BulkCompensationImportPanel.razor. This is the sole E2E coverage for bulk compensation
-/// adjustments/imports — the old standalone full-page Bulk Compensation Update screen (and its
-/// tests) has been removed now that everything it did is reachable from these dialogs.
-///
-/// Every scenario that mutates data creates its own brand-new employee(s) so it can't leak side
-/// effects into other tests that rely on seeded employees' compensation state remaining untouched.
-/// </summary>
 public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private const string LauraEmail = "laura.bennett@acme.example";
 
-    /// <summary>
-    /// Returns a dedicated pre-seeded pool employee (SeededE2eEmployees.ListBulkUpdate[slot]).
-    /// Every pool member already has a single open-ended "current" compensation record of £50,000
-    /// effective 2026-03-01 — the same starting state the old
-    /// create-employee-then-add-compensation flow produced (the <paramref name="initialSalary"/>
-    /// parameter is therefore ignored; all pool members start at £50,000). Each of these tests
-    /// applies a real, persisted bulk adjustment to its employee, so callers pass a distinct slot.
-    /// </summary>
     private static (string LastName, Guid EmployeeId) CreateEmployeeWithCompensationAsync(int slot)
     {
         var seeded = SeededE2eEmployees.ListBulkUpdate[slot];
@@ -70,8 +50,6 @@ public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) :
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Two dedicated pool employees, both starting at £50,000, sharing the "SeedBulk" prefix so
-        // a single search surfaces both rows for multi-selection.
         var (firstLastName, firstId) = CreateEmployeeWithCompensationAsync(slot: 0);
         var (secondLastName, secondId) = CreateEmployeeWithCompensationAsync(slot: 1);
 
@@ -109,7 +87,6 @@ public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) :
         Assert.NotNull(success);
         Assert.Contains("Updated compensation for 2 employee", success);
 
-        // Verify the change actually persisted server-side via each employee's own Compensation tab.
         await empEdit.GoToAsync(AcmeId, firstId);
         await empEdit.OpenCompensationTabAsync();
         var firstSalaryText = await empEdit.GetCompensationFieldTextAsync("compensation-salary");
@@ -185,7 +162,6 @@ public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) :
         await empList.CheckEmployeeRowAsync(lastName);
         await empList.ClickBulkUpdateAsync();
 
-        // 10% increase would auto-calculate to 55,000 — edit it down to a custom value instead.
         await dialog.SelectModeAsync("Percentage Increase");
         await dialog.FillAdjustmentValueAsync("10");
         await dialog.FillEffectiveDateAsync("01/06/2026");
@@ -220,7 +196,6 @@ public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) :
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Create a new employee with NO compensation record at all.
         var unique = Guid.NewGuid().ToString("N")[..8];
         var lastName = $"BulkListNoComp{unique}";
         var workEmail = $"e2e.bulklistnocomp{unique}@acme.example";
@@ -250,8 +225,6 @@ public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) :
         await dialog.SelectReasonAsync("Annual Review");
         await dialog.ClickBuildPreviewAsync();
 
-        // No selected employee has a current compensation record, so no preview card renders —
-        // instead the panel shows its own "None of the selected employees…" error.
         Assert.False(await dialog.HasPreviewCardAsync(),
             "Expected no preview card when the only selected employee has no compensation record");
 
@@ -274,7 +247,6 @@ public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) :
         var fileName = await empList.ClickDownloadTemplateAsync();
         Assert.Equal("compensation-import-template.xlsx", fileName);
 
-        // Downloading shouldn't surface any error banner on the list page.
         Assert.Null(await empList.GetActionErrorMessageAsync());
     }
 
@@ -300,9 +272,6 @@ public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) :
         var seeded = SeededE2eEmployees.ListBulkUpdate[5];
         var employeeId = seeded.EmployeeId;
 
-        // The pool employee was seeded directly with a fixed employee number regardless of Acme's
-        // (shared, mutable) Employee Number Mode, so — unlike a UI-created hire — it is always
-        // exactly this string.
         var assignedEmployeeNumber = seeded.EmployeeNumber;
 
         var tempFile = Path.Combine(Path.GetTempPath(), $"compensation-import-list-{unique}.xlsx");
@@ -368,13 +337,6 @@ public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) :
         }
     }
 
-    /// <summary>
-    /// Writes a compensation-import .xlsx workbook matching the columns produced by
-    /// CompensationImportTemplateBuilder / read by CompensationImportFileParser: Employee Number,
-    /// Employee Name, Current Salary, Salary Frequency, New Salary, Effective Date, Reason, Notes.
-    /// Mirrors BulkCompensationUpdateTests.WriteImportWorkbook for the same coverage against the
-    /// Employee List's own Import entry point.
-    /// </summary>
     private static void WriteImportWorkbook(
         string filePath,
         (string EmployeeNumber, string NewSalary, string SalaryFrequency, string EffectiveDate, string Reason, string Notes)[] rows)

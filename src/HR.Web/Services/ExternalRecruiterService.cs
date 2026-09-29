@@ -10,7 +10,6 @@ public sealed class ExternalRecruiterService(HrApiHttpClientFactory httpClientFa
 {
     private HttpClient Http => httpClientFactory.CreateClient();
 
-    // ── EXTERNAL RECRUITERS (#75) ────────────────────────────────────────────
 
     public async Task<ListExternalRecruitersResponse?> ListExternalRecruitersAsync(
         Guid companyId, string? search = null, bool? isActive = null, int pageNumber = 1, int pageSize = 20)
@@ -106,7 +105,6 @@ public sealed class ExternalRecruiterService(HrApiHttpClientFactory httpClientFa
         }
     }
 
-    // ── IEditService<ExternalRecruiterEditModel, Guid> ───────────────────────
 
     async Task<ExternalRecruiterEditModel?> IEditService<ExternalRecruiterEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
     {

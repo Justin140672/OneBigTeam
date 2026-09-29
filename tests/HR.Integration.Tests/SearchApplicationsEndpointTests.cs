@@ -5,13 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Postgres integration coverage for GET /recruitment/applications/search. See
-/// SearchApplicationsHandlerTests / SearchApplicationsValidatorTests in HR.Modules.Recruitment.Tests
-/// for the unit-level equivalent.
-/// Covers: anonymous 401, wrong-role 403, happy 200 paged result, free-text search filter,
-/// vacancy filter, company isolation, page-size validation 422.
-/// </summary>
 [Collection("Integration")]
 public class SearchApplicationsEndpointTests
 {

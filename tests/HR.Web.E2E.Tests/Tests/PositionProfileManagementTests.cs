@@ -4,11 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies HR Administrator CRUD workflows for position profiles:
-/// - Seeded profiles appear in the list.
-/// - A new profile can be created and appears in the list.
-/// </summary>
 public sealed class PositionProfileManagementTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -51,7 +46,6 @@ public sealed class PositionProfileManagementTests(HrAdminPersonaFixture fixture
 
         await ppEdit.FillTitleAsync(profileTitle);
         await ppEdit.FillDescriptionAsync("Created by E2E test");
-        // Department, Location and Default Leave Policy are now mandatory on Position Profile.
         await ppEdit.SelectDepartmentAsync("Engineering");
         await ppEdit.SelectLocationAsync("London Office");
         await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
@@ -79,7 +73,6 @@ public sealed class PositionProfileManagementTests(HrAdminPersonaFixture fixture
         await ppEdit.FillTitleAsync(profileTitle);
         await ppEdit.FillProbationMonthsOverrideAsync(3);
         await ppEdit.FillSalaryRangeAsync(40000, 60000);
-        // Department, Location and Default Leave Policy are now mandatory on Position Profile.
         await ppEdit.SelectDepartmentAsync("Engineering");
         await ppEdit.SelectLocationAsync("London Office");
         await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
@@ -89,7 +82,6 @@ public sealed class PositionProfileManagementTests(HrAdminPersonaFixture fixture
         Assert.True(await ppList.HasPositionProfileAsync(profileTitle),
             $"Expected the new position profile '{profileTitle}' to appear in the list");
 
-        // Reopen and confirm the template defaults round-tripped through Create -> Get.
         await ppList.OpenPositionProfileAsync(profileTitle);
 
         Assert.Equal("3", await _page.GetByPlaceholder("Use company default").InputValueAsync());
@@ -113,7 +105,6 @@ public sealed class PositionProfileManagementTests(HrAdminPersonaFixture fixture
 
         await _page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
 
-        // Wait for the API to respond: either an error appears or the URL changes on success.
         await _page.WaitForFunctionAsync(
             "document.querySelector('.alert-danger, .validation-message') !== null " +
             "|| !window.location.href.includes('/position-profiles/new')",
@@ -138,12 +129,10 @@ public sealed class PositionProfileManagementTests(HrAdminPersonaFixture fixture
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Create an onboarding template to link to the profile.
         await templateEdit.GoToNewAsync(AcmeId);
         await templateEdit.FillNameAsync(templateName);
         await templateEdit.SaveAsync();
 
-        // Create a position profile and select the new onboarding template.
         await ppList.GoToAsync(AcmeId);
         await ppList.ClickNewPositionProfileAsync();
 
@@ -154,15 +143,12 @@ public sealed class PositionProfileManagementTests(HrAdminPersonaFixture fixture
         await ppEdit.SelectOnboardingTemplateAsync(templateName);
         await ppEdit.SaveAsync();
 
-        // Reopen and confirm the onboarding template selection persisted.
         await ppList.OpenPositionProfileAsync(profileTitle);
         Assert.Equal(templateName, await ppEdit.GetSelectedOnboardingTemplateTextAsync());
 
-        // Clear the onboarding template via the "None" sentinel item and save.
         await ppEdit.ClearOnboardingTemplateAsync();
         await ppEdit.SaveAsync();
 
-        // Reopen and confirm the cleared selection persisted.
         await ppList.OpenPositionProfileAsync(profileTitle);
         Assert.Equal("None", await ppEdit.GetSelectedOnboardingTemplateTextAsync());
     }
@@ -179,17 +165,14 @@ public sealed class PositionProfileManagementTests(HrAdminPersonaFixture fixture
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Create first.
         await ppList.GoToAsync(AcmeId);
         await ppList.ClickNewPositionProfileAsync();
         await ppEdit.FillTitleAsync(profileTitle);
-        // Department, Location and Default Leave Policy are now mandatory on Position Profile.
         await ppEdit.SelectDepartmentAsync("Engineering");
         await ppEdit.SelectLocationAsync("London Office");
         await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
         await ppEdit.SaveAsync();
 
-        // Deactivate.
         await ppList.GoToAsync(AcmeId);
         Assert.True(await ppList.IsActiveAsync(profileTitle), "Expected newly created position profile to be Active");
         await ppList.DeactivateAsync(profileTitle);
@@ -197,7 +180,6 @@ public sealed class PositionProfileManagementTests(HrAdminPersonaFixture fixture
         Assert.False(await ppList.HasPositionProfileAsync(profileTitle),
             $"Expected '{profileTitle}' to no longer appear in the default active-only view after deactivation");
 
-        // Show inactive and verify it reappears.
         await ppList.ShowInactiveAsync();
 
         Assert.True(await ppList.HasPositionProfileAsync(profileTitle),
@@ -218,11 +200,6 @@ public sealed class PositionProfileManagementTests(HrAdminPersonaFixture fixture
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/position-profiles");
 
-        // See E2ETestBase.WaitForUrlToStopContainingAsync's doc comment: the redirect is a
-        // client-side Blazor NavigateTo fired from OnBeforeLoadAsync, not a full page navigation,
-        // so NetworkIdle can resolve before the redirect actually happens — not an auth
-        // regression, the same race already fixed this way across every other
-        // PlainEmployee_IsRedirectedAway-shaped test in the suite.
         await WaitForUrlToStopContainingAsync("/position-profiles");
 
         var finalUrl = _page.Url;

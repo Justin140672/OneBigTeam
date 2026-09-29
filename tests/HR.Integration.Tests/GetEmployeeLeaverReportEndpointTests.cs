@@ -52,7 +52,6 @@ public class GetEmployeeLeaverReportEndpointTests
     [Fact]
     public async Task Get_EmployeeLeavers_Returns_Forbidden_For_Recruiter()
     {
-        // reporting:view-hr only — unlike the starter report, Recruiter is not gated in here.
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Recruiter);

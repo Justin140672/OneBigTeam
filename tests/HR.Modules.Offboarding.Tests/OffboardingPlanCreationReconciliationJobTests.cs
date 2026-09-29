@@ -10,10 +10,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Offboarding.Tests;
 
-// OFF-03: this job is the recovery path for both halves of "starting a leaving process results in
-// exactly one active offboarding plan, whose tasks all eventually get a Tasks-module counterpart" —
-// missing plans (the automatic trigger never ran / failed outright) and partially-synced plans (the
-// plan is durable but one or more OffboardingTask rows never got their TaskItem created).
 public class OffboardingPlanCreationReconciliationJobTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 8, 25, 8, 0, 0, DateTimeKind.Utc);
@@ -134,7 +130,7 @@ public class OffboardingPlanCreationReconciliationJobTests
     {
         await using var dbContext = BuildContext();
         var companyIdA = Guid.NewGuid();
-        var employeeIdA = Guid.NewGuid(); // no name registered -> StartOffboardingHandler returns NotFound (isolated failure)
+        var employeeIdA = Guid.NewGuid();
         var companyIdB = Guid.NewGuid();
         var employeeIdB = Guid.NewGuid();
         var names = new Dictionary<Guid, string> { [employeeIdB] = "Jamie Smith" };
@@ -199,7 +195,6 @@ public class OffboardingPlanCreationReconciliationJobTests
         Assert.Empty(harness.TaskCreator.Created);
     }
 
-    // ---- OFF-04: AddMissingAssetReturnTasksAsync ----
 
     [Fact]
     public async Task ExecuteAsync_Creates_AssetReturnTask_For_Asset_Assigned_After_Plan_Was_Created()
@@ -221,7 +216,7 @@ public class OffboardingPlanCreationReconciliationJobTests
         Assert.Equal(plan.Id, task.OffboardingPlanId);
         Assert.Contains("Monitor", task.Title);
         Assert.Equal(plan.LastWorkingDay, task.DueDate);
-        Assert.NotNull(task.TaskItemCreatedAt); // synced within the same run
+        Assert.NotNull(task.TaskItemCreatedAt);
         Assert.Single(harness.TaskCreator.Created, c => c.Title.Contains("Monitor"));
     }
 

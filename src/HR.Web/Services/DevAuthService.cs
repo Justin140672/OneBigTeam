@@ -24,12 +24,6 @@ public sealed class DevAuthService(HrApiHttpClientFactory httpClientFactory, ILo
         }
     }
 
-    // Calls HR.Api's dev persona-switch endpoint, which performs a real Supabase password-grant
-    // login for that persona (see the "Switch development to real Supabase auth" plan) and returns
-    // the resulting tokens. Establishing the session cookie from those tokens must happen via a real
-    // browser navigation to HR.Web's /dev/persona-cookie endpoint (see MainLayout.razor's
-    // OnPersonaSwitchAsync) — not a server-side HTTP call, since Set-Cookie on a request made from
-    // inside the Blazor Server process never reaches the user's actual browser cookie jar.
     public async Task<DevSupabaseSessionDto?> SwitchAsync(string userId)
     {
         try

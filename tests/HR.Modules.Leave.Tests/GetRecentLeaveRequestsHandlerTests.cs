@@ -76,7 +76,6 @@ public class GetRecentLeaveRequestsHandlerTests
             CancellationToken.None);
 
         Assert.Equal(10, result.Items.Count);
-        // The 10 most recent (smallest AddDays offset -> latest CreatedAt) should be returned.
         Assert.True(result.Items.SequenceEqual(result.Items.OrderByDescending(i => i.CreatedAt)));
         Assert.Equal(Now, result.Items[0].CreatedAt);
     }
@@ -180,7 +179,6 @@ public class GetRecentLeaveRequestsHandlerTests
         Assert.Single(result.Items);
     }
 
-    // ── HR-admin vs. manager scoping ──────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_NonHrViewer_Sees_Only_Direct_Reports_Requests()
@@ -273,8 +271,6 @@ public class GetRecentLeaveRequestsHandlerTests
         var leaveType = SeedLeaveType(context, companyId);
 
         var pending = CreateRequest(companyId, unrelatedEmployeeId, leaveType.Id, Now);
-        // Approved but not yet started (StartDate is after "Now") — still expected to show; see
-        // HandleAsync_HrAdministrator_Hides_Approved_Requests_Once_Started for the other side.
         var approved = CreateRequest(
             companyId, unrelatedEmployeeId, leaveType.Id, Now.AddDays(-1),
             startDate: DateOnly.FromDateTime(Now.UtcDateTime).AddDays(5),
@@ -283,7 +279,6 @@ public class GetRecentLeaveRequestsHandlerTests
         context.LeaveRequests.AddRange(pending, approved);
         await context.SaveChangesAsync();
 
-        // Viewer has no direct reports at all — HR admins must still see everything.
         var handler = new GetRecentLeaveRequestsHandler(
             context, new FakeEmployeeNameReader(), new FakeDirectReportsReader(), new FakeOpenTaskBySourceEntityReader(), new FakeClock(Now.UtcDateTime));
 
@@ -335,9 +330,6 @@ public class GetRecentLeaveRequestsHandlerTests
         var leaveType = SeedLeaveType(context, companyId);
         var today = DateOnly.FromDateTime(Now.UtcDateTime);
 
-        // Only Status == Approved is affected by the "hide once started" rule — a pending
-        // request covering a date range that has already begun (e.g. submitted late) must
-        // still surface for an admin to action.
         var pending = CreateRequest(
             companyId, employeeId, leaveType.Id, Now, startDate: today.AddDays(-1), endDate: today.AddDays(1));
         context.LeaveRequests.Add(pending);
@@ -356,7 +348,6 @@ public class GetRecentLeaveRequestsHandlerTests
         Assert.Equal(pending.Id, item.LeaveRequestId);
     }
 
-    // ── TaskId ─────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_TaskId_Is_Null_When_No_Open_Task_Exists()

@@ -5,17 +5,6 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace HR.Modules.Assets.Services;
 
-/// <summary>
-/// OBT-721 Workload &amp; HR Actions Report provider for assets awaiting return. HR-only, reuses
-/// IAssetAssignmentReportReader (already used by GetAssetAssignmentReport/Handler.cs).
-///
-/// Interpretation note (per OBT-721 ticket guidance to document rather than block when there's no
-/// clean 1:1 domain concept, same approach as VacanciesAwaitingActionWorkloadActionProvider):
-/// AssetAssignment has no "return requested" flag — RequestAssetReturn only notifies, it does not
-/// set a distinguishing field visible on AssetAssignmentReportItem. Every currently-active
-/// (unreturned) assignment is therefore treated as "awaiting return" here. DueDate is left null
-/// (Upcoming urgency) since there is no return-due-by field either.
-/// </summary>
 internal sealed class AssetsAwaitingReturnWorkloadActionProvider(
     IAssetAssignmentReportReader assetAssignmentReportReader,
     IEmployeeDepartmentReader employeeDepartmentReader,

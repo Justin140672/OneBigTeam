@@ -44,22 +44,17 @@ public class AdjustLeaveBalanceIdempotencyFaultTests
         var (companyId, leaveTypeId, employeeId, client) = await SetupEmployeeWithBalanceAsync();
         var idempotencyKey = Guid.NewGuid();
 
-        // Arm the double to fail AFTER the handler's own transaction commit (operation name has no
-        // ".PreCommit" suffix) for this exact key.
         _factory.PostCommitFaultInjector.ArmOnce(nameof(AdjustLeaveBalanceHandler), idempotencyKey.ToString());
 
         var firstResponse = await SendAdjustAsync(client, companyId, employeeId, leaveTypeId, 2m, idempotencyKey);
         Assert.True((int)firstResponse.StatusCode >= 500);
 
-        // The business write must have already committed despite the "failed" response.
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
             Assert.Single(await db.LeaveBalanceAdjustments.Where(a => a.CompanyId == companyId && a.EmployeeId == employeeId).ToListAsync());
         }
 
-        // A retry with the SAME key and payload must replay the stored response rather than
-        // double-apply the adjustment.
         var secondResponse = await SendAdjustAsync(client, companyId, employeeId, leaveTypeId, 2m, idempotencyKey);
         Assert.Equal(HttpStatusCode.Created, secondResponse.StatusCode);
 
@@ -76,20 +71,17 @@ public class AdjustLeaveBalanceIdempotencyFaultTests
         var (companyId, leaveTypeId, employeeId, client) = await SetupEmployeeWithBalanceAsync();
         var idempotencyKey = Guid.NewGuid();
 
-        // Arm the double to fail BEFORE the transaction commits for this exact key.
         _factory.PostCommitFaultInjector.ArmOnce($"{nameof(AdjustLeaveBalanceHandler)}.PreCommit", idempotencyKey.ToString());
 
         var firstResponse = await SendAdjustAsync(client, companyId, employeeId, leaveTypeId, 2m, idempotencyKey);
         Assert.True((int)firstResponse.StatusCode >= 500);
 
-        // Nothing committed on the failed first attempt.
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
             Assert.Empty(await db.LeaveBalanceAdjustments.Where(a => a.CompanyId == companyId && a.EmployeeId == employeeId).ToListAsync());
         }
 
-        // Retry with the same key now goes through cleanly and commits exactly once.
         var secondResponse = await SendAdjustAsync(client, companyId, employeeId, leaveTypeId, 2m, idempotencyKey);
         Assert.Equal(HttpStatusCode.Created, secondResponse.StatusCode);
 
@@ -100,7 +92,6 @@ public class AdjustLeaveBalanceIdempotencyFaultTests
         }
     }
 
-    // ── Helpers (mirrors AdjustLeaveBalanceEndpointTests' setup) ───────────────────
 
     private static Task<HttpResponseMessage> SendAdjustAsync(
         HttpClient client, Guid companyId, Guid employeeId, Guid leaveTypeId, decimal adjustmentValue, Guid idempotencyKey)

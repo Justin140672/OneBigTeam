@@ -84,11 +84,9 @@ public sealed class CandidateEditConcurrencyConflictTests(RecruiterPersonaFixtur
         var otherTabPhone = $"07700 2{Guid.NewGuid().ToString("N")[..5]}";
         var finalPhone    = $"07700 3{Guid.NewGuid().ToString("N")[..5]}";
 
-        // ── Tab 1: open the editor and start editing the Phone (loads version v1) ──
         await candidateEdit.GoToAsync(AcmeId, id);
         await candidateEdit.SetPhoneAsync(firstTabPhone);
 
-        // ── Tab 2 (same context / persona): load the same candidate and save first ──
         var otherPage = await _context.NewPageAsync();
         try
         {
@@ -102,7 +100,6 @@ public sealed class CandidateEditConcurrencyConflictTests(RecruiterPersonaFixtur
             await otherPage.CloseAsync();
         }
 
-        // ── Tab 1: saving now is stale → conflict banner, page stays, input preserved ──
         await candidateEdit.SaveExpectingConflictAsync();
 
         Assert.True(await candidateEdit.IsConcurrencyWarningVisibleAsync(),
@@ -110,14 +107,12 @@ public sealed class CandidateEditConcurrencyConflictTests(RecruiterPersonaFixtur
         Assert.Contains($"/candidates/{id}", _page.Url);
         Assert.Equal(firstTabPhone, await candidateEdit.GetPhoneAsync());
 
-        // ── Tab 1: "Reload latest values" clears the banner and adopts the other tab's value ──
         await candidateEdit.ClickReloadLatestValuesAsync();
 
         Assert.False(await candidateEdit.IsConcurrencyWarningVisibleAsync(),
             "Expected the conflict banner to clear after reloading latest values");
         Assert.Equal(otherTabPhone, await candidateEdit.WaitForPhoneAsync(otherTabPhone));
 
-        // ── Tab 1: re-edit against the fresh version and save successfully ──
         await candidateEdit.SetPhoneAsync(finalPhone);
         await candidateEdit.SaveAndWaitForListAsync();
 
@@ -125,7 +120,6 @@ public sealed class CandidateEditConcurrencyConflictTests(RecruiterPersonaFixtur
         Assert.Equal(finalPhone, await candidateEdit.WaitForPhoneAsync(finalPhone));
     }
 
-    /// <summary>Creates a uniquely-named candidate via the list + new-page flow and returns its last name and id.</summary>
     private async Task<(string LastName, Guid Id)> CreateCandidateAsync(
         CandidateListPage candidateList, CandidateEditPage candidateEdit)
     {

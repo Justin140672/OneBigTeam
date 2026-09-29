@@ -19,10 +19,6 @@ public class AmendLeavingProcessEndpointTests
     private static readonly Guid EmployeeRoleUser = new("ffffffff-3000-0000-0000-000000000005");
     private static readonly Guid ManagerRoleUser = new("ffffffff-3000-0000-0000-000000000006");
 
-    // Relative to "today" rather than hardcoded literals — see StartLeavingProcessEndpointTests'
-    // identical fields for why a fixed near-term literal eventually becomes "backdated".
-    // OriginalLeavingDate is what StartLeavingProcessAsync below sets; AmendedLeavingDate is the
-    // later date most tests here amend it to.
     private static readonly DateOnly OriginalLeavingDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
     private static readonly DateOnly OriginalLastWorkingDay = OriginalLeavingDate.AddDays(-1);
     private static readonly DateOnly AmendedLeavingDate = OriginalLeavingDate.AddDays(31);
@@ -354,7 +350,6 @@ public class AmendLeavingProcessEndpointTests
         Assert.Equal("FormerEmployee", employee!.Status);
     }
 
-    // Spec SPEC-OFF-01: Notes required when LeavingReason is Other.
     [Fact]
     public async Task Put_LeavingProcess_Returns_UnprocessableEntity_When_LeavingReason_Is_Other_And_Notes_Missing()
     {

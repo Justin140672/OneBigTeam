@@ -66,14 +66,9 @@ public class GetOffboardingOverviewEndpointTests
         var assetId = await CreateAssetAsync(client, companyId, categoryId, $"OB-{Guid.NewGuid():N}");
         await AssignAssetAsync(client, companyId, assetId, employeeId);
 
-        // Future date: a past last-working-day is treated as a backdated departure, which reroutes
-        // the asset-return task to HR reconciliation and waives the access-revocation checklist
-        // item, changing the task shape this test asserts.
         var lastWorkingDay = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
         await StartOffboardingAsync(client, companyId, employeeId, lastWorkingDay, "Resigned.");
 
-        // Complete the employee's asset-return task so we exercise a Completed status
-        // alongside the still-Pending HR / manager checklist tasks.
         await CompleteEmployeeTaskAsync(client, companyId, employeeId, "Return asset:");
 
         var response = await client.GetAsync(
@@ -88,25 +83,18 @@ public class GetOffboardingOverviewEndpointTests
         Assert.Equal(lastWorkingDay, payload.LastWorkingDay);
         Assert.Equal("Resigned.", payload.Notes);
 
-        // 1 asset-return (Employee) task + 1 HR document-review task + 4 manager checklist tasks.
         Assert.Equal(6, payload.Tasks.Count);
 
-        // Matched by AssignTo rather than by the generic Tasks-module id returned from
-        // CompleteEmployeeTaskAsync — that id belongs to the Tasks module's own TaskItem, a
-        // different entity from the OffboardingTask this endpoint returns (linked, not identical).
         var completedAssetTask = Assert.Single(payload.Tasks, t => t.AssignTo == "Employee");
         Assert.Equal("Completed", completedAssetTask.Status);
         Assert.NotNull(completedAssetTask.CompletedAt);
         Assert.Equal(completedAssetTask.CompletedAt, completedAssetTask.UpdatedAt);
-        // OFF-04: the employee's asset-return obligation must carry through the AssetAssignmentId
-        // of the asset it's returning so the UI can deep-link to the source assignment record.
         Assert.NotNull(completedAssetTask.AssetAssignmentId);
 
         var hrTask = Assert.Single(payload.Tasks, t => t.AssignTo == "HR");
         Assert.Equal("Pending", hrTask.Status);
         Assert.Null(hrTask.CompletedAt);
         Assert.Equal(lastWorkingDay, hrTask.DueDate);
-        // The HR document-review obligation isn't asset-backed.
         Assert.Null(hrTask.AssetAssignmentId);
 
         var managerTasks = payload.Tasks.Where(t => t.AssignTo == "Manager").ToList();
@@ -135,8 +123,6 @@ public class GetOffboardingOverviewEndpointTests
         var lastWorkingDay = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
         await StartOffboardingAsync(client, companyId, employeeId, lastWorkingDay, "Resigned.");
 
-        // Every obligation is synchronized into a Tasks-module TaskItem as part of starting
-        // offboarding, so its OpenTaskId should already be populated before anything is completed.
         var listResp = await client.GetAsync($"/api/companies/{companyId}/employees/{employeeId}/tasks");
         listResp.EnsureSuccessStatusCode();
         var tasksPayload = await listResp.Content.ReadFromJsonAsync<EmployeeTasksPayload>();
@@ -161,7 +147,6 @@ public class GetOffboardingOverviewEndpointTests
         var employeeId = await CreateEmployeeAsync(clientA, companyA);
         await StartOffboardingAsync(clientA, companyA, employeeId, new DateOnly(2026, 8, 1), "Resigned.");
 
-        // Query the same employeeId, but scoped to a different company/tenant.
         using var clientB = await AdminClient(companyB);
         var response = await clientB.GetAsync(
             $"/api/companies/{companyB}/employees/{employeeId}/offboarding-overview");
@@ -176,7 +161,6 @@ public class GetOffboardingOverviewEndpointTests
         Assert.Empty(payload.Tasks);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AdminClient(Guid companyId)
     {

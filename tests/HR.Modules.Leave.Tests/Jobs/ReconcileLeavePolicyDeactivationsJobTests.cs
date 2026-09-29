@@ -7,9 +7,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Leave.Tests.Jobs;
 
-// Daily sweep that re-enqueues any LeavePolicyDeactivationOnDeparture record still Pending or
-// Failed — covers the case where the initial Hangfire enqueue never happened, or a Failed record
-// needs a fresh round of retries.
 public class ReconcileLeavePolicyDeactivationsJobTests
 {
     private static readonly DateTimeOffset OccurredAt = new(2026, 6, 8, 7, 0, 0, TimeSpan.Zero);
@@ -55,7 +52,7 @@ public class ReconcileLeavePolicyDeactivationsJobTests
         Assert.Single(jobClient.CreatedJobs, j => j.Type == typeof(LeavePolicyDeactivationJob));
 
         var reloaded = await db.LeavePolicyDeactivationsOnDeparture.SingleAsync(r => r.Id == pendingRequest.Id);
-        Assert.Equal(LeavePolicyDeactivationOnDeparture.StatusPending, reloaded.Status); // unchanged
+        Assert.Equal(LeavePolicyDeactivationOnDeparture.StatusPending, reloaded.Status);
     }
 
     [Fact]

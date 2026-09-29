@@ -64,11 +64,6 @@ public class AppointInternalCandidateHandlerTests
         }
     }
 
-    /// <summary>
-    /// Seeds an internal application (employee-linked candidate, Source Internal) on the Offer stage,
-    /// an active employee, and a resolvable position profile with department and location.
-    /// <paramref name="configure"/> runs before the save so it can shape the application.
-    /// </summary>
     private static async Task<Harness> SeedAsync(
         Func<RecruitmentStageTestData.SeededStages, RecruitmentStage>? stage = null,
         Action<Application, Harness>? configure = null,
@@ -121,7 +116,6 @@ public class AppointInternalCandidateHandlerTests
         return harness;
     }
 
-    // ------------------------------------------------------------------ happy path
 
     [Fact]
     public async Task HandleAsync_Moves_Application_To_Hired_And_Marks_Appointment_Completed()
@@ -318,7 +312,6 @@ public class AppointInternalCandidateHandlerTests
         Assert.False(result.Value!.IsApplied);
         Assert.False(Assert.Single(h.Events.PublishedEvents.OfType<InternalCandidateAppointedIntegrationEvent>()).IsApplied);
 
-        // Still completed on the Recruitment side and counted as a hire.
         var saved = await h.ReloadApplicationAsync();
         Assert.Equal(InternalAppointmentStatus.Completed, saved.AppointmentStatus);
         Assert.Equal(h.Stages.Hired.Id, saved.CurrentStageId);
@@ -338,7 +331,6 @@ public class AppointInternalCandidateHandlerTests
         Assert.DoesNotContain(typeof(IEmployeeProvisioningService), completerDependencies);
     }
 
-    // ------------------------------------------------------------------ manager / effective date
 
     [Fact]
     public async Task HandleAsync_NoManager_Passes_Null_Manager()
@@ -402,7 +394,6 @@ public class AppointInternalCandidateHandlerTests
         await AssertRefusedUntouchedAsync(h, result, "validation");
     }
 
-    // ------------------------------------------------------------------ eligibility
 
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Vacancy_Missing()
@@ -458,7 +449,6 @@ public class AppointInternalCandidateHandlerTests
         {
             a.BeginInternalAppointment(Guid.NewGuid(), Guid.NewGuid(), Now.AddDays(-1));
         });
-        // Complete it (Hired stage) as a first appointment would have.
         h.Application.CompleteInternalAppointment(h.Stages.Hired.Id, Guid.NewGuid(), EffectiveDate, Now.AddDays(-1));
         await h.Db.SaveChangesAsync();
 
@@ -503,7 +493,6 @@ public class AppointInternalCandidateHandlerTests
     [InlineData("AwaitingResponse")]
     public async Task HandleAsync_Succeeds_When_Offer_Accepted_Or_Awaiting_Response(string response)
     {
-        // An accepted offer is NOT required — same rule as the external Hire.
         var h = await SeedAsync(configure: (a, _) =>
         {
             a.RecordOfferTerms(70000m, OfferSalaryFrequency.Annual, EffectiveDate, new DateOnly(2026, 9, 20), null, Now.AddDays(-6));
@@ -573,7 +562,6 @@ public class AppointInternalCandidateHandlerTests
     public async Task HandleAsync_Returns_Validation_When_Employee_Not_Found_In_Company()
     {
         var h = await SeedAsync();
-        // Profile exists only in another company: the company-scoped reader returns null.
         h.ApplicantReader = new FakeEmployeeApplicantReader(
             FakeEmployeeApplicantReader.Profile(Guid.NewGuid(), h.EmployeeId));
 
@@ -637,7 +625,6 @@ public class AppointInternalCandidateHandlerTests
         await AssertRefusedUntouchedAsync(h, result, "validation");
     }
 
-    // ------------------------------------------------------------------ Employees-module failure
 
     [Theory]
     [InlineData("conflict")]
@@ -687,7 +674,6 @@ public class AppointInternalCandidateHandlerTests
         Assert.Equal(1, h.Service.RecordedCount);
     }
 
-    // ------------------------------------------------------------------ recovery
 
     [Fact]
     public async Task HandleAsync_Completes_Pending_Appointment_From_Recorded_Change_Without_Calling_Appoint()
@@ -714,7 +700,6 @@ public class AppointInternalCandidateHandlerTests
         Assert.Equal(retriedBy, resume.PerformedBy);
         Assert.Equal(0, h.ApplicantReader.Calls);
 
-        // Completed as recorded — the new request's effective date/manager are NOT re-applied.
         Assert.Equal(recorded.PromotionId, result.Value!.PromotionId);
         Assert.Equal(recordedDate, result.Value.EffectiveDate);
 
@@ -773,16 +758,10 @@ public class AppointInternalCandidateHandlerTests
         Assert.Equal("validation", result.Error.Code);
         Assert.Empty(h.Service.AppointRequests);
 
-        // Left Pending so a later retry/reconciliation can complete it once a Hired stage exists.
         Assert.Equal(InternalAppointmentStatus.Pending, (await h.ReloadApplicationAsync()).AppointmentStatus);
     }
 
-    // ------------------------------------------------------------------ helpers
 
-    /// <summary>
-    /// Asserts a refusal that happened before anything was recorded: the Employees module was never
-    /// called, the application is not left Pending, its stage is unchanged and nothing was published.
-    /// </summary>
     private static async Task AssertRefusedUntouchedAsync(
         Harness h, Result<AppointInternalCandidateResponse> result, string expectedCode)
     {

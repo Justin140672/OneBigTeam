@@ -4,10 +4,6 @@ using Hangfire.States;
 
 namespace HR.Modules.Documents.Tests.Infrastructure;
 
-/// <summary>
-/// Records every job Create call so upload-handler tests can assert that a scan job was actually
-/// enqueued (job type + method name), without a real Hangfire storage backend.
-/// </summary>
 internal sealed class SpyBackgroundJobClient : IBackgroundJobClient
 {
     public List<Job> CreatedJobs { get; } = [];

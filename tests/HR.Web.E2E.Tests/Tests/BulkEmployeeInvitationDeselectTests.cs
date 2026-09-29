@@ -3,7 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>Split out of BulkEmployeeInvitationTests for real cross-test parallelism — see BulkEmployeeInvitationGettingStartedTests' remarks.</summary>
 public sealed class BulkEmployeeInvitationDeselectTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");

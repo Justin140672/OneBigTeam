@@ -259,12 +259,9 @@
 
     private bool HasSubmittedCv => _app?.CvDocumentId is not null;
 
-    // Offered only when the candidate has a current CV that isn't already this application's CV.
     private bool CanUseCurrentCandidateCv => _app?.CurrentCandidateCvDocumentId is Guid currentId
         && currentId != _app.CvDocumentId;
 
-    // CandidateDetail's Close honours returnUrl, so this brings the user back to this review page.
-    // The returnUrl here is internal (built from Navigation.Uri) so it's guaranteed safe.
     private string ManageCandidateCvsUrl => _app is null
         ? string.Empty
         : $"/companies/{CompanyId}/candidates/{_app.CandidateId}?returnUrl={Uri.EscapeDataString("/" + Navigation.ToBaseRelativePath(Navigation.Uri))}";
@@ -284,7 +281,6 @@
         ? "Submitted CV"
         : _app?.CurrentCandidateCvDocumentId is not null ? "Candidate's current CV" : "CV";
 
-    // Scan state of whichever CV is displayed (submitted, else current). Only "Clean" is viewable.
     private string? DisplayedCvScanStatus => _app?.CvDocumentId is not null
         ? _app.CvScanStatus
         : _app?.CurrentCandidateCvScanStatus;
@@ -420,7 +416,6 @@
             _success = hadSubmittedCv ? "CV replaced for this application." : "CV uploaded for this application.";
         }
 
-        // Reload either way so the page reflects the true state (new current CV, version, etc.).
         await ReloadApplicationAsync();
         _busy = false;
     }
@@ -448,7 +443,6 @@
         _busy = false;
     }
 
-    // Reloads the page data without discarding unsaved review notes typed into the notes box.
     private async Task ReloadApplicationAsync()
     {
         var notes = _notes;
@@ -456,7 +450,6 @@
         _notes = notes;
     }
 
-    // "Check again" on the pending-scan alert: re-fetch the application to pick up the latest scan state.
     private async Task CheckScanAgainAsync()
     {
         if (_busy) return;

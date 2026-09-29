@@ -146,7 +146,6 @@ public class AssetReturnServiceTests
         Assert.True(assignment!.IsActive);
     }
 
-    // ---- Verified overload (OFF-04) ----
 
     [Fact]
     public async Task VerifiedReturnAsync_Returns_NotFound_When_Assignment_Does_Not_Exist()

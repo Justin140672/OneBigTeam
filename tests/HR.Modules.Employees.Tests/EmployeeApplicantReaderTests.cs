@@ -80,8 +80,6 @@ public class EmployeeApplicantReaderTests
         Assert.Null(profile.PhoneNumber);
     }
 
-    // EmploymentStatus is internal, so a public theory cannot take it as a parameter (CS0051); rows
-    // carry member names and are parsed inside the test.
     [Theory]
     [InlineData(nameof(EmploymentStatus.Draft), nameof(EmployeeApplicantEmploymentState.Draft))]
     [InlineData(nameof(EmploymentStatus.Active), nameof(EmployeeApplicantEmploymentState.Active))]
@@ -118,8 +116,8 @@ public class EmployeeApplicantReaderTests
     }
 
     [Theory]
-    [InlineData(2)] // retired OnLeave
-    [InlineData(4)] // retired Terminated
+    [InlineData(2)]
+    [InlineData(4)]
     [InlineData(99)]
     public void MapState_Fails_Closed_To_Draft_For_Retired_Or_Unknown_Values(int rawStatus)
     {

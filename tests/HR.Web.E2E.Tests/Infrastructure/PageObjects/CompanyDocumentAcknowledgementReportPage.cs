@@ -2,13 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the Company Document Acknowledgement report
-/// (/companies/{companyId}/reporting/document-acknowledgement —
-/// CompanyDocumentAcknowledgementReportPage.razor). This page has no filter control at all —
-/// just three summary stat cards (Total Required / Total Acknowledged / Total Outstanding) above
-/// the grid, and export via the same SfDropDownButton pattern as the other report pages.
-/// </summary>
 public sealed class CompanyDocumentAcknowledgementReportPage(IPage page, string baseUrl)
 {
     private const string RowsRenderedSelector = ".e-grid .e-row, .e-grid .e-emptyrow";
@@ -36,7 +29,6 @@ public sealed class CompanyDocumentAcknowledgementReportPage(IPage page, string 
         return await page.Locator(".e-grid .e-row").CountAsync();
     }
 
-    // ── Summary stat cards ─────────────────────────────────────────────────────
 
     private ILocator StatCard(string labelText) =>
         page.Locator(".card").Filter(new() { HasText = labelText }).First;
@@ -47,7 +39,6 @@ public sealed class CompanyDocumentAcknowledgementReportPage(IPage page, string 
         return int.TryParse(text?.Trim(), out var value) ? value : -1;
     }
 
-    // ── Export ─────────────────────────────────────────────────────────────────
 
     public async Task<IDownload> ExportAsync(string formatLabel)
     {

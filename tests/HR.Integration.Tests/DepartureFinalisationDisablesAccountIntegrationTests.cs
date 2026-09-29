@@ -13,15 +13,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// P1 fix: end-to-end coverage that departure finalisation — not offboarding-plan completion — is
-/// the sole trigger for disabling a departed employee's ApplicationUser (the flag
-/// DisabledAccountMiddleware actually enforces). Mirrors
-/// EmployeeDepartureFinalisedDeactivatesLeavePolicyAssignmentTests's "backdated + confirmed leaving
-/// process finalises synchronously" setup, and NotificationRecoveryIntegrationTests's pattern of
-/// manually executing a Hangfire job body captured by the test-only FakeBackgroundJobClient (real
-/// Hangfire job execution is disabled for this suite — see FakeBackgroundJobClient's doc comment).
-/// </summary>
 [Collection("Integration")]
 public class DepartureFinalisationDisablesAccountIntegrationTests
 {
@@ -58,9 +49,6 @@ public class DepartureFinalisationDisablesAccountIntegrationTests
         return (await response.Content.ReadFromJsonAsync<IdPayload>())!.Id;
     }
 
-    // Ensures the departing employee's own HasSystemAccess flag is true (regardless of what the
-    // create-employee endpoint defaults it to) and links an active ApplicationUser under the same id
-    // (ApplicationUser.Id == EmployeeId convention).
     private async Task GrantSystemAccessAndSeedActiveAccountAsync(Guid companyId, Guid employeeId, string email)
     {
         using var scope = _factory.Services.CreateScope();
@@ -122,7 +110,6 @@ public class DepartureFinalisationDisablesAccountIntegrationTests
         var email = $"departing.{Guid.NewGuid():N}@test.com";
         await GrantSystemAccessAndSeedActiveAccountAsync(companyId, employeeId, email);
 
-        // New companies default AutoDisableAccessOnLeavingDate to true — no explicit PUT needed.
         var leavingResponse = await FinaliseBackdatedDepartureAsync(client, companyId, employeeId);
         Assert.Equal(HttpStatusCode.Created, leavingResponse.StatusCode);
 
@@ -140,8 +127,6 @@ public class DepartureFinalisationDisablesAccountIntegrationTests
             j.Type == typeof(AccountDisablementJob)
             && (Guid?)j.Args.ElementAtOrDefault(0) == accountDisablementId);
 
-        // Real Hangfire job execution is disabled for this suite (see FakeBackgroundJobClient) — run
-        // the captured job body directly, mirroring NotificationRecoveryIntegrationTests's pattern.
         using (var scope = _factory.Services.CreateScope())
         {
             var job = ActivatorUtilities.CreateInstance<AccountDisablementJob>(scope.ServiceProvider);
@@ -178,10 +163,6 @@ public class DepartureFinalisationDisablesAccountIntegrationTests
         var email = $"early.{Guid.NewGuid():N}@test.com";
         await GrantSystemAccessAndSeedActiveAccountAsync(companyId, employeeId, email);
 
-        // Simulates whatever triggers offboarding-plan completion (e.g. all tasks completed) by
-        // publishing the event through the real dispatch pipeline — OffboardingPlanCompletedIntegrationEvent
-        // currently has zero consumers (see its doc comment); this proves that, in particular,
-        // Identity no longer reacts to it at all.
         using (var scope = _factory.Services.CreateScope())
         {
             var publisher = scope.ServiceProvider.GetRequiredService<IIntegrationEventPublisher>();
@@ -215,9 +196,6 @@ public class DepartureFinalisationDisablesAccountIntegrationTests
         var identityDb = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         var user = await identityDb.Users.SingleAsync(u => u.Id == employeeId);
         Assert.True(user.IsActive);
-        // No durable disablement request was ever created for this employee — the definitive proof
-        // that Identity's OnEmployeeDepartureFinalised handler treated AccessDisabled: false as a
-        // no-op, since it never even queries for an ApplicationUser to disable in that branch.
         Assert.False(await identityDb.AccountDisablements.AnyAsync(d => d.EmployeeId == employeeId));
     }
 

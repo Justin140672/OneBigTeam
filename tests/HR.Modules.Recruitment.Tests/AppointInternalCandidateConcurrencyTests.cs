@@ -72,8 +72,6 @@ public class AppointInternalCandidateConcurrencyTests(RecruitmentDatabaseFixture
 
         var service = new FakeEmployeeInternalAppointmentService
         {
-            // Widen the window between "Pending saved" and "change recorded" so the second request
-            // regularly observes the first one mid-flight.
             BeforeAppoint = () => Task.Delay(25),
         };
 
@@ -135,12 +133,10 @@ public class AppointInternalCandidateConcurrencyTests(RecruitmentDatabaseFixture
                     .Where(e => e.ApplicationId == r.ApplicationId)
                     .ToListAsync());
 
-                // One employee change recorded, keyed by the application's source reference.
                 Assert.Equal(1, r.Service.RecordedCount);
                 Assert.All(r.Service.AppointRequests,
                     req => Assert.Equal($"recruitment:application:{r.ApplicationId}", req.SourceReference));
 
-                // Events are only published by the request whose completion committed.
                 var appointedEvents = a.Events.PublishedEvents.Concat(b.Events.PublishedEvents)
                     .OfType<InternalCandidateAppointedIntegrationEvent>()
                     .ToList();

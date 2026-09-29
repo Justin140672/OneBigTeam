@@ -158,7 +158,7 @@ public class UpdateSicknessRecordEndpointTests
                 companyId,
                 employeeId,
                 id = recordId,
-                categoryId = Guid.NewGuid(), // non-existent
+                categoryId = Guid.NewGuid(),
                 startDate = "2026-07-01",
                 startDayPart = 0,
                 expectedVersion = 1

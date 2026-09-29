@@ -9,9 +9,6 @@ public class IdentityAuthorizationServiceTests(IdentityDatabaseFixture fixture)
     private static readonly DateTimeOffset Now = new(2026, 6, 6, 12, 0, 0, TimeSpan.Zero);
     private static readonly FakeClock Clock = new(Now.UtcDateTime);
 
-    // -----------------------------------------------------------------------
-    // Helpers
-    // -----------------------------------------------------------------------
 
     private IdentityAuthorizationService BuildService() =>
         new(fixture.BuildContext(), Clock);
@@ -63,9 +60,6 @@ public class IdentityAuthorizationServiceTests(IdentityDatabaseFixture fixture)
         return permissionId;
     }
 
-    // -----------------------------------------------------------------------
-    // GetEffectiveRolesAsync
-    // -----------------------------------------------------------------------
 
     [Fact]
     public async Task GetEffectiveRoles_Returns_Empty_For_Unknown_User()
@@ -102,7 +96,6 @@ public class IdentityAuthorizationServiceTests(IdentityDatabaseFixture fixture)
     [Fact]
     public async Task GetEffectiveRoles_Excludes_Expired_Position_Role()
     {
-        // Position expired 1 second before "now".
         var (userId, roleId) = await SeedUserWithPositionRole(
             positionExpiresAt: Now.AddSeconds(-1),
             suffix: "pos-expired");
@@ -116,7 +109,6 @@ public class IdentityAuthorizationServiceTests(IdentityDatabaseFixture fixture)
     [Fact]
     public async Task GetEffectiveRoles_Excludes_Position_Role_Expiring_Exactly_At_Now()
     {
-        // ExpiresAt == now is excluded because the comparison is strictly ">" not ">=".
         var (userId, roleId) = await SeedUserWithPositionRole(
             positionExpiresAt: Now,
             suffix: "pos-exact-now");
@@ -190,9 +182,6 @@ public class IdentityAuthorizationServiceTests(IdentityDatabaseFixture fixture)
         Assert.DoesNotContain(roleId, roles);
     }
 
-    // -----------------------------------------------------------------------
-    // GetEffectivePermissionsAsync / HasPermissionAsync
-    // -----------------------------------------------------------------------
 
     [Fact]
     public async Task GetEffectivePermissions_Returns_Permissions_For_Effective_Roles()
@@ -324,8 +313,6 @@ public class IdentityAuthorizationServiceTests(IdentityDatabaseFixture fixture)
     [Fact]
     public async Task HasPermission_Remains_True_When_One_Of_Two_Granting_Roles_Is_Denied()
     {
-        // Both roleA and roleB grant the same permission.
-        // Denying roleA should NOT revoke the permission because roleB still grants it.
         await using var db = fixture.BuildContext();
         var userId = Guid.NewGuid();
         var roleA = Guid.NewGuid();

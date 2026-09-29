@@ -4,7 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>Split out of BulkEmployeeInvitationTests for real cross-test parallelism — see BulkEmployeeInvitationGettingStartedTests' remarks.</summary>
 public sealed class BulkEmployeeInvitationMissingEmailTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -13,10 +12,6 @@ public sealed class BulkEmployeeInvitationMissingEmailTests(HrAdminPersonaFixtur
     [Fact]
     public async Task InviteMode_CandidateMissingWorkEmail_IsVisibleButNotPreselected_WithEditLink()
     {
-        // WorkEmail is mandatory on both create and update, so this environment has no UI path to
-        // produce a genuinely missing-email candidate. Assert the behaviour when the shared/seeded
-        // data happens to contain one; otherwise skip gracefully rather than fabricate an
-        // unreachable state.
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
         var grid = new InviteModeCandidateGridPage(_page);
@@ -32,7 +27,7 @@ public sealed class BulkEmployeeInvitationMissingEmailTests(HrAdminPersonaFixtur
 
         if (await missingEmailRow.CountAsync() == 0)
         {
-            return; // No such candidate exists in this environment — nothing to assert.
+            return;
         }
 
         var rowText = (await missingEmailRow.First.InnerTextAsync()).Trim();

@@ -75,7 +75,7 @@ public class ProcessInvitationBatchJobTests(IdentityDatabaseFixture fixture)
     {
         var companyId = Guid.NewGuid();
         var (batch, recipient) = await SeedWaitingRecipientAsync(companyId, "now-ineligible@test.com");
-        var candidateReader = new FakeEmployeeInviteCandidateReader(); // no longer eligible
+        var candidateReader = new FakeEmployeeInviteCandidateReader();
         var auditPublisher = new FakeAuditEventPublisher();
 
         await using var db = fixture.BuildContext();
@@ -121,7 +121,6 @@ public class ProcessInvitationBatchJobTests(IdentityDatabaseFixture fixture)
         var candidateReader = new FakeEmployeeInviteCandidateReader(
             new EmployeeInviteCandidate(recipient.EmployeeId, "Retry Person", recipient.Email, null, null));
 
-        // First run: invite gets created, but the email send itself fails.
         await using (var db = fixture.BuildContext())
         {
             var failingSender = new FakeInvitationEmailSender(succeeds: false);
@@ -132,13 +131,12 @@ public class ProcessInvitationBatchJobTests(IdentityDatabaseFixture fixture)
         {
             var reloaded = await verifyDb.InvitationBatchRecipients.SingleAsync(r => r.Id == recipient.Id);
             Assert.Equal(InvitationBatchRecipient.StatusFailed, reloaded.Status);
-            Assert.NotNull(reloaded.InviteId); // invite WAS created before the send failed
+            Assert.NotNull(reloaded.InviteId);
 
             var inviteCount = await verifyDb.UserInvites.CountAsync(i => i.EmployeeId == recipient.EmployeeId);
             Assert.Equal(1, inviteCount);
         }
 
-        // Simulate RetryInvitationBatch resetting the Failed recipient back to Waiting.
         await using (var resetDb = fixture.BuildContext())
         {
             var toReset = await resetDb.InvitationBatchRecipients.SingleAsync(r => r.Id == recipient.Id);
@@ -146,7 +144,6 @@ public class ProcessInvitationBatchJobTests(IdentityDatabaseFixture fixture)
             await resetDb.SaveChangesAsync();
         }
 
-        // Second run: succeeds, must reuse the existing invite rather than creating a second one.
         await using (var db = fixture.BuildContext())
         {
             var succeedingSender = new FakeInvitationEmailSender(succeeds: true);
@@ -158,7 +155,7 @@ public class ProcessInvitationBatchJobTests(IdentityDatabaseFixture fixture)
         Assert.Equal(InvitationBatchRecipient.StatusSent, finalRecipient.Status);
 
         var finalInviteCount = await finalDb.UserInvites.CountAsync(i => i.EmployeeId == recipient.EmployeeId);
-        Assert.Equal(1, finalInviteCount); // still only one UserInvite row for this employee
+        Assert.Equal(1, finalInviteCount);
     }
 
     [Fact]
@@ -206,8 +203,6 @@ public class ProcessInvitationBatchJobTests(IdentityDatabaseFixture fixture)
         Assert.Equal(InvitationBatch.StatusCompleted, reloadedBatch.Status);
     }
 
-    /// <summary>Throws for a specific recipient email's send, to prove one recipient's unexpected
-    /// exception (as opposed to a mere "email send returned false") doesn't abort the job's loop.</summary>
     private sealed class ThrowingForEmailInvitationEmailSender(string throwingEmail) : IInvitationEmailSender
     {
         public Task<bool> SendAsync(string toEmail, string? recipientName, string actionUrl, CancellationToken ct = default)

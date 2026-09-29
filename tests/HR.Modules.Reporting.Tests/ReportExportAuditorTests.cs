@@ -44,8 +44,6 @@ public class ReportExportAuditorTests
         Assert.Equal(companyId, command.CompanyId);
         Assert.Equal(HR.Infrastructure.Abstractions.AdministrativeAlertCategory.ReportGeneration, command.Category);
         Assert.Equal("report-generation:employee-directory", command.DedupKey);
-        // Follow-up F: an ordinary report-export failure carries no Reason, so it is recorded
-        // without queuing an internal-operations notification email.
         Assert.Null(command.Reason);
     }
 
@@ -119,9 +117,6 @@ public class ReportExportAuditorTests
     [Fact]
     public async Task PublishSuccessAsync_Filters_Never_Contain_Row_Level_Content_Only_Structured_Request_Properties()
     {
-        // The auditor never has access to the generated report's rows in the first place -- it only
-        // ever sees the export request. Asserting the filter keys match exactly the request's own
-        // property names (minus CompanyId/Format) pins that no row/PII data can leak in here.
         var auditor = BuildAuditor(out var publisher);
         var companyId = Guid.NewGuid();
         var request = new FakeExportRequest(companyId, null, null, ReportExportFormat.Csv);
@@ -180,8 +175,6 @@ public class ReportExportAuditorTests
         var evt = Assert.IsType<ReportExportAuditEvent>(Assert.Single(publisher.Published));
         Assert.Equal(ReportSensitivity.Sensitive.ToString(), evt.Sensitivity);
 
-        // Also verify the fail-closed default surfaces through the anonymous Metadata payload
-        // (what actually gets persisted to the audit store), not just the strongly-typed property.
         var metadata = ((HR.SharedKernel.IAuditEvent)evt).Metadata;
         var sensitivityProperty = metadata!.GetType().GetProperty("Sensitivity");
         Assert.NotNull(sensitivityProperty);

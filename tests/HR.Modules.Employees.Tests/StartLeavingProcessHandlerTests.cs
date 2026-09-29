@@ -39,10 +39,6 @@ public class StartLeavingProcessHandlerTests
             confirmBackdatedLeavingDate,
             replacementManagerEmployeeId);
 
-    // Builds a real EmployeeDepartureFinalizer from the same Fakes passed to the handler so
-    // assertions on auditPublisher/notificationWriter state after a confirmed-backdated
-    // HandleAsync call cover both LeavingProcessStartedAuditEvent and
-    // EmployeeDepartureFinalisedAuditEvent published through the same instance.
     private static StartLeavingProcessHandler BuildHandler(
         EmployeesDbContext context,
         FakeAuditPublisher? auditPublisher = null,
@@ -391,7 +387,6 @@ public class StartLeavingProcessHandlerTests
         Assert.NotNull(auditEvent);
     }
 
-    // -- OFF-06: ReplacementManagerEmployeeId ------------------------------------------------
 
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_ReplacementManagerEmployeeId_Does_Not_Exist()
@@ -554,11 +549,6 @@ public class StartLeavingProcessHandlerTests
     [Fact]
     public async Task HandleAsync_With_IdempotencyKey_And_Backdated_LeavingDate_Returns_PostFinalization_Status()
     {
-        // Regression guard: StartLeavingProcessHandler snapshots the response for the
-        // idempotency-replay payload BEFORE calling FinalizeAsync, since a replayed request must
-        // never re-run finalization. The value actually returned to THIS (first, non-replayed)
-        // caller must still reflect the post-finalization state (Status == Completed), not the
-        // pre-finalization snapshot that was persisted for replay purposes.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);

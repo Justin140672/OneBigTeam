@@ -3,13 +3,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.DataImport.Tests.Infrastructure;
 
-/// <summary>
-/// Test double for <see cref="IImportLookupResolver"/>: lets tests seed which Department/
-/// EmploymentType/Location/PositionProfile names "already exist" (mapped to a specific id) for a
-/// company, while mirroring the real resolver's create-if-missing behavior for anything else -
-/// auto-creating a stable new Guid per unique (companyId, normalized-name) pair on first use and
-/// reusing it (with WasCreated: false) on subsequent calls, without needing a live DbContext.
-/// </summary>
 internal sealed class FakeImportLookupResolver : IImportLookupResolver
 {
     private readonly Dictionary<(Guid CompanyId, string NormalizedName), Guid> _departments = new();

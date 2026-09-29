@@ -31,8 +31,8 @@ public sealed class ReleaseIdentityTests : IDisposable
     }
 
     [Theory]
-    [InlineData("1.0.123+abc1234", null)]                                  // short build metadata only - not a full sha
-    [InlineData("1.0.123", null)]                                          // no metadata
+    [InlineData("1.0.123+abc1234", null)]
+    [InlineData("1.0.123", null)]
     [InlineData("1.0.123+0f3c1b2a9d4e5f60718293a4b5c6d7e8f9012345", "0f3c1b2a9d4e5f60718293a4b5c6d7e8f9012345")]
     [InlineData("1.0.123+abc1234.0f3c1b2a9d4e5f60718293a4b5c6d7e8f9012345", "0f3c1b2a9d4e5f60718293a4b5c6d7e8f9012345")]
     [InlineData("", null)]
@@ -86,7 +86,6 @@ public sealed class ReleaseIdentityTests : IDisposable
         Assert.Equal("api", doc.RootElement.GetProperty("service").GetString());
         Assert.Equal("Production", doc.RootElement.GetProperty("environment").GetString());
         Assert.Equal("abc1234abc1234abc1234abc1234abc1234abc123", doc.RootElement.GetProperty("sha").GetString());
-        // Railway-injected identity is null when the Railway env vars are absent (e.g. local/test).
         Assert.Equal(System.Text.Json.JsonValueKind.Null, doc.RootElement.GetProperty("deploymentId").ValueKind);
     }
 
@@ -106,7 +105,6 @@ public sealed class ReleaseIdentityTests : IDisposable
         Assert.Equal("svc-abc", doc.RootElement.GetProperty("railwayServiceId").GetString());
         Assert.Equal("env-xyz", doc.RootElement.GetProperty("railwayEnvironmentId").GetString());
         Assert.Equal("commitsha", doc.RootElement.GetProperty("railwayCommit").GetString());
-        // Distinct from the mutable display sha.
         Assert.NotEqual(doc.RootElement.GetProperty("sha").GetString(), doc.RootElement.GetProperty("deploymentId").GetString());
     }
 
@@ -120,6 +118,5 @@ public sealed class ReleaseIdentityTests : IDisposable
     }
 }
 
-/// <summary>Serialises the env-var-mutating tests so they do not race.</summary>
 [CollectionDefinition("ReleaseIdentity env", DisableParallelization = true)]
 public sealed class ReleaseIdentityEnvCollection;

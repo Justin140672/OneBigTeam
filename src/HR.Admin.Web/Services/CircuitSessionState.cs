@@ -13,8 +13,6 @@ public enum CircuitAuthStatus
     Uninitialized,
     Authenticated,
 
-    // Sticky: once Invalidated, this instance must never accept another token — only a genuinely
-    // new circuit (a brand-new CircuitSessionState instance via DI scoping) can authenticate again.
     Invalidated,
 }
 

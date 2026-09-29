@@ -2,13 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the HR Headcount Summary report
-/// (/companies/{companyId}/reporting/hr-headcount-summary — HrHeadcountSummaryReportPage.razor).
-/// Shows 5 summary stat cards (Total Headcount / Active Employees / Future Starters / Leavers /
-/// Total FTE) above a ReportFilterPanel (Department/Location/EmploymentType/Status — no
-/// PositionProfile or Manager filter) and a grid that supports drag-to-group (AllowGrouping="true").
-/// </summary>
 public sealed class HrHeadcountSummaryReportPage(IPage page, string baseUrl)
 {
     private const string RowsRenderedSelector = ".e-grid .e-row, .e-grid .e-emptyrow";
@@ -36,7 +29,6 @@ public sealed class HrHeadcountSummaryReportPage(IPage page, string baseUrl)
         return await page.Locator(".e-grid .e-row").CountAsync();
     }
 
-    // ── Summary stat cards ───────────────────────────────────────────────────────
 
     private ILocator StatCard(string label) =>
         page.Locator(".card").Filter(new() { HasText = label }).First;
@@ -58,7 +50,6 @@ public sealed class HrHeadcountSummaryReportPage(IPage page, string baseUrl)
         return decimal.TryParse(text?.Trim(), out var value) ? value : -1m;
     }
 
-    // ── Filter panel (ReportFilterPanel — Department/Location/EmploymentType/Status only) ──
 
     private ILocator FilterField(string labelText) =>
         page.Locator(".card-body .col-md-3").Filter(new() { HasText = labelText }).First;
@@ -80,7 +71,6 @@ public sealed class HrHeadcountSummaryReportPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 
-    // ── Export ─────────────────────────────────────────────────────────────────
 
     public async Task<IDownload> ExportAsync(string formatLabel)
     {

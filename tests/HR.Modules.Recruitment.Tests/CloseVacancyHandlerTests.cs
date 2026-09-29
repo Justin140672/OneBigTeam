@@ -155,7 +155,6 @@ public class CloseVacancyHandlerTests
         db.Vacancies.Add(vacancy);
         await db.SaveChangesAsync();
 
-        // No summaries dictionary supplied — simulates the linked profile no longer being resolvable.
         var auditPublisher = new FakeAuditPublisher();
 
         var result = await handler(db, auditPublisher).HandleAsync(

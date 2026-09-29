@@ -12,9 +12,9 @@ public class SubmitLeaveRequestValidatorTests
         CompanyId = Guid.NewGuid(),
         EmployeeId = Guid.NewGuid(),
         LeaveTypeId = Guid.NewGuid(),
-        StartDate = new DateOnly(2026, 8, 3),   // Monday
+        StartDate = new DateOnly(2026, 8, 3),
         StartPart = LeaveDayPart.FullDay,
-        EndDate = new DateOnly(2026, 8, 7),     // Friday
+        EndDate = new DateOnly(2026, 8, 7),
         EndPart = LeaveDayPart.FullDay,
         Reason = null
     };

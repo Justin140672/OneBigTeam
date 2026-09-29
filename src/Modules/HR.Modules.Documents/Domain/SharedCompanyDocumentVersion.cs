@@ -1,10 +1,5 @@
 namespace HR.Modules.Documents.Domain;
 
-/// <summary>
-/// A point-in-time record of one uploaded file for a <see cref="SharedCompanyDocument"/>. A row
-/// is written every time the document is created or its file is replaced, so "version history"
-/// is always a complete list (including the current version), not just past ones.
-/// </summary>
 internal sealed class SharedCompanyDocumentVersion : IScannableFile
 {
     private SharedCompanyDocumentVersion() { }
@@ -20,15 +15,9 @@ internal sealed class SharedCompanyDocumentVersion : IScannableFile
     public Guid CreatedBy { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
-    // Distinct from SharedCompanyDocument.RequiresAcknowledgement (the document-level, current
-    // setting) — this records whether THIS SPECIFIC version required (re-)acknowledgement at the
-    // time it was uploaded, for audit/history display.
     public string? VersionNote { get; private set; }
     public bool RequiresAcknowledgement { get; private set; }
 
-    // Snapshot of SharedCompanyDocument.EffectiveDate at the moment this version was created —
-    // like VersionNote/RequiresAcknowledgement above, this is point-in-time history, not a
-    // user-editable field of the version itself.
     public DateOnly? EffectiveDate { get; private set; }
 
     // Independent, point-in-time copy of the acknowledgement statement wording in effect when

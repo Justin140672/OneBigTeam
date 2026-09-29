@@ -6,13 +6,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Admin.Web.Tests;
 
-/// <summary>
-/// CodeQL #59 (cross-site scripting, flagged on the support request description): the admin
-/// SupportRequestDetails.razor renders a customer-submitted description via Razor text
-/// interpolation (<c>@_detail.Description</c>), which HTML-encodes, never via
-/// <see cref="MarkupString"/>. (Only the separately-sanitised response body uses MarkupString.)
-/// These tests pin the source invariant and prove the encoding behaviour without bUnit.
-/// </summary>
 public class SupportRequestDescriptionEncodingTests
 {
     private const string MaliciousDescription = "<script>alert(1)</script><img src=x onerror=alert(2)>\"'&";
@@ -74,7 +67,6 @@ public class SupportRequestDescriptionEncodingTests
         throw new InvalidOperationException("Could not locate the repository root from " + AppContext.BaseDirectory);
     }
 
-    /// <summary>Emits exactly what Razor compiles <c>&lt;p&gt;@_detail.Description&lt;/p&gt;</c> to.</summary>
     public sealed class DescriptionProbe : ComponentBase
     {
         [Parameter]

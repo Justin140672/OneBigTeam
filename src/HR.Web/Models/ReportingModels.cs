@@ -1,6 +1,5 @@
 namespace HR.Web.Models;
 
-// ── Catalog ───────────────────────────────────────────────────────────────────
 
 public record GetReportCatalogResponse(List<ReportCatalogItemModel> Items);
 
@@ -10,13 +9,6 @@ public record ReportCatalogItemModel(
     string Category,
     string Description);
 
-/// <summary>
-/// Catalog report id -> the route segment for its dedicated page under
-/// /companies/{companyId}/reporting/{route}. Shared between ReportCatalogPage (main catalog grid)
-/// and FavouriteReportsWidget/TeamReportsWidget (dashboard widgets) so the two never drift apart —
-/// see ReportCatalogPage's "phase 1 proved the permission-filtered pattern" comment for why some
-/// catalog entries have no route yet ("Coming soon").
-/// </summary>
 public static class ReportRoutes
 {
     public static readonly IReadOnlyDictionary<string, string> Map = new Dictionary<string, string>
@@ -50,7 +42,6 @@ public static class ReportRoutes
     public static string? RouteFor(string reportId) => Map.GetValueOrDefault(reportId);
 }
 
-// ── Employee Directory report ────────────────────────────────────────────────
 
 public record EmployeeDirectoryReportFilter(
     Guid? DepartmentId = null,
@@ -85,7 +76,6 @@ public record EmployeeDirectoryReportItemModel(
     string? WorkLocation,
     string Email);
 
-// ── Shared report filter criteria (Department/Location/PositionProfile/EmploymentType/DateRange) ──
 
 public record ReportFilterCriteriaModel(
     Guid? DepartmentId = null,
@@ -95,7 +85,6 @@ public record ReportFilterCriteriaModel(
     DateOnly? DateRangeStart = null,
     DateOnly? DateRangeEnd = null);
 
-// ── Employee Starter report ──────────────────────────────────────────────────
 
 public record EmployeeStarterReportFilter(
     Guid? DepartmentId = null,
@@ -125,7 +114,6 @@ public record EmployeeStarterReportItemModel(
     string? OnboardingStatus,
     string? ProbationStatus);
 
-// ── Employee Leaver report ───────────────────────────────────────────────────
 
 public record EmployeeLeaverReportFilter(
     Guid? DepartmentId = null,
@@ -154,7 +142,6 @@ public record EmployeeLeaverReportItemModel(
     string? OffboardingStatus,
     string AccountStatus);
 
-// ── Leave Summary report ─────────────────────────────────────────────────────
 
 public enum LeaveSummaryGroupBy
 {
@@ -180,7 +167,6 @@ public record LeaveSummaryGroupRowModel(
     decimal RemainingDays,
     int PendingRequestCount);
 
-// ── Leave Calendar report ────────────────────────────────────────────────────
 
 public record LeaveCalendarReportFilter(
     int Year,
@@ -199,7 +185,6 @@ public record LeaveCalendarReportRowModel(
     decimal DurationDays,
     string ApprovalStatus);
 
-// ── Sickness report ───────────────────────────────────────────────────────────
 
 public enum SicknessReportGroupBy
 {
@@ -221,7 +206,6 @@ public record SicknessReportGroupRowModel(
     decimal DaysAbsent,
     int BradfordScore);
 
-// ── Recruitment Pipeline report ─────────────────────────────────────────────
 
 public enum RecruitmentPipelineGroupBy
 {
@@ -247,7 +231,6 @@ public record RecruitmentPipelineReportRowModel(
     int Offers,
     int Hires);
 
-// ── Vacancy Performance report ──────────────────────────────────────────────
 
 public record VacancyPerformanceReportFilter(
     DateOnly? StartDate = null,
@@ -266,7 +249,6 @@ public record VacancyPerformanceReportRowModel(
     int OfferCount,
     DateOnly? HireDate);
 
-// ── Probation report ─────────────────────────────────────────────────────────
 
 public record GetProbationReportResponse(
     List<ProbationReportRowModel> Items,
@@ -285,7 +267,6 @@ public record ProbationReportRowModel(
     int DueReviews,
     int OverdueReviews);
 
-// ── Onboarding Progress report ───────────────────────────────────────────────
 
 public record OnboardingProgressReportFilter(bool OverdueOnly = false);
 
@@ -309,7 +290,6 @@ public record OnboardingReportTaskItemModel(
     string? Owner,
     bool IsOverdue);
 
-// ── Offboarding Progress report ──────────────────────────────────────────────
 
 public record GetOffboardingProgressReportResponse(
     List<OffboardingProgressReportRowModel> Items,
@@ -328,7 +308,6 @@ public record OffboardingProgressReportRowModel(
     bool DocumentsReturned,
     bool AssetsReturned);
 
-// ── Document Compliance report ───────────────────────────────────────────────
 
 public record DocumentComplianceReportFilter(Guid? PositionProfileId = null);
 
@@ -349,7 +328,6 @@ public record DocumentComplianceReportRowModel(
     int ExpiredCount,
     List<string> MissingDocumentTypeNames);
 
-// ── Company Document Acknowledgement report ──────────────────────────────────
 
 public record GetCompanyDocumentAcknowledgementReportResponse(
     List<CompanyDocumentAcknowledgementReportRowModel> Items,
@@ -364,7 +342,6 @@ public record CompanyDocumentAcknowledgementReportRowModel(
     bool Acknowledged,
     DateTimeOffset? AcknowledgedAt);
 
-// ── Asset Assignment report ──────────────────────────────────────────────────
 
 public record GetAssetAssignmentReportResponse(
     List<AssetAssignmentReportRowModel> Items,
@@ -378,7 +355,6 @@ public record AssetAssignmentReportRowModel(
     DateTimeOffset AssignedDate,
     string ReturnStatus);
 
-// ── Workload & HR Actions report ─────────────────────────────────────────────
 
 public enum WorkloadActionsGroupBy
 {
@@ -431,7 +407,6 @@ public record WorkloadActionSummaryModel(
     int DueToday,
     int DueThisWeek);
 
-// ── Recruitment Pipeline Summary report ─────────────────────────────────────
 
 // IsInternal (internal recruitment Ticket 6): null = all applications; true = internal only; false = external only.
 public record RecruitmentPipelineSummaryReportFilter(bool IncludeClosed = false, bool? IsInternal = null);
@@ -452,7 +427,6 @@ public record RecruitmentPipelineSummaryRowModel(
     int CandidateCount,
     Dictionary<Guid, int> CandidatesByStage);
 
-// ── HR Headcount Summary report ──────────────────────────────────────────────
 
 public record HrHeadcountSummaryReportFilter(
     Guid? DepartmentId = null,
@@ -480,11 +454,7 @@ public record HrHeadcountSummaryReportItemModel(
     DateOnly? LeavingDate,
     decimal? Fte);
 
-// ── ADM-08 Governance reporting hub ─────────────────────────────────────────
 
-// Shared shape for the three governance audit reports: User Activity,
-// Administrative Changes and Security Events. Each has an identical paged GET
-// and a Csv/Excel/Pdf export at the same path + "/export".
 public record GovernanceAuditReportFilter(
     Guid? ActorUserId = null,
     string? EventType = null,
@@ -539,11 +509,9 @@ public record GovernanceComplianceStatusRowModel(
     DateOnly? DueDate,
     string Severity);
 
-// ── Favourites ────────────────────────────────────────────────────────────────
 
 public record GetReportFavouritesResponse(List<string> ReportIds);
 
-// ── Saved Report Views ───────────────────────────────────────────────────────
 
 public record SavedReportViewModel(
     Guid Id,

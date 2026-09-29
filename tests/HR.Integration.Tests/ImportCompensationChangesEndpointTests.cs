@@ -36,11 +36,6 @@ public class ImportCompensationChangesEndpointTests
     [Fact]
     public async Task Post_Import_Returns_UnprocessableEntity_For_Wrong_File_Extension()
     {
-        // File extension/content-type checks live in ImportCompensationChangesValidator
-        // (FluentValidation), not the handler's InvalidFile path — this codebase's established
-        // convention is that FastEndpoints validator failures return 422, not 400 (Program.cs —
-        // c.Errors.StatusCode = 422; see also CreateAssetCategoryEndpointTests for the equivalent
-        // convention on another endpoint).
         var companyId = Guid.NewGuid();
         using var client = await AdminClient(companyId);
 
@@ -65,7 +60,6 @@ public class ImportCompensationChangesEndpointTests
 
         var (_, employeeNumber) = await CompensationTestHelpers.CreateEmployeeWithNumberAsync(client, companyId);
 
-        // New Salary is not a positive number.
         var upload = BuildUpload(companyId, BuildWorkbookBytes((employeeNumber, "not-a-number", "Annual", "2027-01-01", "NewHire", null)));
 
         var response = await client.PostAsync($"/api/companies/{companyId}/compensation/import", upload);
@@ -85,8 +79,6 @@ public class ImportCompensationChangesEndpointTests
 
         var (employeeId, employeeNumber) = await CompensationTestHelpers.CreateEmployeeWithNumberAsync(client, companyId);
 
-        // Salary Frequency is reference-only on import — the row's frequency is inherited from the
-        // employee's existing open compensation record, so one must be seeded first.
         var initial = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees/{employeeId}/compensation", new
         {
             companyId,

@@ -46,15 +46,6 @@ builder.Host.UseSerilogWithDefaults();
 var connectionString = builder.Configuration.GetConnectionString("hr")
 	?? throw new InvalidOperationException("Connection string 'hr' was not found.");
 
-// Npgsql's own defaults (Maximum Pool Size=100, Minimum Pool Size=0) mean the pool starts cold and
-// grows lazily under load, then caps out at 100 real connections shared across every module's
-// DbContext (they all use this same connection string, so Npgsql pools them together). Under this
-// suite's concurrent E2E load that shared pool is one of several plausible contributors to the
-// "shared Aspire-hosted app gets busy" timeouts already documented throughout the E2E test
-// infrastructure (see E2ETestBase's own remarks) — raised here to rule it out / relieve it as a
-// bottleneck: a higher ceiling and a small warm floor so connections don't need to be established
-// from scratch on every burst. Harmless for a normal single-app-instance deployment against its own
-// dedicated Postgres — this isn't shared across unrelated services.
 var isE2ETestingRun = string.Equals(
 	Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
 
@@ -68,16 +59,10 @@ if (isE2ETestingRun && !builder.Environment.IsDevelopment())
 		$"E2E_TESTING=true is not permitted in the '{builder.Environment.EnvironmentName}' environment. "
 		+ "Test authentication is only allowed under Development. Refusing to start.");
 }
-// Under the E2E run this one api instance is shared across up to 15 concurrent Playwright circuits,
-// so give the pool a higher ceiling and a warmer floor (the AppHost lifts Postgres' own
-// max_connections to 500 to stay clear of this). A normal deployment keeps the more conservative
-// 300/10 — plenty for a single app against its own dedicated Postgres.
 connectionString += isE2ETestingRun
 	? ";Maximum Pool Size=400;Minimum Pool Size=30"
 	: ";Maximum Pool Size=300;Minimum Pool Size=10";
 
-// Security: DevTools provides anonymous minting of access tokens and persona switching for
-// local development. Fail fast if attempted to enable in non-Development environments.
 var devToolsOptions = new DevToolsOptions();
 builder.Configuration.GetSection(DevToolsOptions.SectionName).Bind(devToolsOptions);
 if (devToolsOptions.Enabled && !builder.Environment.IsDevelopment())
@@ -87,8 +72,6 @@ if (devToolsOptions.Enabled && !builder.Environment.IsDevelopment())
 		+ "Development tools are only allowed under Development. Refusing to start.");
 }
 
-// The Identity dev endpoints (DevActivateCompany / DevEnsureEmployeeLogin) read IOptions<DevToolsOptions>,
-// which must be bound to the same "DevTools" section or they always see Enabled=false and 404.
 builder.Services.Configure<DevToolsOptions>(builder.Configuration.GetSection(DevToolsOptions.SectionName));
 
 builder.Services.AddCompaniesModule(connectionString, builder.Configuration);
@@ -123,16 +106,9 @@ builder.Services.AddSingleton<HR.SharedKernel.Idempotency.IPostCommitFaultInject
     HR.SharedKernel.Idempotency.NoOpPostCommitFaultInjector>();
 builder.Services.AddScoped<IIntegrationEventPublisher, IntegrationEventPublisher>();
 
-// Lightweight abuse protection for the public marketing contact form (POST /api/contact below) —
-// no external captcha service exists in this codebase, so a simple per-IP fixed window limiter is
-// used instead. Keeps this endpoint from being used to spam the configured recipient inbox or hammer
-// the Postmark API.
 builder.Services.AddRateLimiter(options =>
 {
 	options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-	// Window/PermitLimit are configurable (not just hardcoded) so integration tests can widen them —
-	// ContactEndpointTests exercises many validation cases per class run against one in-memory
-	// TestServer, all sharing a single per-IP partition; production defaults are unchanged.
 	var contactFormRateLimitWindowMinutes = builder.Configuration.GetValue("Marketing:ContactForm:RateLimit:WindowMinutes", 5);
 	var contactFormRateLimitPermitLimit = builder.Configuration.GetValue("Marketing:ContactForm:RateLimit:PermitLimit", 5);
 	options.AddPolicy(RateLimitRejectionLogging.ContactFormPolicy, context =>
@@ -145,10 +121,6 @@ builder.Services.AddRateLimiter(options =>
 				QueueLimit = 0,
 			}));
 
-	// P1: abuse protection for the anonymous identity endpoints (Login, Sign-up, Forgot password,
-	// Resend verification, Accept invitation, Reset password) — see
-	// HR.Api.RateLimiting.IdentityRateLimiting for the full design (layered per-IP + per-identity
-	// limiters, keyed-hash partition keys, configurable windows/limits).
 	options.AddIdentityRateLimiting(builder.Configuration);
 });
 
@@ -177,19 +149,6 @@ if (builder.Environment.IsDevelopment())
 	builder.Services.AddSingleton<DevPersonaStore>();
 }
 
-// Supabase-backed authentication for all environments. Development previously fell back to a
-// DevAuthHandler dev-persona auto-login bypass; that has been removed — Development now always
-// authenticates through real Supabase, same as production (see the "Switch development to real
-// Supabase auth" plan). The dev persona switcher in HR.Web still exists, but it now performs a
-// real Supabase password-grant login (see /api/dev/persona/{userId} below) rather than flipping
-// an in-memory claims pointer.
-// P1 "Login as Customer": a support-session request authenticates with a distinctly-signed,
-// distinctly-issued token (see SupportSessionJwtBearerConfiguration / HR.Infrastructure's
-// SupportSessionTokenIssuer), never a real Supabase-issued token. A policy scheme picks the right
-// JwtBearer handler per request by cheaply peeking the token's unvalidated "iss" claim; the
-// selected handler still performs full signature/issuer/audience/lifetime validation. This keeps
-// the real Supabase validation path (ConfigureSupabaseJwtBearer) completely unchanged for every
-// other request — support-session tokens are the only thing ever routed to the second scheme.
 const string AuthenticationSelectorScheme = "BearerOrSupportSession";
 
 builder.Services
@@ -235,7 +194,6 @@ builder.Services
 	.AddAuthorizationBuilder()
 	.AddRolePolicies();
 
-// A required migration failure must make the instance NOT ready (see StartupMigrationRunner).
 builder.Services.AddSingleton<StartupMigrationRunner>();
 // E2E-only diagnostic (no-ops outside E2E_TESTING) — see ThreadPoolDiagnosticsService's remarks.
 builder.Services.AddHostedService<ThreadPoolDiagnosticsService>();
@@ -249,17 +207,6 @@ var app = builder.Build();
 
 var migrationRunner = app.Services.GetRequiredService<StartupMigrationRunner>();
 
-// Required migrations + seeding, run in dependency order. Each step is awaited in sequence; a
-// failure records the affected module and (below) prevents the normal request pipeline and the
-// Hangfire recurring job registration from being wired up.
-// (Health key stays "companies": it is part of the /health/startup-migrations payload contract.)
-// The core application startup (Companies migration + seed + Platform migration) is orchestrated by
-// CompaniesModule.MigrateAndSeedCoreApplicationAsync(), which enforces the mandatory ordering:
-// Companies must run before Platform (Platform migration has FK to companies.companies and
-// copies data from companies.platform_settings and companies.platform_metrics_snapshots).
-// Integration tests call the same orchestration method to ensure consistency.
-// The orchestration is the single source of truth: changing the order inside it will be reflected
-// in both Program.cs and integration tests automatically.
 await migrationRunner.RunAsync("companies", app.Services, async sp =>
 {
 	await sp.MigrateAndSeedCoreApplicationAsync();
@@ -288,10 +235,7 @@ await migrationRunner.RunAsync("employees", app.Services, async sp =>
 await migrationRunner.RunAsync("identity", app.Services, async sp =>
 {
 	await sp.MigrateIdentityAsync();
-	// Bootstrap PlatformAdministrator rows from the PlatformAdmin:AllowedEmails config allow-list.
-	// Runs in every environment (the allow-list itself is configured per-environment). Idempotent.
 	await sp.SeedPlatformAdministratorsFromConfigAsync(app.Configuration);
-	// IAM-03: idempotent, additive-only backfill of position-based role assignments.
 	await sp.ReconcilePositionRoleAssignmentsAsync();
 	if (app.Environment.IsDevelopment())
 	{
@@ -333,9 +277,6 @@ await migrationRunner.RunAsync("notifications", app.Services, async sp =>
 {
 	await sp.MigrateNotificationsAsync();
 	await sp.SeedNotificationsAsync();
-	// E2E-only: deterministic pool of operational alerts for HR.Admin.Web's /operational-alerts
-	// Playwright coverage (system-generated, no create UI). Same E2E_TESTING gate as the
-	// Employees arrange-data pool above.
 	if (string.Equals(Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase))
 	{
 		await sp.SeedE2eOperationalAlertsAsync();
@@ -353,8 +294,6 @@ await migrationRunner.RunAsync("onboarding", app.Services, async sp =>
 	await sp.MigrateOnboardingAsync();
 	if (string.Equals(Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase))
 	{
-		// E2E-only: every E2E arrange-data pool employee gets a NotStarted onboarding plan + the
-		// 3 default checklist tasks. All Acme, StartDate 2026-03-01.
 		var acmeCompanyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 		var onboardingPoolStart = new DateOnly(2026, 3, 1);
 		await sp.SeedE2eOnboardingPlansAsync(
@@ -433,19 +372,9 @@ if (!app.Environment.IsDevelopment())
 
 if (app.Environment.IsDevelopment() && devToolsOptions.Enabled)
 {
-	// AllPersonas (seeded catalog + runtime-registered self-service signups), not the static
-	// Personas field alone — the login form's persona lookup (Login.razor) needs to find a
-	// brand-new signup admin registered via /api/dev/persona/register, which only ever lands in
-	// the instance's _registeredPersonas list, never in the static seeded catalog.
 	app.MapGet("/api/dev/personas", (DevPersonaStore store) => store.AllPersonas.ToList()).AllowAnonymous();
 	app.MapPost("/api/dev/persona/{userId}", async (string userId, DevPersonaStore store, IServiceProvider services) =>
 	{
-		// The dev persona switcher is the only real "sign-in" path in this codebase today (see
-		// HR.Modules.Identity.IdentityModule.TryDevSignInAsync remarks) — this is where the
-		// IsActive gate (ticket #88) and LastLoginAt recording (ticket #89) are wired in. After the
-		// gate passes, a real Supabase password-grant login is performed for that persona's email
-		// so HR.Web can establish a genuine Supabase session cookie (see the "Switch development to
-		// real Supabase auth" plan).
 		if (!Guid.TryParse(userId, out var userGuid))
 			return Results.NoContent();
 
@@ -466,12 +395,6 @@ if (app.Environment.IsDevelopment() && devToolsOptions.Enabled)
 		});
 	}).AllowAnonymous();
 
-	// Establishes a dev-stub session for a brand-new self-service signup admin (HR.Modules.Identity's
-	// SignUp feature returns exactly these fields). Identity cannot reference DevPersonaStore itself
-	// (it lives in HR.Api, the host) — the client (marketing StartTrial page / HR.Web) calls this
-	// immediately after a successful signup. The new admin is also seeded as a real Supabase dev
-	// user and logged in via password grant, so the "auto-login after signup" UX keeps working under
-	// real Supabase auth.
 	app.MapPost("/api/dev/persona/register", async (
 		RegisterDevPersonaRequest request, DevPersonaStore store, IServiceProvider services) =>
 	{
@@ -494,9 +417,6 @@ if (app.Environment.IsDevelopment() && devToolsOptions.Enabled)
 		});
 	}).AllowAnonymous();
 
-	// Dev-only delivery for the Local*StorageService temp-directory fallbacks. Serves a file only for a
-	// short-lived HMAC-signed URL minted after the normal authorised download handler ran, and only
-	// while the owning module re-confirms the record is live and Clean. See DevLocalStorageDeliveryEndpoint.
 	app.MapDevLocalStorageDelivery();
 }
 
@@ -537,20 +457,12 @@ app.Use(async (context, next) =>
 	}
 });
 
-// Trusted-proxy-only forwarded-header resolution (see IdentityRateLimiting.ConfigureTrustedProxies)
-// must run before routing/rate limiting so RemoteIpAddress is already the real client IP by the
-// time the identity rate-limit policies partition on it.
 app.UseForwardedHeaders();
-// Security: enforce loopback-only access to /api/dev/* endpoints when DevTools is enabled.
-// Must run after ForwardedHeaders (so RemoteIpAddress is correct) but before routing.
 if (app.Environment.IsDevelopment() && devToolsOptions.Enabled)
 {
 	app.UseLoopbackOnlyForDevTools();
 }
 app.UseRouting();
-// Buffers+parses the (small, already-to-be-validated) request body for exactly the six identity
-// POST routes to extract a normalized email/token for the keyed rate-limit partition — must run
-// before UseRateLimiter, which reads HttpContext.Items[IdentityRateLimiting.SecondaryKeyItemKey].
 app.Use(IdentityRateLimiting.ExtractSecondaryRateLimitKeyAsync);
 app.UseRateLimiter();
 app.UseAuthentication();
@@ -612,8 +524,6 @@ app.MapPost("/api/contact", async (
 	}
 	catch (Exception ex)
 	{
-		// Never log the message body, email address, or other submitted PII — only the outcome and
-		// exception type, per the coding standards' logging rules.
 		logger.LogError(ex, "Contact form submission failed: {ErrorType}", ex.GetType().Name);
 		return Results.Problem("We couldn't send your message. Please try again shortly.", statusCode: StatusCodes.Status502BadGateway);
 	}
@@ -677,9 +587,6 @@ public partial class Program;
 
 internal sealed record RegisterDevPersonaRequest(Guid UserId, Guid CompanyId, string FirstName, string LastName, string Email);
 
-// "Website" is the honeypot field — must stay named plausibly enough that a scripted bot fills it,
-// while a real visitor never sees or fills it (hidden via CSS in Contact.razor, not via type="hidden",
-// so autofill/accessibility tooling still treats it as a normal-looking field bots target).
 internal sealed record ContactRequest(
 	string Name,
 	string Email,

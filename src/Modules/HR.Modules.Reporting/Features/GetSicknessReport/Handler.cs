@@ -49,11 +49,6 @@ internal sealed class GetSicknessReportHandler(
         return Result.Success(new GetSicknessReportResponse(rows, totalCount, isTruncated));
     }
 
-    /// <summary>
-    /// Bradford Factor = S^2 * D (S = separate absence spells, D = total days absent), evaluated
-    /// over the report's own requested date range — see the comment on SicknessReportGroupRow for
-    /// why there is no separately-enforced rolling window.
-    /// </summary>
     private static SicknessReportGroupRow BuildRow(string groupKey, string groupLabel, int absenceCount, decimal daysAbsent)
     {
         var bradfordScore = (int)(absenceCount * absenceCount * daysAbsent);

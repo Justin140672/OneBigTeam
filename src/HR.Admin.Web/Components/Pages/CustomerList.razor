@@ -68,9 +68,6 @@ else
         _loading = false;
     }
 
-    // Debounced so every keystroke doesn't trigger a round trip to the API — matches the
-    // "search by name/email/company id" acceptance criterion without hammering the server on
-    // large lists.
     private async Task OnSearchChanged(string? value)
     {
         _searchTerm = value;

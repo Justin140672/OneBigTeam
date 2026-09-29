@@ -27,11 +27,6 @@ public sealed record ExecutionContextInfo(
     AuditActorType ActorType,
     ExecutionOrigin Origin) : IExecutionContext
 {
-    /// <summary>
-    /// Builds the context for a brand-new workflow root (e.g. a fresh HTTP request or a scheduled
-    /// job tick with no prior correlation) — CorrelationId is the string form of a newly minted
-    /// MessageId and CausationId is null, since nothing caused this message.
-    /// </summary>
     public static ExecutionContextInfo NewRoot(
         ExecutionOrigin origin,
         string? traceId = null,
@@ -43,10 +38,6 @@ public sealed record ExecutionContextInfo(
         return new ExecutionContextInfo(id.ToString("D"), id, null, traceId, actorUserId, actorEmployeeId, actorType, origin);
     }
 
-    /// <summary>
-    /// Builds the context for a message caused by <paramref name="parent"/>: preserves the parent's
-    /// CorrelationId, sets CausationId to the parent's MessageId, and mints a new MessageId.
-    /// </summary>
     public static ExecutionContextInfo CausedBy(
         IExecutionContext parent,
         ExecutionOrigin origin,
@@ -64,14 +55,6 @@ public sealed record ExecutionContextInfo(
             origin);
     }
 
-    /// <summary>
-    /// Restores a persisted/durable context (e.g. from a stored outbox row or a durable operation
-    /// record) after a process restart or on a background retry — reuses the recorded
-    /// correlation/causation/message ids rather than inventing new ones, so a retry of the same
-    /// logical message keeps its identity. Durable Guid-typed correlation columns pass their value's
-    /// string form here (see <see cref="CorrelationIdGuid.Derive"/> for the inverse mapping used when
-    /// persisting).
-    /// </summary>
     public static ExecutionContextInfo Restore(
         string correlationId,
         Guid messageId,
@@ -83,11 +66,6 @@ public sealed record ExecutionContextInfo(
         string? traceId = null) =>
         new(correlationId, messageId, causationId, traceId, actorUserId, actorEmployeeId, actorType, origin);
 
-    /// <summary>
-    /// Builds the context for a newly generated recovery/reconciliation action: preserves the
-    /// workflow correlation id but mints a new message id and records the recovered
-    /// operation/message as its cause.
-    /// </summary>
     public static ExecutionContextInfo Recovered(string correlationId, Guid recoveredOperationMessageId) =>
         new(correlationId, Guid.NewGuid(), recoveredOperationMessageId, null, null, null,
             AuditActorType.IntegrationHandler, ExecutionOrigin.ReconciliationJob);

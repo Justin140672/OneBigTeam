@@ -64,8 +64,6 @@ internal sealed class ExternalRecruiter : HR.SharedKernel.IVersionedAggregate
         UpdatedAt        = now;
     }
 
-    // Deactivating never deletes the row: historical assignments/activity referencing this recruiter
-    // must remain resolvable.
     public void SetActiveStatus(bool isActive, DateTimeOffset now)
     {
         IsActive  = isActive;

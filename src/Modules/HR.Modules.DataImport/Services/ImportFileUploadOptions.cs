@@ -2,7 +2,7 @@ namespace HR.Modules.DataImport.Services;
 
 internal sealed class ImportFileUploadOptions
 {
-    public long MaxFileSizeBytes { get; set; } = 10 * 1024 * 1024; // 10 MB
+    public long MaxFileSizeBytes { get; set; } = 10 * 1024 * 1024;
 
     public List<string> AllowedExtensions { get; set; } =
     [

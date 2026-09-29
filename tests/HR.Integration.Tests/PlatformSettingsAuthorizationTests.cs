@@ -5,16 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// SEC-002 regression coverage: the "platform:admin" FastEndpoints policy on GetPlatformSettings /
-/// UpdatePlatformSettings used to be RequireAuthenticatedUser() only, so any authenticated caller
-/// of any tenant/role could read or mutate global platform settings. It is now backed by
-/// PlatformAdminAuthorizationHandler, which succeeds only for a caller matching an enabled
-/// identity.platform_administrators row (by SupabaseAuthUserId or, as a fallback, by email). This
-/// covers the full authorization matrix for both endpoints: anonymous, authenticated-but-not-an-
-/// admin (across several roles), a disabled (revoked) administrator, and an enabled administrator
-/// matched via each of the two lookup paths.
-/// </summary>
 [Collection("Integration")]
 public class PlatformSettingsAuthorizationTests
 {
@@ -151,9 +141,6 @@ public class PlatformSettingsAuthorizationTests
     [MemberData(nameof(Endpoints))]
     public async Task Succeeds_For_Enabled_PlatformAdministrator_Matched_By_Email_Fallback(HttpMethod method)
     {
-        // No SupabaseAuthUserId link on the seeded row — only the (case-insensitively matched)
-        // email connects this caller to the PlatformAdministrator row, exercising
-        // PlatformAdminAuthorizationHandler's fallback lookup path.
         var email = $"fallback-admin-{Guid.NewGuid():N}@test.example";
         await PlatformAdministratorTestHelpers.SeedAdministratorAsync(
             _factory,

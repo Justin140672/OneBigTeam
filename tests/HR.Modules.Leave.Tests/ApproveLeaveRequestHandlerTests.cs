@@ -30,11 +30,6 @@ public class ApproveLeaveRequestHandlerTests
             new DateOnly(2026, 8, 7), LeaveDayPart.FullDay,
             5m, "Holiday", now);
 
-    /// <summary>
-    /// Creates a pending leave request together with a matching HasBalance == false LeaveType, so
-    /// tests that only care about approval mechanics (audit/notification/event publication) do not
-    /// need to also set up a LeaveBalance row to reach a successful approval.
-    /// </summary>
     private static async Task<LeaveRequest> CreatePendingRequestWithNonBalanceTypeAsync(
         LeaveDbContext context, Guid companyId, Guid employeeId, DateTimeOffset now)
     {
@@ -297,9 +292,6 @@ public class ApproveLeaveRequestHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_Validation_Error_When_No_Balance_Record_Exists_And_LeaveType_Not_Found()
     {
-        // Legacy/orphaned leave requests whose LeaveType row no longer exists are treated as
-        // "unknown" and fall into the balance-tracked branch (leaveType is null); with no balance
-        // row present, approval must fail rather than silently approving without deduction.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -469,7 +461,7 @@ public class ApproveLeaveRequestHandlerTests
 
         var savedBalance = await context.LeaveBalances.SingleAsync();
         Assert.Equal(3m, savedBalance.UsedDays);
-        Assert.Equal(2m, savedBalance.RemainingDays); // 0 entitlement + 5 adjustment - 3 used
+        Assert.Equal(2m, savedBalance.RemainingDays);
     }
 
     [Fact]
@@ -483,7 +475,6 @@ public class ApproveLeaveRequestHandlerTests
         var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "TOIL", "TOIL", 0,
             AccrualMethod.None, LeaveTypeBehaviour.Toil, now);
 
-        // TOIL earned in 2025, leave taken in 2026 — different policy years
         var leaveRequest = LeaveRequest.Create(
             Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(),
             new DateOnly(2026, 1, 5), LeaveDayPart.FullDay,
@@ -510,7 +501,7 @@ public class ApproveLeaveRequestHandlerTests
 
         var savedBalance = await context.LeaveBalances.SingleAsync();
         Assert.Equal(3m, savedBalance.UsedDays);
-        Assert.Equal(1m, savedBalance.RemainingDays); // deducted from 2025 balance despite 2026 leave dates
+        Assert.Equal(1m, savedBalance.RemainingDays);
     }
 
     [Fact]
@@ -555,8 +546,8 @@ public class ApproveLeaveRequestHandlerTests
 
         var saved2025 = await context.LeaveBalances.SingleAsync(b => b.PolicyYear == 2025);
         var saved2026 = await context.LeaveBalances.SingleAsync(b => b.PolicyYear == 2026);
-        Assert.Equal(1m, saved2025.UsedDays);  // deducted from the older balance
-        Assert.Equal(0m, saved2026.UsedDays);  // 2026 balance untouched
+        Assert.Equal(1m, saved2025.UsedDays);
+        Assert.Equal(0m, saved2026.UsedDays);
     }
 
     [Fact]
@@ -687,7 +678,7 @@ public class ApproveLeaveRequestHandlerTests
         Assert.Equal(LeaveRequestStatus.Approved, saved.Status);
         var savedBalance = await context.LeaveBalances.SingleAsync();
         Assert.Equal(3m, savedBalance.UsedDays);
-        Assert.Equal(-2m, savedBalance.RemainingDays); // 0 entitlement + 1 adjustment - 3 used
+        Assert.Equal(-2m, savedBalance.RemainingDays);
     }
 
     [Fact]
@@ -781,12 +772,6 @@ public class ApproveLeaveRequestHandlerTests
     [Fact]
     public async Task HandleAsync_Second_Sequential_Approval_Fails_When_Combined_Requests_Exceed_Balance()
     {
-        // Regression for the original P2 report: submission only checks availability at the moment
-        // a request is created - a pending request does not reserve leave - so two individually
-        // valid pending requests could previously both be approved, driving the balance negative
-        // under a policy that forbids it. Each approval below uses its own DbContext instance
-        // (a fresh "request") against the same underlying store, as two separate approval calls
-        // against the same employee/balance would in production.
         var dbName = Guid.NewGuid().ToString("N");
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -865,7 +850,7 @@ public class ApproveLeaveRequestHandlerTests
             Assert.Null(savedRequestTwo.ReviewedByEmployeeId);
 
             var savedBalance = await verifyContext.LeaveBalances.SingleAsync();
-            Assert.Equal(5m, savedBalance.UsedDays);   // only the first approval's usage
+            Assert.Equal(5m, savedBalance.UsedDays);
             Assert.Equal(0m, savedBalance.RemainingDays);
         }
 
@@ -963,7 +948,7 @@ public class ApproveLeaveRequestHandlerTests
 
         var savedBalance = await context.LeaveBalances.SingleAsync();
         Assert.Equal(5m, savedBalance.UsedDays);
-        Assert.Equal(0m, savedBalance.RemainingDays); // 3 entitlement + 2 adjustment - 5 used
+        Assert.Equal(0m, savedBalance.RemainingDays);
     }
 
     [Fact]
@@ -1050,9 +1035,6 @@ public class ApproveLeaveRequestHandlerTests
         Assert.True(firstResult.IsSuccess);
         Assert.Equal("Approved", firstResult.Value!.Status);
 
-        // Same key, same request payload, submitted again against the now-Approved leave request —
-        // must replay the first call's success response, not fail with
-        // "Cannot approve a leave request with status 'Approved'.".
         var secondResult = await handler.HandleAsync(request, CancellationToken.None);
 
         Assert.True(secondResult.IsSuccess);
@@ -1060,7 +1042,6 @@ public class ApproveLeaveRequestHandlerTests
         Assert.Equal(firstResult.Value.ReviewedAt, secondResult.Value.ReviewedAt);
         Assert.Equal(firstResult.Value.ReviewedByEmployeeId, secondResult.Value.ReviewedByEmployeeId);
 
-        // Only one approval's worth of effects actually ran — balance/status mutated exactly once.
         var saved = await context.LeaveRequests.SingleAsync();
         Assert.Equal(LeaveRequestStatus.Approved, saved.Status);
     }
@@ -1068,9 +1049,6 @@ public class ApproveLeaveRequestHandlerTests
     [Fact]
     public async Task HandleAsync_With_Different_IdempotencyKey_Still_Fails_On_Already_Approved_Status()
     {
-        // Negated branch of the above: a DIFFERENT key against an already-Approved request must
-        // still hit the ordinary validation failure — replay only short-circuits on an exact repeat
-        // key, never as a general "already approved is fine" bypass.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();

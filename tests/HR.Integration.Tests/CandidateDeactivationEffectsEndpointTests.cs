@@ -8,12 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Covers the downstream effects of candidate deactivation on ListCandidates and CreateApplication —
-/// i.e. that an inactive candidate drops out of the default candidate list and can no longer be added
-/// to a new application. See DeactivateCandidateEndpointTests/ReactivateCandidateEndpointTests for the
-/// deactivate/reactivate endpoints themselves.
-/// </summary>
 [Collection("Integration")]
 public class CandidateDeactivationEffectsEndpointTests
 {

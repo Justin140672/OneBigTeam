@@ -233,8 +233,6 @@ public class OnboardingReminderJobTests
 
         var notifications = new FakeNotificationWriter();
 
-        // Run twice against the same writer — the second run must see the existing
-        // notification via ExistsAsync and skip re-sending it.
         await BuildJob(dbContext, notifications, managerId).ExecuteAsync();
         await BuildJob(dbContext, notifications, managerId).ExecuteAsync();
 

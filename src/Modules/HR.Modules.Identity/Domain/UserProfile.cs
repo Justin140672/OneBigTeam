@@ -58,11 +58,6 @@ internal sealed class UserProfile
         UpdatedAt = now;
     }
 
-    /// <summary>
-    /// Development-only self-heal: corrects a UserProfile row seeded with a stale/wrong
-    /// SupabaseAuthUserId (e.g. from an earlier buggy seeding run) so it matches the "sub" claim
-    /// actually issued on dev-persona tokens going forward. See IdentityModule.SeedDevSupabaseUsersAsync.
-    /// </summary>
     public void UpdateSupabaseAuthUserId(Guid supabaseAuthUserId, DateTimeOffset now)
     {
         SupabaseAuthUserId = supabaseAuthUserId;

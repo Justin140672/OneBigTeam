@@ -235,8 +235,6 @@ public class OffboardingReminderJobTests
 
         var notifications = new FakeNotificationWriter();
 
-        // Run twice against the same writer — the second run must see the existing
-        // notification via ExistsAsync and skip re-sending it.
         await BuildJob(dbContext, notifications, managerId).ExecuteAsync();
         await BuildJob(dbContext, notifications, managerId).ExecuteAsync();
 
@@ -273,11 +271,6 @@ public class OffboardingReminderJobTests
     [Fact]
     public async Task ExecuteAsync_Resolves_Overdue_Boundary_Per_Company_Timezone()
     {
-        // At 2026-07-11T23:30:00Z the UTC day is still Jul 11. Company A is in a fixed UTC+12 zone
-        // so its local day is already Jul 12 — a task due Jul 12 is therefore NOT yet overdue there.
-        // Company B stays on UTC, so for it Jul 12 is still in the future too — but a task due Jul
-        // 11 (already past in both zones) IS overdue for company B while being not-yet-due if it
-        // were UTC+12. This proves each company's own timezone drives its own "today".
         var fixedUtcNow = new DateTime(2026, 7, 11, 23, 30, 0, DateTimeKind.Utc);
 
         await using var dbContext = BuildContext();
@@ -285,13 +278,11 @@ public class OffboardingReminderJobTests
         var companyIdAheadOfUtc = Guid.NewGuid();
         var employeeIdAhead = Guid.NewGuid();
         var planAhead = SeedPlan(dbContext, companyIdAheadOfUtc, employeeIdAhead);
-        // Local day for this company is already Jul 12, so a task due Jul 11 (yesterday locally) is overdue.
         var taskAhead = SeedTask(dbContext, companyIdAheadOfUtc, planAhead.Id, OffboardingTaskAssignTo.Employee, new DateOnly(2026, 7, 11), "Ahead task");
 
         var companyIdUtc = Guid.NewGuid();
         var employeeIdUtc = Guid.NewGuid();
         var planUtc = SeedPlan(dbContext, companyIdUtc, employeeIdUtc);
-        // Local day for this company is still Jul 11, so a task due Jul 11 (today) is NOT yet overdue.
         SeedTask(dbContext, companyIdUtc, planUtc.Id, OffboardingTaskAssignTo.Employee, new DateOnly(2026, 7, 11), "UTC task");
 
         await dbContext.SaveChangesAsync();

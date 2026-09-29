@@ -2,11 +2,6 @@ using HR.Infrastructure.Persistence;
 
 namespace HR.Architecture.Tests;
 
-/// <summary>
-/// NFR-01: direct coverage of <see cref="AuditPayloadRedactionGuard"/> — the runtime guard that
-/// rejects an audit payload containing either a prohibited field name or a sensitive-looking value.
-/// (The assembly-wide sweep of every IAuditEvent implementation lives in AuditPayloadRedactionTests.)
-/// </summary>
 public class AuditPayloadRedactionValueTests
 {
     [Fact]

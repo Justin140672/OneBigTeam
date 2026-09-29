@@ -147,8 +147,6 @@ internal sealed class CloseSicknessRecordHandler(
                 now);
         }
 
-        // Built from in-memory values ahead of the save, so it can double as both the response
-        // and the payload persisted for an idempotency replay.
         var response = new CloseSicknessRecordResponse(
             record.Id,
             record.CompanyId,
@@ -174,9 +172,6 @@ internal sealed class CloseSicknessRecordHandler(
 
             if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
             {
-                // Lost a race against a concurrent duplicate under the same key. SaveIdempotentAsync
-                // already rolled back this attempt's transaction - nothing here was committed, so
-                // skip the rest of this handler's side effects and hand back the winner's result.
                 return Result.Success(outcome.Response!);
             }
         }
@@ -185,10 +180,6 @@ internal sealed class CloseSicknessRecordHandler(
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        // One-time evaluation at close time (SICK-01) — an absence that already reached the
-        // fit-note threshold by the time it was closed (including one closed before the daily
-        // FitNoteRequestJob last ran) gets its evidence request immediately rather than waiting for
-        // the next job run.
         await fitNoteEvidenceRequestService.RequestIfEligibleAsync(
             record, sicknessSettings.FitNoteRequiredAfterDays, request.EndDate, now, cancellationToken,
             evaluationDateIsFinal: true);

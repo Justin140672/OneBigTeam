@@ -1,9 +1,5 @@
 namespace HR.Admin.Web.Models;
 
-// Mirrors HR.Modules.Support.Features.{ListSupportRequests,GetSupportRequest,UpdateSupportRequestStatus}
-// response shapes exactly — same "app-local DTO matching the API contract" convention as
-// CustomerDetailsModels.cs / CustomerSupportViewModels.cs. Read-side shapes also mirror HR.Web's
-// own Models/SupportModels.cs (kept in sync by hand, since the two apps don't share a project).
 
 public sealed record SupportRequestListItem(
     Guid Id,

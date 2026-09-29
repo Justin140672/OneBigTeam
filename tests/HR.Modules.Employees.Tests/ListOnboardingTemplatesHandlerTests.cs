@@ -86,9 +86,6 @@ public class ListOnboardingTemplatesHandlerTests
 
         Assert.True(result.IsSuccess);
 
-        // The requesting company has no templates of its own yet, so OnboardingTemplateSeeder
-        // lazily seeds the default "Standard Onboarding" template on this call — the other
-        // company's template must never leak into this company's result regardless.
         Assert.Single(result.Value!.Items);
         Assert.Equal("Standard Onboarding", result.Value.Items[0].Name);
     }

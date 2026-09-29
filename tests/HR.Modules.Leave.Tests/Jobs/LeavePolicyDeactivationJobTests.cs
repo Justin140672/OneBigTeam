@@ -7,9 +7,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Leave.Tests.Jobs;
 
-// Reliability follow-up: unit tests for LeavePolicyDeactivationJob, the durable, retryable worker
-// that performs and confirms the actual EmployeeLeavePolicyAssignment deactivation requested by
-// EmployeeDepartureFinalisedHandler. Mirrors HR.Modules.Identity.Tests.Jobs.AccountDisablementJobTests.
 public class LeavePolicyDeactivationJobTests
 {
     private static readonly DateTimeOffset OccurredAt = new(2026, 6, 8, 7, 0, 0, TimeSpan.Zero);
@@ -103,10 +100,8 @@ public class LeavePolicyDeactivationJobTests
         await job.ProcessAsync(request.Id, companyId);
 
         var reloaded = await db.LeavePolicyDeactivationsOnDeparture.SingleAsync(r => r.Id == request.Id);
-        Assert.Equal(RequestedAt.AddMinutes(2), reloaded.ProcessedAt); // untouched — no second run occurred
+        Assert.Equal(RequestedAt.AddMinutes(2), reloaded.ProcessedAt);
 
-        // Assignment was never actually deactivated by this no-op run, only by the earlier
-        // (simulated) successful run this test doesn't perform — assignment remains untouched too.
         var assignment = await db.EmployeeLeavePolicyAssignments.SingleAsync(a => a.EmployeeId == employeeId);
         Assert.True(assignment.IsActive);
     }
@@ -118,8 +113,6 @@ public class LeavePolicyDeactivationJobTests
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        // No EmployeeLeavePolicyAssignment seeded — assignment.Deactivate() is a null-conditional
-        // no-op in this case, so the request should still be marked Processed rather than failing.
         var request = LeavePolicyDeactivationOnDeparture.CreatePending(
             Guid.NewGuid(), companyId, employeeId, OccurredAt, RequestedAt);
         db.LeavePolicyDeactivationsOnDeparture.Add(request);
@@ -145,18 +138,12 @@ public class LeavePolicyDeactivationJobTests
 
         var reloadedAssignment = await db.EmployeeLeavePolicyAssignments.SingleAsync(a => a.EmployeeId == employeeId);
         Assert.False(reloadedAssignment.IsActive);
-        // Deactivate() is a no-op if already inactive, so DeactivatedAt keeps the original value
-        // from SeedPendingRequestWithAssignmentAsync (RequestedAt), not the job's OccurredAt.
         Assert.Equal(RequestedAt, reloadedAssignment.DeactivatedAt);
 
         var reloadedRequest = await db.LeavePolicyDeactivationsOnDeparture.SingleAsync(r => r.Id == request.Id);
         Assert.Equal(LeavePolicyDeactivationOnDeparture.StatusProcessed, reloadedRequest.Status);
     }
 
-    // Fault injection: IClock is the only collaborator inside the try block that can be made to
-    // fail without corrupting the DbContext directly. The 1st access (before the try, for
-    // MarkProcessing) is left to succeed; the 2nd (fetching processedAt at the end of the try) is
-    // made to throw, simulating a genuine mid-operation failure before the row is marked Processed.
     [Fact]
     public async Task ProcessAsync_Transient_Failure_Leaves_Processing_And_Rethrows_When_Retries_Remain()
     {

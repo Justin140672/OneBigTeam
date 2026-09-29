@@ -132,10 +132,6 @@
     private SfDropDownList<Guid?, ReviewOwnerOption> _reviewOwnerDropdown = default!;
     private List<ReviewOwnerOption> _reviewOwnerOptions = [];
 
-    // Category is rendered once _categories has actually loaded rather than immediately with an
-    // empty DataSource — Blazor renders this dialog as soon as it becomes visible, before the
-    // await below completes, so an ungated dropdown would briefly look interactive but have
-    // nothing to show in its popup.
     private bool _dataLoaded;
 
     // Ticket 2: optimistic-concurrency token loaded with the document, sent as ExpectedVersion on save.
@@ -159,9 +155,6 @@
         _loadedVersion = Document?.Version;
         _categories = (await DocumentService.ListCompanyDocumentCategoriesAsync(CompanyId))?.Items.ToList() ?? [];
 
-        // A first page (browsable without typing anything) — same pattern as
-        // EmployeeEmploymentTab's manager picker. The rest of the company is reached by typing,
-        // see OnReviewOwnerFilteringAsync, so this page doesn't need to be exhaustive.
         _reviewOwnerOptions = ((await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50))?.Items ?? [])
             .Select(e => new ReviewOwnerOption(e.Id, $"{e.FirstName} {e.LastName}"))
             .ToList();
@@ -179,9 +172,6 @@
             Model.CustomReviewFrequencyMonths = Document.CustomReviewFrequencyMonths;
             Model.ReviewOwnerEmployeeId = Document.ReviewOwnerEmployeeId ?? Guid.Empty;
 
-            // The current review owner might not fall within the first page above — merge them in
-            // explicitly so their name always renders rather than blank, same as the manager
-            // picker's handling of employee.ManagerFullName.
             if (Document.ReviewOwnerEmployeeId is { } reviewOwnerId && _reviewOwnerOptions.All(o => o.Id != reviewOwnerId))
                 _reviewOwnerOptions.Add(new ReviewOwnerOption(reviewOwnerId, Document.ReviewOwnerName ?? ""));
         }
@@ -193,15 +183,8 @@
         _dataLoaded = true;
     }
 
-    // The review owner list can't be preloaded in one bounded page the way _categories is — a
-    // company can have far more employees than any reasonable page size. Search server-side as
-    // the user types instead, same pattern as EmployeeEmploymentTab's manager picker.
     private int _reviewOwnerFilterRequestId;
 
-    // Requests aren't guaranteed to resolve in the order they were fired — applying every response
-    // unconditionally means a late-arriving response for an earlier keystroke can land after the
-    // user already picked a review owner from a later, faster response, visibly clearing their
-    // selection. Only the most recently issued request's response is applied.
     private async Task OnReviewOwnerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
     {
         args.PreventDefaultAction = true;
@@ -216,10 +199,6 @@
         await _reviewOwnerDropdown.FilterAsync(_reviewOwnerOptions, new Query());
     }
 
-    // Mirrors UploadSharedCompanyDocumentDialog's ValidateExtra hook — DataAnnotations can't
-    // express "required only when another field has a certain value", so this cross-field check
-    // lives here instead, giving immediate client-side feedback ahead of the matching
-    // server-side rule in UpdateSharedCompanyDocumentMetadataValidator.
     protected override string? ValidateExtra() =>
         Model.ReviewFrequency != "None" && Model.ReviewDate is null
             ? "A next review date is required when a review frequency is set."

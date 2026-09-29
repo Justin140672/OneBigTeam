@@ -44,8 +44,6 @@ public class PublishSharedCompanyDocumentHandlerTests
     [Fact]
     public async Task HandleAsync_Succeeds_With_No_Audience_Rules_Set()
     {
-        // "All Employees" (zero rules) is a deliberate, valid audience — publishing must never
-        // be blocked just because no specific department/location/position/employee was picked.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var category  = await SeedCategory(db, companyId);
@@ -203,8 +201,6 @@ public class PublishSharedCompanyDocumentHandlerTests
     [Fact]
     public async Task HandleAsync_Publishes_When_Acknowledgement_Required_And_DueDate_Set_But_No_Statement()
     {
-        // The statement is explicitly optional — a missing statement must never block publishing,
-        // only a missing due date does.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var category  = await SeedCategory(db, companyId);
@@ -302,9 +298,6 @@ public class PublishSharedCompanyDocumentHandlerTests
     [Fact]
     public async Task HandleAsync_Skips_Creating_A_Task_For_An_Employee_Who_Already_Acknowledged_This_Version()
     {
-        // Guards against a duplicate reminder: if this exact version was already acknowledged
-        // (e.g. between an earlier publish and a metadata-only republish), the employee has
-        // already complied and doesn't need a task nagging them to do it again.
         await using var db = BuildContext();
         var companyId  = Guid.NewGuid();
         var category   = await SeedCategory(db, companyId);

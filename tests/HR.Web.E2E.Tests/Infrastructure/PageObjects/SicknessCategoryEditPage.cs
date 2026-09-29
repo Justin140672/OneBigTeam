@@ -16,8 +16,6 @@ public sealed class SicknessCategoryEditPage(IPage page, string baseUrl)
         await page.Keyboard.PressAsync("Tab");
     }
 
-    // SfNumericTextBox: a bare FillAsync bypasses its interop entirely (see LeaveTypeEditPage.
-    // FillDefaultDaysAsync for the same pattern/explanation) — retype the value for real.
     public async Task FillDisplayOrderAsync(int order)
     {
         var input = page.Locator("input.e-numerictextbox").First;
@@ -28,11 +26,6 @@ public sealed class SicknessCategoryEditPage(IPage page, string baseUrl)
         await page.Keyboard.PressAsync("Tab");
     }
 
-    // The post-save navigation back to the list is a forceLoad (EditPageBase.NavigateToList) whose
-    // "load" event waits on every Syncfusion CSS/font/script resource — under maxParallelThreads=15
-    // that routinely outlasts a plain WaitForURLAsync (default waitUntil: "Load"), surfacing as
-    // "waiting for navigation to **/sickness-categories until Load". Wait on "Commit" instead and
-    // let the grid-row wait be the real readiness gate — same fix as the login flow / EmploymentType.
     private static readonly PageWaitForURLOptions CommitNav = new()
     {
         Timeout = 30_000,

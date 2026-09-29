@@ -118,12 +118,6 @@ internal sealed record EmployeeDocumentRestoredAuditEvent(
     object? IAuditEvent.Metadata        => new { DocumentTypeName, EmployeeId };
 }
 
-/// <summary>
-/// DOC-04: raised by the separately authorised retention-purge process when it permanently
-/// deletes an archived employee document's row and stored file. Distinct from
-/// EmployeeDocumentArchivedAuditEvent — this is the terminal, unrecoverable operation, so the
-/// event captures what was destroyed (Before) with no After, since nothing remains.
-/// </summary>
 internal sealed record EmployeeDocumentPurgedAuditEvent(
     Guid CompanyId,
     Guid EmployeeDocumentId,
@@ -579,12 +573,6 @@ internal sealed record DocumentUploadedAuditEvent(
     object? IAuditEvent.Metadata       => new { IsManagerUpload };
 }
 
-/// <summary>
-/// DOC-05: raised when a new version of an employee document is uploaded (e.g. renewing an
-/// expired passport/visa/licence). Distinct from DocumentUploadedAuditEvent — that event covers
-/// the first version of a lineage; this one captures the supersession relationship (PreviousVersionId)
-/// so the audit trail can show "this replaced that" without needing to separately query the entity.
-/// </summary>
 internal sealed record EmployeeDocumentVersionUploadedAuditEvent(
     Guid CompanyId,
     Guid EmployeeDocumentId,
@@ -612,12 +600,6 @@ internal sealed record EmployeeDocumentVersionUploadedAuditEvent(
     object? IAuditEvent.Metadata        => null;
 }
 
-/// <summary>
-/// DOC-05: raised whenever an HR administrator views the full version history of an employee
-/// document lineage — mirrors the audit-on-read convention used for other HR-only history/archive
-/// views in this module (e.g. archived-document access is itself only reachable via an audited
-/// HR-only endpoint).
-/// </summary>
 internal sealed record EmployeeDocumentVersionHistoryViewedAuditEvent(
     Guid CompanyId,
     Guid EmployeeDocumentId,
@@ -727,13 +709,6 @@ internal sealed record ProfilePhotoApprovedAuditEvent(
     object? IAuditEvent.Metadata        => new { ReviewedBy };
 }
 
-/// <summary>
-/// Raised for every virus-scan status transition (Pending/Scanning -> Clean/Infected/Failed) on
-/// any scannable entity in this module (Document, EmployeeProfilePhoto, PendingProfilePhoto,
-/// SharedCompanyDocument, SharedCompanyDocumentVersion). EntityType distinguishes which kind of
-/// row changed, since a single shared event shape covers all five per the existing audit
-/// convention in this module.
-/// </summary>
 internal sealed record FileScanStatusChangedAuditEvent(
     Guid CompanyId,
     string EntityTypeName,

@@ -31,7 +31,6 @@ public class SupabaseAuthGatewayAccountEmailPolicyTests
         ResponseBodyToReturn = $$"""{"id": "{{Guid.NewGuid()}}"}""",
     };
 
-    // ── Account-creation methods are guarded ────────────────────────────────────
 
     [Theory]
     [InlineData("person@gmail.com")]
@@ -143,7 +142,6 @@ public class SupabaseAuthGatewayAccountEmailPolicyTests
         Assert.Equal("https://example.supabase.co/auth/v1/admin/users", handler.Requests[0].Request.RequestUri!.ToString());
     }
 
-    // ── Existing-account operations are NOT guarded ─────────────────────────────
 
     [Fact]
     public async Task SignInWithPasswordAsync_For_Public_Domain_Still_Issues_Its_Request()

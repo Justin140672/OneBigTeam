@@ -48,7 +48,6 @@ public class UploadImportFileEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, Guid.NewGuid().ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
 
-        // Authenticated user belongs to a different company than the one in the route (cross-tenant).
         var response = await client.PostAsync(
             $"/api/companies/{AcmeCompanyId}/data-import/sessions",
             BuildCsvUpload("Employee"));
@@ -63,7 +62,6 @@ public class UploadImportFileEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, Guid.NewGuid().ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, AcmeCompanyId.ToString());
 
-        // Same company, but no role assigned -> fails the "employee:manage" policy check.
         var response = await client.PostAsync(
             $"/api/companies/{AcmeCompanyId}/data-import/sessions",
             BuildCsvUpload("Employee"));
@@ -74,7 +72,6 @@ public class UploadImportFileEndpointTests
     [Fact]
     public async Task Returns_UnprocessableEntity_When_Csv_Is_Uploaded()
     {
-        // CSV import support has been removed; only .xlsx uploads are accepted now.
         using var client = await AdminClient();
 
         const string csv = "first_name,last_name,email\nJohn,Doe,john@example.com\nJane,Doe,jane@example.com\n";
@@ -100,7 +97,7 @@ public class UploadImportFileEndpointTests
         var payload = await response.Content.ReadFromJsonAsync<UploadPayload>();
         Assert.NotNull(payload);
         Assert.Equal("employees.xlsx", payload!.FileName);
-        Assert.Equal(4, payload.TotalRows); // header row excluded
+        Assert.Equal(4, payload.TotalRows);
     }
 
     [Fact]
@@ -108,7 +105,6 @@ public class UploadImportFileEndpointTests
     {
         using var client = await AdminClient();
 
-        // Default max is 10 MB; build an oversized CSV payload.
         var oversized = new byte[11 * 1024 * 1024];
 
         var response = await client.PostAsync(
@@ -160,7 +156,6 @@ public class UploadImportFileEndpointTests
         return content;
     }
 
-    // Builds a real XLSX workbook (header row + dataRowCount data rows) via ClosedXML.
     private static byte[] BuildXlsxBytes(int dataRowCount)
     {
         using var workbook = new XLWorkbook();

@@ -10,15 +10,6 @@ using IClock = HR.SharedKernel.IClock;
 
 namespace HR.Modules.Probation.Services;
 
-/// <summary>
-/// OBT-721 Workload &amp; HR Actions Report provider for probation reviews that are pending and due
-/// (not yet overdue). Row-scoping mirrors GetProbationReport/Handler.cs exactly: HR sees every
-/// pending review company-wide, a Manager sees reviews for their whole reporting sub-tree
-/// (direct or indirect reports, per DSH-02).
-/// See <see cref="OverdueProbationReviewsWorkloadActionProvider"/> for the overdue counterpart —
-/// split into two categories/providers per the OBT-721 ticket rather than one, so they can be
-/// filtered/grouped independently on the dashboard.
-/// </summary>
 internal sealed class ProbationReviewsDueWorkloadActionProvider(
     ProbationDbContext dbContext,
     IDirectReportsReader directReportsReader,
@@ -40,10 +31,6 @@ internal sealed class ProbationReviewsDueWorkloadActionProvider(
             companyId, caller, requestedScope, ActionCategory, overdueOnly: false, cancellationToken);
 }
 
-/// <summary>
-/// Overdue counterpart to <see cref="ProbationReviewsDueWorkloadActionProvider"/> — same row-scoping,
-/// restricted to reviews whose DueDate has already passed.
-/// </summary>
 internal sealed class OverdueProbationReviewsWorkloadActionProvider(
     ProbationDbContext dbContext,
     IDirectReportsReader directReportsReader,
@@ -65,11 +52,6 @@ internal sealed class OverdueProbationReviewsWorkloadActionProvider(
             companyId, caller, requestedScope, ActionCategory, overdueOnly: true, cancellationToken);
 }
 
-/// <summary>
-/// Shared query/scoping logic for the two probation review providers above — kept as a plain
-/// internal static helper (not a service of its own) since it is only ever called by these two
-/// providers within the same module.
-/// </summary>
 internal static class ProbationReviewWorkloadActions
 {
     public static async Task<IReadOnlyList<WorkloadAction>> GetAsync(
@@ -87,14 +69,9 @@ internal static class ProbationReviewWorkloadActions
         bool overdueOnly,
         CancellationToken cancellationToken)
     {
-        // Scope is driven by the EXPLICITLY requested workspace, never re-inferred from the
-        // caller's full role set — a caller holding both HR and Manager roles must still only see
-        // their own reporting sub-tree when the Manager workspace is requested.
         IReadOnlyCollection<Guid>? employeeIds = null;
         if (requestedScope == WorkloadScope.Hr)
         {
-            // A requested workspace is a display-routing signal only: re-verify the caller actually
-            // holds HR access before honouring it, never trust it as authorization.
             var callerIsHr = (await authorizationService.AuthorizeAsync(caller, "reporting:view-hr")).Succeeded;
             if (!callerIsHr)
                 return [];
@@ -105,15 +82,9 @@ internal static class ProbationReviewWorkloadActions
             if (!callerIsManager)
                 return [];
 
-            // NOT caller.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's
-            // resolved Employee/UserId. ICurrentUser.UserId is safe here even though this provider
-            // runs in its own DI scope: it reads off the ambient HttpContext (IHttpContextAccessor),
-            // which is shared across scopes for the same request.
             if (currentUser.UserId is not { } callerEmployeeId)
                 return [];
 
-            // DSH-02: a manager's dashboard scope is their entire reporting sub-tree (direct and
-            // indirect reports). See specifications/architecture/11-manager-hierarchy-scope.md.
             var teamIds = await directReportsReader.GetAllDescendantIdsAsync(
                 companyId, callerEmployeeId, cancellationToken);
 
@@ -161,10 +132,6 @@ internal static class ProbationReviewWorkloadActions
         var reviewEmployeeIds = reviews.Select(r => recordMap[r.ProbationRecordId]).Distinct();
         var departments = await employeeDepartmentReader.GetDepartmentsAsync(companyId, reviewEmployeeIds, cancellationToken);
 
-        // A pending probation review is actioned via its Task (TaskActionType.Review, keyed by the
-        // review id as SourceEntityId). This category is entirely task-backed: no employee-profile
-        // deep link is offered as a fallback — when the task cannot be resolved, DeepLinkUrl stays
-        // blank so the dashboard shows an explicit "no longer available" state instead.
         var taskIdsByReview = await taskReader.GetOpenTaskIdsAsync(
             companyId, reviews.Select(r => r.Id), cancellationToken, TaskActionType.Review);
 

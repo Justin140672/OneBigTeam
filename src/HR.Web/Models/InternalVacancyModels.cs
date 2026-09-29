@@ -1,9 +1,5 @@
 namespace HR.Web.Models;
 
-// ── INTERNAL VACANCIES (employee-facing) ──────────────────────────────────────
-// Backed by the read-only "internal-vacancies" endpoints which require only an authenticated
-// employee of the company. closingDate / employmentType are currently always null server-side —
-// only render them when non-null.
 
 public record InternalVacancyListResponse(List<InternalVacancyListItem> Items);
 
@@ -25,8 +21,6 @@ public record InternalVacancyDetail(
     DateOnly? ClosingDate,
     DateOnly? OpenedAt);
 
-// Outcome of an employee applying for an internal vacancy (multipart CV upload only — the
-// applicant's identity is resolved server-side from the signed-in employee and never sent).
 public enum InternalVacancyApplyOutcome
 {
     Submitted,

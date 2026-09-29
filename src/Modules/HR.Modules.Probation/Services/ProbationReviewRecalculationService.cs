@@ -66,10 +66,6 @@ internal sealed class ProbationReviewRecalculationService(
                 Guid.NewGuid(), record.CompanyId, record.Id, entry.ReviewType, entry.DueDate, now))
             .ToList();
 
-        // Cancel every still-pending review being replaced. supersededByReviewId points at the
-        // fresh review of the same type where one exists (mirrors ProbationExtensionService's
-        // FinalDecision supersession); older reviews that were the only one of a now-dropped
-        // checkpoint type have no direct replacement and are cancelled with a null reference.
         foreach (var pending in pendingReviews)
         {
             var replacement = newReviews.FirstOrDefault(r => r.ReviewType == pending.ReviewType);
@@ -114,14 +110,6 @@ internal sealed class ProbationReviewRecalculationService(
         }
     }
 
-    /// <summary>
-    /// Same idempotent "review due" notification pattern used by GenerateDueProbationReviewsJob —
-    /// duplicated in each caller rather than sharing a service because the two paths run in
-    /// different transactional contexts (job batch vs. inline recalculation) and shipping a review
-    /// due notification for a review created seconds ago is intentional here (recalculation
-    /// replaces a still-open review with an immediate replacement, so the audience should learn
-    /// about the new due date immediately rather than waiting for the next daily job run).
-    /// </summary>
     private async Task NotifyReviewDueAsync(
         ProbationRecord record,
         ProbationReview review,

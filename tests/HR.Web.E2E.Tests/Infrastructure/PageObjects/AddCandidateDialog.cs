@@ -53,7 +53,6 @@ public sealed class AddCandidateDialog(IPage page)
 
     private ILocator ValidationMessages => Dialog.Locator(".validation-message");
 
-    // ── Mode ──────────────────────────────────────────────────────────────────────
 
     /// <summary>
     /// Switches to "Create new candidate" and waits for the new-candidate field group to render
@@ -79,24 +78,17 @@ public sealed class AddCandidateDialog(IPage page)
         await Assertions.Expect(NewCandidateFields).ToBeHiddenAsync(new() { Timeout = 15_000 });
     }
 
-    // ── Existing mode ─────────────────────────────────────────────────────────────
 
-    /// <summary>Selects a candidate in the existing-mode picker (scoped to its own field wrapper).</summary>
     public async Task SelectExistingCandidateAsync(string nameFragment)
     {
         await Assertions.Expect(CandidateField).ToBeVisibleAsync(new() { Timeout = 15_000 });
         await DropDownSelector.SelectAsync(page, CandidateField, nameFragment);
     }
 
-    /// <summary>Asserts the existing-mode picker currently displays a candidate matching <paramref name="nameFragment"/>.</summary>
     public Task ExpectSelectedCandidateAsync(string nameFragment) =>
         Assertions.Expect(CandidateField.Locator("span[role='combobox'] input").First)
             .ToHaveValueAsync(new Regex(Regex.Escape(nameFragment)), new() { Timeout = 15_000 });
 
-    /// <summary>
-    /// Waits for the "Attach current CV" option — it only renders after the async current-CV lookup
-    /// for the selected candidate returns a CV.
-    /// </summary>
     public async Task ExpectAttachCurrentCvVisibleAsync(string expectedFileName)
     {
         await Assertions.Expect(AttachCurrentCvWrapper).ToBeVisibleAsync(new() { Timeout = 15_000 });
@@ -106,9 +98,7 @@ public sealed class AddCandidateDialog(IPage page)
     public Task ExpectAttachCurrentCvCheckedAsync() =>
         Assertions.Expect(AttachCurrentCvCheckbox).ToBeCheckedAsync(new() { Timeout = 10_000 });
 
-    // ── New mode ──────────────────────────────────────────────────────────────────
 
-    // HrTextBox (SfTextBox) commits on change/blur, so every fill is followed by a Tab.
     private async Task FillAsync(string id, string value)
     {
         var input = NewCandidateFields.Locator($"input#{id}");
@@ -129,7 +119,6 @@ public sealed class AddCandidateDialog(IPage page)
         await FillEmailAsync(email);
     }
 
-    /// <summary>Chooses a CV file and waits for the dialog to accept it (selected-file summary shown).</summary>
     public async Task SelectCvAsync(string fileName, byte[] content, string mimeType = "application/pdf")
     {
         await SetCvFileAsync(fileName, content, mimeType);
@@ -159,7 +148,6 @@ public sealed class AddCandidateDialog(IPage page)
     public Task ExpectNoCvSelectedAsync() =>
         Assertions.Expect(CvSelected).ToBeHiddenAsync(new() { Timeout = 15_000 });
 
-    // ── Source / recruiter (both modes) ───────────────────────────────────────────
 
     public async Task SelectSourceAsync(string sourceLabel)
     {
@@ -167,23 +155,19 @@ public sealed class AddCandidateDialog(IPage page)
         await DropDownSelector.SelectAsync(page, SourceField, sourceLabel);
     }
 
-    /// <summary>The Recruiter field only renders once Source = External Recruiter has round-tripped — wait for it.</summary>
     public async Task SelectRecruiterAsync(string agencyNameFragment)
     {
         await Assertions.Expect(RecruiterField).ToBeVisibleAsync(new() { Timeout = 15_000 });
         await DropDownSelector.SelectAsync(page, RecruiterField, agencyNameFragment);
     }
 
-    // ── Footer / outcomes ─────────────────────────────────────────────────────────
 
-    /// <summary>Clicks "Add" without waiting for any particular outcome.</summary>
     public async Task ClickSubmitAsync()
     {
         await Assertions.Expect(SubmitButton).ToBeEnabledAsync(new() { Timeout = 15_000 });
         await SubmitButton.ClickAsync();
     }
 
-    /// <summary>Clicks "Add" and waits for the dialog to close (a successful add).</summary>
     public async Task SubmitExpectingSuccessAsync()
     {
         await ClickSubmitAsync();
@@ -208,7 +192,6 @@ public sealed class AddCandidateDialog(IPage page)
         await Assertions.Expect(GeneralError).ToContainTextAsync(textFragment, new() { IgnoreCase = true });
     }
 
-    /// <summary>Waits for a validation message containing <paramref name="text"/> to render inside the dialog.</summary>
     public Task ExpectValidationMessageAsync(string text) =>
         Assertions.Expect(ValidationMessages.Filter(new() { HasText = text }).First)
             .ToBeVisibleAsync(new() { Timeout = 15_000 });
@@ -217,7 +200,6 @@ public sealed class AddCandidateDialog(IPage page)
         Assertions.Expect(ValidationMessages.Filter(new() { HasText = text }))
             .ToHaveCountAsync(0, new() { Timeout = 15_000 });
 
-    // ── Duplicate email ───────────────────────────────────────────────────────────
 
     public async Task ExpectDuplicateAlertAsync(string expectedName, string expectedEmail)
     {

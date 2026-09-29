@@ -5,14 +5,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Probation.Services;
 
-/// <summary>
-/// Company-wide (optionally employee-id-filtered) probation reader backing the Probation Report
-/// (OBT-711). Distinct from ProbationSummaryReader, which only reads a single employee's latest
-/// record and cannot serve a company-wide/manager-scoped report.
-/// </summary>
 internal sealed class ProbationReportReader(ProbationDbContext dbContext) : IProbationReportReader
 {
-    // Row cap (OBT-720 perf pass) — see SicknessReportReader.MaxRows for rationale.
     private const int MaxRows = 50_000;
 
     public async Task<IReadOnlyList<ProbationReportItem>> GetProbationReportAsync(

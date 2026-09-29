@@ -4,11 +4,6 @@ namespace HR.Modules.Companies.Features.AdminCancelSubscription;
 
 internal sealed record AdminCancelSubscriptionAuditSnapshot(string Status, bool CancelAtPeriodEnd);
 
-/// <summary>
-/// Records a platform-administrator-initiated cancellation (support intervention — e.g. handling
-/// a customer complaint directly). Uses the same cross-cutting IAuditEventPublisher as every other
-/// audited action in this module (see ExtendCustomerTrial's Audit.cs remarks).
-/// </summary>
 internal sealed record SubscriptionCancelledByAdminAuditEvent(
     Guid CompanyId,
     Guid? ActorUserId,

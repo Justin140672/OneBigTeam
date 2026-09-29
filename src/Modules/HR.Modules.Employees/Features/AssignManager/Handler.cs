@@ -73,8 +73,6 @@ internal sealed class AssignManagerHandler
                     Error.NotFound($"Manager employee '{request.ManagerId}' was not found."));
             }
 
-            // Circular hierarchy check: walk up the proposed manager's chain.
-            // If we reach the employee being updated, the assignment would create a cycle.
             var allEmployees = await _dbContext.Employees
                 .AsNoTracking()
                 .Where(e => e.CompanyId == request.CompanyId)
@@ -118,9 +116,6 @@ internal sealed class AssignManagerHandler
             var outcome = await _dbContext.SaveIdempotentAsync<IdempotencyRecord, AssignManagerResponse>(_dbContext.IdempotencyRecords, 
                 scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
 
-            // Lost a race against a concurrent duplicate under the same key - this attempt's
-            // assignment was rolled back along with it, so skip our own post-save side effects and
-            // hand back the winner's result untouched.
             if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
                 return Result.Success(outcome.Response!);
         }

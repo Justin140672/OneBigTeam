@@ -101,9 +101,6 @@ internal sealed class PositionRoleReconciliationService(
                 }
                 catch (Exception ex)
                 {
-                    // Isolate this employee's failure from the rest of the run/company. Drop any
-                    // partially-tracked/half-mutated state for this employee so the loop continues
-                    // cleanly against a known-good context.
                     db.ChangeTracker.Clear();
                     logger.LogError(ex,
                         "Position-role reconciliation failed for employee {EmployeeId} in company {CompanyId}; " +
@@ -130,15 +127,6 @@ internal sealed class PositionRoleReconciliationService(
             }
             catch (Exception ex)
             {
-                // Resolving/provisioning the NEW position failed (deleted PositionProfile, or a
-                // transient read failure). Isolate this failure here (rather than letting it
-                // propagate to the employee-level catch in ReconcileAllCompaniesAsync) so the
-                // revocation loop and SaveChangesAsync below still run this pass — an unresolved
-                // new position never justifies retaining grants for a position the employee no
-                // longer holds. No assignment can legitimately already exist for the unresolved
-                // position (a UserPosition row only exists for a Position that has been synced), so
-                // this can never suppress a legitimate reopen/insert below; the new assignment is
-                // just retried on the next scheduled run.
                 currentPosition = null;
                 logger.LogWarning(ex,
                     "Position-role reconciliation could not resolve position {PositionProfileId} for employee " +
@@ -189,8 +177,6 @@ internal sealed class PositionRoleReconciliationService(
             }
             else if (!currentAssignment.IsActive(now))
             {
-                // Reopen rather than insert — (UserId, PositionId) is the composite primary key, so
-                // a naive insert here would throw a duplicate-key DbUpdateException.
                 currentAssignment.ClearExpiry();
                 changed = true;
             }
@@ -205,11 +191,6 @@ internal sealed class PositionRoleReconciliationService(
         }
         catch (DbUpdateException)
         {
-            // Lost a race against a concurrent write for the same employee (e.g. a live
-            // OnEmployeePositionChanged event processing at the same moment, or an overlapping
-            // reconciliation pass). Defer entirely to the next scheduled run rather than fail this
-            // employee's whole reconciliation — the next pass re-reads current state and converges
-            // again, so nothing is permanently lost.
             db.ChangeTracker.Clear();
             logger.LogWarning(
                 "Position-role reconciliation lost a concurrent-write race for employee {EmployeeId} in company " +

@@ -94,15 +94,6 @@ internal sealed class CompleteOnboardingTaskFromTaskAction(
         if (isCompleting)
             plan.Complete(now);
 
-        // Primary mutation commits first (task + plan transition). Everything below is a durably
-        // recoverable follow-up: every effect carries a deterministic key (task-creation
-        // idempotency key, notification's own (employee, source, type) uniqueness, or the audit
-        // event's deterministic EventId), so an interruption between here and the end of this method
-        // is safely recovered by RecoverPlanEffectsAsync (see the already-resolved branch above) on
-        // the next dispatch of this SAME operation. On the normal, uninterrupted path each effect is
-        // still gated by its own fresh transition flag (isStarting/isCompleting) rather than fired
-        // unconditionally, so an ordinary completion of an unrelated task never re-sends the "plan
-        // started" notification.
         await dbContext.SaveChangesAsync(cancellationToken);
 
         if (isStarting)
@@ -130,11 +121,6 @@ internal sealed class CompleteOnboardingTaskFromTaskAction(
     {
         if (plan.Status is OnboardingStatus.InProgress or OnboardingStatus.Completed)
         {
-            // Checked explicitly (rather than relying solely on NotificationWriter's own unique-key
-            // dedupe) so a normal, uninterrupted replay of an already-fully-applied completion sends
-            // no notification at all, not merely "no duplicate row" — the employee-facing
-            // notification is always written when the plan starts, so its presence is a reliable
-            // proxy for "the start effect already ran".
             var alreadyNotified = await notificationWriter.ExistsAsync(
                 plan.EmployeeId, plan.Id, NotificationType.OnboardingStarted, cancellationToken);
             if (!alreadyNotified)
@@ -165,9 +151,6 @@ internal sealed class CompleteOnboardingTaskFromTaskAction(
             now,
             context.CompletedBy), cancellationToken);
 
-        // Cross-module delivery — per architecture, downstream consumers of an integration event
-        // must already be idempotent under repeated delivery, so an unconditional re-publish here on
-        // recovery is safe by contract, not merely by convention.
         await integrationEventPublisher.PublishAsync(
             new OnboardingCompletedIntegrationEvent(plan.CompanyId, plan.EmployeeId, plan.Id, now),
             cancellationToken);

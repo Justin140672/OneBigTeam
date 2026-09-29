@@ -113,9 +113,6 @@
 }
 
 @code {
-    // Optional cross-widget wiring from ManagerDashboard: aggregated open-attention-item counts
-    // per employee, computed once by ManagerAttentionQueueWidget and passed down here rather than
-    // re-fetched — avoids a second round of the same service calls just to badge a card.
     [Parameter] public IReadOnlyDictionary<Guid, int>? AlertCounts { get; set; }
 
     private bool _loading = true;
@@ -149,9 +146,6 @@
 
         _includeIndirect = includeIndirect;
 
-        // Unlike the initial load, switching scope keeps the existing card grid visible (dimmed via
-        // team-widget-body--switching) rather than swapping the whole widget out for a loading
-        // spinner — that full remount/collapse was the source of the reported jumpy re-render.
         _scopeSwitching = true;
         StateHasChanged();
 

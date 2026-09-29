@@ -22,13 +22,9 @@ internal static class NotificationChannelDefaults
 {
     private static readonly HashSet<NotificationType> EmailEligibleTypes =
     [
-        // Leave decisions materially affect the employee's plans and are infrequent enough that
-        // email is proportionate.
         NotificationType.LeaveApproved,
         NotificationType.LeaveRejected,
 
-        // A recorded probation outcome and a review coming due are both significant/time-sensitive
-        // career events.
         NotificationType.ProbationOutcomeRecorded,
         NotificationType.ProbationReviewDue,
 
@@ -37,7 +33,6 @@ internal static class NotificationChannelDefaults
         NotificationType.OffboardingRequiresHrReconciliation,
         NotificationType.IncompleteOffboardingAtDeparture,
 
-        // Compliance-relevant overdue/expiry states — missing these has real consequences.
         NotificationType.DocumentExpired,
         NotificationType.SicknessEvidenceOverdue,
         NotificationType.ReturnToWorkReviewOverdue,

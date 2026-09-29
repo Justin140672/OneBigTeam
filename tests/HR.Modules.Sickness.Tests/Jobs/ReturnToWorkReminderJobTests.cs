@@ -164,9 +164,6 @@ public class ReturnToWorkReminderJobTests
     [Fact]
     public async Task ExecuteAsync_Reconciles_Missing_Overdue_Notification_For_Already_Overdue_Review_Exactly_Once()
     {
-        // OBT-REM-04: a review already persisted as Overdue whose overdue notification was never
-        // sent (prior run crashed after the status commit) gets that notification reconciled on a
-        // later run — exactly once across repeated runs.
         await using var db = BuildContext();
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();

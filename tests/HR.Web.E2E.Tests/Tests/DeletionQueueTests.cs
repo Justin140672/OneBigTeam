@@ -3,29 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies HR.Admin.Web's Permanent Deletion Queue (/deletion-queue) and the "Schedule deletion"
-/// entry point on Customer Details' Subscription management panel (Customer Lifecycle epic):
-/// - An allow-listed platform admin can load the queue page (even with zero eligible rows).
-/// - Scheduling a deletion from Customer Details makes the company appear in the queue as
-///   Pending, with a live countdown.
-/// - Cancelling a pending deletion from the queue (reason required) flips it to Cancelled.
-/// - Executing a deletion now (reason required) flips it to Executed, and the confirmation
-///   dialog's warning copy explicitly disclaims real data destruction — a deliberate wording
-///   choice (see DeletionQueue.razor / CustomerDetails.razor DialogWarning), asserted on here so a
-///   future edit can't silently reintroduce alarming "this deletes everything" language.
-/// - Anonymous access to /deletion-queue is blocked at the router level, same pattern as
-///   CustomerDetailsPageTests.AnonymousAccess_RedirectsToLogin.
-///
-/// Uses the second seeded dev/E2E company (Beta Corp, id ...002) rather than Acme for the
-/// schedule/cancel/execute flows, since those are destructive to subscription/access state and
-/// Acme is relied on as a stable "fully active" fixture by many other test classes. Beta Corp is
-/// itself reused elsewhere (see TenantIsolationTests etc.) as a second-tenant fixture, so these
-/// tests run its deletion lifecycle end-to-end (schedule -> cancel, then separately schedule ->
-/// execute) rather than leaving it in a half-mutated state, and should be treated as a soft
-/// candidate for its own dedicated third seeded company if Beta Corp's mutated state ever
-/// conflicts with other suites — see remarks in the class-level test report.
-/// </summary>
 public sealed class DeletionQueueTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     private static readonly Guid BetaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
@@ -46,9 +23,6 @@ public sealed class DeletionQueueTests(CrossUserFixture fixture) : RoleE2ETestBa
         Assert.False(await queue.IsErrorBannerVisibleAsync(),
             "Expected the allow-listed admin to see the deletion queue, not the error banner");
 
-        // The queue may legitimately be empty (no deletions ever scheduled) or already have rows
-        // from a previous test run against the same fixture — either the empty-state message or
-        // the table is an acceptable "list rendered" outcome.
         var isEmpty = await queue.IsEmptyStateVisibleAsync();
         var hasTable = await queue.IsTableVisibleAsync();
         Assert.True(isEmpty || hasTable,
@@ -122,9 +96,6 @@ public sealed class DeletionQueueTests(CrossUserFixture fixture) : RoleE2ETestBa
         await login.GoToAsync();
         await login.LoginAsync(AllowListedAdminEmail);
 
-        // Ensure there's a pending deletion for Beta Corp to cancel — scheduling again while one is
-        // already pending is a no-op-equivalent action from the UI's perspective (still lands on the
-        // same "Pending" row), so this is safe to run independently of the scheduling test above.
         await details.GoToAsync(BetaCorpId);
         await details.ClickScheduleDeletionAsync();
         await details.FillScheduleDeletionReasonAsync("E2E: ensuring a pending deletion exists to cancel");
@@ -156,7 +127,6 @@ public sealed class DeletionQueueTests(CrossUserFixture fixture) : RoleE2ETestBa
         await login.GoToAsync();
         await login.LoginAsync(AllowListedAdminEmail);
 
-        // Ensure a pending row exists so the "Cancel deletion" action is available on the row.
         await details.GoToAsync(BetaCorpId);
         await details.ClickScheduleDeletionAsync();
         await details.FillScheduleDeletionReasonAsync("E2E: ensuring a pending deletion exists for validation check");
@@ -185,9 +155,6 @@ public sealed class DeletionQueueTests(CrossUserFixture fixture) : RoleE2ETestBa
         await login.GoToAsync();
         await login.LoginAsync(AllowListedAdminEmail);
 
-        // Ensure a pending deletion exists (schedule again if a previous test already cancelled or
-        // executed it — scheduling while one is already pending is safe/idempotent from the UI's
-        // perspective, see remarks above).
         await details.GoToAsync(BetaCorpId);
         await details.ClickScheduleDeletionAsync();
         await details.FillScheduleDeletionReasonAsync("E2E: ensuring a pending deletion exists to execute");
@@ -228,7 +195,6 @@ public sealed class DeletionQueueTests(CrossUserFixture fixture) : RoleE2ETestBa
         await login.GoToAsync();
         await login.LoginAsync(AllowListedAdminEmail);
 
-        // Ensure a pending row exists so the "Execute now" action is available on the row.
         await details.GoToAsync(BetaCorpId);
         await details.ClickScheduleDeletionAsync();
         await details.FillScheduleDeletionReasonAsync("E2E: ensuring a pending deletion exists for validation check");
@@ -250,9 +216,6 @@ public sealed class DeletionQueueTests(CrossUserFixture fixture) : RoleE2ETestBa
     [Fact]
     public async Task AnonymousAccess_ToDeletionQueue_RedirectsToLogin()
     {
-        // Same pattern as CustomerDetailsPageTests.AnonymousAccess_RedirectsToLogin: navigate
-        // directly rather than via DeletionQueuePage.GoToAsync, which waits for that page's own
-        // settled-state selectors and would time out on /login.
         await _page.GotoAsync($"{_fixture.AdminWebBaseUrl}/deletion-queue");
 
         await _page.WaitForURLAsync(url => url.ToString().Contains("/login"), new() { Timeout = 20_000 });

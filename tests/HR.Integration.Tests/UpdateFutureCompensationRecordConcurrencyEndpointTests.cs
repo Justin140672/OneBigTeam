@@ -56,7 +56,6 @@ public class UpdateFutureCompensationRecordConcurrencyEndpointTests
             Body(companyId, employeeId, record.Id, salary: 81000m, expectedVersion: version, notes: "FirstWrite"));
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
 
-        // Second editor still holds the old version.
         var stale = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/compensation/{record.Id}",
             Body(companyId, employeeId, record.Id, salary: 92000m, expectedVersion: version, notes: "StaleWrite"));

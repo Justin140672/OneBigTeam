@@ -14,7 +14,6 @@ public class VacancyServiceTests
         AdvertTitle = "Software Engineer",
     };
 
-    // ── UpdateAsync(ApiSaveResult) — ANY 409 is a save conflict (no "code" needed) ──
 
     [Fact]
     public async Task UpdateAsync_Returns_Ok_When_Api_Returns_Success()
@@ -89,7 +88,6 @@ public class VacancyServiceTests
         Assert.NotNull(result.ErrorMessage);
     }
 
-    // ── CreateVacancyAsync ────────────────────────────────────────────────────────
 
     [Fact]
     public async Task CreateVacancyAsync_Returns_ValidationMessage_When_Api_Returns_BadRequest()
@@ -104,7 +102,6 @@ public class VacancyServiceTests
         Assert.Equal("A hiring manager is required.", error);
     }
 
-    // ── GetVacancyAsync (representative read) ────────────────────────────────────
 
     [Fact]
     public async Task GetVacancyAsync_Returns_Value_When_Api_Returns_Ok()

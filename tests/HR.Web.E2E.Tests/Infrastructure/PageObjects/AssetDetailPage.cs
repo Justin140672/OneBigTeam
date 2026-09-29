@@ -40,7 +40,6 @@ public sealed class AssetDetailPage(IPage page, string baseUrl)
     public async Task<bool> IsNotFoundAlertVisibleAsync() =>
         await page.Locator(".alert-danger").IsVisibleAsync();
 
-    // ── Assignments section ───────────────────────────────────────────────────
 
     public async Task WaitForAssignmentsSectionAsync()
     {

@@ -199,10 +199,6 @@ public class GetCustomerDatabaseAssignmentEndpointTests
         DateTimeOffset UpdatedAt);
 }
 
-/// <summary>
-/// Tests for CustomerDatabaseConnection resolver: connection resolution, caching behavior,
-/// and error handling for various assignment states and configuration scenarios.
-/// </summary>
 [Collection("Integration")]
 public class CustomerDatabaseConnectionTests
 {
@@ -312,10 +308,9 @@ public class CustomerDatabaseConnectionTests
 
         var connectionString = await resolver.GetConnectionStringAsync(companyId);
 
-        // The test config includes a valid connection string for "cust-test-db1"
         Assert.NotNull(connectionString);
         Assert.NotEmpty(connectionString);
-        Assert.Contains("Host=", connectionString); // PostgreSQL connection string pattern
+        Assert.Contains("Host=", connectionString);
     }
 
     [Fact]
@@ -333,7 +328,6 @@ public class CustomerDatabaseConnectionTests
 
         var connectionString = await resolver.GetConnectionStringAsync(companyId);
 
-        // Active without a database key signals shared database
         Assert.Null(connectionString);
     }
 
@@ -373,17 +367,14 @@ public class CustomerDatabaseConnectionTests
         var resolver = scope.ServiceProvider.GetRequiredService<CustomerDatabaseConnection>();
         var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
 
-        // First call should query the database
         var firstConnectionString = await resolver.GetConnectionStringAsync(companyId);
         Assert.NotNull(firstConnectionString);
 
-        // Delete the assignment from the database
         var assignment = await db.CustomerDatabaseAssignments
             .FirstAsync(a => a.CompanyId == companyId);
         db.CustomerDatabaseAssignments.Remove(assignment);
         await db.SaveChangesAsync();
 
-        // Second call within 60 seconds should still return the cached result
         var secondConnectionString = await resolver.GetConnectionStringAsync(companyId);
         Assert.Equal(firstConnectionString, secondConnectionString);
     }
@@ -402,17 +393,14 @@ public class CustomerDatabaseConnectionTests
         var resolver = scope.ServiceProvider.GetRequiredService<CustomerDatabaseConnection>();
         var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
 
-        // First call should return null (shared database) and cache the result
         var firstResult = await resolver.GetConnectionStringAsync(companyId);
         Assert.Null(firstResult);
 
-        // Delete the assignment from the database
         var assignment = await db.CustomerDatabaseAssignments
             .FirstAsync(a => a.CompanyId == companyId);
         db.CustomerDatabaseAssignments.Remove(assignment);
         await db.SaveChangesAsync();
 
-        // Second call within 60 seconds should still return the cached null result (not throw)
         var secondResult = await resolver.GetConnectionStringAsync(companyId);
         Assert.Null(secondResult);
     }

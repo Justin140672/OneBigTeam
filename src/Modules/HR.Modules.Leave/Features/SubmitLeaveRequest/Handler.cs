@@ -134,9 +134,6 @@ internal sealed class SubmitLeaveRequestHandler
                          b.PolicyYear == policyYear,
                     cancellationToken);
 
-            // Uses the same LeaveAccrualCalculator as balance display (GetEmployeeLeaveBalanceHandler)
-            // and preview (PreviewLeaveRequestHandler) so the figure enforced here can never diverge
-            // from what the employee was shown before submitting (LEAVE-04).
             decimal? availableDays = null;
             if (balance is not null)
             {
@@ -185,8 +182,6 @@ internal sealed class SubmitLeaveRequestHandler
             .Select(r => new LeaveConflictWarning(r.Id, r.LeaveTypeId, r.StartDate, r.EndDate, r.Status.ToString()))
             .ToListAsync(cancellationToken);
 
-        // LEAVE-08: surfaces the same public-holiday-in-range warning PreviewLeaveRequestHandler
-        // returns, so a client that skipped preview still sees it on submission.
         var excludedHolidays = (await _warningCalculator.GetExcludedPublicHolidaysAsync(
                 request.CompanyId, request.StartDate, request.EndDate, workingPattern,
                 leaveSettings.ExcludePublicHolidaysFromLeave, cancellationToken))
@@ -195,17 +190,10 @@ internal sealed class SubmitLeaveRequestHandler
 
         _dbContext.LeaveRequests.Add(leaveRequest);
 
-        // LEAVE-07: RequiresApproval lives on the policy, defaulting to true (the safer choice)
-        // when the employee has no resolvable policy - see LeavePolicy.RequiresApproval.
         var requiresApproval = policy?.RequiresApproval ?? true;
 
         if (!requiresApproval)
         {
-            // Auto-approval path: apply the exact same balance/TOIL-ledger mutation and Approve()
-            // call a manual reviewer's approval would trigger (LeaveApprovalEffectsService),
-            // reviewed-by defaults to the requesting employee since there is no separate approver
-            // for policies that skip manual review. No LeaveRequestedIntegrationEvent is
-            // published, so the Tasks module never creates an approval task for this request.
             var effectResult = await _approvalEffects.ApplyBalanceEffectsAndApproveAsync(
                 leaveRequest, leaveType, request.EmployeeId, now, cancellationToken);
 
@@ -283,7 +271,6 @@ internal sealed class SubmitLeaveRequestHandler
         }
         else
         {
-            // Produces the same audit/notification outcome a manual approval would (LEAVE-07 AC).
             await _approvalEffects.PublishApprovalOutcomeAsync(leaveRequest, request.EmployeeId, now, cancellationToken);
         }
 

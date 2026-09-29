@@ -10,36 +10,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Modules.DataImport.Jobs;
 
-/// <summary>
-/// Security review finding #2: durable, retryable sweep for raw import workbook files (PII:
-/// names, emails, employment data, manager relationships) that were not deleted inline.
-///
-/// The immediate-deletion path lives in ValidateImportSessionHandler — the file is only ever
-/// read there, so it is deleted the moment validation finishes (success or failure). This job is
-/// the safety net for everything that path cannot cover:
-/// <list type="bullet">
-///   <item>Sessions abandoned before they were ever validated (stuck Pending/Processing) — swept
-///   once they are older than <see cref="DataImportFileRetentionOptions.AbandonedSessionRetentionDays"/>.</item>
-///   <item>Sessions that reached a terminal state without validation ever running (Cancelled) or
-///   whose terminal state does not on its own imply the file was handled.</item>
-///   <item>Any inline deletion attempt that failed (storage outage, transient error) — retried
-///   here on a rolling basis, gated by <see cref="DataImportFileRetentionOptions.RetryGraceHours"/>
-///   so failures do not get hammered every tick.</item>
-/// </list>
-///
-/// Deletion is idempotent (see <see cref="IImportFileStorageService.DeleteAsync"/>) and status is
-/// tracked on the session (FileDeletedAt / FileDeletionAttemptCount) separately from the
-/// session's business Status, so a retry or a concurrent run can never double-process or corrupt
-/// import progress. <see cref="DisableConcurrentExecutionAttribute"/> takes a distributed lock so
-/// two scheduler ticks never race the same batch.
-///
-/// Unlike <c>PurgeExpiredReadNotificationsJob</c> this job does not ship in dry-run mode: the
-/// finding this closes is that raw import files are <i>never</i> deleted today, so a dry-run
-/// default would leave the vulnerability open. It does follow that job's other two conventions —
-/// per-company legal-hold skip (<see cref="ILegalHoldStatusReader"/>) and a failure alert via
-/// <see cref="IAdministrativeAlertWriter"/> — since a data-import raw file is customer HR content,
-/// not transient UI state.
-/// </summary>
 internal sealed class PurgeImportSessionFilesJob(
     DataImportDbContext db,
     IImportFileStorageService storage,
@@ -93,10 +63,6 @@ internal sealed class PurgeImportSessionFilesJob(
 
                 if (await legalHoldStatusReader.IsUnderLegalHoldAsync(session.CompanyId, cancellationToken))
                 {
-                    // Legal hold preserves everything for the tenant, including transient
-                    // workflow artefacts — the file is left untouched and will be reconsidered
-                    // on a later run once the hold lifts. Not recorded as a failed attempt: this
-                    // is an intentional skip, not an error.
                     logger.LogInformation(
                         "Skipping raw-file purge for import session {ImportSessionId}: company {CompanyId} is under a legal hold.",
                         session.Id, session.CompanyId);

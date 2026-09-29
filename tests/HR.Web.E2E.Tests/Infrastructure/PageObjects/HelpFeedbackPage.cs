@@ -2,11 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for HelpFeedback.razor (/companies/{companyId}/support) — the employee-facing
-/// submission form plus "My Submissions" list. Type/Priority/status-filter dropdowns are all
-/// Syncfusion SfDropDownList instances, so selection goes through the shared DropDownSelector.
-/// </summary>
 public sealed class HelpFeedbackPage(IPage page, string baseUrl)
 {
     private ILocator SubmissionForm => page.Locator(".card").Filter(new() { HasText = "New Submission" });
@@ -18,8 +13,6 @@ public sealed class HelpFeedbackPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("button:has-text('Submit')", new() { Timeout = 20_000 });
     }
 
-    // The submission form has two SfDropDownList comboboxes in DOM order: Type (index 0),
-    // then Priority (index 1) — both scoped under the same "New Submission" card.
     public Task SelectTypeAsync(string type) =>
         DropDownSelector.SelectAsync(page, SubmissionForm, type, index: 0);
 
@@ -47,7 +40,6 @@ public sealed class HelpFeedbackPage(IPage page, string baseUrl)
     public async Task SubmitAsync()
     {
         await SubmissionForm.GetByRole(AriaRole.Button, new() { Name = "Submit" }).ClickAsync();
-        // On success the page navigates to the newly created request's detail page.
         await page.WaitForURLAsync("**/support/*", new() { Timeout = 20_000 });
     }
 

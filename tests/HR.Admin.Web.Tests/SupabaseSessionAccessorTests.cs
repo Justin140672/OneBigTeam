@@ -53,17 +53,12 @@ public class SupabaseSessionAccessorTests
     [Fact]
     public void AccessToken_Does_Not_Leak_Between_Separate_CircuitSessionState_Instances()
     {
-        // Two separate CircuitSessionState instances stand in for two separate admin-portal
-        // circuits/DI scopes (e.g. two different platform administrators, or the same administrator
-        // in two tabs). Isolation does not depend on ExecutionContext flow at all.
         var accessorA = new FakeHttpContextAccessor();
         var sutA = new SupabaseSessionAccessor(accessorA, new CircuitSessionState());
 
         accessorA.HttpContext = BuildHttpContextWithCookie(SupabaseSessionAccessor.CookieName, "token-a");
         Assert.Equal("token-a", sutA.AccessToken);
 
-        // A brand-new circuit's accessor/state pair — the previous (buggy) implementation latched
-        // onto the FIRST captured token forever and would have returned "token-a" here too.
         var accessorB = new FakeHttpContextAccessor { HttpContext = null };
         var sutB = new SupabaseSessionAccessor(accessorB, new CircuitSessionState());
 

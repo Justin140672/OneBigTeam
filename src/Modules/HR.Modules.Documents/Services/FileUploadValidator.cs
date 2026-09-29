@@ -5,33 +5,31 @@ namespace HR.Modules.Documents.Services;
 
 internal sealed class FileUploadValidator : IFileUploadValidator
 {
-    // Maps a declared content type to the magic byte sequences that identify it.
-    // Multiple sequences cover format variants (e.g. JFIF vs EXIF JPEG).
     private static readonly Dictionary<string, byte[][]> MagicBytes = new(StringComparer.OrdinalIgnoreCase)
     {
         ["application/pdf"] =
         [
-            [0x25, 0x50, 0x44, 0x46], // %PDF
+            [0x25, 0x50, 0x44, 0x46],
         ],
         ["application/msword"] =
         [
-            [0xD0, 0xCF, 0x11, 0xE0], // OLE2 compound document
+            [0xD0, 0xCF, 0x11, 0xE0],
         ],
         ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"] =
         [
-            [0x50, 0x4B, 0x03, 0x04], // PK (ZIP)
-            [0x50, 0x4B, 0x05, 0x06], // PK empty archive
+            [0x50, 0x4B, 0x03, 0x04],
+            [0x50, 0x4B, 0x05, 0x06],
         ],
         ["image/jpeg"] =
         [
-            [0xFF, 0xD8, 0xFF, 0xE0], // JFIF
-            [0xFF, 0xD8, 0xFF, 0xE1], // EXIF
-            [0xFF, 0xD8, 0xFF, 0xE8], // SPIFF
-            [0xFF, 0xD8, 0xFF, 0xDB], // raw JPEG
+            [0xFF, 0xD8, 0xFF, 0xE0],
+            [0xFF, 0xD8, 0xFF, 0xE1],
+            [0xFF, 0xD8, 0xFF, 0xE8],
+            [0xFF, 0xD8, 0xFF, 0xDB],
         ],
         ["image/png"] =
         [
-            [0x89, 0x50, 0x4E, 0x47], // ‰PNG
+            [0x89, 0x50, 0x4E, 0x47],
         ],
     };
 
@@ -76,7 +74,7 @@ internal sealed class FileUploadValidator : IFileUploadValidator
         var normalizedContentType = contentType.Split(';')[0].Trim();
 
         if (!MagicBytes.TryGetValue(normalizedContentType, out var signatures))
-            return Result.Success(); // no known signature for this type; defer to other checks
+            return Result.Success();
 
         Span<byte> header = stackalloc byte[4];
         var read = content.Read(header);

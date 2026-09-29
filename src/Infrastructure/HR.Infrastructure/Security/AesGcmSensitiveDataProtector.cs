@@ -4,24 +4,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Infrastructure.Security;
 
-/// <summary>
-/// AES-256-GCM implementation of <see cref="ISensitiveDataProtector"/>.
-///
-/// Token format (all ASCII, safe for a Postgres text/varchar column and for transport):
-/// <code>
-/// OBTENC1:{keyId}:{base64( nonce[12] || ciphertext[n] || tag[16] )}
-/// </code>
-/// <list type="bullet">
-/// <item><description><c>OBTENC1</c> — format version. A future format bump becomes <c>OBTENC2</c>.</description></item>
-/// <item><description><c>keyId</c> — identifies which configured key encrypted the value. Decryption
-/// selects the key by this id, which is what makes key rotation a config change rather than a data
-/// migration. May not contain <c>:</c>.</description></item>
-/// <item><description><c>nonce</c> — 96-bit random value, freshly generated per <see cref="Protect"/> call.</description></item>
-/// <item><description><c>tag</c> — 128-bit GCM authentication tag. The scheme + key id are bound in as
-/// associated data, so swapping the key id in a stored token is detected as tampering.</description></item>
-/// </list>
-/// The stored value is ciphertext only — it never contains or reveals plaintext.
-/// </summary>
 internal sealed class AesGcmSensitiveDataProtector : ISensitiveDataProtector
 {
     internal const string Scheme = "OBTENC1";
@@ -38,10 +20,6 @@ internal sealed class AesGcmSensitiveDataProtector : ISensitiveDataProtector
         _activeKeyId = activeKeyId;
     }
 
-    /// <summary>
-    /// Builds a protector from configuration. Throws <see cref="SensitiveDataProtectionException"/>
-    /// with a message free of key material when the configuration is missing or invalid.
-    /// </summary>
     public static AesGcmSensitiveDataProtector Create(SensitiveDataProtectionOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);

@@ -42,8 +42,6 @@ internal sealed class EmployeeRenumberSideEffectJob(
             return;
         }
 
-        // OBT-REM-11: verify the caller-supplied companyId (used by the Hangfire failure-audit
-        // filter to scope this job to a tenant) actually matches the outbox row being processed.
         if (message.CompanyId != companyId)
         {
             logger.LogError(
@@ -53,8 +51,6 @@ internal sealed class EmployeeRenumberSideEffectJob(
                 $"OutboxMessage {outboxMessageId} does not belong to company {companyId}.");
         }
 
-        // Idempotency guard: already completed (possibly by a prior attempt that succeeded but
-        // crashed before this status update, or a duplicate enqueue) — no-op.
         if (message.Status == Domain.OutboxMessage.StatusProcessed)
             return;
 
@@ -106,9 +102,6 @@ internal sealed class EmployeeRenumberSideEffectJob(
                     message.AttemptCount, message.CompanyId, outboxMessageId);
             }
 
-            // Rethrow while retries remain so Hangfire schedules the next attempt; rethrow on the
-            // final attempt too so the existing BackgroundJobAuditFilter records the standard
-            // operational-failure audit trail every other job already relies on.
             throw;
         }
     }

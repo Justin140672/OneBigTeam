@@ -53,8 +53,6 @@ internal sealed class CompleteSharedCompanyDocumentReviewHandler(
         var reviewDate = DateOnly.FromDateTime(clock.UtcNow);
         var nextReviewDate = ComputeNextReviewDate(document.ReviewFrequency, document.CustomReviewFrequencyMonths, reviewDate);
 
-        // Captured before CompleteReview overwrites document.ReviewDate — this is the due date
-        // that THIS review is fulfilling, not the next scheduled one.
         var previousReviewDate = document.ReviewDate;
 
         document.CompleteReview(reviewedBy, request.ReviewNotes, reviewDate, nextReviewDate, clock.UtcNowOffset());
@@ -72,8 +70,6 @@ internal sealed class CompleteSharedCompanyDocumentReviewHandler(
 
         var now = clock.UtcNowOffset();
 
-        // Built from in-memory values ahead of the save (CompleteReview already ran above), so it
-        // can double as both the response and the payload persisted for an idempotency replay.
         var response = new CompleteSharedCompanyDocumentReviewResponse(
             document.Id,
             document.CompanyId,
@@ -87,9 +83,6 @@ internal sealed class CompleteSharedCompanyDocumentReviewHandler(
             var outcome = await db.SaveIdempotentAsync(db.IdempotencyRecords,
             scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
 
-            // Lost a race against a concurrent duplicate under the same key — this attempt's
-            // changes were rolled back along with it, so skip the task-complete/audit publishing
-            // below and hand back the winner's result untouched.
             if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
                 return Result.Success(outcome.Response!);
         }
@@ -98,11 +91,6 @@ internal sealed class CompleteSharedCompanyDocumentReviewHandler(
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        // Closes the open Review task created by DetectDocumentsDueForReviewJob (sourceEntityId =
-        // document.Id, TaskActionType.Review) so the next review cycle's ReviewDate isn't
-        // permanently suppressed by a dangling open task — mirrors UploadRequestedDocumentHandler's
-        // placement, after SaveChangesAsync so a task-completion failure can't roll back the review
-        // itself. No-op if no matching open task exists.
         await taskCompleter.CompleteBySourceEntityAsync(
             document.CompanyId,
             document.Id,
@@ -138,8 +126,6 @@ internal sealed class CompleteSharedCompanyDocumentReviewHandler(
             SharedCompanyDocumentReviewFrequency.Quarterly  => reviewDate.AddMonths(3),
             SharedCompanyDocumentReviewFrequency.SixMonthly => reviewDate.AddMonths(6),
             SharedCompanyDocumentReviewFrequency.Yearly     => reviewDate.AddMonths(12),
-            // Defensive: Custom should always carry a value, but fall back to 0 months rather than
-            // throwing if it somehow doesn't.
             SharedCompanyDocumentReviewFrequency.Custom     => reviewDate.AddMonths(customReviewFrequencyMonths ?? 0),
             _                                                => null,
         };

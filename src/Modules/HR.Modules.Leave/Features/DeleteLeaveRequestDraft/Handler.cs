@@ -8,9 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Features.DeleteLeaveRequestDraft;
 
-// LEAVE-07: a draft never touched LeaveBalance/ToilTransaction/notifications/tasks, so deleting it
-// is a plain hard delete - there is nothing to reverse and no audit trail of a "real" leave event
-// to preserve (compare CancelLeaveRequestHandler, which reverses balance usage for a real request).
 internal sealed class DeleteLeaveRequestDraftHandler(LeaveDbContext dbContext, IClock clock)
 {
     public async Task<Result<DeleteLeaveRequestDraftResponse>> HandleAsync(

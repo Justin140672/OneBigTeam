@@ -5,10 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Probation.Tests;
 
-/// <summary>
-/// DSH-05: <see cref="EmployeesInProbationReader"/> — "in probation" means an active probation
-/// record (Active / ReviewDue / Extended). NotStarted, Passed, Failed and NotApplicable are not.
-/// </summary>
 public class EmployeesInProbationReaderTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 30, 10, 0, 0, TimeSpan.Zero);

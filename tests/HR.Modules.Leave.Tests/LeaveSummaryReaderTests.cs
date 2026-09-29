@@ -86,9 +86,6 @@ public class LeaveSummaryReaderTests
 
         var reader = new LeaveSummaryReader(db);
 
-        // Empty (non-null) collection is treated as "no restriction" per the reader's
-        // `employeeIds is { Count: > 0 }` guard — company-wide is still bounded by the caller's
-        // own resolved direct-report set at the handler layer, never here.
         var result = await reader.GetLeaveSummaryAsync(companyId, employeeIds: [], policyYear: 2026, CancellationToken.None);
 
         Assert.Single(result);

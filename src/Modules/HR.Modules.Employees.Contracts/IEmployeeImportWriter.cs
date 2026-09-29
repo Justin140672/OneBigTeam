@@ -16,16 +16,10 @@ public sealed record EmployeeImportCreateRequest(
     Guid LocationId,
     Guid EmploymentTypeId,
     Guid PositionProfileId,
-    // Null/blank when the company is in Automatic employee-numbering mode: the writer generates
-    // the number itself via IEmployeeNumberGenerator in that case. Always populated in Manual mode
-    // (guaranteed by EmployeeStagingRowValidator's mode-aware requiredness check at staging time).
     string? EmployeeNumber,
     Guid ImportSessionId,
     Guid? ActorUserId,
     string? Address = null,
-    // When null, the writer falls back to the company's default probation-length calculation
-    // (IProbationDateResolver). When populated (from the import file's Probation End Date column),
-    // the imported value is used as-is instead.
     DateOnly? ProbationEndDate = null);
 
 public sealed record EmployeeImportCreateResult(
@@ -48,23 +42,11 @@ public sealed record EmployeeImportCompensation(
     string SalaryType,
     string Currency);
 
-/// <summary>
-/// Cross-module write surface used exclusively by the DataImport confirm step to create
-/// employees and their related records without DataImport referencing HR.Modules.Employees
-/// directly. Implemented in HR.Modules.Employees.Services and DI-registered in EmployeesModule.
-/// </summary>
 public interface IEmployeeImportWriter
 {
     Task<EmployeeImportCreateResult> CreateEmployeeAsync(
         EmployeeImportCreateRequest request, CancellationToken cancellationToken);
 
-    /// <summary>
-    /// Updates an existing employee (identified by <paramref name="existingEmployeeId"/>) with the
-    /// import row's data, instead of creating a new employee. Used exclusively for the single
-    /// case where an import row's Work Email matches the company's initial (seed) admin employee —
-    /// see Employee.IsInitialCompanyAdmin / EmployeeStagingRowValidator. The seed-admin flag itself
-    /// is left untouched (still true) — this only refreshes the employee's data from the import row.
-    /// </summary>
     Task<EmployeeImportCreateResult> UpdateEmployeeAsync(
         Guid existingEmployeeId, EmployeeImportCreateRequest request, CancellationToken cancellationToken);
 
@@ -74,21 +56,9 @@ public interface IEmployeeImportWriter
     Task CreateOpeningCompensationAsync(
         Guid companyId, Guid employeeId, DateOnly effectiveFrom, EmployeeImportCompensation compensation, CancellationToken cancellationToken);
 
-    /// <summary>
-    /// Assigns a manager to an already-created employee, replicating AssignManager's circular
-    /// hierarchy guard. Returns false (without making any change) if the assignment would
-    /// create a cycle or the manager does not exist/is terminated.
-    /// </summary>
     Task<bool> TryAssignManagerAsync(
         Guid companyId, Guid employeeId, Guid managerId, CancellationToken cancellationToken);
 
-    /// <summary>
-    /// Reads back the data needed to (re)publish import integration events for an employee that
-    /// was already created by a previous (failed/partial) confirm run. Used by
-    /// ConfirmImportSession's resume path so a retry never calls CreateEmployeeAsync/
-    /// UpdateEmployeeAsync a second time for a row whose employee already exists. Null if the
-    /// employee cannot be found (should not normally happen since the row recorded its id).
-    /// </summary>
     Task<EmployeeImportCreateResult?> GetImportSnapshotAsync(
         Guid companyId, Guid employeeId, CancellationToken cancellationToken);
 }

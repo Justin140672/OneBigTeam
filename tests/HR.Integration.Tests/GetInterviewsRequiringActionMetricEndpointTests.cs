@@ -111,7 +111,6 @@ public class GetInterviewsRequiringActionMetricEndpointTests
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
-            // Custom single-stage pipeline.
             var stage = RecruitmentStage.Create(Guid.NewGuid(), companyId, "Meeting the team", 1, false, RecruitmentStageTerminalOutcome.None, Now);
             db.RecruitmentStages.Add(stage);
             var g = Graph(db, companyId, stage.Id);

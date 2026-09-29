@@ -109,8 +109,6 @@ else
         _loading = false;
     }
 
-    // Debounced text filters — same "don't hammer the server on every keystroke" pattern as
-    // CustomerList.razor/FailedPayments.razor.
     private async Task DebouncedReloadAsync()
     {
         _filterDebounceCts?.Cancel();

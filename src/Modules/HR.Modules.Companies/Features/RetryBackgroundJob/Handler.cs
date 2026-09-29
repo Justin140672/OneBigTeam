@@ -5,12 +5,6 @@ using Microsoft.Extensions.Configuration;
 
 namespace HR.Modules.Companies.Features.RetryBackgroundJob;
 
-/// <summary>
-/// Requeues a failed background job (Background Jobs epic, Job Monitoring story). Same
-/// defense-in-depth allow-list gate as ForceCustomerReadOnlyHandler (see its remarks), and the same
-/// "audit every administrative intervention" convention as the other Subscription Management
-/// actions in this module.
-/// </summary>
 internal sealed class RetryBackgroundJobHandler(
     ICurrentUser currentUser,
     IConfiguration configuration,

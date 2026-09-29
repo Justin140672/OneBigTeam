@@ -12,9 +12,6 @@ using OpenTelemetry.Trace;
 
 namespace Microsoft.Extensions.Hosting;
 
-// Adds common Aspire services: service discovery, resilience, health checks, and OpenTelemetry.
-// This project should be referenced by each service project in your solution.
-// To learn more about using this project, see https://aka.ms/aspire/service-defaults
 public static class Extensions
 {
     private const string HealthEndpointPath = "/health";
@@ -48,7 +45,6 @@ public static class Extensions
             {
                 options.AttemptTimeout.Timeout = TimeSpan.FromSeconds(30);
                 options.TotalRequestTimeout.Timeout = TimeSpan.FromSeconds(120);
-                // CircuitBreaker.SamplingDuration must be >= 2 * AttemptTimeout.
                 options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(60);
                 options.Retry.MaxRetryAttempts = 4;
                 options.Retry.Delay = TimeSpan.FromMilliseconds(500);
@@ -77,15 +73,9 @@ public static class Extensions
                 };
             });
 
-            // Turn on service discovery by default
             http.AddServiceDiscovery();
         });
 
-        // Uncomment the following to restrict the allowed schemes for service discovery.
-        // builder.Services.Configure<ServiceDiscoveryOptions>(options =>
-        // {
-        //     options.AllowedSchemes = ["https"];
-        // });
 
         return builder;
     }
@@ -107,18 +97,14 @@ public static class Extensions
             })
             .WithTracing(tracing =>
             {
-                // NFR-01: redact sensitive tag/status/exception values from every span before export.
                 tracing.AddProcessor(new SensitiveDataRedactingProcessor());
 
                 tracing.AddSource(builder.Environment.ApplicationName)
                     .AddAspNetCoreInstrumentation(tracing =>
-                        // Exclude health check requests from tracing
                         tracing.Filter = context =>
                             !context.Request.Path.StartsWithSegments(HealthEndpointPath)
                             && !context.Request.Path.StartsWithSegments(AlivenessEndpointPath)
                     )
-                    // Uncomment the following line to enable gRPC instrumentation (requires the OpenTelemetry.Instrumentation.GrpcNetClient package)
-                    //.AddGrpcClientInstrumentation()
                     .AddHttpClientInstrumentation();
             });
 
@@ -136,12 +122,6 @@ public static class Extensions
             builder.Services.AddOpenTelemetry().UseOtlpExporter();
         }
 
-        // Uncomment the following lines to enable the Azure Monitor exporter (requires the Azure.Monitor.OpenTelemetry.AspNetCore package)
-        //if (!string.IsNullOrEmpty(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
-        //{
-        //    builder.Services.AddOpenTelemetry()
-        //       .UseAzureMonitor();
-        //}
 
         return builder;
     }
@@ -149,7 +129,6 @@ public static class Extensions
     public static TBuilder AddDefaultHealthChecks<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         builder.Services.AddHealthChecks()
-            // Add a default liveness check to ensure app is responsive
             .AddCheck("self", () => HealthCheckResult.Healthy(), ["live"]);
 
         return builder;
@@ -157,9 +136,6 @@ public static class Extensions
 
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
-        // NFR-03: production-safe liveness (/alive) and readiness (/health/ready) endpoints are
-        // mapped in every environment. See HealthCheckEndpoints for the security model (minimal
-        // public body, token-gated detail, critical-vs-degraded dependency classification).
         HealthCheckEndpoints.MapLivenessAndReadiness(app);
 
         // Ticket 5: anonymous running-release identity probe. Used by the deploy pipeline to verify
@@ -170,8 +146,6 @@ public static class Extensions
             .AllowAnonymous()
             .WithName("HealthRelease");
 
-        // The original Aspire aggregate endpoint stays Development-only — it emits full per-check
-        // detail with no auth. See https://aka.ms/aspire/healthchecks.
         if (app.Environment.IsDevelopment())
         {
             app.MapHealthChecks(HealthEndpointPath);

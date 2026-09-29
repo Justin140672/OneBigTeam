@@ -11,19 +11,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Recruitment.Tests;
 
-/// <summary>
-/// [P1] Case-insensitive candidate email uniqueness — real-PostgreSQL coverage (via
-/// <see cref="RecruitmentDatabaseFixture"/>) of the unique index
-/// <c>ux_candidates_company_id_normalised_email</c>, its detection by
-/// <see cref="CandidateEmailUniqueness.IsViolation"/>, and every candidate write path racing another:
-/// legacy CreateCandidate vs itself, legacy vs the combined intake, and two UpdateCandidate email
-/// changes.
-///
-/// Deterministic by construction (same shape as <see cref="CreateCandidateApplicationConcurrencyTests"/>):
-/// each participant has its own DbContext, calls run concurrently via Task.WhenAll, every round uses a
-/// fresh company, and assertions are on the final database state and on the pair of outcomes — never
-/// on which call won, or on which safeguard (pre-check, lock re-check or unique index) stopped the loser.
-/// </summary>
 public class CandidateEmailUniquenessPostgresTests(RecruitmentDatabaseFixture fixture)
     : IClassFixture<RecruitmentDatabaseFixture>
 {
@@ -95,7 +82,6 @@ public class CandidateEmailUniquenessPostgresTests(RecruitmentDatabaseFixture fi
 
         await using (var db = fixture.BuildContext())
         {
-            // Same (company_id, name) — a unique violation, but not on the candidate email index.
             db.RecruitmentStages.Add(RecruitmentStage.Create(Guid.NewGuid(), companyId, "Screening", 2, false, RecruitmentStageTerminalOutcome.None, Now));
 
             var ex = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
@@ -112,7 +98,6 @@ public class CandidateEmailUniquenessPostgresTests(RecruitmentDatabaseFixture fi
         Assert.False(CandidateEmailUniqueness.IsViolation(new DbUpdateException("boom", new InvalidOperationException())));
     }
 
-    // ── Legacy CreateCandidate vs legacy CreateCandidate ───────────────────
 
     [Fact]
     public async Task Concurrent_Legacy_Creates_For_Case_Variants_Create_Exactly_One_Candidate()
@@ -147,7 +132,6 @@ public class CandidateEmailUniquenessPostgresTests(RecruitmentDatabaseFixture fi
         }
     }
 
-    // ── Legacy CreateCandidate vs combined intake ──────────────────────────
 
     [Fact]
     public async Task Concurrent_Legacy_Create_And_Combined_Intake_For_Case_Variants_Create_Exactly_One_Candidate()
@@ -159,7 +143,6 @@ public class CandidateEmailUniquenessPostgresTests(RecruitmentDatabaseFixture fi
             var lowerEmail = $"{local}@example.com";
             var upperEmail = $" {local.ToUpperInvariant()}@Example.Com  ";
 
-            // Alternate which path gets which variant so both directions are exercised.
             var legacyEmail = round % 2 == 0 ? lowerEmail : upperEmail;
             var intakeEmail = round % 2 == 0 ? upperEmail : lowerEmail;
 
@@ -216,7 +199,6 @@ public class CandidateEmailUniquenessPostgresTests(RecruitmentDatabaseFixture fi
         }
     }
 
-    // ── UpdateCandidate vs UpdateCandidate ─────────────────────────────────
 
     [Fact]
     public async Task Concurrent_Updates_Of_Two_Candidates_To_Case_Variants_Of_Same_Email_Leave_Exactly_One_Owner()
@@ -253,7 +235,6 @@ public class CandidateEmailUniquenessPostgresTests(RecruitmentDatabaseFixture fi
                 .ToListAsync());
             Assert.Equal(winner.Id, owner.Id);
 
-            // The loser's row is untouched.
             var loserId = winner.Id == emma.Id ? liam.Id : emma.Id;
             var loserRow = await verify.Candidates.AsNoTracking().SingleAsync(c => c.Id == loserId);
             var originalLoserEmail = loserId == emma.Id ? emma.NormalisedEmail : liam.NormalisedEmail;
@@ -265,7 +246,6 @@ public class CandidateEmailUniquenessPostgresTests(RecruitmentDatabaseFixture fi
     [Fact]
     public async Task Update_To_Case_Variant_Of_Existing_Email_Returns_Conflict_On_Postgres()
     {
-        // Pins that the normalised-email comparison translates to SQL correctly (not only on InMemory).
         var companyId = Guid.NewGuid();
         var emma = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, Now);
         var local = $"taken.{Guid.NewGuid():N}";
@@ -285,7 +265,6 @@ public class CandidateEmailUniquenessPostgresTests(RecruitmentDatabaseFixture fi
         Assert.Equal("conflict", result.Error.Code);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────
 
     private static CreateCandidateHandler LegacyHandler(RecruitmentDbContext db) =>
         new(db, new FakeClock(FixedUtcNow), NullLogger<CreateCandidateHandler>.Instance);

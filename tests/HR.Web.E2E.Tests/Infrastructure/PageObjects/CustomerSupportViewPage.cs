@@ -2,15 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for HR.Admin.Web's CustomerSupportView.razor (/customers/{CompanyId}/support) — a
-/// fully read-only, troubleshooting-optimised summary of one tenant (subscription/trial, users vs.
-/// employees, recent billing snapshots, platform-wide background job health, and several honest
-/// "not yet available" panels). There is no create/edit/delete affordance on this page.
-///
-/// Renders exactly one of: "Loading…", the "not authorised / couldn't be found" dashboard-error
-/// div, or the details grid — GoToAsync waits for whichever settles first.
-/// </summary>
 public sealed class CustomerSupportViewPage(IPage page, string baseUrl)
 {
     private const string ResolvedSelector = ".details-grid, .dashboard-error";

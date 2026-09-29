@@ -120,8 +120,6 @@ public class GetDocumentComplianceReportHandlerTests
     [Fact]
     public async Task HandleAsync_Above_DisplayRowLimit_Is_Truncated_And_Sums_Computed_From_Full_Set()
     {
-        // Seed limit+500 items, each contributing 1 to missing/expiringSoon/expired, so the
-        // full-set sum (limit+500) is clearly distinguishable from the capped-set sum (limit).
         const int overLimitBy = 500;
         var totalItems = ReportLimits.DisplayRowLimit + overLimitBy;
         var items = Enumerable.Range(0, totalItems)
@@ -137,7 +135,6 @@ public class GetDocumentComplianceReportHandlerTests
         Assert.True(response.IsTruncated);
         Assert.Equal(totalItems, response.TotalEmployees);
         Assert.Equal(ReportLimits.DisplayRowLimit, response.Items.Count);
-        // Sums must reflect the FULL set (totalItems), not just the capped rows (DisplayRowLimit).
         Assert.Equal(totalItems, response.TotalMissing);
         Assert.Equal(totalItems, response.TotalExpiringSoon);
         Assert.Equal(totalItems, response.TotalExpired);

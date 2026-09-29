@@ -19,7 +19,6 @@ public class AccountEmailDomainPolicyTests
         return data;
     }
 
-    // ── Every embedded entry ────────────────────────────────────────────────────
 
     [Theory]
     [MemberData(nameof(EmbeddedEntries))]
@@ -54,7 +53,6 @@ public class AccountEmailDomainPolicyTests
         Assert.Equal(entry, evaluation.MatchedBlockedDomain);
     }
 
-    // ── Explicit acceptance cases ───────────────────────────────────────────────
 
     [Theory]
     [InlineData("person@gmail.com", "gmail.com")]
@@ -90,14 +88,12 @@ public class AccountEmailDomainPolicyTests
     [Theory]
     [InlineData("person@company.co.uk", "company.co.uk")]
     [InlineData("person@acme.example", "acme.example")]
-    // Google Workspace / Microsoft 365 hosted organisation domain — the host doesn't matter.
     [InlineData("person@brightsparks-consulting.co.uk", "brightsparks-consulting.co.uk")]
-    // Suffix look-alikes: label-wise matching, not raw string suffix.
-    [InlineData("person@olive.com", "olive.com")]          // not "live.com"
-    [InlineData("person@acme.com", "acme.com")]            // not "me.com"
-    [InlineData("person@notgmail.com", "notgmail.com")]    // not "gmail.com"
-    [InlineData("person@gmail.co", "gmail.co")]            // not in list
-    [InlineData("person@gmail.com.acme.example", "gmail.com.acme.example")] // blocked name as a LEFT-hand label
+    [InlineData("person@olive.com", "olive.com")]
+    [InlineData("person@acme.com", "acme.com")]
+    [InlineData("person@notgmail.com", "notgmail.com")]
+    [InlineData("person@gmail.co", "gmail.co")]
+    [InlineData("person@gmail.com.acme.example", "gmail.com.acme.example")]
     [InlineData("PERSON@BRIGHTSPARKS-CONSULTING.CO.UK", "brightsparks-consulting.co.uk")]
     public void Evaluate_Allows_Organisation_Domains(string email, string expectedDomain)
     {
@@ -129,7 +125,6 @@ public class AccountEmailDomainPolicyTests
             Assert.Equal("gmail.com", evaluation.MatchedBlockedDomain);
     }
 
-    // ── Malformed ───────────────────────────────────────────────────────────────
 
     [Theory]
     [InlineData(null)]
@@ -156,7 +151,6 @@ public class AccountEmailDomainPolicyTests
         Assert.Null(evaluation.MatchedBlockedDomain);
     }
 
-    // ── Construction ────────────────────────────────────────────────────────────
 
     [Fact]
     public void Default_Is_A_Singleton_Built_From_The_Embedded_List()
@@ -188,7 +182,6 @@ public class AccountEmailDomainPolicyTests
             }));
 
         Assert.Equal(AccountEmailDomainVerdict.Blocked, policy.Evaluate("person@newly-observed-disposable.test").Verdict);
-        // Baseline entries are never removed by configuration.
         Assert.Equal(AccountEmailDomainVerdict.Blocked, policy.Evaluate("person@gmail.com").Verdict);
     }
 }

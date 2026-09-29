@@ -135,7 +135,6 @@ public class ConfirmImportSessionHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
 
-        // Pending is not Validated or CompletedWithErrors.
         var session = ImportSession.Create(
             Guid.NewGuid(), companyId, "Employee", "employees.csv", 1, Guid.NewGuid(),
             "sessions/abc/employees.csv", "text/csv", FixedNowOffset);
@@ -156,9 +155,6 @@ public class ConfirmImportSessionHandlerTests
     [Fact]
     public async Task HandleAsync_Updates_Existing_Employee_Instead_Of_Creating_When_Row_Targets_Seed_Admin()
     {
-        // A staging row with ExistingEmployeeIdToUpdate set (Work Email matched the company's seed
-        // admin employee — see EmployeeStagingRowValidator) must be routed to
-        // IEmployeeImportWriter.UpdateEmployeeAsync, never CreateEmployeeAsync.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var session = SeedSession(db, companyId, ImportStatus.Validated);
@@ -188,7 +184,6 @@ public class ConfirmImportSessionHandlerTests
         var companyId = Guid.NewGuid();
         var session = SeedSession(db, companyId, ImportStatus.Validated);
 
-        // No staging rows added at all.
         var handler = BuildHandler(db);
 
         var result = await handler.HandleAsync(
@@ -280,8 +275,6 @@ public class ConfirmImportSessionHandlerTests
 
         Assert.True(result.IsSuccess);
         var call = Assert.Single(leaveWriter.Calls);
-        // Leave Type Code was removed from the import template — Annual Leave is now hardcoded as
-        // the only leave type an import ever sets an opening balance for.
         Assert.Equal("Annual Leave", call.LeaveTypeCode);
         Assert.Equal(20m, call.OpeningBalanceDays);
     }
@@ -289,10 +282,6 @@ public class ConfirmImportSessionHandlerTests
     [Fact]
     public async Task HandleAsync_Marks_Session_CompletedWithErrors_When_Session_Has_An_Already_Invalid_Row()
     {
-        // A row that failed the earlier Validate step never enters ConfirmImportSessionHandler's
-        // own creation loop (only IsValid staging rows do) — this proves that pre-existing
-        // failure still surfaces in the final status/FailedCount rather than vanishing once every
-        // row that WAS valid confirms successfully.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var session = SeedSession(db, companyId, ImportStatus.Validated, totalRows: 2);
@@ -417,9 +406,6 @@ public class ConfirmImportSessionHandlerTests
         AddValidRow(db, companyId, session.Id, 3, workEmail: "report@example.com", managerReference: "MGR1",
             rawData: BuildRawData(workEmail: "report@example.com"));
 
-        // The fake's TryAssignManagerAsync normally fails only for pre-registered employee ids —
-        // since the handler generates a fresh Guid per row, force every assignment attempt to
-        // fail instead.
         var employeeWriter = new FakeEmployeeImportWriter();
         employeeWriter.FailAllManagerAssignments();
         var handler = BuildHandler(db, employeeWriter);

@@ -5,22 +5,8 @@ using HR.Modules.Support.Domain;
 
 namespace HR.Modules.Support.Services;
 
-/// <summary>A rendered support notification email: a header-safe subject and an HTML body.</summary>
 internal sealed record SupportEmail(string Subject, string HtmlBody);
 
-/// <summary>
-/// The single rendering point for every email the Support module sends (new-request admin alert,
-/// staff-reply customer notification and the retry-job notification), so all paths share one
-/// encoding policy and cannot drift.
-/// <para>
-/// Policy: every dynamic value interpolated into an HTML body goes through <see cref="Encode"/> —
-/// support request titles are plain text, never rich text, so they are always encoded and never
-/// sanitised. The encoder escapes all HTML-significant characters (&lt; &gt; &amp; " ' and more)
-/// while leaving letters from every Unicode range literal so non-English titles stay readable.
-/// Every subject goes through <see cref="SanitizeSubject"/>, which removes CR/LF and other
-/// control/line-separator characters (header injection) and bounds the length.
-/// </para>
-/// </summary>
 internal static class SupportEmailRenderer
 {
     internal const int MaxSubjectLength = 200;
@@ -34,8 +20,6 @@ internal static class SupportEmailRenderer
         string title,
         string? viewRequestLink)
     {
-        // viewRequestLink must already be a validated absolute http(s) URI built from trusted
-        // configuration (see SubmitSupportRequestHandler); it is still attribute-encoded here.
         var linkHtml = viewRequestLink is null
             ? string.Empty
             : $"""
@@ -78,16 +62,9 @@ internal static class SupportEmailRenderer
         return new SupportEmail(SanitizeSubject($"[Retry] Support request update: {referenceNumber}"), body);
     }
 
-    /// <summary>HTML-encodes a plain-text value for element-text or quoted-attribute contexts.</summary>
     public static string Encode(string? value) =>
         string.IsNullOrEmpty(value) ? string.Empty : Encoder.Encode(value);
 
-    /// <summary>
-    /// Makes a value safe to use as an email subject header: every control character (including
-    /// CR, LF, TAB, NUL, NEL) and the Unicode line/paragraph separators are replaced with a space,
-    /// runs of whitespace are collapsed, and the result is trimmed and bounded to
-    /// <see cref="MaxSubjectLength"/> characters without splitting a surrogate pair.
-    /// </summary>
     public static string SanitizeSubject(string? value)
     {
         if (string.IsNullOrEmpty(value))

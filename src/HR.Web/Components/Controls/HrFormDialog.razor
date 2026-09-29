@@ -31,8 +31,6 @@
     [Parameter] public RenderFragment? ChildContent { get; set; }
     [Parameter] public RenderFragment? FooterContent { get; set; }
 
-    // Soft-cancel via close icon/Escape/backdrop click, same as HrConfirmDialog — except while
-    // Busy (an async save in flight), which ignores the close attempt rather than racing it.
     [Parameter] public EventCallback OnCancelled { get; set; }
 
     private Task HandleClosed() => Busy ? Task.CompletedTask : OnCancelled.InvokeAsync();

@@ -131,10 +131,6 @@ internal sealed class ImportLookupResolver(
         if (existing is not null)
             return new PositionProfileImportLookupResult(existing.Value, WasCreated: false, Skipped: false);
 
-        // Department, Location and DefaultLeavePolicyId are mandatory on PositionProfile. A brand-new
-        // position profile can only be safely auto-created here when the department, location, AND the
-        // company's default leave policy (via ILeavePolicyReader) are all resolvable. If any of the
-        // three is missing, skip — same as the existing missing department/location guard.
         var defaultLeavePolicyId = await leavePolicyReader.GetDefaultLeavePolicyIdAsync(companyId, cancellationToken);
 
         if (departmentId is null || locationId is null || defaultLeavePolicyId is null)

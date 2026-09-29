@@ -153,7 +153,6 @@ public class CreateAssetValidatorTests
     [Fact]
     public void Validate_Passes_When_AssetNumber_Is_Whitespace_Only()
     {
-        // See Validate_Passes_When_AssetNumber_Is_Empty — requiredness is handler-level now.
         var result = _validator.Validate(Valid() with { AssetNumber = "   " });
         Assert.True(result.IsValid);
     }

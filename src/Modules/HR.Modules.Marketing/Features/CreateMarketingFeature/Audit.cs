@@ -10,12 +10,6 @@ internal sealed record MarketingFeatureAuditSnapshot(
     int DisplayOrder,
     string DeliveryStatus);
 
-/// <summary>
-/// Records a platform-administrator creating a marketing feature. Uses the shared cross-cutting
-/// IAuditEventPublisher infrastructure (same pattern as
-/// HR.Modules.Companies.Features.UpdatePlatformSettings.Audit) — marketing content is global/system
-/// data, so <see cref="IAuditEvent.CompanyId"/> is <see cref="Guid.Empty"/>.
-/// </summary>
 internal sealed record MarketingFeatureCreatedAuditEvent(
     Guid FeatureId,
     Guid? ActorUserId,

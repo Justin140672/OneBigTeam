@@ -89,7 +89,6 @@ public class SignUpWorkEmailPolicyEndpointTests
 
         await AssertNothingCreatedAsync(companyName, email);
 
-        // One privacy-safe rejection audit row actually persisted (anonymous actor, domain only).
         Assert.Equal(auditsBefore + 1, await CountPublicSignupRejectionAuditsAsync());
         using var scope = _factory.Services.CreateScope();
         var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
@@ -126,7 +125,7 @@ public class SignUpWorkEmailPolicyEndpointTests
     }
 
     [Theory]
-    [InlineData("brightsparks-consulting.co.uk")] // Google Workspace / Microsoft 365 hosted organisation domain
+    [InlineData("brightsparks-consulting.co.uk")]
     [InlineData("olive.com")]                     // must not be caught by "live.com"
     public async Task Post_SignUp_Succeeds_For_Organisation_Domain(string domain)
     {
@@ -149,7 +148,6 @@ public class SignUpWorkEmailPolicyEndpointTests
     [Fact]
     public async Task Post_SignUp_Existing_Account_Conflict_Is_Still_409_For_An_Organisation_Domain()
     {
-        // Moving to ProblemResults.FromError must keep the conflict mapping (409) intact.
         using var client = _factory.CreateClient();
         var email = $"ada-{Guid.NewGuid():N}@acme.example";
 

@@ -34,10 +34,6 @@ internal sealed class AmendLeavingProcessHandler(
             return Result.Failure<AmendLeavingProcessResponse>(
                 Error.NotFound($"No in-progress leaving process was found for employee '{request.EmployeeId}'."));
 
-        // Backdating is permitted for genuine historical/corrective entry, but a LeavingDate
-        // before today requires explicit confirmation since it immediately finalises the employee
-        // through the same idempotent finalisation path ProcessLeavingEmployeesJob uses once a
-        // leaving date becomes due.
         var timeZoneId = await companyTimeZoneReader.GetTimeZoneAsync(request.CompanyId, cancellationToken);
         var today = clock.TodayIn(timeZoneId);
         var isBackdated = request.LeavingDate < today;
@@ -57,8 +53,6 @@ internal sealed class AmendLeavingProcessHandler(
             leavingProcess.LeavingReason,
             leavingProcess.Status);
 
-        // Surfaced back to the UI as a non-blocking warning per the AC ("warn if offboarding has
-        // already started") — this endpoint amends the leaving process regardless of the result.
         var offboardingStatus = await offboardingStatusReader.GetStatusAsync(
             request.CompanyId, request.EmployeeId, cancellationToken);
         var offboardingAlreadyStarted = offboardingStatus is not null;
@@ -100,18 +94,12 @@ internal sealed class AmendLeavingProcessHandler(
                 offboardingAlreadyStarted),
             cancellationToken);
 
-        // Cross-module notification so consuming modules (e.g. Leave, LEAVE-05) recalculate the
-        // employee's current policy year entitlement pro-rated through the amended LeavingDate.
-        // Always recalculated from the current LeavingDate (never an incremental delta), so a
-        // chain of amendments converges rather than compounding reductions.
         await integrationEventPublisher.PublishAsync(
             new EmployeeLeavingDateSetIntegrationEvent(
                 leavingProcess.CompanyId, leavingProcess.EmployeeId,
                 leavingProcess.LeavingDate, leavingProcess.LastWorkingDay, now),
             cancellationToken);
 
-        // request.ConfirmBackdatedLeavingDate is guaranteed true here — the unconfirmed case
-        // already returned a Conflict above before the amendment was applied.
         if (isBackdated)
         {
             var employee = await dbContext.Employees

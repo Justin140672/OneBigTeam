@@ -19,9 +19,7 @@ public sealed class IdempotencyKeyScope
 {
     private Guid? _key;
 
-    /// <summary>The key for the in-progress (or about-to-start) attempt of this logical operation.</summary>
     public Guid Current => _key ??= Guid.NewGuid();
 
-    /// <summary>Call after a definitive outcome so the next call starts a genuinely new operation.</summary>
     public void Reset() => _key = null;
 }

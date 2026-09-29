@@ -35,7 +35,6 @@ internal sealed class AccountCreationEmailGuard(
     public const string WorkEmailRequiredMessage =
         "Please use your organisation's work email address. Public email services such as Gmail, Hotmail and Outlook.com cannot be used to create an account.";
 
-    /// <summary>Bulk-invitation exclusion reason code (see QueueInvitationBatch / ProcessInvitationBatchJob).</summary>
     public const string BulkExclusionReason = "PublicEmailDomain";
 
     public const string BulkExclusionMessage = "An organisation email address is required to create an account.";
@@ -49,10 +48,6 @@ internal sealed class AccountCreationEmailGuard(
     public static Error ErrorFor(AccountEmailDomainEvaluation evaluation) =>
         evaluation.Verdict == AccountEmailDomainVerdict.Malformed ? InvalidEmail : WorkEmailRequired;
 
-    /// <summary>
-    /// Evaluates a single address; on rejection records the audit event and returns the failure to
-    /// hand straight back to the caller.
-    /// </summary>
     public async Task<Result> EnsureAllowedAsync(
         string? email,
         AccountCreationPath path,

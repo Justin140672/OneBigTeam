@@ -146,9 +146,6 @@ public class ScanUploadedFileJobTests
     [Fact]
     public async Task ExecuteAsync_Scanner_Exception_With_Null_Context_Rethrows_Without_Marking_Failed()
     {
-        // context defaults to null (no PerformContext supplied), so retryCount defaults to 0 and
-        // isFinalAttempt is always false — the entity is left Scanning, not Failed, and the
-        // exception propagates so Hangfire's [AutomaticRetry] can retry it.
         await using var db = BuildContext();
         var companyId       = Guid.NewGuid();
         var (_, doc)         = await SeedPendingDocument(db, companyId);
@@ -174,6 +171,6 @@ public class ScanUploadedFileJobTests
         await job.ExecuteAsync(FileScanTargetType.Document, doc.Id, companyId);
 
         var stored = await db.Documents.SingleAsync(d => d.Id == doc.Id);
-        Assert.Equal(1, stored.ScanAttemptCount); // MarkScanning increments this once
+        Assert.Equal(1, stored.ScanAttemptCount);
     }
 }

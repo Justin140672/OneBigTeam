@@ -28,9 +28,6 @@ public sealed class SupabaseSessionAccessor(IHttpContextAccessor httpContextAcce
                 var context = httpContextAccessor.HttpContext;
                 if (context is not null)
                 {
-                    // A real HttpContext is present: its cookie state is authoritative for this
-                    // request. Always re-read it — never trust an earlier caller's cached value —
-                    // and fail closed (null) if this request carries no session cookie.
                     var cookie = context.Request.Cookies[CookieName];
                     sessionState.SetToken(cookie);
                     return cookie;
@@ -38,28 +35,12 @@ public sealed class SupabaseSessionAccessor(IHttpContextAccessor httpContextAcce
             }
             catch
             {
-                // stale/disposed HttpContext (documented Blazor Server footgun) — fall through to
-                // CircuitSessionState below, which is safe because it is a genuine per-circuit DI
-                // object, not a value some other, unrelated caller could have left behind.
             }
 
-            // No live HttpContext (Blazor Server interactive circuit event handling). Return only
-            // the token captured earlier in *this circuit's own scoped state* — CircuitSessionState
-            // is resolved per-circuit by DI, so it can never hold a value left behind by some other,
-            // unrelated circuit or request.
             return sessionState.AccessToken;
         }
     }
 
-    /// <summary>
-    /// Sets the session cookie and updates this (real, request-scoped) circuit's own
-    /// CircuitSessionState to match. See HR.Web.Services.SupabaseSessionAccessor.SetSessionCookie for
-    /// the full "auth changed on an open tab" policy: authentication changes are never applied
-    /// in-place on a live circuit. The browser always performs a full top-level navigation afterwards,
-    /// tearing down the old circuit/DI scope and starting a fresh one whose own early middleware
-    /// re-derives CircuitSessionState AND the cascading AuthenticationState together from the same
-    /// cookie — so they can never diverge.
-    /// </summary>
     public static void SetSessionCookie(
         HttpContext context,
         string accessToken,
@@ -70,8 +51,6 @@ public sealed class SupabaseSessionAccessor(IHttpContextAccessor httpContextAcce
         context.Response.Cookies.Append(CookieName, accessToken, new CookieOptions
         {
             HttpOnly = true,
-            // Always Secure outside Development; in Development the site may still be plain-http
-            // localhost, where a Secure cookie would simply be dropped.
             Secure = !environment.IsDevelopment() || context.Request.IsHttps,
             SameSite = SameSiteMode.Lax,
             Expires = DateTimeOffset.UtcNow.AddSeconds(expiresInSeconds),
@@ -82,11 +61,6 @@ public sealed class SupabaseSessionAccessor(IHttpContextAccessor httpContextAcce
         sessionState?.SetToken(accessToken);
     }
 
-    /// <summary>
-    /// Deletes the session cookie and clears this request's CircuitSessionState so that no later
-    /// call on this scope — even one that races and finds no live HttpContext — can resume sending
-    /// the old bearer token.
-    /// </summary>
     public static void ClearSessionCookie(HttpContext context, IHostEnvironment environment, CircuitSessionState? sessionState = null)
     {
         context.Response.Cookies.Delete(CookieName, new CookieOptions

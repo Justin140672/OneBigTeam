@@ -3,10 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Direct coverage of the Close / unsaved-changes prompt (EditPageBase) on the Position
-/// Profile edit page.
-/// </summary>
 public sealed class PositionProfileEditCloseBehaviorTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -27,7 +23,6 @@ public sealed class PositionProfileEditCloseBehaviorTests(HrAdminPersonaFixture 
         await ppList.GoToAsync(AcmeId);
         await ppList.ClickNewPositionProfileAsync();
         await ppEdit.FillTitleAsync(title);
-        // Department, Location and Default Leave Policy are now mandatory on Position Profile.
         await ppEdit.SelectDepartmentAsync("Engineering");
         await ppEdit.SelectLocationAsync("London Office");
         await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
@@ -101,7 +96,6 @@ public sealed class PositionProfileEditCloseBehaviorTests(HrAdminPersonaFixture 
 
         await ppEdit.GoToNewAsync(AcmeId);
         await ppEdit.FillTitleAsync(title);
-        // Department, Location and Default Leave Policy are now mandatory on Position Profile.
         await ppEdit.SelectDepartmentAsync("Engineering");
         await ppEdit.SelectLocationAsync("London Office");
         await ppEdit.SelectDefaultLeavePolicyAsync("Standard");

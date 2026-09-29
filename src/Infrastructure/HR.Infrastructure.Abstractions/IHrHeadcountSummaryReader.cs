@@ -1,13 +1,5 @@
 namespace HR.Infrastructure.Abstractions;
 
-/// <summary>
-/// Company-wide headcount data for the HR Headcount Summary Report, as owned by
-/// HR.Modules.Employees. Employee status reuses the existing EmploymentStatus enum (via
-/// EmployeeStatus.ToString()) rather than introducing new classification logic — see
-/// HrHeadcountSummaryItem's remarks. FTE is resolved from each employee's current Compensation
-/// record (EffectiveFrom &lt;= today &amp;&amp; (EffectiveTo == null || EffectiveTo &gt;= today)); it is
-/// sensitive/salary-adjacent data and must never be logged.
-/// </summary>
 public interface IHrHeadcountSummaryReader
 {
     Task<HrHeadcountSummaryResult> GetHeadcountSummaryAsync(

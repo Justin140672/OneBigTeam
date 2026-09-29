@@ -110,9 +110,7 @@ public class HrHeadcountSummaryReaderTests
         var companyId = Guid.NewGuid();
         var employee = SeedEmployee(db, companyId, Today.AddDays(-365));
 
-        // Expired record (should be ignored).
         SeedCompensation(db, companyId, employee.Id, 0.2m, Today.AddDays(-365), Today.AddDays(-100));
-        // Current record (EffectiveFrom in the past, no EffectiveTo).
         SeedCompensation(db, companyId, employee.Id, 0.8m, Today.AddDays(-99));
 
         await db.SaveChangesAsync();
@@ -162,7 +160,6 @@ public class HrHeadcountSummaryReaderTests
         var companyId = Guid.NewGuid();
         var employee = SeedEmployee(db, companyId, Today.AddDays(-30));
 
-        // Future-dated compensation, not yet effective.
         SeedCompensation(db, companyId, employee.Id, 1.0m, Today.AddDays(10));
 
         await db.SaveChangesAsync();
@@ -248,7 +245,6 @@ public class HrHeadcountSummaryReaderTests
         active.Activate(Now);
 
         var draft = SeedEmployee(db, companyId, Today);
-        // draft left at default EmploymentStatus.Draft.
 
         await db.SaveChangesAsync();
 

@@ -5,11 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Integration coverage for the ListNationalities reference-data slice (GET /api/nationalities).
-/// The nationalities table is populated once at module startup
-/// (EmployeesModule seed data), so this is a global, tenant-agnostic list.
-/// </summary>
 [Collection("Integration")]
 public class ListNationalitiesEndpointTests
 {
@@ -68,7 +63,6 @@ public class ListNationalitiesEndpointTests
         var names = payload.Items.Select(i => i.Name).ToList();
         Assert.Equal(names.OrderBy(n => n, StringComparer.OrdinalIgnoreCase), names, StringComparer.OrdinalIgnoreCase);
 
-        // Ids are stable non-zero reference keys.
         Assert.All(payload.Items, i => Assert.True(i.Id > 0));
         Assert.Equal(payload.Items.Select(i => i.Id).Distinct().Count(), payload.Items.Count);
     }

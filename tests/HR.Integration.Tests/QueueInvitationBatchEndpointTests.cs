@@ -93,7 +93,6 @@ public class QueueInvitationBatchEndpointTests
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
 
-        // An id that resolves to nothing in this company's candidate list.
         var response = await client.PostAsJsonAsync(Url(companyId), new { companyId, employeeIds = new[] { Guid.NewGuid() } });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
@@ -143,7 +142,7 @@ public class QueueInvitationBatchEndpointTests
 
         var response = await client.PostAsJsonAsync(Url(companyId), new { companyId, employeeIds = new[] { crossCompanyEmployeeId } });
 
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode); // zero eligible remain
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();

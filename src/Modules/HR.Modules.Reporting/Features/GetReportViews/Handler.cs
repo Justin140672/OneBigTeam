@@ -13,9 +13,6 @@ internal sealed class GetReportViewsHandler(ReportingDbContext dbContext)
         ReportAccessGates accessGates,
         CancellationToken cancellationToken)
     {
-        // REP-03: if the report was removed from the catalogue, or the caller's access to it has
-        // since been revoked, silently return no saved views rather than erroring — this covers
-        // views persisted before this change under a permission the caller may no longer hold.
         if (!ReportCatalog.TryGet(request.ReportId, out var definition) || !accessGates.IsAuthorized(definition.AccessGate))
             return Result.Success(new GetReportViewsResponse([]));
 

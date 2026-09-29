@@ -22,7 +22,6 @@ public class ReassignTaskEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    // ── Auth ───────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Reassign_Task_Returns_Unauthorized_When_No_Auth_Header()
@@ -52,7 +51,6 @@ public class ReassignTaskEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── Not found ──────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Reassign_Task_Returns_NotFound_When_Task_Does_Not_Exist()
@@ -66,7 +64,6 @@ public class ReassignTaskEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    // ── Happy path ─────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Reassign_Task_Updates_AssignedEmployeeId()
@@ -105,7 +102,6 @@ public class ReassignTaskEndpointTests
         Assert.Null(payload.AssignedUserId);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient()
     {

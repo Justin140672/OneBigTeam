@@ -65,9 +65,6 @@ internal sealed class ToilExpiryJob(
             {
                 try
                 {
-                    // Fresh scope every attempt, not just every company - a retried attempt must
-                    // recompute from scratch against a brand new DbContext/transaction, never reuse
-                    // the previous attempt's now-stale tracked entities.
                     await using var scope = scopeFactory.CreateAsyncScope();
                     var expiryService = scope.ServiceProvider.GetRequiredService<ToilExpiryService>();
 
@@ -82,14 +79,10 @@ internal sealed class ToilExpiryJob(
                             today);
                     }
 
-                    break; // success (including a legitimate no-op) - stop retrying this company.
+                    break;
                 }
                 catch (DbUpdateConcurrencyException ex) when (attempt < MaxAttemptsPerCompany)
                 {
-                    // The row lock inside ExpireCompanyAsync should make this rare, but if it still
-                    // happens, the failed attempt's transaction was never committed (rolled back on
-                    // dispose) - no partial ledger/balance changes and no audit event were
-                    // persisted for it. Retry with a fresh scope rather than the stale one.
                     logger.LogWarning(
                         ex,
                         "TOIL expiry for company {CompanyId} hit a concurrency conflict on attempt {Attempt}/{MaxAttempts}; retrying with a fresh scope",
@@ -99,14 +92,6 @@ internal sealed class ToilExpiryJob(
                 }
                 catch (Exception ex)
                 {
-                    // Isolate one company's failure from the rest of the batch - ExpireCompanyAsync's
-                    // own idempotency guard means a company that already completed is a safe no-op on
-                    // retry, so only the failed company's remaining work is repeated. The scope (and
-                    // its DbContext/change tracker) used for this company is disposed here regardless
-                    // of outcome, so nothing from this attempt can leak into the next company's scope.
-                    // This also catches a DbUpdateConcurrencyException on the final attempt, making
-                    // retry exhaustion clearly observable as an error (distinct from the warnings
-                    // logged for the earlier, retried attempts) rather than being silently swallowed.
                     logger.LogError(ex, "TOIL expiry failed for company {CompanyId} after {Attempt} attempt(s)", companyId, attempt);
                     break;
                 }

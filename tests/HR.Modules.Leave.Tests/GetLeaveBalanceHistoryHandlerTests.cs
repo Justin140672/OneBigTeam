@@ -11,10 +11,6 @@ namespace HR.Modules.Leave.Tests;
 
 public class GetLeaveBalanceHistoryHandlerTests
 {
-    // All seeded events fall within 2026, and "now" is fixed inside 2026 too so the handler's
-    // "current policy year" (calendar year, since LeaveYearStartMonth defaults to 1) lines up
-    // with the seeded LeaveBalance's PolicyYear, making the BalanceAfter running-total math
-    // deterministic in these tests.
     private static readonly DateTime FixedUtcNow = new(2026, 12, 1, 0, 0, 0, DateTimeKind.Utc);
 
     private static readonly DateTimeOffset ApprovedLeaveDate = new(2026, 1, 10, 9, 0, 0, TimeSpan.Zero);
@@ -44,14 +40,6 @@ public class GetLeaveBalanceHistoryHandlerTests
             new FakeCompanyLeaveSettingsReader(),
             new FakeEmployeeNameReader(names));
 
-    /// <summary>
-    /// Seeds one leave type, an employee's balance for the current (2026) policy year, and one
-    /// event of each of the 5 history categories. The balance's Entitlement/Used/Adjustment
-    /// remain at their initial Create() values (25/0/0) regardless of the history events seeded
-    /// alongside it — this test seeds history rows directly rather than driving them through the
-    /// real handlers, so the "current remaining balance" anchor is simply whatever the
-    /// LeaveBalance row says, not a derived total of the seeded events.
-    /// </summary>
     private static (Guid CompanyId, Guid EmployeeId, Guid LeaveTypeId, Guid LeaveBalanceId) SeedFullHistory(
         LeaveDbContext context, Guid? companyId = null, Guid? employeeId = null, Guid? leaveTypeId = null,
         string leaveTypeName = "Annual Leave")
@@ -61,9 +49,6 @@ public class GetLeaveBalanceHistoryHandlerTests
         var leaveType = leaveTypeId ?? Guid.NewGuid();
         var policyId = Guid.NewGuid();
 
-        // Check both already-tracked-but-unsaved entries (Local) and previously persisted rows,
-        // since these test helpers may be called multiple times against the same context before
-        // a single SaveChangesAsync() at the end (see the "noise" seeding tests below).
         if (!context.LeaveTypes.Local.Any(t => t.Id == leaveType) && !context.LeaveTypes.Any(t => t.Id == leaveType))
         {
             context.LeaveTypes.Add(LeaveType.Create(
@@ -93,8 +78,6 @@ public class GetLeaveBalanceHistoryHandlerTests
             1m, new DateOnly(2026, 3, 8), null, "Overtime", ToilAwardDate);
         context.ToilTransactions.Add(toilTransaction);
 
-        // Adjustment amounts are stored in days (AdjustmentDays); AdjustmentHours is only
-        // populated for TOIL-behaviour leave types, which this Standard leave type is not.
         var manualAdjustment = LeaveBalanceAdjustment.Create(
             Guid.NewGuid(), company, employee, leaveType,
             2m, null, LeaveBalanceAdjustmentReason.ManualAward, "Bonus days", AdjusterId, ManualAdjustmentDate);
@@ -162,29 +145,24 @@ public class GetLeaveBalanceHistoryHandlerTests
         Assert.True(result.IsSuccess);
         var items = result.Value!.Items;
 
-        // Approved leave consumes balance -> negative Change.
         var approved = Assert.Single(items, i => i.Category == "ApprovedLeave");
-        Assert.Equal(-32m, approved.Change); // -(4 days * 8 hours/day)
+        Assert.Equal(-32m, approved.Change);
         Assert.Equal("Leave Taken", approved.Reason);
 
-        // Cancelled leave gives hours back -> positive Change.
         var cancelled = Assert.Single(items, i => i.Category == "CancelledLeave");
-        Assert.Equal(16m, cancelled.Change); // 2 days * 8 hours/day
+        Assert.Equal(16m, cancelled.Change);
         Assert.Equal("Leave Cancelled", cancelled.Reason);
 
-        // TOIL award adds to balance -> positive Change.
         var toil = Assert.Single(items, i => i.Category == "ToilAward");
-        Assert.Equal(8m, toil.Change); // 1 day * 8 hours/day
+        Assert.Equal(8m, toil.Change);
         Assert.Equal("TOIL Award", toil.Reason);
 
-        // Adjustment days are converted to hours via the employee's working pattern; sign is
-        // the adjustment's own signed value.
         var manual = Assert.Single(items, i => i.Category == "ManualAdjustment");
-        Assert.Equal(16m, manual.Change); // 2 days * 8 hours/day
+        Assert.Equal(16m, manual.Change);
         Assert.Equal("ManualAward", manual.Reason);
 
         var carryOver = Assert.Single(items, i => i.Category == "CarryOver");
-        Assert.Equal(8m, carryOver.Change); // 1 day * 8 hours/day
+        Assert.Equal(8m, carryOver.Change);
         Assert.Equal("Carry Over", carryOver.Reason);
     }
 
@@ -195,8 +173,6 @@ public class GetLeaveBalanceHistoryHandlerTests
         var (companyId, employeeId, leaveTypeId, _) = SeedFullHistory(context);
         await context.SaveChangesAsync();
 
-        // Default working pattern (7.5 hours/day). The seeded LeaveBalance is untouched by the
-        // history rows (Entitlement 25, Used 0, Adjustment 0 -> Remaining 25 days = 187.5 hours).
         var handler = BuildHandler(context);
         var result = await handler.HandleAsync(
             new GetLeaveBalanceHistoryRequest(companyId, employeeId, leaveTypeId),
@@ -205,15 +181,12 @@ public class GetLeaveBalanceHistoryHandlerTests
         Assert.True(result.IsSuccess);
         var items = result.Value!.Items;
 
-        // Ascending chronological order (default working pattern, 7.5 hours/day):
-        // Approved(-30) -> Cancelled(+15) -> Toil(+7.5) -> ManualAward(2 days = +15) ->
-        // CarryOver(1 day = +7.5). Starting balance = 187.5 - 15 = 172.5.
         var byCategory = items.ToDictionary(i => i.Category);
-        Assert.Equal(142.5m, byCategory["ApprovedLeave"].BalanceAfter);   // 172.5 - 30
-        Assert.Equal(157.5m, byCategory["CancelledLeave"].BalanceAfter);  // 142.5 + 15
-        Assert.Equal(165m, byCategory["ToilAward"].BalanceAfter);        // 157.5 + 7.5
-        Assert.Equal(180m, byCategory["ManualAdjustment"].BalanceAfter); // 165 + 15
-        Assert.Equal(187.5m, byCategory["CarryOver"].BalanceAfter);      // 180 + 7.5 == current remaining balance
+        Assert.Equal(142.5m, byCategory["ApprovedLeave"].BalanceAfter);
+        Assert.Equal(157.5m, byCategory["CancelledLeave"].BalanceAfter);
+        Assert.Equal(165m, byCategory["ToilAward"].BalanceAfter);
+        Assert.Equal(180m, byCategory["ManualAdjustment"].BalanceAfter);
+        Assert.Equal(187.5m, byCategory["CarryOver"].BalanceAfter);
     }
 
     [Fact]
@@ -240,7 +213,7 @@ public class GetLeaveBalanceHistoryHandlerTests
         var items = result.Value!.Items.ToDictionary(i => i.Category);
 
         Assert.Equal("Approver Name", items["ApprovedLeave"].CreatedBy);
-        Assert.Equal("Employee Name", items["CancelledLeave"].CreatedBy); // self-service cancellation, no separate actor tracked
+        Assert.Equal("Employee Name", items["CancelledLeave"].CreatedBy);
         Assert.Equal("Awarder Name", items["ToilAward"].CreatedBy);
         Assert.Equal("Adjuster Name", items["ManualAdjustment"].CreatedBy);
         Assert.Equal("Adjuster Name", items["CarryOver"].CreatedBy);
@@ -253,7 +226,7 @@ public class GetLeaveBalanceHistoryHandlerTests
         var (companyId, employeeId, leaveTypeId, _) = SeedFullHistory(context);
         await context.SaveChangesAsync();
 
-        var handler = BuildHandler(context); // no names supplied
+        var handler = BuildHandler(context);
         var result = await handler.HandleAsync(
             new GetLeaveBalanceHistoryRequest(companyId, employeeId, leaveTypeId),
             CancellationToken.None);
@@ -305,13 +278,10 @@ public class GetLeaveBalanceHistoryHandlerTests
         await using var context = BuildContext();
         var (companyId, employeeId, leaveTypeId, _) = SeedFullHistory(context);
 
-        // Noise: same employee/leave type but different company.
         SeedFullHistory(context, companyId: Guid.NewGuid(), employeeId: employeeId, leaveTypeId: leaveTypeId);
 
-        // Noise: same company/leave type but different employee.
         SeedFullHistory(context, companyId: companyId, employeeId: Guid.NewGuid(), leaveTypeId: leaveTypeId);
 
-        // Noise: same company/employee but different leave type.
         SeedFullHistory(context, companyId: companyId, employeeId: employeeId, leaveTypeId: Guid.NewGuid(), leaveTypeName: "Sick Leave");
 
         await context.SaveChangesAsync();

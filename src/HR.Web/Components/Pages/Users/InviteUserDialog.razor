@@ -76,12 +76,6 @@
     private string? _globalError;
     private string _email = string.Empty;
 
-    // The Employee role is mandatory for every invited user and is always applied — it's shown as
-    // a fixed, non-removable badge rather than a selectable multiselect item, which avoids the
-    // multiselect having to represent a "checked but disabled" item (Syncfusion's SfMultiSelect
-    // doesn't support disabling individual items, and mutating the bound list in @bind-Value:after
-    // previously caused a NullReferenceException when re-selecting the Employee entry).
-    // _selectedAdditionalRoleIds holds only roles beyond Employee.
     private List<Guid> _selectedAdditionalRoleIds = [];
 
     private readonly List<RoleOption> _additionalRoleOptions =

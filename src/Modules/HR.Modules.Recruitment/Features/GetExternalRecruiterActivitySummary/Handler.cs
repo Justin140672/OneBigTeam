@@ -52,8 +52,6 @@ internal sealed class GetExternalRecruiterActivitySummaryHandler(RecruitmentDbCo
             .AsNoTracking()
             .CountAsync(a => a.CompanyId == request.CompanyId && a.SourceExternalRecruiterId == request.ExternalRecruiterId, cancellationToken);
 
-        // Ticket #99: "hired" now means the application's current stage has TerminalOutcome == Hired,
-        // rather than Status == ApplicationStatus.Hired.
         var candidatesHiredCount = await (
             from a in db.Set<Application>().AsNoTracking()
             join s in db.RecruitmentStages.AsNoTracking() on a.CurrentStageId equals s.Id

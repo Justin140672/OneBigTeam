@@ -3,12 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the Recruitment Pipeline report page
-/// (/companies/{companyId}/reporting/recruitment-pipeline — RecruitmentPipelineReportPage.razor):
-/// loading, the date-range filter panel, the standalone Group by (Recruiter/Vacancy) control,
-/// and export. Catalog-page navigation coverage lives in <see cref="ReportCatalogTests"/>.
-/// </summary>
 public sealed class RecruitmentPipelineReportTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -19,7 +13,7 @@ public sealed class RecruitmentPipelineReportTests(RecruiterPersonaFixture fixtu
     // Laura Bennett (HR Administrator, no Recruiter role) would get 403 Forbidden here and the page
     // would show its generic load-error banner — use the Recruiter persona, matching every other
     // Recruitment-domain E2E test (e.g. EmployeeDirectoryReportTests, RecruitmentDashboardTests).
-    private const string MarcusEmail = "marcus.diallo@acme.example"; // Recruiter
+    private const string MarcusEmail = "marcus.diallo@acme.example";
 
     [Fact]
     public async Task Page_Loads_WithExpectedColumns()

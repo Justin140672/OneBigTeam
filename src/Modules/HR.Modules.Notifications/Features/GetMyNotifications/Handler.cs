@@ -9,9 +9,6 @@ internal sealed class GetMyNotificationsHandler(NotificationsDbContext dbContext
         GetMyNotificationsRequest request,
         CancellationToken cancellationToken)
     {
-        // NOT-06: unread total is a genuinely independent query — unfiltered (ignores IsRead/Type/
-        // Priority/date-range filters below) and unpaginated, so it always represents every unread
-        // notification belonging to the employee, never a count derived from the current page.
         var unreadCount = await dbContext.Notifications
             .AsNoTracking()
             .CountAsync(
@@ -44,9 +41,6 @@ internal sealed class GetMyNotificationsHandler(NotificationsDbContext dbContext
         var pageSize = request.PageSize <= 0 ? 50 : request.PageSize;
         var pageNumber = request.PageNumber <= 0 ? 1 : request.PageNumber;
 
-        // NOT-06: deterministic ordering — CreatedAt DESC, Id DESC as tie-break so notifications
-        // created with equal timestamps (concurrent writes) still page/order deterministically
-        // instead of depending on unspecified database row order.
         var items = await query
             .OrderByDescending(n => n.CreatedAt)
             .ThenByDescending(n => n.Id)

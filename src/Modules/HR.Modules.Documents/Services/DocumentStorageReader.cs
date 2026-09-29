@@ -5,12 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Services;
 
-/// <summary>
-/// Aggregates real, already-persisted file-size data across every document-bearing table in the
-/// Documents schema (employee documents, shared company documents + their historic versions, and
-/// profile photos). This is the only genuine "storage usage" data available in the platform today —
-/// there is no separate storage-accounting table, so usage is computed on demand from FileSize columns.
-/// </summary>
 internal sealed class DocumentStorageReader(DocumentsDbContext dbContext) : IDocumentStorageReader
 {
     public async Task<DocumentStorageUsage> GetStorageUsageAsync(Guid companyId, CancellationToken cancellationToken)

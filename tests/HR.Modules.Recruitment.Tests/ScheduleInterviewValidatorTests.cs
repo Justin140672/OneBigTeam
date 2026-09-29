@@ -124,7 +124,6 @@ public class ScheduleInterviewValidatorTests
     [Fact]
     public void Validate_Passes_When_DurationMinutes_Is_One()
     {
-        // Boundary: GreaterThan(0) — 1 is the smallest valid value.
         var result = _validator.Validate(new ScheduleInterviewRequest
         {
             CompanyId             = Guid.NewGuid(),

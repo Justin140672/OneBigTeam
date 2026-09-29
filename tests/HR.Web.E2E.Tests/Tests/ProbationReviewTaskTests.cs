@@ -5,26 +5,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the probation review task detail screen.
-///
-/// Uses the seeded "Complete probation review — Carlos Rivera" task
-/// (ID: a0000000-0000-0000-0000-000000000005), a ManagerCheckIn review assigned to David Park —
-/// Carlos's actual line manager and an HrAdministrator. The single-resource probation review
-/// read (GET /probation-reviews/{id}) enforces reporting-chain / HR scope, so the task assignee
-/// (and this test's persona) has to be someone who can genuinely view Carlos's review.
-///
-/// Several tests read the shared seeded task above, and one (<see
-/// cref="TaskView_CompleteReview_ChangesStatusToCompleted"/>) mutates it by completing the
-/// review. xUnit does not guarantee declaration-order execution, so that mutation must be
-/// pinned to run after the read-only tests via <see cref="TestPriorityAttribute"/> +
-/// <see cref="PriorityOrderer"/> — relying on method declaration order (as a stale "Run last"
-/// comment used to) let the mutating test run first non-deterministically, which completed the
-/// task before the read-only tests navigated to it. Completing a task doesn't remove its
-/// `task-view-btn-{id}` row (GetMyTasksHandler has no status filter and shows completed tasks
-/// too), but it can still change other content those tests assert on, so pinning order removes
-/// the whole class of flake rather than relying on incidental behaviour.
-/// </summary>
 [TestCaseOrderer("HR.Web.E2E.Tests.Infrastructure.PriorityOrderer", "HR.Web.E2E.Tests")]
 public sealed class ProbationReviewTaskTests(DavidParkPersonaFixture fixture)
     : RoleE2ETestBase<DavidParkPersonaFixture>(fixture)
@@ -32,11 +12,8 @@ public sealed class ProbationReviewTaskTests(DavidParkPersonaFixture fixture)
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid DavidId = Guid.Parse("30000000-0000-0000-0000-000000000008");
 
-    // Seeded probation review task — ManagerCheckIn for Carlos Rivera, assigned to David Park.
     private static readonly Guid TaskProbationReviewId = Guid.Parse("a0000000-0000-0000-0000-000000000005");
 
-    // A non-probation-review task assigned to David Park, used to verify the probation panel is
-    // absent for other sources (seeded generic TaskSource.Workflow task).
     private static readonly Guid TaskQ2ReviewId = Guid.Parse("a0000000-0000-0000-0000-00000000002a");
 
     private const string DavidEmail = "david.park@acme.example";
@@ -101,8 +78,6 @@ public sealed class ProbationReviewTaskTests(DavidParkPersonaFixture fixture)
             "Expected no 'Complete Probation Review' panel on a non-ProbationReview task");
     }
 
-    // Runs last — mutates the seeded task by completing the review. Enforced via
-    // TestPriorityAttribute/PriorityOrderer above, not declaration order (see class remarks).
     [Fact]
     [TestPriority(1)]
     public async Task TaskView_CompleteReview_ChangesStatusToCompleted()

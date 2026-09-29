@@ -54,7 +54,6 @@ public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
         return result.Success ? result.Value : null;
     }
 
-    // ── DSH-03 non-swallowing siblings ──────────────────────────────────────
     public Task<ListVacanciesResponse?> ListVacanciesOrThrowAsync(
         Guid companyId, string? status = null, Guid? positionProfileId = null, Guid? departmentId = null,
         bool excludeClosed = false, string? search = null, int? pageSize = null)
@@ -85,9 +84,6 @@ public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
         Http.GetFromJsonAsync<GetPipelineSummaryResponse>(
             $"api/companies/{companyId}/recruitment/pipeline-summary", HrApiJsonOptions.Default, cancellationToken);
 
-    // ── DSH-04 authoritative recruitment dashboard metrics ──────────────────
-    // Non-swallowing (DSH-03 style): let HttpRequestException surface so WidgetSourceLoader records
-    // a failed source rather than a misleading 0.
     public Task<NewApplicationsMetricResponse?> GetNewApplicationsMetricOrThrowAsync(
         Guid companyId, CancellationToken cancellationToken = default) =>
         Http.GetFromJsonAsync<NewApplicationsMetricResponse>(
@@ -98,7 +94,6 @@ public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
         Http.GetFromJsonAsync<CandidatesInProgressMetricResponse>(
             $"api/companies/{companyId}/recruitment/metrics/candidates-in-progress", HrApiJsonOptions.Default, cancellationToken);
 
-    // Swallowing sibling for non-DSH-03 consumers (OffersAwaitingResponseWidget).
     public async Task<OffersAwaitingResponseMetricResponse?> GetOffersAwaitingResponseMetricAsync(
         Guid companyId, CancellationToken cancellationToken = default)
     {
@@ -108,9 +103,6 @@ public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
         return result.Success ? result.Value : null;
     }
 
-    // Non-swallowing sibling of GetOffersAwaitingResponseMetricAsync, for callers (e.g.
-    // OffersAwaitingResponseWidget) that use WidgetSourceLoader to distinguish a failed load from a
-    // genuine empty result rather than collapsing both into null.
     public async Task<OffersAwaitingResponseMetricResponse?> GetOffersAwaitingResponseMetricOrThrowAsync(
         Guid companyId, CancellationToken cancellationToken = default) =>
         await Http.GetFromJsonAsync<OffersAwaitingResponseMetricResponse>(
@@ -156,7 +148,6 @@ public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
         return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to publish vacancy."));
     }
 
-    // ── IEditService<VacancyEditModel, Guid> ────────────────────────────────────
 
     async Task<VacancyEditModel?> IEditService<VacancyEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
     {
@@ -196,7 +187,6 @@ public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
         if (result.Success)
             return ApiSaveResult.Ok(result.Value?.Version);
 
-        // The recruitment API returns no "code" on its 409 body, so ANY 409 is treated as a save conflict.
         var isConflict = result.FailureKind is ApiFailureKind.Concurrency or ApiFailureKind.Conflict;
         return ApiSaveResult.Fail(
             result.DisplayMessage ?? (isConflict

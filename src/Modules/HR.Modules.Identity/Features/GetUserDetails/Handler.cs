@@ -16,8 +16,6 @@ internal sealed class GetUserDetailsHandler(
 {
     public async Task<Result<GetUserDetailsResponse>> HandleAsync(GetUserDetailsRequest request, CancellationToken cancellationToken)
     {
-        // IAM-01: prove the target employee actually belongs to the route company before resolving
-        // anything about them. Tenant middleware only proves the CALLER's company.
         var isMember = await targetUserCompanyGuard.IsMemberAsync(request.CompanyId, request.EmployeeId, cancellationToken);
         if (!isMember)
             return Result.Failure<GetUserDetailsResponse>(Error.NotFound("No user or invitation found for this employee."));
@@ -57,7 +55,7 @@ internal sealed class GetUserDetailsHandler(
 
         string invitationStatus;
         if (invite is null)
-            invitationStatus = "Claimed"; // user exists without a tracked invite record (e.g. seeded dev persona)
+            invitationStatus = "Claimed";
         else if (invite.IsCancelled)
             invitationStatus = "Cancelled";
         else if (invite.IsClaimed)
@@ -73,7 +71,6 @@ internal sealed class GetUserDetailsHandler(
             ? names.GetValueOrDefault(actorId)
             : null;
 
-        // ADM-01: the linked employee's current position.
         var audience = await employeeAudienceReader.GetEmployeeAudienceAsync(
             request.CompanyId, request.EmployeeId, cancellationToken);
         Guid? positionProfileId = audience?.PositionProfileId;

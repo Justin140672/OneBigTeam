@@ -3,17 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the Close button and "unsaved changes" confirmation prompt that <c>EditPageBase</c>
-/// provides to every edit page (see EditPageBase.cs / UnsavedChangesDialog.razor). Exercised
-/// via the Candidate edit page as a representative host — the behavior under test lives in
-/// the shared base class, not in CandidateEdit itself.
-///
-/// Uses Marcus Diallo (Recruiter role) rather than Laura Bennett (HR Administrator) — candidate:view
-/// and recruitment:manage (candidate creation) are Recruiter-only (see
-/// IdentityModule.AddRolePolicies); an HR Administrator does not automatically get recruitment
-/// access.
-/// </summary>
 public sealed class CandidateEditCloseBehaviorTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -30,7 +19,6 @@ public sealed class CandidateEditCloseBehaviorTests(RecruiterPersonaFixture fixt
         await login.GoToAsync();
         await login.LoginAsync(MarcusEmail);
 
-        // Create a candidate first so we have an existing, unmodified record to reopen.
         var unique   = Guid.NewGuid().ToString("N")[..8];
         var lastName = $"E2EClose{unique}";
         await candidateList.GoToAsync(AcmeId);
@@ -43,9 +31,6 @@ public sealed class CandidateEditCloseBehaviorTests(RecruiterPersonaFixture fixt
         await candidateList.GoToAsync(AcmeId);
         Assert.True(await candidateList.HasCandidateAsync(lastName));
 
-        // Reopening it and clicking Close with no edits should navigate straight back to the
-        // list — no "unsaved changes" prompt should appear (the wait inside CloseAndWaitForListAsync
-        // would time out if one blocked navigation).
         await candidateList.ClickCandidateAsync(lastName);
         await candidateEdit.CloseAndWaitForListAsync();
 
@@ -148,8 +133,6 @@ public sealed class CandidateEditCloseBehaviorTests(RecruiterPersonaFixture fixt
 
         await candidateEdit.CancelUnsavedChangesDialogAsync();
 
-        // Cancelling the prompt should just dismiss it — the user stays on the form with
-        // their edits untouched, free to keep editing or click Close again.
         Assert.Contains("/candidates/new", _page.Url);
         Assert.Equal(firstName, await candidateEdit.GetFirstNameAsync());
     }

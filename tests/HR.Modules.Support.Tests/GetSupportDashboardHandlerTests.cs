@@ -96,7 +96,6 @@ public class GetSupportDashboardHandlerTests
         db.SupportRequests.Add(request2);
         await db.SaveChangesAsync();
 
-        // First staff response after 2 hours for request1, 4 hours for request2 -> average 3 hours.
         db.SupportResponses.Add(SupportResponse.Create(
             Guid.NewGuid(), request1.Id, companyId, Guid.NewGuid(), true, "Reply 1", Now.AddHours(2)));
         db.SupportResponses.Add(SupportResponse.Create(
@@ -104,7 +103,6 @@ public class GetSupportDashboardHandlerTests
         // A later staff response on request1 must not affect the FIRST-response average.
         db.SupportResponses.Add(SupportResponse.Create(
             Guid.NewGuid(), request1.Id, companyId, Guid.NewGuid(), true, "Reply 1b", Now.AddHours(10)));
-        // A customer response should never count as a staff response time sample.
         db.SupportResponses.Add(SupportResponse.Create(
             Guid.NewGuid(), request1.Id, companyId, Guid.NewGuid(), false, "Customer reply", Now.AddHours(1)));
         await db.SaveChangesAsync();

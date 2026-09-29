@@ -4,16 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the Sickness tab on the employee edit page: the record history grid,
-/// recording a new sickness absence via the "Record Sickness" dialog, and closing
-/// an open record via the "Close" dialog.
-///
-/// Uses the seeded "Tom Williams" employee (ID: 30000000-0000-0000-0000-000000000004)
-/// as the target employee, with Laura Bennett (HR Administrator) performing the actions.
-/// A sickness category is created fresh in each test that needs one, since categories
-/// are not seeded by default (see SicknessCategoryManagementTests.cs for the same pattern).
-/// </summary>
 public sealed class EmployeeSicknessTabTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId      = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -32,10 +22,6 @@ public sealed class EmployeeSicknessTabTests(HrAdminPersonaFixture fixture) : Ro
 
         await empEdit.GoToAsync(AcmeId, TomWilliams);
 
-        // GoToAsync only waits for a combobox to render, not for the full tab list — which
-        // depends on the employee's own async-loaded data (_showProbationTab etc.) — so a bare
-        // instant IsVisibleAsync() here can race that and report "not visible" for a tab that's
-        // genuinely there a moment later. A bounded wait avoids that.
         await EmployeeEditPage.SelectOwningGroupAsync(_page, "Sickness");
         await EmployeeEditPage.SectionTab(_page, "Sickness").WaitForAsync(
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
@@ -66,7 +52,6 @@ public sealed class EmployeeSicknessTabTests(HrAdminPersonaFixture fixture) : Ro
     {
         var suffix   = Guid.NewGuid().ToString("N")[..8];
         var catName  = $"E2E Cold {suffix}";
-        // A distinctive, unlikely-to-collide start date so the grid row can be found reliably.
         var startDate = new DateOnly(2026, 1, 15).AddDays(Random.Shared.Next(0, 300));
         var startDateGridText = startDate.ToString("dd MMM yyyy");
 
@@ -77,7 +62,6 @@ public sealed class EmployeeSicknessTabTests(HrAdminPersonaFixture fixture) : Ro
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Create a category to select in the Record Sickness dialog.
         await catEdit.GoToNewAsync(AcmeId);
         await catEdit.FillNameAsync(catName);
         await catEdit.FillDisplayOrderAsync(1);
@@ -97,9 +81,6 @@ public sealed class EmployeeSicknessTabTests(HrAdminPersonaFixture fixture) : Ro
         var status = await empEdit.GetSicknessStatusBadgeForStartDateAsync(startDateGridText);
         Assert.Equal("Active", status);
 
-        // Close the record so this employee is left with no open sickness record —
-        // RecordSickness rejects a second open record for the same employee, and other
-        // tests/re-runs sharing this seeded employee would otherwise fail.
         await empEdit.StartCloseSicknessRecordAsync(startDateGridText);
         await empEdit.FillCloseSicknessEndDateAsync(startDate.AddDays(1).ToString("dd/MM/yyyy"));
         await empEdit.SubmitCloseSicknessRecordAsync();
@@ -129,7 +110,6 @@ public sealed class EmployeeSicknessTabTests(HrAdminPersonaFixture fixture) : Ro
         await empEdit.GoToAsync(AcmeId, TomWilliams);
         await empEdit.OpenSicknessTabAsync();
 
-        // Record an open (no end date) sickness absence first.
         await empEdit.OpenRecordSicknessDialogAsync();
         await empEdit.SelectRecordSicknessCategoryAsync(catName);
         await empEdit.FillRecordSicknessStartDateAsync(startDate.ToString("dd/MM/yyyy"));
@@ -138,7 +118,6 @@ public sealed class EmployeeSicknessTabTests(HrAdminPersonaFixture fixture) : Ro
         var openStatus = await empEdit.GetSicknessStatusBadgeForStartDateAsync(startDateGridText);
         Assert.Equal("Active", openStatus);
 
-        // Now close it.
         await empEdit.StartCloseSicknessRecordAsync(startDateGridText);
         await empEdit.FillCloseSicknessEndDateAsync(endDate.ToString("dd/MM/yyyy"));
         await empEdit.SubmitCloseSicknessRecordAsync();

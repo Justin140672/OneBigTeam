@@ -91,9 +91,6 @@ public class ListUsersEndpointTests
     [Fact]
     public async Task Get_ListUsers_Returns_Row_For_UserProfile_With_No_Invite_And_No_ApplicationUser()
     {
-        // Self-service signup creates a UserProfile directly (Supabase-backed), with neither a
-        // UserInvite row nor an ApplicationUser row — this previously fell through both lookups
-        // and was silently skipped entirely.
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
 
@@ -136,7 +133,6 @@ public class ListUsersEndpointTests
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
 
-        // SeedEmployeeAsync always links the employee to a seeded PositionProfile (title "Role-...").
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId, "Positioned", "Person");
         await IdentityUserAdminTestHelpers.SeedInviteAsync(_factory, companyId, employeeId, "positioned@test.com");
 

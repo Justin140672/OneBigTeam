@@ -79,7 +79,6 @@ public class ApproveProfilePhotoHandlerTests
         Assert.Equal(pending.StorageKey,  live.StorageKey);
         Assert.Equal(pending.UploadedBy,  live.UploadedBy);
 
-        // Reuses the pending photo's storage key rather than re-uploading.
         Assert.Empty(storage.Uploads);
 
         Assert.Equal(live.Id, result.Value!.Id);
@@ -105,14 +104,12 @@ public class ApproveProfilePhotoHandlerTests
         Assert.True(result.IsSuccess);
 
         var live = await db.EmployeeProfilePhotos.SingleAsync();
-        Assert.Equal(existing.Id,        live.Id); // same row, replaced in place
+        Assert.Equal(existing.Id,        live.Id);
         Assert.Equal("new.png",          live.FileName);
         Assert.Equal(pending.StorageKey, live.StorageKey);
 
-        // Never re-uploads — reuses the pending submission's blob.
         Assert.Empty(storage.Uploads);
 
-        // Old blob deleted only once the replacement is safely persisted.
         Assert.Single(storage.Deletions);
         Assert.Equal("current/old.png", storage.Deletions[0]);
     }

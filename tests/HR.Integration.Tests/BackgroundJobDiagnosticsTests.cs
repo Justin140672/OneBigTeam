@@ -19,7 +19,6 @@ public class BackgroundJobDiagnosticsTests(ApiWebApplicationFactory factory)
 
         var response = await client.GetAsync("/health/background-jobs");
 
-        // Any 2xx or 503 is valid — 500 would indicate the handler itself crashed.
         Assert.NotEqual(HttpStatusCode.InternalServerError, response.StatusCode);
         Assert.NotEqual(HttpStatusCode.NotFound, response.StatusCode);
     }

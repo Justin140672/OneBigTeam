@@ -8,27 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Jobs;
 
-/// <summary>
-/// Daily job (SICK-01) that re-evaluates sickness records' calendar-day duration against the
-/// company's configured FitNoteRequiredAfterDays threshold and creates a fit-note evidence request
-/// (see FitNoteEvidenceRequestService) the first time a record reaches it.
-///
-/// Two passes per company:
-///   1. Open (Active, EndDate == null) records are evaluated against "today". This is what actually
-///      detects an ongoing absence crossing the threshold — duration grows day over day, so a
-///      record that wasn't eligible yesterday may be eligible today.
-///   2. Closed records that don't yet have a live evidence request are evaluated against their own
-///      EndDate — a defence-in-depth catch-all for a record closed before this job last ran. The
-///      RecordSickness/RecordMySickness and CloseSicknessRecord handlers already perform this same
-///      evaluation immediately (via FitNoteEvidenceRequestService) at creation/close time, so this
-///      pass is normally a no-op, but it still covers imported/backdated data and any write path
-///      that bypasses those handlers.
-///
-/// Entirely idempotent: FitNoteEvidenceRequestService.RequestIfEligibleAsync checks for an existing
-/// live request before creating one, so re-running this job — including a Hangfire retry after a
-/// partial failure — never creates duplicate requests, tasks, notifications or audit events.
-/// Received/Waived records are always skipped and never re-requested.
-/// </summary>
 internal sealed class FitNoteRequestJob(
     SicknessDbContext db,
     ICompanySicknessSettingsReader sicknessSettingsReader,
@@ -53,7 +32,6 @@ internal sealed class FitNoteRequestJob(
         {
             var settings = await sicknessSettingsReader.GetSicknessSettingsAsync(companyId, CancellationToken.None);
 
-            // Mandatory, always set (no opt-out) — see CompanySettings.FitNoteRequiredAfterDays.
             var threshold = settings.FitNoteRequiredAfterDays;
 
             await EvaluateOpenRecordsAsync(companyId, threshold, today, now);

@@ -356,7 +356,7 @@ public class UpdateProbationRecordEndpointTests
                 companyId,
                 id = created.Id,
                 managerEmployeeId = managerId,
-                expectedEndDate = "2026-09-01", // unchanged
+                expectedEndDate = "2026-09-01",
                 notes = "No date change.",
                 expectedVersion = currentVersion
             });

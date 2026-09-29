@@ -221,7 +221,6 @@ public class EmployeeRecruiterReaderTests
         var earlierVacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Earlier", null, Guid.NewGuid(), Now, earlierRecruiter.Id);
         db.Candidates.Add(candidate);
         db.Vacancies.AddRange(laterVacancy, earlierVacancy);
-        // Inserted later-first so insertion order cannot be what decides.
         db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, laterVacancy.Id, candidate.Id, Guid.NewGuid(), null, Now.AddDays(-1), ApplicationSource.Direct));
         db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, earlierVacancy.Id, candidate.Id, Guid.NewGuid(), null, Now.AddDays(-30)));
         await db.SaveChangesAsync();

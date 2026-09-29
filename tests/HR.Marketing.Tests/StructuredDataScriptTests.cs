@@ -34,8 +34,7 @@ public class StructuredDataScriptTests
         Assert.NotNull(result);
         Assert.DoesNotContain("</script>", result!, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("<script>", result!, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("\\u003C", result!); // '<' escaped
-        // Still valid JSON with the original logical value preserved.
+        Assert.Contains("\\u003C", result!);
         using var doc = JsonDocument.Parse(result!);
         Assert.Equal("</script><script>alert(1)</script>", doc.RootElement.GetProperty("name").GetString());
     }

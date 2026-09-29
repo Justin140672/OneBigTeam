@@ -47,10 +47,10 @@ public class OrganisationDataExportArchiveBudgetStreamTests
     {
         var (stream, inner) = New(maxBytes: 8);
 
-        stream.Write(new byte[8], 0, 8); // exactly at the ceiling: allowed
+        stream.Write(new byte[8], 0, 8);
 
         Assert.Equal(8, inner.Length);
-        Assert.Throws<OrganisationDataExportTempCapacityException>(() => stream.WriteByte(0)); // 9th byte
+        Assert.Throws<OrganisationDataExportTempCapacityException>(() => stream.WriteByte(0));
         Assert.Equal(8, inner.Length);
     }
 
@@ -59,13 +59,13 @@ public class OrganisationDataExportArchiveBudgetStreamTests
     {
         var (stream, inner) = New(maxBytes: 10);
 
-        stream.Write(new byte[4], 0, 4); // 4
-        stream.Write(new byte[4], 0, 4); // 8
+        stream.Write(new byte[4], 0, 4);
+        stream.Write(new byte[4], 0, 4);
         var ex = Assert.Throws<OrganisationDataExportTempCapacityException>(
-            () => stream.Write(new byte[4], 0, 4)); // would be 12
+            () => stream.Write(new byte[4], 0, 4));
 
         Assert.Contains("per-export", ex.Message);
-        Assert.Equal(8, inner.Length); // the crossing write left no trace
+        Assert.Equal(8, inner.Length);
     }
 
     [Fact]
@@ -132,11 +132,9 @@ public class OrganisationDataExportArchiveBudgetStreamTests
         var (stream, _) = New(maxBytes: 8);
         stream.Write(new byte[8], 0, 8);
 
-        // Rewind and overwrite: still within the high-water mark, still allowed.
         stream.Position = 0;
         stream.Write(new byte[8], 0, 8);
 
-        // But growing past the high-water mark is refused.
         stream.Position = 8;
         Assert.Throws<OrganisationDataExportTempCapacityException>(() => stream.WriteByte(0));
     }

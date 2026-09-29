@@ -26,8 +26,6 @@ internal sealed class RenameReportViewHandler(ReportingDbContext dbContext)
             return Result.Failure<RenameReportViewResponse>(
                 Error.Validation($"'{SaveReportViewHandler.ReservedStandardViewName}' is a reserved name — please choose another."));
 
-        // Excludes the view's own current row so renaming to its own existing name (a no-op) isn't
-        // flagged as a collision with itself.
         var nameInUse = await dbContext.SavedReportViews
             .AnyAsync(
                 v => v.Id != view.Id

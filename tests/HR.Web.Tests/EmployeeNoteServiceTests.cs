@@ -160,7 +160,6 @@ public class EmployeeNoteServiceTests
         ], sorted.Select(n => n.Id));
     }
 
-    // ── Category label helper ───────────────────────────────────────────────────
 
     [Theory]
     [InlineData("General")]
@@ -183,7 +182,6 @@ public class EmployeeNoteServiceTests
         Assert.Equal(9, EmployeeNoteCategories.All.Length);
     }
 
-    // ── Fake handlers ────────────────────────────────────────────────────────────
 
     private sealed class JsonResponseHandler(HttpStatusCode statusCode, object payload) : HttpMessageHandler
     {

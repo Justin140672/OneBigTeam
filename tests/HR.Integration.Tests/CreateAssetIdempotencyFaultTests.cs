@@ -43,22 +43,17 @@ public class CreateAssetIdempotencyFaultTests
         var idempotencyKey = Guid.NewGuid();
         var payload = CreateAssetPayload(companyId, categoryId);
 
-        // Arm the double to fail AFTER the handler's own commit (operation name has no
-        // ".PreCommit" suffix) for this exact key.
         _factory.PostCommitFaultInjector.ArmOnce(nameof(CreateAssetHandler), idempotencyKey.ToString());
 
         var firstResponse = await SendCreateAsync(client, companyId, payload, idempotencyKey);
         Assert.True((int)firstResponse.StatusCode >= 500);
 
-        // The business write must have already committed despite the "failed" response.
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AssetsDbContext>();
             Assert.Single(await db.Assets.Where(a => a.CompanyId == companyId).ToListAsync());
         }
 
-        // A retry with the SAME key and payload must replay the stored response rather than create
-        // a second asset row.
         var secondResponse = await SendCreateAsync(client, companyId, payload, idempotencyKey);
         Assert.Equal(HttpStatusCode.Created, secondResponse.StatusCode);
 
@@ -76,20 +71,17 @@ public class CreateAssetIdempotencyFaultTests
         var idempotencyKey = Guid.NewGuid();
         var payload = CreateAssetPayload(companyId, categoryId);
 
-        // Arm the double to fail BEFORE anything commits for this exact key.
         _factory.PostCommitFaultInjector.ArmOnce($"{nameof(CreateAssetHandler)}.PreCommit", idempotencyKey.ToString());
 
         var firstResponse = await SendCreateAsync(client, companyId, payload, idempotencyKey);
         Assert.True((int)firstResponse.StatusCode >= 500);
 
-        // Nothing committed on the failed first attempt — including no asset number consumed.
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AssetsDbContext>();
             Assert.Empty(await db.Assets.Where(a => a.CompanyId == companyId).ToListAsync());
         }
 
-        // Retry with the same key now goes through cleanly and commits exactly once.
         var secondResponse = await SendCreateAsync(client, companyId, payload, idempotencyKey);
         Assert.Equal(HttpStatusCode.Created, secondResponse.StatusCode);
 
@@ -100,7 +92,6 @@ public class CreateAssetIdempotencyFaultTests
         }
     }
 
-    // ── Helpers (mirrors CreateAssetIdempotencyIntegrationTests' setup) ────────────
 
     private static Task<HttpResponseMessage> SendCreateAsync(
         HttpClient client, Guid companyId, object payload, Guid idempotencyKey)
@@ -116,7 +107,6 @@ public class CreateAssetIdempotencyFaultTests
     private static object CreateAssetPayload(Guid companyId, Guid categoryId) => new
     {
         companyId,
-        // No assetNumber - the company is in Automatic mode, so the handler generates one.
         categoryId,
         name = "Fault Injection Test Laptop",
     };

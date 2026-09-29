@@ -112,9 +112,6 @@ public class ExecutionContextAccessorTests
             // Intentionally does nothing with ctx — just establishes it as ambient on this flow.
         }
 
-        // Scope has been popped; a completely separate async flow started now (simulating a
-        // fire-and-forget background operation with no logical relationship to the request that
-        // just finished) must never observe the popped context.
         IExecutionContext? observedInSibling = null;
         await Task.Run(() =>
         {

@@ -25,10 +25,6 @@
         (function () {
             try {
                 var t = localStorage.getItem('theme');
-                // No explicit stored choice (t is neither 'dark' nor 'light') falls back to the
-                // OS/browser's current preference, same as app.js's getTheme() — otherwise a
-                // visitor with a dark system theme and no prior toggle-button choice would see a
-                // flash of the light theme before app.js runs and corrects it.
                 var isDark = t === 'dark' || (t !== 'light' && window.matchMedia &&
                     window.matchMedia('(prefers-color-scheme: dark)').matches);
                 if (isDark) {

@@ -4,22 +4,6 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 
 namespace HR.Integration.Tests.Performance;
 
-/// <summary>
-/// NFR-02: counts every SQL command EF Core executes against any module DbContext while a scope is
-/// active, and records the text + duration of commands slower than
-/// <see cref="SlowCommandThreshold"/>.
-///
-/// Implemented as a process-wide <see cref="DiagnosticListener"/> observer rather than a
-/// DI-registered <c>IInterceptor</c>: the app registers its module contexts with plain
-/// <c>AddDbContext</c> and EF's app-container interceptor discovery did not pick a test-side
-/// registration up here, whereas the <c>Microsoft.EntityFrameworkCore</c> diagnostic source fires
-/// unconditionally for every context.
-///
-/// The integration assembly disables test parallelization and these tests issue one HTTP request at
-/// a time, so a single process-wide counter (rather than an async-local one) is safe and avoids any
-/// execution-context-flow ambiguity across the in-process TestServer boundary. Counting is opt-in:
-/// outside a <see cref="BeginScope"/> the observer ignores events.
-/// </summary>
 internal sealed class QueryCountingInterceptor : IObserver<DiagnosticListener>, IObserver<KeyValuePair<string, object?>>
 {
     public static readonly QueryCountingInterceptor Instance = new();

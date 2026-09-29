@@ -10,14 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Follow-up C: the internal-operations email side-effect of opening a new ReportGeneration
-/// administrative alert. Exercises the real Postgres partial unique (company_id, dedup_key) index —
-/// the concurrent-creation case cannot be reproduced against the EF Core InMemory provider used by
-/// the module unit tests. Job execution itself is a no-op here (ApiWebApplicationFactory swaps in
-/// <see cref="FakeBackgroundJobClient"/>); this test only asserts on what gets enqueued and the
-/// delivery rows written in the same transaction as the alert.
-/// </summary>
 [Collection("Integration")]
 public class OperationalAlertEmailNotificationTests
 {

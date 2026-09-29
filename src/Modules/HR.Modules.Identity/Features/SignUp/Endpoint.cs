@@ -5,9 +5,6 @@ using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Identity.Features.SignUp;
 
-// Public (anonymous) self-service signup — the only path today that creates a brand-new Company +
-// admin user without an already-authenticated caller. See Handler.cs remarks for the local-auth
-// approach (mirrors AcceptInvite) and cross-module transaction caveat.
 internal sealed class Endpoint(
     SignUpHandler handler) : Endpoint<SignUpRequest, SignUpResponse>
 {
@@ -15,7 +12,6 @@ internal sealed class Endpoint(
     {
         Post("/api/signup");
         AllowAnonymous();
-        // See HR.Modules.Identity.Features.Login.Endpoint's remarks on why this is a literal.
         Options(b => b.RequireRateLimiting("identity-signup"));
     }
 

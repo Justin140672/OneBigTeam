@@ -62,9 +62,6 @@ public class UpdateVacancyHandlerTests
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Old Title", null, Guid.NewGuid(), Now);
         db.Vacancies.Add(vacancy);
 
-        // Ticket #81: AssignedRecruiterId now references ExternalRecruiter (in this same module/schema)
-        // rather than an unvalidated Employee id, so the handler validates existence/company-ownership —
-        // a real, active ExternalRecruiter row must exist for this to succeed.
         var recruiter = ExternalRecruiter.Create(Guid.NewGuid(), companyId, "Acme Recruiting", null, null, null, null, null, Now);
         db.ExternalRecruiters.Add(recruiter);
         await db.SaveChangesAsync();
@@ -320,7 +317,6 @@ public class UpdateVacancyHandlerTests
         db.Vacancies.Add(vacancy);
         await db.SaveChangesAsync();
 
-        // No summaries dictionary supplied — simulates the linked profile no longer being resolvable.
         var auditPublisher = new FakeAuditPublisher();
 
         var result = await handler(db, auditPublisher).HandleAsync(
@@ -394,7 +390,6 @@ public class UpdateVacancyHandlerTests
         Assert.Equal(newPositionProfileId, assignedEvent.PositionProfileId);
         Assert.Equal(vacancy.Id, assignedEvent.VacancyId);
 
-        // The standard VacancyUpdatedAuditEvent still fires alongside the position-profile-change event.
         Assert.Single(auditPublisher.Published.OfType<VacancyUpdatedAuditEvent>());
     }
 
@@ -481,8 +476,6 @@ public class UpdateVacancyHandlerTests
         await db.SaveChangesAsync();
 
         var auditPublisher = new FakeAuditPublisher();
-        // The reader is configured to match a different company than the request, simulating a
-        // position profile that belongs to another company (cross-company rejection).
         var reader = new FakePositionProfileReader(matchingCompanyId: Guid.NewGuid(), matchingPositionProfileId: newPositionProfileId);
 
         var result = await handler(db, auditPublisher, reader).HandleAsync(
@@ -699,9 +692,6 @@ public class UpdateVacancyHandlerTests
     [Fact]
     public async Task ChangePositionProfile_Does_Not_Touch_AdvertTitle_Or_AdvertDescription()
     {
-        // Vacancy.ChangePositionProfile only ever sets PositionProfileId and UpdatedAt — proves the
-        // domain method itself carries no side effect on advert fields, independent of whatever the
-        // handler separately does via UpdateDetails.
         var vacancy = Vacancy.Create(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
             "Original Advert Title", "Original Advert Description", Guid.NewGuid(), Now);
@@ -715,9 +705,6 @@ public class UpdateVacancyHandlerTests
     [Fact]
     public async Task HandleAsync_AuthorisedCorrection_PositionProfile_Change_Applies_Requested_AdvertTitle_And_Description_Via_UpdateDetails_Not_As_A_SideEffect_Of_The_ProfileChange()
     {
-        // The handler always calls UpdateDetails separately from ChangePositionProfile, so
-        // AdvertTitle/AdvertDescription end up reflecting whatever the request explicitly supplied —
-        // not silently cleared or left stale as a side effect of the Position Profile change itself.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var oldPositionProfileId = Guid.NewGuid();

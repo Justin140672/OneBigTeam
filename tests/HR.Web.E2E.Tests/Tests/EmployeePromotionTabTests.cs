@@ -4,34 +4,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the Promotion History tab and the "Promote Employee" wizard dialog on the employee
-/// edit page.
-///
-/// Uses several seeded Acme employees so each test can freely add promotion records without
-/// affecting the others (see EmployeesModule's dev seed): Sarah Chen (CTO, untouched — used only
-/// for the empty-state assertion), Tom Williams (Software Engineer, reports to James Okafor —
-/// used only for the read-only dropdown-options test, which depends on his position profile
-/// staying "Software Engineer"), Marcus Diallo (HR Advisor, reports to Laura Bennett — used for
-/// the manager/location step, cancelled rather than submitted), Priya Sharma (Senior Software
-/// Engineer — used for the compensation validation test, cancelled rather than submitted) and
-/// David Park (Sales Manager — used for the cancel-mid-wizard test).
-///
-/// The one test that actually SUBMITS a promotion (PromoteEmployee_WithPositionStepOnly_AppearsInHistoryGrid)
-/// used to submit it against Tom Williams, permanently changing his position profile from
-/// "Software Engineer" to "Senior Software Engineer" — an irreversible mutation that would have
-/// broken PromoteEmployeeDialog_NewPositionProfileDropdown_OnlyOffersVacantProfiles in this same
-/// file (which asserts Tom's *current* position is still plain "Software Engineer") under real
-/// parallel/re-run execution. It now creates its own fresh employee instead — see that test's own
-/// comment for why a fresh "Software Engineer" employee is a safe, valid target.
-///
-/// That same submitting test also promotes into "QA Engineer" rather than "Senior Software
-/// Engineer" — promoting an employee into "Senior Software Engineer" would permanently occupy it,
-/// which (like CreateEmployeeTests) would hide it from VacancyDetail's "New Vacancy" Position
-/// Profile dropdown that many Recruitment E2E tests depend on, for the rest of the parallel test
-/// run. "QA Engineer" is a seeded profile dedicated to this kind of test (same Department/Location
-/// as "Senior Software Engineer" — Engineering / London Office — see EmployeesModule's dev seed).
-/// </summary>
 public sealed class EmployeePromotionTabTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -151,7 +123,6 @@ public sealed class EmployeePromotionTabTests(HrAdminPersonaFixture fixture) : R
         await wizard.FillReasonAsync("Annual review promotion");
         await wizard.FillNotesAsync("Consistently exceeded expectations this cycle.");
 
-        // Skip step 2 (Manager & Location) and step 3 (Compensation) entirely.
         await wizard.ClickNextAsync();
         Assert.Equal("2. Manager & Location", await wizard.GetActiveStepLabelAsync());
 
@@ -249,13 +220,6 @@ public sealed class EmployeePromotionTabTests(HrAdminPersonaFixture fixture) : R
 
         await wizard.CheckCreateCompensationChangeAsync();
 
-        // Salary type defaults to "Annual" and currency defaults to "GBP" (see
-        // PromoteEmployeeDialog.ResetForm), but Salary itself is NOT left blank here: OnOpenedAsync
-        // pre-fills Model.CompensationSalary from the employee's current compensation (Priya
-        // Sharma has an existing salary) as a UX convenience so reviewers don't have to re-type
-        // figures that usually don't change. Explicitly clear it to actually exercise
-        // ValidateCompensation's "Please enter a salary greater than 0." rule when attempting to
-        // advance to the Confirm step.
         await wizard.FillCompensationSalaryAsync("");
         await wizard.ClickNextAsync();
 
@@ -264,7 +228,6 @@ public sealed class EmployeePromotionTabTests(HrAdminPersonaFixture fixture) : R
         Assert.NotNull(error);
         Assert.Contains("salary", error, StringComparison.OrdinalIgnoreCase);
 
-        // Fill in a valid salary and confirm the wizard now advances past the step.
         await wizard.FillCompensationSalaryAsync("150000");
         await wizard.ClickNextAsync();
         Assert.Equal("4. Confirm", await wizard.GetActiveStepLabelAsync());
@@ -301,7 +264,6 @@ public sealed class EmployeePromotionTabTests(HrAdminPersonaFixture fixture) : R
 
         Assert.False(await wizard.IsVisibleAsync(), "Expected the wizard dialog to close after cancelling");
 
-        // Grid/tab state should be exactly as before — no promotion was created.
         Assert.True(await empEdit.HasNoPromotionsMessageAsync(),
             "Expected the empty state to still be shown after cancelling the wizard mid-way");
         Assert.False(await empEdit.HasPromotionHistoryGridAsync(),

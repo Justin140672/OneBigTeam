@@ -19,14 +19,6 @@ internal sealed class OpenTaskBySourceEntityReader(TasksDbContext dbContext) : I
         if (ids.Count == 0)
             return new Dictionary<Guid, Guid>();
 
-        // A source entity should only ever have one open (Open/InProgress) task of a given
-        // action type at a time in practice, but grouping + taking the most recent keeps this
-        // safe even if that invariant is ever violated, rather than throwing on
-        // ToDictionaryAsync duplicates. Without the actionType filter, a source entity can
-        // legitimately have several concurrent open tasks of different action types (e.g. a
-        // Shared Company Document with many per-employee open Acknowledge tasks alongside a
-        // single open Review task) — callers that care about one specific kind must supply
-        // actionType or they will match the wrong task.
         var query = dbContext.TaskItems
             .AsNoTracking()
             .Where(t => t.CompanyId == companyId
@@ -76,9 +68,6 @@ internal sealed class OpenTaskBySourceEntityReader(TasksDbContext dbContext) : I
         if (ids.Count == 0)
             return new Dictionary<Guid, Guid?>();
 
-        // Same effective-assignee resolution as GetTaskHandler's authorization check
-        // (AssignedEmployeeId ?? AssignedUserId), so callers decide actionability against exactly
-        // what GetTask will enforce.
         var tasks = await dbContext.TaskItems
             .AsNoTracking()
             .Where(t => t.CompanyId == companyId && ids.Contains(t.Id))

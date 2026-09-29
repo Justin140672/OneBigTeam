@@ -79,8 +79,8 @@ public class UpdateEmployeeProfileAndEmploymentHandlerTests
             Guid.NewGuid(), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("Alicia", result.Value!.FirstName);   // profile half
-        Assert.Equal("merged", result.Value.Notes);         // employment half
+        Assert.Equal("Alicia", result.Value!.FirstName);
+        Assert.Equal("merged", result.Value.Notes);
         Assert.Equal(2, result.Value.Version);
 
         await using var verify = new EmployeesDbContext(Options(dbName));
@@ -139,11 +139,9 @@ public class UpdateEmployeeProfileAndEmploymentHandlerTests
             await seed.SaveChangesAsync();
         }
 
-        // Context A tracks the row at Version 1.
         await using var ctxA = new EmployeesDbContext(Options(dbName));
         await ctxA.Employees.SingleAsync();
 
-        // Context B wins the race, bumping the store to Version 2.
         await using (var ctxB = new EmployeesDbContext(Options(dbName)))
         {
             var winner = await Handler(ctxB).HandleAsync(
@@ -166,8 +164,8 @@ public class UpdateEmployeeProfileAndEmploymentHandlerTests
 
         await using var verify = new EmployeesDbContext(Options(dbName));
         var saved = await verify.Employees.SingleAsync();
-        Assert.Equal("Winner", saved.FirstName);       // profile field unchanged by loser
-        Assert.Equal("winner-note", saved.Notes);       // employment field unchanged by loser
+        Assert.Equal("Winner", saved.FirstName);
+        Assert.Equal("winner-note", saved.Notes);
         Assert.Equal(2, saved.Version);
     }
 
@@ -217,7 +215,6 @@ public class UpdateEmployeeProfileAndEmploymentHandlerTests
         await using var ctxA = new EmployeesDbContext(Options(dbName));
         await ctxA.Employees.SingleAsync();
 
-        // A second context bumps the row's version between context A's load and its save.
         await using (var ctxB = new EmployeesDbContext(Options(dbName)))
         {
             var other = await ctxB.Employees.SingleAsync();

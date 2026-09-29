@@ -6,8 +6,6 @@
 
     private string VariantClass => Variant.ToString().ToLowerInvariant();
 
-    // Bootstrap bg-* class is kept alongside the soft-token styling below purely so existing
-    // E2E locators (e.g. ".badge.bg-success") keep matching without needing to be rewritten.
     private string BootstrapClass => Variant switch
     {
         StatusBadgeVariant.Success => "bg-success",

@@ -75,13 +75,10 @@ public class GetTeamOnboardingEndpointTests
         Assert.Equal(0, item.PercentComplete);
     }
 
-    // ── DSH-02: {managerId} is authorized against the caller, not trusted ─────────
 
     [Fact]
     public async Task Get_TeamOnboarding_Returns_Forbidden_For_Unrelated_Employee_Passing_A_Managers_Id()
     {
-        // This endpoint previously did NO authorization at all — any employee could read any
-        // manager's team onboarding by editing the URL. DSH-02 closed that.
         var companyId = Guid.NewGuid();
         using var client = await AuthenticatedClient(companyId);
 
@@ -149,7 +146,6 @@ public class GetTeamOnboardingEndpointTests
         var report = await CreateEmployeeAsync(client, companyId, "Any", "Report");
         await AssignManagerAsync(client, companyId, report.Id, manager.Id);
 
-        // client is authenticated as AdminUser (HR Administrator) but is not in manager's chain.
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{manager.Id}/team-onboarding");
 
@@ -158,7 +154,6 @@ public class GetTeamOnboardingEndpointTests
         Assert.Contains(payload!.Items, i => i.EmployeeId == report.Id);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> ClientForEmployee(Guid companyId, Guid employeeId)
     {

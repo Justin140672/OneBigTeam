@@ -46,7 +46,7 @@ public class ApproveProfilePhotoEndpointTests
         var employeeId = Guid.NewGuid();
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ManagerUser.ToString());
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString()); // different company
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo/pending/approve",
@@ -74,8 +74,6 @@ public class ApproveProfilePhotoEndpointTests
     [Fact]
     public async Task Post_Returns_Forbidden_When_Caller_Is_The_Employee_Themself_Without_EmployeeManage()
     {
-        // ApproveProfilePhoto has no "self" bypass — it strictly requires the employee:manage
-        // policy, even when the caller is the target employee themself.
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         using var client = _factory.CreateClient();
@@ -107,7 +105,6 @@ public class ApproveProfilePhotoEndpointTests
     [Fact]
     public async Task Post_Returns_NotFound_When_EmployeeId_Belongs_To_Different_Company()
     {
-        // The employee (and their pending photo) genuinely belong to Company B.
         var companyB   = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
@@ -225,7 +222,6 @@ public class ApproveProfilePhotoEndpointTests
         Assert.Empty(pendingRows);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> SelfClient(Guid companyId, Guid employeeId)
     {
@@ -261,18 +257,16 @@ public class ApproveProfilePhotoEndpointTests
         return form;
     }
 
-    // Builds a minimal-but-valid PNG byte stream: signature + IHDR chunk carrying the given
-    // width/height at the big-endian offsets ImageUploadValidator reads (16/20).
     private static byte[] BuildPngBytes(int width, int height)
     {
         var bytes = new List<byte>();
-        bytes.AddRange(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }); // signature
-        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x0D }); // IHDR chunk data length
+        bytes.AddRange(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
+        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x0D });
         bytes.AddRange("IHDR"u8.ToArray());
         bytes.AddRange(BigEndianUInt32(width));
         bytes.AddRange(BigEndianUInt32(height));
-        bytes.AddRange(new byte[] { 0x08, 0x06, 0x00, 0x00, 0x00 }); // bit depth, color type, compression, filter, interlace
-        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 }); // dummy CRC (not validated)
+        bytes.AddRange(new byte[] { 0x08, 0x06, 0x00, 0x00, 0x00 });
+        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 });
         return [.. bytes];
     }
 

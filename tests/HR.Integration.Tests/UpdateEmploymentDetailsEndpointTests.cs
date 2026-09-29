@@ -25,8 +25,6 @@ public class UpdateEmploymentDetailsEndpointTests
             await TestRoleSeeder.AssignRoleAsync(factory, User2, SystemRoles.HrAdministrator);
             await TestRoleSeeder.AssignRoleAsync(factory, User3, SystemRoles.HrAdministrator);
             await TestRoleSeeder.AssignRoleAsync(factory, User4, SystemRoles.HrAdministrator);
-            // GetVersionAsync GETs the employee record (policy role:employee) to round-trip the
-            // concurrency version, so these users also need the Employee role.
             await TestRoleSeeder.AssignRoleAsync(factory, User1, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, User2, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, User3, SystemRoles.Employee);
@@ -294,12 +292,6 @@ public class UpdateEmploymentDetailsEndpointTests
     [Fact]
     public async Task Put_Profile_Then_Put_Employment_With_Same_Location_Does_Not_Revert_Location()
     {
-        // Locks in last-write-wins persistence at the API layer, matching the EmployeeEmploymentTab
-        // fix: EmployeeEdit.razor's combined Save flow calls UpdateEmployeeProfile (which correctly
-        // saves a new Location) and then immediately calls the Employment tab's SaveAsync, which
-        // now synchronises its own Model.LocationId to the just-saved value before submitting
-        // UpdateEmploymentDetailsRequest, instead of resubmitting a stale copy that silently
-        // reverted the just-saved Location.
         using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User1.ToString());
@@ -320,8 +312,6 @@ public class UpdateEmploymentDetailsEndpointTests
         newLocResp.EnsureSuccessStatusCode();
         var newLocationId = (await newLocResp.Content.ReadFromJsonAsync<EmployeeRef>())!.Id;
 
-        // Step 1: UpdateEmployeeProfile saves the new Location (simulates EmployeeEdit.razor's
-        // SaveCoreAsync calling UpdateEmployeeProfileAsync first).
         var profileResponse = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employee.Id}/profile",
             new
@@ -337,9 +327,6 @@ public class UpdateEmploymentDetailsEndpointTests
             });
         Assert.Equal(HttpStatusCode.OK, profileResponse.StatusCode);
 
-        // Step 2: UpdateEmploymentDetails is called immediately after with the SAME location value
-        // — matching what the fixed EmployeeEmploymentTab.SyncSharedAssignmentFields now does —
-        // rather than a stale/older LocationId that would silently revert step 1's change.
         var employmentResponse = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employee.Id}/employment",
             new
@@ -359,7 +346,6 @@ public class UpdateEmploymentDetailsEndpointTests
         Assert.NotNull(payload);
         Assert.Equal(newLocationId, payload!.LocationId);
 
-        // Re-fetch the profile to double-check the location wasn't reverted on the profile side either.
         var profilePayload = await profileResponse.Content.ReadFromJsonAsync<EmployeeProfilePayload>();
         Assert.NotNull(profilePayload);
         Assert.Equal(newLocationId, profilePayload!.LocationId);
@@ -461,8 +447,6 @@ public class UpdateEmploymentDetailsEndpointTests
     private static async Task<EmployeeRef> CreateEmployeeAsync(HttpClient client, Guid companyId)
     {
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
-        // These tests set/correct an explicit employee number via PUT .../employment, which is only
-        // permitted in Manual employee-number mode (the default is Automatic).
         await EmployeeReferenceDataSeeder.SetEmployeeNumberModeManualAsync(client, companyId);
 
         var response = await client.PostAsJsonAsync(

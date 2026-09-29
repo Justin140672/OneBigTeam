@@ -374,7 +374,7 @@ public class CancelLeaveRequestHandlerTests
 
         var savedBalance = await context.LeaveBalances.SingleAsync();
         Assert.Equal(0m, savedBalance.UsedDays);
-        Assert.Equal(5m, savedBalance.RemainingDays); // fully restored
+        Assert.Equal(5m, savedBalance.RemainingDays);
     }
 
     [Fact]
@@ -388,7 +388,6 @@ public class CancelLeaveRequestHandlerTests
         var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "TOIL", "TOIL", 0,
             AccrualMethod.None, LeaveTypeBehaviour.Toil, now);
 
-        // TOIL earned in 2025, leave taken in 2026
         var leaveRequest = LeaveRequest.Create(
             Guid.NewGuid(), companyId, employeeId, leaveType.Id, Guid.NewGuid(),
             new DateOnly(2026, 1, 5), LeaveDayPart.FullDay,
@@ -423,7 +422,7 @@ public class CancelLeaveRequestHandlerTests
 
         var savedBalance = await context.LeaveBalances.SingleAsync();
         Assert.Equal(0m, savedBalance.UsedDays);
-        Assert.Equal(4m, savedBalance.RemainingDays); // 2025 balance fully restored
+        Assert.Equal(4m, savedBalance.RemainingDays);
     }
 
     [Fact]
@@ -486,8 +485,6 @@ public class CancelLeaveRequestHandlerTests
         balance.Adjust(6m, now);
         balance.RecordUsage(4m, now);
 
-        // Two buckets were drawn from when the request was approved (mirroring what ApproveLeaveRequestHandler /
-        // ToilLedgerService.ConsumeAsync would have produced for a 4-day request spanning two 2-day buckets).
         var bucketA = CreateEarnedBucket(companyId, employeeId, balance.Id, 2m, new DateOnly(2026, 4, 1), now);
         var bucketB = CreateEarnedBucket(companyId, employeeId, balance.Id, 4m, new DateOnly(2026, 5, 1), now);
         var usedA = CreateUsedTransaction(companyId, employeeId, balance.Id, bucketA.Id, leaveRequest.Id, 2m, new DateOnly(2026, 8, 3), now);
@@ -527,8 +524,6 @@ public class CancelLeaveRequestHandlerTests
         Assert.Equal(0m, savedBalance.UsedDays);
         Assert.Equal(6m, savedBalance.RemainingDays);
 
-        // Subsequent consumption should be able to draw straight back from the restored buckets,
-        // confirming the reversal correctly restored the ledger rather than just the aggregate.
         var ledgerService = new ToilLedgerService(context);
         var reconsumeResult = await ledgerService.ConsumeAsync(
             companyId, employeeId, leaveType.Id, 2m, Guid.NewGuid(), Guid.NewGuid(),
@@ -536,14 +531,12 @@ public class CancelLeaveRequestHandlerTests
 
         Assert.True(reconsumeResult.IsSuccess);
         var reconsumed = Assert.Single(reconsumeResult.Value!.Transactions);
-        Assert.Equal(bucketA.Id, reconsumed.RelatedTransactionId); // oldest bucket again, FIFO
+        Assert.Equal(bucketA.Id, reconsumed.RelatedTransactionId);
     }
 
     [Fact]
     public async Task HandleAsync_Returns_Validation_Error_When_Cancelling_A_Draft()
     {
-        // LEAVE-07: a Draft was never submitted, so cancel is not a meaningful action - the caller
-        // must use DeleteLeaveRequestDraft instead.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();

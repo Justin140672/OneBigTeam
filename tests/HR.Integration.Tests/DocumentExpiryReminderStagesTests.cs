@@ -10,11 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// DOC-03: covers the three independent upcoming-expiry reminder stages (90/30/7 days) and the
-/// reminder-state reset performed by EmployeeDocument.UpdateExpiryDate, on top of the pre-existing
-/// coverage in DocumentExpiryTasksEndToEndTests.
-/// </summary>
 [Collection("Integration")]
 public class DocumentExpiryReminderStagesTests
 {
@@ -67,7 +62,6 @@ public class DocumentExpiryReminderStagesTests
         using var client = await AdminClient(companyId);
 
         var docTypeId = await CreateDocTypeAsync(client, companyId);
-        // Start out already within the 90-day window so the first run fires the 90-day stage.
         var employeeDocumentId = await UploadDocAsync(client, companyId, docTypeId, employeeId, Today.AddDays(60));
 
         var firstResp = await client.PostAsJsonAsync(
@@ -76,17 +70,11 @@ public class DocumentExpiryReminderStagesTests
         var firstPayload = await firstResp.Content.ReadFromJsonAsync<NotifPayload>();
         Assert.Equal(1, firstPayload!.Reminder90Count);
 
-        // No accessible API to edit an EmployeeDocument's expiry date exists yet (DOC-03 adds
-        // UpdateExpiryDate to the domain for forward-safety only — see EmployeeDocument.cs), so we
-        // exercise it directly against the DbContext, mirroring how other integration tests reach
-        // into the database for setup that has no corresponding endpoint (see
-        // AdjustLeaveBalanceEndpointTests.CreateLeaveTypeAsync for the same pattern).
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<DocumentsDbContext>();
             var entity = await db.EmployeeDocuments.SingleAsync(ed => ed.Id == employeeDocumentId);
 
-            // Push the expiry date far enough out that none of the three stages are due yet.
             entity.UpdateExpiryDate(Today.AddDays(120), DateTimeOffset.UtcNow);
             await db.SaveChangesAsync();
         }
@@ -114,8 +102,6 @@ public class DocumentExpiryReminderStagesTests
             Assert.Equal(Today.AddDays(120), entity.ExpiryDate);
         }
 
-        // Now push the expiry date back into the 90-day window and confirm it correctly fires
-        // again against the new date, proving the reset genuinely restarted the schedule.
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<DocumentsDbContext>();
@@ -143,7 +129,6 @@ public class DocumentExpiryReminderStagesTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AdminClient(Guid companyId)
     {
@@ -183,8 +168,6 @@ public class DocumentExpiryReminderStagesTests
             $"/api/companies/{companyId}/employees/{employeeId}/documents", content);
         resp.EnsureSuccessStatusCode();
 
-        // Look up the resulting EmployeeDocument id directly, since the upload response does not
-        // itself return the EmployeeDocument's own id (the join id between Document and Employee).
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DocumentsDbContext>();
         var employeeDocument = await db.EmployeeDocuments

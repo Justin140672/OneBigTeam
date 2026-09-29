@@ -12,9 +12,6 @@ internal sealed class FakeOffboardingPlanCoordinator : IOffboardingPlanCoordinat
     public List<CancelOutstandingTasksCall> CancelOutstandingTasksCalls { get; } = [];
     public List<RescheduleOutstandingTasksCall> RescheduleOutstandingTasksCalls { get; } = [];
 
-    /// <summary>Set to make CancelOutstandingTasksAsync throw for a specific employee — used to
-    /// prove one employee's failure doesn't stop a batch (e.g. the reconciliation job) from
-    /// processing the rest.</summary>
     public HashSet<Guid> EmployeeIdsThatThrow { get; } = [];
 
     public Task StartAsync(

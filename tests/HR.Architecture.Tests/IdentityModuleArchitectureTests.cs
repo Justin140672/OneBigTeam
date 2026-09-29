@@ -149,7 +149,6 @@ public class IdentityModuleArchitectureTests
         Assert.Equal("supabase_auth_user_id", supabaseUserIdProperty!.GetColumnName());
     }
 
-    // ── UserPosition boundary tests ──────────────────────────────────────────
 
     [Fact]
     public void UserPosition_Entity_Is_Not_Public()

@@ -16,21 +16,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// [P1] Malware-scan gating of candidate documents, end to end against Postgres:
-/// GET /candidates/{c}/documents/{d}/download returns 302 only for a Clean document; Pending/Scanning
-/// → 409 "document_scan_pending"; Infected → 403 "document_quarantined"; Failed → 403
-/// "document_scan_failed". Also covers real uploads being dispatched for scanning (on-save interceptor,
-/// including the coordinated intake's explicit-transaction path), ScanCandidateDocumentJob with the
-/// host's no-op scanner, an EICAR-detecting scanner and a failing scanner, and the reconciliation
-/// sweep dispatching backfilled Pending rows.
-///
-/// The test host's IBackgroundJobClient is FakeBackgroundJobClient (records, never runs jobs), so
-/// every test drives ScanCandidateDocumentJob itself. That fake is a shared singleton — assertions
-/// filter recorded jobs by document id rather than counting.
-/// See ScanCandidateDocumentJobTests / DownloadCandidateDocumentHandlerTests in
-/// HR.Modules.Recruitment.Tests for the unit-level equivalents.
-/// </summary>
 [Collection("Integration")]
 public class CandidateDocumentScanGatingEndpointTests
 {
@@ -128,7 +113,6 @@ public class CandidateDocumentScanGatingEndpointTests
         Assert.False(string.IsNullOrWhiteSpace(body.Error));
     }
 
-    // ── Status → response mapping (seeded rows) ──────────────────────────────────────────────
 
     [Fact]
     public async Task Get_Download_Returns_Unauthorized_For_Anonymous_Request()
@@ -269,7 +253,6 @@ public class CandidateDocumentScanGatingEndpointTests
         }
     }
 
-    // ── Real upload → dispatch → scan → download ────────────────────────────────────────────
 
     [Fact]
     public async Task Uploaded_Clean_Cv_Is_Blocked_Until_Scanned_Then_Downloadable()
@@ -280,14 +263,11 @@ public class CandidateDocumentScanGatingEndpointTests
 
         var documentId = await UploadAsync(client, companyId, candidateId, HarmlessPdf);
 
-        // Immediately after upload: not yet scanned → 409.
         var before = await client.GetAsync(DownloadUrl(companyId, candidateId, documentId));
         await AssertBlockedAsync(before, HttpStatusCode.Conflict, "document_scan_pending");
 
-        // The save dispatched exactly one scan for this document.
         Assert.Equal(1, ScanJobsFor(documentId));
 
-        // Run the dispatched job with the host's (no-op, always clean) scanner.
         await RunScanWithHostScannerAsync(documentId);
 
         var saved = await LoadDocumentAsync(documentId);
@@ -306,18 +286,12 @@ public class CandidateDocumentScanGatingEndpointTests
         var candidateId = await RecruitmentTestSeeder.SeedCandidateAsync(_factory, companyId, Now);
         using var client = await ClientAs(RecruiterUser, companyId);
 
-        // Declared as a PDF (name + content type pass upload validation); the bytes carry the EICAR
-        // signature. It is embedded after a PDF-looking header rather than being a bare EICAR file on
-        // purpose: LocalCandidateDocumentStorageService writes to the real temp dir, and host
-        // antivirus (e.g. Windows Defender) would otherwise quarantine a bare EICAR file mid-test.
-        // The test scanner below detects the signature anywhere in the content.
         var spoofed = "%PDF-1.7\n" + Eicar + "\n%%EOF";
         var documentId = await UploadAsync(client, companyId, candidateId, Encoding.ASCII.GetBytes(spoofed), "cv.pdf", "application/pdf");
 
         var scanner = new EicarDetectingScanner();
         await RunScanWithAsync(documentId, scanner);
 
-        // The scanner inspected the actual stored bytes, read back from storage.
         Assert.Equal(spoofed, Assert.Single(scanner.ScannedContents));
 
         var saved = await LoadDocumentAsync(documentId);
@@ -327,7 +301,6 @@ public class CandidateDocumentScanGatingEndpointTests
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
-            // Excludes the upload's own pre-upload "reserved" intent row for the same key.
             var quarantine = await db.CandidateDocumentDeletionOperations.AsNoTracking()
                 .Where(o => o.StorageKey == saved.StorageKey && o.Status != CandidateDocumentDeletionOperation.StatusReserved)
                 .ToListAsync();
@@ -347,7 +320,6 @@ public class CandidateDocumentScanGatingEndpointTests
         Assert.Equal("Infected", item.ScanStatus);
         Assert.False(item.IsDownloadable);
 
-        // Re-running the (already terminal) job is a no-op — it cannot flip the result to Clean.
         await RunScanWithHostScannerAsync(documentId);
         Assert.Equal(CandidateDocumentScanStatus.Infected, (await LoadDocumentAsync(documentId)).ScanStatus);
     }
@@ -370,22 +342,18 @@ public class CandidateDocumentScanGatingEndpointTests
         Assert.NotNull(saved.ScanNextAttemptAt);
         Assert.Equal(CandidateDocumentScanFailureReasons.ScannerUnavailable, saved.ScanFailureReason);
 
-        // A retry was scheduled for this document.
         Assert.Equal(scanJobsBefore + 1, ScanJobsFor(documentId));
 
         var download = await client.GetAsync(DownloadUrl(companyId, candidateId, documentId));
         await AssertBlockedAsync(download, HttpStatusCode.Conflict, "document_scan_pending");
     }
 
-    // ── Reconciliation (backfilled rows) ─────────────────────────────────────────────────────
 
     [Fact]
     public async Task Reconciliation_Dispatches_A_Backfilled_Pending_Document_But_Not_A_Fresh_Upload()
     {
         var companyId = Guid.NewGuid();
         var candidateId = await RecruitmentTestSeeder.SeedCandidateAsync(_factory, companyId, Now);
-        // A row that pre-dates scanning (backfilled Pending by the migration's column default). The very
-        // old CreatedAt also sorts it first in the sweep's oldest-first, bounded batch on the shared DB.
         var backfilledId = await RecruitmentTestSeeder.SeedCandidateDocumentAsync(
             _factory, companyId, candidateId, new DateTimeOffset(2001, 1, 1, 0, 0, 0, TimeSpan.Zero), title: "Legacy CV");
         var freshId = await RecruitmentTestSeeder.SeedCandidateDocumentAsync(
@@ -399,18 +367,15 @@ public class CandidateDocumentScanGatingEndpointTests
         }
 
         Assert.Equal(backfilledBefore + 1, ScanJobsFor(backfilledId));
-        Assert.Equal(freshBefore, ScanJobsFor(freshId)); // still inside the new-upload grace period
+        Assert.Equal(freshBefore, ScanJobsFor(freshId));
         Assert.Equal(CandidateDocumentScanStatus.Pending, (await LoadDocumentAsync(backfilledId)).ScanStatus);
 
-        // A seeded row has no stored blob: the dispatched scan cannot read it, so it records a failed
-        // attempt and stays blocked — a missing/unreadable file is never treated as clean.
         await RunScanWithHostScannerAsync(backfilledId);
         var afterMissingBlob = await LoadDocumentAsync(backfilledId);
         Assert.Equal(CandidateDocumentScanStatus.Pending, afterMissingBlob.ScanStatus);
         Assert.Equal(1, afterMissingBlob.ScanAttemptCount);
         Assert.Equal(CandidateDocumentScanFailureReasons.FileUnreadable, afterMissingBlob.ScanFailureReason);
 
-        // Once the legacy blob is actually present in storage, the next (due) attempt clears it.
         await StoreBlobAndMakeRetryDueAsync(backfilledId, HarmlessPdf);
         await RunScanWithHostScannerAsync(backfilledId);
         var cleared = await LoadDocumentAsync(backfilledId);
@@ -427,13 +392,11 @@ public class CandidateDocumentScanGatingEndpointTests
         var document = await db.CandidateDocuments.SingleAsync(d => d.Id == documentId);
         await storage.UploadAsync(new MemoryStream(content), document.StorageKey, "application/pdf", CancellationToken.None);
 
-        // Skip the back-off the failed attempt scheduled, so the retry is due now.
         await db.CandidateDocuments
             .Where(d => d.Id == documentId)
             .ExecuteUpdateAsync(s => s.SetProperty(d => d.ScanNextAttemptAt, DateTimeOffset.UtcNow.AddMinutes(-1)));
     }
 
-    // ── Dispatch after an explicit transaction commits (coordinated intake) ──────────────────
 
     [Fact]
     public async Task New_Candidate_Application_With_Cv_Dispatches_A_Scan_After_Commit_And_Cv_Is_Blocked()
@@ -459,8 +422,6 @@ public class CandidateDocumentScanGatingEndpointTests
         Assert.NotNull(created);
         var documentId = Assert.IsType<Guid>(created!.CvDocumentId);
 
-        // CandidateApplicationIntake saves inside BeginTransactionAsync — the interceptor defers the
-        // dispatch to TransactionCommitted and sends exactly one scan.
         Assert.Equal(1, ScanJobsFor(documentId));
         Assert.Equal(CandidateDocumentScanStatus.Pending, (await LoadDocumentAsync(documentId)).ScanStatus);
 
@@ -468,7 +429,6 @@ public class CandidateDocumentScanGatingEndpointTests
         await AssertBlockedAsync(download, HttpStatusCode.Conflict, "document_scan_pending");
     }
 
-    // ── test doubles / payloads ──────────────────────────────────────────────────────────────
 
     private sealed class EicarDetectingScanner : IUploadedFileScanner
     {

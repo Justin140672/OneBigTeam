@@ -6,11 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Features.SearchUserAccess;
 
-/// <summary>
-/// IAM-08: batch (not per-user) equivalent of GetEffectiveAccess's direct/inherited/override
-/// resolution, built to answer "which users match this role/position/override criteria" across the
-/// whole company in one pass rather than one authorization-service call per employee.
-/// </summary>
 internal sealed class SearchUserAccessHandler(
     IdentityDbContext db,
     IEmployeeNameReader employeeNameReader,
@@ -70,7 +65,7 @@ internal sealed class SearchUserAccessHandler(
             usersById.TryGetValue(employeeId, out var user);
             profilesById.TryGetValue(employeeId, out var profile);
             if (user is null && profile is null)
-                continue; // No account of any kind — nothing to report on for access search.
+                continue;
 
             var directForUser = directRoles.Where(r => r.UserId == employeeId)
                 .Select(r => new RoleRef(r.RoleId, roleNameLookup.GetValueOrDefault(r.RoleId, string.Empty)))

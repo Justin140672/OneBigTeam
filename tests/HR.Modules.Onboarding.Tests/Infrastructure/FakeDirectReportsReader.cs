@@ -3,19 +3,6 @@ using HR.Modules.Employees.Contracts;
 
 namespace HR.Modules.Onboarding.Tests.Infrastructure;
 
-/// <summary>
-/// Fake <see cref="IDirectReportsReader"/> with two modes.
-///
-/// <para><b>Flat mode</b> (<c>new FakeDirectReportsReader(a, b, c)</c>): every manager id resolves
-/// to exactly the given set for both the direct-reports and full-descendant queries.</para>
-///
-/// <para><b>Hierarchy mode</b> (<see cref="WithHierarchy"/>): builds a real
-/// <c>(manager -&gt; direct reports)</c> adjacency map. <see cref="GetAllDescendantIdsAsync"/> walks
-/// it breadth-first with a visited-set, so a reporting cycle (A -&gt; B -&gt; A) or a self-referential
-/// manager terminates and no id is yielded twice. The map is read fresh on every call, so
-/// <see cref="Reparent"/> moves an employee between managers' sub-trees immediately. See
-/// specifications/architecture/11-manager-hierarchy-scope.md (DSH-02).</para>
-/// </summary>
 internal sealed class FakeDirectReportsReader : IDirectReportsReader
 {
     private readonly IReadOnlyList<Guid>? _flat;

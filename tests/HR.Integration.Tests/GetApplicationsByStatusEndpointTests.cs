@@ -114,7 +114,6 @@ public class GetApplicationsByStatusEndpointTests
             db.Candidates.Add(candidate);
             db.Applications.Add(application);
 
-            // Noise: an application on a different stage that should not be returned for this stageId.
             var otherStageCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", $"liam.{Guid.NewGuid():N}@example.com", null, null, Now);
             var otherStageApplication = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, otherStageCandidate.Id, cvReviewStageId, null, Now);
             db.Candidates.Add(otherStageCandidate);

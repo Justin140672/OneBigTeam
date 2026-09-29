@@ -16,8 +16,6 @@ internal sealed class Endpoint(RecordMySicknessHandler handler, ICurrentUser cur
 
     public override async Task HandleAsync(RecordMySicknessRequest request, CancellationToken cancellationToken)
     {
-        // NOT User.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's resolved
-        // Employee/UserId (see GetMyEmployee/Endpoint.cs for the rationale).
         if (currentUser.UserId is not { } authenticatedEmployeeId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());

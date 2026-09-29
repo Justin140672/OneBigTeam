@@ -80,7 +80,7 @@ public class DeactivateSicknessCategoryHandlerTests
 
         var result = await handler.HandleAsync(new DeactivateSicknessCategoryRequest
         {
-            CompanyId = Guid.NewGuid(), // different company
+            CompanyId = Guid.NewGuid(),
             Id = categoryId
         }, CancellationToken.None);
 
@@ -88,8 +88,6 @@ public class DeactivateSicknessCategoryHandlerTests
         Assert.Equal("not_found", result.Error.Code);
     }
 
-    // SICK-06: actor is resolved server-side from the caller (threaded via
-    // DeactivateSicknessCategoryRequest.ActorEmployeeId).
     [Fact]
     public async Task HandleAsync_Publishes_Audit_Event_With_ActorEmployeeId()
     {

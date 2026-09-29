@@ -6,10 +6,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Verifies that ProcessDocumentExpiryNotifications creates tasks that are
-/// subsequently visible when querying an employee's task list.
-/// </summary>
 [Collection("Integration")]
 public class DocumentExpiryTasksEndToEndTests
 {
@@ -42,10 +38,6 @@ public class DocumentExpiryTasksEndToEndTests
         notifResp.EnsureSuccessStatusCode();
         var notifPayload = await notifResp.Content.ReadFromJsonAsync<NotifPayload>();
 
-        // DOC-03: a document that is 10 days from expiry has already crossed both the 90-day and
-        // the 30-day reminder thresholds by the time it is first evaluated (it was never inside
-        // the 90-day window on an earlier run), so both stages fire together on this first pass —
-        // see ProcessDocumentExpiryNotificationsHandler's catch-up semantics.
         Assert.Equal(2, notifPayload!.ExpiringSoonCount);
         Assert.Equal(1, notifPayload.Reminder90Count);
         Assert.Equal(1, notifPayload.Reminder30Count);
@@ -65,9 +57,6 @@ public class DocumentExpiryTasksEndToEndTests
             Assert.Contains("expiring soon", task.Title, StringComparison.OrdinalIgnoreCase);
         });
 
-        // Re-running the job for the same company must be a no-op for this document — both
-        // stages were already marked sent above, so idempotency is verified by re-posting and
-        // confirming no further reminder is fired.
         var rerunResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/documents/expiry-notifications", new { });
         rerunResp.EnsureSuccessStatusCode();
@@ -122,7 +111,6 @@ public class DocumentExpiryTasksEndToEndTests
         Assert.Contains(payload.Items, n => !n.IsRead);
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AdminClient(Guid companyId)
     {

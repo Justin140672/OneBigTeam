@@ -126,7 +126,6 @@ public class ApplyForInternalVacancyHandlerTests
         Assert.Equal(errorCode, result.Result.Error.Code);
     }
 
-    // ----- Happy path -----
 
     [Fact]
     public async Task HandleAsync_Creates_Linked_Candidate_Internal_Application_And_Cv_From_Employee_Record()
@@ -225,7 +224,6 @@ public class ApplyForInternalVacancyHandlerTests
         Assert.Equal(response.CvDocumentId, cvChanged.NewCvDocumentId);
         Assert.Equal(employeeId, cvChanged.ChangedByUserId);
 
-        // A brand-new candidate is neither "updated" nor "reactivated".
         Assert.Empty(h.Audit.Published.OfType<CandidateUpdatedAuditEvent>());
         Assert.Empty(h.Audit.Published.OfType<CandidateReactivatedAuditEvent>());
     }
@@ -301,7 +299,6 @@ public class ApplyForInternalVacancyHandlerTests
         await AssertNothingCreatedAsync(h);
     }
 
-    // ----- The applicant is the authenticated employee, not the request -----
 
     [Fact]
     public async Task HandleAsync_Takes_Candidate_Identity_Only_From_Employee_Reader_For_The_Supplied_Employee()
@@ -316,7 +313,6 @@ public class ApplyForInternalVacancyHandlerTests
         var h = BuildHarness(db, reader);
         var (vacancy, _) = await SeedCompanyAsync(db, companyId);
 
-        // The request type carries no identity at all — only route ids and the file.
         var identityProperties = typeof(ApplyForInternalVacancyRequest).GetProperties().Select(p => p.Name).OrderBy(n => n).ToArray();
         Assert.Equal(new[] { "CompanyId", "CvFile", "VacancyId" }, identityProperties);
 
@@ -330,10 +326,7 @@ public class ApplyForInternalVacancyHandlerTests
         Assert.Equal("priya.shah@acme.example", candidate.Email);
     }
 
-    // ----- Eligibility -----
 
-    // EmployeeApplicantEmploymentState is public, but the theory rows use names to keep the test data
-    // readable and to mirror the pattern used for internal enums elsewhere in this project.
     [Theory]
     [InlineData(nameof(EmployeeApplicantEmploymentState.Draft))]
     [InlineData(nameof(EmployeeApplicantEmploymentState.Suspended))]
@@ -401,7 +394,6 @@ public class ApplyForInternalVacancyHandlerTests
         AssertRejected(result, StatusCodes.Status403Forbidden, ApplyForInternalVacancyRejection.NotEligibleCode);
     }
 
-    // ----- Vacancy visibility -----
 
     [Fact]
     public async Task HandleAsync_Returns_NotFound_For_Draft_Vacancy()
@@ -525,7 +517,6 @@ public class ApplyForInternalVacancyHandlerTests
         await AssertNothingCreatedAsync(h);
     }
 
-    // ----- Duplicate prevention -----
 
     [Fact]
     public async Task HandleAsync_Second_Application_To_Same_Vacancy_Is_Already_Applied_Without_Upload()
@@ -576,8 +567,6 @@ public class ApplyForInternalVacancyHandlerTests
     [Fact]
     public async Task HandleAsync_Treats_Recruiter_Entered_Application_For_Linked_Candidate_As_Already_Applied()
     {
-        // A hired external candidate (linked to the employee on hire) whose original application was to
-        // this same vacancy — the employee has "already applied".
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -617,7 +606,6 @@ public class ApplyForInternalVacancyHandlerTests
         Assert.Equal(2, await db.Applications.CountAsync(x => x.VacancyId == vacancy.Id));
     }
 
-    // ----- Candidate reuse -----
 
     [Fact]
     public async Task HandleAsync_Second_Vacancy_Reuses_Candidate_And_Refreshes_Changed_Identity()
@@ -635,7 +623,6 @@ public class ApplyForInternalVacancyHandlerTests
         Assert.True(first.Result.IsSuccess);
         var versionAfterFirst = (await db.Candidates.AsNoTracking().SingleAsync()).Version;
 
-        // The Employee record changed between the two applications (e.g. a name change).
         reader.Set(FakeEmployeeApplicantReader.Profile(
             companyId, employeeId, "Priya", "Shah-Patel", "priya.shah-patel@acme.example", "07700 900999"));
 
@@ -710,7 +697,6 @@ public class ApplyForInternalVacancyHandlerTests
             companyId, employeeId, "Priya", "Shah", "priya.shah@acme.example")));
         var (vacancy, stages) = await SeedCompanyAsync(db, companyId);
 
-        // Originally an external candidate (personal email), linked to the employee when hired.
         var hireVacancy = await AddVacancyAsync(db, OpenAdvertised(companyId, "Original Role"));
         var hired = Candidate.Create(Guid.NewGuid(), companyId, "Priya", "Shah", "priya.personal@example.com", null, "https://example.com/old-cv.pdf", Now.AddDays(-400));
         hired.LinkToEmployee(employeeId, Now.AddDays(-365));
@@ -745,7 +731,6 @@ public class ApplyForInternalVacancyHandlerTests
             companyId, employeeId, "Priya", "Shah", "priya.shah@acme.example", "07700 900456")));
         var (vacancy, _) = await SeedCompanyAsync(db, companyId);
 
-        // A previously hired external candidate that a recruiter deactivated after the hire.
         var linked = Candidate.Create(Guid.NewGuid(), companyId, "Priya", "Shah", "priya.shah@acme.example", "07700 900456", null, Now.AddDays(-400));
         linked.LinkToEmployee(employeeId, Now.AddDays(-365));
         linked.Deactivate(Guid.NewGuid(), "Hired", Now.AddDays(-360));
@@ -768,7 +753,6 @@ public class ApplyForInternalVacancyHandlerTests
         Assert.Equal(employeeId, reactivated.ReactivatedByUserId);
         Assert.Equal(employeeId, ((IAuditEvent)reactivated).ActorUserId);
 
-        // Identity was unchanged, so no candidate.updated.
         Assert.Empty(h.Audit.Published.OfType<CandidateUpdatedAuditEvent>());
         var submitted = Assert.Single(h.Audit.Published.OfType<InternalApplicationSubmittedAuditEvent>());
         Assert.True(submitted.CandidateReactivated);
@@ -795,7 +779,6 @@ public class ApplyForInternalVacancyHandlerTests
         Assert.Equal("[purged]", (await db.Candidates.AsNoTracking().SingleAsync()).FirstName);
     }
 
-    // ----- Email owned by a different candidate -----
 
     [Fact]
     public async Task HandleAsync_Refuses_When_Work_Email_Belongs_To_Unlinked_External_Candidate_Case_Insensitively()
@@ -864,7 +847,6 @@ public class ApplyForInternalVacancyHandlerTests
         Assert.Equal(1, await db.Candidates.CountAsync(c => c.CompanyId == companyId));
     }
 
-    // ----- Employee identity / CV file validation -----
 
     [Fact]
     public async Task HandleAsync_Returns_Validation_When_Employee_Has_No_Work_Email()

@@ -7,7 +7,6 @@ namespace HR.Web.Tests;
 
 public class LeaveServiceTests
 {
-    // ── CancelLeaveRequestAsync ───────────────────────────────────────────────────
 
     [Fact]
     public async Task CancelLeaveRequestAsync_Returns_True_When_Api_Returns_NoContent()
@@ -45,7 +44,6 @@ public class LeaveServiceTests
     [Fact]
     public async Task CancelLeaveRequestAsync_Returns_False_When_Api_Returns_Conflict_For_Already_Cancelled_Request()
     {
-        // Guards against cancelling an already-cancelled/approved-past request.
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.Conflict, new { error = "This leave request cannot be cancelled." }));
         var service = new LeaveService(factory);
 
@@ -66,7 +64,6 @@ public class LeaveServiceTests
             () => service.CancelLeaveRequestAsync(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), cts.Token));
     }
 
-    // ── SubmitLeaveRequestAsync (write) ──────────────────────────────────────────
 
     [Fact]
     public async Task SubmitLeaveRequestAsync_Returns_Response_When_Api_Returns_Ok()
@@ -122,7 +119,6 @@ public class LeaveServiceTests
         Assert.NotNull(error);
     }
 
-    // ── GetEmployeeLeaveBalanceAsync (representative read) ───────────────────────
 
     [Fact]
     public async Task GetEmployeeLeaveBalanceAsync_Returns_Value_When_Api_Returns_Ok()

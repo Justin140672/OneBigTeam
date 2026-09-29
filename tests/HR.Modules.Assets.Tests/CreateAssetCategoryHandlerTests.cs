@@ -75,7 +75,6 @@ public class CreateAssetCategoryHandlerTests
     [Fact]
     public async Task HandleAsync_Rejects_Duplicate_Name_Case_Insensitively()
     {
-        // Was previously missing entirely — asset category names had no uniqueness check at all.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
 

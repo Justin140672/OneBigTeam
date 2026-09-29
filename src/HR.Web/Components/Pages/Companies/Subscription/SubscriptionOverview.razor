@@ -171,9 +171,6 @@
     private string NextBillingDateDisplay =>
         _details?.NextBillingDate is { } date ? date.ToLocalTime().ToString("d") : "Not yet billed";
 
-    // "Available" here means the action makes business sense right now, independent of whether an
-    // API call is currently in flight (that's covered separately by the *_Busy flags above/spinner
-    // state) — this is the "unavailable by design" case called out in the styling/UX conventions.
     private bool CancelIsAvailable =>
         _details is not null && _details.Status == SubscriptionStatus.Active && _details.CancelAtPeriodEnd == false;
 
@@ -194,10 +191,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // ADM (Subscription & Billing restriction): Company-Administrator-only, enforced server-side
-        // too — the subscription:manage API policy no longer grants HR Administrator (see
-        // 30-administrative-role-separation-matrix.md). CanManageCompany is true iff the user holds
-        // the CompanyAdministrator role. Bail before any load if the guard redirects.
         await Session.InitialiseAsync();
         if (!AppSession.GuardAccess(NavigationManager, Session.CanManageCompany))
             return;

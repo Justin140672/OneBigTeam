@@ -7,11 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// SICK-03: the canonical way a return-to-work review is completed. Mirrors
-/// SicknessResourceAuthorizationTests' seeding conventions for the "sickness:review"
-/// policy/authorizer pair.
-/// </summary>
 [Collection("Integration")]
 public class CompleteReturnToWorkReviewEndpointTests
 {
@@ -167,7 +162,6 @@ public class CompleteReturnToWorkReviewEndpointTests
             managerNotes = (string?)null
         });
 
-        // Same "unrelated review looks like no such review" pattern as GetReturnToWorkReview.
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -238,7 +232,6 @@ public class CompleteReturnToWorkReviewEndpointTests
         Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
         var firstPayload = await firstResponse.Content.ReadFromJsonAsync<ReviewCompletionPayload>();
 
-        // Second call with different (would-be) values — should be ignored, not overwrite.
         var secondResponse = await CompleteAsync(hrClient, companyId, reviewId, new
         {
             companyId,
@@ -260,9 +253,6 @@ public class CompleteReturnToWorkReviewEndpointTests
         Assert.Equal("FitWithAdjustments", secondPayload.Outcome);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> HrAdminClientAsync(Guid companyId)
     {
@@ -327,11 +317,6 @@ public class CompleteReturnToWorkReviewEndpointTests
         return payload!.Id;
     }
 
-    /// <summary>
-    /// Creates and closes a sickness record whose closure raises a return-to-work review
-    /// (ReturnToWorkRequiredAfterDays defaults to 1, so any closed record with >=1 total day
-    /// qualifies), returning only the review id.
-    /// </summary>
     private async Task<Guid> CreateReturnToWorkReviewAsync(HttpClient hrClient, Guid companyId, Guid employeeId)
     {
         var (_, reviewId) = await CreateReturnToWorkReviewWithRecordAsync(hrClient, companyId, employeeId);

@@ -79,9 +79,6 @@ internal sealed class CreateApplicationHandler(
 
         var now = clock.UtcNowOffset();
 
-        // Defensive: normally already seeded by CreateVacancyHandler (a Vacancy must exist before an
-        // Application can be created against it — see the check above), but this guards against any
-        // other path that creates vacancies without going through that handler (e.g. direct seed data).
         await stageSeeder.EnsureDefaultStagesSeededAsync(request.CompanyId, now, cancellationToken);
 
         var initialStageId = await db.RecruitmentStages

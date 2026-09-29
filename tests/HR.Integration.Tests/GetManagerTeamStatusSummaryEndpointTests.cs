@@ -14,12 +14,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// DSH-05: GET the manager team-status summary. The <c>employee:read</c> policy proves the caller
-/// holds an administrative-read role; the browser-supplied <c>{managerId}</c> route value is then
-/// authorized against the authenticated caller (self / above in the reporting tree / company-wide
-/// employee access). Counts and drill-down are derived from one member list so they always agree.
-/// </summary>
 [Collection("Integration")]
 public class GetManagerTeamStatusSummaryEndpointTests
 {
@@ -36,7 +30,6 @@ public class GetManagerTeamStatusSummaryEndpointTests
     private static string Url(Guid companyId, Guid managerId) =>
         $"/api/companies/{companyId}/employees/{managerId}/team-status-summary";
 
-    // ── auth matrix ────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Returns_Unauthorized_For_Anonymous()
@@ -127,7 +120,6 @@ public class GetManagerTeamStatusSummaryEndpointTests
         Assert.Contains(payload.Members, m => m.EmployeeId == report);
     }
 
-    // ── company isolation ──────────────────────────────────────────────────
 
     [Fact]
     public async Task Company_Isolation_HrAdmin_For_Company_A_Never_Sees_Company_B_Team()
@@ -154,7 +146,6 @@ public class GetManagerTeamStatusSummaryEndpointTests
         Assert.DoesNotContain(payload.Members, m => m.EmployeeId == managerB);
     }
 
-    // ── counts + drill-down ────────────────────────────────────────────────
 
     [Fact]
     public async Task Counts_Are_Computed_End_To_End_And_Agree_With_The_Drilldown()
@@ -169,29 +160,26 @@ public class GetManagerTeamStatusSummaryEndpointTests
         var missingNote = await SeedActiveEmployeeAsync(companyId, refData, "Nia", "NoNote", managerId: manager);
         var plain = await SeedActiveEmployeeAsync(companyId, refData, "Amy", "AtWork", managerId: manager);
 
-        // excluded from the counted population
         await SeedActiveEmployeeAsync(companyId, refData, "Fin", "Future", managerId: manager, startDate: Today.AddDays(30));
         await SeedActiveEmployeeAsync(companyId, refData, "Gus", "Gone", managerId: manager, leavingDate: Today.AddDays(-1));
 
         await SeedApprovedLeaveAsync(companyId, onLeave, Today.AddDays(-1), Today.AddDays(1));
         await SeedActiveSicknessAsync(companyId, offSick, Today.AddDays(-2));
         await SeedActiveProbationAsync(companyId, probation);
-        await SeedPendingFitNoteAsync(companyId, missingNote); // on a closed record → not also "Sick"
+        await SeedPendingFitNoteAsync(companyId, missingNote);
 
         using var client = await ClientForAsync(companyId, Guid.NewGuid(), SystemRoles.HrAdministrator);
         var payload = await client.GetFromJsonAsync<SummaryPayload>(Url(companyId, manager));
 
         Assert.NotNull(payload);
-        // The manager is not part of their own reporting sub-tree: 5 reports are counted.
         Assert.Equal(5, payload!.TeamSize);
         Assert.DoesNotContain(payload.Members, m => m.EmployeeId == manager);
         Assert.Equal(1, payload.OnLeave);
         Assert.Equal(1, payload.Sick);
         Assert.Equal(1, payload.InProbation);
         Assert.Equal(1, payload.MissingFitNotes);
-        Assert.Equal(2, payload.AwayToday); // leave + sick, distinct
+        Assert.Equal(2, payload.AwayToday);
 
-        // drill-down parity — every headline equals the filtered member list
         Assert.Equal(payload.TeamSize, payload.Members.Count);
         Assert.Equal(payload.OnLeave, payload.Members.Count(m => m.OnLeaveToday));
         Assert.Equal(payload.Sick, payload.Members.Count(m => m.OffSickToday));
@@ -251,7 +239,6 @@ public class GetManagerTeamStatusSummaryEndpointTests
         Assert.Equal(current, payload.Members.Single().EmployeeId);
     }
 
-    // ── helpers ────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> ClientForAsync(Guid companyId, Guid userId, Guid roleId)
     {
@@ -346,7 +333,6 @@ public class GetManagerTeamStatusSummaryEndpointTests
         var categoryId = Guid.NewGuid();
         db.SicknessCategories.Add(SicknessCategory.Create(categoryId, companyId, $"Illness-{categoryId:N}", 1, Now));
 
-        // Closed record so this employee is "missing a fit note" without also being counted "Sick".
         var record = SicknessRecord.Create(
             Guid.NewGuid(), companyId, employeeId, categoryId, Today.AddDays(-20), SicknessDayPart.FullDay,
             Today.AddDays(-10), SicknessDayPart.FullDay, 8m, null, SicknessEvidenceStatus.Pending, Now);

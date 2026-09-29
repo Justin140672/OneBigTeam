@@ -67,10 +67,6 @@ internal sealed class StartLeavingProcessHandler(
             return Result.Failure<StartLeavingProcessResponse>(
                 Error.Conflict("A leaving process is already in progress for this employee."));
 
-        // Backdating is permitted for genuine historical/corrective entry, but a LeavingDate
-        // before today requires explicit confirmation since it immediately finalises the employee
-        // through the same idempotent finalisation path ProcessLeavingEmployeesJob uses once a
-        // leaving date becomes due.
         var timeZoneId = await companyTimeZoneReader.GetTimeZoneAsync(request.CompanyId, cancellationToken);
         var today = clock.TodayIn(timeZoneId);
         var isBackdated = request.LeavingDate < today;
@@ -80,11 +76,6 @@ internal sealed class StartLeavingProcessHandler(
                 Error.Conflict(
                     "LeavingDate is in the past. Confirm to backdate and finalise the employee's departure immediately."));
 
-        // OFF-06: validate the nominated replacement manager, if any, up front — mirrors
-        // AssignManagerHandler's existence/active checks. A replacement is only meaningful when
-        // the departing employee actually has direct reports; that is resolved later, inside
-        // EmployeeDepartureFinalizer, at the point the departure is actually finalised (which may
-        // be now, if backdated, or on a later day via ProcessLeavingEmployeesJob).
         if (request.ReplacementManagerEmployeeId is not null)
         {
             var replacementManagerExists = await dbContext.Employees
@@ -134,10 +125,6 @@ internal sealed class StartLeavingProcessHandler(
 
         employee.SetLeaving(now);
 
-        // Snapshot taken before finalization for use as the idempotency-replay payload only — a
-        // replayed request never re-runs FinalizeAsync below, so its cached response must reflect
-        // the state as of the original save, not the (possibly later-finalized) final state. The
-        // actual method return value is rebuilt from final entity state further down instead.
         StartLeavingProcessResponse BuildResponse() => new(
             leavingProcess.Id,
             leavingProcess.CompanyId,
@@ -160,9 +147,6 @@ internal sealed class StartLeavingProcessHandler(
             var outcome = await dbContext.SaveIdempotentAsync<IdempotencyRecord, StartLeavingProcessResponse>(dbContext.IdempotencyRecords, 
                 scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
 
-            // Lost a race against a concurrent duplicate under the same key - this attempt's
-            // leaving process was rolled back along with it, so skip our own post-save side
-            // effects and hand back the winner's result untouched.
             if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
                 return Result.Success(outcome.Response!);
         }
@@ -195,16 +179,12 @@ internal sealed class StartLeavingProcessHandler(
 
         await NotifyLeavingProcessStartedAsync(employee, leavingProcess, now, cancellationToken);
 
-        // Cross-module notification so consuming modules (e.g. Leave, LEAVE-05) recalculate the
-        // employee's current policy year entitlement pro-rated through the new LeavingDate.
         await integrationEventPublisher.PublishAsync(
             new EmployeeLeavingDateSetIntegrationEvent(
                 leavingProcess.CompanyId, leavingProcess.EmployeeId,
                 leavingProcess.LeavingDate, leavingProcess.LastWorkingDay, now),
             cancellationToken);
 
-        // request.ConfirmBackdatedLeavingDate is guaranteed true here — the unconfirmed case
-        // already returned a Conflict above before anything was persisted.
         if (isBackdated)
             await departureFinalizer.FinalizeAsync(employee, leavingProcess, now, cancellationToken);
 

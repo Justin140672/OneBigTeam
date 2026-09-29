@@ -34,8 +34,6 @@ public class RejectProfilePhotoValidatorTests
     [Fact]
     public void Validate_WhitespaceOnly_RejectionReason_Fails()
     {
-        // FluentValidation's NotEmpty() also rejects whitespace-only strings, distinct from a bare
-        // length check — pin that behaviour explicitly rather than relying on the null/empty cases.
         var result = Validator.Validate(new RejectProfilePhotoRequest(Guid.NewGuid(), Guid.NewGuid(), "   "));
 
         Assert.False(result.IsValid);

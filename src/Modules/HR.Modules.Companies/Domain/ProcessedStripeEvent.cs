@@ -16,21 +16,16 @@ internal sealed class ProcessedStripeEvent
 {
     public Guid Id { get; private set; }
 
-    /// <summary>Stripe's own event identifier (<c>evt_...</c>).</summary>
     public string StripeEventId { get; private set; } = string.Empty;
 
     public string EventType { get; private set; } = string.Empty;
 
-    /// <summary>When Stripe created the event — the ordering key.</summary>
     public DateTimeOffset EventCreatedAt { get; private set; }
 
-    /// <summary>Tenant this event related to, when resolvable.</summary>
     public Guid? CompanyId { get; private set; }
 
-    /// <summary>Stripe subscription the event related to, when present — scopes the ordering check.</summary>
     public string? StripeSubscriptionId { get; private set; }
 
-    /// <summary>Whether the projection was applied (false = recognised but skipped as stale).</summary>
     public bool Applied { get; private set; }
 
     public DateTimeOffset ProcessedAt { get; private set; }

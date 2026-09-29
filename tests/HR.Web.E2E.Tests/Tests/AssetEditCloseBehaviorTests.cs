@@ -3,15 +3,11 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Direct coverage of the Close / unsaved-changes prompt (EditPageBase) on the Asset edit page.
-/// </summary>
 public sealed class AssetEditCloseBehaviorTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private const string LauraEmail = "laura.bennett@acme.example";
-    // Seeded asset category for Acme (see AssetsModule.cs seed data).
     private const string SeededCategory = "IT Equipment";
 
     private static string RandomAssetNumber() => $"E2E-{Guid.NewGuid().ToString("N")[..8].ToUpperInvariant()}";

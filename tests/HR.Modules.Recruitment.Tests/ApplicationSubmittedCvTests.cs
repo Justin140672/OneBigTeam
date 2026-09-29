@@ -27,7 +27,6 @@ public class ApplicationSubmittedCvTests
             Guid.NewGuid(), companyId ?? CompanyId, candidateId ?? CandidateId, "CV", "cv.pdf", 1024,
             "application/pdf", "storage/key/cv.pdf", Guid.NewGuid(), createdAt ?? Now, kind);
 
-    // ---- Create ----------------------------------------------------------------------------------
 
     [Fact]
     public void Create_Leaves_CvDocumentId_Null()
@@ -37,7 +36,6 @@ public class ApplicationSubmittedCvTests
         Assert.Null(application.CvDocumentId);
     }
 
-    // ---- AttachCv --------------------------------------------------------------------------------
 
     [Fact]
     public void AttachCv_Records_Document_Id_And_Updates_UpdatedAt()
@@ -56,8 +54,6 @@ public class ApplicationSubmittedCvTests
     [Fact]
     public void AttachCv_Does_Not_Bump_Version_Itself()
     {
-        // Version is advanced only by the save path (SaveChangesWithConcurrencyAsync), never by the
-        // domain mutation — otherwise the pinned original value would be off by one.
         var application = CreateApplication();
 
         application.AttachCv(CreateDocument(), Now.AddHours(1));
@@ -149,7 +145,6 @@ public class ApplicationSubmittedCvTests
         Assert.Equal(Now.AddHours(1), application.UpdatedAt);
     }
 
-    // ---- RemoveCv --------------------------------------------------------------------------------
 
     [Fact]
     public void RemoveCv_Clears_Reference_And_Updates_UpdatedAt()
@@ -191,7 +186,6 @@ public class ApplicationSubmittedCvTests
         Assert.Equal(removedAt, application.UpdatedAt);
     }
 
-    // ---- RedactPersonalData ---------------------------------------------------------------------
 
     [Fact]
     public void RedactPersonalData_Clears_CvDocumentId()
@@ -215,7 +209,6 @@ public class ApplicationSubmittedCvTests
         Assert.Null(application.CvDocumentId);
     }
 
-    // ---- DescribeCvDocumentViolation -------------------------------------------------------------
 
     [Fact]
     public void DescribeCvDocumentViolation_Returns_Null_For_Cv_Of_Same_Company_And_Candidate()
@@ -237,8 +230,6 @@ public class ApplicationSubmittedCvTests
     [Fact]
     public void DescribeCvDocumentViolation_Reports_Other_Company_Before_Other_Candidate_Or_Kind()
     {
-        // All three rules are broken — the company check must win so the message never reveals
-        // anything about a foreign tenant's document.
         var message = Application.DescribeCvDocumentViolation(
             CreateDocument(companyId: Guid.NewGuid(), candidateId: Guid.NewGuid(), kind: CandidateDocumentKind.Other),
             CompanyId, CandidateId);

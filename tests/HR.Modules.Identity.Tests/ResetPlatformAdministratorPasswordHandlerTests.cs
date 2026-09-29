@@ -86,7 +86,6 @@ public class ResetPlatformAdministratorPasswordHandlerTests(IdentityDatabaseFixt
         Assert.True(result.IsSuccess);
         Assert.True(result.Value.Requested);
 
-        // No longer the client-facing /auth/v1/recover path.
         Assert.Empty(gateway.PasswordResetRequests);
 
         var generated = Assert.Single(gateway.RecoveryLinksGenerated);

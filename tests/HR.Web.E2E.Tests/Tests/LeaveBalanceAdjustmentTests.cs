@@ -51,15 +51,9 @@ public sealed class LeaveBalanceAdjustmentTests(HrAdminPersonaFixture fixture) :
     private static decimal ParseHours(string text) =>
         decimal.Parse(text.TrimEnd('d', 'a', 'y', 's'), NumberStyles.Number, CultureInfo.InvariantCulture);
 
-    /// <summary>
-    /// Parses the TOIL Balance card's hours-formatted text (e.g. "20h"), as distinct from
-    /// <see cref="ParseHours"/> above which — despite its name — actually parses the days-formatted
-    /// text (e.g. "25 days") used by every other leave type's balance row.
-    /// </summary>
     private static decimal ParseToilHours(string text) =>
         decimal.Parse(text.TrimEnd('h'), NumberStyles.Number, CultureInfo.InvariantCulture);
 
-    // ── 1. Loading the page ──────────────────────────────────────────────────
 
     [Fact]
     public async Task AdminLeaveTab_ShowsBalances_InHours_NotDays()
@@ -94,7 +88,6 @@ public sealed class LeaveBalanceAdjustmentTests(HrAdminPersonaFixture fixture) :
     // creation. The "no leave policy assignment" state this test constructed can no longer occur
     // through any UI path, so it was removed rather than adapted.
 
-    // ── 2. Adjust button visibility for HR Administrator ─────────────────────
 
     [Fact]
     public async Task AdminLeaveTab_AdjustButton_VisibleToHrAdministrator_ForBalanceRow()
@@ -112,7 +105,6 @@ public sealed class LeaveBalanceAdjustmentTests(HrAdminPersonaFixture fixture) :
             "Expected Laura (HR Administrator) to see the Adjust button on a leave type row with a balance");
     }
 
-    // ── 3. Creating an adjustment ─────────────────────────────────────────────
 
     [Fact]
     public async Task AdjustDialog_PositiveAdjustment_IncreasesBalance_AndClosesDialog()
@@ -129,9 +121,6 @@ public sealed class LeaveBalanceAdjustmentTests(HrAdminPersonaFixture fixture) :
         var before = ParseHours((await empAdmin.GetBalanceRowTextAsync("Annual Leave"))!);
 
         await empAdmin.OpenAdjustDialogAsync("Annual Leave");
-        // Annual Leave is a Standard-behaviour leave type, so the dialog's numeric field is now
-        // interpreted as DAYS directly (no working-pattern conversion) — submitting 1m here means
-        // "+1 day", not "+1 hour ÷ hours-per-day" as it did under the old hours-based contract.
         await empAdmin.SubmitAdjustmentAsync(
             "Annual Leave", hours: 1m, reason: "Manual Award", comments: "E2E test award");
 
@@ -142,7 +131,6 @@ public sealed class LeaveBalanceAdjustmentTests(HrAdminPersonaFixture fixture) :
         Assert.Equal(before + 1m, after, precision: 1);
     }
 
-    // ── 4. Validation failure surfaces inline ────────────────────────────────
 
     [Fact]
     public async Task AdjustDialog_ZeroHours_ShowsInlineError_AndStaysOpen()
@@ -234,9 +222,6 @@ public sealed class LeaveBalanceAdjustmentTests(HrAdminPersonaFixture fixture) :
 
         await empAdmin.OpenAdjustDialogAsync("Annual Leave");
 
-        // Annual Leave is now DAYS-based (Standard behaviour), so -1000 days is already a wildly
-        // overwhelming overshoot of any plausible remaining balance — deterministically drives
-        // the balance below zero regardless of prior test runs against the same seeded balance.
         await empAdmin.SubmitAdjustmentAsync(
             "Annual Leave", hours: -1000m, reason: "Manual Deduction",
             comments: "E2E overshoot without override", allowNegativeOverride: false);
@@ -248,10 +233,6 @@ public sealed class LeaveBalanceAdjustmentTests(HrAdminPersonaFixture fixture) :
         Assert.NotNull(error);
         Assert.Contains("below zero", error, StringComparison.OrdinalIgnoreCase);
 
-        // Retry with the override checked — the hours/reason/comments are still populated from
-        // the failed attempt (the dialog only resets on Cancel or success), so only the override
-        // checkbox needs to change. -30 days is a sensible direct-days overshoot expected to still
-        // plausibly drive a typical seeded Annual Leave balance below zero.
         await empAdmin.SubmitAdjustmentAsync(
             "Annual Leave", hours: -30m, allowNegativeOverride: true);
 
@@ -262,7 +243,6 @@ public sealed class LeaveBalanceAdjustmentTests(HrAdminPersonaFixture fixture) :
         Assert.True(after < 0, $"Expected the balance to be driven below zero, but got {after}h");
     }
 
-    // ── 6. Cancel dismisses the dialog without submitting ────────────────────
 
     [Fact]
     public async Task AdjustDialog_Cancel_DismissesWithoutSubmitting_AndBalanceUnchanged()
@@ -289,7 +269,6 @@ public sealed class LeaveBalanceAdjustmentTests(HrAdminPersonaFixture fixture) :
         Assert.Equal(before, after);
     }
 
-    // ── 7. TOIL stays hours-based while other leave types are days-based ─────
 
     [Fact]
     public async Task AdjustDialog_UnitLabel_IsDaysForStandardLeaveType_AndHoursForToil()
@@ -341,10 +320,6 @@ public sealed class LeaveBalanceAdjustmentTests(HrAdminPersonaFixture fixture) :
         var before = ParseToilHours((await empAdmin.GetToilBalanceTextAsync())!);
 
         await empAdmin.OpenToilAdjustDialogAsync();
-        // TOIL is the one leave-type behaviour that is still hours-based: the dialog converts
-        // this 15 to days server-side using the employee's working pattern, then the TOIL card
-        // converts back to hours for display using the same working pattern, so the round trip
-        // should land back on exactly +15h regardless of the seeded hours-per-day figure.
         await empAdmin.SubmitAdjustmentAsync(
             "Time Off In Lieu", hours: 15m, reason: "Manual Award", comments: "E2E TOIL award");
 
@@ -355,7 +330,6 @@ public sealed class LeaveBalanceAdjustmentTests(HrAdminPersonaFixture fixture) :
         Assert.Equal(before + 15m, after, precision: 1);
     }
 
-    // ── 8. Permission boundary ────────────────────────────────────────────────
 
     [Fact]
     public async Task ManagerRole_IsRedirectedAway_FromAdminEmployeeEditPage_AndNeverReachesAdjustControl()
@@ -365,26 +339,14 @@ public sealed class LeaveBalanceAdjustmentTests(HrAdminPersonaFixture fixture) :
         await login.GoToAsync();
         await login.LoginAsync(JamesEmail);
 
-        // James holds the Manager role (leave:approve) but not employee:manage/leave:manage.
-        // EmployeeEdit.razor's own LoadAsync redirects any user without Session.CanManageEmployees
-        // away from the admin edit route before any tab (including Leave) renders — mirroring
-        // UnauthorizedAccessTests.Employee_CannotAccess_AnotherEmployeesAdminProfile. This
-        // confirms a Manager cannot reach the Adjust control for another employee via this page.
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees/{TomId}");
 
-        // The redirect is issued from EmployeeEdit.razor's LoadAsync (Navigation.NavigateTo(...,
-        // replace: true)) over the Blazor Server SignalR circuit, not via an HTTP navigation —
-        // Playwright's NetworkIdle only tracks HTTP requests, so it can (and reliably did) resolve
-        // before the WebSocket-driven redirect actually lands, making this assertion race against
-        // a navigation that hasn't happened yet. Wait for the actual URL change instead of a
-        // network-idle proxy for it.
         await _page.WaitForURLAsync(url => !url.Contains($"/employees/{TomId}"), new() { Timeout = 15_000 });
 
         var finalUrl = _page.Url;
         Assert.DoesNotContain($"/employees/{TomId}", finalUrl);
     }
 
-    // ── 9. Self-service employee never sees Adjust ───────────────────────────
 
     [Fact]
     public async Task MyProfileLeaveTab_NeverShowsAdjustButton_EvenForHrAdministratorViewingOwnProfile()
@@ -395,9 +357,6 @@ public sealed class LeaveBalanceAdjustmentTests(HrAdminPersonaFixture fixture) :
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Laura is an HR Administrator (CanManageEmployees == true) but is viewing her own
-        // self-service "My Profile" Leave tab here, not the admin edit page — the Adjust control
-        // must never appear there regardless of the viewer's role.
         await profile.GoToAsync(AcmeId, LauraId);
         await profile.OpenLeaveTabAsync();
 

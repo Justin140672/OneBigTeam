@@ -17,7 +17,6 @@ public class CompanyServiceTests
         return new HrApiHttpClientFactory(services.BuildServiceProvider().GetRequiredService<IHttpClientFactory>(), new CircuitSessionState());
     }
 
-    // ── GetCompanySettingsAsync ──────────────────────────────────────────────────
 
     [Fact]
     public async Task GetCompanySettingsAsync_Returns_Settings_Including_Contact_Validation_Regexes()
@@ -49,7 +48,6 @@ public class CompanyServiceTests
         Assert.Null(result);
     }
 
-    // ── GetCompanyAsync ──────────────────────────────────────────────────────────
 
     [Fact]
     public async Task GetCompanyAsync_Returns_Company_When_Api_Returns_Ok()
@@ -75,7 +73,6 @@ public class CompanyServiceTests
         Assert.Null(result);
     }
 
-    // ── UpdateCompanyAsync ───────────────────────────────────────────────────────
 
     [Fact]
     public async Task UpdateCompanyAsync_Returns_Response_When_Api_Returns_Ok()
@@ -94,7 +91,6 @@ public class CompanyServiceTests
     [Fact]
     public async Task UpdateCompanyAsync_Returns_ValidationMessage_When_Api_Returns_BadRequest()
     {
-        // This is the new server-side postcode-regex validation failure path added this session.
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.BadRequest, new { error = "'not a postcode' is not a valid postcode." }));
         var service = new CompanyService(factory);
 
@@ -107,12 +103,6 @@ public class CompanyServiceTests
     [Fact]
     public async Task UpdateCompanyAsync_Returns_FieldErrors_When_Api_Returns_FastEndpoints_ValidationShape()
     {
-        // FastEndpoints' own automatic FluentValidation failures (e.g. UpdateCompanyValidator
-        // rejecting an empty address Line1/City/CountryCode) return a different shape than this
-        // app's handler-level business errors ({ "error": "..." }) — a dictionary of field name
-        // to messages. Before this test's fix, UpdateCompanyAsync couldn't parse this shape at
-        // all and silently fell back to the generic "Failed to save company profile." message,
-        // hiding exactly which fields were invalid.
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.UnprocessableEntity, new
         {
             statusCode = 422,
@@ -145,7 +135,6 @@ public class CompanyServiceTests
         Assert.Equal("Failed to save company profile.", error);
     }
 
-    // ── UpdateCompanySettingsAsync ───────────────────────────────────────────────
 
     [Fact]
     public async Task UpdateCompanySettingsAsync_Returns_Response_When_Api_Returns_Ok()
@@ -177,7 +166,6 @@ public class CompanyServiceTests
         Assert.Null(result);
     }
 
-    // ── Fake handlers ────────────────────────────────────────────────────────────
 
     private sealed class JsonResponseHandler(HttpStatusCode statusCode, object payload) : HttpMessageHandler
     {

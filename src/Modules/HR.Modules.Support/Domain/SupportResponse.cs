@@ -14,12 +14,6 @@ internal sealed class SupportResponse
     public string BodyHtml { get; private set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; private set; }
 
-    /// <summary>
-    /// P1 stored-XSS fix: the body is ALWAYS passed through the shared support allow-list
-    /// (<see cref="SupportHtmlSanitizer"/>) before it can be persisted, so every current and future
-    /// write path (endpoints, seeders, tests) stores sanitised HTML. Untrusted markup must never
-    /// reach <c>support.support_responses.body_html</c>.
-    /// </summary>
     public static SupportResponse Create(
         Guid id,
         Guid supportRequestId,
@@ -41,11 +35,6 @@ internal sealed class SupportResponse
         };
     }
 
-    /// <summary>
-    /// Re-applies the shared allow-list to a stored body (historical rows written before write-time
-    /// sanitisation existed). Idempotent: returns <c>false</c> and changes nothing when the stored
-    /// body is already sanitised.
-    /// </summary>
     public bool ResanitiseBody()
     {
         var sanitised = SupportHtmlSanitizer.Sanitize(BodyHtml);

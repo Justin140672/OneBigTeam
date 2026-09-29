@@ -30,7 +30,6 @@ internal sealed class UpdateDepartmentHandler
                 Error.NotFound($"Department '{request.Id}' was not found."));
         }
 
-        // Validate parent exists in same company (if changing parent)
         if (request.ParentDepartmentId is not null && request.ParentDepartmentId != department.ParentDepartmentId)
         {
             if (request.ParentDepartmentId == request.Id)
@@ -53,7 +52,6 @@ internal sealed class UpdateDepartmentHandler
             }
         }
 
-        // Validate name uniqueness (excluding self), case-insensitively.
         var newName = request.Name.Trim();
         if (!string.Equals(department.Name, newName, StringComparison.OrdinalIgnoreCase))
         {

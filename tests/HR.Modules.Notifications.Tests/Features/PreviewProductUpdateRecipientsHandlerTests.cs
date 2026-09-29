@@ -68,8 +68,6 @@ public class PreviewProductUpdateRecipientsHandlerTests
 
         await handler.HandleAsync(CancellationToken.None);
 
-        // The handler has no INotificationWriter dependency at all — this asserts against a real
-        // NotificationsDbContext to make the "read-only" claim concrete, not just structural.
         Assert.Empty(await ctx.Notifications.ToListAsync());
     }
 

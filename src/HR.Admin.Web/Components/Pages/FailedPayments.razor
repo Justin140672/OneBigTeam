@@ -96,8 +96,6 @@ else
         _loading = false;
     }
 
-    // Debounced so every keystroke doesn't trigger a round trip to the API — mirrors
-    // CustomerList.razor's search debouncing.
     private async Task OnSearchChanged(string? value)
     {
         _searchTerm = value;

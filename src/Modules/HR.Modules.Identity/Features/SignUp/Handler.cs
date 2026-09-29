@@ -93,10 +93,6 @@ internal sealed class SignUpHandler(
 
         var normalizedEmail = request.AdminEmail.Trim().ToUpperInvariant();
 
-        // Checks both identity tables: ApplicationUser (local-auth path — AcceptInvite,
-        // DevAuthHandler, seeded personas) and UserProfile (real Supabase-backed users, which is
-        // what self-service SignUp itself creates as of Phase B) so a duplicate self-service signup
-        // is caught regardless of which table the original account lives in.
         var emailInUse = await dbContext.Users.AnyAsync(u => u.NormalizedEmail == normalizedEmail, cancellationToken)
             || await dbContext.UserProfiles.AnyAsync(p => p.Email.ToUpper() == normalizedEmail, cancellationToken);
         if (emailInUse)
@@ -116,9 +112,6 @@ internal sealed class SignUpHandler(
                 throw new InvalidOperationException(employeeResult.Error.Message);
             }
 
-            // Flags this employee as the company's seed admin record — see Employee.IsInitialCompanyAdmin.
-            // Used only by the DataImport module to allow a later import row to update (not duplicate-
-            // error against) this specific employee if its Work Email matches.
             await employeeProvisioningService.MarkAsInitialCompanyAdminAsync(companyId, employeeResult.Value, cancellationToken);
 
             var (user, replayedResponse) = await CreateIdentityRecordAsync(
@@ -126,9 +119,6 @@ internal sealed class SignUpHandler(
 
             if (replayedResponse is not null)
             {
-                // Lost a race against a concurrent duplicate under the same key - this attempt's
-                // UserProfile/UserRoles rows were rolled back along with it, so skip the audit
-                // publish and hand back the winner's result untouched.
                 return Result.Success(replayedResponse);
             }
 
@@ -141,23 +131,12 @@ internal sealed class SignUpHandler(
         }
         catch (EmailAlreadyRegisteredException ex)
         {
-            // Supabase reported the email as already registered even though SignUpHandler's own
-            // table check above didn't catch it (e.g. a Supabase user left over from a prior signup
-            // attempt whose local UserProfile row never got created) — tell the customer the real
-            // reason instead of falling into the generic "registration failed" message below.
-            // CodeQL #61: EmailAlreadyRegisteredException carries the submitted address in its
-            // Email property, which exception destructuring/telemetry could emit — so the exception
-            // object is not logged; its type is fully described by this message.
             logger.LogWarning("Self-service registration failed for company {CompanyId}: email already registered with Supabase", companyId);
             await CompensateFailedRegistrationAsync(companyId, ex.Message, cancellationToken);
             return Result.Failure<SignUpResponse>(Error.Conflict("An account with this email already exists."));
         }
         catch (Exception ex)
         {
-            // This is handled (not rethrown), so it never appears as an unhandled exception in
-            // Aspire/console logs — logged explicitly here so a failed signup is actually
-            // diagnosable. The full failure reason is also captured in the audit_events table via
-            // RegistrationCreatedAuditEvent below, but that requires a DB query to see.
             logger.LogError(ex, "Self-service registration failed for company {CompanyId} after provisioning", companyId);
             await CompensateFailedRegistrationAsync(companyId, ex.Message, cancellationToken);
             return Result.Failure<SignUpResponse>(
@@ -165,12 +144,6 @@ internal sealed class SignUpHandler(
         }
     }
 
-    // Placeholder personal-detail values below: CreateEmployeeHandler's underlying Employee.Create
-    // (called via IEmployeeProvisioningService, which bypasses the CreateEmployee FluentValidation
-    // validator entirely — same as the existing candidate-hiring provisioning path) requires
-    // DateOfBirth, Nationality, and Gender even though a self-service admin has supplied none of
-    // this yet. These are exactly the kind of "employee record that gets edited later" values the
-    // ticket anticipates — flagged as a known limitation rather than silently invented as if real.
     private async Task<Result<Guid>> CreateAdminEmployeeAsync(
         Guid companyId,
         CompanyDefaultDataResult defaults,
@@ -186,9 +159,6 @@ internal sealed class SignUpHandler(
             DateOfBirth: new DateOnly(1900, 1, 1),
             Nationality: "British",
             Gender: "Unknown",
-            // CompanySettings.CreateDefault now defaults EmployeeNumberMode to Automatic, so
-            // leaving this empty triggers CreateEmployeeHandler's auto-generation instead of
-            // requiring a placeholder value.
             EmployeeNumber: string.Empty,
             EmploymentTypeId: defaults.EmploymentTypeId,
             DepartmentId: defaults.DepartmentId,
@@ -198,10 +168,6 @@ internal sealed class SignUpHandler(
         return await employeeProvisioningService.CreateFromCandidateAsync(provisioningRequest, cancellationToken);
     }
 
-    // Phase B: creates a real, pending Supabase Auth user (via ISupabaseAuthGateway.CreateUserAsync,
-    // which sends the verification email) plus a corresponding local UserProfile, rather than a
-    // local-auth ApplicationUser. The admin is NOT signed in here — the company remains
-    // PendingVerification until Phase D's VerifyEmail flow runs.
     private async Task<(UserProfile? Profile, SignUpResponse? ReplayedResponse)> CreateIdentityRecordAsync(
         Guid companyId, Guid employeeId, SignUpRequest request, string? fingerprint, CancellationToken cancellationToken)
     {
@@ -233,20 +199,6 @@ internal sealed class SignUpHandler(
             now);
         dbContext.UserProfiles.Add(profile);
 
-        // UserRole.UserId must equal UserProfile.Id (NOT the raw Supabase auth user id) — per
-        // SupabaseCurrentUserResolutionMiddleware, ResolvedCurrentUser.UserId resolves to
-        // profile.Id once a UserProfile row is found, and every authorization check downstream
-        // (RoleAuthorizationHandler / IAuthorizationService.GetEffectiveRolesAsync) keys off
-        // ICurrentUser.UserId. Every seeded persona carries SystemRoles.Employee alongside their
-        // specific role — it's the floor role required by "role:employee", which gates core
-        // session endpoints (GetMe, GetCompany, etc.) that AppSession depends on for every page.
-        // Without it, a self-service admin would 403 on first load once verified.
-        // The self-service admin is the company's first (and, at this point, only) user — without
-        // HrAdministrator too they'd be locked out of Employees/HR Settings/User Administration
-        // (and the Getting Started checklist would show tasks pointing at those pages that
-        // immediately redirect them away, since it has no per-task role awareness — see
-        // GettingStarted.razor/OnboardingTaskCard.razor). CompanyAdministrator alone was never
-        // enough to actually use the app end to end.
         dbContext.UserRoles.Add(UserRole.Create(profile.Id, SystemRoles.Employee, now));
         dbContext.UserRoles.Add(UserRole.Create(profile.Id, SystemRoles.CompanyAdministrator, now));
         dbContext.UserRoles.Add(UserRole.Create(profile.Id, SystemRoles.HrAdministrator, now));

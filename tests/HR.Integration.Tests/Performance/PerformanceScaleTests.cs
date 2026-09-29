@@ -7,23 +7,10 @@ using Xunit.Abstractions;
 
 namespace HR.Integration.Tests.Performance;
 
-/// <summary>
-/// NFR-02: repeatable performance / scale tests. Each operation is measured at 50 / 500 / 2000
-/// employees (the product scale range) against the product target
-/// (specifications/product-specifications/31-non-functional-requirements.md), using p95 latency and
-/// a CI multiplier (see <see cref="PerformanceMeasurement"/>). Every measured iteration also
-/// captures EF command count so an N+1 regression at scale fails the run rather than merely slowing
-/// it.
-///
-/// These tests are in their own <c>Category=Performance</c> trait and their own xUnit collection so
-/// the normal PR integration gate never runs them; they run in the dedicated
-/// <c>perf-nightly.yml</c> workflow (or on demand).
-/// </summary>
 [Trait("Category", "Performance")]
 [Collection("Performance")]
 public sealed class PerformanceScaleTests
 {
-    // Product targets (ms). See NFR-02 performance table.
     private const double PageLoadTargetMs = 2000;
     private const double DashboardTargetMs = 2000;
     private const double SearchTargetMs = 500;
@@ -119,7 +106,6 @@ public sealed class PerformanceScaleTests
     {
         var data = await GetDatasetAsync(scale);
         using var client = await HrAdminClientFor(data.CompanyId);
-        // Matches exactly one employee at every scale (LastName == "Employee00042").
         var url = $"/api/companies/{data.CompanyId}/employees?search=Employee00042";
 
         var result = await new PerformanceMeasurement(_output).MeasureAsync(

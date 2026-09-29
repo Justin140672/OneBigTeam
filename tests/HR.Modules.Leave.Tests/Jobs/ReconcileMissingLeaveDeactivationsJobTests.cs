@@ -8,12 +8,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Leave.Tests.Jobs;
 
-// Gap-2 reliability fix: recovers finalised departures Employees considers fully complete that
-// somehow ended up with NO LeavePolicyDeactivationOnDeparture row at all (e.g.
-// EmployeeDepartureFinalisedHandler threw before its own insert). ReconcileLeavePolicyDeactivationsJob
-// only re-enqueues rows that already exist, so this job — driven by the cross-module
-// IFinalisedEmployeeDeparturesReader contract rather than Leave's own table — is the only mechanism
-// that can catch this class of gap.
 public class ReconcileMissingLeaveDeactivationsJobTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 1, 9, 0, 0, TimeSpan.Zero);
@@ -66,7 +60,6 @@ public class ReconcileMissingLeaveDeactivationsJobTests
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        // No assignment at all.
         var reader = new FakeFinalisedEmployeeDeparturesReader();
         reader.Add(Departure(companyId, employeeId, Now.AddDays(-1)));
 
@@ -153,18 +146,13 @@ public class ReconcileMissingLeaveDeactivationsJobTests
         var rows = await db.LeavePolicyDeactivationsOnDeparture
             .Where(d => d.CompanyId == companyId && d.EmployeeId == employeeId)
             .ToListAsync();
-        Assert.Single(rows); // no duplicate created
+        Assert.Single(rows);
         Assert.Empty(jobClient.CreatedJobs);
     }
 
     [Fact]
     public async Task ExecuteAsync_Skips_Departures_OutsideTheLookbackWindow()
     {
-        // The job derives `since = now - 30 days` and calls the reader with that bound. The fake
-        // reader itself applies the "FinalisationCompletedAt >= since" filter (mirroring the real
-        // FinalisedEmployeeDeparturesReader's query), so a departure finalised well outside the
-        // window is never even returned to the job — proving the job honours the lookback rather
-        // than unconditionally processing everything the reader happens to hold.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -174,7 +162,7 @@ public class ReconcileMissingLeaveDeactivationsJobTests
         await db.SaveChangesAsync();
 
         var reader = new FakeFinalisedEmployeeDeparturesReader();
-        reader.Add(Departure(companyId, employeeId, Now.AddDays(-31))); // outside the 30-day lookback
+        reader.Add(Departure(companyId, employeeId, Now.AddDays(-31)));
 
         var jobClient = new RecordingBackgroundJobClient();
         var job = new ReconcileMissingLeaveDeactivationsJob(
@@ -251,6 +239,6 @@ public class ReconcileMissingLeaveDeactivationsJobTests
 
         var alreadyRequestedRows = await db.LeavePolicyDeactivationsOnDeparture
             .Where(d => d.EmployeeId == alreadyRequestedEmployeeId).ToListAsync();
-        Assert.Single(alreadyRequestedRows); // still just the one, not duplicated
+        Assert.Single(alreadyRequestedRows);
     }
 }

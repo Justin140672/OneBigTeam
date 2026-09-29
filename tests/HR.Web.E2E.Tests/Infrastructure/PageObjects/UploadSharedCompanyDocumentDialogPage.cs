@@ -2,14 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the "Upload Document" flow on the Shared Documents list page
-/// (/companies/{companyId}/shared-documents) and its UploadSharedCompanyDocumentDialog.razor
-/// dialog — covering the Title/Category/File basics plus the "Requires employee acknowledgement"
-/// toggle's auto-populate-from-company-default, live preview, and required-when-enabled
-/// validation. Complements SharedDocumentDetailPage (which owns the detail-page/post-upload
-/// flows) — this one is scoped to the list page's own upload entry point.
-/// </summary>
 public sealed class UploadSharedCompanyDocumentDialogPage(IPage page, string baseUrl)
 {
     private ILocator Dialog => page.GetByRole(AriaRole.Dialog, new() { Name = "Upload Document" });
@@ -34,11 +26,6 @@ public sealed class UploadSharedCompanyDocumentDialogPage(IPage page, string bas
         await page.Keyboard.PressAsync("Tab");
     }
 
-    /// <summary>
-    /// Selects a category via the Syncfusion SfDropDownList (same click-open/wait-for-popup/
-    /// click-item interaction pattern used throughout this test suite — see
-    /// SharedDocumentDetailPage.EditTitleDescriptionCategoryAsync).
-    /// </summary>
     public Task SelectCategoryAsync(string categoryLabel) =>
         DropDownSelector.SelectAsync(page, Dialog.Locator(".col-md-6").Filter(new() { HasText = "Category" }), categoryLabel);
 
@@ -51,25 +38,12 @@ public sealed class UploadSharedCompanyDocumentDialogPage(IPage page, string bas
     public Task<bool> IsRequiresAcknowledgementCheckedAsync() =>
         RequiresAcknowledgementCheckboxWrapper.Locator("input[type='checkbox']").IsCheckedAsync();
 
-    /// <summary>
-    /// Toggles "Requires employee acknowledgement" on. When the statement field is currently
-    /// blank, OnRequiresAcknowledgementChangedAsync auto-populates it from the company's
-    /// GetCompanySettingsAsync().DefaultAcknowledgementStatement — an async round trip, so this
-    /// waits briefly for the statement textarea to actually appear with content rather than
-    /// asserting immediately after the click.
-    /// </summary>
     public async Task CheckRequiresAcknowledgementAsync()
     {
         await RequiresAcknowledgementCheckboxWrapper.Locator("label").ClickAsync();
         var textArea = Dialog.Locator("textarea").First;
         await textArea.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
-        // The textarea appearing only proves the field itself has rendered — the auto-populate
-        // from the company's default statement (OnRequiresAcknowledgementChangedAsync) is a
-        // separate, subsequent server round-trip. Callers reading the statement value/preview
-        // immediately after this method can otherwise race that round-trip and observe the field
-        // still blank. Give it a short window to actually populate; if the field is meant to stay
-        // blank (no default configured), this simply times out harmlessly and callers read "".
         try
         {
             await page.WaitForFunctionAsync(
@@ -79,8 +53,6 @@ public sealed class UploadSharedCompanyDocumentDialogPage(IPage page, string bas
         }
         catch (TimeoutException)
         {
-            // No default configured, or genuinely still empty — leave it to the caller's own
-            // assertion to surface that.
         }
     }
 
@@ -94,10 +66,6 @@ public sealed class UploadSharedCompanyDocumentDialogPage(IPage page, string bas
         await page.Keyboard.PressAsync("Tab");
     }
 
-    // Description (above, in the Details section) is also an HrTextBox with Multiline="true", so
-    // an unscoped page-wide "textarea" locator would resolve to two elements once "Requires
-    // employee acknowledgement" is on — scope to the "Acknowledgement Statement" field's own
-    // ".col-12" group to disambiguate.
     private ILocator AcknowledgementStatementTextArea =>
         Dialog.Locator(".col-12").Filter(new() { HasText = "Acknowledgement Statement" }).Locator("textarea");
 
@@ -110,24 +78,12 @@ public sealed class UploadSharedCompanyDocumentDialogPage(IPage page, string bas
         await page.Keyboard.PressAsync("Tab");
     }
 
-    /// <summary>
-    /// Text of the live "Preview — this is what employees will see:" box (.alert-info), which
-    /// UploadSharedCompanyDocumentDialog.razor keeps in sync with Model.AcknowledgementStatement
-    /// as the field is edited.
-    /// </summary>
     public async Task<string> GetAcknowledgementPreviewTextAsync() =>
         (await Dialog.Locator(".alert-info").InnerTextAsync()).Trim();
 
-    /// <summary>
-    /// The inline "An acknowledgement statement is required." message, only rendered once the
-    /// field has been touched (_statementTouched) and is currently blank — i.e. after a blocked
-    /// save attempt, not merely from checking the acknowledgement box. Null if not shown.
-    /// </summary>
     public async Task<string?> GetAcknowledgementStatementValidationErrorAsync()
     {
         var error = Dialog.Locator(".text-danger.small").Filter(new() { HasText = "acknowledgement statement is required" });
-        // Same "read before it settles" race as GetGlobalErrorAsync below — checking
-        // IsVisibleAsync() immediately after a blocked save attempt can race the render tick.
         try
         {
             await error.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
@@ -139,15 +95,9 @@ public sealed class UploadSharedCompanyDocumentDialogPage(IPage page, string bas
         return (await error.InnerTextAsync()).Trim();
     }
 
-    /// <summary>The dialog-level error banner (GlobalError, e.g. "Please select a file." from ValidateExtra), or null if none is shown.</summary>
     public async Task<string?> GetGlobalErrorAsync()
     {
         var error = Dialog.Locator(".alert-danger");
-        // ValidateExtra's error only renders after the click handler's state update completes —
-        // checking IsVisibleAsync() immediately after ClickUploadAsync can race that render tick.
-        // Bumped 5s -> 10s: under higher concurrent load the Blazor Server round trip for this
-        // click can genuinely take longer than 5s (same load-timing theory as the dashboard
-        // navigation timeout bump elsewhere in this suite).
         try
         {
             await error.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
@@ -159,27 +109,15 @@ public sealed class UploadSharedCompanyDocumentDialogPage(IPage page, string bas
         return (await error.InnerTextAsync()).Trim();
     }
 
-    /// <summary>Clicks "Upload" without waiting for the dialog to close — for exercising validation paths that keep it open.</summary>
     public Task ClickUploadAsync() =>
         Dialog.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true }).ClickAsync();
 
-    /// <summary>
-    /// Clicks "Upload" and waits for a successful save to close the dialog. Assumes the form is
-    /// valid — use <see cref="ClickUploadAsync"/> directly to exercise a blocked-save validation
-    /// path instead.
-    /// </summary>
     public async Task UploadAndWaitForCloseAsync()
     {
         await ClickUploadAsync();
         await Dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
 
-    /// <summary>
-    /// Resolves the newly uploaded document's Id from the list grid row matching
-    /// <paramref name="title"/> (its row link's href ends with the document's Guid) — same
-    /// approach as CompanyDocumentsTabTests.UploadAndPublishDocumentAsync. Assumes the dialog has
-    /// already closed after a successful upload and the grid has refreshed to show the new row.
-    /// </summary>
     public async Task<Guid> GetUploadedDocumentIdAsync(string title)
     {
         await page.WaitForSelectorAsync($"text={title}", new() { Timeout = 15_000 });

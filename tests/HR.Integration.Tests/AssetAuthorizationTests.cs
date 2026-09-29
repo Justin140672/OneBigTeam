@@ -5,12 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Proves the asset:view / employee:manage FastEndpoints policy declarations actually
-/// enforce access end-to-end over real HTTP for the Assets module. Company Administrator
-/// is scoped to company profile/settings management only and no longer holds either
-/// permission — see the narrowing in HR.Modules.Identity.IdentityModule.AddRolePolicies.
-/// </summary>
 [Collection("Integration")]
 public class AssetAuthorizationTests
 {
@@ -37,7 +31,6 @@ public class AssetAuthorizationTests
         return client;
     }
 
-    // --- asset:view — ListEmployeeAssets ---
 
     [Fact]
     public async Task CompanyAdministrator_Gets_Forbidden_Listing_Employee_Assets()
@@ -51,7 +44,6 @@ public class AssetAuthorizationTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // --- employee:manage — CreateAssetCategory ---
 
     [Fact]
     public async Task CompanyAdministrator_Gets_Forbidden_Creating_Asset_Category()

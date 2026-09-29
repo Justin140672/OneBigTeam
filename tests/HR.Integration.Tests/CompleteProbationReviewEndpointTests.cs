@@ -451,12 +451,6 @@ public class CompleteProbationReviewEndpointTests
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
-    /// <summary>
-    /// PROB-05: extension end date must move strictly forward relative to the record's current
-    /// expected end date — and the domain rule (400) must be the one that rejects it, not the
-    /// request validator's separate "must be in the future" rule. Uses a future expected end date
-    /// so the submitted value clears the validator and reaches the domain check.
-    /// </summary>
     [Fact]
     public async Task Post_Complete_Returns_BadRequest_When_NewExpectedEndDate_Not_After_Current_ExpectedEndDate()
     {
@@ -479,7 +473,7 @@ public class CompleteProbationReviewEndpointTests
                 reviewId,
                 outcome = "Extend",
                 decisionDate = DateOnly.FromDateTime(DateTime.UtcNow).ToString("yyyy-MM-dd"),
-                newExpectedEndDate = currentExpectedEndDate.ToString("yyyy-MM-dd"), // equal to the record's current ExpectedEndDate
+                newExpectedEndDate = currentExpectedEndDate.ToString("yyyy-MM-dd"),
                 extensionReason = "Needs more time."
             });
 
@@ -490,10 +484,6 @@ public class CompleteProbationReviewEndpointTests
         Assert.Equal(currentExpectedEndDate, record.ExpectedEndDate);
     }
 
-    /// <summary>
-    /// PROB-05: extension end date must also move strictly forward relative to the decision date
-    /// itself, even when it is after the record's current expected end date.
-    /// </summary>
     [Fact]
     public async Task Post_Complete_Returns_BadRequest_When_NewExpectedEndDate_Not_After_DecisionDate()
     {
@@ -514,7 +504,7 @@ public class CompleteProbationReviewEndpointTests
                 reviewId,
                 outcome = "Extend",
                 decisionDate = "2026-12-01",
-                newExpectedEndDate = "2026-12-01", // equal to the decision date, later than current ExpectedEndDate
+                newExpectedEndDate = "2026-12-01",
                 extensionReason = "Needs more time."
             });
 

@@ -7,16 +7,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Admin.Web.Tests;
 
-// Mirrors HR.Web.Tests.AppSessionAuthStateProviderTests — see that file's remarks for the full
-// rationale. These exercise the PRODUCTION SetAuthenticationState path
-// (IHostEnvironmentAuthenticationStateProvider), which is what Blazor Server's CircuitHost actually
-// calls at circuit creation — NOT manual CircuitSessionState.SetToken seeding, which would prove
-// nothing about whether the bridge itself works. See NoOpAuthenticationHandler
-// .SupabaseAccessTokenClaimType and AppSessionAuthStateProvider.SetAuthenticationState for the
-// production mechanism being tested.
 public class AppSessionAuthStateProviderTests
 {
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static HrApiHttpClientFactory BuildFactory(HttpMessageHandler handler, CircuitSessionState sessionState) =>
         new(BuildHttpClientFactory(handler), sessionState);
@@ -37,7 +29,6 @@ public class AppSessionAuthStateProviderTests
     private static AppSessionAuthStateProvider BuildProvider(HrApiHttpClientFactory factory, CircuitSessionState sessionState) =>
         new(factory, NullLogger<AppSessionAuthStateProvider>.Instance, sessionState);
 
-    // ── Existing GetAuthenticationStateAsync behavior, unchanged, with updated constructor calls ──
 
     private sealed class StaticResponseHandler(HttpStatusCode statusCode) : HttpMessageHandler
     {
@@ -68,15 +59,10 @@ public class AppSessionAuthStateProviderTests
         Assert.False(state.User.Identity?.IsAuthenticated);
     }
 
-    // ── Ticket: circuit-scope token bridging regression tests ──────────────────────────────────
 
     [Fact]
     public void SetAuthenticationState_SeedsOnlyTheCircuitsOwnSessionState_NotTheRequestScopesInstance()
     {
-        // Simulates two separate DI scopes: "requestScopeSessionState" stands in for the instance
-        // Program.cs's request middleware resolved and populated from the negotiating HTTP request's
-        // own scope (the one that never reaches the circuit in the original bug); "circuitSessionState"
-        // stands in for the circuit's own, otherwise-uninitiated CircuitSessionState instance.
         var requestScopeSessionState = new CircuitSessionState();
         var circuitSessionState      = new CircuitSessionState();
 
@@ -92,8 +78,6 @@ public class AppSessionAuthStateProviderTests
         Assert.Equal(token, circuitSessionState.AccessToken);
         Assert.Null(requestScopeSessionState.AccessToken);
 
-        // Proves the seeded token actually reaches an outgoing request via the same production
-        // component (HrApiHttpClientFactory) that every real circuit call goes through.
         var httpFactory = new HrApiHttpClientFactory(
             BuildHttpClientFactory(new StaticResponseHandler(HttpStatusCode.OK)), circuitSessionState);
         using var client = httpFactory.CreateClient();
@@ -265,13 +249,11 @@ public class AppSessionAuthStateProviderTests
         var circuitSessionState = new CircuitSessionState();
         var provider = BuildProvider(BuildFactory(new StaticResponseHandler(HttpStatusCode.OK), circuitSessionState), circuitSessionState);
 
-        // A: initial authenticated seed.
         ((IHostEnvironmentAuthenticationStateProvider)provider)
             .SetAuthenticationState(Task.FromResult(new AuthenticationState(BuildPrincipalWithAccessTokenClaim("token-a"))));
         Assert.Equal("token-a", circuitSessionState.AccessToken);
         Assert.Equal(CircuitAuthStatus.Authenticated, circuitSessionState.Status);
 
-        // B: a different identity arrives on the live circuit — fails closed, invalidates.
         ((IHostEnvironmentAuthenticationStateProvider)provider)
             .SetAuthenticationState(Task.FromResult(new AuthenticationState(BuildPrincipalWithAccessTokenClaim("token-b"))));
         Assert.Null(circuitSessionState.AccessToken);
@@ -298,20 +280,16 @@ public class AppSessionAuthStateProviderTests
         var circuitSessionState = new CircuitSessionState();
         var provider = BuildProvider(BuildFactory(new StaticResponseHandler(HttpStatusCode.OK), circuitSessionState), circuitSessionState);
 
-        // A: initial authenticated seed.
         ((IHostEnvironmentAuthenticationStateProvider)provider)
             .SetAuthenticationState(Task.FromResult(new AuthenticationState(BuildPrincipalWithAccessTokenClaim("token-a"))));
         Assert.Equal("token-a", circuitSessionState.AccessToken);
 
-        // Anonymous reconnect — clears/invalidates.
         var anonymousPrincipal = new ClaimsPrincipal(new ClaimsIdentity());
         ((IHostEnvironmentAuthenticationStateProvider)provider)
             .SetAuthenticationState(Task.FromResult(new AuthenticationState(anonymousPrincipal)));
         Assert.Null(circuitSessionState.AccessToken);
         Assert.Equal(CircuitAuthStatus.Invalidated, circuitSessionState.Status);
 
-        // A DIFFERENT token then arrives — this is the A -> anonymous -> B sequence the old bug also
-        // mishandled (AccessToken was null after Clear(), so this looked like a fresh circuit).
         ((IHostEnvironmentAuthenticationStateProvider)provider)
             .SetAuthenticationState(Task.FromResult(new AuthenticationState(BuildPrincipalWithAccessTokenClaim("token-b"))));
         Assert.Null(circuitSessionState.AccessToken);
@@ -327,8 +305,6 @@ public class AppSessionAuthStateProviderTests
     [Fact]
     public void SetAuthenticationState_BrandNewCircuit_AcceptsFirstToken()
     {
-        // A freshly constructed CircuitSessionState (Status defaults to Uninitialized) must still
-        // accept its very first token normally — the negated branch of the Status check above.
         var circuitSessionState = new CircuitSessionState();
         Assert.Equal(CircuitAuthStatus.Uninitialized, circuitSessionState.Status);
 

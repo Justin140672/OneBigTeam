@@ -9,8 +9,6 @@ internal sealed class FakeCompanyTimeZoneReader(string timeZoneId = "UTC") : ICo
         Task.FromResult(timeZoneId);
 }
 
-// Resolves a distinct time zone per company, for tests asserting that a job resolves "today"
-// independently per company rather than once globally.
 internal sealed class PerCompanyTimeZoneReader(IReadOnlyDictionary<Guid, string> timeZonesByCompanyId)
     : ICompanyTimeZoneReader
 {

@@ -21,11 +21,6 @@ public sealed record OrganisationChartNode(
     string? ProfilePhotoUrl,
     IReadOnlyList<OrganisationChartNode> DirectReports);
 
-// Flat, string-keyed shape for Syncfusion's SfDiagramComponent <DataSourceSettings> binding
-// (ID/ParentID are matched to these property names by name, not by type, so they must be
-// strings — Syncfusion's own organizational-chart sample uses the same shape). Built by
-// flattening an already cycle-safe OrganisationChartNode tree back out, rather than binding the
-// raw API data directly, so the diagram never has to cope with a manager cycle itself.
 public sealed class OrganisationChartDiagramItem
 {
     public string Id { get; set; } = string.Empty;

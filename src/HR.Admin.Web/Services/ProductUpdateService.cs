@@ -3,12 +3,6 @@ using HR.SharedKernel.Http;
 
 namespace HR.Admin.Web.Services;
 
-/// <summary>
-/// Wraps the Customer Release Notifications endpoints (SendProductUpdate /
-/// PreviewProductUpdateRecipients, both on HR.Modules.Notifications). Uses the shared
-/// ApiResult&lt;T&gt;/ApiResponseReader contracts (HR.SharedKernel.Http) rather than a bespoke local
-/// envelope, per this repo's shared web-response-handling convention.
-/// </summary>
 public sealed class ProductUpdateService(HrApiHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient();

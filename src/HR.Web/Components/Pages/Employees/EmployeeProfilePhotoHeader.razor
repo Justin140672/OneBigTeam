@@ -66,9 +66,6 @@
 
     private GetPendingProfilePhotoResponse? _pending;
 
-    // The employee's current (approved) live photo, fetched via GetEmployeeProfilePhotoAsync.
-    // Null when the employee has no approved photo yet, in which case ProfilePhotoAvatar falls
-    // back to showing initials.
     private string? _currentPhotoUrl;
 
     private bool _loading;
@@ -115,18 +112,6 @@
         await PollForCurrentPhotoAsync();
     }
 
-    // The virus scan (ScanUploadedFileJob) runs asynchronously via a background job queued
-    // during upload — GetEmployeeProfilePhotoAsync only returns a download URL once that scan
-    // comes back Clean (see ScanStatusAccessGuard.CheckDownloadable), so a single fetch right
-    // after upload can race it and see nothing, leaving the header stuck on the initials
-    // placeholder with nothing left to trigger a re-render once scanning actually finishes.
-    // Poll instead of fetching once. The previous fixed 20s budget was the actual bug: the scan's
-    // latency is Hangfire queue pickup (polling storage) plus whatever other background work is
-    // queued ahead of it, which has no fixed upper bound under load — and once the budget ran out
-    // nothing re-triggered a fetch, so the header showed initials PERMANENTLY even after the scan
-    // finished (the user had to reload the page). Keep polling for as long as the header is on
-    // screen (bounded at a generous 2 minutes, backing off after the first 20s so a slow scan
-    // doesn't hammer the API), and stop as soon as the component is disposed.
     private readonly CancellationTokenSource _disposeCts = new();
 
     private async Task PollForCurrentPhotoAsync()
@@ -148,7 +133,6 @@
         }
         catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
         {
-            // Navigated away — nothing left to update.
         }
     }
 
@@ -168,10 +152,6 @@
         if (error is not null)
             _error = error;
 
-        // Clear the "Pending Review" card promptly regardless of the photo poll below — it can
-        // take up to 20s (see PollForCurrentPhotoAsync's own remarks on the virus scan race), and
-        // the approval itself has already succeeded at this point; there's no reason to leave the
-        // card showing "Pending Review" for an action that already went through.
         _reviewing = false;
         await LoadPendingAsync();
         StateHasChanged();

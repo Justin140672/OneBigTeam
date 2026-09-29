@@ -6,10 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Companies.Features.GetSubscriptionPricingConfig;
 
-/// <summary>
-/// Returns the single authoritative configurable subscription pricing model (Story 4). Lazy-seeds
-/// the PlatformSettings singleton on first read, mirroring GetPlatformSettingsHandler.
-/// </summary>
 internal sealed class GetSubscriptionPricingConfigHandler(PlatformDbContext dbContext, IClock clock)
 {
     public async Task<Result<GetSubscriptionPricingConfigResponse>> HandleAsync(

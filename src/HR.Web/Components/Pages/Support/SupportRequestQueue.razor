@@ -86,16 +86,10 @@
 </div>
 
 @code {
-    // "Closed" is this entity's equivalent of IsActive=false on other list screens — closed
-    // tickets drop out of the default view, same as deactivated records elsewhere, via the same
-    // shared "Show Inactive"/"Show Active" toolbar toggle (SearchPageBase.ShowInactive).
     private const string ClosedStatus = "Closed";
 
     protected override bool SupportsActiveFilter => true;
 
-    // Tickets are only ever created by employees via Help & Feedback, never from this staff
-    // queue — and status can no longer be changed here at all (see item 22: that's exclusively an
-    // Admin app / support-staff action now), so "Add"/"Edit" have nothing to do here either.
     protected override bool IsAddDisabled => true;
 
     private IReadOnlyList<SupportRequestListItem> DisplayedItems =>
@@ -103,18 +97,12 @@
 
     protected override Task OnBeforeLoadAsync()
     {
-        // OBT-IAM-09: gate on support:manage — not company:manage — so a Company-Administrator-only
-        // account (no longer granted support:manage) is denied.
         if (!Session.IsHrAdministrator && !Session.CanManageSupport)
             Navigation.NavigateTo("/access-denied", replace: true);
 
         return Task.CompletedTask;
     }
 
-    // Bounds how long the queue waits on a slow/unresponsive backend before surfacing the Failed
-    // state with a Retry action, rather than showing "Loading support requests…" indefinitely. No
-    // existing shared HTTP-timeout convention was found elsewhere in HR.Web (the "hrapi"
-    // HttpClient itself has no explicit Timeout set), so this is a new, page-local constant.
     private static readonly TimeSpan FetchTimeout = TimeSpan.FromSeconds(20);
 
     protected override TimeSpan? LoadTimeout => FetchTimeout;
@@ -129,7 +117,6 @@
         }
         catch (Exception ex)
         {
-            // Technical detail stays in the log — the user only ever sees LoadErrorMessage below.
             Logger.LogError(ex, "Unexpected error loading support requests for company {CompanyId}.", CompanyId);
             return null;
         }

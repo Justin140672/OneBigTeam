@@ -61,7 +61,6 @@ public class PublishVacancyHandlerTests
         Assert.Equal("validation", result.Error.Code);
     }
 
-    // SET-05: VacancyApprovalRequired gating.
 
     [Fact]
     public async Task HandleAsync_Fails_When_VacancyApprovalRequired_And_Vacancy_Not_Approved()

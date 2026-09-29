@@ -9,11 +9,6 @@ using Microsoft.Extensions.Configuration;
 
 namespace HR.Modules.Companies.Features.PlaceCompanyLegalHold;
 
-/// <summary>
-/// NFR-07: same defense-in-depth allow-list gate as ScheduleCustomerDeletionHandler. Places a
-/// company-wide legal hold so all retention deletion (automated jobs and operator purge endpoints)
-/// skips this company until the hold is lifted.
-/// </summary>
 internal sealed class PlaceCompanyLegalHoldHandler(
     CompaniesDbContext dbContext,
     ICurrentUser currentUser,

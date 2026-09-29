@@ -2,11 +2,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Companies.Features.RevokeSupportSession;
 
-/// <summary>
-/// Records a platform-administrator revoking an outstanding support session (Support epic).
-/// Plugs into the existing cross-cutting IAuditEventPublisher/AuditDbContext infrastructure, same
-/// as HR.Modules.Companies.Features.ExtendCustomerTrial.Audit.
-/// </summary>
 internal sealed record SupportSessionRevokedAuditEvent(
     Guid CompanyId,
     Guid SupportSessionId,

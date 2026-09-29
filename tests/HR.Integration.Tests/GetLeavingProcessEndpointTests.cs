@@ -41,8 +41,6 @@ public class GetLeavingProcessEndpointTests
         return (await response.Content.ReadFromJsonAsync<IdPayload>())!.Id;
     }
 
-    // Relative to "today" rather than hardcoded literals — see StartLeavingProcessEndpointTests'
-    // identical fields for why a fixed near-term literal eventually becomes "backdated".
     private static readonly DateOnly LeavingDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
     private static readonly DateOnly LastWorkingDay = LeavingDate.AddDays(-1);
 
@@ -130,16 +128,11 @@ public class GetLeavingProcessEndpointTests
         var employeeId = await CreateEmployeeAsync(client, companyId);
         await StartLeavingProcessAsync(client, companyId, employeeId);
 
-        // Authenticated as companyId but the route targets otherCompanyId —
-        // TenantRouteAuthorizationMiddleware blocks it before the handler ever runs.
         var response = await client.GetAsync($"/api/companies/{otherCompanyId}/employees/{employeeId}/leaving-process");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ADM-05: authorization change — GetLeavingProcess now requires "employee:manage" policy
-    // (HrAdministrator only), not "employee:read". Offboarding administration is not visible
-    // to a plain Employee, Manager, Recruiter, or Company-Administrator-only user.
 
     [Fact]
     public async Task Get_LeavingProcess_Returns_Forbidden_For_Manager_Accessing_Another_Employee()
@@ -153,7 +146,6 @@ public class GetLeavingProcessEndpointTests
         var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
         await StartLeavingProcessAsync(hrAdminClient, companyId, employeeId);
 
-        // A different user with Manager role
         using var managerClient = _factory.CreateClient();
         var managerId = Guid.NewGuid();
         managerClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, managerId.ToString());
@@ -178,7 +170,6 @@ public class GetLeavingProcessEndpointTests
         var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
         await StartLeavingProcessAsync(hrAdminClient, companyId, employeeId);
 
-        // A different user with Recruiter role
         using var recruiterClient = _factory.CreateClient();
         var recruiterId = Guid.NewGuid();
         recruiterClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, recruiterId.ToString());
@@ -203,7 +194,6 @@ public class GetLeavingProcessEndpointTests
         var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
         await StartLeavingProcessAsync(hrAdminClient, companyId, employeeId);
 
-        // A different user with Employee role only
         using var employeeClient = _factory.CreateClient();
         var otherEmployeeId = Guid.NewGuid();
         employeeClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, otherEmployeeId.ToString());
@@ -228,8 +218,6 @@ public class GetLeavingProcessEndpointTests
         var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
         await StartLeavingProcessAsync(hrAdminClient, companyId, employeeId);
 
-        // A brand-new user id with no TestRoleSeeder role assignment at all — still authenticated
-        // (TestAuthHandler only requires the user header), just role-less.
         using var noRoleClient = _factory.CreateClient();
         noRoleClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, Guid.NewGuid().ToString());
         noRoleClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());

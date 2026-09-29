@@ -11,7 +11,7 @@ namespace HR.Modules.Employees.Tests;
 public class GetEqualityDiversityReportHandlerTests
 {
     private static readonly DateTime Now = new(2026, 9, 4, 12, 0, 0, DateTimeKind.Utc);
-    private static readonly DateOnly Age26Dob = new(2000, 6, 1);   // 26 on 2026-09-04 -> "25-34"
+    private static readonly DateOnly Age26Dob = new(2000, 6, 1);
 
     private static EmployeesDbContext BuildContext(string? dbName = null)
     {
@@ -53,10 +53,6 @@ public class GetEqualityDiversityReportHandlerTests
             new DateTimeOffset(Now)));
     }
 
-    /// <summary>
-    /// Company of 15: 10 aged 25-34, 5 with an unknown DOB. 13 equality records
-    /// (7 White, 3 Mixed, 3 Asian; 8 Woman, 5 Man), 2 employees with no record at all.
-    /// </summary>
     private static async Task<(EmployeesDbContext Db, Guid CompanyId, List<Guid> EmployeeIds)> SeededCompanyAsync()
     {
         var db = BuildContext();
@@ -66,7 +62,6 @@ public class GetEqualityDiversityReportHandlerTests
         for (var i = 0; i < 10; i++) ids.Add(AddEmployee(db, companyId, Age26Dob));
         for (var i = 0; i < 5; i++) ids.Add(AddEmployee(db, companyId, default));
 
-        // Another company's employee — must never bleed into the totals.
         AddEmployee(db, Guid.NewGuid(), Age26Dob);
 
         var ethnic = new[]
@@ -102,7 +97,6 @@ public class GetEqualityDiversityReportHandlerTests
         var report = result.Value!;
         Assert.Equal(15, report.TotalEmployees);
         Assert.Equal(5, report.MinimumGroupSize);
-        // 13 of the 15 employees have a saved equality record.
         Assert.Equal(13, report.RespondentCount);
         Assert.Equal(Math.Round(13 * 100m / 15, 1), report.RespondentPercentage);
         Assert.Equal(DateOnly.FromDateTime(Now), report.ReportingDate);
@@ -136,7 +130,6 @@ public class GetEqualityDiversityReportHandlerTests
 
         var report = (await Handler(db).HandleAsync(new GetEqualityDiversityReportRequest(companyId), CancellationToken.None)).Value!;
 
-        // Nobody supplied a disability answer -> every one of the 15 is "Not stated".
         var disability = Dim(report, "disability");
         var notStated = Assert.Single(disability.Rows);
         Assert.Equal("Not stated", notStated.Value);
@@ -183,17 +176,14 @@ public class GetEqualityDiversityReportHandlerTests
 
         var ethnicity = Dim(report, "ethnicity");
 
-        // Mixed (3) and Asian (3) are each below the threshold of 5.
         Assert.DoesNotContain(ethnicity.Rows, x => x.Value == "Mixed");
         Assert.DoesNotContain(ethnicity.Rows, x => x.Value == "Asian Or Asian British");
-        // "Not stated" is itself an aggregate bucket and is never suppressed, so exclude it here.
         Assert.DoesNotContain(ethnicity.Rows, x => x.Value != "Not stated" && x.Count is >= 1 and < 5 && !x.Suppressed);
 
         var notReported = Assert.Single(ethnicity.Rows, x => x.Value == "Not reported");
         Assert.True(notReported.Suppressed);
-        Assert.Equal(6, notReported.Count); // 3 + 3 folded together
+        Assert.Equal(6, notReported.Count);
 
-        // The real group that clears the threshold is still shown.
         Assert.Equal(7, Assert.Single(ethnicity.Rows, x => x.Value == "White").Count);
         Assert.Equal(2, Assert.Single(ethnicity.Rows, x => x.Value == "Not stated").Count);
     }
@@ -208,7 +198,6 @@ public class GetEqualityDiversityReportHandlerTests
             new GetEqualityDiversityReportRequest(companyId), CancellationToken.None)).Value!;
 
         Assert.Equal(5, report.MinimumGroupSize);
-        // Suppression still applied at 5, not 1.
         Assert.DoesNotContain(Dim(report, "ethnicity").Rows, x => x.Value == "Mixed");
     }
 

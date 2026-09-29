@@ -34,11 +34,6 @@ public class LeaveConcurrencyHandlerTests
 
     private readonly string _store = "leave-conc-" + Guid.NewGuid().ToString("N");
 
-    // .UseVersionedAggregates() is required here - without it, VersionAdvancingSaveChangesInterceptor
-    // is never registered, Version never advances on save, and no conflict can ever be detected.
-    // ConfigureWarnings ignores InMemory's "transactions not supported" warning (which EF otherwise
-    // throws as an error) - AdjustLeaveBalanceHandler opens an explicit transaction; InMemory just
-    // no-ops it, which is fine for what these tests assert.
     private LeaveDbContext Ctx()
     {
         var builder = new DbContextOptionsBuilder<LeaveDbContext>()
@@ -48,7 +43,6 @@ public class LeaveConcurrencyHandlerTests
         return new LeaveDbContext(builder.Options);
     }
 
-    // ─── Domain-level: IVersionedAggregate wiring ─────────────────────────────
 
     [Fact]
     public void LeaveBalance_Version_Starts_At_One_And_IncrementVersion_Increments_By_One()
@@ -84,7 +78,6 @@ public class LeaveConcurrencyHandlerTests
         Assert.Equal(3, request.Version);
     }
 
-    // ─── ApproveLeaveRequest vs ApproveLeaveRequest: two requests, same balance ─
 
     [Fact]
     public async Task Two_Concurrent_Approvals_Deducting_The_Same_Balance_Second_Loses_With_Concurrency_Error()
@@ -119,7 +112,6 @@ public class LeaveConcurrencyHandlerTests
             requestBId = requestB.Id;
         }
 
-        // Both contexts load the balance/requests BEFORE either commits, simulating a genuine race.
         await using var ctxA = Ctx();
         await using var ctxB = Ctx();
         _ = await ctxA.LeaveBalances.SingleAsync();
@@ -135,7 +127,6 @@ public class LeaveConcurrencyHandlerTests
         Assert.True(resultB.IsFailure);
         Assert.Equal("concurrency", resultB.Error.Code);
 
-        // Final state reflects ONLY the winner's deduction - not a lost update, not both applied.
         await using var verify = Ctx();
         var savedBalance = await verify.LeaveBalances.SingleAsync();
         Assert.Equal(3m, savedBalance.UsedDays);
@@ -144,7 +135,7 @@ public class LeaveConcurrencyHandlerTests
         var savedRequestA = await verify.LeaveRequests.SingleAsync(r => r.Id == requestAId);
         var savedRequestB = await verify.LeaveRequests.SingleAsync(r => r.Id == requestBId);
         Assert.Equal(LeaveRequestStatus.Approved, savedRequestA.Status);
-        Assert.Equal(LeaveRequestStatus.Pending, savedRequestB.Status); // loser's approve never committed
+        Assert.Equal(LeaveRequestStatus.Pending, savedRequestB.Status);
     }
 
     // ─── Approve vs Reject: competing status transitions on the SAME request ──
@@ -175,7 +166,6 @@ public class LeaveConcurrencyHandlerTests
         _ = await approveCtx.LeaveRequests.SingleAsync();
         _ = await rejectCtx.LeaveRequests.SingleAsync();
 
-        // Approve commits first, advancing Version.
         var approveResult = await ApproveHandler(approveCtx)
             .HandleAsync(ApproveRequest(companyId, employeeId, requestId), CancellationToken.None);
         Assert.True(approveResult.IsSuccess);
@@ -188,10 +178,9 @@ public class LeaveConcurrencyHandlerTests
 
         await using var verify = Ctx();
         var saved = await verify.LeaveRequests.SingleAsync();
-        Assert.Equal(LeaveRequestStatus.Approved, saved.Status); // never corrupted/ambiguous
+        Assert.Equal(LeaveRequestStatus.Approved, saved.Status);
     }
 
-    // ─── Approve vs Cancel: competing status transitions on the SAME request ──
 
     [Fact]
     public async Task Concurrent_Approve_And_Cancel_Of_The_Same_Request_Produce_One_Consistent_Outcome()
@@ -233,7 +222,6 @@ public class LeaveConcurrencyHandlerTests
         Assert.Equal(LeaveRequestStatus.Cancelled, saved.Status);
     }
 
-    // ─── AwardToil vs AwardToil: two concurrent awards to the SAME balance row ─
 
     [Fact]
     public async Task Two_Concurrent_Toil_Awards_To_The_Same_Balance_Second_Loses_With_Concurrency_Error()
@@ -251,11 +239,6 @@ public class LeaveConcurrencyHandlerTests
             seed.EmployeeLeavePolicyAssignments.Add(assignment);
             await seed.SaveChangesAsync();
 
-            // Establish the balance row first via a normal, uncontested award - two concurrent
-            // awards against a not-yet-existing balance would each insert their own distinct row
-            // (nothing to race on), so this seed step ensures both racing awards below hit the
-            // shared balance.Adjust(...) UPDATE path AwardToilHandler is actually exposed to once a
-            // balance already exists for the policy year.
             var seedHandler = new AwardToilHandler(seed, new FakeClock(FixedUtcNow), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher());
             var seedResult = await seedHandler.HandleAsync(
                 new AwardToilRequest(companyId, employeeId, 1m, new DateOnly(2026, 5, 1), null)
@@ -268,7 +251,6 @@ public class LeaveConcurrencyHandlerTests
 
         await using var ctxA = Ctx();
         await using var ctxB = Ctx();
-        // Both contexts load the existing balance BEFORE either commits, simulating a genuine race.
         _ = await ctxA.LeaveBalances.SingleAsync();
         _ = await ctxB.LeaveBalances.SingleAsync();
 
@@ -296,10 +278,9 @@ public class LeaveConcurrencyHandlerTests
 
         await using var verify = Ctx();
         var savedBalance = await verify.LeaveBalances.SingleAsync();
-        Assert.Equal(1m + 2m, savedBalance.AdjustmentDays); // seed + winning award only
+        Assert.Equal(1m + 2m, savedBalance.AdjustmentDays);
     }
 
-    // ─── AdjustLeaveBalance vs AdjustLeaveBalance: two concurrent manual edits ─
 
     [Fact]
     public async Task Two_Concurrent_Balance_Adjustments_Second_Loses_And_Rolls_Back()
@@ -353,10 +334,9 @@ public class LeaveConcurrencyHandlerTests
         // HR.Integration.Tests/LeaveConcurrencyEndpointTests.cs, not here.
         await using var verify = Ctx();
         var savedBalance = await verify.LeaveBalances.SingleAsync();
-        Assert.Equal(2m, savedBalance.AdjustmentDays); // only the winning adjustment applied
+        Assert.Equal(2m, savedBalance.AdjustmentDays);
     }
 
-    // ─── Helpers ────────────────────────────────────────────────────────────────
 
     private static ApproveLeaveRequestHandler ApproveHandler(LeaveDbContext ctx) =>
         new(ctx, new FakeClock(FixedUtcNow),

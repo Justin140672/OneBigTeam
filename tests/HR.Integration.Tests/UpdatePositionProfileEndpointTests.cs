@@ -206,7 +206,6 @@ public class UpdatePositionProfileEndpointTests
 
         var created = await CreatePositionProfileAsync(client, companyA, departmentId, locationId, leavePolicyId, "Designer");
 
-        // Authenticated as companyA but route targets companyB — middleware blocks it.
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyB}/position-profiles/{created.Id}", new
             {

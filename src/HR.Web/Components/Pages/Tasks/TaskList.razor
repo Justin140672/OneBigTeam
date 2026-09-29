@@ -52,7 +52,6 @@
     [Parameter]
     public bool ShowAssignedTo { get; set; } = true;
 
-    // "View" opens the task in a dialog — see TaskViewDialog.
     [Parameter, EditorRequired]
     public EventCallback<Guid> OnViewTask { get; set; }
 

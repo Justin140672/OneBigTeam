@@ -82,7 +82,6 @@ public class AssetIdempotencySnapshotTests
         Assert.Equal(first, second);
     }
 
-    // 3. Empty string vs whitespace-only string for an optional field normalize identically.
     [Theory]
     [InlineData("Manufacturer")]
     [InlineData("Model")]
@@ -103,7 +102,6 @@ public class AssetIdempotencySnapshotTests
         Assert.Equal(first, second);
     }
 
-    // 4. A genuinely different name must still rotate the key.
     [Fact]
     public void BuildRequestSnapshot_Real_Name_Change_Produces_A_Different_Key()
     {
@@ -120,10 +118,6 @@ public class AssetIdempotencySnapshotTests
         Assert.NotEqual(first, second);
     }
 
-    // 5. Unchanged retry after an ambiguous outcome (operation never Completed) keeps the same key
-    // when driven through BuildRequestSnapshot, mirroring
-    // CreateAssetAsync_Ambiguous_Body_Read_Failure_Does_Not_Force_A_New_Key_On_Retry but exercised
-    // via the fixed EditPageBase call site (BuildRequestSnapshot, not the raw model).
     [Fact]
     public async Task Ambiguous_Failure_Then_Unchanged_Retry_Reuses_The_Same_Key_Via_BuildRequestSnapshot()
     {
@@ -147,8 +141,6 @@ public class AssetIdempotencySnapshotTests
         Assert.Equal(firstKey, secondKey);
     }
 
-    // 6. A genuinely new submission after Complete() was called gets a fresh key even for an
-    // identical-looking model.
     [Fact]
     public void Completed_Operation_Gets_A_Fresh_Key_For_An_Identical_Model()
     {
@@ -165,9 +157,6 @@ public class AssetIdempotencySnapshotTests
         Assert.NotEqual(first, second);
     }
 
-    // 7. BuildRequestSnapshot returns the exact same normalized CreateAssetRequest that is actually
-    // POSTed over HTTP - proven by capturing the real HTTP body and comparing field-by-field against
-    // the snapshot.
     [Fact]
     public async Task BuildRequestSnapshot_Matches_The_Request_Body_Actually_Sent_Over_HTTP()
     {
@@ -190,7 +179,6 @@ public class AssetIdempotencySnapshotTests
             capturing.CapturedBody!, HrApiJsonOptions.Default);
 
         Assert.Equal(snapshot, sentBody);
-        // Confirms the normalization actually happened, not just that both sides agree on a raw value.
         Assert.Equal("Laptop", snapshot.Name);
         Assert.Null(snapshot.Manufacturer);
     }
@@ -206,7 +194,6 @@ public class AssetIdempotencySnapshotTests
         }
     }
 
-    // ── Fake handlers ────────────────────────────────────────────────────────────
 
     private sealed class NeverCalledHandler : HttpMessageHandler
     {

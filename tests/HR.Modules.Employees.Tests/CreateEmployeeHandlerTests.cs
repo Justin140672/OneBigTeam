@@ -636,7 +636,6 @@ public class CreateEmployeeHandlerTests
         var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
         var companyId = Guid.NewGuid();
 
-        // seed a conflicting employee so creation fails
         var existing = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "alice@example.com", StartDate, true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), new DateTimeOffset(FixedUtcNow, TimeSpan.Zero));
         context.Employees.Add(existing);
         await context.SaveChangesAsync();
@@ -663,9 +662,6 @@ public class CreateEmployeeHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
-        // The seeded position profile below has no ProbationMonthsOverride, so the resolver's
-        // company default still applies (this only exercises the "no override present" path,
-        // not a literal absence of PositionProfile — that is no longer a valid Employee state).
         var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
         var reader = new FakeProbationDateResolver(months: 6);
         var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), reader, new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
@@ -811,11 +807,6 @@ public class CreateEmployeeHandlerTests
     [Fact]
     public async Task HandleAsync_Published_Event_Has_PositionProfiles_DefaultLeavePolicyId()
     {
-        // DefaultLeavePolicyId is now mandatory on PositionProfile (a PositionProfile can no longer
-        // exist without one), so every employee linked to a position profile now always publishes a
-        // non-null DefaultLeavePolicyId on the created event. This supersedes the old
-        // "...Has_Null_DefaultLeavePolicyId_When_No_PositionProfile" scenario, which is no longer a
-        // reachable state.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
@@ -1069,11 +1060,6 @@ public class CreateEmployeeHandlerTests
     [Fact]
     public async Task HandleAsync_Retries_When_Generated_EmployeeNumber_Already_Exists()
     {
-        // The atomic counter itself is race-free (see EmployeeNumberGenerator's own remarks), but
-        // its stored "next" value can still drift out of sync with actual data by means outside
-        // CreateEmployeeHandler's control — e.g. an admin directly editing "Next Number" on HR
-        // Settings to a value at or behind one already claimed. The handler must retry with a
-        // fresh claim rather than failing the request outright.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
@@ -1086,8 +1072,6 @@ public class CreateEmployeeHandlerTests
         context.Employees.Add(existing);
         await context.SaveChangesAsync();
 
-        // First claim ("AUTO-00001") collides with the employee just seeded; the second
-        // ("AUTO-00002") does not.
         var generator = new FakeEmployeeNumberGenerator(n => $"AUTO-{n:D5}");
         var handler = new CreateEmployeeHandler(
             context, new FakeClock(FixedUtcNow), new FakeProbationDateResolver(),
@@ -1418,12 +1402,6 @@ public class CreateEmployeeHandlerTests
         return System.Text.Json.JsonSerializer.Deserialize<EmployeeCreatedIntegrationEvent>(entry.PayloadJson)!;
     }
 
-    /// <summary>
-    /// Seeds an active Department, Location, PositionProfile and EmploymentType for
-    /// <paramref name="companyId"/> and returns their ids. CreateEmployeeRequest requires all
-    /// four (plus DateOfBirth/Nationality/Gender/EmployeeNumber) to resolve to a real, active,
-    /// same-company row, so most handler tests need this fixture.
-    /// </summary>
     private static async Task<(Guid DepartmentId, Guid LocationId, Guid PositionProfileId, Guid EmploymentTypeId)> SeedMandatoryLookupsAsync(
         EmployeesDbContext context, Guid companyId, DateTimeOffset now)
     {

@@ -54,10 +54,6 @@ public class CompanyCrossTenantAccessTests
         }).GetAwaiter().GetResult();
     }
 
-    /// <summary>
-    /// Builds a client for <paramref name="userId"/> resolved against their own tenant
-    /// (<paramref name="ownTenantId"/>).
-    /// </summary>
     private async Task<HttpClient> ClientFor(Guid userId, Guid ownTenantId)
     {
         var client = _factory.CreateClient();
@@ -70,8 +66,6 @@ public class CompanyCrossTenantAccessTests
     private async Task<(Guid ownTenantId, Guid otherCompanyId)> SeedOwnAndOtherAsync()
     {
         var ownTenantId = Guid.NewGuid();
-        // Seed the caller's own company under the same id their tenant resolves to, so
-        // TenantRouteAuthorizationMiddleware permits the own-tenant leg of each test.
         await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Own {Guid.NewGuid():N}", companyId: ownTenantId);
         var otherCompanyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Other {Guid.NewGuid():N}");
         return (ownTenantId, otherCompanyId);
@@ -119,7 +113,6 @@ public class CompanyCrossTenantAccessTests
         fileSizeBytes = 1024,
     };
 
-    // --- GetCompany ---
 
     [Fact]
     public async Task Get_Company_Enforces_Tenant_Isolation()
@@ -134,7 +127,6 @@ public class CompanyCrossTenantAccessTests
         Assert.True(ownTenant.IsSuccessStatusCode, $"Expected 2xx for own tenant, got {(int)ownTenant.StatusCode}.");
     }
 
-    // --- UpdateCompany ---
 
     [Fact]
     public async Task Put_Company_Enforces_Tenant_Isolation()
@@ -150,7 +142,6 @@ public class CompanyCrossTenantAccessTests
         Assert.True(ownTenant.IsSuccessStatusCode, $"Expected 2xx for own tenant, got {(int)ownTenant.StatusCode}.");
     }
 
-    // --- GetCompanySettings ---
 
     [Fact]
     public async Task Get_Company_Settings_Enforces_Tenant_Isolation()
@@ -165,7 +156,6 @@ public class CompanyCrossTenantAccessTests
         Assert.True(ownTenant.IsSuccessStatusCode, $"Expected 2xx for own tenant, got {(int)ownTenant.StatusCode}.");
     }
 
-    // --- UpdateCompanySettings ---
 
     [Fact]
     public async Task Put_Company_Settings_Enforces_Tenant_Isolation()
@@ -180,7 +170,6 @@ public class CompanyCrossTenantAccessTests
         Assert.True(ownTenant.IsSuccessStatusCode, $"Expected 2xx for own tenant, got {(int)ownTenant.StatusCode}.");
     }
 
-    // --- GetHrSettings ---
 
     [Fact]
     public async Task Get_Hr_Settings_Enforces_Tenant_Isolation()
@@ -195,7 +184,6 @@ public class CompanyCrossTenantAccessTests
         Assert.True(ownTenant.IsSuccessStatusCode, $"Expected 2xx for own tenant, got {(int)ownTenant.StatusCode}.");
     }
 
-    // --- UpdateHrSettings ---
 
     [Fact]
     public async Task Put_Hr_Settings_Enforces_Tenant_Isolation()
@@ -210,7 +198,6 @@ public class CompanyCrossTenantAccessTests
         Assert.True(ownTenant.IsSuccessStatusCode, $"Expected 2xx for own tenant, got {(int)ownTenant.StatusCode}.");
     }
 
-    // --- UploadCompanyLogo ---
 
     [Fact]
     public async Task Post_Company_Logo_Enforces_Tenant_Isolation()

@@ -66,10 +66,6 @@ public static class IdentityModule
         services.Configure<SupabaseAuthOptions>(configuration.GetSection("SupabaseAuth"));
         services.AddHttpClient();
 
-        // The real gateway makes genuine HTTP calls to Supabase's Auth Admin API — the E2E suite's
-        // signup/resend journeys create a real pending user per run, which hits Supabase's rate
-        // limits under repeated local/CI runs. Swap in a no-op fake for those runs (AppFixture sets
-        // E2E_TESTING=true, same flag HR.AppHost already reads).
         var isE2ETesting = string.Equals(
             Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
         if (isE2ETesting)
@@ -81,9 +77,6 @@ public static class IdentityModule
             services.AddScoped<ISupabaseAuthGateway, SupabaseAuthGateway>();
         }
 
-        // System Health Dashboard (Platform Monitoring epic) — "auth" named health check, live
-        // reachability probe against Supabase Auth's public settings endpoint (see
-        // SupabaseAuthHealthCheck remarks).
         if (isE2ETesting)
         {
             // In E2E mode, skip the Supabase Auth health check to avoid blocking startup when
@@ -94,8 +87,6 @@ public static class IdentityModule
         else
         {
             services.AddHealthChecks()
-                // NFR-03: authentication (Supabase Auth) is a critical dependency — if it is Unhealthy
-                // no user can sign in, so the service is "not ready" (503 on /health/ready).
                 .AddCheck<SupabaseAuthHealthCheck>("auth", tags: ["ready", "critical"]);
         }
 
@@ -112,18 +103,13 @@ public static class IdentityModule
 
         services.AddScoped<ICurrentUser, HttpContextCurrentUser>();
         services.AddScoped<ICurrentTenant, HttpContextCurrentTenant>();
-        // IAM-01: reusable target-user company-membership guard used by every user-administration
-        // handler that resolves a target user/employee by id from the route.
         services.AddScoped<HR.Modules.Identity.Authorization.ITargetUserCompanyGuard,
             HR.Modules.Identity.Authorization.TargetUserCompanyGuard>();
         services.AddScoped<HR.SharedKernel.IAuthorizationService, IdentityAuthorizationService>();
         services.AddScoped<HR.Modules.Identity.Authorization.LastActiveAdministratorGuard>();
         services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, RoleAuthorizationHandler>();
         services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, PlatformAdminAuthorizationHandler>();
-        // IAM-06: backs every named capability policy resolved through PolicyCatalog/PermissionPolicy.
         services.AddScoped<Microsoft.AspNetCore.Authorization.IAuthorizationHandler, PermissionAuthorizationHandler>();
-        // IAM-08: process-wide denial-audit volume control — must be a singleton so the throttle
-        // window is shared across requests/scopes, not reset per request.
         services.AddSingleton<PermissionDenialAuditThrottle>();
         services.AddSingleton<IClock, SystemClock>();
 
@@ -134,14 +120,8 @@ public static class IdentityModule
         services.AddScoped<ICompanyUserEmailSearchReader, CompanyUserEmailSearchReader>();
         services.AddScoped<ICompanyUserCountReader, CompanyUserCountReader>();
 
-        // Platform Audit Log (Audit epic) — resolves ActorUserId -> administrator email for the
-        // Admin Portal's audit log grid/filter. Consumed by HR.Modules.Companies via this
-        // Infrastructure.Abstractions interface, same pattern as ICompanyUserEmailSearchReader above.
         services.AddScoped<IUserEmailDirectoryReader, UserEmailDirectoryReader>();
 
-        // Admin Portal Application Metrics dashboard (Platform Monitoring epic) — platform-wide,
-        // not scoped to a single customer. Consumed by HR.Modules.Companies via this
-        // Infrastructure.Abstractions interface.
         services.AddScoped<IPlatformUserActivityReader, PlatformUserActivityReader>();
 
         services.AddScoped<ListUsersHandler>();
@@ -153,7 +133,6 @@ public static class IdentityModule
         services.AddScoped<GetEffectiveAccessHandler>();
         services.AddScoped<IValidator<GetEffectiveAccessRequest>, GetEffectiveAccessValidator>();
 
-        // IAM-08: permission history, search and access-review reporting.
         services.AddScoped<SearchUserAccessHandler>();
         services.AddScoped<IValidator<SearchUserAccessRequest>, SearchUserAccessValidator>();
         services.AddScoped<GetPermissionHistoryHandler>();
@@ -168,7 +147,6 @@ public static class IdentityModule
         services.AddScoped<IValidator<HR.Modules.Identity.Features.ListInvitableEmployees.ListInvitableEmployeesRequest>,
             HR.Modules.Identity.Features.ListInvitableEmployees.ListInvitableEmployeesValidator>();
 
-        // Bulk employee invitations.
         services.AddScoped<HR.Modules.Identity.Features.QueueInvitationBatch.QueueInvitationBatchHandler>();
         services.AddScoped<IValidator<HR.Modules.Identity.Features.QueueInvitationBatch.QueueInvitationBatchRequest>,
             HR.Modules.Identity.Features.QueueInvitationBatch.QueueInvitationBatchValidator>();
@@ -212,7 +190,6 @@ public static class IdentityModule
 
         services.AddScoped<VerifyEmailHandler>();
 
-        // Admin User Management (Admin Portal "administrator management" screen).
         services.AddScoped<CreatePlatformAdministratorHandler>();
         services.AddScoped<IValidator<CreatePlatformAdministratorRequest>, CreatePlatformAdministratorValidator>();
         services.AddScoped<DisablePlatformAdministratorHandler>();
@@ -226,14 +203,10 @@ public static class IdentityModule
         services.AddScoped<ResetPlatformAdministratorPasswordHandler>();
         services.AddScoped<IValidator<ResetPlatformAdministratorPasswordRequest>, ResetPlatformAdministratorPasswordValidator>();
         services.AddScoped<ResetPlatformAdministratorMfaHandler>();
-        // P1: platform-administrator provisioning workflow.
         services.AddScoped<HR.Modules.Identity.Features.ActivatePlatformAdministrator.ActivatePlatformAdministratorHandler>();
         services.AddScoped<HR.Modules.Identity.Features.RetryPlatformAdministratorProvisioning.RetryPlatformAdministratorProvisioningHandler>();
         services.AddScoped<IValidator<ResetPlatformAdministratorMfaRequest>, ResetPlatformAdministratorMfaValidator>();
 
-        // P1 fix: departure-triggered account disablement is now driven exclusively by
-        // EmployeeDepartureFinalisedIntegrationEvent (the authoritative departure decision), not by
-        // OffboardingPlanCompletedIntegrationEvent — see Features/OnEmployeeDepartureFinalised.
         services.AddScoped<
             IIntegrationEventHandler<EmployeeDepartureFinalisedIntegrationEvent>,
             Features.OnEmployeeDepartureFinalised.Handler>();
@@ -246,7 +219,6 @@ public static class IdentityModule
         // Ticket 12 (P1): recovers InviteAcceptanceOperation rows stuck SupabaseConfirmed.
         services.AddScoped<Jobs.InviteAcceptanceReconciliationJob>();
 
-        // IAM-03: position-based default role administration.
         services.AddScoped<HR.Modules.Identity.Services.PositionSync>();
         // Ticket 6 follow-up: recurring, converge-style authoritative reconciliation (see class docs).
         services.AddScoped<HR.Modules.Identity.Services.PositionRoleReconciliationService>();
@@ -265,7 +237,6 @@ public static class IdentityModule
             IIntegrationEventHandler<PositionProfileUpsertedIntegrationEvent>,
             Features.OnPositionProfileUpserted.Handler>();
 
-        // IAM-04: employee-level role-override administration.
         services.AddScoped<ListEmployeeRoleOverridesHandler>();
         services.AddScoped<IValidator<ListEmployeeRoleOverridesRequest>, ListEmployeeRoleOverridesValidator>();
         services.AddScoped<AddEmployeeRoleOverrideHandler>();
@@ -278,7 +249,6 @@ public static class IdentityModule
         services.AddScoped<IWorkloadActionProvider, EmployeeAccountsAwaitingInvitationWorkloadActionProvider>();
         services.AddScoped<IWorkloadActionProvider, EmployeeAccountsAwaitingDisablementWorkloadActionProvider>();
 
-        // Getting Started checklist task definition (HR.Modules.CompanyOnboarding epic, Phase A).
         services.AddScoped<IOnboardingTaskDefinition, InviteAdditionalUsersTask>();
 
         return services;
@@ -314,7 +284,7 @@ public static class IdentityModule
         // otherwise a disabled invited/signed-up user could keep signing in indefinitely.
         var profile = await db.UserProfiles.FirstOrDefaultAsync(p => p.Id == userId);
         if (profile is null)
-            return true; // no account row at all (e.g. persona seeded only in dev store) — allow, nothing to gate.
+            return true;
 
         return profile.IsActive;
     }
@@ -357,23 +327,12 @@ public static class IdentityModule
             .RequireAuthenticatedUser()
             .AddRequirements(new PlatformAdminRequirement()));
 
-        // Individual role policies
         builder.AddPolicy("role:employee",             RolePolicy(SystemRoles.Employee));
         builder.AddPolicy("role:manager",              RolePolicy(SystemRoles.Manager));
         builder.AddPolicy("role:recruiter",            RolePolicy(SystemRoles.Recruiter));
         builder.AddPolicy("role:hr-administrator",     RolePolicy(SystemRoles.HrAdministrator));
         builder.AddPolicy("role:company-administrator",RolePolicy(SystemRoles.CompanyAdministrator));
 
-        // IAM-06: every remaining named capability policy resolves through the authoritative
-        // permission catalogue (PolicyCatalog -> SystemPermissions -> RolePermission grants) rather
-        // than a role list duplicated inline per policy. This block is the single place these
-        // policies are registered; the role -> permission grants that determine which of
-        // Employee/Manager/Recruiter/HrAdministrator/CompanyAdministrator actually satisfy each one
-        // live in Persistence/Configurations/RolePermissionConfiguration.cs (and are exercised by
-        // HR.Modules.Identity.Tests' policy-matrix test), so a role-mapping change can never leave
-        // this registration and the underlying data inconsistent with each other. See
-        // PolicyCatalog.cs for the current product-decision reasoning behind each mapping (it
-        // reproduces the same OR-of-roles authorization behaviour these policies already had).
         foreach (var (policyName, permissionId) in PolicyCatalog.PermissionPolicies)
         {
             builder.AddPolicy(policyName, PermissionPolicy(permissionId));
@@ -400,11 +359,6 @@ public static class IdentityModule
         await db.Database.MigrateAsync();
     }
 
-    /// <summary>
-    /// IAM-04: daily sweep that clears out expired employee-level role overrides and audits the
-    /// expiry (access is already enforced correctly before this runs — see
-    /// IdentityAuthorizationService — this job only produces the audit trail and tidies the table).
-    /// </summary>
     public static WebApplication UseIdentityRecurringJobs(this WebApplication app)
     {
         var jobManager = app.Services.GetRequiredService<IRecurringJobManager>();
@@ -460,12 +414,6 @@ public static class IdentityModule
         await reconciliationService.ReconcileAllCompaniesAsync(CancellationToken.None);
     }
 
-    /// <summary>
-    /// Seeds development personas with identity records and appropriate roles so
-    /// the DevAuthHandler has valid, permission-bearing identities for each persona.
-    /// Safe to call on every startup: reconciles role assignments to match the list
-    /// below, adding missing roles and removing ones no longer declared.
-    /// </summary>
     public static async Task SeedDevUserAsync(this IServiceProvider services)
     {
         using var scope = services.CreateScope();
@@ -485,18 +433,9 @@ public static class IdentityModule
             (Id: new Guid("30000000-0000-0000-0000-000000000011"), First: "Alice",  Last: "Morgan",  Email: "alice.morgan@betacorp.example",    Roles: new[] { SystemRoles.Employee, SystemRoles.Manager }),
             (Id: new Guid("30000000-0000-0000-0000-000000000012"), First: "Bob",    Last: "Taylor",  Email: "bob.taylor@betacorp.example",      Roles: new[] { SystemRoles.Employee }),
             (Id: new Guid("30000000-0000-0000-0000-000000000015"), First: "Grace",  Last: "Kim",     Email: "grace.kim@betacorp.example",       Roles: new[] { SystemRoles.Employee, SystemRoles.HrAdministrator }),
-            // Beta Corp Company Administrator — dedicated login for the subscription-lifecycle E2E tests
-            // (SubscriptionBillingJourneyTests), which mutate Beta Corp's subscription instead of Acme's.
-            // Listed in HR.Api's DevPersonaStore; without an ApplicationUser + roles here LoginHandler
-            // rejects the login ("Invalid email or password").
             (Id: new Guid("30000000-0000-0000-0000-000000000018"), First: "Charlie", Last: "Wilson", Email: "charlie.wilson@betacorp.example", Roles: new[] { SystemRoles.Employee, SystemRoles.CompanyAdministrator }),
-            // Dedicated to CrossTabLogoutEnforcementTests only — see DevPersonaStore's remarks.
             (Id: new Guid("30000000-0000-0000-0000-000000000016"), First: "Olivia", Last: "Reyes",   Email: "olivia.reyes@acme.example",        Roles: new[] { SystemRoles.Employee, SystemRoles.HrAdministrator }),
-            // Dedicated to ManagerTeamProfileTests only — see DevPersonaStore's remarks.
             (Id: new Guid("30000000-0000-0000-0000-000000000017"), First: "Nina",   Last: "Patel",   Email: "nina.patel@acme.example",          Roles: new[] { SystemRoles.Employee, SystemRoles.Manager }),
-            // Gamma Industries Company Administrator — dedicated login for
-            // ActiveSubscription_Cancel_ShowsConfirmation_AndSchedulesCancellation only (see
-            // DevPersonaStore's remarks / CompaniesModule.SeedCompaniesAsync's Gamma seed).
             (Id: new Guid("30000000-0000-0000-0000-000000000019"), First: "Diana",  Last: "Chen",    Email: "diana.chen@gamma.example",         Roles: new[] { SystemRoles.Employee, SystemRoles.CompanyAdministrator }),
         };
 
@@ -519,8 +458,6 @@ public static class IdentityModule
                     db.UserRoles.Add(UserRole.Create(persona.Id, roleId, now));
             }
 
-            // Reconcile: drop any previously-seeded roles that are no longer declared above,
-            // so re-running against an existing dev database converges on the current mapping.
             var stale = await db.UserRoles
                 .Where(ur => ur.UserId == persona.Id && !persona.Roles.Contains(ur.RoleId))
                 .ToListAsync();
@@ -530,16 +467,6 @@ public static class IdentityModule
         await db.SaveChangesAsync();
     }
 
-    /// <summary>
-    /// Bootstrap-seeds PlatformAdministrator rows from the PlatformAdmin:AllowedEmails config
-    /// allow-list (the same config key the pre-existing, now out-of-scope allow-list handlers
-    /// elsewhere already read — this seeding does not touch or remove those checks). Idempotent
-    /// and safe to call on every startup: for each configured email not already present
-    /// (case-insensitive), creates an enabled PlatformOwner row with CreatedByUserId = null
-    /// (system-seeded). Called from HR.Api's Program.cs startup sequence, in every environment,
-    /// so the "platform:admin" policy (see PlatformAdminAuthorizationHandler) has real
-    /// PlatformAdministrator rows to check against without a manual migration step.
-    /// </summary>
     public static async Task SeedPlatformAdministratorsFromConfigAsync(
         this IServiceProvider services, IConfiguration configuration)
     {
@@ -566,17 +493,6 @@ public static class IdentityModule
         await db.SaveChangesAsync();
     }
 
-    /// <summary>
-    /// Idempotently ensures a matching, login-ready Supabase Auth user AND a linked UserProfile row
-    /// exist for every dev persona supplied (see HR.Api's DevPersonaStore.Personas), so the dev
-    /// persona switcher can perform a real Supabase password-grant login for any of them and HR.Api
-    /// can resolve their tenant (see SupabaseCurrentUserResolutionMiddleware/RequireTenantMiddleware
-    /// — without a UserProfile row, an authenticated dev persona has no resolvable tenant and every
-    /// request 403s). Called from HR.Api's IsDevelopment() startup seeding block, alongside
-    /// SeedDevUserAsync above (which seeds the matching ApplicationUser/UserRole rows keyed by the
-    /// same persona id). Identity cannot reference HR.Api's DevPersonaStore directly (host -> module
-    /// dependency direction only), so the caller supplies the persona details to seed.
-    /// </summary>
     public static async Task SeedDevSupabaseUsersAsync(
         this IServiceProvider services,
         IEnumerable<(Guid Id, Guid CompanyId, string Email, string FirstName, string LastName)> personas)
@@ -587,17 +503,6 @@ public static class IdentityModule
         var logger = scope.ServiceProvider.GetService<ILoggerFactory>()?.CreateLogger("HR.Modules.Identity.IdentityModule");
         var now = DateTimeOffset.UtcNow;
 
-        // Reliability: each persona makes a real, network-dependent Supabase Admin API call
-        // (EnsureDevUserAsync). This used to be a single foreach with ONE SaveChangesAsync after the
-        // whole loop — if any one persona's call threw (most likely a brand-new email never created
-        // in Supabase before, e.g. a newly-added dev persona), the exception propagated out of the
-        // loop before SaveChangesAsync was ever reached, silently discarding every other persona's
-        // already-successful, still-only-in-memory work from this run too (including personas
-        // processed earlier in the list). On a fresh/reset dev database this could leave EARLIER
-        // personas' UserProfile rows never created, breaking their login ("no resolvable tenant")
-        // even though their own EnsureDevUserAsync call had already succeeded. Each persona is now
-        // isolated: failures are logged and skipped rather than aborting the whole batch, and
-        // progress is saved after every persona so one bad account can never roll back another's.
         foreach (var persona in personas)
         {
             try
@@ -614,10 +519,6 @@ public static class IdentityModule
                 }
                 else if (profile.SupabaseAuthUserId != supabaseUserId)
                 {
-                    // Self-heal: an earlier seeding run's admin-list-users lookup (since replaced with a
-                    // password-grant sign-in — see SupabaseAuthGateway.EnsureDevUserAsync) could store a
-                    // SupabaseAuthUserId that doesn't match the "sub" claim actually issued on tokens,
-                    // permanently 404/403ing every request for that persona until corrected.
                     profile.UpdateSupabaseAuthUserId(supabaseUserId, now);
                 }
 
@@ -634,22 +535,15 @@ public static class IdentityModule
             catch (Exception ex)
             {
                 logger?.LogWarning(ex,
-                    "Failed to seed dev Supabase user/profile for persona {Email} — skipping, other personas unaffected.",
-                    persona.Email);
+                    "Failed to seed dev Supabase user/profile for persona {PersonaId} — skipping, other personas unaffected.",
+                    persona.Id);
 
-                // Discard this persona's partially-tracked changes so a later iteration's
-                // SaveChangesAsync can't accidentally try to flush them too.
                 foreach (var entry in db.ChangeTracker.Entries().Where(e => e.State != Microsoft.EntityFrameworkCore.EntityState.Unchanged).ToList())
                     entry.State = Microsoft.EntityFrameworkCore.EntityState.Detached;
             }
         }
     }
 
-    /// <summary>
-    /// Idempotently ensures a single dev persona's Supabase Auth user AND linked UserProfile row
-    /// exist (e.g. a brand-new self-service signup admin), using the same shared dev password as
-    /// SeedDevSupabaseUsersAsync. See that method's remarks for why the UserProfile row matters.
-    /// </summary>
     public static async Task EnsureDevSupabaseUserAsync(
         this IServiceProvider services,
         Guid id, Guid companyId, string email, string firstName, string lastName,
@@ -670,25 +564,10 @@ public static class IdentityModule
         }
         else if (profile.SupabaseAuthUserId != supabaseUserId)
         {
-            // A profile row can already exist here with a stale/fake SupabaseAuthUserId — e.g. a
-            // self-service SignUp's UserProfile is created with whatever id CreateUserAsync
-            // returned (a random Guid.NewGuid() under E2E's FakeSupabaseAuthGateway, which never
-            // calls real Supabase), and this call is the first time a REAL Supabase user id is
-            // obtained for that email. Without this self-heal (the same one
-            // SeedDevSupabaseUsersAsync already applies for regular seeded personas), the stored
-            // id never matches the "sub" claim on tokens actually issued for this account, and
-            // every later login attempt fails to resolve a UserProfile despite Supabase itself
-            // authenticating successfully.
             profile.UpdateSupabaseAuthUserId(supabaseUserId, DateTimeOffset.UtcNow);
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        // Baseline Employee role, same fallback AcceptInvite grants when an invite carries no
-        // explicit role selection. Without this, a UserProfile created by this endpoint has zero
-        // roles — LoginHandler now rejects zero-role accounts outright ("Invalid email or
-        // password.", added to stop a broken blank-session login), so callers of this dev endpoint
-        // (E2E tests logging in as a just-created employee) would otherwise never be able to log in
-        // at all. Idempotent: only adds the role if it isn't already present.
         var hasAnyRole = await db.UserRoles.AnyAsync(ur => ur.UserId == id, cancellationToken);
         if (!hasAnyRole)
         {
@@ -696,11 +575,6 @@ public static class IdentityModule
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        // The ApplicationUser row too — exactly as SeedDevUserAsync creates it for the seeded
-        // personas. Without it the provisioned user could sign in (UserProfile + Supabase user) but
-        // every user-administration endpoint that loads db.Users (UpdateUserRoles, Enable/Disable
-        // user, role overrides) answered "User was not found." — e.g. an E2E arrange granting extra
-        // roles to a freshly provisioned employee. Same id as the employee/UserProfile.
         var normalizedEmail = email.Trim().ToUpperInvariant();
         var userExists = await db.Users.AnyAsync(
             u => u.Id == id || u.NormalizedEmail == normalizedEmail, cancellationToken);
@@ -713,14 +587,6 @@ public static class IdentityModule
         }
     }
 
-    /// <summary>
-    /// Performs a real Supabase password-grant login for a dev persona's email, used by the dev
-    /// persona switcher (HR.Api's /api/dev/persona/{userId} and /api/dev/persona/register) to
-    /// establish a genuine Supabase session that HR.Web can turn into a session cookie. Returns a
-    /// plain tuple rather than a module-defined type, since only IdentityModule itself may be a
-    /// public exported type from this assembly (see
-    /// IdentityModuleArchitectureTests.Identity_Module_Only_Exposes_Registration_Surface_As_Public).
-    /// </summary>
     public static async Task<(string AccessToken, string RefreshToken, int ExpiresIn)> SignInDevPersonaAsync(
         this IServiceProvider services, string email, CancellationToken cancellationToken)
     {

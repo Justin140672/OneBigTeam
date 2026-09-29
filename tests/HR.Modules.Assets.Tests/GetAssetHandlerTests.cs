@@ -94,7 +94,7 @@ public class GetAssetHandlerTests
 
         var result = await handler.HandleAsync(new GetAssetRequest
         {
-            CompanyId = Guid.NewGuid(), // different company
+            CompanyId = Guid.NewGuid(),
             Id = assetId
         }, callerUserId: HrAdmin, CancellationToken.None);
 

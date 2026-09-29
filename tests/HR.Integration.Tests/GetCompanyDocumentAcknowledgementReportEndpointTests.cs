@@ -37,7 +37,6 @@ public class GetCompanyDocumentAcknowledgementReportEndpointTests
     [Fact]
     public async Task Get_DocumentAcknowledgementReport_Returns_Forbidden_For_Manager()
     {
-        // reporting:view-hr only.
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Manager);

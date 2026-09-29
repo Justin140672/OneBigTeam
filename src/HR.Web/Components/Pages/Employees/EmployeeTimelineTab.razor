@@ -72,10 +72,6 @@ else
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
 
-    // Each callback maps to one destination tab this host page actually exposes to the current
-    // viewer. "View details" only renders when the corresponding callback has a delegate attached
-    // — MyProfile wires only the tabs self-service actually has (e.g. Documents), while
-    // EmployeeEdit (HR-only page) wires the full set, so no dead-end links are ever shown.
     [Parameter] public EventCallback OnNavigateToPromotions { get; set; }
     [Parameter] public EventCallback OnNavigateToCompensation { get; set; }
     [Parameter] public EventCallback OnNavigateToProbation { get; set; }
@@ -141,9 +137,6 @@ else
         _ => "fa-solid fa-circle-dot",
     };
 
-    // Event type -> destination tab key. Only events with a real, navigable destination tab get
-    // a mapping here; the rest (e.g. EmployeeJoined, ManagerChanged) are self-contained in their
-    // Title/Summary text and render with no "View details" action at all.
     private static string? MapToTabKey(string eventType) => eventType switch
     {
         "EmployeePromoted" => "promotions",

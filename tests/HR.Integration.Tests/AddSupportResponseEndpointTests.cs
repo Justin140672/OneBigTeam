@@ -25,8 +25,6 @@ public class AddSupportResponseEndpointTests
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
-        // Submit/AddResponse are both gated behind "support:manage" — the whole module is
-        // staff-only, so IsStaffResponse (derived from the same policy) is always true here.
         await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.Employee, companyId);
         await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;
@@ -94,7 +92,6 @@ public class AddSupportResponseEndpointTests
         Assert.True(responsePayload!.IsStaffResponse);
     }
 
-    // ── P1 stored-XSS fix ────────────────────────────────────────────────────────────────────────
 
     private const string MaliciousBody =
         "<p>Hi <strong>there</strong></p><script>alert(1)</script><img src=x onerror=alert(1)>" +
@@ -137,7 +134,6 @@ public class AddSupportResponseEndpointTests
         var responsePayload = await response.Content.ReadFromJsonAsync<ResponsePayload>();
         Assert.NotNull(responsePayload);
 
-        // Persisted row is sanitised (write-time control, not only render-time).
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<SupportDbContext>();
@@ -147,7 +143,6 @@ public class AddSupportResponseEndpointTests
             Assert.Equal(companyId, saved.CompanyId);
         }
 
-        // The API read model returns the sanitised body too.
         var detail = await adminClient.GetAsync($"/api/companies/{companyId}/support/requests/{requestId}");
         Assert.Equal(HttpStatusCode.OK, detail.StatusCode);
         var detailPayload = await detail.Content.ReadFromJsonAsync<SupportRequestDetailPayload>();

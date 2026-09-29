@@ -33,9 +33,6 @@ internal sealed class CreateAssetCategoryHandler(AssetsDbContext db, IClock cloc
             }
         }
 
-        // Was previously missing entirely — an asset category name had no uniqueness check at all
-        // (case-sensitive or otherwise). Added here case-insensitively, matching every other
-        // "Name must be unique per company" entity in this codebase.
         var nameExists = await db.AssetCategories.AnyAsync(
             c => c.CompanyId == request.CompanyId && c.Name.ToLower() == request.Name.Trim().ToLower(),
             cancellationToken);

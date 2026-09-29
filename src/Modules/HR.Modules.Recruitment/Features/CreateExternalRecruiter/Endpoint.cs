@@ -17,11 +17,6 @@ internal sealed class Endpoint(CreateExternalRecruiterHandler handler, ICurrentU
         CreateExternalRecruiterRequest request,
         CancellationToken cancellationToken)
     {
-        // Defence in depth alongside TenantRouteAuthorizationMiddleware — never trust a client-
-        // supplied company identifier for a "manage"-policy write. Mirrors CreateVacancy/Endpoint.cs.
-        // Reads the DB-resolved tenant via ICurrentUser, not a raw "company_id" JWT claim — real
-        // Supabase-issued tokens never carry one, so relying on the claim directly would Forbid
-        // every request unconditionally (see TenantRouteAuthorizationMiddleware).
         if (!Guid.TryParse(currentUser.TenantId, out var callerCompanyId) || callerCompanyId != request.CompanyId)
         {
             await Send.ResultAsync(TypedResults.Forbid());

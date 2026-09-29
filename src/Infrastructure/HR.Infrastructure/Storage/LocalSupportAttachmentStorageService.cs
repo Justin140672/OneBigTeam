@@ -3,11 +3,6 @@ using Microsoft.AspNetCore.Http;
 
 namespace HR.Infrastructure.Storage;
 
-/// <summary>
-/// Development implementation that stores support request/response attachments on the local file
-/// system. Replace with a cloud implementation (Supabase Storage) for production — see
-/// <see cref="SupabaseSupportAttachmentStorageService"/>.
-/// </summary>
 internal sealed class LocalSupportAttachmentStorageService(
     IHttpContextAccessor httpContextAccessor,
     ILocalStorageUrlSigner urlSigner)
@@ -22,8 +17,6 @@ internal sealed class LocalSupportAttachmentStorageService(
         string storageFolder,
         CancellationToken cancellationToken)
     {
-        // The original file name is untrusted; the physical storage key never incorporates it, so
-        // it cannot be used to escape the storage root via ".." or rooted path segments.
         var extension  = Path.GetExtension(fileName);
         var safeFolder = string.Join('/', storageFolder.Split('/', StringSplitOptions.RemoveEmptyEntries)
             .Select(Uri.EscapeDataString));
@@ -47,9 +40,6 @@ internal sealed class LocalSupportAttachmentStorageService(
             ? $"{request.Scheme}://{request.Host}"
             : "http://localhost";
 
-        // Signed like every other local bucket, but no ILocalStorageObjectResolver is registered for
-        // support attachments (nothing downloads them yet), so the dev delivery route refuses these
-        // URLs: fail closed until an authorised download flow and its resolver exist.
         return Task.FromResult(urlSigner.CreateSignedUrl(baseUrl, LocalStorageBuckets.SupportAttachments, storageKey));
     }
 

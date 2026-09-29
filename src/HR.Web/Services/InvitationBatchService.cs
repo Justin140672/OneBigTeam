@@ -3,9 +3,6 @@ using HR.Web.Models;
 
 namespace HR.Web.Services;
 
-// Dedicated service for the bulk-invitation-batch feature — kept separate from
-// UserAdministrationService (which owns single-employee invite/roles/access operations) the same
-// way CompensationService is kept separate from EmployeeService for its own bulk-update feature.
 public sealed class InvitationBatchService(HrApiHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient();
@@ -34,8 +31,6 @@ public sealed class InvitationBatchService(HrApiHttpClientFactory httpClientFact
         return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to load invitation batch status."));
     }
 
-    // 404 ("no batch exists yet for this company") is a legitimate empty state — surfaced as
-    // (null, null) rather than as an error, so callers don't show an alert on first load.
     public async Task<(InvitationBatchStatusResponse? Result, string? Error)> GetLatestAsync(Guid companyId)
     {
         var response = await Http.GetAsync($"api/companies/{companyId}/invitation-batches/latest");

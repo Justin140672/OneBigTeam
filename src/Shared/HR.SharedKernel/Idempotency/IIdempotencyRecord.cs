@@ -19,22 +19,14 @@ namespace HR.SharedKernel.Idempotency;
 /// </summary>
 public interface IIdempotencyRecord
 {
-    /// <summary>Stable identifier for the endpoint/operation (e.g. the handler's own name).</summary>
     string OperationId { get; set; }
 
-    /// <summary>Tenant scope. <see cref="Guid.Empty"/> for operations with no company context.</summary>
     Guid CompanyId { get; set; }
 
-    /// <summary>Authenticated-actor scope. <see cref="Guid.Empty"/> when there is no actor context.</summary>
     Guid ActorId { get; set; }
 
-    /// <summary>The client-supplied Idempotency-Key header value.</summary>
     string Key { get; set; }
 
-    /// <summary>
-    /// Hash of the request payload. Guards against a key being reused for a materially different
-    /// request within the same scope, which is a caller bug rather than a legitimate retry.
-    /// </summary>
     string RequestFingerprint { get; set; }
 
     int ResponseStatusCode { get; set; }
@@ -43,9 +35,5 @@ public interface IIdempotencyRecord
 
     DateTimeOffset CreatedAt { get; set; }
 
-    /// <summary>
-    /// When this record becomes eligible for cleanup. Must exceed the maximum legitimate client
-    /// retry window - see <see cref="DbContextIdempotencyExtensions.DefaultRetention"/>.
-    /// </summary>
     DateTimeOffset ExpiresAt { get; set; }
 }

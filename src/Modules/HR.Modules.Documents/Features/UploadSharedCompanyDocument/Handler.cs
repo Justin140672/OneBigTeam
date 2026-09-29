@@ -27,16 +27,10 @@ internal sealed class UploadSharedCompanyDocumentHandler(
     {
         var file = request.File;
 
-        // Supported file type + maximum file size.
         var validationResult = fileValidator.Validate(file.FileName, file.ContentType, file.Length);
         if (validationResult.IsFailure)
             return Result.Failure<UploadSharedCompanyDocumentResponse>(validationResult.Error);
 
-        // Safe storage filename — strip any directory component a crafted FileName (e.g.
-        // "../../evil.pdf" or "..\..\evil.pdf") might carry, so it can never escape the storage
-        // folder the same way the file-name segment of the storage key otherwise would. Split on
-        // both separators explicitly rather than relying on Path.GetFileName, whose separator
-        // handling is platform-dependent (it only treats '\' as a separator on Windows).
         var safeFileName = file.FileName.Split(['/', '\\']).Last();
         if (string.IsNullOrWhiteSpace(safeFileName) ||
             safeFileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
@@ -45,7 +39,6 @@ internal sealed class UploadSharedCompanyDocumentHandler(
                 Error.Validation("File name is not valid."));
         }
 
-        // Company ownership — the category must belong to the same company as the document.
         var categoryExists = await db.CompanyDocumentCategories
             .AnyAsync(
                 c => c.Id == request.CategoryId &&
@@ -59,7 +52,6 @@ internal sealed class UploadSharedCompanyDocumentHandler(
                 Error.NotFound($"Document category '{request.CategoryId}' was not found."));
         }
 
-        // Same existence check the audience employee ids get via SharedCompanyDocumentAudienceRuleBuilder.
         if (request.ReviewOwnerEmployeeId is { } reviewOwnerEmployeeId &&
             !await employeeAudienceReader.EmployeeExistsAsync(request.CompanyId, reviewOwnerEmployeeId, cancellationToken))
         {
@@ -67,8 +59,6 @@ internal sealed class UploadSharedCompanyDocumentHandler(
                 Error.NotFound($"Employee '{reviewOwnerEmployeeId}' was not found."));
         }
 
-        // The document doesn't exist yet, but audience rules need its id as their foreign key —
-        // generate it up front rather than after SaveChanges.
         var documentId = Guid.NewGuid();
 
         var ruleBuildResult = await audienceRuleBuilder.BuildAsync(
@@ -85,18 +75,12 @@ internal sealed class UploadSharedCompanyDocumentHandler(
 
         await using var fileStream = file.OpenReadStream();
 
-        // Virus scanning happens asynchronously via ScanUploadedFileJob (enqueued below) rather
-        // than inline — the row is stored with ScanStatus = Pending.
-        // Verify file content matches the declared content type (prevents extension/MIME spoofing).
         var contentResult = fileValidator.ValidateContent(fileStream, file.ContentType);
         if (contentResult.IsFailure)
             return Result.Failure<UploadSharedCompanyDocumentResponse>(contentResult.Error);
 
         fileStream.Seek(0, SeekOrigin.Begin);
 
-        // Existing Supabase-backed document storage (same IDocumentStorageService used for
-        // employee documents) — falls back to local disk storage only when Supabase isn't
-        // configured for this environment.
         var storageKey = await storage.UploadAsync(
             fileStream,
             safeFileName,
@@ -106,8 +90,6 @@ internal sealed class UploadSharedCompanyDocumentHandler(
 
         var now = clock.UtcNowOffset();
 
-        // Always created as a Draft — SharedCompanyDocument.Create hard-codes this, publishing
-        // is a separate, explicit action (shared-document:publish).
         var document = SharedCompanyDocument.Create(
             documentId,
             request.CompanyId,
@@ -129,8 +111,6 @@ internal sealed class UploadSharedCompanyDocumentHandler(
             uploadedBy,
             now);
 
-        // Every version (including this first one) gets its own history row — see
-        // SharedCompanyDocumentVersion's doc comment for why version 1 isn't a special case.
         var version = SharedCompanyDocumentVersion.Create(
             Guid.NewGuid(),
             request.CompanyId,
@@ -157,7 +137,6 @@ internal sealed class UploadSharedCompanyDocumentHandler(
         }
         catch
         {
-            // Best-effort: remove the already-uploaded file so it doesn't become an orphan.
             try { await storage.DeleteAsync(storageKey, cancellationToken); } catch { }
             throw;
         }

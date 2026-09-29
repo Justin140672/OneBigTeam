@@ -56,9 +56,6 @@ public class PurgeEligibleArchivedEmployeeDocumentsEndpointTests
         var eligible   = await UploadAndDelete(hrClient, employeeId, "Old Archived Doc");
         var tooRecent  = await UploadAndDelete(hrClient, employeeId, "Recently Archived Doc");
 
-        // Backdate the "eligible" document's ArchivedAt beyond the 90-day retention window
-        // directly via the DbContext — no HTTP surface exists to set this, mirroring
-        // DocumentScanStatusGatingEndpointTests's pattern of seeding state below the API.
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<DocumentsDbContext>();
@@ -128,7 +125,6 @@ public class PurgeEligibleArchivedEmployeeDocumentsEndpointTests
         }
         finally
         {
-            // Restore state so the shared Acme company is not left under hold for other tests.
             using var scope = _factory.Services.CreateScope();
             var companiesDb = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
             var subscription = await companiesDb.CustomerSubscriptions.SingleAsync(s => s.CompanyId == AcmeCompanyId);
@@ -175,7 +171,7 @@ public class PurgeEligibleArchivedEmployeeDocumentsEndpointTests
     private static MultipartFormDataContent BuildPdfUpload(string title)
     {
         var pdfBytes = new byte[1024];
-        pdfBytes[0] = 0x25; pdfBytes[1] = 0x50; pdfBytes[2] = 0x44; pdfBytes[3] = 0x46; // %PDF
+        pdfBytes[0] = 0x25; pdfBytes[1] = 0x50; pdfBytes[2] = 0x44; pdfBytes[3] = 0x46;
 
         var content = new MultipartFormDataContent();
         content.Add(new StringContent(title), "Title");
@@ -188,8 +184,6 @@ public class PurgeEligibleArchivedEmployeeDocumentsEndpointTests
         return content;
     }
 
-    // FastEndpoints rejects with 415 Unsupported Media Type once past authorization — an empty
-    // JSON body is the minimal content that satisfies model binding for this no-payload action.
     private static StringContent EmptyJson() =>
         new("{}", Encoding.UTF8, "application/json");
 

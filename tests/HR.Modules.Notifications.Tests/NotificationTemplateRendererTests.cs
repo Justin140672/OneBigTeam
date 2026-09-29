@@ -3,10 +3,6 @@ using HR.Modules.Notifications.Domain;
 
 namespace HR.Modules.Notifications.Tests;
 
-// NOT-03: unit tests for the deterministic "{TokenName}" substitution engine. Wording assertions for
-// the shipped catalogue templates are pinned here (via NotificationTemplateCatalogue.All, not
-// hand-rolled strings) so a future accidental wording change in the catalogue fails this test rather
-// than only being caught downstream.
 public class NotificationTemplateRendererTests
 {
     [Fact]
@@ -54,7 +50,7 @@ public class NotificationTemplateRendererTests
     public void Render_Fails_When_Single_Required_Token_Missing()
     {
         var template = NotificationTemplateCatalogue.All[NotificationType.LeaveApproved];
-        var tokens = new Dictionary<string, string> { ["StartDate"] = "3 Aug 2026" }; // EndDate missing
+        var tokens = new Dictionary<string, string> { ["StartDate"] = "3 Aug 2026" };
 
         var result = NotificationTemplateRenderer.Render(template, tokens);
 
@@ -66,7 +62,7 @@ public class NotificationTemplateRendererTests
     public void Render_Fails_And_Lists_All_Missing_Required_Tokens_When_Multiple_Missing()
     {
         var template = NotificationTemplateCatalogue.All[NotificationType.DocumentExpiring];
-        var tokens = new Dictionary<string, string>(); // none of the four required tokens supplied
+        var tokens = new Dictionary<string, string>();
 
         var result = NotificationTemplateRenderer.Render(template, tokens);
 
@@ -95,9 +91,6 @@ public class NotificationTemplateRendererTests
     [Fact]
     public void Render_InAppBody_Is_Null_When_Substituted_Result_Is_Entirely_Empty()
     {
-        // TaskAssigned's InAppBodyTemplate is just "{TaskDescription}" — when TaskDescription (an
-        // optional token) is omitted entirely, substitution leaves an empty string, which must
-        // become null rather than "" on the rendered result.
         var template = NotificationTemplateCatalogue.All[NotificationType.TaskAssigned];
         var tokens = new Dictionary<string, string> { ["TaskTitle"] = "Review leave request" };
 
@@ -115,7 +108,7 @@ public class NotificationTemplateRendererTests
             .WithRequiredTokens("Required")
             .WithOptionalTokens("OptionalToken")
             .Build();
-        var tokens = new Dictionary<string, string> { ["Required"] = "x" }; // OptionalToken omitted
+        var tokens = new Dictionary<string, string> { ["Required"] = "x" };
 
         var result = NotificationTemplateRenderer.Render(template, tokens);
 
@@ -123,10 +116,6 @@ public class NotificationTemplateRendererTests
         Assert.Null(result.Value!.InAppBody);
     }
 
-    // Assumption: none of the six shipped catalogue templates currently take an arbitrary,
-    // attacker-controlled token value (e.g. a free-text field a user fully controls with no
-    // downstream sanitisation), so this test builds a synthetic template rather than relying on real
-    // catalogue wording, to demonstrate the encode/don't-encode split in isolation.
     [Fact]
     public void Render_HtmlEncodes_Token_Value_In_EmailBody_Only()
     {
@@ -176,8 +165,6 @@ public class NotificationTemplateRendererTests
     }
 }
 
-/// <summary>Minimal builder for synthetic NotificationTemplate instances used only by tests that need
-/// to isolate rendering behaviour (e.g. HTML encoding) from real catalogue wording.</summary>
 internal sealed class NotificationTemplateTestBuilder
 {
     private string _inAppTitleTemplate = "Title";

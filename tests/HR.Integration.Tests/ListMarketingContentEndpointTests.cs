@@ -49,7 +49,6 @@ public class ListMarketingContentEndpointTests
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         var features = body.GetProperty("features").EnumerateArray().ToList();
 
-        // Includes the just-created unpublished feature (admin view is not filtered by publication).
         Assert.Contains(features, f => f.GetProperty("slug").GetString() == slug && !f.GetProperty("isPublished").GetBoolean());
     }
 }

@@ -78,12 +78,10 @@ public class AssignManagerEndpointTests
         var manager = await CreateEmployeeAsync(client, companyId, "Jane", "Manager", $"jane2.{Guid.NewGuid():N}@example.com");
         var employee = await CreateEmployeeAsync(client, companyId, "Alice", "Smith", $"alice2.{Guid.NewGuid():N}@example.com");
 
-        // Assign first
         await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employee.Id}/manager",
             new { companyId, id = employee.Id, managerId = manager.Id });
 
-        // Then remove
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employee.Id}/manager",
             new { companyId, id = employee.Id, managerId = (Guid?)null });
@@ -108,12 +106,10 @@ public class AssignManagerEndpointTests
         var empA = await CreateEmployeeAsync(client, companyId, "Alice", "Smith", $"alice3.{Guid.NewGuid():N}@example.com");
         var empB = await CreateEmployeeAsync(client, companyId, "Bob", "Jones", $"bob3.{Guid.NewGuid():N}@example.com");
 
-        // B reports to A
         await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{empB.Id}/manager",
             new { companyId, id = empB.Id, managerId = empA.Id });
 
-        // Try to assign B as manager of A — circular
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{empA.Id}/manager",
             new { companyId, id = empA.Id, managerId = empB.Id });
@@ -134,13 +130,11 @@ public class AssignManagerEndpointTests
         var empB = await CreateEmployeeAsync(client, companyId, "Bob", "Jones", $"b4.{Guid.NewGuid():N}@example.com");
         var empC = await CreateEmployeeAsync(client, companyId, "Carol", "White", $"c4.{Guid.NewGuid():N}@example.com");
 
-        // B → A, C → B
         await client.PutAsJsonAsync($"/api/companies/{companyId}/employees/{empB.Id}/manager",
             new { companyId, id = empB.Id, managerId = empA.Id });
         await client.PutAsJsonAsync($"/api/companies/{companyId}/employees/{empC.Id}/manager",
             new { companyId, id = empC.Id, managerId = empB.Id });
 
-        // Try A → C (would create A→B→C→A cycle)
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{empA.Id}/manager",
             new { companyId, id = empA.Id, managerId = empC.Id });

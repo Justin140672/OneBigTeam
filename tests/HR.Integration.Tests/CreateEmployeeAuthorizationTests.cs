@@ -167,10 +167,6 @@ public class CreateEmployeeAuthorizationTests
 
     private sealed record IdPayload(Guid Id);
 
-    // Company Administrator is scoped to company profile/settings management only and must
-    // not be able to manage employees — see the mirror-image rule on company:manage in
-    // HR.Modules.Identity.IdentityModule.AddRolePolicies. This is a deliberate narrowing:
-    // only HR Administrator holds employee:manage.
     [Fact]
     public async Task Post_Employee_Returns_Forbidden_For_Company_Administrator_Role()
     {

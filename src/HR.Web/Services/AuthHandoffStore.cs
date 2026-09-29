@@ -20,8 +20,6 @@ namespace HR.Web.Services;
 /// </summary>
 public sealed class AuthHandoffStore(TimeProvider timeProvider)
 {
-    // Two minutes is comfortably longer than the hard-navigation round trip yet short enough that a
-    // leaked (but unused) code is not a meaningful credential.
     private static readonly TimeSpan Ttl = TimeSpan.FromMinutes(2);
 
     private readonly ConcurrentDictionary<string, Entry> _entries = new(StringComparer.Ordinal);
@@ -30,10 +28,6 @@ public sealed class AuthHandoffStore(TimeProvider timeProvider)
 
     private sealed record Entry(Session Session, DateTimeOffset ExpiresAtUtc);
 
-    /// <summary>
-    /// Stashes a session and returns the opaque handoff code to carry (in a URL query is acceptable
-    /// for this value — it is not a credential and cannot be replayed).
-    /// </summary>
     public string Issue(Session session)
     {
         PurgeExpired();
@@ -43,10 +37,6 @@ public sealed class AuthHandoffStore(TimeProvider timeProvider)
         return code;
     }
 
-    /// <summary>
-    /// Atomically consumes a handoff code. Returns <c>null</c> for an unknown, already-used,
-    /// expired or tampered code — callers must treat all of those identically (redirect to /login).
-    /// </summary>
     public Session? Redeem(string? code)
     {
         if (string.IsNullOrWhiteSpace(code) || !_entries.TryRemove(code, out var entry))

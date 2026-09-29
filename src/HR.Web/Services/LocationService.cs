@@ -35,7 +35,6 @@ public class LocationService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    // ── IEditService<LocationEditModel, Guid> ───────────────────────────────────
 
     async Task<LocationEditModel?> IEditService<LocationEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
     {

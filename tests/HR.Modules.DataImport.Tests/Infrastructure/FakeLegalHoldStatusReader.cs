@@ -2,8 +2,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.DataImport.Tests.Infrastructure;
 
-// Mirrors the fakes of the same name in HR.Modules.Notifications.Tests / HR.Modules.Recruitment.Tests /
-// HR.Modules.Documents.Tests, which are project-local rather than shared.
 internal sealed class FakeLegalHoldStatusReader : ILegalHoldStatusReader
 {
     private readonly HashSet<Guid> _heldCompanyIds;

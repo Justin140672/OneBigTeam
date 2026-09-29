@@ -26,9 +26,6 @@ public class CompanyProvisionerTests
             .Include(c => c.Addresses)
             .SingleAsync(c => c.Id == companyId);
 
-        // A blank RegisteredOffice address so the admin lands on an editable form (Company Edit's
-        // Profile tab) instead of "No addresses found" with nothing to fill in — see
-        // CompanyProvisioner.ProvisionCompanyAsync's remarks.
         var address = Assert.Single(company.Addresses);
         Assert.Equal(CompanyAddressType.RegisteredOffice, address.Type);
         Assert.Equal(string.Empty, address.Line1);
@@ -36,7 +33,6 @@ public class CompanyProvisionerTests
         Assert.Equal(string.Empty, address.City);
         Assert.Null(address.Region);
         Assert.Null(address.PostalCode);
-        // Always "GB" — UK-only customers for now, no longer user-editable in the UI.
         Assert.Equal("GB", address.CountryCode);
     }
 

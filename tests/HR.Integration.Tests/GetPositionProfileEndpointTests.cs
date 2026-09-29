@@ -195,7 +195,6 @@ public class GetPositionProfileEndpointTests
         var created = await createResponse.Content.ReadFromJsonAsync<PositionProfilePayload>();
         Assert.NotNull(created);
 
-        // Authenticated as companyA but route targets companyB — middleware blocks it.
         var response = await client.GetAsync($"/api/companies/{companyB}/position-profiles/{created!.Id}");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);

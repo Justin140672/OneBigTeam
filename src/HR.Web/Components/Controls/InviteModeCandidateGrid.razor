@@ -97,21 +97,13 @@
     private string? _error;
     private List<InvitableEmployeeModel> _candidates = [];
 
-    // The authoritative selection, across every page/sort/filter of the grid.
     private readonly HashSet<Guid> _selectedIds = [];
 
-    // Employees the admin has explicitly unchecked during this page visit — never re-auto-selected
-    // for the lifetime of this component instance (e.g. across ReloadAsync after a batch is sent).
     private readonly HashSet<Guid> _userDeselected = [];
     private Guid? _loadedForCompanyId;
 
     private int SelectedCount => _selectedIds.Count;
 
-    // Blazor invokes OnParametersSetAsync on every parent re-render that reaches this component
-    // (e.g. any StateHasChanged() in EmployeeList.razor for pagination, selection summaries,
-    // etc.), not just when CompanyId actually changes. Only reload when the company we last
-    // loaded for has changed — otherwise every unrelated parent re-render would wipe _loading
-    // back to true, hide the grid/button behind the loading indicator, and reset the selection.
     protected override async Task OnParametersSetAsync()
     {
         if (_loadedForCompanyId == CompanyId)
@@ -137,8 +129,6 @@
 
         _candidates = result;
 
-        // Preselect every eligible employee (has a work email) the admin hasn't explicitly
-        // unchecked. Done on the data, not the grid, so it covers every page at once.
         _selectedIds.Clear();
         foreach (var id in EligibleIds())
             _selectedIds.Add(id);

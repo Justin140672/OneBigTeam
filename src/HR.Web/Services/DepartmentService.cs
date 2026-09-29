@@ -35,7 +35,6 @@ public class DepartmentService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    // ── IEditService<DepartmentEditModel, Guid> ─────────────────────────────────
 
     async Task<DepartmentEditModel?> IEditService<DepartmentEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
     {

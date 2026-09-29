@@ -15,7 +15,6 @@ public class SendProductUpdateValidatorTests
         Assert.True(Validator.Validate(ValidRequest()).IsValid);
     }
 
-    // ── Title ──────────────────────────────────────────────────────────────
 
     [Theory]
     [InlineData(null)]
@@ -43,7 +42,6 @@ public class SendProductUpdateValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(SendProductUpdateRequest.Title));
     }
 
-    // ── Message ────────────────────────────────────────────────────────────
 
     [Theory]
     [InlineData(null)]
@@ -71,7 +69,6 @@ public class SendProductUpdateValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(SendProductUpdateRequest.Message));
     }
 
-    // ── Url ────────────────────────────────────────────────────────────────
 
     [Fact]
     public void Validate_NullUrl_Passes()

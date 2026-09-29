@@ -7,13 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Probation.Tests;
 
-/// <summary>
-/// PROB-02: single-resource read authorization for GetProbationReview — the review/record are
-/// fetched first, and CanViewEmployeeAsync is checked against the resolved record.EmployeeId.
-/// Unauthorized access must resolve to the same NotFound error as a genuinely nonexistent review
-/// id (never a distinct Forbidden), mirroring
-/// HR.Modules.Sickness.Tests.GetReturnToWorkReviewHandlerTests.
-/// </summary>
 public class GetProbationReviewHandlerTests
 {
     private static readonly Guid HrAdministratorRoleId = new("00000000-0000-0000-0000-000000000004");
@@ -68,9 +61,6 @@ public class GetProbationReviewHandlerTests
         var review = SeedReview(context, companyId, record.Id);
         await context.SaveChangesAsync();
 
-        // GetAllDescendantIdsAsync is transitive — the senior manager's full descendant set
-        // includes the indirect (skip-level) report, resolved here via the fake directly
-        // returning the employee.
         var handler = BuildHandler(
             context, new FakeRoleAuthorizationService(), new FakeDirectReportsReader(employeeId));
         var result = await handler.HandleAsync(
@@ -91,8 +81,6 @@ public class GetProbationReviewHandlerTests
         var review = SeedReview(context, companyId, record.Id);
         await context.SaveChangesAsync();
 
-        // The unrelated manager's hierarchy contains someone else entirely, not this review's
-        // employee.
         var handler = BuildHandler(
             context, new FakeRoleAuthorizationService(), new FakeDirectReportsReader(someoneElsesReport));
         var result = await handler.HandleAsync(

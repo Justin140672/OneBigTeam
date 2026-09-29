@@ -43,8 +43,6 @@ public class UpdateUserRolesHandlerTests(IdentityDatabaseFixture fixture)
         return roleId;
     }
 
-    /// <summary>Grants a system role (HrAdministrator/CompanyAdministrator) directly to the given user so
-    /// they're recognised as an administrator by <see cref="RoleAdministrationPolicy"/>.</summary>
     private async Task GrantSystemRole(Guid userId, Guid systemRoleId)
     {
         await using var db = fixture.BuildContext();
@@ -203,7 +201,7 @@ public class UpdateUserRolesHandlerTests(IdentityDatabaseFixture fixture)
         await using var db2 = fixture.BuildContext();
         var roles = await db2.UserRoles.Where(ur => ur.UserId == userId).Select(ur => ur.RoleId).ToListAsync();
         Assert.Single(roles);
-        Assert.Contains(SystemRoles.Manager, roles); // untouched — guard short-circuited before any read/write
+        Assert.Contains(SystemRoles.Manager, roles);
 
         Assert.Empty(auditPublisher.PublishedEvents);
     }
@@ -267,7 +265,7 @@ public class UpdateUserRolesHandlerTests(IdentityDatabaseFixture fixture)
     {
         var targetUserId = await SeedUser("unauthorised-target");
         var actorId = Guid.NewGuid();
-        await GrantSystemRole(actorId, SystemRoles.Manager); // Manager cannot administer any roles
+        await GrantSystemRole(actorId, SystemRoles.Manager);
 
         await using (var db = fixture.BuildContext())
         {
@@ -324,7 +322,7 @@ public class UpdateUserRolesHandlerTests(IdentityDatabaseFixture fixture)
 
         await using var db2 = fixture.BuildContext();
         var roles = await db2.UserRoles.Where(ur => ur.UserId == targetUserId).Select(ur => ur.RoleId).ToListAsync();
-        Assert.Contains(SystemRoles.CompanyAdministrator, roles); // untouched
+        Assert.Contains(SystemRoles.CompanyAdministrator, roles);
     }
 
     [Fact]
@@ -358,7 +356,6 @@ public class UpdateUserRolesHandlerTests(IdentityDatabaseFixture fixture)
     [Fact]
     public async Task HandleAsync_Allows_Multi_Role_Holder_To_Lose_One_Protected_Role_Without_Coupling_To_The_Other()
     {
-        // Mirrors the SignUp initial-company-creator shape: Employee + CompanyAdministrator + HrAdministrator.
         var companyId = Guid.NewGuid();
         var targetUserId = await SeedUser("initial-creator");
         var otherHrAdminId = await SeedUser("other-hr-admin");
@@ -377,8 +374,6 @@ public class UpdateUserRolesHandlerTests(IdentityDatabaseFixture fixture)
         var auditPublisher = new FakeAuditEventPublisher();
         var handler = BuildHandler(auditPublisher, companyEmployeeIds: [targetUserId, otherHrAdminId]);
 
-        // Remove only HrAdministrator — CompanyAdministrator (held only by this user) must stay,
-        // since actor (HrAdministrator) cannot administer that role anyway.
         var result = await handler.HandleAsync(
             new UpdateUserRolesRequest
             {

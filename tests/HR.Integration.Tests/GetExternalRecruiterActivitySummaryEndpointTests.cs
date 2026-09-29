@@ -114,9 +114,6 @@ public class GetExternalRecruiterActivitySummaryEndpointTests
     [Fact]
     public async Task Get_ActivitySummary_Excludes_Vacancy_Reassigned_Away_Before_Closing()
     {
-        // End-to-end confirmation of the ticket #81 behaviour change: once a vacancy's
-        // AssignedRecruiterId is repointed away from a recruiter before the vacancy reaches a
-        // terminal status, that recruiter no longer appears in either bucket for that vacancy.
         var companyId = Guid.NewGuid();
         using var client = await AuthenticatedClient(companyId);
         var recruiterId = await SeedRecruiterAsync(companyId);

@@ -3,9 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the asset category list page (/companies/{companyId}/asset-categories).
-/// </summary>
 public sealed class AssetCategoryListPage(IPage page, string baseUrl)
 {
     public async Task GoToAsync(Guid companyId)
@@ -37,9 +34,6 @@ public sealed class AssetCategoryListPage(IPage page, string baseUrl)
         var btn = page.GetByRole(AriaRole.Button, new() { Name = "Deactivate" });
         await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await btn.ClickAsync();
-        // Opens a confirmation dialog (HrConfirmDialog) rather than deactivating immediately —
-        // scoped to the dialog since its own confirm button shares the "Deactivate" label with
-        // the toolbar button just clicked above.
         var confirmButton = page.GetByRole(AriaRole.Dialog).GetByRole(AriaRole.Button, new() { Name = "Deactivate", Exact = true });
         await confirmButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await confirmButton.ClickAsync();

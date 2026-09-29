@@ -88,7 +88,6 @@ public class MarkOffboardingIncompleteOnDepartureFinalisedHandlerTests
         var employeeId = Guid.NewGuid();
 
         var plan = SeedPlan(dbContext, companyId, employeeId, Now.AddDays(-30), status);
-        // Even though the plan has an outstanding task, a terminal plan must never be flagged.
         var pendingTask = OffboardingTask.Create(
             Guid.NewGuid(), companyId, plan.Id, "Return laptop", null,
             OffboardingTaskAssignTo.Employee, null, Now.AddDays(-30));
@@ -196,7 +195,6 @@ public class MarkOffboardingIncompleteOnDepartureFinalisedHandlerTests
         var handler = BuildHandler(
             dbContext, new FakeHrAdministratorDirectory([hrAdmin]), notifications, auditPublisher);
 
-        // First delivery flags the plan and raises the exception.
         await handler.HandleAsync(BuildEvent(companyId, employeeId), CancellationToken.None);
 
         Assert.Single(auditPublisher.Published);

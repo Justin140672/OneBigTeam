@@ -73,25 +73,14 @@ public static class LeaveModule
             "toil-expiry",
             job => job.ExecuteAsync(),
             Cron.Daily(0));
-        // Reliability follow-up: recovers any leave-policy deactivation-on-departure request left
-        // Pending (enqueue never happened) or Failed (exhausted Hangfire retries) — see
-        // EmployeeDepartureFinalisedHandler and LeavePolicyDeactivationJob.
         jobManager.AddOrUpdate<ReconcileLeavePolicyDeactivationsJob>(
             "reconcile-leave-policy-deactivations",
             job => job.ExecuteAsync(),
             Cron.Daily(1));
-        // Gap-2 reliability fix: recovers finalised departures that never got a
-        // LeavePolicyDeactivationOnDeparture row created at all (e.g. EmployeeDepartureFinalisedHandler
-        // itself threw before inserting one) — see ReconcileMissingLeaveDeactivationsJob's remarks for
-        // why this is a distinct failure mode from the one ReconcileLeavePolicyDeactivationsJob covers.
         jobManager.AddOrUpdate<ReconcileMissingLeaveDeactivationsJob>(
             "reconcile-missing-leave-policy-deactivations",
             job => job.ExecuteAsync(),
             Cron.Daily(2));
-        // Round 3 reliability fix (Gap-2 follow-up): distinct, bounded, paginated one-time sweep of
-        // the ENTIRE finalised-departure history — closes the gap ReconcileMissingLeaveDeactivationsJob's
-        // 30-day lookback can never reach (see ReconcileHistoricalLeaveDeactivationsJob's remarks).
-        // Runs hourly while the backlog is being drained; becomes a cheap no-op once IsComplete.
         jobManager.AddOrUpdate<ReconcileHistoricalLeaveDeactivationsJob>(
             "reconcile-historical-leave-policy-deactivations",
             job => job.ExecuteAsync(),
@@ -185,7 +174,6 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
         services.AddScoped<ToilExpiryJob>();
         services.AddScoped<IdempotencyMaintenanceJob>();
 
-        // Getting Started checklist task definition (HR.Modules.CompanyOnboarding epic, Phase A).
         services.AddScoped<IOnboardingTaskDefinition, ReviewDefaultLeavePolicyTask>();
     }
 
@@ -235,10 +223,6 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
             db.LeavePolicies.Add(policy);
             await db.SaveChangesAsync();
 
-            // Assign all seeded employees to the standard policy and initialise their balances.
-            // Only balance-tracked leave types (HasBalance) get a LeaveBalance row — e.g. Unpaid
-            // Leave has HasBalance = false and is never given one, consistent with how the
-            // balance UI treats such types as "n/a".
             var leaveTypes = await db.LeaveTypes
                 .Where(lt => lt.CompanyId == companyId && lt.IsActive && lt.HasBalance)
                 .ToListAsync();
@@ -281,7 +265,6 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
             await db.SaveChangesAsync();
         }
 
-        // ── Beta Corp leave types & policy ───────────────────────────────────
         var betaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
 
         if (!await db.LeaveTypes.AnyAsync(lt => lt.CompanyId == betaCorpId))
@@ -314,8 +297,8 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
 
             var betaEmployeeIds = new[]
             {
-                Guid.Parse("30000000-0000-0000-0000-000000000011"), // Alice Morgan
-                Guid.Parse("30000000-0000-0000-0000-000000000012"), // Bob Taylor
+                Guid.Parse("30000000-0000-0000-0000-000000000011"),
+                Guid.Parse("30000000-0000-0000-0000-000000000012"),
             };
 
             foreach (var empId in betaEmployeeIds)
@@ -340,17 +323,16 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
             var policyId          = Guid.Parse("C0000000-0000-0000-0000-000000000001");
             var policyYear        = LeaveYearCalculator.GetPolicyYear(DateTimeOffset.UtcNow, startMonth: 1);
 
-            var empSarahId  = Guid.Parse("30000000-0000-0000-0000-000000000001"); // Sarah Chen, CTO
-            var empJamesId  = Guid.Parse("30000000-0000-0000-0000-000000000002"); // James Okafor, Senior Dev
-            var empLauraId  = Guid.Parse("30000000-0000-0000-0000-000000000005"); // Laura Bennett, HR Manager
-            var empEmmaId   = Guid.Parse("30000000-0000-0000-0000-000000000009"); // Emma Jones, Account Exec
-            var adminId     = Guid.Parse("30000000-0000-0000-0000-000000000005"); // Laura (HR) reviewed
+            var empSarahId  = Guid.Parse("30000000-0000-0000-0000-000000000001");
+            var empJamesId  = Guid.Parse("30000000-0000-0000-0000-000000000002");
+            var empLauraId  = Guid.Parse("30000000-0000-0000-0000-000000000005");
+            var empEmmaId   = Guid.Parse("30000000-0000-0000-0000-000000000009");
+            var adminId     = Guid.Parse("30000000-0000-0000-0000-000000000005");
 
             LeaveRequest Req(Guid id, Guid empId, Guid leaveType, DateOnly start, DateOnly end, decimal days, string? reason = null)
                 => LeaveRequest.Create(id, companyId, empId, leaveType, policyId,
                     start, LeaveDayPart.FullDay, end, LeaveDayPart.FullDay, days, reason, now);
 
-            // Sarah Chen — approved 5 days in Jan, pending 4 days in Jul
             var sarahApproved = Req(Guid.Parse("D0000000-0000-0000-0000-000000000001"),
                 empSarahId, annualLeaveTypeId, new DateOnly(2026, 1, 5), new DateOnly(2026, 1, 9), 5m, "New Year break");
             sarahApproved.Approve(adminId, now);
@@ -371,7 +353,6 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
                 empJamesId, sickLeaveTypeId, new DateOnly(2026, 5, 11), new DateOnly(2026, 5, 12), 2m);
             jamesSick.Approve(adminId, now);
 
-            // Laura Bennett — approved 2 days in Mar, pending 5 days in Aug
             var lauraApproved = Req(Guid.Parse("D0000000-0000-0000-0000-000000000006"),
                 empLauraId, annualLeaveTypeId, new DateOnly(2026, 3, 9), new DateOnly(2026, 3, 10), 2m);
             lauraApproved.Approve(adminId, now);
@@ -379,7 +360,6 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
             var lauraPending = Req(Guid.Parse("D0000000-0000-0000-0000-000000000007"),
                 empLauraId, annualLeaveTypeId, new DateOnly(2026, 8, 3), new DateOnly(2026, 8, 7), 5m, "Summer holiday");
 
-            // Emma Jones — pending 2 days at end of Jun (upcoming)
             var emmaPending = Req(Guid.Parse("D0000000-0000-0000-0000-000000000008"),
                 empEmmaId, annualLeaveTypeId, new DateOnly(2026, 6, 29), new DateOnly(2026, 6, 30), 2m);
 
@@ -389,7 +369,6 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
                 lauraApproved, lauraPending,
                 emmaPending);
 
-            // Reflect approved requests in each employee's balance
             var approvedItems = new[]
             {
                 (empSarahId,  annualLeaveTypeId, 5m),

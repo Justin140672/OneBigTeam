@@ -58,11 +58,6 @@ internal static class InternalApplicationTestData
         return (candidate, application);
     }
 
-    /// <summary>
-    /// An external application whose candidate was later hired and therefore linked to an employee
-    /// (mirrors what HireCandidate does via <see cref="Candidate.LinkToEmployee"/>). Its Source is
-    /// never Internal, so it must still be reported as external with a null EmployeeId.
-    /// </summary>
     public static (Candidate Candidate, Application Application) AddHiredExternal(
         RecruitmentDbContext db,
         Guid companyId,
@@ -79,7 +74,6 @@ internal static class InternalApplicationTestData
         return (candidate, application);
     }
 
-    /// <summary>Parses the string form used in [InlineData] (the enum is internal, so it cannot be a public theory parameter).</summary>
     public static ApplicationSource? ParseSource(string? source) =>
         source is null ? null : Enum.Parse<ApplicationSource>(source);
 }

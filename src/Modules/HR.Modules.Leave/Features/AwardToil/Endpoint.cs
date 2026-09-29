@@ -48,8 +48,6 @@ internal sealed class Endpoint(
 
         if (result.IsFailure)
         {
-            // P1 #4: routes "concurrency" (as well as "conflict") to 409, matching every other
-            // versioned-aggregate endpoint (see ProblemResults.FromError).
             await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }

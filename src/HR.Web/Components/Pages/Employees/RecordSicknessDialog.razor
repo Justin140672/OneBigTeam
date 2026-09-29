@@ -91,8 +91,6 @@
 @code {
     [Parameter, EditorRequired] public Guid CompanyId  { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
-    // When true, this is the employee reporting their own sickness (calls RecordMySicknessAsync)
-    // rather than an HR/manager recording it on someone's behalf (RecordSicknessAsync).
     [Parameter] public bool SelfService { get; set; }
 
     public sealed record DayPartChoice(string Value, string Label);

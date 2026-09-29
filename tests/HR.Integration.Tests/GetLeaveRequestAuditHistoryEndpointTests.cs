@@ -5,13 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// AUD-07: GET .../companies/{companyId}/leave-requests/{leaveRequestId}/audit-history.
-/// Gated by <c>employee:manage</c> (HR Administrator). The handler reads the real
-/// AuditDbContext via IAuditHistoryReader, ordered newest-first, and scoped by companyId.
-///
-/// Red until the foreign AUD-04 "actor_type" audit migration is fixed. Write the test correctly anyway.
-/// </summary>
 [Collection("Integration")]
 public class GetLeaveRequestAuditHistoryEndpointTests
 {
@@ -120,7 +113,6 @@ public class GetLeaveRequestAuditHistoryEndpointTests
         client.Dispose();
     }
 
-    // ── helpers ──────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId, bool hrAdministrator = false)
     {

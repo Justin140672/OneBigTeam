@@ -87,9 +87,7 @@ public class GetHeadcountSummaryEndpointTests
             AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.Draft);
             AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.Suspended);
             AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.FormerEmployee);
-            AddEmployee(db, companyId, null, refData, EmploymentStatus.Active); // Unassigned — a
-            // department id that was never seeded as a real Department row, so the handler's
-            // "Unassigned" fallback (no matching Departments row) kicks in.
+            AddEmployee(db, companyId, null, refData, EmploymentStatus.Active);
 
             return department.Id;
         });
@@ -103,10 +101,8 @@ public class GetHeadcountSummaryEndpointTests
 
         var engineering = Assert.Single(payload.Items, i => i.DepartmentId == departmentId);
         Assert.Equal("Engineering", engineering.DepartmentName);
-        Assert.Equal(3, engineering.EmployeeCount); // 3 Active (Draft/Suspended/FormerEmployee excluded)
+        Assert.Equal(3, engineering.EmployeeCount);
 
-        // DepartmentId is mandatory on Employee now, so a "no real department" row still carries
-        // a real (orphan) Guid rather than null — "Unassigned" is signaled by DepartmentName only.
         var unassigned = Assert.Single(payload.Items, i => i.DepartmentName == "Unassigned");
         Assert.Equal(1, unassigned.EmployeeCount);
     }
@@ -140,9 +136,6 @@ public class GetHeadcountSummaryEndpointTests
     {
         var now = DateTimeOffset.UtcNow;
 
-        // A null departmentId here means "Unassigned" — a fresh Guid that was never seeded as a
-        // real Department row, so the handler's "no matching department" fallback groups it
-        // under "Unassigned" (DepartmentId itself is a mandatory, non-nullable Employee column).
         var employee = Employee.Create(
             Guid.NewGuid(), companyId, "First", "Last", $"employee.{Guid.NewGuid():N}@example.com", StartDate,
             hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say",

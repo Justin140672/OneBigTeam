@@ -70,12 +70,6 @@ internal sealed class LeaveRequest : IVersionedAggregate
         };
     }
 
-    /// <summary>
-    /// Creates a Draft leave request (LEAVE-07). Drafts skip every blocking check that a real
-    /// submission enforces (cross-year rejection, balance sufficiency, conflict detection) — see
-    /// CreateLeaveRequestDraftHandler. TotalDays is still computed for display purposes only and
-    /// is recalculated authoritatively when the draft is submitted.
-    /// </summary>
     public static LeaveRequest CreateDraft(
         Guid id,
         Guid companyId,
@@ -92,12 +86,6 @@ internal sealed class LeaveRequest : IVersionedAggregate
         => Create(id, companyId, employeeId, leaveTypeId, leavePolicyId, startDate, startPart, endDate, endPart,
             totalDays, reason, now, LeaveRequestStatus.Draft);
 
-    /// <summary>
-    /// Re-resolves the policy a Draft is submitted under (LEAVE-07). A draft can be created
-    /// before the employee has a resolvable policy assignment (LeavePolicyId null); submission
-    /// re-queries the assignment fresh, so this lets SubmitLeaveRequestDraftHandler keep the
-    /// stored LeavePolicyId in sync with what was actually used for the approval decision.
-    /// </summary>
     public void AssignLeavePolicy(Guid? leavePolicyId)
     {
         LeavePolicyId = leavePolicyId;
@@ -111,13 +99,6 @@ internal sealed class LeaveRequest : IVersionedAggregate
         UpdatedAt = now;
     }
 
-    /// <summary>
-    /// Transitions a Draft to Pending when the assigned leave policy requires manual approval.
-    /// Callers (SubmitLeaveRequestDraftHandler) must verify Status == Draft beforehand and
-    /// translate an invalid state into a Result failure — this throw is a defensive invariant,
-    /// not the primary validation path (see 09-coding-standards.md: Result pattern for business
-    /// flow, exceptions for unexpected failures only).
-    /// </summary>
     public void MarkSubmittedPending(DateTimeOffset now)
     {
         if (Status != LeaveRequestStatus.Draft)

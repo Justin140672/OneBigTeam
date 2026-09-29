@@ -1,7 +1,5 @@
 namespace HR.Admin.Web.Models;
 
-// Mirrors HR.Modules.Companies.Features.GetCustomerBillingBreakdown.Response exactly — same
-// "app-local DTO matching the API contract" convention as CustomerDetailsModels.cs.
 public sealed record CustomerBillingBreakdownResponse(
     Guid CompanyId,
     DateTimeOffset ComputedAt,

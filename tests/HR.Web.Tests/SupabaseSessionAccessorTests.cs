@@ -32,7 +32,6 @@ public class SupabaseSessionAccessorTests
         var sessionState = new CircuitSessionState();
         var sut = new SupabaseSessionAccessor(accessor, sessionState);
 
-        // Prior call on the same instance captured a real token for a different HttpContext.
         accessor.HttpContext = BuildHttpContextWithCookie(SupabaseSessionAccessor.CookieName, "token-a");
         Assert.Equal("token-a", sut.AccessToken);
 
@@ -57,10 +56,6 @@ public class SupabaseSessionAccessorTests
     [Fact]
     public void AccessToken_Does_Not_Leak_Between_Separate_CircuitSessionState_Instances()
     {
-        // Two separate CircuitSessionState instances stand in for two separate Blazor Server
-        // circuits/DI scopes. Unlike the old AsyncLocal design, isolation here does not depend on
-        // ExecutionContext flow at all — it is enforced by each circuit getting its own scoped
-        // object, exactly like every other per-circuit service in this app.
         var accessorA = new FakeHttpContextAccessor();
         var stateA = new CircuitSessionState();
         var sutA = new SupabaseSessionAccessor(accessorA, stateA);
@@ -68,16 +63,12 @@ public class SupabaseSessionAccessorTests
         accessorA.HttpContext = BuildHttpContextWithCookie(SupabaseSessionAccessor.CookieName, "token-a");
         Assert.Equal("token-a", sutA.AccessToken);
 
-        // A brand-new circuit's accessor/state pair, with no live HttpContext at all (simulating an
-        // interactive event handler on a fresh, unauthenticated circuit) — must fail closed, never
-        // inherit "token-a".
         var accessorB = new FakeHttpContextAccessor { HttpContext = null };
         var stateB = new CircuitSessionState();
         var sutB = new SupabaseSessionAccessor(accessorB, stateB);
 
         Assert.Null(sutB.AccessToken);
 
-        // The original circuit must still see its own token, proving isolation is mutual.
         Assert.Equal("token-a", sutA.AccessToken);
     }
 
@@ -88,16 +79,9 @@ public class SupabaseSessionAccessorTests
         var sessionState = new CircuitSessionState();
         var sut = new SupabaseSessionAccessor(accessor, sessionState);
 
-        // Initial pre-render request captures the real token via the live cookie.
         accessor.HttpContext = BuildHttpContextWithCookie(SupabaseSessionAccessor.CookieName, "token-a");
         Assert.Equal("token-a", sut.AccessToken);
 
-        // Later interactive circuit event handling has no HttpContext at all. Because
-        // CircuitSessionState is a real, independently-held object (not an AsyncLocal value that
-        // depends on ExecutionContext flow), this works even when the read happens on a completely
-        // different thread/logical call chain than the one that captured the token — unlike the old
-        // AsyncLocal-based design, which only worked by coincidence when the test itself never left
-        // the original logical chain.
         accessor.HttpContext = null;
         Assert.Equal("token-a", sut.AccessToken);
     }
@@ -105,12 +89,6 @@ public class SupabaseSessionAccessorTests
     [Fact]
     public async Task AccessToken_Retains_Own_Token_Across_A_Real_ExecutionContext_Boundary()
     {
-        // This is the scenario the old AsyncLocal design actually got wrong: a later "circuit event"
-        // that begins its own fresh logical call chain (simulated here via ExecutionContext.SuppressFlow,
-        // just like Blazor Server's SignalR message dispatch does not nest inside the ExecutionContext
-        // of the request that established the circuit). CircuitSessionState must still resolve
-        // correctly because it is a plain object reference held by the test, not something that
-        // needs to flow through ExecutionContext at all.
         var accessor = new FakeHttpContextAccessor();
         var sessionState = new CircuitSessionState();
         var sut = new SupabaseSessionAccessor(accessor, sessionState);
@@ -118,7 +96,6 @@ public class SupabaseSessionAccessorTests
         accessor.HttpContext = BuildHttpContextWithCookie(SupabaseSessionAccessor.CookieName, "token-a");
         Assert.Equal("token-a", sut.AccessToken);
 
-        // No live HttpContext on this "later circuit event".
         accessor.HttpContext = null;
 
         Task<string?> task;
@@ -150,8 +127,6 @@ public class SupabaseSessionAccessorTests
 
         Assert.Null(sessionState.AccessToken);
 
-        // A later read with no live HttpContext at all (e.g. a racing background continuation) must
-        // not resurrect the pre-logout token.
         accessor.HttpContext = null;
         Assert.Null(sut.AccessToken);
     }

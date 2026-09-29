@@ -4,13 +4,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.SharedKernel;
 
-// A single handler failing must never prevent other handlers for the same integration event
-// from running, and must never propagate back to the publishing caller (which is typically
-// mid-way through committing an unrelated business transaction). Each handler invocation is
-// isolated in its own try/catch; failures are logged with enough context to diagnose (event
-// type, handler type, exception) and the loop continues. This changes behaviour for every
-// existing integration event: a handler failure no longer aborts publication to remaining
-// handlers or bubbles up to the caller.
 public sealed class IntegrationEventPublisher(
     IServiceProvider serviceProvider,
     ILogger<IntegrationEventPublisher> logger,
@@ -44,9 +37,6 @@ public sealed class IntegrationEventPublisher(
         return await DispatchAsync(integrationEvent, restoredContext, cancellationToken);
     }
 
-    // allRequiredSucceeded starts true and is only ever flipped to false, so PublishAsync (which
-    // ignores the return value) and PublishAndConfirmAsync share this single dispatch loop with no
-    // behavioural difference for non-required handlers.
     private async Task<bool> DispatchAsync<TEvent>(
         TEvent integrationEvent, IExecutionContext? envelopeContext, CancellationToken cancellationToken)
         where TEvent : IIntegrationEvent
@@ -87,9 +77,6 @@ public sealed class IntegrationEventPublisher(
         {
             foreach (var handler in handlers)
             {
-                // Checked before EVERY handler (not just once up front) — a token can be cancelled
-                // partway through a multi-handler dispatch, and once that happens no further
-                // handler for this event should run.
                 cancellationToken.ThrowIfCancellationRequested();
 
                 try

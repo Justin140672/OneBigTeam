@@ -19,17 +19,6 @@ using HR.Modules.Reporting.Features.GetWorkloadActions;
 
 namespace HR.Modules.Reporting.ReportRegistry;
 
-/// <summary>
-/// Single source of truth for the report catalogue. This is the registry required by REP-03:
-/// GetReportCatalog, SaveReportView, AddReportFavourite, GetReportViews and GetReportFavourites
-/// all consult this instead of maintaining their own copies of report ids/categories/access gates.
-///
-/// Supported filter/grouping/sorting field names are derived by reflecting over each report's own
-/// Request record (excluding CompanyId), so this stays in sync with each report's Validator without
-/// duplicating field lists by hand. Enum-typed fields automatically restrict allowed values to the
-/// enum's member names; a small number of string-typed fields with a bespoke allowed-value list
-/// (e.g. GetWorkloadActions' GroupBy) are given explicit overrides below.
-/// </summary>
 internal static class ReportCatalog
 {
     private static readonly string[] WorkloadActionsGroupByValues =
@@ -47,13 +36,10 @@ internal static class ReportCatalog
 
     private static readonly IReadOnlyList<Entry> Entries =
     [
-        // Standard: company-wide aggregates only, no named individuals in the exported rows.
         new("recruitment-pipeline-summary", "Recruitment Pipeline Summary", ReportCategory.Recruitment,
             "Overview of open vacancies and candidates by pipeline stage.", ReportAccessGate.Recruitment,
             typeof(GetRecruitmentPipelineSummaryReportRequest), ReportSensitivity.Standard),
 
-        // Sensitive: exported rows include employee names (see ExportHrHeadcountSummaryReport/Handler.cs),
-        // despite the aggregate-sounding name — an explicit exception to the "aggregate = Standard" default.
         new("hr-headcount-summary", "HR Headcount Summary", ReportCategory.Hr,
             "Company-wide headcount broken down by department and status.", ReportAccessGate.Hr,
             typeof(GetHrHeadcountSummaryReportRequest), ReportSensitivity.Sensitive),
@@ -82,12 +68,10 @@ internal static class ReportCatalog
             "Absence count, days absent and Bradford score, grouped by department or employee, with date range filtering.",
             ReportAccessGate.Hr, typeof(GetSicknessReportRequest), ReportSensitivity.Sensitive),
 
-        // Standard: recruiter/vacancy-grouped counts only, no named candidates in the exported rows.
         new("recruitment-pipeline-report", "Recruitment Pipeline Report", ReportCategory.Recruitment,
             "Vacancies, candidates, interviews, offers and hires grouped by recruiter or vacancy.",
             ReportAccessGate.Recruitment, typeof(GetRecruitmentPipelineReportRequest), ReportSensitivity.Standard),
 
-        // Standard: per-vacancy aggregate counts only, no named candidates in the exported rows.
         new("vacancy-performance-report", "Vacancy Performance Report", ReportCategory.Recruitment,
             "Per-vacancy days open, candidate count, interview count, offer count and hire date.",
             ReportAccessGate.Recruitment, typeof(GetVacancyPerformanceReportRequest), ReportSensitivity.Standard),
@@ -116,9 +100,6 @@ internal static class ReportCatalog
             "Assets assigned to employees including serial number, assigned date and return status.",
             ReportAccessGate.Hr, typeof(GetAssetAssignmentReportRequest), ReportSensitivity.Sensitive),
 
-        // Standard: anonymous workforce aggregates only — counts and percentages, no named
-        // individuals, no drill-through. Gated on the dedicated reporting:view-equality permission
-        // rather than ReportAccessGate.Hr so general HR reporting access never exposes it.
         new("equality-diversity", "Equality & Diversity Report", ReportCategory.Hr,
             "Anonymous workforce equality statistics by gender, age band, ethnicity, disability, sexual orientation, religion or belief and caring responsibilities, with small groups suppressed.",
             ReportAccessGate.EqualityDiversity, typeof(EqualityDiversityReportCatalogRequest), ReportSensitivity.Standard),

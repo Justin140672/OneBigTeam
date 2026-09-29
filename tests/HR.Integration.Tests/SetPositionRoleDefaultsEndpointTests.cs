@@ -18,10 +18,6 @@ public class SetPositionRoleDefaultsEndpointTests
     private async Task<HttpClient> AuthenticatedClient(Guid companyId, Guid? userId = null, Guid? role = null)
     {
         var client = _factory.CreateClient();
-        // A fresh actor per call by default: HrAdminUser is a fixed guid and effective roles are
-        // resolved suite-wide (UserRoles/UserPositions are not company-scoped), so reusing it let
-        // role/position grants from other test files leak in and defeat the role-administration
-        // guard this class asserts.
         var effectiveUserId = userId ?? Guid.NewGuid();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, effectiveUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
@@ -156,9 +152,6 @@ public class SetPositionRoleDefaultsEndpointTests
     [Fact]
     public async Task Put_SetPositionRoleDefaults_Returns_Forbidden_When_Actor_Not_Authorised_To_Administer_Requested_Role()
     {
-        // HR Administrator may never grant/revoke Company Administrator (mirror-image
-        // RoleAdministrationPolicy boundary reused from IAM-02's UpdateUserRoles guard) —
-        // including indirectly, via a position's configured default roles.
         var companyId = Guid.NewGuid();
         using var client = await AuthenticatedClient(companyId);
         var positionProfileId = await CreatePositionProfileAsync(client, companyId, $"Exec {Guid.NewGuid():N}");

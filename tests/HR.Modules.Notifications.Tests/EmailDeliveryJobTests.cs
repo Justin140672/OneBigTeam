@@ -85,9 +85,6 @@ public class EmailDeliveryJobTests
         Assert.NotNull(stored.LastAttemptAt);
     }
 
-    // OBT-REM-11: the caller-supplied companyId (used to scope the Hangfire failure audit to a
-    // tenant) must be verified against the entity actually loaded, so a caller cannot enqueue a
-    // job whose job-argument company id disagrees with the delivery it operates on.
     [Fact]
     public async Task SendAsync_Throws_When_Supplied_CompanyId_Does_Not_Match_Delivery()
     {
@@ -103,7 +100,6 @@ public class EmailDeliveryJobTests
         Assert.Empty(emailSender.Calls);
     }
 
-    // NOT-05: audit -------------------------------------------------------------------------------
 
     [Fact]
     public async Task SendAsync_Success_Publishes_EmailDeliverySucceededAuditEvent()
@@ -131,9 +127,6 @@ public class EmailDeliveryJobTests
     [Fact]
     public async Task SendAsync_Transient_Failure_With_Null_Context_Rethrows_Without_Marking_Failed()
     {
-        // context defaults to null (no PerformContext supplied), so retryCount defaults to 0 and
-        // isFinalAttempt is always false — the delivery is left Pending (not Failed), and the
-        // exception propagates so Hangfire's [AutomaticRetry] can schedule the next attempt.
         await using var db  = BuildContext();
         var companyId        = Guid.NewGuid();
         var notificationId   = Guid.NewGuid();
@@ -222,7 +215,7 @@ public class EmailDeliveryJobTests
 
         Assert.Empty(emailSender.Calls);
         var stored = await db.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
-        Assert.Equal(1,               stored.AttemptCount); // unchanged — no additional RecordAttempt call
+        Assert.Equal(1,               stored.AttemptCount);
         Assert.Equal(EmailDeliveryStatus.Sent, stored.Status);
         // NOT-05: replayed/re-enqueued jobs for an already-delivered notification must not publish a
         // second, misleading success event.
@@ -236,13 +229,12 @@ public class EmailDeliveryJobTests
         var emailSender      = new FakeEmailSender();
         var job                = BuildJob(db, emailSender);
 
-        await job.SendAsync(Guid.NewGuid(), Guid.NewGuid()); // no EmailDelivery row exists for this id
+        await job.SendAsync(Guid.NewGuid(), Guid.NewGuid());
 
         Assert.Empty(emailSender.Calls);
         Assert.Empty(db.EmailDeliveries);
     }
 
-    // NOT-03: templated vs non-templated wording -----------------------------------------------
 
     [Fact]
     public async Task SendAsync_Templated_Delivery_Sends_Its_Own_Rendered_Subject_And_Body()
@@ -306,7 +298,6 @@ public class EmailDeliveryJobTests
         Assert.Contains(notification.Body!, call.HtmlBody);
     }
 
-    // SET-06: notification-channel settings ----------------------------------------------------
 
     [Fact]
     public async Task SendAsync_EmailNotificationsEnabled_False_For_NonMandatory_Type_Marks_Delivery_Skipped_Without_Sending()
@@ -314,7 +305,7 @@ public class EmailDeliveryJobTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var notificationId = Guid.NewGuid();
-        await SeedPendingDelivery(db, companyId, notificationId); // LeaveApproved — non-mandatory
+        await SeedPendingDelivery(db, companyId, notificationId);
         var emailSender = new FakeEmailSender();
         var settingsReader = new FakeCompanyNotificationSettingsReader(
             new HR.Infrastructure.Abstractions.CompanyNotificationSettings(false, true));
@@ -360,10 +351,6 @@ public class EmailDeliveryJobTests
     [Fact]
     public async Task SendAsync_Delivery_Queued_While_Enabled_Then_Disabled_Before_Job_Runs_Is_Skipped_Not_Sent()
     {
-        // Configuration-changed-after-queueing: the delivery was created while
-        // EmailNotificationsEnabled was true (simulated by the plain SeedPendingDelivery helper,
-        // which mirrors what NotificationWriter would have persisted at queue time), but by the
-        // time this job actually runs, the setting has been switched off.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var notificationId = Guid.NewGuid();
@@ -422,7 +409,6 @@ public class EmailDeliveryJobTests
         Assert.Empty(emailSender.Calls);
     }
 
-    // ADM-03: permanent delivery failures surface in the administrative alerts inbox --------------
 
     [Fact]
     public async Task SendAsync_No_Recipient_Email_Raises_Exactly_One_IntegrationDelivery_Alert()
@@ -461,17 +447,10 @@ public class EmailDeliveryJobTests
         Assert.Empty(alertWriter.Commands);
     }
 
-    // OBT-REM-12: the "claim" step's DbUpdateConcurrencyException guard --------------------------
 
     [Fact]
     public async Task SendAsync_Concurrency_Conflict_On_Claim_Step_Backs_Off_Without_Sending()
     {
-        // Two separate DbContext instances pointed at the same InMemory database name, sharing the
-        // same EmailDelivery row's xmin-backed concurrency token (see EmailDeliveryConfiguration):
-        // the first context "wins" the claim by saving first (bumping the store's current token
-        // value), so when the second context — the one this job runs against — tries to persist its
-        // own RecordAttempt() with its now-stale original token value, EF Core raises
-        // DbUpdateConcurrencyException exactly as it would for a real overlapping Hangfire execution.
         var dbName = Guid.NewGuid().ToString("N");
         var options = new DbContextOptionsBuilder<NotificationsDbContext>()
             .UseInMemoryDatabase(dbName)
@@ -485,17 +464,9 @@ public class EmailDeliveryJobTests
             await SeedPendingDelivery(seedDb, companyId, notificationId);
         }
 
-        // staleLoadContext loads (and tracks) the row FIRST, capturing the pre-conflict concurrency
-        // token as its "original value" — this is the context/job under test.
         await using var staleLoadContext = new NotificationsDbContext(options);
         await staleLoadContext.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
 
-        // Context A then loads its own, independent copy and saves first, bumping the concurrency
-        // token's current store value — simulating another execution "winning" the claim race.
-        // EF Core's InMemory provider does not auto-generate a new xmin-shaped value the way
-        // PostgreSQL does on every UPDATE, so the shadow token is bumped explicitly here to make the
-        // InMemory provider surface the same DbUpdateConcurrencyException a real overlapping Hangfire
-        // execution would get from Npgsql's real xmin system column.
         await using (var contextA = new NotificationsDbContext(options))
         {
             var deliveryA = await contextA.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
@@ -527,7 +498,6 @@ public class EmailDeliveryJobTests
 
         await using var verifyDb = new NotificationsDbContext(options);
         var stored = await verifyDb.EmailDeliveries.SingleAsync(d => d.NotificationId == notificationId);
-        // Context A's attempt (the "winner") is the one that persisted.
         Assert.Equal(1, stored.AttemptCount);
         Assert.Equal(EmailDeliveryStatus.Pending, stored.Status);
     }

@@ -669,7 +669,6 @@ public class CustomerSubscriptionTests
         Assert.Equal("validation", result.Error.Code);
     }
 
-    // ---- NFR-07 legal hold ----
 
     [Fact]
     public void IsUnderLegalHold_Is_False_By_Default()

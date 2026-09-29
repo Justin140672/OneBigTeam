@@ -136,8 +136,8 @@ public class UpdateEmployeeProfileAndEmploymentEndpointTests
 
         var reloaded = await client.GetFromJsonAsync<EmployeeSnapshot>(
             $"/api/companies/{companyId}/employees/{employee.Id}");
-        Assert.Equal("FirstWrite", reloaded!.FirstName);              // profile field unchanged
-        Assert.Equal("EMP-FIRST", reloaded.EmployeeNumber);           // employment field unchanged
+        Assert.Equal("FirstWrite", reloaded!.FirstName);
+        Assert.Equal("EMP-FIRST", reloaded.EmployeeNumber);
     }
 
     // ── Regression: clearing optional employment fields must persist as NULL ──────────────────
@@ -154,7 +154,6 @@ public class UpdateEmployeeProfileAndEmploymentEndpointTests
         var manager = await CreateAdditionalEmployeeAsync(client, companyId, refData, "Manager", "One");
         var empNo = $"EMP-CLR1-{Guid.NewGuid():N}"[..14];
 
-        // Populate all four optional fields.
         var v1 = await GetVersionAsync(client, companyId, subject.Id);
         var populate = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{subject.Id}/profile-and-employment",
@@ -172,7 +171,6 @@ public class UpdateEmployeeProfileAndEmploymentEndpointTests
         Assert.Equal("seed notes", populated.Notes);
         Assert.Equal(manager.Id, populated.ManagerId);
 
-        // Now send the same update with all four explicitly null.
         var clear = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{subject.Id}/profile-and-employment",
             FullBody(companyId, subject.Id, empNo, populated.Version,

@@ -2,12 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the Leave Summary report
-/// (/companies/{companyId}/reporting/leave-summary — LeaveSummaryReportPage.razor).
-/// Unlike the paged report pages, this grid has no paging and reloads on "Apply Filters" or on
-/// GroupBy change (GroupBy is bound directly and reloads via LoadAsync, same as Apply Filters).
-/// </summary>
 public sealed class LeaveSummaryReportPage(IPage page, string baseUrl)
 {
     private const string RowsRenderedSelector = ".e-grid .e-row, .e-grid .e-emptyrow";
@@ -20,14 +14,6 @@ public sealed class LeaveSummaryReportPage(IPage page, string baseUrl)
 
     public async Task<IReadOnlyList<string>> GetColumnHeadersAsync()
     {
-        // Same race as MyProfilePage.GetCompanyDocumentsGridColumnHeadersAsync — the row/empty
-        // wait after Apply/GroupBy doesn't guarantee the header cells' own separate Syncfusion JS
-        // render pass has finished, so an instant AllAsync() can read zero headers. A single
-        // point-in-time WaitForSelectorAsync(".e-headercell") isn't enough on its own either: a
-        // GroupBy change can trigger a second reload shortly after the first header cells appear
-        // (detach + re-render), so the momentary "at least one exists" check can still be
-        // immediately followed by reading a stale/emptied collection. Poll until a genuinely
-        // non-empty set of header texts is observed instead of trusting a single snapshot.
         var deadline = DateTime.UtcNow.AddSeconds(15);
         List<string> result;
         do
@@ -55,7 +41,6 @@ public sealed class LeaveSummaryReportPage(IPage page, string baseUrl)
         return await page.Locator(".e-grid .e-row").CountAsync();
     }
 
-    // ── Inline filters ─────────────────────────────────────────────────────────
 
     private ILocator PolicyYearInput => page.Locator(".card-body .col-md-3")
         .Filter(new() { HasText = "Policy Year" }).First.Locator("input");
@@ -75,7 +60,6 @@ public sealed class LeaveSummaryReportPage(IPage page, string baseUrl)
     private ILocator GroupByField => page.Locator(".card-body .col-md-3")
         .Filter(new() { HasText = "Group By" }).First;
 
-    /// <summary>Selects the GroupBy option ("Employee"/"Department"/"Leave Type") and waits for the resulting reload.</summary>
     public async Task SelectGroupByAsync(string groupByLabel)
     {
         await DropDownSelector.SelectAsync(page, GroupByField, groupByLabel);
@@ -88,7 +72,6 @@ public sealed class LeaveSummaryReportPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 
-    // ── Export ─────────────────────────────────────────────────────────────────
 
     public async Task<IDownload> ExportAsync(string formatLabel)
     {

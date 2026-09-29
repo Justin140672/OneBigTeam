@@ -3,21 +3,13 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the HR Headcount Summary report page
-/// (/companies/{companyId}/reporting/hr-headcount-summary — HrHeadcountSummaryReportPage.razor):
-/// loading, the 5 summary stat cards, the ReportFilterPanel (Department/Location/EmploymentType/
-/// Status only), export, and access control for the "reporting:view-hr"-gated data/export
-/// endpoints. Catalog-page card visibility/navigation coverage lives in
-/// <see cref="ReportCatalogTests"/>.
-/// </summary>
 public sealed class HrHeadcountSummaryReportTests(HrAdminPersonaFixture fixture)
     : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    private const string LauraEmail = "laura.bennett@acme.example"; // HR Administrator
-    private const string MarcusEmail = "marcus.diallo@acme.example"; // Recruiter — no HrAdministrator role
+    private const string LauraEmail = "laura.bennett@acme.example";
+    private const string MarcusEmail = "marcus.diallo@acme.example";
 
     [Fact]
     public async Task Page_Loads_WithExpectedColumnsAndStatCards()
@@ -44,12 +36,6 @@ public sealed class HrHeadcountSummaryReportTests(HrAdminPersonaFixture fixture)
         Assert.Contains(headers, h => h.Contains("FTE"));
     }
 
-    /// <summary>
-    /// Exercises the report's aggregation logic against the seeded dev data's employee population
-    /// (a mix of active employees, future starters and leavers), not just an empty-state render:
-    /// the summary stat cards must be internally consistent with each other and with the grid's
-    /// own row count, proving the totals are actually computed off the same underlying data set.
-    /// </summary>
     [Fact]
     public async Task SummaryStatCards_AreConsistentWithGridRowCount()
     {
@@ -74,9 +60,6 @@ public sealed class HrHeadcountSummaryReportTests(HrAdminPersonaFixture fixture)
         Assert.True(leavers >= 0, "Expected Leavers to render a parseable non-negative number");
         Assert.True(totalFte >= 0m, "Expected Total FTE to render a parseable non-negative number");
 
-        // The grid is paged (AllowPaging="true"), so the on-screen row count may be capped at the
-        // page size while Total Headcount reflects the full unpaged result set — assert the grid
-        // never shows more rows than the stat card claims exist, not strict equality.
         Assert.True(rowCount <= totalHeadcount,
             "Expected the grid's visible row count to never exceed the Total Headcount stat");
         Assert.True(activeEmployees <= totalHeadcount,
@@ -96,9 +79,6 @@ public sealed class HrHeadcountSummaryReportTests(HrAdminPersonaFixture fixture)
 
         var unfilteredRowCount = await report.GetRowCountAsync();
 
-        // "Engineering" is the seeded Acme department used throughout this suite — see
-        // EmployeeStarterReportTests.FilterPanel_ByDepartment_ReloadsGridWithoutErroring's own
-        // reasoning for choosing a real, non-empty expected value here.
         await report.SelectFilterAsync("Department", "Engineering");
         await report.ApplyFiltersAsync();
 
@@ -171,9 +151,6 @@ public sealed class HrHeadcountSummaryReportTests(HrAdminPersonaFixture fixture)
 
         await catalog.GoToAsync(AcmeId);
 
-        // Marcus (Recruiter, no HrAdministrator role) passes "reporting:view-recruitment" but not
-        // "reporting:view-hr" — the catalog endpoint filters out "Hr"-category entries server-side,
-        // same as EmployeeDirectoryReportTests.NonHrPersona_DoesNotSeeEmployeeDirectoryCard_InCatalog.
         Assert.False(await catalog.HasCardAsync("HR Headcount Summary"),
             "Expected a non-HR-admin persona to not see the HR Headcount Summary catalog card at all");
     }
@@ -187,10 +164,6 @@ public sealed class HrHeadcountSummaryReportTests(HrAdminPersonaFixture fixture)
         await login.GoToAsync();
         await login.LoginAsync(MarcusEmail);
 
-        // ADM-05 (commit e67ba6ff): HrHeadcountSummaryReportPage guards on Session.CanViewHrReports
-        // via AppSession.GuardAccess, which redirects a persona that lacks it to /access-denied
-        // (replace) rather than rendering the page and letting the data call 403. Marcus is a
-        // Recruiter, not an HR Administrator.
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/reporting/hr-headcount-summary");
 
         await accessDenied.WaitForLoadedAsync();

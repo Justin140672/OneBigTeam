@@ -64,7 +64,6 @@ public class PublicHolidayService(HrApiHttpClientFactory httpClientFactory)
         return (null, "Failed to update public holiday.");
     }
 
-    // No dedicated backend GetById endpoint — the list already returns full item detail.
     async Task<PublicHolidayEditModel?> IEditService<PublicHolidayEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
     {
         var list = await ListAsync(companyId);

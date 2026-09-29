@@ -55,7 +55,7 @@ public class EmailDeliveryTests
     {
         var delivery = EmailDelivery.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
         delivery.RecordAttempt(Now.AddMinutes(1));
-        delivery.MarkFailed("Email provider error."); // simulate a prior failed attempt
+        delivery.MarkFailed("Email provider error.");
 
         delivery.MarkSent(Now.AddMinutes(2));
 
@@ -75,7 +75,6 @@ public class EmailDeliveryTests
         Assert.Equal("Invalid recipient address.", delivery.FailureReason);
     }
 
-    // SET-06 -------------------------------------------------------------------------------------
 
     [Fact]
     public void MarkSkipped_Sets_Status_Skipped_And_FailureReason()

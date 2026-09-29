@@ -4,11 +4,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Leave.Features.GetLeaveRequestAuditHistory;
 
-/// <summary>
-/// AUD-07: entity activity history for a specific leave request.
-/// Follows the same pattern as GetSharedCompanyDocumentAuditHistory in the Documents module.
-/// Accessible to HR Administrators (employee:manage policy).
-/// </summary>
 internal sealed class GetLeaveRequestAuditHistoryHandler(
     IAuditHistoryReader auditHistoryReader,
     IEmployeeNameReader employeeNameReader)

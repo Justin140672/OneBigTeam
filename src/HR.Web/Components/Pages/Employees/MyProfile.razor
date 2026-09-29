@@ -103,11 +103,6 @@
 
     private int _activeTabIndex;
 
-    // Gates the entire markup above so a cross-tenant deep link (e.g. an Acme manager guessing/
-    // reusing a BetaCorp employee's profile URL) never even briefly renders that employee's name,
-    // tabs, or "Request Leave"/task actions before the redirect below completes — the previous
-    // version rendered the page unconditionally and only navigated away as a side effect of
-    // OnParametersSetAsync, which could flash unauthorized content for a render or two.
     private bool _authorized;
 
     protected override async Task OnParametersSetAsync()
@@ -116,8 +111,6 @@
 
         await Session.InitialiseAsync();
 
-        // Redirect if the URL's company or employee doesn't match the signed-in user.
-        // This prevents cross-tenant profile URL access.
         if (Session.CompanyId != CompanyId || Session.EmployeeId != (Guid?)EmployeeId)
         {
             Navigation.NavigateTo("/", replace: true);
@@ -132,9 +125,6 @@
             _activeTabIndex = tab.ToString() switch
             {
                 "leave"     => 5,
-                // "companyDocuments" merged into "documents" — see MyProfileDocumentsTab's
-                // combined-list remarks — kept as an alias so any existing bookmarked/shared link
-                // using the old query value still lands on the (now single) Documents tab.
                 "documents" or "companyDocuments" => 7,
                 "tasks"     => 8,
                 "assets"    => 9,

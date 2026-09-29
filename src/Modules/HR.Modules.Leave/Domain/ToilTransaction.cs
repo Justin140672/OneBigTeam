@@ -1,16 +1,5 @@
 namespace HR.Modules.Leave.Domain;
 
-/// <summary>
-/// A single typed entry in the TOIL ledger (LEAVE-06). The ledger is the source of truth for TOIL
-/// balances - every award, consumption, reversal and expiry is represented as one of these rows,
-/// each with an actor, a date, an amount (always stored positive; direction is implied by
-/// <see cref="Type"/>) and a traceable source.
-///
-/// An Earned transaction is itself a FIFO "bucket": <see cref="Days"/> is the amount originally
-/// awarded, and its remaining balance is the amount not yet accounted for by Used/Expired
-/// transactions (and any Adjusted reversals) whose <see cref="RelatedTransactionId"/> points back
-/// at it - see <c>ToilLedgerService</c> for the consumption/reversal/expiry algorithms.
-/// </summary>
 internal sealed class ToilTransaction
 {
     private ToilTransaction() { }
@@ -21,15 +10,10 @@ internal sealed class ToilTransaction
     public Guid LeaveBalanceId { get; private set; }
     public ToilTransactionType Type { get; private set; }
 
-    /// <summary>Always positive; the magnitude of the change. Direction is implied by <see cref="Type"/>.</summary>
     public decimal Days { get; private set; }
 
     public DateOnly OccurredOn { get; private set; }
 
-    /// <summary>
-    /// Only set on Earned transactions (buckets) when the company's TOIL policy configures an
-    /// expiry (see <see cref="LeaveType.ToilExpiryDays"/>). Null means this bucket never expires.
-    /// </summary>
     public DateOnly? ExpiresOn { get; private set; }
 
     /// <summary>
@@ -39,18 +23,14 @@ internal sealed class ToilTransaction
     /// </summary>
     public Guid? RelatedTransactionId { get; private set; }
 
-    /// <summary>Only set on a reversal Adjusted transaction: the specific Used transaction it reverses.</summary>
     public Guid? ReversesTransactionId { get; private set; }
 
-    /// <summary>The leave request that caused this Used or reversal transaction, if any.</summary>
     public Guid? SourceLeaveRequestId { get; private set; }
 
-    /// <summary>The person or system actor responsible for this ledger entry.</summary>
     public Guid ActorEmployeeId { get; private set; }
 
     public string? Notes { get; private set; }
 
-    /// <summary>Human-meaningful description for balance history display.</summary>
     public string Description { get; private set; } = string.Empty;
 
     public DateTimeOffset CreatedAt { get; private set; }

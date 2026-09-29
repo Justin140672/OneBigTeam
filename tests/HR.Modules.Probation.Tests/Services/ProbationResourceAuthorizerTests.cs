@@ -3,15 +3,8 @@ using HR.Modules.Probation.Tests.Infrastructure;
 
 namespace HR.Modules.Probation.Tests.Services;
 
-/// <summary>
-/// PROB-02: unit coverage for ProbationResourceAuthorizer's HR-administrator bypass and
-/// reporting-hierarchy resolution, mirroring HR.Modules.Leave.Tests.LeaveResourceAuthorizerTests /
-/// HR.Modules.Sickness.Tests.Services.SicknessResourceAuthorizerTests' shape for the equivalent
-/// LEAVE-02/SICK-02 authorizers.
-/// </summary>
 public class ProbationResourceAuthorizerTests
 {
-    // Mirrors HR.Modules.Probation.Services.ProbationResourceAuthorizer.HrAdministratorRoleId.
     private static readonly Guid HrAdministratorRoleId = new("00000000-0000-0000-0000-000000000004");
     private static readonly Guid ManagerRoleId = new("00000000-0000-0000-0000-000000000002");
     private static readonly Guid CompanyId = Guid.NewGuid();
@@ -23,7 +16,6 @@ public class ProbationResourceAuthorizerTests
             authorizationService ?? new FakeRoleAuthorizationService(),
             directReportsReader ?? new FakeDirectReportsReader());
 
-    // ── IsHrAdministratorAsync ───────────────────────────────────────────────────
 
     [Fact]
     public async Task IsHrAdministratorAsync_True_When_Role_Present()
@@ -62,7 +54,6 @@ public class ProbationResourceAuthorizerTests
         Assert.False(result);
     }
 
-    // ── GetAuthorizedEmployeeIdsAsync ────────────────────────────────────────────
 
     [Fact]
     public async Task GetAuthorizedEmployeeIdsAsync_Returns_Null_For_HrAdministrator()
@@ -96,8 +87,6 @@ public class ProbationResourceAuthorizerTests
     [Fact]
     public async Task GetAuthorizedEmployeeIdsAsync_Returns_Empty_Set_For_Manager_With_No_Reports()
     {
-        // Distinguishes "manager, but zero-length hierarchy" (empty set, callers should filter
-        // to nothing) from the HR-administrator "unrestricted" null-sentinel case.
         var manager = Guid.NewGuid();
         var authorizer = BuildAuthorizer(directReportsReader: new FakeDirectReportsReader());
 
@@ -107,7 +96,6 @@ public class ProbationResourceAuthorizerTests
         Assert.Empty(result!);
     }
 
-    // ── CanViewEmployeeAsync ──────────────────────────────────────────────────────
 
     [Fact]
     public async Task CanViewEmployeeAsync_Allows_HrAdministrator_Regardless_Of_Hierarchy()
@@ -116,7 +104,7 @@ public class ProbationResourceAuthorizerTests
         var target = Guid.NewGuid();
         var authorizer = BuildAuthorizer(
             authorizationService: new FakeRoleAuthorizationService(HrAdministratorRoleId),
-            directReportsReader: new FakeDirectReportsReader()); // empty hierarchy
+            directReportsReader: new FakeDirectReportsReader());
 
         var result = await authorizer.CanViewEmployeeAsync(CompanyId, caller, target, CancellationToken.None);
 
@@ -138,9 +126,6 @@ public class ProbationResourceAuthorizerTests
     [Fact]
     public async Task CanViewEmployeeAsync_Allows_Skip_Level_Manager_In_Three_Level_Hierarchy()
     {
-        // GetAllDescendantIdsAsync is transitive — a skip-level manager's full descendant set
-        // includes indirect reports, verified here by including the target directly in the
-        // fake's returned set (matching how a real implementation would resolve it).
         var skipLevelManager = Guid.NewGuid();
         var indirectReport = Guid.NewGuid();
         var authorizer = BuildAuthorizer(directReportsReader: new FakeDirectReportsReader(indirectReport));
@@ -167,8 +152,6 @@ public class ProbationResourceAuthorizerTests
     [Fact]
     public async Task CanViewEmployeeAsync_Denies_Own_Manager_Viewed_Bottom_Up()
     {
-        // The hierarchy check is one-directional (manager sees reports, not vice versa) — being
-        // someone's report does not grant view rights over the manager's own resources.
         var manager = Guid.NewGuid();
         var report = Guid.NewGuid();
         var authorizer = BuildAuthorizer(directReportsReader: new FakeDirectReportsReader(report));

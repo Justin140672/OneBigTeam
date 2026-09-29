@@ -5,9 +5,6 @@ namespace HR.Modules.Reporting.Features.GetReportCatalog;
 
 internal sealed class GetReportCatalogHandler
 {
-    // REP-03: the catalogue is now sourced from the central ReportRegistry.ReportCatalog rather
-    // than maintaining its own static list, so SaveReportView/AddReportFavourite/GetReportViews/
-    // GetReportFavourites see exactly the same set of reports, categories and access gates.
     public Task<Result<GetReportCatalogResponse>> HandleAsync(
         GetReportCatalogRequest request,
         bool canViewRecruitment,

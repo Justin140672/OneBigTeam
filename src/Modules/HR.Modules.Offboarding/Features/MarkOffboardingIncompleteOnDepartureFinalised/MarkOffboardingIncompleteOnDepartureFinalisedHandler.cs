@@ -40,8 +40,6 @@ internal sealed class MarkOffboardingIncompleteOnDepartureFinalisedHandler(
             .OrderByDescending(p => p.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
-        // No plan at all, or the most recent plan already Completed/Cancelled: nothing outstanding
-        // to flag. A Cancelled plan represents a withdrawn leaving process, not an incomplete one.
         if (plan is null || plan.Status is OffboardingStatus.Completed or OffboardingStatus.Cancelled)
             return;
 
@@ -50,7 +48,7 @@ internal sealed class MarkOffboardingIncompleteOnDepartureFinalisedHandler(
             .ToListAsync(cancellationToken);
 
         if (OffboardingPlan.CanComplete(tasks))
-            return; // Every mandatory task is already resolved — nothing incomplete to flag.
+            return;
 
         var now = clock.UtcNowOffset();
         var wasAlreadyFlagged = plan.HasIncompleteOffboardingAtDeparture;

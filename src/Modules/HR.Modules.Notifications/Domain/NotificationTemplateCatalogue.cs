@@ -96,10 +96,6 @@ internal static class NotificationTemplateCatalogue
                 OptionalTokens: new HashSet<string> { "TaskDescription" }),
         };
 
-    /// <summary>Every registered template, exposed only so NotificationTemplateCatalogueTests can walk
-    /// the full set and assert every "{Token}" placeholder used in a template string is declared in
-    /// that template's RequiredTokens/OptionalTokens — a template-authoring-time consistency check,
-    /// not something evaluated per-render.</summary>
     public static IReadOnlyDictionary<NotificationType, NotificationTemplate> All => Templates;
 
     public static bool TryGet(NotificationType type, out NotificationTemplate? template) =>

@@ -7,12 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Services;
 
-/// <summary>
-/// OBT-721 Workload &amp; HR Actions Report provider for upcoming employee start dates. HR-only —
-/// there is no manager-scoped tier for this category per the OBT-721 ticket. Queries
-/// EmployeesDbContext directly (rather than IEmployeeStarterReader, which is paged/filtered for a
-/// dedicated report UI) since this provider only needs a simple forward-looking window.
-/// </summary>
 internal sealed class UpcomingEmployeeStartDatesWorkloadActionProvider(
     EmployeesDbContext dbContext,
     IEmployeeDepartmentReader employeeDepartmentReader,

@@ -5,15 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// DSH-02: GetTeamSicknessToday derives the caller from <c>ICurrentUser</c> and authorizes the
-/// browser-supplied <c>{managerId}</c> route value via
-/// <c>SicknessResourceAuthorizer.CanViewManagerTeamAsync</c> (self / manager-above / HR admin),
-/// then scopes the results to that manager's entire reporting sub-tree (direct and indirect
-/// reports). See specifications/architecture/11-manager-hierarchy-scope.md.
-/// Policy-level enforcement of <c>sickness:view-team</c> is covered by SicknessAuthorizationTests;
-/// this class covers the resource check and the hierarchy data scope.
-/// </summary>
 [Collection("Integration")]
 public class GetTeamSicknessTodayEndpointTests
 {
@@ -152,7 +143,6 @@ public class GetTeamSicknessTodayEndpointTests
         Assert.Contains(payload!.Items, i => i.EmployeeId == report);
     }
 
-    // ── Helpers (mirrors SicknessResourceAuthorizationTests) ─────────────────────
 
     private async Task<HttpClient> HrAdminClientAsync(Guid companyId)
     {
@@ -211,8 +201,6 @@ public class GetTeamSicknessTodayEndpointTests
         return (await response.Content.ReadFromJsonAsync<CategoryPayload>())!.Id;
     }
 
-    /// <summary>Creates an open (unclosed) sickness record — its status is Active — for the
-    /// employee, so it shows on the team-sickness-today widget.</summary>
     private async Task CreateActiveSicknessRecordAsync(HttpClient hrClient, Guid companyId, Guid employeeId)
     {
         var categoryId = await CreateCategoryAsync(hrClient, companyId);

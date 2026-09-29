@@ -32,14 +32,8 @@ public sealed class AdminSupportRequestStatusConcurrencyTests(HrAdminPersonaFixt
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    // Staff persona used to submit the seed support request via HR.Web's Help & Feedback page — a
-    // platform-admin-only persona (e.g. priya.shah) has no employee record and cannot log into
-    // HR.Web itself, so a real tenant HR.Web login is still needed for seeding.
     private const string LauraEmail = "laura.bennett@acme.example";
 
-    // Platform-admin-allow-listed persona used for the Admin Portal itself. Purely a
-    // CompanyAdministrator on the tenant side — no "support:manage" grant needed any more, since
-    // the Admin Portal now calls the "platform:admin"-gated admin routes exclusively.
     private const string AllowListedAdminEmail = "priya.shah@acme.example";
 
     [Fact]
@@ -102,8 +96,6 @@ public sealed class AdminSupportRequestStatusConcurrencyTests(HrAdminPersonaFixt
             "Expected the support request detail page to load, not the not-authorised error banner");
         Assert.Equal(title, await detail.GetTitleAsync());
 
-        // A freshly-submitted request starts life as SupportRequestStatus.Submitted (see
-        // SupportRequest.cs's constructor).
         Assert.Equal("Submitted", await detail.GetSelectedStatusAsync());
     }
 
@@ -130,8 +122,6 @@ public sealed class AdminSupportRequestStatusConcurrencyTests(HrAdminPersonaFixt
             "Expected a success message after saving the new status with no conflicting change");
         Assert.False(await detail.IsConflictBannerVisibleAsync());
 
-        // Reload the page entirely (not just re-navigate client-side) to confirm the new status
-        // actually persisted server-side, not merely in local component state.
         await detail.GoToAsync(AcmeId, id);
         Assert.Equal("UnderReview", await detail.GetSelectedStatusAsync());
     }
@@ -152,10 +142,8 @@ public sealed class AdminSupportRequestStatusConcurrencyTests(HrAdminPersonaFixt
         await queue.OpenRequestAsync(title);
         var id = UrlIdParser.LastGuid(_page.Url);
 
-        // ── Tab 1: open the editor and select a new status, but do not save yet (loads Version v1) ──
         await detail.SelectStatusAsync("Planned");
 
-        // ── Tab 2 (same context / persona): load the same request and save first, bumping its Version ──
         var otherPage = await _context.NewPageAsync();
         try
         {
@@ -171,7 +159,6 @@ public sealed class AdminSupportRequestStatusConcurrencyTests(HrAdminPersonaFixt
             await otherPage.CloseAsync();
         }
 
-        // ── Tab 1: saving now is stale → conflict banner, page stays, selection preserved ──
         await detail.SaveExpectingConflictAsync();
 
         Assert.True(await detail.IsConflictBannerVisibleAsync(),
@@ -179,14 +166,12 @@ public sealed class AdminSupportRequestStatusConcurrencyTests(HrAdminPersonaFixt
         Assert.Contains($"/support-requests/{id}", _page.Url);
         Assert.Equal("Planned", await detail.GetSelectedStatusAsync());
 
-        // ── Tab 1: "Reload latest values" clears the banner and adopts the other tab's winning value ──
         await detail.ClickReloadLatestValuesAsync();
 
         Assert.False(await detail.IsConflictBannerVisibleAsync(),
             "Expected the conflict banner to clear after reloading latest values");
         Assert.Equal("WaitingForCustomer", await detail.GetSelectedStatusAsync());
 
-        // ── Tab 1: re-select against the fresh version and save successfully ──
         await detail.SelectStatusAsync("Resolved");
         await detail.SaveAsync();
 
@@ -197,11 +182,6 @@ public sealed class AdminSupportRequestStatusConcurrencyTests(HrAdminPersonaFixt
         Assert.Equal("Resolved", await detail.GetSelectedStatusAsync());
     }
 
-    /// <summary>
-    /// Submits a uniquely-titled support request as a staff HR.Web persona (Laura) via the
-    /// Help &amp; Feedback page, so each test contends only with its own seed data (deterministic
-    /// at maxParallelThreads=15). Returns the generated title.
-    /// </summary>
     private async Task<string> SeedSupportRequestAsync(string label)
     {
         var title = $"{label} {Guid.NewGuid().ToString("N")[..8]}";

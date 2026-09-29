@@ -66,14 +66,6 @@ internal sealed class ProbationRecord : IVersionedAggregate
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    /// <summary>
-    /// Round 3 reliability fix: the OccurredAt of the most recent
-    /// EmployeeManagerChangedIntegrationEvent actually applied to <see cref="ManagerEmployeeId"/> by
-    /// <see cref="ApplyManagerChangeFromEvent"/>. Distinct from <see cref="UpdatedAt"/> (which
-    /// changes on many unrelated mutations), this lets ManagerChangedHandler detect and ignore a
-    /// stale/out-of-order redelivery — e.g. recovery replaying an old A-&gt;B event after a later
-    /// B-&gt;C event has already been applied — rather than trusting event arrival order.
-    /// </summary>
     public DateTimeOffset? ManagerChangeSourceOccurredAt { get; private set; }
 
     // Ticket 16 (optimistic concurrency): explicit, persisted concurrency token. Mapped as an EF
@@ -88,13 +80,6 @@ internal sealed class ProbationRecord : IVersionedAggregate
 
     public void IncrementVersion() => Version++;
 
-    /// <summary>
-    /// PROB-06: <paramref name="today"/> decides the initial status — NotStarted when the
-    /// employee's start date is still in the future, otherwise Active. Callers pass their own
-    /// "today" (rather than this method reading a clock itself) so it can be resolved in the
-    /// caller's own company time zone, consistent with how GenerateDueProbationReviewsJob resolves
-    /// "today" per company elsewhere in this module.
-    /// </summary>
     public static ProbationRecord Create(
         Guid id,
         Guid companyId,
@@ -121,15 +106,6 @@ internal sealed class ProbationRecord : IVersionedAggregate
         };
     }
 
-    /// <summary>
-    /// PROB-06: creates a record that represents an explicit "probation does not apply" decision
-    /// made before any in-flight record existed for this employee (e.g. HR marking the employee
-    /// not applicable while probation creation was still deferred for lack of a manager/period).
-    /// ManagerEmployeeId/ExpectedEndDate are still required non-null fields on this entity, so
-    /// callers supply nominal values (typically the employee's current manager, if any, and the
-    /// start date itself as a placeholder end date) — they carry no workflow meaning for a record
-    /// that will never run reviews.
-    /// </summary>
     public static ProbationRecord CreateNotApplicable(
         Guid id,
         Guid companyId,
@@ -155,16 +131,6 @@ internal sealed class ProbationRecord : IVersionedAggregate
         };
     }
 
-    /// <summary>
-    /// PROB-06: called from GenerateDueProbationReviewsJob's daily pass. A NotStarted record is
-    /// left untouched until its StartDate is reached, then flips to Active the next time the job
-    /// runs — a lightweight, at-most-24h-lag transition rather than a persisted status computed
-    /// eagerly at every read. Chosen over a purely derived (never-persisted) status because a
-    /// stored column is simpler to query/index/report on (consistent with this session's general
-    /// preference for persisted columns over computed properties) and the daily job already exists
-    /// as the natural place to reconcile date-driven state — no new job/schedule was introduced for
-    /// this. No-op if not currently NotStarted or if the start date has not yet been reached.
-    /// </summary>
     public void ActivateIfDue(DateOnly today, DateTimeOffset now)
     {
         if (Status != ProbationStatus.NotStarted || today < StartDate)
@@ -175,11 +141,6 @@ internal sealed class ProbationRecord : IVersionedAggregate
         UpdatedAt = now;
     }
 
-    /// <summary>
-    /// PROB-06: records an explicit "probation does not apply" decision against an existing
-    /// NotStarted or Active record. See <see cref="AllowedTransitions"/> for why ReviewDue/Extended
-    /// records cannot take this path.
-    /// </summary>
     public void MarkNotApplicable(string? reason, DateTimeOffset now)
     {
         AssertCanTransitionTo(ProbationStatus.NotApplicable);
@@ -231,37 +192,21 @@ internal sealed class ProbationRecord : IVersionedAggregate
         UpdatedAt = now;
     }
 
-    /// <summary>
-    /// PROB-04: applies a manager change originating from the Employees module
-    /// (<c>EmployeeManagerChangedIntegrationEvent</c>) so that ManagerCheckIn/FinalDecision/
-    /// ExtensionConfirmation tasks created after this point resolve to the employee's current
-    /// responsible manager rather than whoever was recorded at probation-record creation time.
-    /// </summary>
     public void ChangeManager(Guid newManagerEmployeeId, DateTimeOffset now)
     {
         ManagerEmployeeId = newManagerEmployeeId;
         UpdatedAt = now;
     }
 
-    /// <summary>
-    /// Round 3 reliability fix: replaces the old "record.ManagerEmployeeId == event.NewManagerId
-    /// means already applied" idempotency guard in ManagerChangedHandler, which hid incomplete task
-    /// reconciliation work on retry. Applies <paramref name="newManagerEmployeeId"/> only if
-    /// <paramref name="occurredAt"/> is at least as new as the last manager-change event actually
-    /// applied (<see cref="ManagerChangeSourceOccurredAt"/>) — a stale/out-of-order redelivery (e.g.
-    /// an old A-&gt;B event replayed after a later B-&gt;C event already landed) is a no-op here, so the
-    /// record never regresses to an outdated manager. Returns true if the record's ManagerEmployeeId
-    /// was changed by this call, false if it was left as-is (already current, or event is stale).
-    /// </summary>
     public bool ApplyManagerChangeFromEvent(Guid newManagerEmployeeId, DateTimeOffset occurredAt, DateTimeOffset now)
     {
         if (ManagerChangeSourceOccurredAt is not null && occurredAt < ManagerChangeSourceOccurredAt)
-            return false; // Stale/out-of-order event — a newer manager change has already been applied.
+            return false;
 
         ManagerChangeSourceOccurredAt = occurredAt;
 
         if (ManagerEmployeeId == newManagerEmployeeId)
-            return false; // Already reflects this manager — no field actually changed.
+            return false;
 
         ManagerEmployeeId = newManagerEmployeeId;
         UpdatedAt = now;
@@ -277,11 +222,6 @@ internal sealed class ProbationRecord : IVersionedAggregate
     {
         AssertCanTransitionTo(ProbationStatus.Extended);
 
-        // PROB-05: an extension must move the expected end date forward — never sideways,
-        // backwards, or only relative to "today". Both comparisons are required: against the
-        // record's current ExpectedEndDate (an extension that doesn't actually extend is
-        // meaningless) and against the decision date itself (an extension can't be backdated to
-        // end before/on the day the decision was made).
         if (newExpectedEndDate <= ExpectedEndDate)
             throw new InvalidOperationException(
                 "New expected end date must be later than the current expected end date.");

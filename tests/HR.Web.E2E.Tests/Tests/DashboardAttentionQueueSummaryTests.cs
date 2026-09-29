@@ -5,59 +5,17 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// DSH-06 stage 2 — the HR dashboard "Needs your attention" widget
-/// (AttentionQueueWidget.razor) and the Manager dashboard "Requires your attention" widget
-/// (ManagerAttentionQueueWidget.razor) were rewired from a fan-out of ~6-7 browser fetches down
-/// to ONE server-side bounded summary request each:
-///
-///   HR      → GET /api/companies/{companyId}/dashboards/hr/summary
-///   Manager → GET /api/companies/{companyId}/dashboards/manager/summary
-///
-/// The DSH-03 degraded-source UX is preserved: each returned category maps to a
-/// WidgetSourceOutcome, so WidgetPanelState.Summarise still drives the per-failed-source
-/// <c>.widget-source-warning</c> row, the <c>.attention-queue-all-clear</c> block and the
-/// <c>.widget-count-badge</c>. The DSH-04 drill-down is preserved: a row with a linked TaskId
-/// opens <see cref="TaskViewPage">TaskViewDialog</see> in place, otherwise it navigates the
-/// item's DeepLinkUrl. The "Show resolved leave requests" checkbox and per-source individual
-/// retry buttons were removed — retry is now retry-all, wired to the widget's ReloadAllAsync.
-///
-/// COMPILE-ONLY, and several assertions are written defensively (guard-and-return when the
-/// relevant seeded data isn't present for a given run), mirroring the existing
-/// HrDashboardTests / ManagerDashboardTests / DashboardWidgetFailureTests style:
-///  * The Blazor Server dashboards fetch the summary server-side over the "hrapi" HttpClient, so
-///    a browser-level <see cref="IPage.RouteAsync"/> cannot by itself force the upstream call to
-///    fail — the partial-failure tests reuse DashboardWidgetFailureTests' interception mechanism
-///    and no-op when the fault doesn't reach a browser-observable request (no server-side fault
-///    hook exists yet).
-///  * Likewise the route-wait on <c>**/dashboards/*/summary</c> is best-effort — it is captured
-///    to document intent and tolerates a timeout for the same server-side-fetch reason.
-/// </summary>
 public static class DashboardAttentionQueueSummaryTests
 {
-    // shared helpers -------------------------------------------------------------------------
 
     public static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    /// <summary>
-    /// Every possible <see cref="AttentionQueueSupport.ResolveActionLabel"/> value for a
-    /// task-backed row (TaskId is not null) — see that method's switch. A deep-link row (no
-    /// TaskId) never produces the bare word "View": it's always "View &lt;noun&gt;" (e.g. "View
-    /// employee", "View document") or "Review user account"/"View details". So identifying a
-    /// deep-link row means excluding these exact task-backed labels, not looking for an exact
-    /// "View" match.
-    /// </summary>
     public static readonly string[] TaskBackedActionLabels =
     [
         "Open task", "Review leave request", "Review probation",
         "Complete return-to-work review", "View evidence request",
     ];
 
-    /// <summary>
-    /// Best-effort wait for the single bounded summary request. The dashboards issue this
-    /// server-side, so it may never surface as a browser request — a timeout here is not a
-    /// failure, it just means the journey couldn't be observed at the network layer.
-    /// </summary>
     public static async Task<bool> TryWaitForSummaryRequestAsync(IPage page, string urlGlob, Func<Task> trigger)
     {
         try
@@ -71,11 +29,6 @@ public static class DashboardAttentionQueueSummaryTests
         }
     }
 
-    /// <summary>
-    /// Mirrors DashboardWidgetFailureTests.ForceOneSourceToFailAsync: fulfils the first matching
-    /// request with a 500 so the widget records a failed source. Only has an effect if the
-    /// summary fetch is observable at the browser layer.
-    /// </summary>
     public static async Task ForceSummaryToFailAsync(IPage page, Regex summaryUrl)
     {
         var tripped = false;
@@ -98,7 +51,6 @@ public static class DashboardAttentionQueueSummaryTests
     }
 }
 
-/// <summary>HR Administrator persona (Laura Bennett) against "/dashboard/hr".</summary>
 public sealed class HrDashboardAttentionQueueSummaryTests(HrAdminPersonaFixture fixture)
     : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
@@ -128,22 +80,17 @@ public sealed class HrDashboardAttentionQueueSummaryTests(HrAdminPersonaFixture 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Route-wait around the navigation that triggers the widget's OnInitializedAsync fetch.
         await DashboardAttentionQueueSummaryTests.TryWaitForSummaryRequestAsync(
             _page, "**/dashboards/hr/summary", () => dashboard.GoToAsync());
 
         Assert.True(await dashboard.HasWidgetAsync("Needs your attention"));
 
-        // Loading indicator resolves to either rows or the "All clear" block.
         await dashboard.WaitForAttentionQueueLoadedAsync();
     }
 
     [Fact]
     public async Task SeededActionableData_RendersRows_AndCountBadgeMatchesRowCount()
     {
-        // Acme always has some mix of seeded HR tasks / leave requests / reviews / documents, so
-        // the queue is expected to be non-empty for Laura. If a given run genuinely has none, the
-        // "all clear" contract is covered by AllClearState_RendersWhenNoActionableWork below.
         var dashboard = await LoginAndOpenAsync();
         await dashboard.WaitForAttentionQueueLoadedAsync();
 
@@ -170,15 +117,12 @@ public sealed class HrDashboardAttentionQueueSummaryTests(HrAdminPersonaFixture 
         var employeeNames = await dashboard.GetAttentionQueueEmployeeNamesAsync();
         var carlos = employeeNames.FirstOrDefault(n => n.Contains("Carlos", StringComparison.OrdinalIgnoreCase));
         if (carlos is null)
-            return; // Carlos' review not in this run's top-25 window — nothing to assert here.
+            return;
 
         await dashboard.ClickAttentionQueueItemAsync(carlos);
 
         await task.WaitForLoadedAsync();
         Assert.Contains("/dashboard/hr", _page.Url);
-        // The dialog header shows the task's own title ("{Action} — {EmployeeName}"), not the
-        // queue row's "{EmployeeName} · Due {Date}" meta text used to find/click the row above
-        // — only the employee name is common to both, so that's what we can assert here.
         Assert.Contains("Carlos", await task.GetTitleAsync(), StringComparison.OrdinalIgnoreCase);
     }
 
@@ -188,16 +132,6 @@ public sealed class HrDashboardAttentionQueueSummaryTests(HrAdminPersonaFixture 
         var dashboard = await LoginAndOpenAsync();
         await dashboard.WaitForAttentionQueueLoadedAsync();
 
-        // A row whose action label isn't one of the task-backed labels (AttentionQueuePanel's
-        // ActivateAsync only opens the task dialog when TaskId is set — see
-        // AttentionQueueSupport.ResolveActionLabel) has no linked TaskId and navigates its
-        // DeepLinkUrl on activation instead.
-        // The attention queue is HR-wide shared data, not isolated per test — under 15-thread
-        // parallel runs another test can add/complete/claim items while this loop is mid-iteration,
-        // shifting the live row list out from under a count taken once up front. Index i can then
-        // point at a row that's been removed or replaced, and TextContentAsync()'s default 30s
-        // auto-wait for ".attention-queue-action" to appear would hang the whole test on that one
-        // stale index instead of just skipping it. Bound the wait and skip rows that don't resolve.
         var rows = _page.Locator(".attention-queue-card .attention-queue-item");
         var count = await rows.CountAsync();
         for (var i = 0; i < count; i++)
@@ -221,15 +155,11 @@ public sealed class HrDashboardAttentionQueueSummaryTests(HrAdminPersonaFixture 
             return;
         }
 
-        // No deep-link row in this run's queue — covered structurally elsewhere.
     }
 
     [Fact]
     public async Task AllClearState_RendersWhenNoActionableWork()
     {
-        // Defensive contract check (same as HrDashboardTests.AttentionQueue_ShowsAllClearSummary_
-        // WhenEmpty): whenever the summary reports nothing actionable, the compact "All clear"
-        // block shows and there are no rows — never both, never neither.
         var dashboard = await LoginAndOpenAsync();
         await dashboard.WaitForAttentionQueueLoadedAsync();
 
@@ -257,12 +187,10 @@ public sealed class HrDashboardAttentionQueueSummaryTests(HrAdminPersonaFixture 
         await dashboard.WaitForAttentionQueueLoadedAsync();
 
         if (await dashboard.GetAttentionQueueSourceWarningCountAsync() == 0)
-            return; // server-side fetch — fault not browser-observable without a server hook.
+            return;
 
-        // A degraded source never shows the "All clear" block.
         Assert.False(await dashboard.AttentionQueueIsAllClearAsync());
 
-        // Stop forcing the failure, then retry-all: the warning must clear.
         await _page.UnrouteAsync("**/api/**");
         await dashboard.RetryAttentionQueueAllAsync();
         await dashboard.WaitForAttentionQueueSourceWarningsClearedAsync();
@@ -279,22 +207,19 @@ public sealed class HrDashboardAttentionQueueSummaryTests(HrAdminPersonaFixture 
     [Fact]
     public async Task RowTitle_ShowsSpecificActionNotGenericCategory_AndMetaShowsEmployeeOrCategory()
     {
-        // Title now shows the specific task/action title (e.g. "Complete Return to Work Review",
-        // "Approve Leave Request") rather than a generic category label; the employee/category
-        // detail moved to the meta line.
         var dashboard = await LoginAndOpenAsync();
         await dashboard.WaitForAttentionQueueLoadedAsync();
 
         var titles = await dashboard.GetAttentionQueueSubjectsAsync();
         var metas  = await dashboard.GetAttentionQueueEmployeeNamesAsync();
         if (titles.Count == 0)
-            return; // nothing seeded in this run's queue — covered by AllClearState test.
+            return;
 
         var specificIndex = titles.ToList().FindIndex(t =>
             !GenericCategoryLabels.Contains(t, StringComparer.OrdinalIgnoreCase));
 
         if (specificIndex < 0)
-            return; // every seeded row this run happened to have a title equal to a generic label.
+            return;
 
         Assert.False(string.IsNullOrWhiteSpace(metas[specificIndex]));
     }
@@ -308,7 +233,7 @@ public sealed class HrDashboardAttentionQueueSummaryTests(HrAdminPersonaFixture 
         var rows = _page.Locator(".attention-queue-card .attention-queue-item.attention-queue-item--overdue");
         var count = await rows.CountAsync();
         if (count == 0)
-            return; // no overdue row in this run's queue.
+            return;
 
         var text = (await rows.First.TextContentAsync()) ?? "";
         var occurrences = System.Text.RegularExpressions.Regex.Matches(
@@ -319,7 +244,6 @@ public sealed class HrDashboardAttentionQueueSummaryTests(HrAdminPersonaFixture 
     }
 }
 
-/// <summary>Manager persona (James Okafor) against "/dashboard/manager".</summary>
 public sealed class ManagerDashboardAttentionQueueSummaryTests(ManagerPersonaFixture fixture)
     : RoleE2ETestBase<ManagerPersonaFixture>(fixture)
 {
@@ -376,11 +300,6 @@ public sealed class ManagerDashboardAttentionQueueSummaryTests(ManagerPersonaFix
     [Fact]
     public async Task PendingLeaveRequest_ForTeamMember_AppearsAsAnActionableRow()
     {
-        // Seed an actionable item James actually owns: Tom Williams (his direct report) submits a
-        // pending leave request, which becomes an open leave-approval task assigned to James — the
-        // manager summary's "Leave request" category then surfaces it. LoginPage.LoginAsync does a
-        // real re-login when the requested persona differs from the fixture's (see
-        // RolePersonaFixtureBase), so a single-class fixture can still drive both personas.
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
         var dash    = new ManagerDashboardPage(_page, _fixture.WebBaseUrl);
@@ -429,7 +348,6 @@ public sealed class ManagerDashboardAttentionQueueSummaryTests(ManagerPersonaFix
             return;
         }
 
-        // No task-backed row in this run's queue — the deep-link path is covered below.
     }
 
     [Fact]
@@ -438,9 +356,6 @@ public sealed class ManagerDashboardAttentionQueueSummaryTests(ManagerPersonaFix
         var dashboard = await LoginAndOpenAsync();
         await dashboard.WaitForAttentionQueueLoadedAsync();
 
-        // See the HR-dashboard variant of this test for why this bounds the per-row wait and skips
-        // rows that don't resolve quickly: the attention queue is shared, live data, and the row
-        // list can shift under this loop across 15-thread parallel runs.
         var rows = _page.Locator(".attention-queue-card .attention-queue-item");
         var count = await rows.CountAsync();
         for (var i = 0; i < count; i++)
@@ -495,7 +410,7 @@ public sealed class ManagerDashboardAttentionQueueSummaryTests(ManagerPersonaFix
         await dashboard.WaitForAttentionQueueLoadedAsync();
 
         if (await dashboard.GetAttentionQueueSourceWarningCountAsync() == 0)
-            return; // server-side fetch — fault not browser-observable without a server hook.
+            return;
 
         Assert.False(await dashboard.AttentionQueueIsAllClearAsync());
 
@@ -521,7 +436,7 @@ public sealed class ManagerDashboardAttentionQueueSummaryTests(ManagerPersonaFix
         var titles = await dashboard.GetAttentionQueueSubjectsAsync();
         var metas  = await dashboard.GetAttentionQueueEmployeeNamesAsync();
         if (titles.Count == 0)
-            return; // nothing seeded in this run's queue — covered by AllClearState test.
+            return;
 
         var specificIndex = titles.ToList().FindIndex(t =>
             !GenericCategoryLabels.Contains(t, StringComparer.OrdinalIgnoreCase));

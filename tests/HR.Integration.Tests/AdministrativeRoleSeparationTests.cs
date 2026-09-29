@@ -21,9 +21,6 @@ public class AdministrativeRoleSeparationTests
 {
     private readonly ApiWebApplicationFactory _factory;
 
-    // Fixed per-role personas. Distinct literal ids (not Guid.NewGuid()) so the constructor's
-    // one-time role seeding is stable, but namespaced under this file's own prefix so they can't
-    // collide with personas seeded by sibling test classes under the shared database collection.
     private static readonly Guid EmployeeOnly       = new("ad050000-0000-0000-0000-000000000001");
     private static readonly Guid ManagerPersona     = new("ad050000-0000-0000-0000-000000000002");
     private static readonly Guid RecruiterPersona   = new("ad050000-0000-0000-0000-000000000003");
@@ -37,8 +34,6 @@ public class AdministrativeRoleSeparationTests
 
         Task.Run(async () =>
         {
-            // Every persona also holds the Employee floor role, mirroring production (everyone is
-            // an Employee) and the sibling authz test classes.
             await TestRoleSeeder.AssignRoleAsync(factory, EmployeeOnly, SystemRoles.Employee);
 
             await TestRoleSeeder.AssignRoleAsync(factory, ManagerPersona, SystemRoles.Employee);
@@ -59,7 +54,6 @@ public class AdministrativeRoleSeparationTests
         }).GetAwaiter().GetResult();
     }
 
-    // Role keys used by [Theory] InlineData -> persona id.
     private const string Employee = "employee";
     private const string Manager = "manager";
     private const string Recruiter = "recruiter";
@@ -100,10 +94,6 @@ public class AdministrativeRoleSeparationTests
             response.StatusCode is not (HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized),
             $"Expected the request to pass authorization (not 401/403) but got {(int)response.StatusCode} {response.StatusCode}");
 
-    // ---------------------------------------------------------------------
-    // Employee administration - list  (employee:manage)
-    // GET /api/companies/{companyId}/employees
-    // ---------------------------------------------------------------------
 
     [Theory]
     [InlineData(Employee)]
@@ -133,13 +123,6 @@ public class AdministrativeRoleSeparationTests
         AssertReachedHandler(response);
     }
 
-    // ---------------------------------------------------------------------
-    // Employee selection list  (employee:read)
-    // GET /api/companies/{companyId}/employees/selectable
-    // The lightweight name/id picker projection — Manager / Recruiter / HR Administrator may
-    // reach it (dropdowns such as the vacancy hiring-manager picker), but a plain Employee or a
-    // Company-Administrator-only user may not.
-    // ---------------------------------------------------------------------
 
     [Theory]
     [InlineData(Manager)]
@@ -168,10 +151,6 @@ public class AdministrativeRoleSeparationTests
         AssertForbidden(response);
     }
 
-    // ---------------------------------------------------------------------
-    // Workforce analytics  (employee:read)
-    // GET /api/companies/{companyId}/employees/headcount-summary
-    // ---------------------------------------------------------------------
 
     [Theory]
     [InlineData(Employee)]
@@ -200,10 +179,6 @@ public class AdministrativeRoleSeparationTests
         AssertReachedHandler(response);
     }
 
-    // ---------------------------------------------------------------------
-    // Offboarding read  (employee:read)
-    // GET /api/companies/{companyId}/employees/{employeeId}/leaving-process
-    // ---------------------------------------------------------------------
 
     [Theory]
     [InlineData(Employee)]
@@ -225,17 +200,12 @@ public class AdministrativeRoleSeparationTests
         var companyId = Guid.NewGuid();
         using var client = await ClientFor(HrAdmin, companyId);
 
-        // Unseeded employee id: a 404 is acceptable here, a 401/403 is not.
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/leaving-process");
 
         AssertReachedHandler(response);
     }
 
-    // ---------------------------------------------------------------------
-    // Employee administration - mutate  (employee:manage)
-    // POST /api/companies/{companyId}/employees
-    // ---------------------------------------------------------------------
 
     [Theory]
     [InlineData(Employee)]
@@ -265,7 +235,6 @@ public class AdministrativeRoleSeparationTests
         var companyId = Guid.NewGuid();
         using var client = await ClientFor(HrAdmin, companyId);
 
-        // Missing reference data -> the handler may 400/422; what matters is it is not 401/403.
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
         {
             companyId,
@@ -278,10 +247,6 @@ public class AdministrativeRoleSeparationTests
         AssertReachedHandler(response);
     }
 
-    // ---------------------------------------------------------------------
-    // User & role administration  (users:view)
-    // GET /api/companies/{companyId}/users
-    // ---------------------------------------------------------------------
 
     [Theory]
     [InlineData(Employee)]
@@ -309,10 +274,6 @@ public class AdministrativeRoleSeparationTests
         AssertReachedHandler(response);
     }
 
-    // ---------------------------------------------------------------------
-    // HR settings  (hr-settings:manage)
-    // PUT /api/companies/{companyId}/hr-settings
-    // ---------------------------------------------------------------------
 
     [Theory]
     [InlineData(Employee)]
@@ -349,11 +310,6 @@ public class AdministrativeRoleSeparationTests
         probationMonths = 6
     };
 
-    // ---------------------------------------------------------------------
-    // Company profile / settings  (company:manage)
-    // PUT /api/companies/{companyId}/settings   +   GET .../settings/history
-    // Company Administrator is the ONLY role permitted here; HR Administrator must be denied.
-    // ---------------------------------------------------------------------
 
     [Theory]
     [InlineData(Employee)]
@@ -401,10 +357,6 @@ public class AdministrativeRoleSeparationTests
         locale = "en-GB",
     };
 
-    // ---------------------------------------------------------------------
-    // HR reports  (reporting:view-hr)
-    // GET /api/companies/{companyId}/reporting/hr-headcount-summary
-    // ---------------------------------------------------------------------
 
     [Theory]
     [InlineData(Employee)]
@@ -432,10 +384,6 @@ public class AdministrativeRoleSeparationTests
         AssertReachedHandler(response);
     }
 
-    // ---------------------------------------------------------------------
-    // Recruitment  (candidate:view)
-    // GET /api/companies/{companyId}/recruitment/applications
-    // ---------------------------------------------------------------------
 
     [Theory]
     [InlineData(Employee)]
@@ -463,10 +411,6 @@ public class AdministrativeRoleSeparationTests
         AssertReachedHandler(response);
     }
 
-    // ---------------------------------------------------------------------
-    // Leave administration  (leave:manage)
-    // POST /api/companies/{companyId}/leave-policies
-    // ---------------------------------------------------------------------
 
     [Theory]
     [InlineData(Employee)]
@@ -505,10 +449,6 @@ public class AdministrativeRoleSeparationTests
         AssertReachedHandler(response);
     }
 
-    // ---------------------------------------------------------------------
-    // Sickness administration  (sickness:manage)
-    // GET /api/companies/{companyId}/employees/{employeeId}/sickness-records
-    // ---------------------------------------------------------------------
 
     [Theory]
     [InlineData(Employee)]
@@ -537,9 +477,6 @@ public class AdministrativeRoleSeparationTests
         AssertReachedHandler(response);
     }
 
-    // ---------------------------------------------------------------------
-    // Anonymous (no auth header) -> 401 across a sample of protected endpoints
-    // ---------------------------------------------------------------------
 
     [Theory]
     [InlineData("/api/companies/{c}/employees")]
@@ -556,9 +493,6 @@ public class AdministrativeRoleSeparationTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ---------------------------------------------------------------------
-    // Positive: Company Administrator retains its own configuration surface
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task CompanyAdministrator_CanReach_CompanyProfileAndSettingsReads()
@@ -593,10 +527,6 @@ public class AdministrativeRoleSeparationTests
         AssertReachedHandler(response);
     }
 
-    // OBT-IAM-09: onboarding:view removed from Company Administrator — a
-    // Company-Administrator-only account is limited to company settings and subscription
-    // administration. CompanyAdminPlusHrAdmin retains access via HR Administrator's own grant (see
-    // CompanyAdministratorPlusHrAdministrator_CanReach_OnboardingChecklist below).
     [Fact]
     public async Task CompanyAdministratorOnly_CannotReach_OnboardingChecklist()
     {
@@ -619,14 +549,6 @@ public class AdministrativeRoleSeparationTests
         AssertReachedHandler(response);
     }
 
-    // ---------------------------------------------------------------------
-    // Subscription & billing  (subscription:manage)
-    // POST /api/companies/subscription/cancel
-    // ADM-05 / RestrictSubscriptionToCompanyAdministrator: subscription & billing is a company-
-    // ownership function. Company Administrator is the ONLY role that holds subscription:manage;
-    // HR Administrator's historical grant was removed by migration
-    // RestrictSubscriptionToCompanyAdministrator.
-    // ---------------------------------------------------------------------
 
     [Theory]
     [InlineData(Employee)]
@@ -670,11 +592,6 @@ public class AdministrativeRoleSeparationTests
         AssertReachedHandler(await companyAdminClient.GetAsync("/api/companies/subscription-details"));
     }
 
-    // OBT-IAM-09: support:manage removed from Company Administrator — a
-    // Company-Administrator-only account is limited to company settings and subscription
-    // administration (the queue admin surface is the support dashboard; GET .../support/requests is
-    // now self-service, own-requests-only, gated by support:request). CompanyAdminPlusHrAdmin retains access via HR Administrator's own grant (see
-    // CompanyAdministratorPlusHrAdministrator_CanReach_SupportRequestsQueue below).
     [Fact]
     public async Task CompanyAdministratorOnly_CannotReach_SupportRequestsQueue()
     {

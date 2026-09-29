@@ -43,11 +43,6 @@ internal sealed class EmployeeLeavePolicyAssignment
         UpdatedAt = now;
     }
 
-    // Called when the employee's departure has been finalised (EmployeeDepartureFinalisedIntegrationEvent).
-    // The row is kept — not deleted — so historical LeaveBalance/LeaveBalanceAdjustment rows for
-    // this employee still resolve a policy via LeaveYearRolloverService's dictionary lookups, and
-    // so re-hiring the same person later has a clear prior record. Idempotent: reactivating is not
-    // supported by this type today, and repeated Deactivate calls are harmless no-ops.
     public void Deactivate(DateTimeOffset now)
     {
         if (!IsActive)

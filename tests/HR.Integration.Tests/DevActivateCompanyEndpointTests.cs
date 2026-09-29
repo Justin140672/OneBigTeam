@@ -9,11 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Covers the dev-only /api/dev/activate-company endpoint (Features/DevActivateCompany), which
-/// replaces the removed /api/dev/confirm-email stub — local dev/demo bypass to flip a company
-/// straight to Active without going through Supabase/VerifyEmail.
-/// </summary>
 [Collection("Integration")]
 public class DevActivateCompanyEndpointTests
 {
@@ -62,15 +57,6 @@ public class DevActivateCompanyEndpointTests
     [Fact]
     public async Task Post_DevActivateCompany_Returns_NotFound_Outside_Development()
     {
-        // Reuse the shared collection's already-migrated Postgres container rather than spinning
-        // up a dedicated one — only the hosting environment needs to differ. WithWebHostBuilder
-        // composes on top of ApiWebApplicationFactory's ConfigureWebHost (TestAuthHandler, fakes).
-        //
-        // "Test" (rather than "Production"/"Staging") because the endpoint's gate only checks
-        // !IsDevelopment(), and "Test" is also one of the environments DataImportModule/
-        // DocumentsModule treat as allowed to fall back to their no-op local-storage/scanner
-        // implementations — avoiding both modules' Staging/Production guard, which requires real
-        // Supabase/ClamAv configuration that isn't available in this test host.
         using var testFactory = _factory.WithWebHostBuilder(builder =>
             builder.UseEnvironment("Test"));
 

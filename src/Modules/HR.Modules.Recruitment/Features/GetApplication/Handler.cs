@@ -83,16 +83,13 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
                 .SingleOrDefaultAsync(cancellationToken)
             : null;
 
-        // The candidate's current (most recently uploaded) CV, returned separately so the UI can offer
-        // it as clearly labelled current/legacy material — e.g. for historic applications with no
-        // captured CV — without ever presenting it as the submitted CV.
         var currentCv = await db.CandidateDocuments
             .AsNoTracking()
             .Where(cd => cd.CompanyId == request.CompanyId &&
                          cd.CandidateId == row.CandidateId &&
                          cd.Kind == Domain.CandidateDocumentKind.Cv)
             .OrderByDescending(cd => cd.CreatedAt)
-            .ThenByDescending(cd => cd.Id) // Same deterministic order as ListCandidateDocuments' IsCurrentCv.
+            .ThenByDescending(cd => cd.Id)
             .Select(cd => new { cd.Id, cd.FileName, cd.ContentType, cd.FileSize, cd.CreatedAt, cd.ScanStatus })
             .FirstOrDefaultAsync(cancellationToken);
 

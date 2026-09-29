@@ -12,8 +12,8 @@ namespace HR.Modules.Support.Services;
 internal static class SupportAttachmentPolicy
 {
     public const int MaxFileCount = 5;
-    public const long MaxFileSizeBytes = 10 * 1024 * 1024; // 10 MB per file
-    public const long MaxTotalSizeBytes = 25 * 1024 * 1024; // 25 MB per request/response
+    public const long MaxFileSizeBytes = 10 * 1024 * 1024;
+    public const long MaxTotalSizeBytes = 25 * 1024 * 1024;
 
     public static readonly IReadOnlyCollection<string> AllowedExtensions =
     [
@@ -33,14 +33,11 @@ internal static class SupportAttachmentPolicy
         "text/plain",
     ];
 
-    // Maps a declared content type to the magic byte sequences that identify it — the same
-    // signature-verification approach as HR.Modules.Documents.Services.FileUploadValidator.
-    // "text/plain"/.log have no reliable magic bytes and are only gated by extension/MIME/size.
     public static readonly IReadOnlyDictionary<string, byte[][]> MagicBytes =
         new Dictionary<string, byte[][]>(StringComparer.OrdinalIgnoreCase)
         {
-            ["application/pdf"] = [[0x25, 0x50, 0x44, 0x46]], // %PDF
-            ["image/png"] = [[0x89, 0x50, 0x4E, 0x47]], // .PNG
+            ["application/pdf"] = [[0x25, 0x50, 0x44, 0x46]],
+            ["image/png"] = [[0x89, 0x50, 0x4E, 0x47]],
             ["image/jpeg"] =
             [
                 [0xFF, 0xD8, 0xFF, 0xE0],

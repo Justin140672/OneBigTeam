@@ -20,7 +20,6 @@ public class SearchEmployeeDocumentsValidatorTests
         Assert.True(Validator.Validate(ValidRequest()).IsValid);
     }
 
-    // ── CompanyId ──────────────────────────────────────────────────────────
 
     [Fact]
     public void Validate_EmptyCompanyId_Fails()
@@ -30,7 +29,6 @@ public class SearchEmployeeDocumentsValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(SearchEmployeeDocumentsRequest.CompanyId));
     }
 
-    // ── PageNumber ─────────────────────────────────────────────────────────
 
     [Fact]
     public void Validate_PageNumber_Zero_Fails()
@@ -54,7 +52,6 @@ public class SearchEmployeeDocumentsValidatorTests
         Assert.True(Validator.Validate(ValidRequest() with { PageNumber = 1 }).IsValid);
     }
 
-    // ── PageSize ───────────────────────────────────────────────────────────
 
     [Fact]
     public void Validate_PageSize_Zero_Fails()
@@ -84,7 +81,6 @@ public class SearchEmployeeDocumentsValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(SearchEmployeeDocumentsRequest.PageSize));
     }
 
-    // ── SearchText ─────────────────────────────────────────────────────────
 
     [Fact]
     public void Validate_SearchText_Null_Passes()
@@ -108,7 +104,6 @@ public class SearchEmployeeDocumentsValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(SearchEmployeeDocumentsRequest.SearchText));
     }
 
-    // ── UploadedFrom / UploadedTo ──────────────────────────────────────────
 
     [Fact]
     public void Validate_UploadedTo_Before_UploadedFrom_Fails()
@@ -146,7 +141,6 @@ public class SearchEmployeeDocumentsValidatorTests
         Assert.True(Validator.Validate(ValidRequest() with { UploadedTo = new DateOnly(2026, 6, 1) }).IsValid);
     }
 
-    // ── ExpiresFrom / ExpiresTo ────────────────────────────────────────────
 
     [Fact]
     public void Validate_ExpiresTo_Before_ExpiresFrom_Fails()
@@ -184,7 +178,6 @@ public class SearchEmployeeDocumentsValidatorTests
         Assert.True(Validator.Validate(ValidRequest() with { ExpiresTo = new DateOnly(2026, 6, 1) }).IsValid);
     }
 
-    // ── Passthrough fields ─────────────────────────────────────────────────
 
     [Fact]
     public void Validate_Passes_When_Status_Is_Specified()

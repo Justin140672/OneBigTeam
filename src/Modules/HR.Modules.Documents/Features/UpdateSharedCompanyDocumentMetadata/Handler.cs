@@ -25,8 +25,6 @@ internal sealed class UpdateSharedCompanyDocumentMetadataHandler(
             return Result.Failure<UpdateSharedCompanyDocumentMetadataResponse>(
                 Error.NotFound($"Shared document '{request.DocumentId}' was not found."));
 
-        // Company ownership — the category must belong to the same company as the document,
-        // same check UploadSharedCompanyDocument performs.
         var categoryExists = await db.CompanyDocumentCategories
             .AnyAsync(
                 c => c.Id == request.CategoryId &&
@@ -40,7 +38,6 @@ internal sealed class UpdateSharedCompanyDocumentMetadataHandler(
                 Error.NotFound($"Document category '{request.CategoryId}' was not found."));
         }
 
-        // Same existence check the audience employee ids get via SharedCompanyDocumentAudienceRuleBuilder.
         if (request.ReviewOwnerEmployeeId is { } reviewOwnerEmployeeId &&
             !await employeeAudienceReader.EmployeeExistsAsync(request.CompanyId, reviewOwnerEmployeeId, cancellationToken))
         {
@@ -64,9 +61,6 @@ internal sealed class UpdateSharedCompanyDocumentMetadataHandler(
             document.ReviewOwnerEmployeeId,
         };
 
-        // CustomReviewFrequencyMonths is compared against what it will become post-clear (i.e.
-        // null whenever ReviewFrequency isn't Custom), not the raw request value, so a stray
-        // months value submitted alongside a non-Custom frequency doesn't register as a change.
         var requestCustomReviewFrequencyMonths = request.ReviewFrequency == SharedCompanyDocumentReviewFrequency.Custom
             ? request.CustomReviewFrequencyMonths
             : null;

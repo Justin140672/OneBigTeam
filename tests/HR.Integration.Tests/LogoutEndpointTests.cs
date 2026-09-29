@@ -5,13 +5,6 @@ using HR.Integration.Tests.Infrastructure;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// POST /api/logout — best-effort server-side Supabase session revocation on sign-out (security
-/// ticket "Remove authentication tokens from browser-visible URLs"). Anonymous: the caller
-/// (HR.Web's /logout) presents the access token from its session cookie as a bearer, which
-/// authenticates the request to Supabase's GoTrue logout endpoint, not to this API. The endpoint
-/// must always return 200 so a revocation failure never blocks the user's sign-out.
-/// </summary>
 [Collection("Integration")]
 public class LogoutEndpointTests
 {

@@ -208,7 +208,6 @@ public class UpdateCompanySettingsHandlerTests
 		context.Companies.Add(company);
 		await context.SaveChangesAsync();
 
-		// First update succeeds and bumps Version from 1 to 2.
 		var firstHandler = new UpdateCompanySettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)),
@@ -228,7 +227,6 @@ public class UpdateCompanySettingsHandlerTests
 		Assert.True(firstResult.IsSuccess);
 		Assert.Equal(2, firstResult.Value!.Version);
 
-		// Second attempt is submitted against the stale Version = 1 read before the first update.
 		var auditPublisher = new CapturingAuditEventPublisher();
 		var secondHandler = new UpdateCompanySettingsHandler(
 			context,

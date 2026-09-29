@@ -2,25 +2,17 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for <c>InvitationBatchProgressPanel.razor</c> — the batch-progress panel rendered
-/// on the Employee List page (both invite mode and the normal grid). Loads the latest batch for
-/// the company on mount (GET .../invitation-batches/latest), and polls GET
-/// .../invitation-batches/{batchId} every ~3s while the batch is Queued/Processing.
-/// </summary>
 public sealed class InvitationBatchProgressPanelPage(IPage page)
 {
     private ILocator Root => page.Locator(".invitation-batch-progress-panel");
 
     public Task<bool> IsVisibleAsync() => Root.IsVisibleAsync();
 
-    /// <summary>Per-recipient rows of the panel's table (Email, Status, Detail) — for auto-waiting assertions.</summary>
     public ILocator RecipientRows => Root.Locator("table tbody tr");
 
     public Task WaitForVisibleAsync(int timeoutMs = 15_000) =>
         Root.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = timeoutMs });
 
-    /// <summary>The "processing continues even if you navigate away" hint, shown only while Queued/Processing.</summary>
     public Task<bool> HasProcessingContinuesMessageAsync() =>
         Root.GetByText("Processing continues even if you navigate away").IsVisibleAsync();
 
@@ -48,12 +40,9 @@ public sealed class InvitationBatchProgressPanelPage(IPage page)
     public async Task ClickRetryFailedAsync()
     {
         await RetryFailedButton.ClickAsync();
-        // ApplyUpdatedStatus's re-render is a Blazor Server round-trip; give it a moment before a
-        // caller reads counts immediately after.
         await page.WaitForTimeoutAsync(500);
     }
 
-    /// <summary>Rows of the per-recipient table (Email, Status, Detail).</summary>
     public async Task<IReadOnlyList<(string Email, string Status, string Detail)>> GetRecipientRowsAsync()
     {
         var rows = await Root.Locator("table tbody tr").AllAsync();
@@ -70,13 +59,6 @@ public sealed class InvitationBatchProgressPanelPage(IPage page)
         return result;
     }
 
-    /// <summary>
-    /// Polls the panel's own status label until it reports "Completed" (the batch's terminal
-    /// state — see InvitationBatchProgressPanel.PollLoopAsync, which stops polling once the
-    /// server reports Status == "Completed"), or the timeout elapses. CI-safe: polls the actual
-    /// rendered outcome rather than sleeping a fixed duration, matching this suite's existing
-    /// convention (e.g. EmployeeListPage.SearchAsync's settle-poll).
-    /// </summary>
     public async Task WaitForCompletedAsync(int timeoutMs = 30_000)
     {
         var deadline = DateTime.UtcNow.AddMilliseconds(timeoutMs);

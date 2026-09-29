@@ -8,9 +8,6 @@ public class SicknessCategoryService(HrApiHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient();
 
-    // Defaults to true (no filtering) so existing callers that resolve category names for
-    // historical records keep seeing deactivated categories. The list page explicitly
-    // passes false to filter to active-only by default.
     public async Task<ListSicknessCategoriesResponse?> ListSicknessCategoriesAsync(Guid companyId, bool includeInactive = true)
     {
         try
@@ -82,7 +79,6 @@ public class SicknessCategoryService(HrApiHttpClientFactory httpClientFactory)
         return body?.Error ?? "Failed to delete sickness category.";
     }
 
-    // No dedicated backend GetById endpoint — the list already returns full item detail.
     async Task<SicknessCategoryEditModel?> IEditService<SicknessCategoryEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
     {
         var list = await ListSicknessCategoriesAsync(companyId);

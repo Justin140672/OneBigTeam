@@ -2,15 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for HR.Admin.Web's OperationalAlertDetails.razor (/operational-alerts/{Id:guid}).
-/// Renders the full alert as a set of <c>&lt;dt&gt;/&lt;dd&gt;</c> pairs. When the alert is not yet
-/// resolved it shows a "Resolve alert" <c>SfButton</c> which opens the shared
-/// <c>AdminActionConfirmDialog</c> (title "Resolve alert", mandatory reason textarea, min 5 chars —
-/// see AdminActionConfirmDialog.razor). On success ".admin-action-success" appears and the alert
-/// reloads as Resolved (button gone); a 409 surfaces the friendly ".admin-action-error"
-/// "already been resolved" message.
-/// </summary>
 public sealed class OperationalAlertDetailsPage(IPage page, string baseUrl)
 {
     public async Task GotoAsync(Guid id)
@@ -22,7 +13,6 @@ public sealed class OperationalAlertDetailsPage(IPage page, string baseUrl)
     public Task<bool> IsErrorBannerVisibleAsync() =>
         page.Locator(".dashboard-error").IsVisibleAsync();
 
-    /// <summary>Value of the &lt;dd&gt; immediately following the &lt;dt&gt; whose text is exactly <paramref name="label"/>.</summary>
     public async Task<string> FieldAsync(string label)
     {
         var dd = page.Locator($"dt:text-is('{label}') + dd").First;
@@ -45,16 +35,11 @@ public sealed class OperationalAlertDetailsPage(IPage page, string baseUrl)
 
     public Task<bool> ResolveButtonVisibleAsync() => ResolveButton.IsVisibleAsync();
 
-    /// <summary>
-    /// Full resolve flow: open the confirm dialog, enter <paramref name="note"/>, confirm, and wait
-    /// for the action to settle on exactly one result message with the dialog closed.
-    /// </summary>
     public async Task ResolveAsync(string note)
     {
         await ResolveButton.ClickAsync();
         await ResolveDialog.WaitForAsync(new() { Timeout = 15_000 });
 
-        // AdminActionConfirmDialog's SfTextBox binds on blur/change, not raw input — Tab to commit.
         await ResolveDialog.Locator("#admin-action-reason").FillAsync(note);
         await page.Keyboard.PressAsync("Tab");
 
@@ -64,7 +49,6 @@ public sealed class OperationalAlertDetailsPage(IPage page, string baseUrl)
         await ResolveDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
 
-    /// <summary>Opens the dialog and clicks confirm without entering a note — used to assert the min-length guard.</summary>
     public async Task OpenResolveDialogAsync()
     {
         await ResolveButton.ClickAsync();

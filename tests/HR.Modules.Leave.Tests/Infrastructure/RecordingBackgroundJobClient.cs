@@ -4,11 +4,6 @@ using Hangfire.States;
 
 namespace HR.Modules.Leave.Tests.Infrastructure;
 
-/// <summary>
-/// Records every job "created" (i.e. enqueued) so Leave handler/job tests can assert what was
-/// enqueued (e.g. LeavePolicyDeactivationJob) without a real Hangfire storage backend. Mirrors
-/// HR.Modules.Identity.Tests.Infrastructure.RecordingBackgroundJobClient.
-/// </summary>
 internal sealed class RecordingBackgroundJobClient : IBackgroundJobClient
 {
     public List<Job> CreatedJobs { get; } = [];

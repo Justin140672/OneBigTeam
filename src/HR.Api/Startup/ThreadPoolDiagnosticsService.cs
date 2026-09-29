@@ -42,7 +42,6 @@ internal sealed class ThreadPoolDiagnosticsService(ILogger<ThreadPoolDiagnostics
             }
             catch (Exception ex)
             {
-                // Best-effort diagnostic only — never let a logging failure affect the actual app.
                 logger.LogWarning(ex, "[ThreadPoolDiag] sample failed");
             }
 
@@ -52,7 +51,6 @@ internal sealed class ThreadPoolDiagnosticsService(ILogger<ThreadPoolDiagnostics
             }
             catch (OperationCanceledException)
             {
-                // Normal shutdown.
             }
         }
     }

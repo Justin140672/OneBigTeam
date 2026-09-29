@@ -42,15 +42,9 @@ public class GetCompanySettingsEndpointTests
     [Fact]
     public async Task Get_Company_Settings_Returns_Slimmed_ProfileScoped_Fields_When_Never_Customised()
     {
-        // The route companyId must match the caller's resolved tenant (UserProfile.CompanyId),
-        // which TenantRouteAuthorizationMiddleware now enforces — seed the company under a
-        // freshly generated tenant id and sync the caller to that same id, rather than an
-        // unrelated one.
         var tenantId = Guid.NewGuid();
         using var client = await AuthenticatedClient(tenantId);
 
-        // POST /api/companies (CreateCompany) was removed in 78a43344; seed the company directly
-        // via CompaniesDbContext instead, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
         var createdCompanyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Settings Test {Guid.NewGuid():N}", companyId: tenantId);
 
         var response = await client.GetAsync($"/api/companies/{createdCompanyId}/settings");
@@ -59,7 +53,6 @@ public class GetCompanySettingsEndpointTests
 
         var rawJson = await response.Content.ReadAsStringAsync();
 
-        // Lock in that HR-policy fields no longer appear in the company-settings response.
         Assert.DoesNotContain("workingDays", rawJson, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("employeeNumberMode", rawJson, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("noticePeriodUnit", rawJson, StringComparison.OrdinalIgnoreCase);
@@ -78,9 +71,6 @@ public class GetCompanySettingsEndpointTests
     [Fact]
     public async Task Get_Company_Settings_Returns_NotFound_For_Unknown_Id()
     {
-        // Route companyId must match the caller's resolved tenant to pass tenant-route
-        // authorization; sync the caller to a fresh tenant id for which no Company row was ever
-        // seeded, so the request is authorized but the endpoint's own lookup 404s.
         var tenantId = Guid.NewGuid();
         using var client = await AuthenticatedClient(tenantId, ensureActiveSubscription: false);
 

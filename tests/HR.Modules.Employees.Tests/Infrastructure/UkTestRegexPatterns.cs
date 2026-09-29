@@ -1,8 +1,5 @@
 namespace HR.Modules.Employees.Tests.Infrastructure;
 
-// Mirrors HR.Modules.Companies.Domain.UkContactRegexDefaults (internal to that module, so not
-// directly referenceable here). Kept as literal patterns so these tests exercise the same
-// contract a real company's settings would apply, independent of Companies-module internals.
 internal static class UkTestRegexPatterns
 {
     public const string Postcode = @"^[A-Za-z]{1,2}\d[A-Za-z\d]?\s?\d[A-Za-z]{2}$";

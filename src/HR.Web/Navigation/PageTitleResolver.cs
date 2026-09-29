@@ -1,35 +1,11 @@
 namespace HR.Web.Navigation;
 
-/// <summary>
-/// Resolves the persistent application top-bar title from the current route. The resolver only
-/// ever sees the URL (never the loaded record), so titles are route-shaped, not data-shaped.
-///
-/// <para><b>Naming convention (applied uniformly):</b></para>
-/// <list type="bullet">
-///   <item>List / index routes use a <b>plural</b> noun — "Employees", "Leave Policies", "Vacancies".</item>
-///   <item>Detail / edit / view routes use the <b>singular</b> noun — "Employee", "Leave Policy", "Vacancy".</item>
-///   <item>Create routes prefix the singular with "New " — "New Employee", "New Leave Policy".</item>
-///   <item>The three role landing pages keep their explicit dashboard titles — "HR Dashboard",
-///         "Recruitment Dashboard", "Manager Dashboard".</item>
-/// </list>
-///
-/// <para><b>Matching order:</b> exact known paths first, then company-scoped resource rules keyed
-/// on the meaningful segment after <c>/companies/{guid}/</c>. A generic tail rule covers any
-/// resource that follows the URL convention: bare resource segment → plural, <c>/new</c> → "New {singular}",
-/// a trailing <c>{guid}</c> or <c>{guid}/view</c> → singular. New pages that follow the convention are
-/// therefore auto-covered without editing this class.</para>
-///
-/// <para><b>Fallback:</b> unknown / unmatched routes return <see cref="Fallback"/> ("One Big Team").
-/// The resolver never returns "Dashboard" for a non-dashboard route.</para>
-/// </summary>
 public static class PageTitleResolver
 {
-    /// <summary>Title used for the site root and any route that matches no rule.</summary>
     public const string Fallback = "One Big Team";
 
     private sealed record Resource(string Plural, string Singular);
 
-    // Company-scoped CRUD resources: segment after /companies/{guid}/ → (plural, singular).
     private static readonly Dictionary<string, Resource> Resources = new(StringComparer.Ordinal)
     {
         ["employees"] = new("Employees", "Employee"),
@@ -52,7 +28,6 @@ public static class PageTitleResolver
         ["recruitment-stages"] = new("Recruitment Stages", "Recruitment Stage"),
     };
 
-    // /companies/{guid}/reporting/{slug}
     private static readonly Dictionary<string, string> ReportTitles = new(StringComparer.Ordinal)
     {
         ["document-acknowledgement"] = "Document Acknowledgement Report",
@@ -74,7 +49,6 @@ public static class PageTitleResolver
         ["sickness"] = "Sickness Report",
     };
 
-    // Exact, non-parameterised paths (already lower-cased, trimmed of slashes).
     private static readonly Dictionary<string, string> ExactPaths = new(StringComparer.Ordinal)
     {
         ["dashboard/hr"] = "HR Dashboard",
@@ -91,10 +65,6 @@ public static class PageTitleResolver
         ["error"] = "Error",
     };
 
-    /// <summary>
-    /// Resolves a human page title for the given route. Accepts either an absolute URI
-    /// (e.g. <c>NavigationManager.Uri</c>) or a bare absolute path.
-    /// </summary>
     public static string Resolve(string? absolutePathOrUri)
     {
         if (string.IsNullOrWhiteSpace(absolutePathOrUri))
@@ -123,7 +93,6 @@ public static class PageTitleResolver
         return Fallback;
     }
 
-    // s = the path segments after /companies/{guid}/
     private static string ResolveCompanyScoped(string[] s)
     {
         var resource = s[0];
@@ -181,7 +150,7 @@ public static class PageTitleResolver
                 return res.Plural;
             if (s[1] == "new")
                 return $"New {res.Singular}";
-            return res.Singular; // {guid} or {guid}/view
+            return res.Singular;
         }
 
         return Fallback;

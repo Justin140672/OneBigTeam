@@ -1,15 +1,5 @@
 namespace HR.Modules.Support.Domain;
 
-/// <summary>
-/// Reliability review issue 4 (P1): durable record of a support-attachment storage blob that failed
-/// immediate best-effort deletion (e.g. during cleanup after a failed upload batch), so it can be
-/// retried by <see cref="Jobs.SupportAttachmentPendingDeletionRetryJob"/> instead of leaking forever.
-/// This is an internal operational/reconciliation record, not tenant-facing business data — it has
-/// no company_id because a storage key alone is sufficient to complete the retry, mirroring other
-/// infra-owned durable-retry tables in this codebase (e.g. Recruitment's
-/// CandidateDocumentDeletionOperation, which does carry company_id because it also drives
-/// company-scoped audit events; this table does not).
-/// </summary>
 internal sealed class SupportAttachmentPendingDeletion
 {
     private SupportAttachmentPendingDeletion() { }

@@ -51,17 +51,6 @@ internal sealed class OffboardingPlanCreationReconciliationJob(
         await SyncPartiallySyncedPlansAsync();
     }
 
-    // OFF-04: an asset assigned to an employee AFTER their offboarding plan/checklist was generated
-    // (StartOffboardingHandler only builds the checklist once, at plan creation) would otherwise
-    // never get a return task and could walk out the door with it. No "asset assigned" integration
-    // event currently exists in Assets to drive this reactively, so — per this session's guidance to
-    // prefer the lighter-weight option when no suitable event already exists — this diffs each
-    // active plan's currently-assigned assets (IAssignedAssetReader, the same read contract
-    // StartOffboardingHandler itself uses) against the OffboardingTasks it already has (matched by
-    // AssetAssignmentId, not by label) and creates any that are missing. Idempotent: an assignment
-    // that already has a task (of any status — including a completed/skipped one, e.g. it was
-    // returned and the asset was later reassigned then reassigned again is out of scope here since
-    // IAssignedAssetReader only returns currently-active assignments) is never duplicated.
     private async Task AddMissingAssetReturnTasksAsync()
     {
         var activePlans = await dbContext.OffboardingPlans
@@ -117,10 +106,6 @@ internal sealed class OffboardingPlanCreationReconciliationJob(
                     "assigned after the plan was created.",
                     missingAssets.Count, plan.Id, plan.EmployeeId, plan.CompanyId);
 
-                // Sync only this plan's newly-added tasks now, rather than waiting for the general
-                // SyncPartiallySyncedPlansAsync pass below — cheap since it only queries tasks with
-                // TaskItemCreatedAt == null, and keeps the Tasks-module checklist current within the
-                // same run.
                 await taskSynchronizer.SyncPlanAsync(plan.CompanyId, plan.Id, CancellationToken.None);
             }
             catch (Exception ex)
@@ -152,8 +137,6 @@ internal sealed class OffboardingPlanCreationReconciliationJob(
             .Select(p => (p.CompanyId, p.EmployeeId))
             .ToHashSet();
 
-        // Safety-net diagnostic: the unique partial index should make this impossible, but if it
-        // is ever observed, HR needs visibility rather than silent data drift.
         var duplicateActivePlanGroups = employeesWithActivePlans
             .GroupBy(p => (p.CompanyId, p.EmployeeId))
             .Where(g => g.Count() > 1);
@@ -184,9 +167,6 @@ internal sealed class OffboardingPlanCreationReconciliationJob(
 
                 if (result.IsFailure)
                 {
-                    // Conflict here means another path (a concurrent run of this job, or the
-                    // synchronous trigger finishing just before us) already created the plan —
-                    // that's success from this job's point of view, not a failure to report.
                     if (result.Error.Code != "conflict")
                     {
                         logger.LogError(
@@ -205,8 +185,6 @@ internal sealed class OffboardingPlanCreationReconciliationJob(
             }
             catch (Exception ex)
             {
-                // One employee's reconciliation failing must never stop the rest of the batch from
-                // being checked — same isolation principle as OffboardingCancellationReconciliationJob.
                 logger.LogError(
                     ex,
                     "Offboarding plan creation reconciliation threw for employee {EmployeeId} in " +

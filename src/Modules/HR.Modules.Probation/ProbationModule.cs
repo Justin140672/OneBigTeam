@@ -119,7 +119,6 @@ public static class ProbationModule
         var acmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
         var betaId = Guid.Parse("00000000-0000-0000-0000-000000000002");
 
-        // All seeded employees that have a manager (employeeId, managerId, companyId, startDate)
         (Guid companyId, Guid employeeId, Guid managerId, DateOnly startDate)[] entries =
         [
             (acmeId, Guid.Parse("30000000-0000-0000-0000-000000000002"), Guid.Parse("30000000-0000-0000-0000-000000000001"), new DateOnly(2021, 3,  15)),
@@ -164,9 +163,6 @@ public static class ProbationModule
             db.ProbationReviews.Add(finalReview);
         }
 
-        // Active probation — Carlos Rivera on probation under David Park (his actual line
-        // manager in EmployeesModule, and an HrAdministrator). ManagerCheckIn is overdue;
-        // record is ReviewDue. Fixed IDs so the UI/E2E tests can navigate directly to this review.
         var activeRecordId = Guid.Parse("40000000-0000-0000-0000-000000000010");
         var activeReviewId = Guid.Parse("50000000-0000-0000-0000-000000000100");
         var empCarlosId    = Guid.Parse("30000000-0000-0000-0000-000000000010");

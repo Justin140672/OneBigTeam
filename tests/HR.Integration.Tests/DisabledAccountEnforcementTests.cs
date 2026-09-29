@@ -38,9 +38,6 @@ public class DisabledAccountEnforcementTests
 
     private async Task<(Guid userId, string email)> SeedAdminCallerAsync(Guid companyId, bool isActive = true)
     {
-        // ApplicationUser.Id == EmployeeId by convention; the resolved current-user id for a caller
-        // with no UserProfile is the raw Supabase sub (== the X-Test-User header), so seeding the
-        // account row under that same guid is what wires the middleware lookup to this caller.
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
         var email = $"enforce.{Guid.NewGuid():N}@test.com";
         await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, employeeId, email, isActive);
@@ -150,8 +147,6 @@ public class DisabledAccountEnforcementTests
     public async Task Platform_Administrator_With_Disabled_ApplicationUser_Is_Not_Gated()
     {
         var companyId = Guid.NewGuid();
-        // Give the platform-admin caller a disabled ApplicationUser row under the same guid; the
-        // middleware must still let them through on the strength of the enabled platform-admin row.
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
         var email = $"platform.{Guid.NewGuid():N}@test.com";
         await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, employeeId, email, isActive: false);
@@ -169,19 +164,16 @@ public class DisabledAccountEnforcementTests
     public async Task Platform_Administrator_With_Disabled_ApplicationUser_Is_Still_Gated_On_Company_Endpoint()
     {
         var companyId = Guid.NewGuid();
-        // Same person: an enabled platform administrator who also owns a disabled company account.
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
         var email = $"platform.{Guid.NewGuid():N}@test.com";
         await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, employeeId, email, isActive: false);
         await PlatformAdministratorTestHelpers.SeedAdministratorAsync(
             _factory, PlatformAdministratorRole.SupportStaff, email: email);
 
-        // Platform-administration endpoint (company-agnostic client): allowed.
         using var platformClient = PlatformAdministratorTestHelpers.ClientFor(_factory, employeeId, email);
         var platformResponse = await platformClient.GetAsync("/api/platform-administrators");
         Assert.Equal(HttpStatusCode.OK, platformResponse.StatusCode);
 
-        // Ordinary company endpoint through the same disabled account: 403 account_disabled.
         using var companyClient = AuthenticatedClient(companyId, employeeId, email);
         var companyResponse = await companyClient.GetAsync($"/api/companies/{companyId}/users");
         await AssertAccountDisabledAsync(companyResponse);
@@ -254,8 +246,6 @@ public class DisabledAccountEnforcementTests
         using var adminClient = AuthenticatedClient(companyId, adminUserId, adminEmail);
 
         var (targetEmployeeId, targetSupabaseAuthUserId, targetEmail) = await SeedUserProfileOnlyCallerAsync(companyId);
-        // The target's own client authenticates with their SupabaseAuthUserId, not their employee id
-        // — see SeedUserProfileOnlyCallerAsync remarks.
         using var targetClient = AuthenticatedClient(companyId, targetSupabaseAuthUserId, targetEmail);
 
         var baseline = await targetClient.GetAsync("/api/me");

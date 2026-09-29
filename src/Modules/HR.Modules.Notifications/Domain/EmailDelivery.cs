@@ -1,15 +1,5 @@
 namespace HR.Modules.Notifications.Domain;
 
-/// <summary>
-/// Tracks the asynchronous email delivery attempt(s) for a single Notification (NOT-02). Exactly
-/// one EmailDelivery row is created per notification that is channel-eligible for email (see
-/// NotificationChannelDefaults) — the notification's own Id doubles as this row's idempotency key
-/// (IdempotencyKey == NotificationId, enforced by a unique index), so re-enqueuing the delivery job
-/// for the same notification (e.g. a caller retrying after a crash) can never create a duplicate
-/// delivery attempt record; EmailDeliveryJob additionally short-circuits as a no-op once Status is
-/// Sent, covering the case where Postmark's call actually succeeded but the app crashed before the
-/// Sent status was persisted.
-/// </summary>
 internal sealed class EmailDelivery
 {
     private EmailDelivery() { }
@@ -25,19 +15,10 @@ internal sealed class EmailDelivery
     public string? FailureReason { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
-    /// <summary>
-    /// NOT-03: which NotificationTemplate version (see NotificationTemplateCatalogue) rendered
-    /// EmailSubject/EmailBody below, or null when this delivery was raised via the pre-existing
-    /// non-templated WriteAsync path (EmailDeliveryJob falls back to Notification.Title/Body in
-    /// that case). Lets a support engineer see exactly what template version produced a given
-    /// historical email even after the catalogue's wording later changes.
-    /// </summary>
     public int? TemplateVersion { get; private set; }
 
-    /// <summary>Rendered email subject, set only for templated deliveries (see TemplateVersion).</summary>
     public string? EmailSubject { get; private set; }
 
-    /// <summary>Rendered, HTML-encoded email body, set only for templated deliveries (see TemplateVersion).</summary>
     public string? EmailBody { get; private set; }
 
     public static EmailDelivery Create(
@@ -52,12 +33,6 @@ internal sealed class EmailDelivery
         CreatedAt      = now,
     };
 
-    /// <summary>
-    /// NOT-03: creates an EmailDelivery whose subject/body were already rendered from a
-    /// NotificationTemplate (see NotificationTemplateRenderer) rather than being derived later, at
-    /// send time, from the notification's own Title/Body — this preserves the exact rendered
-    /// (HTML-encoded) content and records which template version produced it.
-    /// </summary>
     public static EmailDelivery CreateTemplated(
         Guid id, Guid companyId, Guid notificationId, int templateVersion,
         string emailSubject, string emailBody, DateTimeOffset now) => new()
@@ -74,7 +49,6 @@ internal sealed class EmailDelivery
         CreatedAt       = now,
     };
 
-    /// <summary>Records that a real delivery attempt (an actual Postmark call) is being made.</summary>
     public void RecordAttempt(DateTimeOffset now)
     {
         AttemptCount++;
@@ -88,19 +62,7 @@ internal sealed class EmailDelivery
         FailureReason = null;
     }
 
-    /// <summary>
-    /// Marks this delivery as permanently failed. Reason must already be a short, sanitised,
-    /// human-readable category (e.g. "Invalid recipient address", "Email provider error") — never
-    /// a raw exception message or stack trace, which could leak internal detail into a
-    /// support/reporting-visible record.
-    /// </summary>
     public void MarkFailed(string reason) => (Status, FailureReason) = (EmailDeliveryStatus.Failed, reason);
 
-    /// <summary>
-    /// SET-06: marks this delivery as permanently (not retried) skipped because the company had
-    /// email notifications disabled at dispatch time — re-checked by EmailDeliveryJob immediately
-    /// before sending, even if the row was queued before the setting changed. Distinct from
-    /// MarkFailed: this is expected, intended non-delivery, not an error.
-    /// </summary>
     public void MarkSkipped(string reason) => (Status, FailureReason) = (EmailDeliveryStatus.Skipped, reason);
 }

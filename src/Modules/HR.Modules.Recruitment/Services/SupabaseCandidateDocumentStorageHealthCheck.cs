@@ -4,15 +4,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Recruitment.Services;
 
-/// <summary>
-/// Reliability review issue 2 (P1): readiness probe proving the configured Supabase Storage project
-/// backing candidate documents is actually reachable — mirrors DocumentStorageHealthCheck /
-/// SupabaseSupportAttachmentStorageHealthCheck. Only registered when Supabase candidate document
-/// storage is configured (see RecruitmentModule.AddCandidateDocumentStorage); Development/test
-/// environments using LocalCandidateDocumentStorageService have nothing to probe. Tagged "degraded"
-/// (not "critical"): candidate document upload/download is impaired, not the whole platform, if this
-/// dependency is unavailable.
-/// </summary>
 internal sealed class SupabaseCandidateDocumentStorageHealthCheck(
     IHttpClientFactory httpClientFactory,
     IOptions<SupabaseCandidateDocumentStorageOptions> options) : IHealthCheck

@@ -128,7 +128,6 @@ public class GetDirectoryEmployeeEndpointTests
         var employeeInB = await SeedEmployeeAsync(companyB, EmploymentStatus.Active);
         using var client = await ClientFor(PlainEmployee3, companyA);
 
-        // Route + auth tenant both companyA; the employee id belongs to companyB.
         var response = await client.GetAsync($"/api/companies/{companyA}/employees/directory/{employeeInB}");
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);

@@ -18,8 +18,6 @@ internal sealed class GetEffectiveAccessHandler(
 
     public async Task<Result<GetEffectiveAccessResponse>> HandleAsync(GetEffectiveAccessRequest request, CancellationToken cancellationToken)
     {
-        // IAM-05: prove the target employee actually belongs to the route company before resolving
-        // anything about them, same non-disclosing guard every other user-administration handler uses.
         var isMember = await targetUserCompanyGuard.IsMemberAsync(request.CompanyId, request.EmployeeId, cancellationToken);
         if (!isMember)
             return Result.Failure<GetEffectiveAccessResponse>(Error.NotFound("No user found for this employee."));
@@ -31,7 +29,6 @@ internal sealed class GetEffectiveAccessHandler(
 
         var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == request.EmployeeId, cancellationToken);
 
-        // All active position assignments (company-scoped via the joined Position row).
         var activePositions = await db.UserPositions
             .AsNoTracking()
             .Where(up => up.UserId == request.EmployeeId && (up.ExpiresAt == null || up.ExpiresAt > now))
@@ -108,7 +105,6 @@ internal sealed class GetEffectiveAccessHandler(
                 o.IsActive(now)))
             .ToList();
 
-        // Origins per role: everything that legitimately contributes to a role being effective.
         var roleOrigins = new Dictionary<Guid, List<string>>();
         foreach (var roleId in effectiveRoleIds)
         {
@@ -133,7 +129,6 @@ internal sealed class GetEffectiveAccessHandler(
             .OrderBy(r => r.RoleName, StringComparer.Ordinal)
             .ToList();
 
-        // Effective permissions: everything granted by an effective role, with per-source attribution.
         var effectiveRoleIdList = effectiveRoleIds.ToList();
         var grantingRolePermissions = effectiveRoleIdList.Count == 0
             ? []
@@ -165,9 +160,6 @@ internal sealed class GetEffectiveAccessHandler(
             .OrderBy(p => p.PermissionName, StringComparer.Ordinal)
             .ToList();
 
-        // Denied permissions: roles that would apply from direct assignment/position inheritance but
-        // were removed from the effective set — under the current model this only happens via an
-        // active Deny override (see IdentityAuthorizationService.GetEffectiveRolesAsync).
         var baseRoleIds = new HashSet<Guid>(directRoleIds);
         baseRoleIds.UnionWith(inheritedRows.Select(r => r.RoleId));
         var deniedRoleIds = baseRoleIds.Except(effectiveRoleIds).ToList();
@@ -193,12 +185,12 @@ internal sealed class GetEffectiveAccessHandler(
                 var matchingOverride = overrides.FirstOrDefault(o =>
                     o.RoleId == deniedRoleId && o.OverrideType == EmployeeRoleOverrideType.Deny && o.IsActive(now));
                 if (matchingOverride is null)
-                    continue; // defensive: shouldn't happen under the current model.
+                    continue;
 
                 foreach (var rp in deniedRolePermissions.Where(rp => rp.RoleId == deniedRoleId))
                 {
                     if (effectivePermissionIds.Contains(rp.PermissionId))
-                        continue; // still granted through some other still-effective role.
+                        continue;
 
                     var permissionName = deniedPermissionLookup.GetValueOrDefault(rp.PermissionId, string.Empty);
                     deniedPermissions.Add(new DeniedPermissionDto(

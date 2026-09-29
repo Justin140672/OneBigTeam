@@ -9,13 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// LEGACY / dead-in-practice: <see cref="Vacancy.PositionProfileId"/> is now a non-nullable
-/// <see cref="Guid"/>, so there is no way to construct a vacancy that "needs" an auto-matched
-/// position profile any more — every vacancy always has one. The ApplyPositionProfileMatches endpoint
-/// was rewritten to always short-circuit and return an empty result; these tests assert exactly that
-/// and confirm it never touches existing rows.
-/// </summary>
 [Collection("Integration")]
 public class ApplyPositionProfileMatchesEndpointTests
 {

@@ -14,6 +14,5 @@ internal sealed record CompanyAuditLogItem(
     Guid EntityId,
     Guid? EmployeeId,
     Guid? ActorUserId,
-    /// <summary>Resolved display name for the actor — null if the actor is a system process.</summary>
     string? ActorDisplayName,
     string? Summary);

@@ -6,11 +6,6 @@ using HR.Modules.Tasks.Contracts;
 
 namespace HR.Modules.Offboarding.Tests;
 
-/// <summary>
-/// OBT-721 workload action provider tests for outstanding offboarding tasks — HR-only (see xmldoc
-/// on the provider). Offboarding has no manager-scoped tier, unlike onboarding/probation, so a
-/// Manager caller must get nothing back regardless of any other role.
-/// </summary>
 public class OutstandingOffboardingTasksWorkloadActionProviderTests
 {
     private static readonly DateOnly Today = new(2026, 7, 29);
@@ -52,7 +47,6 @@ public class OutstandingOffboardingTasksWorkloadActionProviderTests
             BuildItem(Guid.NewGuid(), Today.AddDays(5), "Return laptop"),
         ]);
 
-        // Manager (or any other) role, but not HR — this category has no manager-scoped tier.
         var provider = new OutstandingOffboardingTasksWorkloadActionProvider(
             reader, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService("reporting:view-onboarding"),
             new FakeOpenTaskBySourceEntityReader());
@@ -84,7 +78,7 @@ public class OutstandingOffboardingTasksWorkloadActionProviderTests
     {
         var reader = new FakeOffboardingReportReader(
         [
-            BuildItem(Guid.NewGuid(), Today.AddDays(5)), // no outstanding task titles
+            BuildItem(Guid.NewGuid(), Today.AddDays(5)),
         ]);
 
         var provider = new OutstandingOffboardingTasksWorkloadActionProvider(
@@ -99,10 +93,6 @@ public class OutstandingOffboardingTasksWorkloadActionProviderTests
     [Fact]
     public async Task Status_Is_Outstanding_Not_Overdue_When_LastWorkingDay_Is_Exactly_Today()
     {
-        // Boundary: the provider computes Status via `item.LastWorkingDay < today`, so a
-        // LastWorkingDay equal to today must land on the "Outstanding" side, not "Overdue".
-        // The provider reads DateTime.UtcNow.Date directly (no injected clock), so this test
-        // must use the real current date rather than the fixture's fixed `Today` constant.
         var actualToday = DateOnly.FromDateTime(DateTime.UtcNow.Date);
         var employeeId = Guid.NewGuid();
         var reader = new FakeOffboardingReportReader(
@@ -142,7 +132,6 @@ public class OutstandingOffboardingTasksWorkloadActionProviderTests
         Assert.Equal("Outstanding Offboarding Tasks", action.ActionCategory);
         Assert.Equal("Overdue", action.Status);
         Assert.Equal(pastDueDate, action.DueDate);
-        // No employee-profile fallback: entirely task-backed category.
         Assert.Equal("", action.DeepLinkUrl);
         Assert.Null(action.TaskId);
     }
@@ -205,7 +194,6 @@ public class OutstandingOffboardingTasksWorkloadActionProviderTests
         Assert.Equal(2, result.Count);
         Assert.Contains(result, a => a.TaskId == linkedTaskId1);
         Assert.Contains(result, a => a.TaskId == linkedTaskId2);
-        // Both rows resolved distinctly, not the same task id for both.
         Assert.NotEqual(result[0].TaskId, result[1].TaskId);
     }
 

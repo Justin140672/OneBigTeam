@@ -17,8 +17,6 @@ public class ClamAvHealthCheckTests
     {
         var options = Options.Create(new ClamAvOptions
         {
-            // Reserved TEST-NET-1 address (RFC 5737) — never routable, connect will fail fast
-            // rather than hang for the full configured timeout.
             Host = "192.0.2.1",
             Port = 3310,
             TimeoutSeconds = 1,

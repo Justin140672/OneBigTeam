@@ -6,11 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests.Infrastructure;
 
-/// <summary>
-/// Shared seed helpers for Recruitment integration tests — vacancies, candidates, applications,
-/// interviews and candidate documents. Uses the module's own domain factories and the real
-/// <see cref="RecruitmentStageSeeder"/> default stage set so persisted state matches production.
-/// </summary>
 internal static class RecruitmentTestSeeder
 {
     public sealed record SeededApplication(
@@ -46,10 +41,6 @@ internal static class RecruitmentTestSeeder
         return candidate.Id;
     }
 
-    /// <summary>
-    /// Seeds the default recruitment stages, a vacancy, a candidate and an application sitting on the
-    /// "CV Review" (non-terminal) stage.
-    /// </summary>
     public static async Task<SeededApplication> SeedApplicationAsync(
         ApiWebApplicationFactory factory, Guid companyId, DateTimeOffset now,
         string candidateFirstName = "Emma", string candidateLastName = "Clarke",
@@ -120,13 +111,6 @@ internal static class RecruitmentTestSeeder
         return interview.Id;
     }
 
-    /// <summary>
-    /// Seeds a candidate document row (no blob is written to storage). [P1] Documents start
-    /// <see cref="CandidateDocumentScanStatus.Pending"/> exactly as a real upload does, so a download
-    /// of one is refused (409) until it is scanned; pass <paramref name="scanStatus"/> =
-    /// <see cref="CandidateDocumentScanStatus.Clean"/> for a test that needs a downloadable document.
-    /// The status is reached through the real domain transitions (see <see cref="ApplyScanStatus"/>).
-    /// </summary>
     public static async Task<Guid> SeedCandidateDocumentAsync(
         ApiWebApplicationFactory factory, Guid companyId, Guid candidateId, DateTimeOffset now,
         string title = "CV", string fileName = "cv.pdf", CandidateDocumentKind kind = CandidateDocumentKind.Other,
@@ -143,10 +127,6 @@ internal static class RecruitmentTestSeeder
         return document.Id;
     }
 
-    /// <summary>
-    /// [P1] Moves an existing Pending candidate document to <paramref name="scanStatus"/> through the
-    /// domain methods (as ScanCandidateDocumentJob would), without running a scanner.
-    /// </summary>
     public static async Task SetCandidateDocumentScanStatusAsync(
         ApiWebApplicationFactory factory, Guid documentId, CandidateDocumentScanStatus scanStatus)
     {
@@ -157,10 +137,6 @@ internal static class RecruitmentTestSeeder
         await db.SaveChangesAsync();
     }
 
-    /// <summary>Drives a Pending document to the requested scan status via the domain API. Scan
-    /// transitions are stamped with <paramref name="at"/> — callers pass the real current time so a
-    /// Scanning claim stays live (the recurring reconciliation sweep releases claims older than the
-    /// 15-minute lease), independent of the document's own CreatedAt.</summary>
     public static void ApplyScanStatus(CandidateDocument document, CandidateDocumentScanStatus scanStatus, DateTimeOffset at)
     {
         switch (scanStatus)

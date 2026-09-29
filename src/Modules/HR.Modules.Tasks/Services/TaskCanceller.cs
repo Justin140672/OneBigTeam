@@ -64,13 +64,6 @@ internal sealed class TaskCanceller(TasksDbContext dbContext, INotificationWrite
         return tasks.Count;
     }
 
-    // OFF-01: bulk cancel-by-source for a caller-owned group of source entity ids (e.g. every
-    // OffboardingTask.Id belonging to one OffboardingPlan). Excludes tasks already
-    // Completed/Cancelled — those terminal states are never touched — which is what makes this
-    // safe to call repeatedly against the exact same id set (e.g. from an idempotent event
-    // consumer, or a reconciliation job retrying after a previous partial failure): the first
-    // call cancels whatever is still open, every subsequent call finds nothing left to do and
-    // returns 0.
     public async Task<int> CancelManyBySourceEntitiesAsync(
         Guid companyId,
         IReadOnlyCollection<Guid> sourceEntityIds,

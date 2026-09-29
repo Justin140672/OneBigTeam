@@ -15,7 +15,6 @@ internal sealed class Endpoint(GetMyTeamRosterHandler handler, ICurrentUser curr
 
     public override async Task HandleAsync(GetMyTeamRosterRequest request, CancellationToken cancellationToken)
     {
-        // Self-scoped by the caller's own resolved user id — same convention as GetMyTeam.
         if (currentUser.UserId is not { } managerId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());

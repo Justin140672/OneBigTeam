@@ -4,10 +4,6 @@ using Testcontainers.PostgreSql;
 
 namespace HR.Modules.Identity.Tests.Infrastructure;
 
-/// <summary>
-/// Spins up a single PostgreSQL container per test collection and provides
-/// a fresh, migrated <see cref="IdentityDbContext"/> for each test.
-/// </summary>
 public sealed class IdentityDatabaseFixture : IAsyncLifetime
 {
     private readonly PostgreSqlContainer _postgres = new PostgreSqlBuilder("postgres:16-alpine")
@@ -23,7 +19,6 @@ public sealed class IdentityDatabaseFixture : IAsyncLifetime
         await _postgres.StartAsync();
         ConnectionString = _postgres.GetConnectionString();
 
-        // Apply all migrations once for the whole fixture lifetime.
         await using var ctx = BuildContext();
         await ctx.Database.MigrateAsync();
     }

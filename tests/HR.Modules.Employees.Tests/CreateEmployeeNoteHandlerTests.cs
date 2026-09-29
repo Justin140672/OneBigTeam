@@ -72,9 +72,6 @@ public class CreateEmployeeNoteHandlerTests
         Assert.Equal(ActorUserId, evt.ActorUserId);
         Assert.Equal(ActorEmployeeId, evt.ActorEmployeeId);
 
-        // Confidentiality: the raw note text must never appear anywhere in the published audit
-        // event's payload — assert it across the entire event, not just a specific property, so
-        // this test still catches a regression if NoteText were ever added to Before/After/Metadata.
         var eventJson = System.Text.Json.JsonSerializer.Serialize(evt);
         Assert.DoesNotContain("Great quarter.", eventJson);
     }

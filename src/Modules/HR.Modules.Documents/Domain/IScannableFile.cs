@@ -1,11 +1,5 @@
 namespace HR.Modules.Documents.Domain;
 
-/// <summary>
-/// Common shape shared by every entity that owns an uploaded file subject to virus scanning
-/// (Document, EmployeeProfilePhoto, PendingProfilePhoto, SharedCompanyDocument,
-/// SharedCompanyDocumentVersion). Lets ScanUploadedFileJob operate on any of the five without
-/// scanner- or entity-specific branching beyond picking which DbSet to query.
-/// </summary>
 internal interface IScannableFile
 {
     string StorageKey { get; }

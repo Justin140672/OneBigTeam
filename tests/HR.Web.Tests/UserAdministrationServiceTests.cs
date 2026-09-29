@@ -7,7 +7,6 @@ namespace HR.Web.Tests;
 
 public class UserAdministrationServiceTests
 {
-    // ── ListUsersAsync (representative read) ─────────────────────────────────────
 
     [Fact]
     public async Task ListUsersAsync_Returns_Value_When_Api_Returns_Ok()
@@ -43,7 +42,6 @@ public class UserAdministrationServiceTests
         Assert.Null(result);
     }
 
-    // ── InviteEmployeeUserAsync (write) ──────────────────────────────────────────
 
     [Fact]
     public async Task InviteEmployeeUserAsync_Returns_Result_When_Api_Returns_Created()
@@ -73,7 +71,6 @@ public class UserAdministrationServiceTests
     [Fact]
     public async Task InviteEmployeeUserAsync_Returns_Failure_When_Api_Returns_Conflict_For_Already_Invited_Employee()
     {
-        // Guards against re-inviting an employee that already has a pending invite/account.
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.Conflict, new { error = "This employee already has a user account or pending invite." }));
         var service = new UserAdministrationService(factory);
 
@@ -95,7 +92,6 @@ public class UserAdministrationServiceTests
         Assert.NotNull(error);
     }
 
-    // ── UpdateUserRolesAsync (write, no-content) ─────────────────────────────────
 
     [Fact]
     public async Task UpdateUserRolesAsync_Returns_Success_When_Api_Returns_NoContent()
@@ -133,7 +129,6 @@ public class UserAdministrationServiceTests
         Assert.Equal("User not found.", error);
     }
 
-    // ── DisableUserAsync / EnableUserAsync ────────────────────────────────────────
 
     [Fact]
     public async Task DisableUserAsync_Returns_Success_When_Api_Returns_NoContent()

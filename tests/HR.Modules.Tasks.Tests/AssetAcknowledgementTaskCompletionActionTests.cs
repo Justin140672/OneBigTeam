@@ -33,7 +33,6 @@ public class AssetAcknowledgementTaskCompletionActionTests
         new(ackService ?? new FakeAssetAcknowledgementService(),
             taskCreator ?? new FakeTaskCreator());
 
-    // ── Source / ActionType ────────────────────────────────────────────────────
 
     [Fact]
     public void Source_Is_Asset()
@@ -47,7 +46,6 @@ public class AssetAcknowledgementTaskCompletionActionTests
         Assert.Equal(TaskActionType.Acknowledge, MakeAction().ActionType);
     }
 
-    // ── Acknowledgement call ───────────────────────────────────────────────────
 
     [Fact]
     public async Task ExecuteAsync_Calls_AcknowledgeAsync_With_Correct_Arguments()
@@ -63,7 +61,6 @@ public class AssetAcknowledgementTaskCompletionActionTests
         Assert.Equal(CompletedBy,  call.AcknowledgedBy);
     }
 
-    // ── Return task creation ───────────────────────────────────────────────────
 
     [Fact]
     public async Task ExecuteAsync_Creates_A_Return_Task_After_Acknowledgement()
@@ -103,7 +100,6 @@ public class AssetAcknowledgementTaskCompletionActionTests
         Assert.Equal(EmployeeId,   created.AssignedEmployeeId);
     }
 
-    // ── Guard clause ───────────────────────────────────────────────────────────
 
     [Fact]
     public async Task ExecuteAsync_Does_Nothing_When_SourceEntityId_Is_Null()

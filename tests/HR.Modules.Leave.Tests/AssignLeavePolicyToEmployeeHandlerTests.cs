@@ -121,7 +121,7 @@ public class AssignLeavePolicyToEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new AssignLeavePolicyToEmployeeRequest
             {
-                CompanyId = Guid.NewGuid(), // different company
+                CompanyId = Guid.NewGuid(),
                 EmployeeId = Guid.NewGuid(),
                 LeavePolicyId = policy.Id,
                 EffectiveFrom = EffectiveDate
@@ -135,9 +135,6 @@ public class AssignLeavePolicyToEmployeeHandlerTests
     [Fact]
     public async Task HandleAsync_Initialises_Balance_With_AccrualStartDate_Equal_To_EffectiveFrom_When_MidYear()
     {
-        // EffectiveDate (2026-07-01) is later than the policy year start (2026-01-01), so the
-        // new balance's AccrualStartDate should track the assignment's own effective date, mirroring
-        // EmployeeCreatedHandler's joiner logic (LEAVE-04).
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -170,9 +167,6 @@ public class AssignLeavePolicyToEmployeeHandlerTests
     [Fact]
     public async Task HandleAsync_Initialises_Balance_With_AccrualStartDate_Equal_To_PolicyYearStart_When_EffectiveFrom_Is_Earlier()
     {
-        // EffectiveFrom (2025-06-01) predates the current policy year start (2026-01-01) - the
-        // policy year start wins, since accrual for the year in question cannot begin before the
-        // year itself does (LEAVE-04).
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();

@@ -6,14 +6,6 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace HR.Modules.Onboarding.Services;
 
-/// <summary>
-/// OBT-721 Workload &amp; HR Actions Report provider for outstanding onboarding tasks. Reuses
-/// IOnboardingReportReader (already used by GetOnboardingProgressReport/Handler.cs) rather than
-/// querying OnboardingDbContext directly, so the "outstanding task" definition stays in one place.
-/// Row-scoping mirrors GetOnboardingProgressReport/Handler.cs exactly: HR sees every outstanding
-/// task company-wide, a Manager sees their whole reporting sub-tree's tasks (direct or indirect
-/// reports, per DSH-02).
-/// </summary>
 internal sealed class OutstandingOnboardingTasksWorkloadActionProvider(
     IOnboardingReportReader onboardingReportReader,
     IDirectReportsReader directReportsReader,
@@ -30,15 +22,10 @@ internal sealed class OutstandingOnboardingTasksWorkloadActionProvider(
         WorkloadScope requestedScope,
         CancellationToken cancellationToken)
     {
-        // Scope is driven by the EXPLICITLY requested workspace, never re-inferred from the
-        // caller's full role set — a caller holding both HR and Manager roles must still only see
-        // their own reporting sub-tree when the Manager workspace is requested.
         IReadOnlyCollection<Guid>? employeeIds = null;
         Guid? managerCallerId = null;
         if (requestedScope == WorkloadScope.Hr)
         {
-            // A requested workspace is a display-routing signal only: re-verify the caller actually
-            // holds HR access before honouring it, never trust it as authorization.
             var callerIsHr = (await authorizationService.AuthorizeAsync(caller, "reporting:view-hr")).Succeeded;
             if (!callerIsHr)
                 return [];
@@ -49,14 +36,9 @@ internal sealed class OutstandingOnboardingTasksWorkloadActionProvider(
             if (!callerIsManager)
                 return [];
 
-            // NOT caller.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's
-            // resolved Employee/UserId. ICurrentUser.UserId reads off the ambient HttpContext, safe
-            // even from this provider's own DI scope.
             if (currentUser.UserId is not { } callerEmployeeId)
                 return [];
 
-            // DSH-02: a manager's dashboard scope is their entire reporting sub-tree (direct and
-            // indirect reports). See specifications/architecture/11-manager-hierarchy-scope.md.
             var teamIds = await directReportsReader.GetAllDescendantIdsAsync(
                 companyId, callerEmployeeId, cancellationToken);
 
@@ -74,11 +56,6 @@ internal sealed class OutstandingOnboardingTasksWorkloadActionProvider(
         var allEmployeeIds = items.Select(i => i.EmployeeId).ToHashSet();
         var departments = await employeeDepartmentReader.GetDepartmentsAsync(companyId, allEmployeeIds, cancellationToken);
 
-        // Each outstanding onboarding task is actioned via its own Task
-        // (TaskActionType.Complete, keyed by the OnboardingTask id as SourceEntityId — see
-        // CompleteOnboardingTaskFromTaskAction/OnboardingModule.cs). Resolve the exact linked task
-        // id per onboarding task rather than matching by title/employee, so a dashboard row opens
-        // the correct Task View entry even when an employee has multiple tasks with the same title.
         var allTaskIds = items.SelectMany(i => i.OutstandingTasks.Select(t => t.TaskId)).ToList();
         var openTaskIds = await taskReader.GetOpenTaskIdsAsync(
             companyId, allTaskIds, cancellationToken, TaskActionType.Complete);
@@ -130,10 +107,6 @@ internal sealed class OutstandingOnboardingTasksWorkloadActionProvider(
                     DueDate: task.DueDate,
                     AssignedTo: task.Owner,
                     Status: task.IsOverdue ? "Overdue" : "Outstanding",
-                    // No employee-profile fallback: this category is entirely task-backed. When
-                    // TaskId resolves, AttentionQueuePanel opens the Task View dialog; when it
-                    // cannot be resolved, DeepLinkUrl stays blank so the dashboard shows an
-                    // explicit "no longer available" state instead of opening the employee profile.
                     DeepLinkUrl: "",
                     TaskId: linkedTaskId,
                     IsOwnerActionable: isOwnerActionable,

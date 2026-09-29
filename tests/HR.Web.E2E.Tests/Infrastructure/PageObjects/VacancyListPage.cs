@@ -2,43 +2,20 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the vacancy list page (/companies/{companyId}/vacancies).
-/// </summary>
 public sealed class VacancyListPage(IPage page, string baseUrl)
 {
-    // Waiting for ".e-grid" alone (or for the Blazor-side loading spinner to clear) is NOT
-    // sufficient to guarantee rows are queryable: Syncfusion's EJ2 grid does its own JS render
-    // pass to populate ".e-row"/".e-rowcell" into the DOM on a separate tick after the Blazor
-    // component itself has mounted. Waiting for the row selector (or its empty-state sibling)
-    // directly is the only wait that's actually tied to the data being present.
     private const string RowsRenderedSelector = ".e-grid .e-row, .e-grid .e-emptyrow";
 
     public async Task GoToAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/vacancies");
-        // With prerender disabled the page is blank until the interactive circuit connects — gate
-        // on the authenticated shell first so the 20s grid-render budget isn't partly consumed by
-        // circuit establishment on a cold shared E2E app.
         await page.WaitForSelectorAsync(".app-shell", new() { Timeout = 30_000 });
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 30_000 });
     }
 
-    /// <summary>
-    /// The standard SearchPageBase "Show Inactive"/"Show Active" toolbar toggle (SupportsActiveFilter)
-    /// — defaults to hiding Closed vacancies from the list until toggled; see VacancyList.razor's
-    /// ShowInactive/DisplayedItems.
-    /// </summary>
     public Task<bool> IsShowingActiveOnlyAsync() =>
         page.GetByRole(AriaRole.Button, new() { Name = "Show Inactive" }).IsVisibleAsync();
 
-    /// <summary>
-    /// Clicks "Show Inactive" so closed vacancies are shown too. Waits for the toolbar toggle to
-    /// flip to "Show Active" rather than for <see cref="RowsRenderedSelector"/> — the grid already
-    /// has rows rendered from before the click (DisplayedItems is a client-side filter over
-    /// already-loaded Items, not a server round-trip), so that selector is satisfied instantly and
-    /// doesn't prove the re-filtered (now-including-closed) grid has actually re-rendered.
-    /// </summary>
     public async Task ShowAllVacanciesAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Show Inactive" }).ClickAsync();
@@ -48,31 +25,13 @@ public sealed class VacancyListPage(IPage page, string baseUrl)
 
     public async Task ClickNewVacancyAsync()
     {
-        // Trailing "**" so the glob still matches when the list page appends "?returnUrl=..." to
-        // the create route (SearchPageBase.AppendReturnUrl). The shared helper waits on Commit,
-        // re-clicks only while the URL is unchanged (the toolbar's click wiring lands after the
-        // rows paint), and on failure reports the page's actual URL — e.g. /access-denied, which is
-        // where VacancyList.OnBeforeLoadAsync sends a non-recruiter session (the grid can still
-        // paint first, so GoToAsync's rows wait passes and the "Add" button then disappears).
-        // Then wait for the create form itself before callers start filling fields.
         await page.ClickGridAddAndWaitForCreateRouteAsync("**/vacancies/new**");
         await page.GetByPlaceholder("e.g. Senior Software Engineer")
             .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
     }
 
-    /// <summary>
-    /// Waits for the grid's rows to actually be rendered, then checks whether a row with this
-    /// title is present. Callers that navigate here via something other than GoToAsync (e.g.
-    /// clicking a dashboard widget) won't have already waited for this, so checking immediately
-    /// on arrival can race the load and report false negatives while rows are still populating.
-    /// </summary>
     public async Task<bool> HasVacancyAsync(string titleFragment)
     {
-        // The list endpoint has no pagination and GridPageSettings caps the grid at 20 rows/page —
-        // on this shared, long-lived E2E database, older seeded/created vacancies (e.g. "HR
-        // Business Partner") can easily be pushed past page 1 by newly-created ones. Search first
-        // so the grid narrows to just this vacancy regardless of how many others exist (same
-        // reasoning as ClickVacancyAsync/EmployeeListPage.HasEmployeeAsync).
         await SearchAsync(titleFragment);
 
         return await page.Locator(".e-rowcell")
@@ -83,29 +42,16 @@ public sealed class VacancyListPage(IPage page, string baseUrl)
 
     public async Task SearchAsync(string query)
     {
-        // VacancyList.razor's search placeholder is "Search by title or position profile".
         var searchInput = page.GetByPlaceholder("Search by title or position profile");
         await searchInput.ClearAsync();
         await searchInput.FillAsync(query);
-        // HrTextBox (SfTextBox) only raises ValueChanged on blur/change, not on the "input" event
-        // Playwright's FillAsync dispatches — without an explicit Enter/blur here,
-        // SearchPageBase.OnSearchChanged never actually fires and the grid silently keeps showing
-        // the unfiltered rows (same reasoning as EmployeeListPage.SearchAsync).
         await searchInput.PressAsync("Enter");
-        // OnSearchChanged debounces 300ms before reloading — wait past that, then for the grid to
-        // settle on the filtered result (row or empty state) rather than the pre-search rows.
         await page.WaitForTimeoutAsync(400);
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 
     public async Task ClickVacancyAsync(string titleFragment)
     {
-        // The list endpoint has no pagination (VacancyList.razor's FetchItemsAsync loads every
-        // vacancy for the company on every call) and GridPageSettings caps the grid at 20 rows per
-        // page — on this shared, long-lived E2E database that's easy to exceed, so a vacancy this
-        // test just created (e.g. sorted onto page 2+) can silently sit outside the current page
-        // with no indication why. Search first so the grid narrows to just this vacancy regardless
-        // of how many others exist (same reasoning as EmployeeListPage.HasEmployeeAsync).
         await SearchAsync(titleFragment);
 
         var link = page.Locator(".e-rowcell a")
@@ -114,68 +60,31 @@ public sealed class VacancyListPage(IPage page, string baseUrl)
         await link.ClickAsync();
         await page.WaitForURLAsync("**/vacancies/**", new() { Timeout = 30_000 });
 
-        // The URL changes as soon as client-side routing kicks in — well before the vacancy detail
-        // page's own async load (_vacancy, Linked Position Profile card, etc.) has actually
-        // finished rendering. A caller that immediately asserts on that page's content right after
-        // this method returns can otherwise race the load (same reasoning as VacancyDetailPage.
-        // GoToAsync's own post-navigation wait).
         await page.WaitForSelectorAsync(".e-tab, span[role='combobox']", new() { Timeout = 20_000 });
     }
 
-    /// <summary>
-    /// Returns the text of the given 0-based column index for the row matching
-    /// <paramref name="titleFragment"/>. Column order matches VacancyList.razor's GridColumns:
-    /// 0=Title, 1=Position Profile, 2=Location, 3=Applications, 4=Status, 5=Opened, 6=Closed.
-    /// </summary>
     public async Task<string> GetRowCellAsync(string titleFragment, int columnIndex)
     {
-        // See HasVacancyAsync/ClickVacancyAsync — search first so the target row isn't hidden on
-        // a later grid page than the one currently displayed.
         await SearchAsync(titleFragment);
 
         var row = page.Locator(".e-row").Filter(new() { HasText = titleFragment }).First;
         return (await row.Locator(".e-rowcell").Nth(columnIndex).InnerTextAsync()).Trim();
     }
 
-    /// <summary>
-    /// Reads the "Position Profile" column's text (the linked profile's own Title, or blank for
-    /// the rare legacy vacancy with no linked profile) for the row matching
-    /// <paramref name="titleFragment"/> — see VacancyListItemModel.PositionProfileTitle and the
-    /// "Derive Vacancy Role Information from Position Profile" story's new grid column.
-    /// </summary>
     public Task<string> GetPositionProfileColumnTextAsync(string titleFragment) =>
         GetRowCellAsync(titleFragment, columnIndex: 1);
 
-    /// <summary>Reads the "Applications" column's text (VacancyListItemModel.ApplicationCount) for the row matching <paramref name="titleFragment"/>.</summary>
     public Task<string> GetApplicationsColumnTextAsync(string titleFragment) =>
         GetRowCellAsync(titleFragment, columnIndex: 3);
 
-    /// <summary>
-    /// Returns true if the Title column's "(from Position Profile)" muted-italic fallback
-    /// indicator (rendered only when AdvertTitle is null — see VacancyList.razor's Title
-    /// GridColumn Template) is present within the row matching <paramref name="titleFragment"/>.
-    /// Scoped to the Title column's own cell (column 0) so it can't accidentally match the
-    /// Location column's identical suffix text on the same row.
-    /// </summary>
     public async Task<bool> HasTitleColumnPositionProfileFallbackIndicatorAsync(string titleFragment)
     {
-        // See HasVacancyAsync/ClickVacancyAsync — search first so the target row isn't hidden on
-        // a later grid page than the one currently displayed.
         await SearchAsync(titleFragment);
 
-        // Scoped to the Title cell (column 0) specifically, not "row contains this text anywhere"
-        // — the Position Profile column (column 1) can independently contain the same text as
-        // titleFragment (e.g. a vacancy with its own AdvertTitle override that's still linked to
-        // the same Position Profile named titleFragment), which would otherwise make a whole-row
-        // HasText filter match the wrong row.
         var row = page.Locator(".e-row")
             .Filter(new() { Has = page.Locator(".e-rowcell:first-child", new() { HasText = titleFragment }) })
             .First;
         var titleCell = row.Locator(".e-rowcell").Nth(0);
-        // Give the title cell a brief moment to settle before reading — SearchAsync's own wait
-        // only proves the grid has re-rendered with the filtered row set, not that this
-        // conditionally-rendered fallback-indicator span (versus the plain title text) has
-        // finished its own render pass.
         await row.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         return await titleCell.Locator("span.fst-italic", new() { HasText = "(from Position Profile)" }).IsVisibleAsync();
     }

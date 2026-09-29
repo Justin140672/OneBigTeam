@@ -14,20 +14,9 @@ namespace HR.Web.E2E.Tests.Infrastructure;
 // Supabase auth) was deliberately un-gated so those classes run concurrently. Any failures caused by
 // genuine shared-state races between them are to be diagnosed and fixed individually.
 
-/// <summary>
-/// Base for a test class whose tests must run one-at-a-time relative to other classes gated on the
-/// same static <see cref="HrSettingsSerialTestBase.GateInstance"/>, while remaining free to run
-/// concurrently with every other class. Wraps E2ETestBase's per-test InitializeAsync/DisposeAsync
-/// with acquire/release of the gate. xUnit creates a fresh test-class instance per [Fact]/[Theory]
-/// method, so gating InitializeAsync/DisposeAsync serializes one test at a time.
-/// </summary>
 public abstract class HrSettingsSerialTestBase(HrSettingsSerialFixture fixture)
     : E2ETestBase(fixture), IClassFixture<HrSettingsSerialFixture>
 {
-    /// <summary>
-    /// Shared static gate. Public so classes that can't derive from this base (different fixture)
-    /// can still serialize their mutating methods against it directly.
-    /// </summary>
     public static readonly SemaphoreSlim GateInstance = new(1, 1);
 
     public override async Task InitializeAsync()

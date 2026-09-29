@@ -23,7 +23,6 @@ public class SaveMyEqualityDataValidatorTests
         ReligionOrBeliefSelfDescribed: null,
         CaringResponsibilities: null);
 
-    // ── Happy paths ────────────────────────────────────────────────────────────
 
     [Fact]
     public void Passes_When_All_Answers_Null()
@@ -75,7 +74,6 @@ public class SaveMyEqualityDataValidatorTests
         Assert.True(Validator.Validate(request).IsValid);
     }
 
-    // ── Enum range ─────────────────────────────────────────────────────────────
 
     [Fact]
     public void Fails_When_Enum_Is_Out_Of_Range()
@@ -91,7 +89,6 @@ public class SaveMyEqualityDataValidatorTests
         Assert.False(Validator.Validate(request).IsValid);
     }
 
-    // ── Caring responsibilities ───────────────────────────────────────────────
 
     [Fact]
     public void Passes_When_CaringResponsibilities_Is_Null()
@@ -105,7 +102,6 @@ public class SaveMyEqualityDataValidatorTests
     public void Fails_When_CaringResponsibilities_Enum_Is_Out_Of_Range()
         => Assert.False(Validator.Validate(Valid() with { CaringResponsibilities = (CaringResponsibilities)999 }).IsValid);
 
-    // ── Self-described: required-when branch ───────────────────────────────────
 
     [Fact]
     public void Fails_When_SelfDescribed_Selected_But_Free_Text_Is_Null()
@@ -128,7 +124,6 @@ public class SaveMyEqualityDataValidatorTests
         Assert.False(Validator.Validate(request).IsValid);
     }
 
-    // ── Self-described: not-allowed-otherwise branch ──────────────────────────
 
     [Fact]
     public void Fails_When_Free_Text_Provided_But_Paired_Enum_Is_A_Non_SelfDescribed_Value()
@@ -151,7 +146,6 @@ public class SaveMyEqualityDataValidatorTests
         Assert.False(Validator.Validate(request).IsValid);
     }
 
-    // ── Length boundaries ─────────────────────────────────────────────────────
 
     [Fact]
     public void Passes_When_SelfDescribed_Is_Exactly_250_Characters()
@@ -191,7 +185,6 @@ public class SaveMyEqualityDataValidatorTests
         Assert.False(Validator.Validate(request).IsValid);
     }
 
-    // ── Route ids ─────────────────────────────────────────────────────────────
 
     [Fact]
     public void Fails_When_CompanyId_Is_Empty()

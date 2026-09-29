@@ -21,10 +21,6 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
 {
     private static readonly DateTimeOffset Now = new(2026, 6, 6, 12, 0, 0, TimeSpan.Zero);
 
-    /// <summary>
-    /// Single-company audience reader for reconciliation tests: profiles keyed by employee id,
-    /// with an optional per-employee throw to simulate an isolated failure for scenario 5.
-    /// </summary>
     private sealed class ReconciliationAudienceReader(
         Guid companyId,
         IReadOnlyDictionary<Guid, EmployeeAudienceProfile> profilesById,
@@ -39,12 +35,6 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
             if (cId != companyId)
                 return Task.FromResult((IReadOnlyDictionary<Guid, EmployeeAudienceProfile>)new Dictionary<Guid, EmployeeAudienceProfile>());
 
-            // Profiles are returned as normal (throwForEmployeeId only affects per-employee
-            // reconciliation, exercised by making that employee's "current position" resolve to a
-            // position id that the FakePositionProfileReader is configured to throw for, or by
-            // relying on ReconcileEmployeeAsync's own try/catch around a bad read). Here we simulate
-            // the isolated-failure scenario at the profile level: an employee entry whose
-            // PositionProfileId is a sentinel the position reader is wired to throw for.
             return Task.FromResult((IReadOnlyDictionary<Guid, EmployeeAudienceProfile>)
                 profilesById.Where(kvp => employeeIds.Contains(kvp.Key)).ToDictionary(kvp => kvp.Key, kvp => kvp.Value));
         }
@@ -69,9 +59,6 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
             Task.FromResult(cId == companyId ? (IReadOnlyList<Guid>)profilesById.Keys.ToList() : []);
     }
 
-    /// <summary>
-    /// Multi-company variant, for the per-employee/per-company isolation scenarios.
-    /// </summary>
     private sealed class MultiCompanyAudienceReader(
         IReadOnlyDictionary<Guid, IReadOnlyDictionary<Guid, EmployeeAudienceProfile>> byCompany) : IEmployeeAudienceReader
     {
@@ -110,10 +97,6 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
         }
     }
 
-    /// <summary>
-    /// A position-profile reader that throws for a specific position id, used to simulate a
-    /// transient read failure for one employee's position without affecting others (scenario 5).
-    /// </summary>
     private sealed class ThrowingPositionProfileReader(
         Guid throwForPositionProfileId,
         IReadOnlyDictionary<Guid, PositionProfileSummary>? summaries) : IPositionProfileReader
@@ -160,10 +143,6 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
         var provider = services.BuildServiceProvider();
         var logger = provider.GetRequiredService<ILogger<PositionRoleReconciliationService>>();
         var positionSync = new PositionSync(db, positionProfileReader);
-        // The service must reconcile against the SAME "now" the seeded fixture data (and this
-        // test's assertions) use — not the real wall clock — otherwise ExpiresAt gets stamped with
-        // the real current time, which is always later than the fixed `Now` these tests assert
-        // against, making a just-expired row look "still active" from the test's point of view.
         return new PositionRoleReconciliationService(db, audienceReader, positionSync, new FakeClock(Now.UtcDateTime), logger);
     }
 
@@ -188,9 +167,7 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
         {
             seed.Positions.Add(Position.Create(stalePositionId, companyId, "Stale Position", Now));
             seed.Positions.Add(Position.Create(currentPositionId, companyId, "Current Position", Now));
-            // Stale position is still active (a failed/missed revocation).
             seed.UserPositions.Add(UserPosition.Create(employeeId, stalePositionId, Now.AddDays(-90)));
-            // Current position was previously held, then expired.
             seed.UserPositions.Add(UserPosition.Create(employeeId, currentPositionId, Now.AddDays(-200), Now.AddDays(-90)));
             await seed.SaveChangesAsync();
         }
@@ -210,11 +187,8 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
         var stale = await verify.UserPositions.SingleAsync(up => up.UserId == employeeId && up.PositionId == stalePositionId);
         Assert.False(stale.IsActive(Now));
 
-        // SingleAsync above already proves there is exactly one row for (employeeId, currentPositionId)
-        // — a duplicate-key insert would have thrown a DbUpdateException during reconciliation, and a
-        // second surviving row would fail this SingleAsync. Reopened in place, not duplicated.
         var current = await verify.UserPositions.SingleAsync(up => up.UserId == employeeId && up.PositionId == currentPositionId);
-        Assert.True(current.IsActive(Now)); // reopened, no duplicate-key failure
+        Assert.True(current.IsActive(Now));
         Assert.Equal(1, await verify.UserPositions.CountAsync(up => up.UserId == employeeId && up.PositionId == currentPositionId));
     }
 
@@ -285,7 +259,7 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
 
         await using var verify = fixture.BuildContext();
         var assignments = await verify.UserPositions.Where(up => up.UserId == employeeId).ToListAsync();
-        Assert.Single(assignments); // no new row created
+        Assert.Single(assignments);
         Assert.False(assignments[0].IsActive(Now));
     }
 
@@ -309,7 +283,6 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
 
         var audienceReader = new ReconciliationAudienceReader(
             companyId, new Dictionary<Guid, EmployeeAudienceProfile> { [employeeId] = new(null, null, unresolvablePositionId) });
-        // No summary registered for unresolvablePositionId -> GetSummaryAsync returns null -> PositionSync.EnsureExistsAsync returns null.
         var positionReader = new FakePositionProfileReader(summaries: new Dictionary<Guid, PositionProfileSummary>());
 
         await using var db = fixture.BuildContext();
@@ -318,18 +291,15 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
 
         await using var verify = fixture.BuildContext();
         var assignments = await verify.UserPositions.Where(up => up.UserId == employeeId).ToListAsync();
-        Assert.Single(assignments); // no new row created for the unresolvable position
+        Assert.Single(assignments);
         Assert.Equal(staleActivePositionId, assignments[0].PositionId);
-        Assert.False(assignments[0].IsActive(Now)); // expired despite the new position being unresolvable
-        Assert.False(await verify.Positions.AnyAsync(p => p.Id == unresolvablePositionId)); // never created
+        Assert.False(assignments[0].IsActive(Now));
+        Assert.False(await verify.Positions.AnyAsync(p => p.Id == unresolvablePositionId));
     }
 
     [Fact]
     public async Task Reconcile_Later_Resolves_New_Position_Without_Duplicating_The_Already_Expired_Stale_Row()
     {
-        // Two-pass scenario: pass 1 confirms B but can't resolve it, so A is expired and B stays
-        // unprovisioned; pass 2 resolves B and must create exactly one assignment for it, with A
-        // still expired (not resurrected) and no duplicate-key failure.
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var oldPositionId = Guid.NewGuid();
@@ -372,10 +342,10 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
 
         await using var verify = fixture.BuildContext();
         var oldFinal = await verify.UserPositions.SingleAsync(up => up.UserId == employeeId && up.PositionId == oldPositionId);
-        Assert.False(oldFinal.IsActive(Now)); // still expired, not resurrected
+        Assert.False(oldFinal.IsActive(Now));
 
         var newAssignments = await verify.UserPositions.Where(up => up.UserId == employeeId && up.PositionId == newPositionId).ToListAsync();
-        Assert.Single(newAssignments); // exactly one row, no duplicate-key failure
+        Assert.Single(newAssignments);
         Assert.True(newAssignments[0].IsActive(Now));
     }
 
@@ -400,10 +370,8 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
             await seed.SaveChangesAsync();
         }
 
-        // Authoritative employee data already confirms the employee is now on throwingPositionId.
         var audienceReader = new ReconciliationAudienceReader(
             companyId, new Dictionary<Guid, EmployeeAudienceProfile> { [employeeId] = new(null, null, throwingPositionId) });
-        // But resolving/provisioning it throws instead of returning null.
         var positionReader = new ThrowingPositionProfileReader(throwingPositionId, summaries: null);
 
         await using (var db = fixture.BuildContext())
@@ -415,14 +383,12 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
         await using (var verify = fixture.BuildContext())
         {
             var assignments = await verify.UserPositions.Where(up => up.UserId == employeeId).ToListAsync();
-            var stale = Assert.Single(assignments); // no new row created for the throwing position
+            var stale = Assert.Single(assignments);
             Assert.Equal(stalePositionId, stale.PositionId);
-            Assert.False(stale.IsActive(Now)); // expired despite the new position lookup throwing
-            Assert.False(await verify.Positions.AnyAsync(p => p.Id == throwingPositionId)); // never created
+            Assert.False(stale.IsActive(Now));
+            Assert.False(await verify.Positions.AnyAsync(p => p.Id == throwingPositionId));
         }
 
-        // A later pass, once the position becomes resolvable, provisions it safely — no duplicate-key
-        // failure from the still-present expired stale row, and no leftover exception state.
         await using (var db = fixture.BuildContext())
         {
             var resolvedReader = new FakePositionProfileReader(summaries: new Dictionary<Guid, PositionProfileSummary>
@@ -435,20 +401,16 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
 
         await using var final = fixture.BuildContext();
         var staleFinal = await final.UserPositions.SingleAsync(up => up.UserId == employeeId && up.PositionId == stalePositionId);
-        Assert.False(staleFinal.IsActive(Now)); // still expired, not resurrected
+        Assert.False(staleFinal.IsActive(Now));
 
         var resolvedAssignments = await final.UserPositions.Where(up => up.UserId == employeeId && up.PositionId == throwingPositionId).ToListAsync();
-        Assert.Single(resolvedAssignments); // exactly one row, no duplicate-key failure
+        Assert.Single(resolvedAssignments);
         Assert.True(resolvedAssignments[0].IsActive(Now));
     }
 
     [Fact]
     public async Task Reconcile_Preserves_Already_Active_Current_Assignment_When_Its_Own_Profile_Lookup_Throws()
     {
-        // P2 follow-up: classification of "is this assignment current" must use the authoritative
-        // currentPositionProfileId, not the separately-resolved `currentPosition` (which is null
-        // whenever EnsureExistsAsync throws) — otherwise an already-active, still-correct assignment
-        // for the confirmed current position gets wrongly expired alongside genuinely stale ones.
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var stalePositionId = Guid.NewGuid();
@@ -461,19 +423,15 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
             seed.Positions.Add(Position.Create(stalePositionId, companyId, "Stale Position", Now));
             seed.Positions.Add(Position.Create(currentPositionId, companyId, "Current Position", Now));
             seed.UserPositions.Add(UserPosition.Create(employeeId, stalePositionId, Now.AddDays(-30)));
-            // Current position's assignment already exists and is active from an earlier, successful sync.
             seed.UserPositions.Add(UserPosition.Create(employeeId, currentPositionId, Now.AddDays(-10)));
             seed.UserRoles.Add(UserRole.Create(employeeId, directRoleId, Now));
             await seed.SaveChangesAsync();
         }
 
-        // Authoritative employee data confirms current position B, but resolving/refreshing B's
-        // profile throws this pass (e.g. a transient read failure) instead of returning a summary.
         var audienceReader = new ReconciliationAudienceReader(
             companyId, new Dictionary<Guid, EmployeeAudienceProfile> { [employeeId] = new(null, null, currentPositionId) });
         var throwingReader = new ThrowingPositionProfileReader(currentPositionId, summaries: null);
 
-        // Run twice to prove repeated lookup failures neither revoke B nor restore A.
         for (var pass = 0; pass < 2; pass++)
         {
             await using var db = fixture.BuildContext();
@@ -484,12 +442,11 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
         await using (var verify = fixture.BuildContext())
         {
             var stale = await verify.UserPositions.SingleAsync(up => up.UserId == employeeId && up.PositionId == stalePositionId);
-            Assert.False(stale.IsActive(Now)); // stale A still expired
+            Assert.False(stale.IsActive(Now));
 
             var current = await verify.UserPositions.SingleAsync(up => up.UserId == employeeId && up.PositionId == currentPositionId);
-            Assert.True(current.IsActive(Now)); // active B preserved despite its own lookup throwing
+            Assert.True(current.IsActive(Now));
 
-            // Direct roles/overrides untouched by reconciliation.
             Assert.True(await verify.UserRoles.AnyAsync(ur => ur.UserId == employeeId && ur.RoleId == directRoleId));
         }
 
@@ -506,7 +463,7 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
 
         await using var final = fixture.BuildContext();
         var currentAssignments = await final.UserPositions.Where(up => up.UserId == employeeId && up.PositionId == currentPositionId).ToListAsync();
-        Assert.Single(currentAssignments); // no duplicate row
+        Assert.Single(currentAssignments);
         Assert.True(currentAssignments[0].IsActive(Now));
     }
 
@@ -519,7 +476,7 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
         var healthyEmployeeId = Guid.NewGuid();
         var otherCompanyEmployeeId = Guid.NewGuid();
 
-        var failingPositionId = Guid.NewGuid(); // resolving this position throws
+        var failingPositionId = Guid.NewGuid();
         var healthyPositionId = Guid.NewGuid();
         var otherCompanyPositionId = Guid.NewGuid();
 
@@ -556,8 +513,6 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
         await using var verify = fixture.BuildContext();
         Assert.True(await verify.UserPositions.AnyAsync(up => up.UserId == healthyEmployeeId && up.PositionId == healthyPositionId));
         Assert.True(await verify.UserPositions.AnyAsync(up => up.UserId == otherCompanyEmployeeId && up.PositionId == otherCompanyPositionId));
-        // The failing employee got no assignment created for the unresolvable position (isolated failure, not silently ignored-successfully),
-        // but also has no pre-existing assignment here to expire — this scenario is about failure isolation, not revocation.
         Assert.False(await verify.UserPositions.AnyAsync(up => up.UserId == failingEmployeeId && up.PositionId == failingPositionId));
     }
 
@@ -600,7 +555,6 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
         Assert.True(await verify.UserRoles.AnyAsync(ur => ur.UserId == employeeId && ur.RoleId == directRoleId));
         Assert.True(await verify.EmployeeRoleOverrides.AnyAsync(o => o.Id == overrideId));
 
-        // Position reconciliation still happened as expected alongside the untouched direct grants.
         var stale = await verify.UserPositions.SingleAsync(up => up.UserId == employeeId && up.PositionId == stalePositionId);
         Assert.False(stale.IsActive(Now));
         Assert.True(await verify.UserPositions.AnyAsync(up => up.UserId == employeeId && up.PositionId == currentPositionId && up.ExpiresAt == null));
@@ -609,8 +563,6 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
     [Fact]
     public async Task Reconcile_Converges_Preexisting_Inconsistent_State_In_One_Pass()
     {
-        // Simulates data left behind by historical bugs/duplicated events: two stale active
-        // assignments AND an already-expired row for what is now the current position, all at once.
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var staleA = Guid.NewGuid();

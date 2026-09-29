@@ -17,9 +17,5 @@ internal interface ISessionRevocationStore
     /// </summary>
     Task RevokeAsync(Guid supabaseAuthUserId, DateTimeOffset revokedAt, CancellationToken cancellationToken);
 
-    /// <summary>
-    /// Returns the instant this user's sessions were last revoked, or null if they have never been
-    /// revoked (or the revocation record does not exist).
-    /// </summary>
     Task<DateTimeOffset?> GetRevokedAtAsync(Guid supabaseAuthUserId, CancellationToken cancellationToken);
 }

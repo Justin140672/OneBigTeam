@@ -6,12 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Tests;
 
-/// <summary>
-/// DSH-02: the team-sickness-today widget scopes to the manager's entire reporting sub-tree
-/// (direct and indirect reports) via <c>GetAllDescendantIdsAsync</c>. A peer / unrelated manager's
-/// active sickness records are excluded. See
-/// specifications/architecture/11-manager-hierarchy-scope.md.
-/// </summary>
 public class GetTeamSicknessTodayHierarchyScopeTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 1, 9, 0, 0, TimeSpan.Zero);

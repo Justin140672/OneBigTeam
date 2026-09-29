@@ -122,8 +122,6 @@ public class SetRecruitmentStageActiveStatusEndpointTests
         var companyId = Guid.NewGuid();
         var stages = await SeedDefaultStagesAsync(companyId);
 
-        // Deactivate every stage except one non-terminal stage (using direct EF access to save
-        // HTTP round trips — the business rule under test is enforced on the last remaining one).
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();

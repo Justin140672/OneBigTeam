@@ -66,8 +66,8 @@ public class ListEmployeeRoleOverridesHandlerTests(IdentityDatabaseFixture fixtu
 
         await SeedOverride(companyId, targetUserId, SystemRoles.Manager, EmployeeRoleOverrideType.Grant, Now);
         await SeedOverride(companyId, targetUserId, SystemRoles.Recruiter, EmployeeRoleOverrideType.Deny, Now.AddMinutes(5));
-        await SeedOverride(companyId, otherUserId, SystemRoles.Manager, EmployeeRoleOverrideType.Grant, Now); // different user
-        await SeedOverride(otherCompanyId, targetUserId, SystemRoles.Employee, EmployeeRoleOverrideType.Grant, Now); // different company
+        await SeedOverride(companyId, otherUserId, SystemRoles.Manager, EmployeeRoleOverrideType.Grant, Now);
+        await SeedOverride(otherCompanyId, targetUserId, SystemRoles.Employee, EmployeeRoleOverrideType.Grant, Now);
 
         var handler = BuildHandler();
 
@@ -77,7 +77,6 @@ public class ListEmployeeRoleOverridesHandlerTests(IdentityDatabaseFixture fixtu
 
         Assert.True(result.IsSuccess);
         Assert.Equal(2, result.Value!.Overrides.Count);
-        // Newest-first: the Recruiter deny (assigned later) must come before the Manager grant.
         Assert.Equal(SystemRoles.Recruiter, result.Value.Overrides[0].RoleId);
         Assert.Equal(SystemRoles.Manager, result.Value.Overrides[1].RoleId);
     }

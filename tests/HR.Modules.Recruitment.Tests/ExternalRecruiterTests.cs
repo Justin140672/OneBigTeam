@@ -61,7 +61,6 @@ public class ExternalRecruiterTests
 
         Assert.False(recruiter.IsActive);
         Assert.Equal(later, recruiter.UpdatedAt);
-        // Row still fully populated/addressable — nothing was deleted.
         Assert.Equal("Acme Recruiting", recruiter.AgencyName);
 
         var evenLater = later.AddDays(1);

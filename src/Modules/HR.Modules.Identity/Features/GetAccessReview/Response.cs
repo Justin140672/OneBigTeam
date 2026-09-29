@@ -1,10 +1,9 @@
 namespace HR.Modules.Identity.Features.GetAccessReview;
 
-/// <summary>One privilege a user holds and where it comes from.</summary>
 internal sealed record PrivilegeSourceItem(
     Guid RoleId,
     string RoleName,
-    string Source, // "Direct" | "Position:{PositionName}" | "Override"
+    string Source,
     DateTimeOffset? OverrideExpiresAt,
     bool IsExpiringSoon);
 

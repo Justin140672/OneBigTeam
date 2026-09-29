@@ -3,9 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the leave policy list page (/companies/{companyId}/leave-policies).
-/// </summary>
 public sealed class LeavePolicyListPage(IPage page, string baseUrl)
 {
     public async Task GoToAsync(Guid companyId)
@@ -28,10 +25,6 @@ public sealed class LeavePolicyListPage(IPage page, string baseUrl)
             .First
             .WaitUntilVisibleAsync();
 
-    /// <summary>
-    /// Checks whether the row containing <paramref name="nameFragment"/> shows the "Default"
-    /// star badge.
-    /// </summary>
     public async Task<bool> IsDefaultAsync(string nameFragment)
     {
         var row = page.Locator(".e-row")
@@ -40,10 +33,6 @@ public sealed class LeavePolicyListPage(IPage page, string baseUrl)
         return await row.Locator(".badge:has-text('Default')").IsVisibleAsync();
     }
 
-    /// <summary>
-    /// Sets the policy whose row contains <paramref name="nameFragment"/> as the company's
-    /// default leave policy via the "Set as Default" toolbar action.
-    /// </summary>
     public async Task SetAsDefaultAsync(string nameFragment)
     {
         var row = page.Locator(".e-row")

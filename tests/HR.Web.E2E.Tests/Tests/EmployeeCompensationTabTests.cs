@@ -4,18 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the Compensation tab on the employee edit page.
-///
-/// Uses the seeded "Sarah Chen" employee (ID: 30000000-0000-0000-0000-000000000001) who has two
-/// seeded Annual compensation records: a closed starting salary of 120,000 GBP (6 Jan 2020 to
-/// 31 Dec 2022) and the current, open-ended 145,000 GBP record effective 1 Jan 2023. Sarah is
-/// only ever READ here, never mutated.
-///
-/// The future-dated add/edit/delete tests below each create their own fresh, uniquely-named
-/// employee instead of reusing the shared Tom Williams — Tom is mutated by ~40+ other test files
-/// running in parallel, so adding/editing/deleting his compensation rows here would race those.
-/// </summary>
 public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId     = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -34,16 +22,10 @@ public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) 
 
         await empEdit.GoToAsync(AcmeId, SarahChen);
 
-        // GoToAsync only waits for a combobox to render, not for the full tab list — which
-        // depends on the employee's own async-loaded data (_showProbationTab etc.) — so a bare
-        // instant IsVisibleAsync() here can race that and report "not visible" for a tab that's
-        // genuinely there a moment later. A bounded wait avoids that.
         await EmployeeEditPage.SelectOwningGroupAsync(_page, "Compensation History");
         await EmployeeEditPage.SectionTab(_page, "Compensation History").WaitForAsync(
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
-        // Renamed from "Compensation" to "Compensation History" (the separate "Current
-        // Compensation" card was removed entirely — see the next test).
         Assert.True(
             await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Compensation History"),
             "Expected a 'Compensation History' tab on the employee edit page");
@@ -69,10 +51,6 @@ public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) 
         Assert.False(await _page.GetByText("Current Compensation", new() { Exact = true }).IsVisibleAsync(),
             "Did not expect a 'Current Compensation' heading anywhere on the tab");
 
-        // The Compensation History card/grid takes over showing the current record as just
-        // another (undated-end) row alongside past records. Scoped to the <h5> card heading
-        // specifically — the Compensation History *tab* label is also "Compensation History"
-        // exactly, so a bare GetByText match is ambiguous between the two (Playwright strict mode).
         Assert.True(await _page.GetByRole(AriaRole.Heading, new() { Name = "Compensation History", Exact = true }).IsVisibleAsync(),
             "Expected the 'Compensation History' card heading");
 
@@ -114,10 +92,6 @@ public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Every seeded Acme employee (including Tom Williams — see EmployeesModule's
-        // newHireCompensation seed array) already has at least one compensation record, so a
-        // genuinely empty compensation history can only be exercised via a freshly created
-        // employee.
         var unique    = Guid.NewGuid().ToString("N")[..8];
         var lastName  = $"NoCompensation{unique}";
         var workEmail = $"e2e.nocomp{unique}@acme.example";
@@ -135,10 +109,6 @@ public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) 
         await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
         await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
 
-        // QA Engineer's Department/Location auto-populate from the Position Profile selection
-        // via a second async server round trip (EmployeeEmploymentTab.OnPositionProfileChanged) —
-        // wait for it to land before saving, or Save can race ahead with both fields still blank
-        // and fail mandatory-field validation.
         await empEdit.WaitForDropdownPopulatedAsync("Department");
         await empEdit.WaitForDropdownPopulatedAsync("Location");
 
@@ -150,22 +120,10 @@ public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) 
         Assert.False(await empEdit.HasCurrentCompensationPanelAsync(),
             "Expected no Current Compensation panel for an employee without a compensation record");
 
-        // With no current record and no history, the tab shows a single unified empty-state
-        // message rather than separate "no current" and "no history" messages side by side.
         Assert.True(await _page.Locator("[data-testid='no-compensation-message']").IsVisibleAsync(),
             "Expected a single unified empty-state message when there is no compensation data at all");
     }
 
-    /// <summary>
-    /// Creates a fresh, uniquely-named Acme employee and navigates to their Compensation History
-    /// tab. Used by the mutating future-compensation tests below instead of the shared Tom
-    /// Williams: Tom is reused by ~40+ other test files (job-title mutation, document/task status,
-    /// etc.), so tests that add/edit/delete compensation rows against him race those other tests
-    /// under real parallel execution even when the specific dates used don't literally collide.
-    /// A fresh employee has no seeded compensation record at all (unlike every seeded Acme
-    /// employee including Tom — see EmployeesModule's newHireCompensation seed array), which is
-    /// exactly what these "add a future record" tests need to start from.
-    /// </summary>
     private async Task<EmployeeEditPage> CreateFreshEmployeeOnCompensationTabAsync(string labelSuffix)
     {
         var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
@@ -188,10 +146,6 @@ public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) 
         await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
         await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
 
-        // QA Engineer's Department/Location auto-populate from the Position Profile selection via a
-        // second async server round trip (EmployeeEmploymentTab.OnPositionProfileChanged) — wait for
-        // it to land before saving, or Save can race ahead with both fields still blank and fail
-        // mandatory-field validation. Matches CompensationTab_ShowsEmptyState_ForEmployeeWithNoCompensationRecord.
         await empEdit.WaitForDropdownPopulatedAsync("Department");
         await empEdit.WaitForDropdownPopulatedAsync("Location");
 
@@ -224,7 +178,6 @@ public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) 
         Assert.True(await row.First.IsVisibleAsync(),
             "Expected the newly added future-dated record to appear in the history grid");
 
-        // Future-dated rows show Edit/Delete; past/current ones don't.
         Assert.True(await row.GetByTitle("Edit").IsVisibleAsync(), "Expected an Edit action on the future-dated row");
         Assert.True(await row.GetByTitle("Delete").IsVisibleAsync(), "Expected a Delete action on the future-dated row");
     }
@@ -238,9 +191,6 @@ public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Seeded, dedicated-to-this-test employee (SeededE2eEmployees.CompensationEdit) instead of
-        // paying the full New Employee form — see that member's doc comment for why it's a
-        // dedicated pool member rather than the shared Sarah Chen/Tom Williams employees.
         await empEdit.GoToAsync(AcmeId, SeededE2eEmployees.CompensationEdit.EmployeeId);
         await empEdit.OpenCompensationTabAsync();
 
@@ -280,10 +230,6 @@ public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) 
         await empEdit.ClickDeleteCompensationRowAsync("1 Dec 2030");
         await empEdit.ConfirmDeleteCompensationAsync();
 
-        // ConfirmDeleteCompensationAsync's own wait only confirms the "Yes" confirmation button
-        // itself disappeared — that's a separate render pass from the grid actually re-fetching
-        // and dropping the deleted row, so a single immediate IsVisibleAsync() snapshot here can
-        // still catch it mid-transition. Use an auto-retrying assertion instead.
         await Assertions.Expect(empEdit.CompensationHistoryRow("1 Dec 2030").First)
             .Not.ToBeVisibleAsync(new() { Timeout = 10_000 });
     }

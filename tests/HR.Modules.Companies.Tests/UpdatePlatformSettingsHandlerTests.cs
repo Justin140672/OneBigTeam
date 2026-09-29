@@ -79,7 +79,6 @@ public class UpdatePlatformSettingsHandlerTests
 
         var published = Assert.Single(publisher.Published);
         var auditEvent = Assert.IsType<PlatformSettingsUpdatedAuditEvent>(published);
-        // Lazily-seeded row starts from CreateDefault defaults as the "previous" snapshot.
         Assert.Equal(14, auditEvent.PreviousState!.TrialLengthDays);
     }
 

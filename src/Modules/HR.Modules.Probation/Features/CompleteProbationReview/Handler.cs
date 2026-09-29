@@ -102,11 +102,6 @@ internal sealed class CompleteProbationReviewHandler
             return Result.Failure<CompleteProbationReviewResponse>(
                 Error.Validation("Outcome can only be set on FinalDecision or ExtensionConfirmation reviews."));
 
-        // PROB-05: extension end date must move strictly forward — both relative to the record's
-        // current expected end date and relative to the decision date itself. Checked here (in
-        // addition to the domain-level guard inside ProbationRecord.Extend) so a caller gets a
-        // clean validation Result instead of an unhandled exception, and so no review/task/record
-        // mutation happens when the check fails.
         if (request.Outcome == ProbationOutcome.Extend)
         {
             if (request.NewExpectedEndDate!.Value <= record.ExpectedEndDate)
@@ -205,10 +200,6 @@ internal sealed class CompleteProbationReviewHandler
                 completedByEmployeeId, review.ReviewType.ToString(), hasNotes, now), cancellationToken);
         }
 
-        // PROB-07: Pass, Fail and Extend outcomes each get a dedicated EmployeeTimelineEntry via
-        // their own integration event — previously only Pass did (see Wave 2a scope notes this
-        // ticket completes). Extend's timeline entry is published by
-        // ProbationExtensionService.ApplyAsync below, alongside its own audit event.
         if (request.Outcome == ProbationOutcome.Pass)
         {
             await _integrationEventPublisher.PublishAsync(
@@ -222,9 +213,6 @@ internal sealed class CompleteProbationReviewHandler
                 cancellationToken);
         }
 
-        // PROB-04: notify the employee when a Pass/Fail outcome is recorded. Extend is handled
-        // separately by ProbationExtensionService.ApplyAsync (called above), which already sends
-        // its own "probation extended" notification — sending another one here would duplicate it.
         if (request.Outcome is ProbationOutcome.Pass or ProbationOutcome.Fail)
         {
             await ProbationOutcomeNotifier.NotifyAsync(

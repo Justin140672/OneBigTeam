@@ -5,11 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// See UpdateNotificationSettingsHandlerTests/UpdateNotificationSettingsValidatorTests/
-/// CompanySettingsNotificationSettingsTests in HR.Modules.Companies.Tests for the equivalent
-/// unit-level coverage of the same behaviour.
-/// </summary>
 [Collection("Integration")]
 public class UpdateNotificationSettingsEndpointTests
 {
@@ -74,8 +69,6 @@ public class UpdateNotificationSettingsEndpointTests
     [Fact]
     public async Task Put_NotificationSettings_Returns_Forbidden_For_Recruiter_Only_Role()
     {
-        // Proves "the Recruiter role alone cannot change company-wide configuration": Recruiter
-        // holds recruitment:manage but not hr-settings:manage.
         var tenantId = Guid.NewGuid();
         using var client = await ClientFor(RecruiterOnlyUserId, tenantId);
 

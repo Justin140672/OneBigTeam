@@ -126,7 +126,6 @@ public class EmployeeInternalAppointmentServiceTests
     private static InternalAppointmentCompensation Compensation(string salaryType = "Annual") =>
         new(salaryType, 72000m, "gbp", 37.5m, 1m, "New role salary.");
 
-    // ------------------------------------------------------------------ immediate application
 
     [Fact]
     public async Task AppointAsync_Applies_Position_Department_Location_And_Manager_When_Due_Today()
@@ -217,7 +216,6 @@ public class EmployeeInternalAppointmentServiceTests
         var result = await h.Service().AppointAsync(h.Request(), CancellationToken.None);
         Assert.True(result.IsSuccess);
 
-        // The timeline entry for an applied change is written by the EmployeePromoted consumer.
         var consumerTimeline = new FakeEmployeeTimelineWriter();
         var promoted = Assert.Single(h.Events.Published.OfType<EmployeePromotedIntegrationEvent>());
         await new EmployeePromotedHandler(h.Db, consumerTimeline).HandleAsync(promoted, CancellationToken.None);
@@ -255,7 +253,6 @@ public class EmployeeInternalAppointmentServiceTests
         Assert.True(result.Value!.IsApplied);
     }
 
-    // ------------------------------------------------------------------ scheduled (future-dated)
 
     [Fact]
     public async Task AppointAsync_Future_Dated_Is_Scheduled_Without_Changing_Employee()
@@ -290,7 +287,6 @@ public class EmployeeInternalAppointmentServiceTests
         Assert.Contains("Engineering Manager", entry.Summary);
     }
 
-    // ------------------------------------------------------------------ idempotency / resume
 
     [Fact]
     public async Task AppointAsync_Retry_With_Same_Source_Reference_Returns_Same_Change_And_Records_Nothing_New()
@@ -350,7 +346,6 @@ public class EmployeeInternalAppointmentServiceTests
     [Fact]
     public async Task ResumeBySourceReferenceAsync_Finalizes_A_Due_But_Uncompleted_Change()
     {
-        // Simulates an attempt interrupted after the promotion row committed but before finalisation.
         EmployeePromotion? interrupted = null;
         var h = await SeedAsync(harness =>
         {
@@ -464,7 +459,6 @@ public class EmployeeInternalAppointmentServiceTests
         Assert.Equal(1, await h.Db.EmployeePromotions.CountAsync());
     }
 
-    // ------------------------------------------------------------------ manager
 
     [Fact]
     public async Task AppointAsync_Without_Manager_Leaves_Employee_With_No_Manager()
@@ -534,7 +528,6 @@ public class EmployeeInternalAppointmentServiceTests
     [Fact]
     public async Task AppointAsync_Returns_Conflict_When_Manager_Would_Create_A_Cycle()
     {
-        // The proposed manager already reports (indirectly) to the employee.
         var h = await SeedAsync(harness =>
             harness.Manager.Assign(harness.Manager.DepartmentId, harness.Manager.PositionProfileId, harness.Manager.LocationId, harness.Employee.Id, Now));
 
@@ -543,7 +536,6 @@ public class EmployeeInternalAppointmentServiceTests
         await AssertNothingRecordedAsync(h, result, "conflict");
     }
 
-    // ------------------------------------------------------------------ validation failures
 
     [Theory]
     [InlineData("Draft")]
@@ -637,7 +629,6 @@ public class EmployeeInternalAppointmentServiceTests
         await AssertNothingRecordedAsync(h, result, "validation");
     }
 
-    // ------------------------------------------------------------------ compensation
 
     [Theory]
     [InlineData("Annual", "Annual")]
@@ -676,7 +667,6 @@ public class EmployeeInternalAppointmentServiceTests
         Assert.Equal(0, await h.Db.Compensations.CountAsync());
     }
 
-    // ------------------------------------------------------------------ helpers
 
     private static async Task AssertNothingRecordedAsync(Harness h, Result<InternalAppointmentResult> result, string expectedCode)
     {

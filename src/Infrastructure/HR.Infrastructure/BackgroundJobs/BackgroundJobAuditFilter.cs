@@ -44,13 +44,9 @@ internal sealed class BackgroundJobAuditFilter(
         }
         catch (DbUpdateException ex) when (IsDuplicateEvent(ex))
         {
-            // Deterministic EventId per Hangfire job id: a retry of the same failing job races to
-            // insert the same row. One failure audit per job is intended — swallow the duplicate.
         }
         catch (Exception ex)
         {
-            // OBT-REM-02: an audit persistence failure must never mask the original job failure —
-            // Hangfire still sees context.Exception and applies its retry/error handling.
             logger.LogError(
                 ex,
                 "Failed to persist background-job failure audit for job {HangfireJobId}",
@@ -58,10 +54,6 @@ internal sealed class BackgroundJobAuditFilter(
         }
     }
 
-    /// <summary>
-    /// A tenant-aware job declares a <c>Guid companyId</c> parameter; pull the matching argument
-    /// value so the audit row is scoped to that tenant. System-wide jobs have no such parameter.
-    /// </summary>
     private static Guid? ExtractCompanyId(PerformedContext context)
     {
         var parameters = context.BackgroundJob.Job.Method.GetParameters();

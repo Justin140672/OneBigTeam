@@ -92,7 +92,6 @@ public class CloseSicknessRecordHandlerTests
     [Fact]
     public async Task HandleAsync_Closes_Record_And_Calculates_TotalDays()
     {
-        // 2026-07-01 (Wed) to 2026-07-03 (Fri) = 3 working days
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -171,7 +170,7 @@ public class CloseSicknessRecordHandlerTests
             CompanyId = companyId,
             EmployeeId = employeeId,
             Id = record.Id,
-            EndDate = new DateOnly(2026, 6, 30), // before StartDate 2026-07-01
+            EndDate = new DateOnly(2026, 6, 30),
             EndDayPart = SicknessDayPart.FullDay
         }, CancellationToken.None);
 
@@ -182,7 +181,6 @@ public class CloseSicknessRecordHandlerTests
     [Fact]
     public async Task HandleAsync_Excludes_Public_Holidays_When_Setting_Is_Enabled()
     {
-        // 2026-07-01 to 2026-07-03 = 3 working days, but 2026-07-02 is a holiday → 2 days
         var publicHolidays = new List<DateOnly> { new(2026, 7, 2) };
 
         await using var db = BuildContext();
@@ -276,7 +274,6 @@ public class CloseSicknessRecordHandlerTests
     [Fact]
     public async Task HandleAsync_Sets_EvidenceStatus_Pending_When_TotalDays_Meets_Threshold_On_Close()
     {
-        // StartDate = 2026-07-01, EndDate = 2026-07-03 = 3 working days, threshold = 3 → Pending
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -299,7 +296,6 @@ public class CloseSicknessRecordHandlerTests
     [Fact]
     public async Task HandleAsync_Sets_EvidenceStatus_NotRequired_When_TotalDays_Below_Threshold_On_Close()
     {
-        // StartDate = 2026-07-01, EndDate = 2026-07-03 = 3 working days, threshold = 7 → NotRequired
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -366,7 +362,6 @@ public class CloseSicknessRecordHandlerTests
     [Fact]
     public async Task HandleAsync_Creates_ReturnToWorkReview_When_TotalDays_Meets_Threshold_On_Close()
     {
-        // StartDate = 2026-07-01, EndDate = 2026-07-03 = 3 working days, threshold = 3 → review created
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -477,7 +472,6 @@ public class CloseSicknessRecordHandlerTests
     [Fact]
     public async Task HandleAsync_Does_Not_Create_ReturnToWorkReview_When_TotalDays_Below_Threshold()
     {
-        // StartDate = 2026-07-01, EndDate = 2026-07-03 = 3 working days, threshold = 7 → no review
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -500,23 +494,17 @@ public class CloseSicknessRecordHandlerTests
         Assert.Empty(eventPublisher.PublishedEvents);
     }
 
-    // ReturnToWorkRequiredAfterDays is mandatory now (no opt-out — see
-    // CompanySettings.ReturnToWorkRequiredAfterDays), so the "setting is null, no review created"
-    // case this used to cover can no longer occur and has been removed.
 
     [Fact]
     public async Task HandleAsync_CreatesEvidenceRequest_Immediately_WhenClosedSpanMeetsThreshold()
     {
-        // Distinct from the EvidenceStatus-only assertions above: this confirms the handler itself
-        // creates the SicknessEvidenceRequest row at close time (rather than waiting for the daily
-        // FitNoteRequestJob's catch-all pass over closed records without a request).
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
         var record = await SeedOpenRecord(db, companyId, employeeId, categoryId);
 
-        var endDate = new DateOnly(2026, 7, 3); // StartDate 2026-07-01 → 3 calendar days elapsed
+        var endDate = new DateOnly(2026, 7, 3);
 
         var result = await BuildHandler(db, fitNoteRequiredAfterDays: 3).HandleAsync(new CloseSicknessRecordRequest
         {
@@ -548,7 +536,7 @@ public class CloseSicknessRecordHandlerTests
             CompanyId = companyId,
             EmployeeId = employeeId,
             Id = record.Id,
-            EndDate = new DateOnly(2026, 8, 1), // large span, well over threshold
+            EndDate = new DateOnly(2026, 8, 1),
             EndDayPart = SicknessDayPart.FullDay
         }, CancellationToken.None);
 
@@ -556,8 +544,6 @@ public class CloseSicknessRecordHandlerTests
         Assert.Empty(await db.SicknessEvidenceRequests.ToListAsync());
     }
 
-    // SICK-06: actor is the manager/HR user who performed the close action, never implicitly
-    // assumed to be the affected employee.
     [Fact]
     public async Task HandleAsync_Audit_ActorEmployeeId_Reflects_Authenticated_Caller_Not_Employee()
     {
@@ -608,13 +594,11 @@ public class CloseSicknessRecordHandlerTests
         Assert.True(result.IsSuccess);
         var auditEvent = Assert.IsType<SicknessClosedAuditEvent>(Assert.Single(auditPublisher.PublishedEvents));
         Assert.Equal(beforeStartDate, auditEvent.BeforeStartDate);
-        Assert.Null(auditEvent.BeforeEndDate); // open before close
+        Assert.Null(auditEvent.BeforeEndDate);
         Assert.Equal(new DateOnly(2026, 7, 3), auditEvent.EndDate);
         Assert.Equal(3m, auditEvent.TotalDays);
     }
 
-    // SICK-06: ReturnToWorkReviewRequiredAuditEvent's actor is the same person who closed the
-    // record (they caused this outcome directly), not the affected employee.
     [Fact]
     public async Task HandleAsync_ReturnToWorkReviewRequired_AuditEvent_ActorEmployeeId_Is_Closer_Not_Employee()
     {
@@ -644,7 +628,6 @@ public class CloseSicknessRecordHandlerTests
         Assert.NotEqual(employeeId, ((HR.SharedKernel.IAuditEvent)auditEvent).ActorEmployeeId);
     }
 
-    // SICK-06: Notes is free-text and must never appear in the serialized audit event.
     [Fact]
     public async Task HandleAsync_Audit_Event_Does_Not_Contain_Notes_Free_Text()
     {

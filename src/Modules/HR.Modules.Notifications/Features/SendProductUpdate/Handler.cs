@@ -37,10 +37,6 @@ internal sealed class SendProductUpdateHandler(
 
         var now = clock.UtcNowOffset();
 
-        // Shared across every recipient of this one send: gives every row the same SourceEntityId,
-        // so (employee_id, source_entity_id, type) uniqueness means a retried request cannot double-
-        // notify the same admin for the same announcement, while a later, different announcement
-        // (a new batch id) is unaffected.
         var batchId = Guid.NewGuid();
 
         foreach (var recipient in recipients)

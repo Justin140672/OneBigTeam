@@ -3,18 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// ADM-01: the User Administration list page's own "Invite User" toolbar action, which opens the
-/// 4-step <c>InviteUserWizard.razor</c> (Employee → Email → Roles → Review → Send). Complements
-/// <see cref="UserAdministrationManagementTests"/>, which still covers the Employee-List row-level
-/// Quick Invite path plus resend/cancel/disable/enable/manage-roles.
-///
-/// Uses Laura Bennett (HR Administrator) against the seeded Acme company. "Emma Jones" is a seeded
-/// Acme employee with no dev-persona user account (same target as
-/// UserAdministrationManagementTests.InviteEmployee_EndToEnd_ShowsPendingInvitationInGrid) — if the
-/// seed data changes so she gains an account, she'll drop out of the wizard's invitable list and
-/// this test fails fast; pick another unlinked seeded employee at that point.
-/// </summary>
 public sealed class InviteUserFromAdminTests(HrAdminPersonaFixture fixture)
     : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {

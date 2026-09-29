@@ -67,8 +67,6 @@ internal sealed class ResolveOperationalAlertHandler(
         var now = clock.UtcNowOffset();
         alert.Resolve(userId, request.ResolutionNote, now);
 
-        // Built from in-memory values ahead of the save, so it can double as both the response and
-        // the payload persisted for an idempotency replay.
         var response = new ResolveOperationalAlertResponse(
             alert.Id,
             alert.Status.ToString(),
@@ -80,9 +78,6 @@ internal sealed class ResolveOperationalAlertHandler(
             var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
                 scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
 
-            // Lost a race against a concurrent duplicate under the same key - this attempt's alert
-            // update was rolled back along with it, so skip our own audit publish and hand back the
-            // winner's result untouched.
             if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
                 return Result.Success(outcome.Response!);
         }

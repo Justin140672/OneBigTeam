@@ -25,7 +25,6 @@ internal sealed class CreateApplicationValidator : AbstractValidator<CreateAppli
             .NotEqual(Domain.ApplicationSource.Internal)
             .WithMessage("Source 'Internal' is recorded automatically when an employee applies for an internal vacancy and cannot be set manually.");
 
-        // Ticket #78: source and recruiter reference are validated as a pair.
         RuleFor(r => r.SourceExternalRecruiterId)
             .NotEmpty()
             .WithMessage("SourceExternalRecruiterId is required when Source is ExternalRecruiter.")

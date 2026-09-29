@@ -29,7 +29,7 @@ public class SensitiveDataProtectionKeysNotCommittedTests
         if (!doc.RootElement.TryGetProperty("Infrastructure", out var infrastructure)
             || !infrastructure.TryGetProperty("SensitiveDataProtection", out var protection))
         {
-            return; // section absent entirely — nothing committed, which is what we want.
+            return;
         }
 
         if (protection.TryGetProperty("Keys", out var keys))

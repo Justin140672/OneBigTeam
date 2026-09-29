@@ -5,11 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// SET-02 counterpart to GetCompanySettingsHistoryEndpointTests — gated by "hr-settings:manage"
-/// (HrAdministrator-only), the mirror-image restriction to company:manage. See
-/// UpdateHrSettingsEndpointTests and IdentityModule.AddRolePolicies for the policy definition.
-/// </summary>
 [Collection("Integration")]
 public class GetHrSettingsHistoryEndpointTests
 {

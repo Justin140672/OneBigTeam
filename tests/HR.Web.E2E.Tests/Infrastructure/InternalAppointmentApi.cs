@@ -28,10 +28,8 @@ internal static class InternalAppointmentApi
 {
     private static readonly Guid AcmeId = InternalVacancyApplyApi.AcmeId;
 
-    /// <summary>The seeded Recruiter persona (Marcus — RecruiterPersonaFixture): recruitment:manage, no employee:manage.</summary>
     public const string RecruiterEmail = "marcus.diallo@acme.example";
 
-    // SystemRoles (HR.Modules.Identity.Domain.SystemRoles) — internal to the module, so mirrored here.
     private static readonly Guid EmployeeRoleId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid RecruiterRoleId = Guid.Parse("00000000-0000-0000-0000-000000000003");
     private static readonly Guid HrAdministratorRoleId = Guid.Parse("00000000-0000-0000-0000-000000000004");
@@ -41,11 +39,6 @@ internal static class InternalAppointmentApi
     private static readonly SemaphoreSlim AppointerLock = new(1, 1);
     private static Appointer? _appointer;
 
-    /// <summary>
-    /// Returns the process-wide HR Administrator + Recruiter appointer user (see class remarks),
-    /// creating it on first use. Only needed when a test must also open the appointee's full profile.
-    /// Makes real Supabase calls on first use (ensure-employee-login + /api/login).
-    /// </summary>
     public static async Task<Appointer> EnsureAppointerAsync(HttpClient hrAdminApi, string apiBaseUrl)
     {
         if (_appointer is not null) return _appointer;
@@ -68,9 +61,6 @@ internal static class InternalAppointmentApi
             Assert.True(rolesResponse.IsSuccessStatusCode,
                 $"Granting HR Administrator + Recruiter to the appointer failed with {rolesResponse.StatusCode}: {await rolesResponse.Content.ReadAsStringAsync()}");
 
-            // Prove the appointer really holds both permissions (recruitment:manage to appoint,
-            // employee:manage to open the appointee's full profile), so a role/permission drift
-            // surfaces here with a clear message instead of as a UI 403 later.
             using (var appointerApi = await InternalVacancyApplyApi.CreateEmployeeApiClientAsync(apiBaseUrl, employee.WorkEmail))
             {
                 var employeeManage = await appointerApi.GetAsync($"/api/companies/{AcmeId}/employees?pageSize=1");
@@ -102,7 +92,6 @@ internal static class InternalAppointmentApi
         string FirstName,
         string LastName);
 
-    /// <summary>GET /api/companies/{companyId}/employees/{id} (HR Administrator client).</summary>
     public static async Task<EmployeeSnapshot> GetEmployeeAsync(HttpClient hrAdminApi, Guid employeeId)
     {
         var response = await hrAdminApi.GetAsync($"/api/companies/{AcmeId}/employees/{employeeId}");
@@ -113,10 +102,6 @@ internal static class InternalAppointmentApi
         return employee!;
     }
 
-    /// <summary>
-    /// Total number of Acme employees (any status) whose name/email/number contains
-    /// <paramref name="search"/> — GET /api/companies/{companyId}/employees?search=... (employee:manage).
-    /// </summary>
     public static async Task<int> CountEmployeesMatchingAsync(HttpClient hrAdminApi, string search)
     {
         var response = await hrAdminApi.GetAsync(
@@ -135,7 +120,6 @@ internal static class InternalAppointmentApi
         Guid? PositionProfileDepartmentId,
         string? EffectiveLocation);
 
-    /// <summary>GET /api/companies/{companyId}/vacancies/{vacancyId} (recruitment:view).</summary>
     public static async Task<VacancySnapshot> GetVacancyAsync(HttpClient recruiterApi, Guid vacancyId)
     {
         var response = await recruiterApi.GetAsync($"/api/companies/{AcmeId}/vacancies/{vacancyId}");
@@ -146,7 +130,6 @@ internal static class InternalAppointmentApi
         return vacancy!;
     }
 
-    /// <summary>GET /api/companies/{companyId}/departments/{id} — returns the department's name.</summary>
     public static async Task<string> GetDepartmentNameAsync(HttpClient hrAdminApi, Guid departmentId)
     {
         var response = await hrAdminApi.GetAsync($"/api/companies/{AcmeId}/departments/{departmentId}");
@@ -165,7 +148,6 @@ internal static class InternalAppointmentApi
         string? Notes,
         string Reason);
 
-    /// <summary>GET /api/companies/{companyId}/employees/{employeeId}/compensation/current (employee:manage).</summary>
     public static async Task<CompensationSnapshot> GetCurrentCompensationAsync(HttpClient hrAdminApi, Guid employeeId)
     {
         var response = await hrAdminApi.GetAsync($"/api/companies/{AcmeId}/employees/{employeeId}/compensation/current");

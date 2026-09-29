@@ -84,11 +84,9 @@ public sealed class ExternalRecruiterEditConcurrencyConflictTests(RecruiterPerso
         var otherTabContact = $"E2E Contact Other {Guid.NewGuid().ToString("N")[..6]}";
         var finalContact    = $"E2E Contact Final {Guid.NewGuid().ToString("N")[..6]}";
 
-        // ── Tab 1: open the editor and start editing the Contact Name (loads version v1) ──
         await recruiterEdit.GoToAsync(AcmeId, id);
         await recruiterEdit.SetContactNameAsync(firstTabContact);
 
-        // ── Tab 2 (same context / persona): load the same recruiter and save first ──
         var otherPage = await _context.NewPageAsync();
         try
         {
@@ -102,7 +100,6 @@ public sealed class ExternalRecruiterEditConcurrencyConflictTests(RecruiterPerso
             await otherPage.CloseAsync();
         }
 
-        // ── Tab 1: saving now is stale → conflict banner, page stays, input preserved ──
         await recruiterEdit.SaveExpectingConflictAsync();
 
         Assert.True(await recruiterEdit.IsConcurrencyWarningVisibleAsync(),
@@ -110,14 +107,12 @@ public sealed class ExternalRecruiterEditConcurrencyConflictTests(RecruiterPerso
         Assert.Contains($"/external-recruiters/{id}", _page.Url);
         Assert.Equal(firstTabContact, await recruiterEdit.GetContactNameAsync());
 
-        // ── Tab 1: "Reload latest values" clears the banner and adopts the other tab's value ──
         await recruiterEdit.ClickReloadLatestValuesAsync();
 
         Assert.False(await recruiterEdit.IsConcurrencyWarningVisibleAsync(),
             "Expected the conflict banner to clear after reloading latest values");
         Assert.Equal(otherTabContact, await recruiterEdit.WaitForContactNameAsync(otherTabContact));
 
-        // ── Tab 1: re-edit against the fresh version and save successfully ──
         await recruiterEdit.SetContactNameAsync(finalContact);
         await recruiterEdit.SaveAsync();
 
@@ -125,7 +120,6 @@ public sealed class ExternalRecruiterEditConcurrencyConflictTests(RecruiterPerso
         Assert.Equal(finalContact, await recruiterEdit.WaitForContactNameAsync(finalContact));
     }
 
-    /// <summary>Creates a uniquely-named external recruiter and returns its agency name and id.</summary>
     private async Task<(string Name, Guid Id)> CreateRecruiterAsync(
         ExternalRecruiterListPage recruiterList, ExternalRecruiterDetailPage recruiterEdit)
     {

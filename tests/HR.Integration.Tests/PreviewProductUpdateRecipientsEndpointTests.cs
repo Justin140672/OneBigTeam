@@ -8,12 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Customer Release Notifications: GET /api/notifications/admin/product-updates/recipient-preview
-/// — the read-only "{N} Company Admin users across {M} active customer companies" count the Admin
-/// Portal's confirmation dialog shows before SendProductUpdate is allowed to run. Gated by the
-/// same "platform:admin" policy as SendProductUpdate.
-/// </summary>
 [Collection("Integration")]
 public class PreviewProductUpdateRecipientsEndpointTests
 {

@@ -1,27 +1,16 @@
 namespace HR.Web.Services;
 
-/// <summary>
-/// Story 2: HR.Web data service for the customer-facing organisation data export feature. Calls the
-/// four Reporting endpoints under /api/companies/{companyId}/reporting/data-exports using the shared
-/// "hrapi" IHttpClientFactory client (bearer auth is attached by the client's handler, same pattern
-/// as ReportingService/SubscriptionService).
-/// </summary>
 public class OrganisationDataExportService(HrApiHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient();
 
     private static string Base(Guid companyId) => $"api/companies/{companyId}/reporting/data-exports";
 
-    /// <summary>POST — requests a new export. Returns (ExportId, Status) on success, an error message otherwise.</summary>
     public async Task<(RequestOrganisationDataExportResult? Result, string? Error)> RequestAsync(
         Guid companyId, CancellationToken cancellationToken = default)
     {
         try
         {
-            // PostAsync(url, content: null) sends no Content-Type header at all, which FastEndpoints'
-            // JSON body binder rejects with 415 even though this request has no meaningful body
-            // (CompanyId comes from the route) — PostAsJsonAsync with an empty object matches the
-            // same route-bound-only pattern used elsewhere (e.g. ApplicationService.OfferAsync).
             var response = await Http.PostAsJsonAsync(Base(companyId), new { }, cancellationToken);
 
             if (response.IsSuccessStatusCode)
@@ -42,7 +31,6 @@ public class OrganisationDataExportService(HrApiHttpClientFactory httpClientFact
         }
     }
 
-    /// <summary>GET latest — always returns a payload (Status null when no export has ever been requested).</summary>
     public async Task<OrganisationDataExportLatest?> GetLatestAsync(
         Guid companyId, CancellationToken cancellationToken = default)
     {
@@ -57,7 +45,6 @@ public class OrganisationDataExportService(HrApiHttpClientFactory httpClientFact
         }
     }
 
-    /// <summary>GET list — recent export history (newest first).</summary>
     public async Task<IReadOnlyList<OrganisationDataExportHistoryItem>> GetHistoryAsync(
         Guid companyId, CancellationToken cancellationToken = default)
     {
@@ -73,7 +60,6 @@ public class OrganisationDataExportService(HrApiHttpClientFactory httpClientFact
         }
     }
 
-    /// <summary>GET download — returns the ZIP bytes for a completed export, or an error message.</summary>
     public async Task<(byte[]? Bytes, string? ContentType, string? FileName, string? Error)> DownloadAsync(
         Guid companyId, Guid exportId, CancellationToken cancellationToken = default)
     {

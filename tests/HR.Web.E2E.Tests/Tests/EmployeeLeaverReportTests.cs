@@ -3,18 +3,11 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the Employee Leaver report page
-/// (/companies/{companyId}/reporting/employee-leavers — EmployeeLeaverReportPage.razor):
-/// loading, the ReportFilterPanel (Department/PositionProfile/DateRange only — Location/Manager/
-/// EmploymentType/Status are hidden on this page), and export. Catalog-page coverage (card
-/// visibility/navigation) lives in <see cref="ReportCatalogTests"/>.
-/// </summary>
 public sealed class EmployeeLeaverReportTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    private const string LauraEmail = "laura.bennett@acme.example"; // HR Administrator
+    private const string LauraEmail = "laura.bennett@acme.example";
 
     [Fact]
     public async Task Page_Loads_WithExpectedColumns()

@@ -3,11 +3,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Reporting.Tests.Infrastructure;
 
-/// <summary>
-/// Hand-rolled fake for <see cref="IDirectReportsReader"/> — returns a pre-configured set of
-/// direct report ids for the caller, used to test row-level manager scoping in handlers like
-/// GetLeaveSummaryReportHandler and GetProbationReportHandler.
-/// </summary>
 internal sealed class FakeDirectReportsReader : IDirectReportsReader
 {
     private readonly IReadOnlyList<Guid> _directReportIds;

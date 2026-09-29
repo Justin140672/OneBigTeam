@@ -6,7 +6,6 @@ internal sealed record ListSharedCompanyDocumentsRequest
 {
     public Guid CompanyId { get; init; }
 
-    /// <summary>Case-insensitive substring match against document title.</summary>
     public string? Search { get; init; }
 
     public Guid? CategoryId { get; init; }

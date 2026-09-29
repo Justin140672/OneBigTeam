@@ -9,11 +9,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Recruitment.Tests.Jobs;
 
-/// <summary>
-/// [P1] ReconcileCandidateDocumentScansJob: the recurring backstop that re-dispatches due Pending
-/// scans (lost enqueue, lost retry schedule, rows backfilled to Pending by the migration) and
-/// releases abandoned Scanning claims.
-/// </summary>
 public class ReconcileCandidateDocumentScansJobTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 9, 26, 12, 0, 0, DateTimeKind.Utc);
@@ -63,18 +58,15 @@ public class ReconcileCandidateDocumentScansJobTests
             .Select(j => (Guid)j.Args[0]!)
             .ToList();
 
-    // ── Due Pending rows ──────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Backfilled_Pending_Row_Older_Than_Grace_Is_Dispatched()
     {
-        // A row that existed before scanning was introduced: Pending, never attempted, old CreatedAt.
         var backfilled = await SeedAsync(Now.AddMonths(-6));
 
         await RunAsync();
 
         Assert.Equal(new[] { backfilled.Id }, DispatchedScanIds());
-        // Dispatch alone does not change the row — the scan job's own claim does.
         var after = await ReloadAsync(backfilled.Id);
         Assert.Equal(CandidateDocumentScanStatus.Pending, after.ScanStatus);
         Assert.Equal(0, after.ScanAttemptCount);
@@ -106,7 +98,6 @@ public class ReconcileCandidateDocumentScansJobTests
     [Fact]
     public async Task Pending_Row_In_Back_Off_Is_Not_Dispatched_Until_Due()
     {
-        // Old enough to be past the grace period — but the back-off takes precedence.
         var inBackOff = await SeedAsync(Now.AddHours(-1), d =>
         {
             d.BeginScanAttempt(Now.AddMinutes(-2));
@@ -121,7 +112,6 @@ public class ReconcileCandidateDocumentScansJobTests
     [Fact]
     public async Task Pending_Row_Whose_Back_Off_Has_Elapsed_Is_Dispatched()
     {
-        // Exactly due (ScanNextAttemptAt == now) — the boundary is inclusive.
         var due = await SeedAsync(Now.AddHours(-1), d =>
         {
             d.BeginScanAttempt(Now.AddMinutes(-2));
@@ -136,7 +126,6 @@ public class ReconcileCandidateDocumentScansJobTests
     [Fact]
     public async Task Retry_Row_Is_Dispatched_Even_If_Created_Within_The_Grace_Period()
     {
-        // ScanNextAttemptAt, when set, governs instead of the new-upload grace period.
         var retry = await SeedAsync(Now.AddSeconds(-30), d =>
         {
             d.BeginScanAttempt(Now.AddSeconds(-20));
@@ -185,7 +174,6 @@ public class ReconcileCandidateDocumentScansJobTests
         Assert.Equal(terminal, (await ReloadAsync(document.Id)).ScanStatus);
     }
 
-    // ── Abandoned Scanning claims ─────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Expired_Scanning_Claim_Is_Released_To_Pending_Audited_And_Redispatched()
@@ -209,7 +197,6 @@ public class ReconcileCandidateDocumentScansJobTests
         Assert.Equal(1, audit.AttemptCount);
         Assert.Equal(CandidateDocumentScanFailureReasons.ScanAbandoned, audit.Reason);
 
-        // Released rows are immediately due, so the same sweep re-dispatches them.
         Assert.Contains(abandoned.Id, DispatchedScanIds());
     }
 
@@ -224,7 +211,7 @@ public class ReconcileCandidateDocumentScansJobTests
                 d.BeginScanAttempt(t.AddMinutes(i));
                 d.RecordFailedScanAttempt(CandidateDocumentScanFailureReasons.ScannerUnavailable, t.AddMinutes(i), t.AddMinutes(i));
             }
-            d.BeginScanAttempt(Now.AddHours(-1)); // fifth and final attempt, abandoned
+            d.BeginScanAttempt(Now.AddHours(-1));
         });
 
         await RunAsync();
@@ -243,7 +230,6 @@ public class ReconcileCandidateDocumentScansJobTests
     [Fact]
     public async Task Live_Scanning_Claim_Is_Left_Alone()
     {
-        // One tick short of the lease expiring.
         var live = await SeedAsync(Now.AddHours(-1),
             d => d.BeginScanAttempt(Now - CandidateDocument.ScanLeaseDuration + TimeSpan.FromTicks(1)));
 
@@ -256,7 +242,6 @@ public class ReconcileCandidateDocumentScansJobTests
         Assert.DoesNotContain(live.Id, DispatchedScanIds());
     }
 
-    // ── Robustness ────────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Job_Store_Outage_During_Dispatch_Does_Not_Fail_The_Sweep_Or_Change_Rows()
@@ -273,7 +258,6 @@ public class ReconcileCandidateDocumentScansJobTests
             Assert.Equal(1, client.Attempts);
         }
 
-        // Still Pending, so the next sweep picks it up again.
         Assert.Equal(CandidateDocumentScanStatus.Pending, (await ReloadAsync(backfilled.Id)).ScanStatus);
         await RunAsync();
         Assert.Contains(backfilled.Id, DispatchedScanIds());
@@ -289,7 +273,6 @@ public class ReconcileCandidateDocumentScansJobTests
 
         var dispatched = DispatchedScanIds();
         Assert.Equal(2, dispatched.Count);
-        // Oldest first.
         Assert.Equal(new[] { a.Id, b.Id }, dispatched);
     }
 

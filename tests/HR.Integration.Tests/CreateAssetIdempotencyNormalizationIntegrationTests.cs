@@ -44,19 +44,12 @@ public class CreateAssetIdempotencyNormalizationIntegrationTests
         var (companyId, categoryId, client) = await SetupAutomaticNumberingCompanyAsync();
         var idempotencyKey = Guid.NewGuid();
 
-        // The fixed client (AssetService.BuildRequestSnapshot) always applies FormText.Required
-        // normalization BEFORE fingerprinting and BEFORE sending - so whether the user typed
-        // " Laptop " or "Laptop" first, the request body actually transmitted over HTTP is always
-        // the normalized "Laptop", under the same key. This test sends that normalized body twice,
-        // simulating an ambiguous-retry-after-a-lost-response for that already-normalized request.
         var normalizedPayload = CreateAssetPayload(companyId, categoryId, "Laptop");
 
         var first = await SendCreateAsync(client, companyId, normalizedPayload, idempotencyKey);
         Assert.Equal(HttpStatusCode.Created, first.StatusCode);
         var firstBody = await first.Content.ReadFromJsonAsync<AssetPayload>();
 
-        // Simulate losing that response and resending through a BRAND NEW HttpRequestMessage with
-        // the same key and the identical (already-normalized) body.
         var second = await SendCreateAsync(client, companyId, normalizedPayload, idempotencyKey);
         Assert.Equal(HttpStatusCode.Created, second.StatusCode);
         var secondBody = await second.Content.ReadFromJsonAsync<AssetPayload>();
@@ -69,7 +62,7 @@ public class CreateAssetIdempotencyNormalizationIntegrationTests
         var db = scope.ServiceProvider.GetRequiredService<AssetsDbContext>();
 
         var assets = await db.Assets.Where(a => a.CompanyId == companyId).ToListAsync();
-        Assert.Single(assets); // one asset, one asset number consumed - not two
+        Assert.Single(assets);
 
         var idempotencyRows = await db.IdempotencyRecords
             .Where(r => r.Key == idempotencyKey.ToString() && r.CompanyId == companyId)
@@ -79,7 +72,6 @@ public class CreateAssetIdempotencyNormalizationIntegrationTests
         Assert.Single(await db.AuditOutboxEntries.Where(e => e.CompanyId == companyId).ToListAsync());
     }
 
-    // ── Helpers (mirrors CreateAssetIdempotencyIntegrationTests' setup) ────────────
 
     private static Task<HttpResponseMessage> SendCreateAsync(
         HttpClient client, Guid companyId, object payload, Guid idempotencyKey)
@@ -95,7 +87,6 @@ public class CreateAssetIdempotencyNormalizationIntegrationTests
     private static object CreateAssetPayload(Guid companyId, Guid categoryId, string name) => new
     {
         companyId,
-        // No assetNumber - the company is in Automatic mode, so the handler generates one.
         categoryId,
         name,
     };

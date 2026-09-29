@@ -7,10 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Tests;
 
-/// <summary>
-/// [P1] ListCandidateDocuments exposes ScanStatus/IsDownloadable per document, and GetApplication
-/// exposes CvScanStatus (submitted CV) and CurrentCandidateCvScanStatus (newest CV).
-/// </summary>
 public class CandidateDocumentScanStatusProjectionTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 26, 9, 0, 0, TimeSpan.Zero);
@@ -118,7 +114,6 @@ public class CandidateDocumentScanStatusProjectionTests
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
         db.CandidateDocuments.Add(submittedCv);
-        // A newer CV, uploaded after the application, still infected/quarantined.
         db.CandidateDocuments.Add(NewDocument(companyId, candidate.Id, CandidateDocumentScanStatus.Infected, Now.AddDays(1), CandidateDocumentKind.Cv));
         await db.SaveChangesAsync();
 

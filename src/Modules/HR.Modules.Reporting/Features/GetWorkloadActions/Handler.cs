@@ -7,16 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Modules.Reporting.Features.GetWorkloadActions;
 
-/// <summary>
-/// Aggregates every registered <see cref="IWorkloadActionProvider"/> across modules into a single
-/// Workload &amp; HR Actions Report (OBT-721). This handler never performs its own row-level
-/// authorization/permission filtering — each provider has already scoped its own results to what
-/// <paramref name="caller"/> is allowed to see (HR-only, manager-scoped to direct reports,
-/// recruitment-scoped, or self-scoped) before returning here. This handler only merges, computes
-/// urgency, applies the caller-supplied display filters, groups and summarises — defense-in-depth:
-/// the endpoint's reporting:view-workload-actions policy (Manager/HrAdministrator only) is a menu
-/// gate, real filtering happens per-provider.
-/// </summary>
 internal sealed class GetWorkloadActionsHandler(
     IServiceScopeFactory scopeFactory,
     IEmployeeDirectoryReader employeeDirectoryReader,
@@ -31,11 +21,6 @@ internal sealed class GetWorkloadActionsHandler(
     {
         var today = DateOnly.FromDateTime(clock.UtcNow);
 
-        // This report is a single, non-workspace-tabbed view (unlike the Manager/HR dashboard
-        // summaries), so the requested scope is derived once here from the caller's own HR access
-        // rather than being an explicit caller-chosen workspace — this preserves this endpoint's
-        // pre-existing "HR sees company-wide, Manager sees their team" behaviour while still routing
-        // through the same explicit WorkloadScope contract every provider now honours.
         var callerIsHr = (await authorizationService.AuthorizeAsync(caller, "reporting:view-hr")).Succeeded;
         var requestedScope = callerIsHr ? WorkloadScope.Hr : WorkloadScope.Manager;
 
@@ -99,10 +84,6 @@ internal sealed class GetWorkloadActionsHandler(
 
         var filteredSoFar = withUrgency.ToList();
 
-        // Manager/Location filters are resolved via IEmployeeDirectoryReader (owned by
-        // HR.Modules.Employees) since individual WorkloadAction rows don't carry manager/location —
-        // only department. This never widens what a caller can see: it only narrows the
-        // already-provider-scoped set down to employees matching the requested manager/location.
         if (request.ManagerId is not null || request.LocationId is not null)
         {
             var directoryFilter = new ReportFilterCriteria(
@@ -124,9 +105,6 @@ internal sealed class GetWorkloadActionsHandler(
                 && recruiterName.Contains(request.RecruitmentUser, StringComparison.OrdinalIgnoreCase)).ToList();
         }
 
-        // Summary cards are computed from the caller's full permitted+filtered set before any
-        // grouping/sorting is applied — safe against future pagination since this handler currently
-        // returns the whole set, not a page.
         var filtered = filteredSoFar;
 
         var summary = new WorkloadActionSummary(
@@ -135,16 +113,12 @@ internal sealed class GetWorkloadActionsHandler(
             DueToday: filtered.Count(a => a.Urgency == WorkloadActionUrgency.DueToday),
             DueThisWeek: filtered.Count(a => a.Urgency == WorkloadActionUrgency.DueThisWeek));
 
-        // Overdue-first sort, then soonest due date, matching the ticket's "sorts overdue-first"
-        // requirement.
         var sorted = filtered
             .OrderBy(a => a.Urgency == WorkloadActionUrgency.Overdue ? 0 : 1)
             .ThenBy(a => a.DueDate ?? DateOnly.MaxValue)
             .ThenBy(a => a.EmployeeName)
             .ToList();
 
-        // REP-05: display cap with an explicit truncation flag. Summary above is already computed
-        // from the full filtered set, so it remains accurate even when rows/groups are capped.
         var totalCount = sorted.Count;
         var isTruncated = totalCount > ReportLimits.DisplayRowLimit;
         var rows = sorted.Take(ReportLimits.DisplayRowLimit).Select(ToRow).ToList();
@@ -183,10 +157,6 @@ internal sealed class GetWorkloadActionsHandler(
             .OrderBy(g => g.Key)
             .ToList();
 
-    // Pulls every page from IEmployeeDirectoryReader for the given manager/location filter — this
-    // handler needs the full matching employee-id set (not a page) to filter the already-fetched
-    // WorkloadAction list. A large page size is used rather than true unbounded pagination since
-    // this is an internal composition call, not a user-facing listing.
     private async Task<HashSet<Guid>> GetAllMatchingEmployeeIdsAsync(
         ReportFilterCriteria filter, Guid companyId, CancellationToken cancellationToken)
     {

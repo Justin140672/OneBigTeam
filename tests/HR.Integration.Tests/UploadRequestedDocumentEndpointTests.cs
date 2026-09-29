@@ -111,7 +111,6 @@ public class UploadRequestedDocumentEndpointTests
             $"/api/companies/{companyId}/employees/{ownerEmployeeId}/document-requests/{requestId}/upload",
             BuildPdfUpload("Passport"));
 
-        // Non-manager uploading to a different employee's route → Forbidden at the endpoint level
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -127,7 +126,6 @@ public class UploadRequestedDocumentEndpointTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private async Task<(Guid CompanyId, Guid EmployeeId, Guid RequestId)> SetupAsync()
     {

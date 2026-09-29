@@ -70,10 +70,6 @@ internal sealed class EmployeeDetailsCorrectedHandler : IIntegrationEventHandler
 
         foreach (var balance in balances)
         {
-            // Safety guard: never overwrite a balance that has recorded usage or a manual
-            // adjustment — those signal the balance is no longer "untouched" and recalculating
-            // EntitlementDays underneath them could silently invalidate a value the business has
-            // already relied upon.
             if (balance.UsedDays != 0 || balance.AdjustmentDays != 0)
                 continue;
 

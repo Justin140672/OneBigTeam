@@ -18,7 +18,6 @@ public class GetStaleVacanciesHandlerTests
         var companyId = Guid.NewGuid();
         var vacancy = OpenVacancy(companyId, Now.AddDays(-30));
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        // Application activity 5 days ago — well within the default 14-day window.
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now.AddDays(-5));
 
         db.Vacancies.Add(vacancy);
@@ -80,7 +79,6 @@ public class GetStaleVacanciesHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        // Never opened — stays in Draft status.
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Software Engineer", null, Guid.NewGuid(), Now.AddDays(-60));
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Noah", "Patel", "noah.patel@example.com", null, null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now.AddDays(-40));
@@ -103,7 +101,6 @@ public class GetStaleVacanciesHandlerTests
         var companyId = Guid.NewGuid();
         var vacancy = OpenVacancy(companyId, Now.AddDays(-60));
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Ava", "Bell", "ava.bell@example.com", null, null, Now);
-        // 20 days since activity — stale under the default 14-day threshold.
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now.AddDays(-20));
 
         db.Vacancies.Add(vacancy);
@@ -126,7 +123,6 @@ public class GetStaleVacanciesHandlerTests
         var companyId = Guid.NewGuid();
         var vacancy = OpenVacancy(companyId, Now.AddDays(-60));
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Sophie", "Wright", "sophie.wright@example.com", null, null, Now);
-        // 20 days since activity — stale under the default 14 days, but not under a 30-day threshold.
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now.AddDays(-20));
 
         db.Vacancies.Add(vacancy);
@@ -149,9 +145,7 @@ public class GetStaleVacanciesHandlerTests
         var companyId = Guid.NewGuid();
         var vacancy = OpenVacancy(companyId, Now.AddDays(-60));
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Kai", "Reed", "kai.reed@example.com", null, null, Now);
-        // Application itself has not changed in 40 days...
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now.AddDays(-40));
-        // ...but an interview is scheduled just 2 days ago — clear sign the vacancy is active.
         var interview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(-2), 30, "Room 1", Now.AddDays(-40));
 
         db.Vacancies.Add(vacancy);

@@ -34,7 +34,6 @@ public class EqualityDataRetentionTests
     private static string ReportRoute(Guid companyId)
         => $"/api/companies/{companyId}/reporting/equality-diversity";
 
-    // ── Cascade delete ────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Physically_Deleting_The_Employee_Row_Cascade_Deletes_Its_Equality_Data()
@@ -76,8 +75,6 @@ public class EqualityDataRetentionTests
 
         Assert.Equal(1, await CountEqualityRowsByIdAsync(equalityId));
 
-        // Physically delete the employee row (mirrors the manual per-store customer-deletion
-        // procedure in specifications/compliance/data-protection-operations.md).
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
@@ -86,13 +83,11 @@ public class EqualityDataRetentionTests
             await db.SaveChangesAsync();
         }
 
-        // The equality row for the deleted employee is gone; the colleague's row is untouched.
         Assert.Equal(0, await CountEqualityRowsByIdAsync(equalityId));
         Assert.Equal(0, await CountEqualityRowsByEmployeeAsync(companyId, employeeId));
         Assert.Equal(1, await CountEqualityRowsByIdAsync(otherEqualityId));
     }
 
-    // ── Cross-company isolation (regression protection) ───────────────────────
 
     [Fact]
     public async Task Employee_Of_Company_A_Cannot_Get_Company_B_Equality_Record()
@@ -145,7 +140,6 @@ public class EqualityDataRetentionTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── helpers ───────────────────────────────────────────────────────────────
 
     private async Task<(HttpClient Client, Guid CompanyId, Guid EmployeeId)> EmployeeAsync()
     {

@@ -7,8 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Web.Services;
 
-// Wraps the HR.Modules.Support API surface (submission, thread, staff status changes and the
-// staff-only cross-company dashboard). See src/Modules/HR.Modules.Support/Features/*.
 public sealed class SupportService(HrApiHttpClientFactory httpClientFactory, ILogger<SupportService> logger)
 {
     private HttpClient Http => httpClientFactory.CreateClient();
@@ -25,8 +23,6 @@ public sealed class SupportService(HrApiHttpClientFactory httpClientFactory, ILo
 
         if (!result.Success)
         {
-            // Technical detail logged server-side only — callers surface a generic, non-technical
-            // failure message to the end user (see SupportRequestQueue's Failed state).
             logger.LogWarning("Failed to list support requests for company {CompanyId}: {Error}", companyId, result.Error);
             return null;
         }
@@ -50,7 +46,6 @@ public sealed class SupportService(HrApiHttpClientFactory httpClientFactory, ILo
         return result.Success ? result.Value : null;
     }
 
-    // Returns null on success, or an error message string on failure.
     public async Task<(SubmitSupportRequestResult? Result, string? Error)> SubmitSupportRequestAsync(
         Guid companyId,
         string type,
@@ -126,8 +121,6 @@ public sealed class SupportService(HrApiHttpClientFactory httpClientFactory, ILo
         using var content = new MultipartFormDataContent();
         content.Add(new StringContent(companyId.ToString()), "CompanyId");
         content.Add(new StringContent(id.ToString()), "Id");
-        // bodyHtml is rich/formatted editor content — not run through FormText, whitespace
-        // and markup here are meaningful and normalized (if at all) by the rich-text editor itself.
         content.Add(new StringContent(bodyHtml), "BodyHtml");
 
         var streams = new List<Stream>();

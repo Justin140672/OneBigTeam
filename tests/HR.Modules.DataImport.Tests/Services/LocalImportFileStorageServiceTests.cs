@@ -26,7 +26,6 @@ public sealed class LocalImportFileStorageServiceTests
         var storageKey = sut.GenerateStorageKey($"test-{Guid.NewGuid():N}", "employees.xlsx");
         await sut.UploadAsync(upload, storageKey, "application/octet-stream", CancellationToken.None);
 
-        // The physical key must never carry the original file name through.
         Assert.DoesNotContain("employees.xlsx", storageKey);
 
         using var buffer = new MemoryStream();

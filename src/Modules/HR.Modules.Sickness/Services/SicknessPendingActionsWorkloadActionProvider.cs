@@ -9,24 +9,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Services;
 
-/// <summary>
-/// OBT-721 Workload &amp; HR Actions Report provider for outstanding sickness administration.
-/// Combines two distinct outstanding-action shapes under one category: pending/overdue Return to
-/// Work reviews, and open requests for fit note evidence.
-///
-/// Return to Work reviews are always assigned to the EMPLOYEE'S MANAGER (see
-/// ReturnToWorkReviewRequiredHandler), not to HR — so unlike GetSicknessReport/
-/// GetOverdueReturnToWorkReviews/GetMissingFitNotes (all reporting:view-hr-gated, HR-only report
-/// surfaces), this provider must also surface reviews to the Manager workspace, scoped to the
-/// caller's own reporting sub-tree, so a manager's dashboard/task list actually shows and can open
-/// their own team's reviews. When composing the HR workspace, reviews remain visible company-wide
-/// for oversight but are marked non-owner-actionable (the manager is the true owner) rather than
-/// omitted, matching how HR sees other manager-owned items on this report.
-///
-/// Evidence requests are actioned by the EMPLOYEE themselves (self-upload task, see
-/// SicknessEvidenceRequestedHandler) and remain HR-workspace-only, for the same oversight-not-
-/// actionable reason.
-/// </summary>
 internal sealed class SicknessPendingActionsWorkloadActionProvider(
     SicknessDbContext dbContext,
     IEmployeeDepartmentReader employeeDepartmentReader,
@@ -65,8 +47,6 @@ internal sealed class SicknessPendingActionsWorkloadActionProvider(
             managerTeamIds = teamIds;
         }
 
-        // Manager workspace only ever sees reviews (the only sickness action type actually
-        // assigned to a manager) — evidence requests remain an HR-only oversight category.
         var reviewsQuery = dbContext.ReturnToWorkReviews
             .AsNoTracking()
             .Where(r => r.CompanyId == companyId
@@ -79,8 +59,6 @@ internal sealed class SicknessPendingActionsWorkloadActionProvider(
             .Select(r => new { r.Id, r.EmployeeId, r.SicknessRecordId, r.DueDate, r.Status })
             .ToListAsync(cancellationToken);
 
-        // Evidence requests are self-upload employee tasks and stay an HR-only oversight category
-        // — never surfaced to the Manager workspace.
         var evidenceRequests = managerTeamIds is null
             ? await (
                 from e in dbContext.SicknessEvidenceRequests.AsNoTracking()
@@ -100,17 +78,11 @@ internal sealed class SicknessPendingActionsWorkloadActionProvider(
 
         var departments = await employeeDepartmentReader.GetDepartmentsAsync(companyId, employeeIds, cancellationToken);
 
-        // Reviews are actioned via their own Task (TaskActionType.Review, keyed by the review id as
-        // SourceEntityId — see CompleteReturnToWorkReviewFromTaskAction). Evidence requests are
-        // actioned via TaskActionType.Upload, keyed by the evidence request id (see
-        // SicknessEvidenceUploadCompletionAction / FitNoteEvidenceRequestService).
         var reviewTaskIds = await taskReader.GetOpenTaskIdsAsync(
             companyId, reviews.Select(r => r.Id), cancellationToken, TaskActionType.Review);
         var evidenceTaskIds = await taskReader.GetOpenTaskIdsAsync(
             companyId, evidenceRequests.Select(e => e.Id), cancellationToken, TaskActionType.Upload);
 
-        // Reviews are owned by the manager — only actionable when composing the Manager workspace
-        // for that manager's own team. Visible to HR for company-wide oversight either way.
         var reviewsOwnedByViewer = managerTeamIds is not null;
 
         var actions = new List<WorkloadAction>();
@@ -128,7 +100,6 @@ internal sealed class SicknessPendingActionsWorkloadActionProvider(
                 DueDate: r.DueDate,
                 AssignedTo: null,
                 Status: r.Status.ToString(),
-                // No employee-profile fallback: entirely task-backed category.
                 DeepLinkUrl: "",
                 TaskId: taskId,
                 IsOwnerActionable: reviewsOwnedByViewer,

@@ -46,10 +46,8 @@ namespace HR.Modules.Tasks.Contracts;
 /// </summary>
 public interface ITaskCompletionAction
 {
-    /// <summary>The task source this action handles.</summary>
     TaskSource Source { get; }
 
-    /// <summary>The action type this implementation handles.</summary>
     TaskActionType ActionType { get; }
 
     Task<Result> ExecuteAsync(TaskCompletionContext context, CancellationToken cancellationToken);

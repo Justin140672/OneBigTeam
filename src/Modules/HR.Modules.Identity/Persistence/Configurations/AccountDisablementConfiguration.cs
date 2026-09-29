@@ -87,9 +87,6 @@ internal sealed class AccountDisablementConfiguration : IEntityTypeConfiguration
         builder.HasIndex(d => d.CompanyId);
         builder.HasIndex(d => new { d.Status, d.RequestedAt });
 
-        // At most one durable disablement record per application user — repeated delivery of the
-        // same (or a reconciliation-republished) EmployeeDepartureFinalisedIntegrationEvent must
-        // never enqueue a second disablement attempt for the same account.
         builder.HasIndex(d => d.ApplicationUserId)
             .IsUnique()
             .HasDatabaseName("ix_account_disablements_application_user_id");

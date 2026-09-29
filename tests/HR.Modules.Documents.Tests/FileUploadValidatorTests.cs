@@ -117,7 +117,6 @@ public class FileUploadValidatorTests
     {
         var validator = CreateValidator();
 
-        // Extension is allowed but content type is spoofed
         var result = validator.Validate("report.pdf", "text/html", 1024);
 
         Assert.True(result.IsFailure);
@@ -130,7 +129,6 @@ public class FileUploadValidatorTests
     {
         var validator = CreateValidator();
 
-        // Some clients append charset or boundary parameters
         var result = validator.Validate("report.pdf", "application/pdf; charset=utf-8", 1024);
 
         Assert.True(result.IsSuccess);
@@ -146,12 +144,11 @@ public class FileUploadValidatorTests
         Assert.True(result.IsSuccess);
     }
 
-    // --- ValidateContent (magic bytes) ---
 
-    private static Stream PdfStream()    => new MemoryStream([0x25, 0x50, 0x44, 0x46, 0x2D]); // %PDF-
-    private static Stream JpegStream()   => new MemoryStream([0xFF, 0xD8, 0xFF, 0xE0, 0x00]); // JFIF
-    private static Stream PngStream()    => new MemoryStream([0x89, 0x50, 0x4E, 0x47, 0x00]); // PNG
-    private static Stream DocxStream()   => new MemoryStream([0x50, 0x4B, 0x03, 0x04, 0x00]); // PK zip
+    private static Stream PdfStream()    => new MemoryStream([0x25, 0x50, 0x44, 0x46, 0x2D]);
+    private static Stream JpegStream()   => new MemoryStream([0xFF, 0xD8, 0xFF, 0xE0, 0x00]);
+    private static Stream PngStream()    => new MemoryStream([0x89, 0x50, 0x4E, 0x47, 0x00]);
+    private static Stream DocxStream()   => new MemoryStream([0x50, 0x4B, 0x03, 0x04, 0x00]);
     private static Stream ZeroStream()   => new MemoryStream([0x00, 0x00, 0x00, 0x00, 0x00]);
 
     [Fact]
@@ -185,7 +182,6 @@ public class FileUploadValidatorTests
     [Fact]
     public void ValidateContent_Pdf_WithWrongMagicBytes_ReturnsFailure()
     {
-        // File claims to be PDF but has zero bytes (spoofed/renamed)
         var result = CreateValidator().ValidateContent(ZeroStream(), "application/pdf");
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
@@ -195,7 +191,6 @@ public class FileUploadValidatorTests
     [Fact]
     public void ValidateContent_UnknownContentType_ReturnsSuccess()
     {
-        // No magic bytes defined for unknown types — let other checks handle it
         var result = CreateValidator().ValidateContent(ZeroStream(), "application/octet-stream");
         Assert.True(result.IsSuccess);
     }
@@ -203,7 +198,6 @@ public class FileUploadValidatorTests
     [Fact]
     public void ValidateContent_ContentTypeWithParameters_MatchesCorrectly()
     {
-        // Ensure params like "; charset=utf-8" are stripped before lookup
         var result = CreateValidator().ValidateContent(PdfStream(), "application/pdf; charset=utf-8");
         Assert.True(result.IsSuccess);
     }
@@ -211,7 +205,6 @@ public class FileUploadValidatorTests
     [Fact]
     public void ValidateContent_StreamShorterThanMagicByteHeader_ReturnsFailure()
     {
-        // Fewer than 4 bytes available — can't even read a full magic-byte header.
         var result = CreateValidator().ValidateContent(new MemoryStream([0x25, 0x50]), "application/pdf");
 
         Assert.True(result.IsFailure);

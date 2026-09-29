@@ -2,18 +2,10 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Identity.Tests;
 
-/// <summary>
-/// IAM-08: <see cref="IAuditEvent"/> property-mapping tests for the two new audit events
-/// (<see cref="PermissionDeniedAuditEvent"/> and <see cref="AccessReviewExportedAuditEvent"/>)
-/// introduced in IdentityAudit.cs.
-/// </summary>
 public class IdentityAuditEventsTests
 {
     private static readonly DateTimeOffset Now = new(2026, 6, 6, 12, 0, 0, TimeSpan.Zero);
 
-    // -----------------------------------------------------------------------
-    // PermissionDeniedAuditEvent
-    // -----------------------------------------------------------------------
 
     [Fact]
     public void PermissionDeniedAuditEvent_Maps_Core_Properties()
@@ -72,9 +64,6 @@ public class IdentityAuditEventsTests
         Assert.Contains("IsRepeatedEscalation", metadata.ToString());
     }
 
-    // -----------------------------------------------------------------------
-    // AccessReviewExportedAuditEvent
-    // -----------------------------------------------------------------------
 
     [Fact]
     public void AccessReviewExportedAuditEvent_Maps_Core_Properties()
@@ -117,8 +106,6 @@ public class IdentityAuditEventsTests
     [Fact]
     public void AccessReviewExportedAuditEvent_Never_Carries_The_Actual_Exported_Rows()
     {
-        // Metadata must only ever carry Format/RowCount/Success/FailureReason — never the row data
-        // itself (see the field-level remark in IdentityAudit.cs).
         IAuditEvent auditEvent = new AccessReviewExportedAuditEvent(
             Guid.NewGuid(), "Csv", Success: true, RowCount: 3, FailureReason: null, Guid.NewGuid(), Now);
 

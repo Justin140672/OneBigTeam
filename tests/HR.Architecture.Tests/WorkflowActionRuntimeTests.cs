@@ -4,7 +4,6 @@ namespace HR.Architecture.Tests;
 
 public class WorkflowActionRuntimeTests
 {
-    // GitHub retired the Node 20 runtime on hosted runners; these action majors only ship a Node 20 entrypoint.
     private static readonly Dictionary<string, string> KnownNode20OnlyVersions = new(StringComparer.OrdinalIgnoreCase)
     {
         ["actions/checkout"] = "v4",

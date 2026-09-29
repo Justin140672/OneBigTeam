@@ -20,10 +20,6 @@ public class ValidateImportSessionEndpointTests
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.HrAdministrator);
-            // CompanyAdministrator is additionally required by the Manual-mode scenarios below,
-            // which call PUT .../hr-settings (company:manage) to switch the company into Manual
-            // employee-numbering mode before uploading. Employee is required by this file's own
-            // CreateCompanyAsync test helper (POST /api/companies, "role:employee" policy).
             await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.CompanyAdministrator);
             await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.Employee);
         }).GetAwaiter().GetResult();
@@ -56,12 +52,6 @@ public class ValidateImportSessionEndpointTests
         var (client, companyId) = await ManualModeAdminClientAsync();
         using var _ = client;
 
-        // Second data row is missing a required "Last Name" value. One row is still valid, so
-        // per ImportSession.Validate() the session lands on Validated (ready to confirm the
-        // valid subset) rather than CompletedWithErrors (which is reserved for "every row failed").
-        // Every other required field (including the mandatory Department/Location/Employment
-        // Type/Position Profile lookups) is present on both rows so "Last Name" is the only
-        // reason the second row fails.
         const string csv =
             "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount\n" +
             "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer,50000\n" +
@@ -87,9 +77,6 @@ public class ValidateImportSessionEndpointTests
         var (client, companyId) = await ManualModeAdminClientAsync();
         using var _ = client;
 
-        // Department, Location, Employment Type and Position Profile are all mandatory lookups
-        // now — Location/Employment Type/Position Profile use pre-existing values here so the
-        // only *new* reference data this row creates is the Department itself.
         const string csv =
             "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount\n" +
             "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer,50000\n" +
@@ -165,10 +152,6 @@ public class ValidateImportSessionEndpointTests
         var (client, companyId) = await ManualModeAdminClientAsync();
         using var _ = client;
 
-        // Headers don't match the standard template ("Given Name"/"Family Name" instead of
-        // "First Name"/"Last Name") — without a mapping override this would fail to populate
-        // the required FirstName/LastName fields. Every other column uses its standard header
-        // name (no override needed for those targets).
         const string csv =
             "Given Name,Family Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount\n" +
             "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer,50000\n";
@@ -197,8 +180,6 @@ public class ValidateImportSessionEndpointTests
         var companyId = Guid.NewGuid();
         using var client = await AdminClient(companyId);
 
-        // Same non-standard headers as the mapping-override test above, but posted with no
-        // override — proves the override in that test is actually doing something, not a no-op.
         const string csv =
             "Given Name,Family Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount\n" +
             "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer,50000\n";
@@ -239,7 +220,6 @@ public class ValidateImportSessionEndpointTests
         mismatchedClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ImportAdmin.ToString());
         mismatchedClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
 
-        // Route company differs from the authenticated user's company_id claim (cross-tenant).
         var response = await mismatchedClient.PostAsync(ValidateUrl(companyId, sessionId), EmptyJson());
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -256,8 +236,6 @@ public class ValidateImportSessionEndpointTests
 
         using var callerClient = await AdminClient(callerCompanyId);
 
-        // Caller's claim matches the route company (passes the auth check), but the session
-        // was created under a different company, so the handler cannot find it for this caller.
         var response = await callerClient.PostAsync(ValidateUrl(callerCompanyId, sessionId), EmptyJson());
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -287,12 +265,6 @@ public class ValidateImportSessionEndpointTests
         return client;
     }
 
-    // A company with no persisted company_settings row now defaults to Automatic employee
-    // numbering (CompanySettings.CreateDefault / CompanyEmployeeNumberSettingsReader — matches
-    // what every real company gets via CompanyProvisioner at signup). CSVs in this file that
-    // supply an explicit Employee Number per row therefore need a real company (SetEmployeeNumberModeAsync
-    // requires one) switched to Manual mode explicitly rather than relying on it being the implicit
-    // default.
     private async Task<(HttpClient Client, Guid CompanyId)> ManualModeAdminClientAsync()
     {
         var client = _factory.CreateClient();
@@ -306,17 +278,12 @@ public class ValidateImportSessionEndpointTests
         return (client, companyId);
     }
 
-    // POST /api/companies (CreateCompany) was removed in 78a43344; this now provisions the
-    // company directly via CompaniesDbContext, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
     private async Task<Guid> CreateCompanyAsync(HttpClient client)
     {
         _ = client;
         return await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Validate Import Test Co {Guid.NewGuid():N}");
     }
 
-    // UpdateCompanySettings only persists TimeZone/Locale and silently ignores employeeNumberMode.
-    // The actual employee-number/HR settings live behind PUT /api/companies/{id}/hr-settings
-    // (UpdateHrSettingsHandler), which requires a real companies.companies row to exist.
     private static async Task SetEmployeeNumberModeAsync(
         HttpClient client, Guid companyId, string mode, string? prefix = null, int nextEmployeeNumber = 1, int minimumLength = 1)
     {
@@ -338,14 +305,6 @@ public class ValidateImportSessionEndpointTests
 
     private sealed record IdPayload(Guid Id);
 
-    /// <summary>
-    /// DefaultLeavePolicyId is now mandatory on PositionProfile, so
-    /// ImportLookupResolver.GetOrCreatePositionProfileAsync can only auto-create a position
-    /// profile for a CSV row when the company already has a default leave policy configured
-    /// (the first policy created for a company is automatically its default — see
-    /// CreateLeavePolicyHandler). Without this, rows referencing a not-yet-existing position
-    /// profile are silently skipped and the row fails.
-    /// </summary>
     private static async Task EnsureDefaultLeavePolicyAsync(HttpClient client, Guid companyId)
     {
         var response = await client.PostAsJsonAsync(
@@ -387,9 +346,6 @@ public class ValidateImportSessionEndpointTests
         return content;
     }
 
-    // Builds a minimal XLSX workbook (via ClosedXML) from comma-delimited "csv-shaped" header/data
-    // lines, so existing test fixtures (written as csv-style strings for readability) can still be
-    // uploaded against the now xlsx-only import endpoint.
     private static byte[] BuildXlsxBytes(string csvShapedContent)
     {
         var lines = csvShapedContent

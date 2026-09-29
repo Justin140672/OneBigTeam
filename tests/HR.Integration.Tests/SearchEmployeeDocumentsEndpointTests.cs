@@ -9,9 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-// DOC-06: company-wide document search/filter endpoint. Access-scope resolution mirrors
-// DocumentsResourceAuthorizationTests's self/manager-hierarchy/HR-administrator matrix, applied
-// here across every result row instead of gating a single target employee.
 [Collection("Integration")]
 public class SearchEmployeeDocumentsEndpointTests(ApiWebApplicationFactory factory)
 {
@@ -22,9 +19,6 @@ public class SearchEmployeeDocumentsEndpointTests(ApiWebApplicationFactory facto
     private static readonly Guid PositionProfileId = Guid.Parse("20000000-0000-0000-0000-000000000002");
     private static readonly Guid SeededCompanyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Authorization / tenant checks
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Returns_Unauthorized_For_Anonymous_Request()
@@ -77,9 +71,6 @@ public class SearchEmployeeDocumentsEndpointTests(ApiWebApplicationFactory facto
         Assert.Single(payload!.Items);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Tenant isolation
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Never_Returns_Documents_Belonging_To_A_Different_Company()
@@ -98,9 +89,6 @@ public class SearchEmployeeDocumentsEndpointTests(ApiWebApplicationFactory facto
         Assert.DoesNotContain(payload!.Items, i => i.Title == "Other Co Doc");
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Permission scoping
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task HrAdministrator_Sees_Documents_Company_Wide()
@@ -166,9 +154,6 @@ public class SearchEmployeeDocumentsEndpointTests(ApiWebApplicationFactory facto
         Assert.Equal("My Doc", payload.Items[0].Title);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Archived exclusion
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Excludes_Archived_Documents_By_Default_For_HrAdministrator()
@@ -217,9 +202,6 @@ public class SearchEmployeeDocumentsEndpointTests(ApiWebApplicationFactory facto
         Assert.DoesNotContain(payload!.Items, i => i.Title == "Archived Doc");
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Combined filters, pagination and ordering
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Combined_Filters_Return_Paginated_And_Correctly_Ordered_Results()
@@ -231,7 +213,6 @@ public class SearchEmployeeDocumentsEndpointTests(ApiWebApplicationFactory facto
         await UploadDocumentAsync(employee, "Middle Right To Work", "mid-rtw.pdf");
         await Task.Delay(15);
         await UploadDocumentAsync(employee, "New Right To Work", "new-rtw.pdf");
-        // Not matching the search text — should never appear regardless of pagination.
         await UploadDocumentAsync(employee, "Passport", "passport.pdf");
 
         using var hrClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true);
@@ -254,9 +235,6 @@ public class SearchEmployeeDocumentsEndpointTests(ApiWebApplicationFactory facto
         Assert.Equal("Old Right To Work", page2.Items[0].Title);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId, bool hrAdministrator = false)
     {
@@ -271,11 +249,6 @@ public class SearchEmployeeDocumentsEndpointTests(ApiWebApplicationFactory facto
         return client;
     }
 
-    /// <summary>
-    /// Creates a real employee via the employees API and returns its id, which doubles as the
-    /// identity user id for the linked account — mirrors
-    /// DocumentsResourceAuthorizationTests.CreateEmployeeAsync.
-    /// </summary>
     private async Task<Guid> CreateEmployeeAsync()
     {
         using var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true);
@@ -305,12 +278,6 @@ public class SearchEmployeeDocumentsEndpointTests(ApiWebApplicationFactory facto
         return payload!.Id;
     }
 
-    /// <summary>
-    /// Sets up a wholly separate company (own subscription, reference data, employee, document
-    /// type and HR-administrator caller) and uploads a single document into it — used to prove
-    /// the search endpoint never leaks another tenant's documents even though employee/company
-    /// GUIDs are otherwise randomly generated and could theoretically collide.
-    /// </summary>
     private async Task UploadDocumentInOtherCompanyAsync(string title)
     {
         var otherCompanyId = await CompanyTestSeeder.CreateCompanyAsync(factory);
@@ -358,14 +325,6 @@ public class SearchEmployeeDocumentsEndpointTests(ApiWebApplicationFactory facto
         response.EnsureSuccessStatusCode();
     }
 
-    /// <summary>
-    /// UploadEmployeeDocument is gated by the "employee:manage" policy (HrAdministrator role
-    /// only), so every upload here goes through a fresh HR-administrator client regardless of
-    /// whose document is being seeded — mirrors DocumentsResourceAuthorizationTests.UploadDocumentAsync.
-    /// The freshly-uploaded Document is force-marked clean so ScanStatusAccessGuard never blocks
-    /// the search endpoint's results deterministically in this test host (FakeBackgroundJobClient
-    /// makes ScanUploadedFileJob a no-op).
-    /// </summary>
     private async Task<(Guid DocumentId, Guid EmployeeDocumentId)> UploadDocumentAsync(Guid employeeId, string title, string fileName)
     {
         using var uploaderClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true);
@@ -397,7 +356,7 @@ public class SearchEmployeeDocumentsEndpointTests(ApiWebApplicationFactory facto
     private static MultipartFormDataContent BuildPdfUpload(Guid documentTypeId, string title)
     {
         var pdfBytes = new byte[1024];
-        pdfBytes[0] = 0x25; pdfBytes[1] = 0x50; pdfBytes[2] = 0x44; pdfBytes[3] = 0x46; // %PDF
+        pdfBytes[0] = 0x25; pdfBytes[1] = 0x50; pdfBytes[2] = 0x44; pdfBytes[3] = 0x46;
 
         var content = new MultipartFormDataContent();
         content.Add(new StringContent(title), "Title");

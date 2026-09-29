@@ -2,13 +2,6 @@ using System.Net;
 
 namespace HR.Modules.Documents.Tests.Infrastructure;
 
-/// <summary>
-/// Minimal <see cref="HttpMessageHandler"/> test double for exercising DocumentStorageHealthCheck
-/// with no network access. Distinct from <see cref="StubHttpMessageHandler"/> (used by
-/// ScanUploadedFileJobTests for a plain byte download) because the health check needs control over
-/// both the status code and the response body. Records every request and returns a
-/// caller-configured canned response, or a thrown transport exception.
-/// </summary>
 internal sealed class FakeSupabaseHttpMessageHandler : HttpMessageHandler
 {
     public List<HttpRequestMessage> Requests { get; } = [];

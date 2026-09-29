@@ -51,10 +51,6 @@ public class GetExternalRecruiterActivitySummaryHandlerTests
     [Fact]
     public async Task HandleAsync_Reassigned_Away_Before_Closing_Vacancy_Does_Not_Appear_In_Current_Or_Previous()
     {
-        // Ticket #81 behaviour change documented in GetExternalRecruiterActivitySummaryHandler: unlike
-        // the old VacancyRecruiterAssignment history model, there is no longer any record of a recruiter
-        // that was once assigned but was reassigned/cleared before the vacancy reached a terminal
-        // status. Such a vacancy simply vanishes from this recruiter's summary entirely.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var recruiter = ExternalRecruiter.Create(Guid.NewGuid(), companyId, "Acme Recruiting", null, null, null, null, null, Now);
@@ -63,7 +59,6 @@ public class GetExternalRecruiterActivitySummaryHandlerTests
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now, recruiter.Id);
         vacancy.Open(Now, new DateOnly(2026, 1, 1));
 
-        // Reassigned to a different recruiter before the vacancy closes.
         vacancy.AssignRecruiter(replacementRecruiter.Id, Now);
         vacancy.Close(Now, new DateOnly(2026, 2, 1));
 
@@ -79,9 +74,6 @@ public class GetExternalRecruiterActivitySummaryHandlerTests
         Assert.Empty(result.Value!.CurrentVacancies);
         Assert.Empty(result.Value.PreviousVacancies);
 
-        // Meanwhile the replacement recruiter (the one still assigned at closing time) does pick it
-        // up as a previous vacancy, confirming the vacancy itself wasn't dropped, only the original
-        // recruiter's historical link to it.
         var replacementResult = await new GetExternalRecruiterActivitySummaryHandler(db).HandleAsync(
             new GetExternalRecruiterActivitySummaryRequest(companyId, replacementRecruiter.Id),
             CancellationToken.None);

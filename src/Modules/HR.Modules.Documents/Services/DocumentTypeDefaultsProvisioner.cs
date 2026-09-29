@@ -6,12 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Services;
 
-/// <summary>
-/// Implements IDocumentTypeDefaultsProvisioner — see the interface doc comment in
-/// HR.Infrastructure.Abstractions for why this exists. Mirrors DocumentsModule's dev seed set so
-/// production provisioning never drifts out of sync with what the dev/E2E environment already
-/// treats as "correct".
-/// </summary>
 internal sealed class DocumentTypeDefaultsProvisioner(DocumentsDbContext dbContext, IClock clock) : IDocumentTypeDefaultsProvisioner
 {
     public async Task EnsureDefaultDocumentTypesAsync(Guid companyId, CancellationToken cancellationToken)

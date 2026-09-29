@@ -17,12 +17,6 @@ internal sealed class AssetNumberGenerator(CompaniesDbContext dbContext) : IAsse
 
         try
         {
-            // Single atomic UPDATE ... RETURNING round-trip — see EmployeeNumberGenerator's own
-            // remarks for the concurrency rationale, mirrored here for asset numbers.
-            //
-            // A missing row is not expected here: AssetNumberMode can only become Automatic via
-            // UpdateAssetNumberSettings, which always persists a company_settings row as a side
-            // effect — so by the time this mode is readable, the row already exists.
             await using var command = connection.CreateCommand();
             command.CommandText = """
                 UPDATE companies.company_settings

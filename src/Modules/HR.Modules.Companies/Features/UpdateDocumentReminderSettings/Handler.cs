@@ -6,10 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Companies.Features.UpdateDocumentReminderSettings;
 
-/// <summary>
-/// SET-07: updates the company's document expiry reminder schedule. Requires "hr-settings:manage" —
-/// the same policy UpdateHrSettings/UpdateRecruitmentSettings/UpdateNotificationSettings require.
-/// </summary>
 internal sealed class UpdateDocumentReminderSettingsHandler(
     CompaniesDbContext dbContext,
     IClock clock,

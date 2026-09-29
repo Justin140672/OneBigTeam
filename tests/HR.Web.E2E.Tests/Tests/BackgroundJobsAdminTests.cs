@@ -25,11 +25,8 @@ namespace HR.Web.E2E.Tests.Tests;
 /// </summary>
 public sealed class BackgroundJobsAdminTests(EmployeePersonaFixture fixture) : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
-    // Seeded platform-admin allow-listed persona — see appsettings.Development.json's
-    // "PlatformAdmin:AllowedEmails" and DevPersonaStore.
     private const string AllowListedAdminEmail = "priya.shah@acme.example";
 
-    // Seeded plain-Employee persona (no platform-admin allow-list entry).
     private const string NonAllowListedEmail = "tom.williams@acme.example";
 
     [Fact]
@@ -51,8 +48,6 @@ public sealed class BackgroundJobsAdminTests(EmployeePersonaFixture fixture) : R
 
         if (errorVisible)
         {
-            // The only acceptable error for an authorised admin is the storage-availability one,
-            // not the "not authorised" branch.
             var text = await jobs.GetErrorBannerTextAsync() ?? "";
             Assert.Contains("unavailable", text, StringComparison.OrdinalIgnoreCase);
         }
@@ -91,28 +86,21 @@ public sealed class BackgroundJobsAdminTests(EmployeePersonaFixture fixture) : R
 
         if (!await jobs.AreJobSectionsVisibleAsync() || await jobs.GetFailedJobRowCountAsync() == 0)
         {
-            // No failed job seeded in this environment — the confirm/retry path is not reachable
-            // from the UI here. The dialog wiring is still covered by
-            // CustomerDetailsPageTests' AdminActionConfirmDialog reason-validation tests (same
-            // shared component). Nothing to assert here without a failed job.
             Assert.True(await jobs.IsNoFailedJobsEmptyStateVisibleAsync() || await jobs.IsErrorBannerVisibleAsync());
             return;
         }
 
         await jobs.OpenRetryDialogForFirstFailedJobAsync();
 
-        // Empty reason -> validation error, dialog stays open, service not called.
         await jobs.ClickRetryConfirmAsync();
         var validation = await jobs.GetRetryValidationErrorAsync() ?? "";
         Assert.Contains("reason", validation, StringComparison.OrdinalIgnoreCase);
         Assert.True(await jobs.IsRetryDialogVisibleAsync(), "Dialog should stay open when no reason is given");
 
-        // Too-short reason (< 5 chars) -> still blocked.
         await jobs.FillRetryReasonAsync("hi");
         await jobs.ClickRetryConfirmAsync();
         Assert.True(await jobs.IsRetryDialogVisibleAsync(), "Dialog should stay open for a too-short reason");
 
-        // Cancel closes without acting — no result message appears.
         await jobs.ClickRetryCancelAsync();
         Assert.False(await jobs.IsRetryDialogVisibleAsync());
         Assert.Null(await jobs.GetActionMessageAsync());
@@ -131,8 +119,6 @@ public sealed class BackgroundJobsAdminTests(EmployeePersonaFixture fixture) : R
 
         if (!await jobs.AreJobSectionsVisibleAsync() || await jobs.GetFailedJobRowCountAsync() == 0)
         {
-            // See RetryConfirmDialog_RequiresReason_AndCancelDoesNotAct — no failed job to retry
-            // in this environment.
             return;
         }
 
@@ -140,9 +126,6 @@ public sealed class BackgroundJobsAdminTests(EmployeePersonaFixture fixture) : R
         await jobs.FillRetryReasonAsync("Re-running after transient dependency outage");
         await jobs.ClickRetryConfirmAsync();
 
-        // Whatever the outcome (requeued, or "may no longer be in a failed state"), the page must
-        // land on exactly one result message and close the dialog — never a stale success banner
-        // alongside an error, and never a hung disabled dialog.
         await _page.WaitForSelectorAsync(".admin-action-success, .admin-action-error", new() { Timeout = 20_000 });
         Assert.False(await jobs.IsRetryDialogVisibleAsync(), "The retry dialog should close after the action resolves");
 

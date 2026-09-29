@@ -10,8 +10,6 @@ internal sealed class Endpoint(GetManagerDashboardSummaryHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/dashboards/manager/summary");
-        // Manager OR HrAdministrator. No managerId route param — the acting manager is ICurrentUser
-        // and each provider self-scopes a manager caller to their full reporting sub-tree (DSH-02).
         Policies("reporting:view-workload-actions");
     }
 

@@ -84,9 +84,6 @@ internal sealed class SharedCompanyDocumentConfiguration : IEntityTypeConfigurat
         builder.Property(d => d.CustomReviewFrequencyMonths)
             .HasColumnName("custom_review_frequency_months");
 
-        // Plain Guid column, no FK — Employee lives in the Employees module, resolved only via
-        // IEmployeeNameReader/IEmployeeAudienceReader at read time, same as
-        // SharedCompanyDocumentAudienceRule.TargetId.
         builder.Property(d => d.ReviewOwnerEmployeeId)
             .HasColumnName("review_owner_employee_id");
 
@@ -171,8 +168,6 @@ internal sealed class SharedCompanyDocumentConfiguration : IEntityTypeConfigurat
             .HasForeignKey(d => d.CategoryId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Every query against this table must filter by CompanyId (no EF global query filter
-        // is used in this codebase — see the tenant-isolation note on the entity itself).
         builder.HasIndex(d => d.CompanyId);
         builder.HasIndex(d => new { d.CompanyId, d.Status });
         builder.HasIndex(d => new { d.CompanyId, d.CategoryId });

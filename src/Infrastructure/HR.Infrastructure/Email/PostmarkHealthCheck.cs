@@ -3,13 +3,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Infrastructure.Email;
 
-/// <summary>
-/// Registered as the "email" named health check (System Health Dashboard, Platform Monitoring
-/// epic). Calls Postmark's read-only "server info" endpoint (GET /server) using the same
-/// X-Postmark-Server-Token auth as PostmarkEmailSender — a cheap, real reachability check that
-/// never actually sends an email. Reports Degraded (not Unhealthy) when Postmark isn't configured
-/// (LoggingEmailSender is in use instead), the same non-fatal-in-dev convention as StripeHealthCheck.
-/// </summary>
 internal sealed class PostmarkHealthCheck(IHttpClientFactory httpClientFactory, IOptions<PostmarkOptions> options)
     : IHealthCheck
 {

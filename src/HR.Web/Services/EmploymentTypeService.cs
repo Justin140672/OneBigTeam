@@ -22,7 +22,6 @@ public class EmploymentTypeService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    // No dedicated backend GetById endpoint — the list already returns full item detail.
     async Task<EmploymentTypeEditModel?> IEditService<EmploymentTypeEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
     {
         var list = await ListEmploymentTypesAsync(companyId, includeInactive: true);

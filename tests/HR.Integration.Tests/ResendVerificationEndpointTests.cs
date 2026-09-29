@@ -44,8 +44,6 @@ public class ResendVerificationEndpointTests
         var signUpResponse = await client.PostAsJsonAsync("/api/signup", ValidSignUpRequest(email));
         Assert.Equal(HttpStatusCode.OK, signUpResponse.StatusCode);
 
-        // The signup itself already created a Supabase user via the gateway — reset the fake so
-        // this test only observes the ResendVerificationEmailAsync call, not CreateUserAsync.
         _factory.SupabaseAuthGateway.ResentEmails.Clear();
 
         var response = await client.PostAsJsonAsync("/api/resend-verification", new { email });

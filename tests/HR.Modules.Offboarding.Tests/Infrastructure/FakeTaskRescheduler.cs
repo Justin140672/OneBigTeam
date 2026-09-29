@@ -9,7 +9,6 @@ internal sealed class FakeTaskRescheduler : ITaskRescheduler
 
     public List<RescheduleManyCall> RescheduleManyCalls { get; } = [];
 
-    /// <summary>Number of tasks RescheduleManyBySourceEntitiesAsync should report as rescheduled — configure per test.</summary>
     public int RescheduleManyReturnCount { get; set; } = -1;
 
     public Task<int> RescheduleManyBySourceEntitiesAsync(

@@ -135,11 +135,6 @@ else
         _loading = false;
     }
 
-    // Fired both after a successful save and after a conflict "Reload latest values" — in both
-    // cases the panel itself stays open (per the ticket: after a successful save the user must be
-    // able to keep editing with the new version; after a reload they must see the winning record
-    // while remaining able to edit and save again), so this only refreshes the read-only summary
-    // data this tab owns (the record + manager name) without touching _editing.
     private async Task OnRecordSaved(ProbationRecordModel updated)
     {
         _record = updated;

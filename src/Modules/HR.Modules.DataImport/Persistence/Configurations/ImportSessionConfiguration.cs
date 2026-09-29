@@ -84,15 +84,12 @@ internal sealed class ImportSessionConfiguration : IEntityTypeConfiguration<Impo
             .HasColumnName("updated_at")
             .IsRequired();
 
-        // OBT-REM-06: optimistic concurrency for the atomic confirm-session claim.
         builder.Property(s => s.Version)
             .HasColumnName("version")
             .IsRequired()
             .IsConcurrencyToken()
             .HasDefaultValue(1);
 
-        // Security review finding #2: retention/deletion tracking for the durable raw import file,
-        // kept separate from the session's business Status.
         builder.Property(s => s.FileDeletedAt)
             .HasColumnName("file_deleted_at");
 
@@ -107,7 +104,6 @@ internal sealed class ImportSessionConfiguration : IEntityTypeConfiguration<Impo
         builder.HasIndex(s => s.CompanyId);
         builder.HasIndex(s => s.Status);
 
-        // Sweep job query pattern: find undeleted files where the deletion status is still open.
         builder.HasIndex(s => s.FileDeletedAt);
     }
 }

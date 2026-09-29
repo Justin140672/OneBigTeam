@@ -8,12 +8,6 @@ public sealed class FailedPaymentsService(HrApiHttpClientFactory httpClientFacto
 {
     private HttpClient Http => httpClientFactory.CreateClient();
 
-    /// <summary>
-    /// Returns null when the call fails or the caller isn't authorised (401/403) — same
-    /// null-means-"show sign-in/not-authorised state" contract as CustomerListService. Real
-    /// enforcement happens server-side (HR.Api's "platform:admin" policy plus
-    /// GetFailedPaymentsHandler's PlatformAdmin:AllowedEmails allow-list); this is UI-side only.
-    /// </summary>
     public async Task<FailedPaymentsResponse?> GetFailedPaymentsOrNullAsync(
         string? search = null,
         string? statusFilter = null,

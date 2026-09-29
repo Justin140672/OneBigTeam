@@ -28,11 +28,8 @@
 }
 
 @code {
-    // Parent (ManagerDashboard) can use the same aggregated per-employee counts to badge
-    // MyTeamWidget cards without a second round of fetches.
     [Parameter] public EventCallback<IReadOnlyDictionary<Guid, int>> OnAlertCountsChanged { get; set; }
 
-    // Total row count, for the page-level one-line activity summary.
     [Parameter] public EventCallback<int> OnItemCountChanged { get; set; }
 
     private const string WidgetName = "Requires your attention";

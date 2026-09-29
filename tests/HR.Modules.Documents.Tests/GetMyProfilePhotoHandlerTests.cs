@@ -47,7 +47,7 @@ public class GetMyProfilePhotoHandlerTests
     {
         switch (status)
         {
-            case FileScanStatus.Pending: break; // Create() defaults to Pending
+            case FileScanStatus.Pending: break;
             case FileScanStatus.Clean: photo.MarkScanClean(DateTimeOffset.UtcNow); break;
             case FileScanStatus.Scanning: photo.MarkScanning(DateTimeOffset.UtcNow); break;
             case FileScanStatus.Infected: photo.MarkScanInfected("EICAR.Test.File", DateTimeOffset.UtcNow); break;
@@ -59,7 +59,7 @@ public class GetMyProfilePhotoHandlerTests
     {
         switch (status)
         {
-            case FileScanStatus.Pending: break; // Create() defaults to Pending
+            case FileScanStatus.Pending: break;
             case FileScanStatus.Clean: photo.MarkScanClean(DateTimeOffset.UtcNow); break;
             case FileScanStatus.Scanning: photo.MarkScanning(DateTimeOffset.UtcNow); break;
             case FileScanStatus.Infected: photo.MarkScanInfected("EICAR.Test.File", DateTimeOffset.UtcNow); break;
@@ -170,8 +170,6 @@ public class GetMyProfilePhotoHandlerTests
         Assert.Null(result.PendingPhoto);
     }
 
-    // Theory parameters must be a publicly accessible type (xUnit requires public test methods),
-    // but FileScanStatus is internal — pass the enum's underlying int value instead and cast.
     [Theory]
     [InlineData((int)FileScanStatus.Pending)]
     [InlineData((int)FileScanStatus.Scanning)]

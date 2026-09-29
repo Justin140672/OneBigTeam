@@ -2,13 +2,6 @@ using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 namespace HR.Modules.Documents.Domain;
 
-/// <summary>
-/// A document owned by the company as a whole (e.g. a policy or handbook) rather than by an
-/// individual employee — distinct from <see cref="Document"/>, which always belongs to an
-/// employee's record. Every query against this entity must filter by CompanyId; there is no
-/// EF Core global query filter in this codebase, so tenant isolation is enforced per-handler,
-/// the same convention used everywhere else here.
-/// </summary>
 internal sealed class SharedCompanyDocument : IScannableFile, IVersionedAggregate
 {
     private SharedCompanyDocument() { }
@@ -35,22 +28,12 @@ internal sealed class SharedCompanyDocument : IScannableFile, IVersionedAggregat
     public SharedCompanyDocumentReviewFrequency ReviewFrequency { get; private set; }
     public int? CustomReviewFrequencyMonths { get; private set; }
 
-    // A company document may not have a review owner assigned — this is a plain Guid reference
-    // to an Employee in the Employees module (no navigation property, same as
-    // SharedCompanyDocumentAudienceRule.TargetId and Document.EmployeeId elsewhere in this
-    // module), resolved to a display name only at the read side via IEmployeeNameReader.
     public Guid? ReviewOwnerEmployeeId { get; private set; }
 
-    // Records the most recently completed review — distinct from ReviewDate, which always holds
-    // the *next* scheduled review date (or null once cleared). LastReviewedByEmployeeId is the
-    // same "plain Guid, no navigation property" convention as ReviewOwnerEmployeeId above.
     public DateOnly? LastReviewedAt { get; private set; }
     public Guid? LastReviewedByEmployeeId { get; private set; }
     public string? LastReviewNotes { get; private set; }
 
-    // Audience is modelled as a separate set of SharedCompanyDocumentAudienceRule rows (see that
-    // type), not fields here — this aggregate has no in-memory audience state of its own, the
-    // same way version history lives entirely in SharedCompanyDocumentVersion rows.
     public bool RequiresAcknowledgement { get; private set; }
 
     // Only meaningful when RequiresAcknowledgement is true. AcknowledgementStatement is
@@ -65,9 +48,6 @@ internal sealed class SharedCompanyDocument : IScannableFile, IVersionedAggregat
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    // Distinct from CreatedBy/CreatedAt and UpdatedBy/UpdatedAt: those change on every edit, so
-    // without a dedicated pair here "who published this and when" would be silently overwritten
-    // by the next metadata or audience change.
     public Guid? PublishedBy { get; private set; }
     public DateTimeOffset? PublishedAt { get; private set; }
 
@@ -88,9 +68,6 @@ internal sealed class SharedCompanyDocument : IScannableFile, IVersionedAggregat
     public int ScanAttemptCount { get; private set; }
     public string? ScanFailureReason { get; private set; }
 
-    // SharedCompanyDocument has no single owning employee — this entity uses
-    // CurrentFileReference (not StorageKey) as its storage pointer, so IScannableFile.StorageKey
-    // is implemented via that property below.
     Guid? IScannableFile.EmployeeId => null;
     string IScannableFile.StorageKey => CurrentFileReference;
 
@@ -190,18 +167,12 @@ internal sealed class SharedCompanyDocument : IScannableFile, IVersionedAggregat
         UpdatedAt = now;
     }
 
-    /// <summary>
-    /// Bumps UpdatedBy/UpdatedAt without changing any other field — used when something owned
-    /// outside this aggregate changes (e.g. its audience rule rows) but should still show up as
-    /// a "last updated" change on the document itself.
-    /// </summary>
     public void Touch(Guid updatedBy, DateTimeOffset now)
     {
         UpdatedBy = updatedBy;
         UpdatedAt = now;
     }
 
-    /// <summary>Uploads a new version of the file, replacing the current one and incrementing VersionNumber.</summary>
     public void ReplaceFile(string newFileReference, string fileName, long fileSize, string contentType, Guid updatedBy, DateTimeOffset now)
     {
         CurrentFileReference = newFileReference.Trim();
@@ -267,13 +238,6 @@ internal sealed class SharedCompanyDocument : IScannableFile, IVersionedAggregat
         UpdatedAt     = now;
     }
 
-    /// <summary>
-    /// Marks the document Expired instead of being renewed — a terminal state distinct from
-    /// Archive: no reason is captured (the ticket does not ask for one, unlike Archive which
-    /// requires a reason). Expired documents are excluded from employee-facing reads via the
-    /// same strict equality-against-Published filter those handlers already use, so no changes
-    /// are needed there.
-    /// </summary>
     public void MarkExpired(Guid expiredBy, DateTimeOffset now)
     {
         Status     = SharedCompanyDocumentStatus.Expired;
@@ -283,7 +247,6 @@ internal sealed class SharedCompanyDocument : IScannableFile, IVersionedAggregat
         UpdatedAt  = now;
     }
 
-    /// <summary>Moves a Published document back to Draft (e.g. to correct a mistake before republishing).</summary>
     public void RevertToDraft(Guid updatedBy, DateTimeOffset now)
     {
         Status    = SharedCompanyDocumentStatus.Draft;
@@ -291,12 +254,6 @@ internal sealed class SharedCompanyDocument : IScannableFile, IVersionedAggregat
         UpdatedAt = now;
     }
 
-    /// <summary>
-    /// Records a completed review and moves ReviewDate forward to the next scheduled review date.
-    /// nextReviewDate is computed by the caller (based on ReviewFrequency/CustomReviewFrequencyMonths)
-    /// — this method has no knowledge of review cadence, the same way UpdateDetails receives
-    /// reviewDate/reviewFrequency as given values rather than computing anything itself.
-    /// </summary>
     public void CompleteReview(Guid reviewedBy, string reviewNotes, DateOnly reviewDate, DateOnly? nextReviewDate, DateTimeOffset now)
     {
         LastReviewedAt           = reviewDate;

@@ -2,13 +2,6 @@ using HR.Web.Services;
 
 namespace HR.Web.Components.Pages.Dashboards;
 
-/// <summary>
-/// Blazor-agnostic view model for one row in an attention-queue widget (shared by
-/// <see cref="AttentionQueueWidget"/> and <see cref="ManagerAttentionQueueWidget"/> via
-/// <see cref="AttentionQueuePanel"/>). Carries everything the shared presentation needs to render
-/// a row and decide how it activates — either opening a task dialog (<see cref="TaskId"/>) or
-/// navigating to a deep link (<see cref="DeepLinkUrl"/>).
-/// </summary>
 public sealed record AttentionQueueItem(
     Guid? EmployeeId,
     string ActionTitle,
@@ -25,12 +18,6 @@ public sealed record AttentionQueueItem(
     bool IsOwnerActionable = true,
     string? OwnerLabel = null)
 {
-    /// <summary>
-    /// An item is actionable only if it is owned by the viewer in the workspace being displayed
-    /// AND it opens a task or has a non-blank deep link. Actionability is never inferred from mere
-    /// visibility — a row can be shown for oversight (<see cref="IsOwnerActionable"/> false) without
-    /// being clickable, e.g. a manager-owned leave approval shown to HR for company-wide visibility.
-    /// </summary>
     public bool HasTarget => IsOwnerActionable && (TaskId is not null || !string.IsNullOrWhiteSpace(DeepLinkUrl));
 
     /// <summary>
@@ -42,11 +29,6 @@ public sealed record AttentionQueueItem(
 
     public string ActionLabel => AttentionQueueSupport.ResolveActionLabel(TaskId, DeepLinkUrl, Category, ActionTitle);
 
-    /// <summary>
-    /// Secondary/supporting line under the task title: employee, source category, and (when
-    /// meaningful) status — never repeating "Overdue" alongside the due-badge, and adding the
-    /// exact due date for overdue rows so same-employee/same-title items stay distinguishable.
-    /// </summary>
     public string MetaText
     {
         get
@@ -54,10 +36,6 @@ public sealed record AttentionQueueItem(
             var parts = new List<string>();
             if (!string.IsNullOrWhiteSpace(EmployeeName)) parts.Add(EmployeeName);
 
-            // When the row is overdue, the due-badge already reads "Overdue" — drop any
-            // supporting part (category name, status) that would repeat the word rather than
-            // only guarding against an exact "Overdue" status match (e.g. category names like
-            // "Manager Tasks Overdue" would otherwise duplicate it).
             if (!string.IsNullOrWhiteSpace(Category) &&
                 !(IsOverdue && Category.Contains("Overdue", StringComparison.OrdinalIgnoreCase)))
             {
@@ -111,14 +89,8 @@ public sealed record AttentionQueueItem(
                 : "This item can no longer be opened — it may have been completed or removed.");
 }
 
-/// <summary>
-/// Pure, Blazor-agnostic helper functions shared by every attention-queue widget: due-date
-/// classification/labelling and category-outcome/action-item conversion. Extracted from the
-/// former per-widget duplicated logic so behaviour (and its tests) live in one place.
-/// </summary>
 public static class AttentionQueueSupport
 {
-    /// <summary>Classifies a due date relative to <paramref name="today"/> into a label and CSS suffix.</summary>
     public static (string? Label, string Css) DueBadge(DateOnly today, DateOnly? due)
     {
         if (due is null) return (null, "");
@@ -134,24 +106,10 @@ public static class AttentionQueueSupport
         return (due.ToString("d MMM"), "normal");
     }
 
-    /// <summary>
-    /// Resolves the visible action label for an attention row. One naming convention is used:
-    /// "&lt;verb&gt; &lt;destination noun&gt;" (e.g. "View employee", "View document",
-    /// "Review user account", "View acknowledgement progress"). A row backed by a task always
-    /// opens the task dialog, so it is always "Open task"; otherwise the destination is derived
-    /// from the corrected deep-link URL, falling back to the category, so the label always
-    /// describes where the row actually goes.
-    /// </summary>
     public static string ResolveActionLabel(Guid? taskId, string? deepLinkUrl, string category, string? actionTitle = null)
     {
         if (taskId is not null)
         {
-            // Category/title-specific wording so the visible label/accessible name describes the
-            // actual destination opened (the matching TaskViewDialog action panel), not just a
-            // generic "Open task" — DSH ticket requirement that labels match their destination
-            // exactly. ActionTitle disambiguates categories that cover more than one destination
-            // (e.g. "Pending Sickness Actions" covers both return-to-work reviews and evidence
-            // requests).
             var c = (category ?? string.Empty).ToLowerInvariant();
             var t = (actionTitle ?? string.Empty).ToLowerInvariant();
 
@@ -187,7 +145,6 @@ public static class AttentionQueueSupport
         };
     }
 
-    /// <summary>Converts one server-returned action item into the shared row view model.</summary>
     public static AttentionQueueItem ToAttentionItem(DashboardActionItemModel it, DateOnly today)
     {
         var (dueLabel, dueCss) = DueBadge(today, it.DueDate);
@@ -208,11 +165,6 @@ public static class AttentionQueueSupport
             OwnerLabel: it.OwnerLabel);
     }
 
-    /// <summary>
-    /// Converts a full dashboard summary response into ordered outcomes + attention items,
-    /// preserving each category's Required/Failed/ActionableCount for <see cref="WidgetPanelState"/>
-    /// and skipping item extraction for failed categories.
-    /// </summary>
     public static (IReadOnlyList<WidgetSourceOutcome> Outcomes, IReadOnlyList<AttentionQueueItem> Items) Convert(
         DashboardSummaryModel response, DateOnly today)
     {

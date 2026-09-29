@@ -14,11 +14,6 @@ internal sealed class ListCandidatesHandler(RecruitmentDbContext db)
             .AsNoTracking()
             .Where(c => c.CompanyId == request.CompanyId);
 
-        // Deactivated candidates are excluded from active searches, pipelines, selectors and default
-        // lists by default (see the ticket's "Include inactive candidates" filter requirement) — this
-        // handler backs the plain candidate list, the application-creation candidate selector and any
-        // other consumer of ListCandidates, so this default applies everywhere unless the caller
-        // explicitly opts in via IncludeInactive.
         if (!request.IncludeInactive)
             query = query.Where(c => c.IsActive);
 

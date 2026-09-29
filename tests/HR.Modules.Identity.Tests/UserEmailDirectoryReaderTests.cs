@@ -4,13 +4,6 @@ using HR.Modules.Identity.Tests.Infrastructure;
 
 namespace HR.Modules.Identity.Tests;
 
-/// <summary>
-/// Exercises the real IdentityDbContext-backed UserEmailDirectoryReader (including its
-/// EF.Functions.ILike-based FindUserIdsByEmailAsync search, which requires a real Postgres provider
-/// — see IdentityDatabaseFixture) — the "Infrastructure.Abstractions port implemented by Identity"
-/// consumed by HR.Modules.Companies' GetAuditLog feature via a fake in Companies.Tests
-/// (FakeUserEmailDirectoryReader), same shape as CompanyUserEmailSearchReader.
-/// </summary>
 [Collection("IdentityDatabase")]
 public class UserEmailDirectoryReaderTests(IdentityDatabaseFixture fixture)
 {

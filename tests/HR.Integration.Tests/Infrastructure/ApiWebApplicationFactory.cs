@@ -46,9 +46,6 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
         await _postgres.DisposeAsync();
     }
 
-    // A fixed, throwaway AES-256 key (32 zero bytes, base64) so the sensitive-data protector is
-    // resolvable in integration tests. Required for any test that persists an application-encrypted
-    // column (e.g. employee equality-monitoring answers) and asserts on ciphertext at rest.
     private const string TestSensitiveDataKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -59,16 +56,7 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
             {
                 ["Infrastructure:SensitiveDataProtection:ActiveKeyId"] = "test",
                 ["Infrastructure:SensitiveDataProtection:Keys:test"] = TestSensitiveDataKey,
-                // P1 "Login as Customer": a fixed, throwaway key so ISupportSessionTokenIssuer /
-                // SupportSessionJwtBearerConfiguration are resolvable in integration tests — never
-                // a real secret, mirrors TestSensitiveDataKey's own convention above.
                 ["SupportSession:SigningKey"] = "test-support-session-signing-key-not-a-real-secret",
-                // P1 identity rate limiting: this shared factory's tests call Login/SignUp/
-                // forgot-password/etc. far more often per class run than the production defaults
-                // allow (many cases exercising the SAME email/IP combination in one run). Widened
-                // here — mirrors the identical convention already used for the marketing
-                // contact-form limiter (Marketing:ContactForm:RateLimit:*) — rather than disabling
-                // the policies outright, so the policies themselves are still genuinely exercised.
                 ["Identity:RateLimits:identity-login:PermitLimit"] = "1000",
                 ["Identity:RateLimits:identity-signup:PermitLimit"] = "1000",
                 ["Identity:RateLimits:identity-forgot-password:PermitLimit"] = "1000",
@@ -96,33 +84,19 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
                     {
                     });
 
-            // Replace real email sender and link builder with test doubles
             services.AddSingleton<IEmailSender>(EmailSender);
             services.AddSingleton<IInviteLinkBuilder, FakeInviteLinkBuilder>();
 
-            // The invitation path uses the branded-template IInvitationEmailSender rather than the
-            // raw IEmailSender — capture those sends into the same FakeEmailSender.Sent surface.
             InvitationEmailSender = new FakeInvitationEmailSender(EmailSender);
             services.AddSingleton<IInvitationEmailSender>(InvitationEmailSender);
 
-            // Password reset also gets a fake to prevent real Postmark calls from test addresses
             services.AddSingleton<IPasswordResetEmailSender>(
                 new FakePasswordResetEmailSender());
 
-            // Replace the real Stripe gateway so no test ever calls out to Stripe's network API.
             services.AddScoped<IStripeGateway>(_ => StripeGateway);
 
-            // Replace the real Supabase Auth gateway so no test ever calls out to Supabase's live
-            // Auth Admin API.
             services.AddScoped<ISupabaseAuthGateway>(_ => SupabaseAuthGateway);
 
-            // Replace the real Hangfire-backed IBackgroundJobClient with a no-op fake. Registered
-            // after AddHangfireBackgroundJobs (Program.cs) has already wired up the real Hangfire
-            // server/storage against the Postgres testcontainer, so this override wins for the
-            // IBackgroundJobClient interface while leaving the Hangfire server/dashboard/health
-            // check plumbing itself intact. See FakeBackgroundJobClient for why this matters: real
-            // job execution otherwise races test-driven state (e.g. ScanUploadedFileJob vs a
-            // test's manual "mark scan clean" step).
             services.AddSingleton<IBackgroundJobClient, FakeBackgroundJobClient>();
 
             // Ticket 3 (P1) final gap item 5: replace the production no-op with the shared,

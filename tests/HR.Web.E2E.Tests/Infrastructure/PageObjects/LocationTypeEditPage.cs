@@ -2,10 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the location type create/edit page.
-/// Routes: /companies/{id}/location-types/new  and  /companies/{id}/location-types/{id}
-/// </summary>
 public sealed class LocationTypeEditPage(IPage page, string baseUrl)
 {
     public async Task GoToEditAsync(Guid companyId, Guid id)
@@ -31,8 +27,6 @@ public sealed class LocationTypeEditPage(IPage page, string baseUrl)
         await page.Keyboard.PressAsync("Tab");
     }
 
-    // ── Description field (optional HrTextBox) — robust type-for-real technique, see
-    // DocumentTypeEditPage.SetDescriptionAsync for the full rationale. ─────────────
     public async Task SetDescriptionAsync(string value)
     {
         var input = page.GetByPlaceholder("Optional description");
@@ -59,7 +53,6 @@ public sealed class LocationTypeEditPage(IPage page, string baseUrl)
     public async Task SaveAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
-        // Navigates back to the location-types list on success.
         await page.WaitForURLAsync("**/location-types", new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }

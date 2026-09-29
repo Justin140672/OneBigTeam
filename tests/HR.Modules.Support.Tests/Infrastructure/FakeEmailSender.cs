@@ -3,11 +3,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Support.Tests.Infrastructure;
 
-/// <summary>
-/// Test double for <see cref="IEmailSender"/>. Set <see cref="ThrowOnSend"/> to simulate an email
-/// provider outage so handlers can be verified to still record a notification attempt (marked
-/// Failed) rather than letting the exception bubble up and abort the whole request.
-/// </summary>
 internal sealed class FakeEmailSender : IEmailSender
 {
     private readonly ConcurrentBag<SentEmail> _sent = new();

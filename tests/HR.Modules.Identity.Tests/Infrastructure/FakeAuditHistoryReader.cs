@@ -2,16 +2,10 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Identity.Tests.Infrastructure;
 
-/// <summary>
-/// Minimal test double for <see cref="IAuditHistoryReader"/> — only
-/// <see cref="GetEmployeeAuditHistoryAsync"/> is used by GetUserAuditHistoryHandler, so every other
-/// member is left unimplemented.
-/// </summary>
 internal sealed class FakeAuditHistoryReader(IReadOnlyList<AuditHistoryEntry>? entries = null) : IAuditHistoryReader
 {
     private readonly IReadOnlyList<AuditHistoryEntry> _entries = entries ?? [];
 
-    /// <summary>Platform-wide entries returned by GetPlatformAuditLogAsync (used by GetPermissionHistoryHandler).</summary>
     private IReadOnlyList<AuditHistoryEntry> _platformEntries = [];
 
     public bool WasCalled { get; private set; }

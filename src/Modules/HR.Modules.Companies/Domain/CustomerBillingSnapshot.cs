@@ -1,10 +1,5 @@
 namespace HR.Modules.Companies.Domain;
 
-/// <summary>
-/// Point-in-time snapshot of how a customer's monthly bill was calculated, computed each time an
-/// admin views the Admin Portal billing breakdown for a customer. Accumulates as an append-only
-/// history — there is no attempt to backfill history predating this feature.
-/// </summary>
 internal sealed class CustomerBillingSnapshot
 {
     private CustomerBillingSnapshot() { }

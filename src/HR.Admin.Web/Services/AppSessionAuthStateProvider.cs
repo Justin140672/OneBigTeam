@@ -100,7 +100,6 @@ public sealed class AppSessionAuthStateProvider(
             return;
         }
 
-        // Sticky fail-closed: once invalidated, no later callback may revive this circuit.
         if (sessionState.Status == CircuitAuthStatus.Invalidated)
         {
             return;
@@ -125,19 +124,12 @@ public sealed class AppSessionAuthStateProvider(
 
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
-        // Bounded so a slow/unreachable API can't hang navigation on every page (including
-        // /login) indefinitely — degrades to "not signed in" instead; real enforcement of what an
-        // authenticated user can actually see still happens server-side on every real API call.
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         try
         {
             var http = httpClientFactory.CreateClient();
             var response = await http.GetAsync("api/platform-admin/me", cts.Token);
 
-            // The Admin Portal is platform-admin-only, and Login.razor already rejects a
-            // valid-but-not-allow-listed sign-in on the login page (so a non-admin never gets a
-            // usable cookie). Anything short of a 200 here therefore means "not a usable Admin
-            // Portal session" — treat it as anonymous and let the router send them to /login.
             if (!response.IsSuccessStatusCode)
                 return Anonymous;
 

@@ -53,12 +53,10 @@ public sealed class SharedCompanyDocumentEditConcurrencyConflictTests(HrAdminPer
             await UploadDocumentAsync(originalTitle, tempFile);
             var documentId = await GetUploadedDocumentIdAsync(originalTitle);
 
-            // ── Tab 1: open the metadata dialog and start editing the Title (loads Version v1) ──
             await detail.GoToAsync(AcmeId, documentId);
             await detail.OpenMetadataDialogAsync();
             await detail.SetMetadataTitleAsync(firstTabTitle);
 
-            // ── Tab 2 (same context / persona): change the same document's Title and save first ──
             var otherPage = await _context.NewPageAsync();
             try
             {
@@ -71,7 +69,6 @@ public sealed class SharedCompanyDocumentEditConcurrencyConflictTests(HrAdminPer
                 await otherPage.CloseAsync();
             }
 
-            // ── Tab 1: saving now is stale → conflict banner, dialog stays open, input preserved ──
             await detail.SaveMetadataDialogExpectingConflictAsync();
 
             Assert.True(await detail.IsMetadataConflictBannerVisibleAsync(),
@@ -80,14 +77,12 @@ public sealed class SharedCompanyDocumentEditConcurrencyConflictTests(HrAdminPer
                 "The Edit Document Metadata dialog should stay open after a concurrency conflict");
             Assert.Equal(firstTabTitle, await detail.GetMetadataTitleValueAsync());
 
-            // ── Tab 1: "Reload latest values" clears the banner and adopts the other tab's value ──
             await detail.ClickMetadataReloadLatestAsync();
 
             Assert.False(await detail.IsMetadataConflictBannerVisibleAsync(),
                 "Expected the conflict banner to clear after reloading latest values");
             await detail.WaitForMetadataTitleValueAsync(otherTabTitle);
 
-            // ── Tab 1: re-edit against the fresh version and save successfully ──
             await detail.SetMetadataTitleAsync(finalTitle);
             await detail.SaveMetadataDialogExpectingSuccessAsync();
 
@@ -121,11 +116,9 @@ public sealed class SharedCompanyDocumentEditConcurrencyConflictTests(HrAdminPer
             await UploadDocumentAsync(title, tempFile);
             var documentId = await GetUploadedDocumentIdAsync(title);
 
-            // ── Tab 1: open the Audience dialog (loads Version v1) ──
             await detail.GoToAsync(AcmeId, documentId);
             await detail.OpenAudienceDialogAsync();
 
-            // ── Tab 2: bump the document's version via a metadata Title change ──
             var otherPage = await _context.NewPageAsync();
             try
             {
@@ -138,7 +131,6 @@ public sealed class SharedCompanyDocumentEditConcurrencyConflictTests(HrAdminPer
                 await otherPage.CloseAsync();
             }
 
-            // ── Tab 1: saving the audience dialog now is stale → conflict banner, dialog stays open ──
             await detail.SaveAudienceDialogExpectingConflictAsync();
 
             Assert.True(await detail.IsAudienceConflictBannerVisibleAsync(),
@@ -146,7 +138,6 @@ public sealed class SharedCompanyDocumentEditConcurrencyConflictTests(HrAdminPer
             Assert.True(await detail.IsAudienceDialogOpenAsync(),
                 "The Edit Document Audience dialog should stay open after a concurrency conflict");
 
-            // ── Tab 1: reload latest clears the banner, then a re-save succeeds ──
             await detail.ClickAudienceReloadLatestAsync();
 
             Assert.False(await detail.IsAudienceConflictBannerVisibleAsync(),
@@ -181,11 +172,9 @@ public sealed class SharedCompanyDocumentEditConcurrencyConflictTests(HrAdminPer
             await UploadDocumentAsync(title, tempFile);
             var documentId = await GetUploadedDocumentIdAsync(title);
 
-            // ── Tab 1: open the Acknowledgement Settings dialog (loads Version v1) ──
             await detail.GoToAsync(AcmeId, documentId);
             await detail.OpenEditAcknowledgementDialogAsync();
 
-            // ── Tab 2: bump the document's version via a metadata Title change ──
             var otherPage = await _context.NewPageAsync();
             try
             {
@@ -198,7 +187,6 @@ public sealed class SharedCompanyDocumentEditConcurrencyConflictTests(HrAdminPer
                 await otherPage.CloseAsync();
             }
 
-            // ── Tab 1: saving the acknowledgement dialog now is stale → conflict banner, dialog stays open ──
             await detail.SaveAcknowledgementDialogExpectingConflictAsync();
 
             Assert.True(await detail.IsAcknowledgementConflictBannerVisibleAsync(),
@@ -206,7 +194,6 @@ public sealed class SharedCompanyDocumentEditConcurrencyConflictTests(HrAdminPer
             Assert.True(await detail.IsAcknowledgementDialogOpenAsync(),
                 "The Edit Acknowledgement Settings dialog should stay open after a concurrency conflict");
 
-            // ── Tab 1: reload latest clears the banner, then a re-save succeeds ──
             await detail.ClickAcknowledgementReloadLatestAsync();
 
             Assert.False(await detail.IsAcknowledgementConflictBannerVisibleAsync(),
@@ -223,8 +210,6 @@ public sealed class SharedCompanyDocumentEditConcurrencyConflictTests(HrAdminPer
         }
     }
 
-    // Uploads a shared document from the Shared Documents list page with the "Policy" category —
-    // same flow as SharedDocumentAudienceTests / SharedDocumentMetadataEditTests.
     private async Task UploadDocumentAsync(string title, string filePath)
     {
         await _page.GotoAsync(_fixture.WebBaseUrl + $"/companies/{AcmeId}/shared-documents");
@@ -256,7 +241,6 @@ public sealed class SharedCompanyDocumentEditConcurrencyConflictTests(HrAdminPer
         return Guid.Parse(href.Split('/').Last());
     }
 
-    // %PDF- followed by padding, so magic-byte content validation passes.
     private static byte[] BuildTestPdf()
     {
         var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };

@@ -9,12 +9,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Reporting.Tests.Jobs;
 
-/// <summary>
-/// Follow-up I: <see cref="CleanUpOrganisationDataExportArtefactsJob"/> sweeps orphan attempt archives
-/// left by failed / superseded organisation data export builds, preserves the published archive, skips
-/// companies under a legal hold, is retryable (a delete failure leaves the row unmarked), and re-checks
-/// recently-cleaned exports for stragglers.
-/// </summary>
 public class CleanUpOrganisationDataExportArtefactsJobTests
 {
     private static CleanUpOrganisationDataExportArtefactsJob Build(
@@ -43,8 +37,6 @@ public class CleanUpOrganisationDataExportArtefactsJobTests
     [Fact]
     public async Task Upload_Succeeded_But_Completion_Save_Lost_Is_The_Same_Shape_And_Is_Cleaned()
     {
-        // Storage accepted the upload; the response (or the completion write) was lost, so the row is
-        // Failed with an orphan attempt archive and no published StorageKey.
         var companyId = Guid.NewGuid();
         var id = Guid.NewGuid();
         var store = new FakeJobStore { Candidates = { Terminal(companyId, id, "Failed") } };
@@ -143,7 +135,6 @@ public class CleanUpOrganisationDataExportArtefactsJobTests
     [Fact]
     public async Task Recheck_Pass_Deletes_A_Straggler_Uploaded_After_An_Earlier_Sweep_Without_Re_Marking()
     {
-        // A superseded worker finished uploading after this export was already cleaned.
         var companyId = Guid.NewGuid();
         var id = Guid.NewGuid();
         var straggler = $"organisation-exports/{companyId}/{id}/late.zip";
@@ -154,7 +145,7 @@ public class CleanUpOrganisationDataExportArtefactsJobTests
         await Build(store, storage, new FakeLegalHoldReader()).ExecuteAsync();
 
         Assert.Equal(new[] { straggler }, storage.DeletedKeys);
-        Assert.Empty(store.MarkedCleaned); // recheck pass never re-marks
+        Assert.Empty(store.MarkedCleaned);
     }
 
     [Fact]
@@ -239,7 +230,6 @@ public class CleanUpOrganisationDataExportArtefactsJobTests
             return rows.Select(r => r.Id).ToList();
         }
 
-        // A "restart" is inherent: every run builds a fresh DbContext + store + job over the shared root.
         public async Task RunCleanupAsync()
         {
             await using var db = NewContext();
@@ -292,7 +282,6 @@ public class CleanUpOrganisationDataExportArtefactsJobTests
     private static string Orphan(OrganisationDataExport e, string name) =>
         $"organisation-exports/{e.CompanyId}/{e.Id}/{name}";
 
-    // ----- Scenario 1 -----
     [Fact]
     public async Task Legal_Holds_On_The_Earliest_Fifty_Do_Not_Starve_Later_Exports()
     {
@@ -316,16 +305,15 @@ public class CleanUpOrganisationDataExportArtefactsJobTests
 
         await h.SeedAsync([.. held, .. later]);
 
-        await h.RunCleanupAsync();          // batch = oldest 50, all held -> all deferred
+        await h.RunCleanupAsync();
         h.Now = h.Now.AddMinutes(2);
-        await h.RunCleanupAsync();          // held rows now behind a backoff -> later 5 take the slots
+        await h.RunCleanupAsync();
 
         var all = (await h.AllAsync()).ToDictionary(e => e.Id);
         Assert.All(later, e => Assert.NotNull(all[e.Id].AttemptFilesCleanedAt));
         Assert.All(held, e => Assert.Null(all[e.Id].AttemptFilesCleanedAt));
     }
 
-    // ----- Scenario 2 -----
     [Fact]
     public async Task Persistent_Delete_Failures_On_The_Earliest_Do_Not_Starve_Later_Exports()
     {
@@ -360,7 +348,6 @@ public class CleanUpOrganisationDataExportArtefactsJobTests
         Assert.All(broken, e => Assert.True(all[e.Id].ArtefactCleanupAttemptCount >= 1));
     }
 
-    // ----- Scenario 3 -----
     [Fact]
     public async Task A_Late_Upload_On_An_Older_Cleaned_Entry_Is_Discovered_Across_Repeated_Runs()
     {
@@ -373,7 +360,6 @@ public class CleanUpOrganisationDataExportArtefactsJobTests
             rows.Add(e);
         }
 
-        // The straggler lands on an entry that is NOT in the first batch of 50 (52nd by cleaned time).
         var straggler = rows[52];
         var lateKey = Orphan(straggler, "late.zip");
         h.Storage.AddAttemptKeys(straggler.Id, lateKey);
@@ -381,14 +367,13 @@ public class CleanUpOrganisationDataExportArtefactsJobTests
         await h.SeedAsync([.. rows]);
 
         await h.RunCleanupAsync();
-        Assert.DoesNotContain(lateKey, h.Storage.DeletedKeys); // first batch didn't reach it
+        Assert.DoesNotContain(lateKey, h.Storage.DeletedKeys);
 
         h.Now = h.Now.AddMinutes(1);
         await h.RunCleanupAsync();
-        Assert.Contains(lateKey, h.Storage.DeletedKeys);       // second run rotates onto it
+        Assert.Contains(lateKey, h.Storage.DeletedKeys);
     }
 
-    // ----- Scenario 4 -----
     [Fact]
     public async Task Equal_Scheduling_Timestamps_Still_Let_Every_Entry_Progress_Via_The_Id_Tie_Breaker()
     {
@@ -397,7 +382,7 @@ public class CleanUpOrganisationDataExportArtefactsJobTests
         var rows = new List<OrganisationDataExport>();
         for (var i = 0; i < 55; i++)
         {
-            var e = NewTerminal(Guid.NewGuid(), "Failed", when); // identical CompletedAt
+            var e = NewTerminal(Guid.NewGuid(), "Failed", when);
             h.Storage.AttemptKeys[e.Id] = [Orphan(e, "a.zip")];
             rows.Add(e);
         }
@@ -412,7 +397,6 @@ public class CleanUpOrganisationDataExportArtefactsJobTests
         Assert.All(rows, e => Assert.NotNull(all[e.Id].AttemptFilesCleanedAt));
     }
 
-    // ----- Scenario 5 -----
     [Fact]
     public async Task A_Cleanup_Failure_Then_A_Job_Restart_Eventually_Succeeds()
     {
@@ -423,23 +407,22 @@ public class CleanUpOrganisationDataExportArtefactsJobTests
         h.Storage.ThrowForKeys.Add(key);
         await h.SeedAsync(e);
 
-        await h.RunCleanupAsync(); // fails -> deferred
+        await h.RunCleanupAsync();
         var afterFailure = await h.ReloadAsync(e.Id);
         Assert.Null(afterFailure.AttemptFilesCleanedAt);
         Assert.NotNull(afterFailure.ArtefactCleanupNextAttemptAt);
         Assert.Equal(1, afterFailure.ArtefactCleanupAttemptCount);
 
         h.Storage.ThrowForKeys.Clear();
-        h.Now = h.Now.AddMinutes(20); // past the backoff
+        h.Now = h.Now.AddMinutes(20);
 
-        await h.RunCleanupAsync(); // brand new DbContext + store + job over the same root
+        await h.RunCleanupAsync();
         var afterRestart = await h.ReloadAsync(e.Id);
         Assert.NotNull(afterRestart.AttemptFilesCleanedAt);
         Assert.Null(afterRestart.ArtefactCleanupNextAttemptAt);
         Assert.Contains(key, h.Storage.DeletedKeys);
     }
 
-    // ----- Scenario 6 -----
     [Fact]
     public async Task A_Failed_Late_Upload_Recheck_Near_The_Window_Edge_Stays_Retryable_Past_Fourteen_Days()
     {
@@ -449,25 +432,23 @@ public class CleanUpOrganisationDataExportArtefactsJobTests
         e.MarkAttemptFilesCleaned(new DateTimeOffset(cleanedAt, TimeSpan.Zero));
         var lateKey = Orphan(e, "late.zip");
         h.Storage.AttemptKeys[e.Id] = [lateKey];
-        h.Storage.ThrowForKeys.Add(lateKey); // recheck delete fails
+        h.Storage.ThrowForKeys.Add(lateKey);
         await h.SeedAsync(e);
 
-        await h.RunCleanupAsync(); // recheck fails -> cursor set, still inside the window
+        await h.RunCleanupAsync();
         var afterFail = await h.ReloadAsync(e.Id);
         Assert.NotNull(afterFail.LateUploadRecheckNextAt);
         Assert.Equal(1, afterFail.LateUploadRecheckAttemptCount);
 
-        // Move well past the 14-day window and let the delete succeed this time.
-        h.Now = h.Now.AddDays(3); // cleanedAt is now 16 days old
+        h.Now = h.Now.AddDays(3);
         h.Storage.ThrowForKeys.Clear();
 
-        await h.RunCleanupAsync(); // row is still selected because its cursor is non-null
+        await h.RunCleanupAsync();
         var afterResolve = await h.ReloadAsync(e.Id);
         Assert.Contains(lateKey, h.Storage.DeletedKeys);
-        Assert.Null(afterResolve.LateUploadRecheckNextAt); // success outside window stops the recheck
+        Assert.Null(afterResolve.LateUploadRecheckNextAt);
     }
 
-    // ----- Scenario 7 -----
     [Fact]
     public async Task A_Legal_Hold_Removed_Makes_A_Previously_Skipped_Export_Processable_On_A_Later_Run()
     {
@@ -488,20 +469,17 @@ public class CleanUpOrganisationDataExportArtefactsJobTests
         Assert.Contains(Orphan(e, "a.zip"), h.Storage.DeletedKeys);
     }
 
-    // ----- Scenario 8 -----
     [Fact]
     public async Task A_Previously_Cleaned_Completed_Export_That_Expires_Has_Its_Remaining_Files_Removed()
     {
         var h = new RealHarness();
         var publishedKey = "organisation-exports/x/published.zip";
-        var e = NewTerminal(Guid.NewGuid(), "Completed", h.Now.AddDays(-10), publishedKey); // expires Now-3d
+        var e = NewTerminal(Guid.NewGuid(), "Completed", h.Now.AddDays(-10), publishedKey);
         e.MarkAttemptFilesCleaned(new DateTimeOffset(h.Now.AddDays(-9), TimeSpan.Zero));
         var leftover = Orphan(e, "leftover.zip");
         h.Storage.AttemptKeys[e.Id] = [publishedKey, leftover];
         await h.SeedAsync(e);
 
-        // The artefact-cleanup cursor won't re-pick an already-cleaned row; the expiry purge re-lists
-        // and removes everything that is still in storage.
         await h.RunPurgeExpiredAsync();
 
         var reloaded = await h.ReloadAsync(e.Id);
@@ -510,7 +488,6 @@ public class CleanUpOrganisationDataExportArtefactsJobTests
         Assert.Contains(publishedKey, h.Storage.DeletedKeys);
     }
 
-    // ----- Scenario 9 -----
     [Fact]
     public async Task Active_Exports_And_Retained_Published_Archives_Are_Never_Touched()
     {

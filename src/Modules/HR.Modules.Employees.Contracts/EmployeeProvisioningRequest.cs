@@ -23,11 +23,6 @@ public sealed record EmployeeProvisioningRequest(
     string? City = null,
     string? County = null,
     string? PostCode = null,
-    /// <summary>
-    /// NFR-08: stable idempotency key for this provisioning. When the calling workflow is retried
-    /// after a partial failure, supplying the same value guarantees the same employee is returned
-    /// instead of a duplicate being created. Format: "&lt;source&gt;:&lt;entity&gt;:&lt;id&gt;".
-    /// </summary>
     string? SourceReference = null,
     /// <summary>
     /// Ticket 2: agreed compensation for an automated hire (candidate offer accepted). When

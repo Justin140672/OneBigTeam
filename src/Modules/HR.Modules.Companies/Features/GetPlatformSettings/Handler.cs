@@ -9,11 +9,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Companies.Features.GetPlatformSettings;
 
-/// <summary>
-/// Lazy-seeds the singleton PlatformSettings row (see PlatformSettings.SingletonId remarks) on
-/// first read, so the Admin Portal settings screen always has a row to display even before any
-/// administrator has ever saved a change.
-/// </summary>
 internal sealed class GetPlatformSettingsHandler(PlatformDbContext dbContext, IClock clock)
 {
     public async Task<Result<GetPlatformSettingsResponse>> HandleAsync(

@@ -13,14 +13,9 @@ public sealed record OffboardingOverviewModel(
     bool IsBackdated,
     bool RequiresHrReconciliation,
     bool HasIncompleteOffboardingAtDeparture,
-    // OFF-07: server-computed (OffboardingProgressCalculator) — display these directly rather than
-    // recomputing locally, so progress can never drift from the Reporting module's own numbers.
     int TotalTasks,
     int ResolvedTasks,
     int ProgressPercent,
-    // SPEC-OFF-01: server-calculated (OffboardingProgressCalculator) "X of Y required" / "X of Y
-    // total" obligation counts, excluding Cancelled obligations from both. Never recompute these
-    // client-side.
     int RequiredObligationsTotal,
     int RequiredObligationsResolved,
     int TotalObligationsCount,
@@ -46,11 +41,6 @@ public sealed record OffboardingTaskOverviewItem(
     Guid? OpenTaskId,
     Guid? AssetAssignmentId);
 
-// Section 7 of the leaving/offboarding workspace: distinguishes "no offboarding plan exists yet"
-// (a legitimate empty state — e.g. leaving process not started, or setup still pending) from
-// "we couldn't load the plan" (Failed) due to a network/server error. Exactly one of
-// Failed/(Overview != null) is true when the request completes; Overview.HasPlan == false is the
-// no-plan-yet case.
 public sealed record OffboardingOverviewLookupResult(OffboardingOverviewModel? Overview, bool Failed)
 {
     public static OffboardingOverviewLookupResult SuccessResult(OffboardingOverviewModel? overview) => new(overview, false);

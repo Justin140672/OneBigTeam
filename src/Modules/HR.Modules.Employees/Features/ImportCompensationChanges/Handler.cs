@@ -48,11 +48,6 @@ internal sealed class ImportCompensationChangesHandler(
             return ImportCompensationChangesOutcome.ValidationFailed(
                 [new CompensationImportRowError(0, "The file contains no data rows.")]);
 
-        // Employee.EmployeeNumber is always normalized to uppercase at write time (mirrors the
-        // WorkEmail convention), so the searched values must be uppercased too before the
-        // database comparison below — a raw .Contains() translates to a case-sensitive SQL IN,
-        // and would silently match nothing for a row whose EmployeeNumber was typed in any other
-        // case even though employeesByNumber's own lookup is case-insensitive.
         var employeeNumbers = parsedRows
             .Select(r => r.EmployeeNumber)
             .Where(n => !string.IsNullOrWhiteSpace(n))
@@ -94,11 +89,6 @@ internal sealed class ImportCompensationChangesHandler(
             if (string.IsNullOrWhiteSpace(row.NewSalary) || !decimal.TryParse(row.NewSalary, out salary) || salary <= 0)
                 errors.Add("New Salary must be a number greater than 0.");
 
-            // Salary Frequency is inherited from the employee's existing open compensation record —
-            // HR can only change the salary amount via bulk import, never the pay frequency, and the
-            // row's own Salary Frequency column is reference-only and never validated as user input.
-            // Employees with no existing open compensation record (e.g. a brand-new hire) have no
-            // frequency to inherit from and cannot be processed via this import.
             var salaryType = default(SalaryType);
             if (employeeId != Guid.Empty)
             {
@@ -164,10 +154,6 @@ internal sealed class ImportCompensationChangesHandler(
         var items = new List<ImportedCompensationItem>();
         var pendingAuditEvents = new List<(ValidatedRow Row, Compensation Record, Compensation? Previous)>();
 
-        // Entire import is written in a single transaction: every row has already been validated
-        // above (including intra-file duplicate checks), and CompensationRecordWriter re-validates
-        // the overlap-with-existing-records rule as each row is written. Any write failure rolls
-        // back the whole import — nothing is left partially applied.
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         foreach (var row in validatedRows)

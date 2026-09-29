@@ -17,9 +17,6 @@ internal sealed class UpdateLeaveTypeHandler(LeaveDbContext db, IClock clock, IA
         if (entity is null)
             return Result.Failure<UpdateLeaveTypeResponse>(Error.NotFound("Leave type not found."));
 
-        // System leave types (e.g. Annual Leave — see LeaveType.IsSystem) can never be renamed;
-        // every other field (code, default entitlement, accrual method, behaviour, tracks-balance)
-        // remains editable. Matches item 50's "not renamable" product decision.
         if (entity.IsSystem && !string.Equals(request.Name, entity.Name, StringComparison.Ordinal))
             return Result.Failure<UpdateLeaveTypeResponse>(
                 Error.Conflict($"'{entity.Name}' is a system leave type and cannot be renamed."));

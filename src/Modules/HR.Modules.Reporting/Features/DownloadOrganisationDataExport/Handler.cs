@@ -23,8 +23,6 @@ internal sealed class DownloadOrganisationDataExportHandler(
         var export = await db.OrganisationDataExports
             .SingleOrDefaultAsync(e => e.Id == request.ExportId, cancellationToken);
 
-        // Any mismatch (missing, wrong company, not completed, expired) is reported as a flat 404 so
-        // the endpoint never discloses the existence of another company's export.
         if (export is null
             || export.CompanyId != request.CompanyId
             || export.Status != OrganisationDataExport.StatusCompleted

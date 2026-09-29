@@ -31,7 +31,6 @@ public class ApplicationInternalAppointmentTests
         Assert.Equal(application.InternalAppointmentSourceReference, application.InternalAppointmentSourceReference);
     }
 
-    // ---- Begin ----
 
     [Fact]
     public void Begin_Sets_Pending_And_Requester()
@@ -97,7 +96,6 @@ public class ApplicationInternalAppointmentTests
         Assert.Equal(InternalAppointmentStatus.Completed, application.AppointmentStatus);
     }
 
-    // ---- Abandon ----
 
     [Fact]
     public void Abandon_Clears_Pending_Appointment()
@@ -159,7 +157,6 @@ public class ApplicationInternalAppointmentTests
         Assert.False(application.AbandonInternalAppointment(Now));
     }
 
-    // ---- Complete ----
 
     [Fact]
     public void Complete_Moves_To_Hired_And_Records_Promotion()

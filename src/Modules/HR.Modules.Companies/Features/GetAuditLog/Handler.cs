@@ -39,8 +39,6 @@ internal sealed class GetAuditLogHandler(
             var matchedActorIds = await userEmailDirectoryReader.FindUserIdsByEmailAsync(
                 request.AdministratorEmail, cancellationToken);
 
-            // No administrator email matches at all — short-circuit to an empty page rather than
-            // an unfiltered actorUserIds set (which GetPlatformAuditLogAsync treats as "no filter").
             if (matchedActorIds.Count == 0)
             {
                 return Result.Success(new GetAuditLogResponse(

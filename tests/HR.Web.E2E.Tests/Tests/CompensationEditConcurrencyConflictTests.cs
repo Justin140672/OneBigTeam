@@ -46,7 +46,6 @@ public sealed class CompensationEditConcurrencyConflictTests(HrAdminPersonaFixtu
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // ── Arrange: fresh employee with a single future-dated compensation record ──
         var empEdit = await CreateFreshEmployeeOnCompensationTabAsync();
 
         await empEdit.ClickAddCompensationAsync();
@@ -58,13 +57,11 @@ public sealed class CompensationEditConcurrencyConflictTests(HrAdminPersonaFixtu
 
         var employeeId = ExtractEmployeeId(_page.Url);
 
-        // ── Tab 1: open the Edit dialog for the future record (loads Version v1) ──
         await empEdit.ClickEditCompensationRowAsync(RowFragment);
         var dialog = new EditFutureCompensationDialog(_page);
         await dialog.WaitForOpenAsync();
         await dialog.FillSalaryAsync(finalSalary);
 
-        // ── Tab 2 (same context / persona): open the same row's Edit dialog and save first ──
         var otherPage = await _context.NewPageAsync();
         try
         {
@@ -83,7 +80,6 @@ public sealed class CompensationEditConcurrencyConflictTests(HrAdminPersonaFixtu
             await otherPage.CloseAsync();
         }
 
-        // ── Tab 1: saving now is stale → conflict banner, dialog stays open, input preserved ──
         await dialog.SubmitExpectingConflictAsync();
 
         Assert.True(await dialog.IsConcurrencyWarningVisibleAsync(),
@@ -92,14 +88,12 @@ public sealed class CompensationEditConcurrencyConflictTests(HrAdminPersonaFixtu
             "The Edit Future Compensation dialog should stay open after a concurrency conflict");
         Assert.Equal(finalSalary, await dialog.GetSalaryValueAsync());
 
-        // ── Tab 1: "Reload latest values" clears the banner and adopts the other tab's value ──
         await dialog.ClickReloadLatestValuesAsync();
 
         Assert.False(await dialog.IsConcurrencyWarningVisibleAsync(),
             "Expected the conflict banner to clear after reloading latest values");
         Assert.Equal(otherTabSalary, await dialog.GetSalaryValueAsync());
 
-        // ── Tab 1: re-edit against the fresh version and save successfully ──
         await dialog.FillSalaryAsync(finalSalary);
         await dialog.SubmitExpectingSuccessAsync();
 
@@ -110,11 +104,6 @@ public sealed class CompensationEditConcurrencyConflictTests(HrAdminPersonaFixtu
         Assert.Contains("60,000.00", rowText);
     }
 
-    /// <summary>
-    /// Creates a fresh, uniquely-named Acme employee and lands on their Compensation History tab.
-    /// Mirrors EmployeeCompensationTabTests.CreateFreshEmployeeOnCompensationTabAsync — a fresh
-    /// employee has no seeded compensation record and is not contended by other parallel tests.
-    /// </summary>
     private async Task<EmployeeEditPage> CreateFreshEmployeeOnCompensationTabAsync()
     {
         var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
@@ -144,11 +133,6 @@ public sealed class CompensationEditConcurrencyConflictTests(HrAdminPersonaFixtu
         return empEdit;
     }
 
-    /// <summary>
-    /// Pulls the employee GUID out of the current /companies/{companyId}/employees/{employeeId}
-    /// URL (optionally suffixed with /view or a query string) so the second tab can navigate
-    /// straight to the same employee.
-    /// </summary>
     private static Guid ExtractEmployeeId(string url)
     {
         var match = System.Text.RegularExpressions.Regex.Match(

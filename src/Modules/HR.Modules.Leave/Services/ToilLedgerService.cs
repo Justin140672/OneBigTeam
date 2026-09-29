@@ -5,32 +5,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Services;
 
-/// <summary>
-/// Owns the TOIL ledger's FIFO consumption, cancellation-reversal and expiry algorithms
-/// (LEAVE-06). Every TOIL balance change is represented as a typed <see cref="ToilTransaction"/>;
-/// this service is the single place that writes Used/Adjusted(reversal)/Expired rows so the
-/// ledger stays internally consistent and the aggregate <see cref="LeaveBalance"/> row (kept for
-/// display/reporting) is updated in lockstep with the ledger, in the same unit of work.
-///
-/// "Bucket" = an Earned transaction. Its remaining amount is its own Days minus everything drawn
-/// against it (Used/Expired transactions whose RelatedTransactionId points at it) plus anything
-/// reversed back into it (Adjusted reversal transactions whose RelatedTransactionId points at it).
-/// Buckets are consumed oldest-earned-first (FIFO), skipping buckets that have already expired.
-///
-/// This is a module-owned domain service (mirrors <c>LeaveYearRolloverService</c>), not a generic
-/// repository - it operates entirely through the module's own <see cref="LeaveDbContext"/> and is
-/// invoked from feature handlers (ApproveLeaveRequest, CancelLeaveRequest) and the TOIL expiry job.
-/// </summary>
 internal sealed class ToilLedgerService(LeaveDbContext dbContext)
 {
-    /// <summary>
-    /// Consumes <paramref name="amountDays"/> of TOIL for <paramref name="employeeId"/>, walking
-    /// non-expired Earned buckets oldest-first and splitting across as many buckets as necessary.
-    /// Fails with a validation error if the employee's available TOIL is insufficient and
-    /// <paramref name="allowNegativeBalance"/> is false; when true and insufficient, the shortfall
-    /// is drawn from the single oldest bucket (or a synthetic overdraw if there are no buckets at
-    /// all) so the ledger still records where the deficit came from.
-    /// </summary>
     public async Task<Result<ToilConsumptionResult>> ConsumeAsync(
         Guid companyId,
         Guid employeeId,
@@ -92,9 +68,6 @@ internal sealed class ToilLedgerService(LeaveDbContext dbContext)
             remainingToConsume -= takeFromBucket;
         }
 
-        // Allowed overdraw beyond every known bucket - record it against the oldest balance row
-        // (or the only one available) so it is still visible in that balance's history, even
-        // though there is no specific Earned bucket left to attribute it to.
         if (remainingToConsume > 0)
         {
             var fallbackBalance = balances.OrderBy(b => b.PolicyYear).First();
@@ -103,7 +76,7 @@ internal sealed class ToilLedgerService(LeaveDbContext dbContext)
                 companyId,
                 employeeId,
                 fallbackBalance.Id,
-                bucketTransactionId: null, // no source bucket - overdraw beyond every known award
+                bucketTransactionId: null,
                 sourceLeaveRequestId,
                 actorEmployeeId,
                 remainingToConsume,
@@ -120,13 +93,6 @@ internal sealed class ToilLedgerService(LeaveDbContext dbContext)
         return Result.Success(new ToilConsumptionResult(created));
     }
 
-    /// <summary>
-    /// Reverses every Used transaction previously recorded against <paramref name="leaveRequestId"/>
-    /// that has not already been reversed, restoring the correct buckets so future FIFO consumption
-    /// remains correct. Idempotent: transactions that already have a matching reversal
-    /// (ReversesTransactionId) are skipped, so calling this twice for the same request is a no-op
-    /// on the second call.
-    /// </summary>
     public async Task<ToilReversalResult> ReverseAsync(
         Guid companyId,
         Guid employeeId,
@@ -230,7 +196,6 @@ internal sealed class ToilLedgerService(LeaveDbContext dbContext)
         var buckets = new List<ToilBucket>();
         foreach (var bucket in earned)
         {
-            // Expired buckets are never available for further consumption.
             if (bucket.ExpiresOn.HasValue && bucket.ExpiresOn.Value <= asOf)
                 continue;
 

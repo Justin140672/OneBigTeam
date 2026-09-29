@@ -1,10 +1,5 @@
 namespace HR.SharedKernel;
 
-/// <summary>
-/// AUD-04: classifies the origin of an audit event so the publisher can validate that
-/// human-triggered operations supply an actor and background operations are explicitly
-/// acknowledged as system-originated.
-/// </summary>
 public enum AuditActorType
 {
     /// <summary>
@@ -14,27 +9,11 @@ public enum AuditActorType
     /// </summary>
     Human = 0,
 
-    /// <summary>
-    /// A scheduled background job or Hangfire recurring task triggered the operation.
-    /// No user actor is expected; a recognisable job identifier should appear in the Summary.
-    /// </summary>
     ScheduledJob = 1,
 
-    /// <summary>
-    /// An integration event handler processed a cross-module event.
-    /// No user actor is expected; the originating event/correlation context identifies the source.
-    /// </summary>
     IntegrationHandler = 2,
 
-    /// <summary>
-    /// A platform support session action taken on behalf of a tenant.
-    /// Both the support actor and the tenant context should be identifiable via the event payload.
-    /// </summary>
     SupportSession = 3,
 
-    /// <summary>
-    /// An unauthenticated public request (e.g. self-service signup or invitation acceptance) for
-    /// which no user or employee identity exists yet. No actor is expected.
-    /// </summary>
     Anonymous = 4,
 }

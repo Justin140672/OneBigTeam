@@ -9,10 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Story 4 — the anonymous marketing feed for the configurable subscription pricing model.
-/// No authentication; returns the default bands when the singleton has never been seeded.
-/// </summary>
 [Collection("Integration")]
 public class GetPublicSubscriptionPricingEndpointTests
 {

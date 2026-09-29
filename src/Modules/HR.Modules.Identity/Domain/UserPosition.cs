@@ -8,10 +8,6 @@ internal sealed class UserPosition
     public Guid PositionId { get; private set; }
     public DateTimeOffset AssignedAt { get; private set; }
 
-    /// <summary>
-    /// When set, the position assignment expires and no longer grants roles after this point.
-    /// Null means the assignment is open-ended.
-    /// </summary>
     public DateTimeOffset? ExpiresAt { get; private set; }
 
     public static UserPosition Create(

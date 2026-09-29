@@ -6,11 +6,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Infrastructure.Tests.Email;
 
-/// <summary>
-/// Defence-in-depth: the live Postmark senders must never dispatch to a permanently-undeliverable
-/// (RFC 2606 reserved, or this app's *.example seed personas) address — a guaranteed hard bounce
-/// that degrades the sending domain's reputation.
-/// </summary>
 public class PostmarkRecipientGuardTests
 {
     [Theory]

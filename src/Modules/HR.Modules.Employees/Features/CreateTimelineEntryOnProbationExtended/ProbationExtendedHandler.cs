@@ -4,11 +4,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Employees.Features.CreateTimelineEntryOnProbationExtended;
 
-/// <summary>
-/// PROB-07: completes the "add timeline events for extended and failed outcomes" requirement.
-/// Summary carries only the new expected end date (a non-sensitive, structured fact) — never the
-/// free-text extension reason recorded on the probation record.
-/// </summary>
 internal sealed class ProbationExtendedHandler(
     IEmployeeTimelineWriter timelineWriter) : IIntegrationEventHandler<ProbationExtendedIntegrationEvent>
 {

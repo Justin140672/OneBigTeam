@@ -25,8 +25,6 @@ public class CompanyDefaultDataSeederTests
         Assert.Equal(1, await context.Departments.CountAsync(d => d.CompanyId == companyId));
         Assert.Equal(1, await context.LocationTypes.CountAsync(lt => lt.CompanyId == companyId));
         Assert.Equal(1, await context.Locations.CountAsync(l => l.CompanyId == companyId));
-        // Full default set (Permanent, Fixed Term, Contractor, Casual, Apprentice) — matches the
-        // dev/E2E seed data's canonical Employment Types, not a single placeholder type.
         Assert.Equal(5, await context.EmploymentTypes.CountAsync(et => et.CompanyId == companyId));
         Assert.Equal(1, await context.PositionProfiles.CountAsync(pp => pp.CompanyId == companyId));
     }
@@ -61,9 +59,6 @@ public class CompanyDefaultDataSeederTests
         Assert.Equal(locationType.Id, location.LocationTypeId);
         Assert.Equal("Office", locationType.Name);
 
-        // The returned EmploymentTypeId is the "Permanent" one — the default assigned to the
-        // admin employee created immediately after this returns (same role "Full-time" used to
-        // play before the full default set was added).
         var employmentType = await context.EmploymentTypes.SingleAsync(et => et.Id == result.EmploymentTypeId);
         Assert.Equal("Permanent", employmentType.Name);
 
@@ -120,8 +115,6 @@ public class CompanyDefaultDataSeederTests
     [Fact]
     public async Task SeedDefaultsAsync_Calls_LeaveType_SicknessCategory_And_DocumentType_DefaultsProvisioners()
     {
-        // Closes a real gap: a brand-new company previously got no default Leave Types, Sickness
-        // Categories, or Document Types at all — only these three provisioners fixed that.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var leaveTypeProvisioner = new FakeLeaveTypeDefaultsProvisioner();

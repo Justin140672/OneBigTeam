@@ -5,11 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// GET .../companies/{companyId}/notifications/unread-count — the badge count for the current
-/// user. Gated by <c>role:employee</c>; the count reflects only unread notifications for the
-/// authenticated employee in the route company.
-/// </summary>
 [Collection("Integration")]
 public class GetUnreadNotificationCountEndpointTests
 {
@@ -60,7 +55,6 @@ public class GetUnreadNotificationCountEndpointTests
         await TaskSeeder.SeedAsync(_factory, companyId, "Unread B", assignedEmployeeId: userId);
         await TaskSeeder.SeedAsync(_factory, companyId, "Will be read", assignedEmployeeId: userId);
 
-        // Mark one of the three read via the real endpoint.
         var myList = await client.GetFromJsonAsync<MyPayload>(MyUrl(companyId));
         var toRead = myList!.Items.First().Id;
         var markResp = await client.PutAsJsonAsync(
@@ -95,7 +89,6 @@ public class GetUnreadNotificationCountEndpointTests
         var companyB = Guid.NewGuid();
         var userId   = Guid.NewGuid();
 
-        // Same user has an unread notification in company B only.
         await TaskSeeder.SeedAsync(_factory, companyB, "Company B notification", assignedEmployeeId: userId);
 
         using var clientA = await ClientFor(companyA, userId);

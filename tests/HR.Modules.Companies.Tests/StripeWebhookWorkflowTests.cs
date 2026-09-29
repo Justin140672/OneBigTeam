@@ -45,8 +45,6 @@ public class StripeWebhookWorkflowTests
 
         var gateway = new FakeStripeGateway
         {
-            // Stripe.net raises StripeException from EventUtility.ConstructEvent on a bad signature;
-            // the fake stands in for that with an equivalent throw before returning any event.
             ExceptionToThrowOnConstructEvent = new InvalidOperationException("Invalid Stripe signature."),
         };
         var handler = new StripeWebhookHandler(context, gateway, new FakeClock(Now), NullLogger<StripeWebhookHandler>.Instance);
@@ -54,13 +52,11 @@ public class StripeWebhookWorkflowTests
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => handler.HandleAsync("payload", "t=1,v1=bad", CancellationToken.None));
 
-        // Nothing was looked up or mutated: subscription still on Trial, no Stripe ids written.
         var persisted = await FreshContext(context).CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
         Assert.Equal(SubscriptionStatus.Trial, persisted.Status);
         Assert.Null(persisted.StripeCustomerId);
     }
 
-    // --- Unknown event types are ignored: no throw, no state change ----------------------------
 
     [Fact]
     public async Task Unknown_Event_Type_Is_Ignored_With_No_State_Change()
@@ -83,10 +79,9 @@ public class StripeWebhookWorkflowTests
 
         var persisted = await FreshContext(context).CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
         Assert.Equal(SubscriptionStatus.Active, persisted.Status);
-        Assert.Equal(new DateTimeOffset(Now), persisted.UpdatedAt); // untouched
+        Assert.Equal(new DateTimeOffset(Now), persisted.UpdatedAt);
     }
 
-    // --- Duplicate delivery: the business change is applied at most once -----------------------
 
     [Fact]
     public async Task Duplicate_CheckoutCompleted_Delivery_Transitions_Subscription_Only_Once()
@@ -98,7 +93,6 @@ public class StripeWebhookWorkflowTests
 
         var gateway = new FakeStripeGateway { WebhookEventToReturn = CheckoutCompleted(companyId) };
 
-        // First delivery activates.
         var firstClock = new FakeClock(Now.AddMinutes(1));
         await new StripeWebhookHandler(context, gateway, firstClock, NullLogger<StripeWebhookHandler>.Instance)
             .HandleAsync("payload", "sig", CancellationToken.None);
@@ -107,8 +101,6 @@ public class StripeWebhookWorkflowTests
         Assert.Equal(SubscriptionStatus.Active, afterFirst.Status);
         var updatedAtAfterFirst = afterFirst.UpdatedAt;
 
-        // Stripe re-delivers the identical event (at-least-once delivery). Re-applying
-        // ActivateSubscription is idempotent — still exactly one Active subscription, same ids.
         await new StripeWebhookHandler(context, gateway, new FakeClock(Now.AddMinutes(2)), NullLogger<StripeWebhookHandler>.Instance)
             .HandleAsync("payload", "sig", CancellationToken.None);
 
@@ -118,7 +110,6 @@ public class StripeWebhookWorkflowTests
         Assert.Equal("cus_1", afterSecond.StripeCustomerId);
         Assert.Equal("sub_1", afterSecond.StripeSubscriptionId);
         Assert.False(afterSecond.CancelAtPeriodEnd);
-        // The replay did not re-run the trial->active transition (no new row, no id churn).
         Assert.True(afterSecond.UpdatedAt >= updatedAtAfterFirst);
     }
 
@@ -150,15 +141,10 @@ public class StripeWebhookWorkflowTests
         Assert.True(persisted.CancelAtPeriodEnd);
     }
 
-    // --- Out-of-order delivery ---------------------------------------------------------------
 
     [Fact]
     public async Task Out_Of_Order_Delivery_Older_Update_After_Newer_Clobbers_State_LastWriteWins()
     {
-        // Documents CURRENT behaviour: StripeWebhookHandler applies customer.subscription.updated
-        // unconditionally (no event-timestamp / period-end guard), so a late-arriving OLDER event
-        // overwrites newer state. If Stripe event ordering guarantees are ever relied upon this
-        // test should flip to asserting the newer state is retained.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var sub = CustomerSubscription.StartTrial(companyId, new DateTimeOffset(Now), 14);
@@ -176,7 +162,6 @@ public class StripeWebhookWorkflowTests
         await new StripeWebhookHandler(context, gateway, new FakeClock(Now.AddDays(1)), NullLogger<StripeWebhookHandler>.Instance)
             .HandleAsync("payload", "sig", CancellationToken.None);
 
-        // Older event (past_due, scheduled to cancel) arrives late.
         gateway.WebhookEventToReturn = SubscriptionUpdated("cus_1", "sub_1", "past_due", olderPeriodEnd, cancelAtPeriodEnd: true);
         await new StripeWebhookHandler(context, gateway, new FakeClock(Now.AddDays(2)), NullLogger<StripeWebhookHandler>.Instance)
             .HandleAsync("payload", "sig", CancellationToken.None);
@@ -187,7 +172,6 @@ public class StripeWebhookWorkflowTests
         Assert.True(persisted.CancelAtPeriodEnd);
     }
 
-    // --- Gateway failure inside the webhook path --------------------------------------------
 
     [Fact]
     public async Task Gateway_Failure_During_Event_Construction_Propagates_And_Persists_Nothing()
@@ -210,7 +194,6 @@ public class StripeWebhookWorkflowTests
         Assert.Equal(SubscriptionStatus.Trial, persisted.Status);
     }
 
-    // --- Redaction: sensitive Stripe identifiers are not written to logs --------------------
 
     [Fact]
     public async Task Unmatched_Event_Warning_Log_Does_Not_Contain_Raw_Payload_Or_Card_Data()
@@ -231,10 +214,6 @@ public class StripeWebhookWorkflowTests
         Assert.DoesNotContain("4242424242424242", logged);
         Assert.DoesNotContain("\"cvc\"", logged);
         Assert.DoesNotContain(rawPayload, logged);
-        // NOTE (finding): the unmatched-subscription warning DOES include StripeCustomerId /
-        // StripeSubscriptionId as structured log fields. Those are Stripe object handles (not PANs,
-        // CVCs or PII) and are the only correlation key available for diagnosing a missing local
-        // row, so this is asserted as acceptable current behaviour rather than a redaction defect.
         Assert.Contains("no matching customer_subscriptions row", logged);
     }
 
@@ -248,8 +227,6 @@ public class StripeWebhookWorkflowTests
         return new CompaniesDbContext(options);
     }
 
-    // Re-open the same in-memory store with a fresh context so assertions read persisted state,
-    // not tracked entities left in the handler's context.
     private CompaniesDbContext FreshContext(CompaniesDbContext existing) => BuildContext();
 
     private sealed class CapturingLogger<T> : ILogger<T>

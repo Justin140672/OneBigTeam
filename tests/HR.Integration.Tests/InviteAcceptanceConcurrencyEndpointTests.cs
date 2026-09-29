@@ -44,7 +44,6 @@ public class InviteAcceptanceConcurrencyEndpointTests
         return client;
     }
 
-    // ── 1 & 2: keyed / unkeyed CancelInvite races a concurrent AcceptInvite ─────────────────────────
 
     [Fact]
     public async Task Keyed_Cancel_Vs_Accept_Race_Never_500s_And_Exactly_One_Side_Commits()
@@ -86,7 +85,6 @@ public class InviteAcceptanceConcurrencyEndpointTests
         var acceptWon = acceptResponse.StatusCode == HttpStatusCode.OK;
         var cancelWon = cancelResponse.StatusCode == HttpStatusCode.OK;
 
-        // Exactly one side actually committed its transition - never both, never neither.
         Assert.True(acceptWon ^ cancelWon, $"cancel={cancelResponse.StatusCode}, accept={acceptResponse.StatusCode}");
 
         using var verifyScope = _factory.Services.CreateScope();
@@ -163,7 +161,6 @@ public class InviteAcceptanceConcurrencyEndpointTests
         }
     }
 
-    // ── 3 & 5: two concurrent first-time AcceptInvite requests racing to create the operation ──────
 
     [Fact]
     public async Task Two_Concurrent_First_Time_Accepts_For_Same_Invite_Exactly_One_Operation_And_Profile_Created()
@@ -199,7 +196,6 @@ public class InviteAcceptanceConcurrencyEndpointTests
 
         var succeeded = new[] { responseA, responseB }.Count(r => r.StatusCode == HttpStatusCode.OK);
         Assert.Equal(1, succeeded);
-        // The loser gets a controlled conflict, not necessarily identical wording to the winner's.
         var loser = responseA.StatusCode == HttpStatusCode.OK ? responseB : responseA;
         Assert.Equal(HttpStatusCode.Conflict, loser.StatusCode);
 
@@ -249,15 +245,11 @@ public class InviteAcceptanceConcurrencyEndpointTests
         var winningPassword = aWon ? passwordA : passwordB;
         var losingPassword = aWon ? passwordB : passwordA;
 
-        // Only the winner's password ever reached CreateConfirmedUserAsync - the loser never touched
-        // Supabase at all (it lost before ever getting there), so its password never had any chance
-        // to silently override the winner's.
         Assert.Contains(_factory.SupabaseAuthGateway.ConfirmedUsersCreated, u => u.Email == email && u.Password == winningPassword);
         Assert.DoesNotContain(_factory.SupabaseAuthGateway.ConfirmedUsersCreated, u => u.Email == email && u.Password == losingPassword);
         Assert.Single(_factory.SupabaseAuthGateway.ConfirmedUsersCreated, u => u.Email == email);
     }
 
-    // ── 4: two concurrent Accepts racing AFTER Supabase provisioning already resolved ────────────────
 
     [Fact]
     public async Task Two_Concurrent_Accepts_Racing_After_Supabase_Already_Resolved_No_Duplicate_Profile_Or_Roles()
@@ -275,10 +267,6 @@ public class InviteAcceptanceConcurrencyEndpointTests
             var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
             token = (await db.UserInvites.SingleAsync(i => i.Id == inviteId)).Token;
 
-            // Pre-seed a Pending operation so both concurrent requests take the "operation already
-            // exists" branch and go straight to resolving the (already-provisioned) Supabase user,
-            // reaching the UserProfile insert race directly rather than the operation-creation race
-            // covered by the tests above.
             var operation = InviteAcceptanceOperation.CreatePending(
                 Guid.NewGuid(), inviteId, companyId, employeeId, email, DateTimeOffset.UtcNow);
             operationId = operation.Id;
@@ -330,25 +318,6 @@ public class InviteAcceptanceConcurrencyEndpointTests
         Assert.Equal(InviteAcceptanceOperation.StatusCompleted, winnerOperation.Status);
     }
 
-    // ── 26a-c: CancelInvite wins the atomic-commit race at various points inside AcceptInvite's ────
-    // single CommitLocalAcceptanceAsync transaction ─────────────────────────────────────────────────
-    //
-    // CommitLocalAcceptanceAsync issues its UserProfile insert, its UserRole insert(s), and its
-    // user_invites UPDATE all inside ONE explicit transaction driven by a SINGLE
-    // db.SaveChangesAsync(ct) call - there is no application-level pause between those statements
-    // for CancelInvite's own (single-statement, autocommitting) UPDATE to slot in "between" them.
-    // The only SQL statement CancelInvite and AcceptInvite ever actually contend on is the
-    // user_invites UPDATE itself (both pin/compare UserInvite.Version), so that is the one place
-    // SqlCommandBarrier can force a genuine two-sided Postgres race - by the time AcceptInvite's
-    // connection dispatches that UPDATE, its profile insert and every role insert for this
-    // SaveChangesAsync call have already been sent ahead of it in the same batch. Varying the
-    // invite's seeded state (fresh profile vs. multi-role vs. both) below is what actually
-    // distinguishes the (a)/(b)/(c)/(d) scenarios from the ticket description, since there is no
-    // earlier common barrier point to force them apart at. This also means the barrier's
-    // simultaneous release does not, by itself, guarantee which side's UPDATE Postgres serializes
-    // first - RaceUntilCancelWinsAsync below retries with a fresh employee/invite pair until
-    // cancellation is the side observed to win, capped so a persistent failure to ever see
-    // cancellation win still fails loudly rather than looping forever.
     private const int MaxCancelWinRaceAttempts = 20;
 
     private async Task<(HttpResponseMessage CancelResponse, HttpResponseMessage AcceptResponse, Guid EmployeeId, Guid InviteId)>
@@ -412,10 +381,6 @@ public class InviteAcceptanceConcurrencyEndpointTests
         Assert.True(invite.IsCancelled);
         Assert.False(invite.IsClaimed);
 
-        // The operation (created during AcceptInvite's Supabase-provisioning step, before the atomic
-        // commit) must be left in a recoverable state for the reconciliation job, never Completed -
-        // the whole point of pinning the invite's Version inside CommitLocalAcceptanceAsync is that a
-        // losing AcceptInvite request's MarkCompleted() call never actually persists.
         var operation = await verifyDb.InviteAcceptanceOperations.AsNoTracking().SingleOrDefaultAsync(o => o.InviteId == inviteId);
         if (operation is not null)
         {
@@ -465,18 +430,9 @@ public class InviteAcceptanceConcurrencyEndpointTests
         Assert.Equal(HttpStatusCode.OK, cancelResponse.StatusCode);
         Assert.NotEqual(HttpStatusCode.OK, acceptResponse.StatusCode);
 
-        // roleIds.Contains asserts none of the THREE roles ended up assigned - not just the first.
         await AssertCancellationWonCleanlyAsync(employeeId, inviteId, roleIds);
     }
 
-    // Covers both (c) "cancellation wins after all roles are staged" and (d) "cancellation wins right
-    // as the final invite UPDATE is attempted" from a single test: as explained in the remarks above
-    // this method, those two scenarios target the exact same statement (the user_invites UPDATE is
-    // the only point where AcceptInvite and CancelInvite ever contend on the same row), so a second,
-    // near-identical test would only pad the suite rather than add coverage. This test additionally
-    // uses a fresh (no pre-existing) profile AND a multi-role invite together, so by the time the
-    // barrier fires every one of CommitLocalAcceptanceAsync's statements (profile insert, all role
-    // inserts, the invite UPDATE itself) has already been attempted in the same SaveChangesAsync call.
     [Fact]
     public async Task Cancellation_Wins_Right_As_The_Final_Invite_Update_Is_Attempted_For_A_Fresh_Multi_Role_Accept()
     {
@@ -500,7 +456,6 @@ public class InviteAcceptanceConcurrencyEndpointTests
         await AssertCancellationWonCleanlyAsync(employeeId, inviteId, roleIds);
     }
 
-    // ── 26d: multi-role acceptance is all-or-nothing under a concurrent cancellation ────────────────
 
     [Fact]
     public async Task Multi_Role_Accept_Racing_A_Cancellation_Is_All_Or_Nothing_Never_A_Partial_Role_Set()
@@ -557,7 +512,6 @@ public class InviteAcceptanceConcurrencyEndpointTests
         }
     }
 
-    // ── 6: reuse of a failed keyed cancellation key over HTTP ────────────────────────────────────────
 
     // Deliberately sequential (accept fully completes before the keyed cancel is even sent) rather
     // than racing via SqlCommandBarrier: a barrier-forced race can't guarantee which side wins, but
@@ -585,13 +539,10 @@ public class InviteAcceptanceConcurrencyEndpointTests
         var adminClient = await AdminClientAsync(companyId);
         var acceptClient = _factory.CreateClient();
 
-        // The invite is accepted (and therefore claimed) first...
         var acceptResponse = await acceptClient.PostAsJsonAsync(
             "/api/invites/accept", new { token, password = "SecurePass1!" });
         Assert.Equal(HttpStatusCode.OK, acceptResponse.StatusCode);
 
-        // ...then a keyed cancellation for the same invite arrives too late and must lose cleanly -
-        // never a 500, and (per the ticket's documented guarantee) no idempotency record committed.
         var cancelKey = $"cancel-httpreuse-{Guid.NewGuid():N}";
         var cancelRequest = BuildIdempotentPostRequest(
             $"/api/companies/{companyId}/invites/{inviteId}/cancel", new { }, cancelKey);
@@ -606,9 +557,6 @@ public class InviteAcceptanceConcurrencyEndpointTests
             Assert.False(await db.IdempotencyRecords.AnyAsync(r => r.Key == cancelKey));
         }
 
-        // Corrected retry: reuse the SAME Idempotency-Key against a different, genuinely-cancellable
-        // invite - must succeed rather than replaying the earlier failure or erroring as "key reused
-        // for a different request" (the earlier attempt never committed a record at all).
         var secondEmployeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId, "Second", "Employee");
         var secondEmail = $"key-reuse-2.{Guid.NewGuid():N}@example.com";
         var secondInviteId = await IdentityUserAdminTestHelpers.SeedInviteAsync(_factory, companyId, secondEmployeeId, secondEmail);

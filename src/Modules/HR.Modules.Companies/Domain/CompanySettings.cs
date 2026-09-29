@@ -70,34 +70,21 @@ internal sealed class CompanySettings
     public string? EmployeeNumberPrefix { get; private set; }
     public int NextEmployeeNumber { get; private set; }
 
-    // Enforced range is 1-10: 1 allows no zero-padding at all (e.g. "1"), while 10 digits is
-    // generous enough for any realistic company size without being an absurd column width.
     public int EmployeeNumberMinimumLength { get; private set; }
 
     public AssetNumberMode AssetNumberMode { get; private set; }
     public string? AssetNumberPrefix { get; private set; }
     public int NextAssetNumber { get; private set; }
 
-    // Same 1-10 rationale as EmployeeNumberMinimumLength.
     public int AssetNumberMinimumLength { get; private set; }
 
-    // SET-05: recruitment-workflow settings. Approvals default to off (false) and retention defaults
-    // to 730 days (2 years) so existing companies get backward-compatible, unchanged behaviour.
     public bool VacancyApprovalRequired { get; private set; }
     public bool OfferApprovalRequired { get; private set; }
     public int CandidateRetentionDays { get; private set; }
 
-    // SET-06: notification-channel settings. Both default to true (on) so existing behaviour is
-    // preserved for existing companies.
     public bool EmailNotificationsEnabled { get; private set; }
     public bool ScheduledRemindersEnabled { get; private set; }
 
-    // SET-07: configurable document expiry reminder schedule. Mirrors the ProbationCheckpointDay1/2/3
-    // pattern above — a fixed set of up to 3 nullable day-offset columns rather than a delimited/JSON
-    // column, since the schedule is always exactly "up to 3 reminder stages" (matching the existing
-    // Documents module's 3 fixed *SentAt tracking columns on EmployeeDocument). A null slot disables
-    // that stage; when set, values must be positive, unique and strictly decreasing
-    // (Day1 &gt; Day2 &gt; Day3) — enforced by UpdateDocumentReminderSettingsValidator.
     public bool DocumentRemindersEnabled { get; private set; }
     public int? DocumentReminderOffsetDays1 { get; private set; }
     public int? DocumentReminderOffsetDays2 { get; private set; }
@@ -106,10 +93,6 @@ internal sealed class CompanySettings
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    // SET-03: explicit, persisted optimistic-concurrency token. Incremented on every mutation
-    // below. A manual application-managed token (rather than EF's provider-generated
-    // IsRowVersion()/Postgres xmin) so the value is a plain, portable, persisted column that both
-    // company-settings and HR-settings updates share, since they mutate the same aggregate row.
     public int Version { get; private set; }
 
     public static CompanySettings CreateDefault(Guid companyId, DateTimeOffset now)
@@ -128,30 +111,13 @@ internal sealed class CompanySettings
             ExcludePublicHolidaysFromLeave = true,
             ExcludePublicHolidaysFromSickness = false,
             DisplaySalaryOnEmployeeProfile = false,
-            // Mandatory, no opt-out — every company requires fit-note evidence after a week of
-            // sickness and a return-to-work review after 1 day by default.
-            //
-            // SICK-05: ReturnToWorkRequiredAfterDays is confirmed as 1 working day (not the 3
-            // working days an earlier draft of the sickness spec described) — a lightweight
-            // "was this a real absence, does it need a chat" check is meant to happen almost
-            // immediately after any absence, not just longer ones. It is evaluated against
-            // SicknessRecord.TotalDays, which is a *working-day* count (see SicknessCalculator) —
-            // that is intentional and different from the calendar-day basis used for the fit-note
-            // threshold (see FitNoteEvaluator's doc comment). Confirmed decision recorded in
-            // specifications/product-specifications/00-current-product-decisions.md
-            // ("Sickness management").
             FitNoteRequiredAfterDays = 7,
             ReturnToWorkRequiredAfterDays = 1,
-            // SICK-04 defaults: 4+ absence spells in a rolling 12 months ("frequent"), a single
-            // weekday recurring 3+ times in a rolling 12 months ("weekday pattern"), a single spell
-            // of 28+ calendar days ("long absence" — UK long-term sickness convention).
             FrequentAbsenceCountThreshold = 4,
             FrequentAbsenceWindowDays = 365,
             LongAbsenceDayThreshold = 28,
             WeekdayPatternOccurrenceThreshold = 3,
             WeekdayPatternWindowDays = 365,
-            // PROB-03 defaults: manager check-in at 30 days, HR review at 60 days, reserved third
-            // checkpoint at 90 days (see doc comment on the properties above).
             ProbationCheckpointDay1 = 30,
             ProbationCheckpointDay2 = 60,
             ProbationCheckpointDay3 = 90,
@@ -163,28 +129,19 @@ internal sealed class CompanySettings
             NoticePeriodUnit = NoticePeriodUnit.Months,
             NoticePeriodLength = 1,
             AutoDisableAccessOnLeavingDate = true,
-            // No prefix/suffix, auto-generated numbers zero-padded to 4 digits (e.g. "0001") — a
-            // new company shouldn't need to configure a numbering scheme before it can add
-            // employees.
             EmployeeNumberMode = EmployeeNumberMode.Automatic,
             EmployeeNumberPrefix = null,
             NextEmployeeNumber = 1,
             EmployeeNumberMinimumLength = 4,
-            // Manual by default — unlike employee numbering, there is no pre-existing "always
-            // automatic" behaviour to preserve for assets, so the same conservative default as
-            // every other opt-in numbering scheme applies.
             AssetNumberMode = AssetNumberMode.Manual,
             AssetNumberPrefix = null,
             NextAssetNumber = 1,
             AssetNumberMinimumLength = 4,
-            // SET-05 defaults: no approval gates, 730-day (2-year) candidate data retention window.
             VacancyApprovalRequired = false,
             OfferApprovalRequired = false,
             CandidateRetentionDays = 730,
-            // SET-06 defaults: both notification channels on (unchanged pre-existing behaviour).
             EmailNotificationsEnabled = true,
             ScheduledRemindersEnabled = true,
-            // SET-07 defaults: the standard 90/30/7-day schedule, enabled.
             DocumentRemindersEnabled = true,
             DocumentReminderOffsetDays1 = 90,
             DocumentReminderOffsetDays2 = 30,
@@ -195,11 +152,6 @@ internal sealed class CompanySettings
         };
     }
 
-    /// <summary>
-    /// Updates the company-profile-scoped fields (Company Administrator territory).
-    /// HR-policy fields are updated separately via <see cref="UpdateHrPolicy"/> so the two
-    /// concerns can be authorized and audited independently against the same aggregate.
-    /// </summary>
     public void UpdateCompanyProfile(
         string timeZone,
         string locale,
@@ -211,10 +163,6 @@ internal sealed class CompanySettings
         Version++;
     }
 
-    /// <summary>
-    /// Updates the HR-policy fields (HR Administrator territory). See
-    /// <see cref="UpdateCompanyProfile"/> for the company-profile counterpart.
-    /// </summary>
     public void UpdateHrPolicy(
         WorkingDays workingDays,
         decimal hoursPerDay,
@@ -262,18 +210,6 @@ internal sealed class CompanySettings
         Version++;
     }
 
-    /// <summary>
-    /// Updates the asset-numbering fields. Kept separate from <see cref="UpdateHrPolicy"/> so the
-    /// Asset numbering setting can be authorized/audited independently, mirroring how employee
-    /// numbering fields are grouped within HR policy but asset numbering is its own concern.
-    /// </summary>
-    /// <summary>
-    /// PROB-03: updates the configured probation review checkpoint days. Kept separate from
-    /// <see cref="UpdateHrPolicy"/> as its own concern, matching how asset numbering is split out
-    /// via <see cref="UpdateAssetNumberSettings"/>. Not currently invoked by any feature handler
-    /// (no UI wiring yet — see the doc comment on the properties) but available for that future
-    /// follow-up, and exercised directly by unit tests.
-    /// </summary>
     public void UpdateProbationCheckpoints(
         int? checkpointDay1,
         int? checkpointDay2,
@@ -287,10 +223,6 @@ internal sealed class CompanySettings
         Version++;
     }
 
-    /// <summary>
-    /// SET-04: updates the SICK-04 attendance-pattern alert thresholds. Kept separate from
-    /// <see cref="UpdateHrPolicy"/> as its own concern, matching <see cref="UpdateProbationCheckpoints"/>.
-    /// </summary>
     public void UpdateAttendanceAlertThresholds(
         int frequentAbsenceCountThreshold,
         int frequentAbsenceWindowDays,
@@ -308,10 +240,6 @@ internal sealed class CompanySettings
         Version++;
     }
 
-    /// <summary>
-    /// SET-05: updates the recruitment approval/retention settings. Kept separate from
-    /// <see cref="UpdateHrPolicy"/> as its own concern, matching <see cref="UpdateAttendanceAlertThresholds"/>.
-    /// </summary>
     public void UpdateRecruitmentSettings(
         bool vacancyApprovalRequired,
         bool offerApprovalRequired,
@@ -325,10 +253,6 @@ internal sealed class CompanySettings
         Version++;
     }
 
-    /// <summary>
-    /// SET-06: updates the notification-channel settings. Kept separate from
-    /// <see cref="UpdateHrPolicy"/> as its own concern, matching <see cref="UpdateRecruitmentSettings"/>.
-    /// </summary>
     public void UpdateNotificationSettings(
         bool emailNotificationsEnabled,
         bool scheduledRemindersEnabled,
@@ -340,10 +264,6 @@ internal sealed class CompanySettings
         Version++;
     }
 
-    /// <summary>
-    /// SET-07: updates the document expiry reminder schedule. Kept separate from
-    /// <see cref="UpdateHrPolicy"/> as its own concern, matching <see cref="UpdateProbationCheckpoints"/>.
-    /// </summary>
     public void UpdateDocumentReminderSettings(
         bool remindersEnabled,
         int? offsetDays1,

@@ -96,7 +96,6 @@ public static class SicknessModule
             Cron.Daily(3));
         jobManager.AddOrUpdate<SicknessEvidenceReminderJob>(
             "sickness-evidence-reminders",
-            // CancellationToken.None is replaced by Hangfire with a live shutdown/abort token at run time.
             job => job.ExecuteAsync(CancellationToken.None),
             Cron.Daily(4));
         jobManager.AddOrUpdate<ReturnToWorkReminderJob>(
@@ -141,18 +140,10 @@ public static class SicknessModule
         // ANY company.
         if (await db.SicknessCategories.AnyAsync(c => c.CompanyId == acmeId))
         {
-            // DSH-05's Tom Williams "Missing fit notes" demo data (below, guarded separately by
-            // its own id check) must still be seeded even on a database that was already fully
-            // seeded before this fix existed — this broad "categories already exist" branch only
-            // skips the ORIGINAL seed content below, which this later addition depends on (its
-            // SicknessRecord references the "Illness" category, so it can only run once that
-            // category is guaranteed to exist — never before the block that creates it).
             await SeedTomWilliamsMissingFitNoteDemoDataAsync(db);
             return;
         }
 
-        // SICK-05: mirrors SicknessCategoryDefaultsProvisioner's broad, non-diagnostic category set
-        // (see that class's doc comment) so dev/E2E data matches what production provisions.
         var illnessId    = Guid.Parse("70000000-0000-0000-0000-000000000001");
         var injuryId     = Guid.Parse("70000000-0000-0000-0000-000000000002");
         var mentalHealthId  = Guid.Parse("70000000-0000-0000-0000-000000000003");
@@ -167,9 +158,6 @@ public static class SicknessModule
         db.SicknessCategories.Add(SicknessCategory.Create(dependantCareId, acmeId, "Dependant care", 5, now));
         db.SicknessCategories.Add(SicknessCategory.Create(otherId,        acmeId, "Other", 6, now));
 
-        // Sarah Chen (CTO) — a closed record and a currently-open one, so both the
-        // Active/Closed status badge and the fit-note evidence badge can be seen
-        // in the UI without having to create data manually first.
         var sarahId = Guid.Parse("30000000-0000-0000-0000-000000000001");
 
         var closedRecord = SicknessRecord.Create(
@@ -197,18 +185,9 @@ public static class SicknessModule
 
         await db.SaveChangesAsync();
 
-        // Categories now exist (just created above), so it's safe to seed Tom's record — see the
-        // matching comment in the "already seeded" branch above for why this can't run earlier.
         await SeedTomWilliamsMissingFitNoteDemoDataAsync(db);
     }
 
-    // DSH-05: Tom Williams (James Okafor's only direct report) needs a live, non-day-of-week-
-    // dependent reason for the Manager Dashboard "Team Status" widget's "Missing fit notes" tile
-    // to be non-zero for James's team (see TeamStatusSummaryTests). Idempotent and always called
-    // regardless of the broad "already seeded" guard above — a database seeded before this fix
-    // existed would otherwise never receive it. Dates are computed relative to "now" rather than
-    // fixed, so this stays true no matter when the seed actually runs. laura.bennett (HR Manager)
-    // is the requester, mirroring how a real evidence request would be raised by HR.
     private static async Task SeedTomWilliamsMissingFitNoteDemoDataAsync(SicknessDbContext db)
     {
         var tomOpenRecordId = Guid.Parse("71000000-0000-0000-0000-000000000003");
@@ -222,10 +201,6 @@ public static class SicknessModule
         var tomId    = Guid.Parse("30000000-0000-0000-0000-000000000004");
         var lauraId  = Guid.Parse("30000000-0000-0000-0000-000000000005");
 
-        // Defence in depth against the FK violation this method previously caused: even though the
-        // caller now checks Acme's categories specifically (see SeedSicknessAsync above), guarantee
-        // the exact category row this record references actually exists before inserting, rather
-        // than assuming it does based on a broader "categories exist" check elsewhere.
         if (!await db.SicknessCategories.AnyAsync(c => c.Id == illnessId))
         {
             db.SicknessCategories.Add(SicknessCategory.Create(illnessId, acmeId, "Illness", 1, now));

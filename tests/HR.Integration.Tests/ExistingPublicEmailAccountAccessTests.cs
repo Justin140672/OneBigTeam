@@ -23,7 +23,6 @@ public class ExistingPublicEmailAccountAccessTests
         _factory.SupabaseAuthGateway.Reset();
     }
 
-    /// <summary>Seeds a pre-existing, login-capable UserProfile whose email is on a public domain.</summary>
     private async Task<Guid> SeedExistingPublicEmailAccountAsync(string email)
     {
         var userId = Guid.NewGuid();

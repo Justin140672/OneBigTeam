@@ -15,7 +15,6 @@ internal sealed class AuditPendingItemConfiguration : IEntityTypeConfiguration<A
             .HasColumnName("id")
             .ValueGeneratedNever();
 
-        // AUD-01: one pending row per logical event — prevents double-enqueue.
         builder.Property(e => e.EventId)
             .HasColumnName("event_id")
             .IsRequired();
@@ -49,7 +48,6 @@ internal sealed class AuditPendingItemConfiguration : IEntityTypeConfiguration<A
         builder.Property(e => e.ProcessedAt)
             .HasColumnName("processed_at");
 
-        // Promoter job queries by status — index covers the typical polling pattern.
         builder.HasIndex(e => e.Status)
             .HasFilter($"status IN ('{AuditPendingItem.StatusPending}', '{AuditPendingItem.StatusProcessing}')")
             .HasDatabaseName("ix_audit_pending_items_status_in_flight");

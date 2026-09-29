@@ -4,11 +4,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Tasks.Features.CompleteTask.Actions;
 
-/// <summary>
-/// When a Probation task is completed, automatically creates a follow-up task
-/// to issue the probation outcome letter. The new task is unassigned so HR can
-/// pick it up, and is due within three working days.
-/// </summary>
 internal sealed class ProbationTaskCompletionAction(ITaskCreator taskCreator, IClock clock) : ITaskCompletionAction
 {
     public TaskSource Source => TaskSource.Probation;

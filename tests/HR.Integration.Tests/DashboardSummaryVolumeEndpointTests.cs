@@ -15,19 +15,6 @@ using Xunit.Abstractions;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// DSH-06 stage 1 representative performance / scale coverage for the bounded dashboard summary.
-///
-/// The load-bearing assertion is structural, not a wall-clock gate: a single summary request issues a
-/// bounded number of provider queries (N registered IWorkloadActionProvider implementations), wholly
-/// independent of how many dashboard widgets a UI might render — it is N provider queries, never
-/// N x widgets. Each category is then capped to 25 display rows with an uncapped headline count.
-///
-/// The elapsed-time check is a GENEROUS, non-gating sanity bound only. Product target is &lt; 2s
-/// (see specifications/product-specifications/31-non-functional-requirements.md, NFR-02); CI hardware
-/// varies wildly, so this asserts merely &lt; 10s and emits the measured milliseconds via
-/// <see cref="ITestOutputHelper"/> for visibility. The real NFR-02 performance suite is a separate ticket.
-/// </summary>
 [Collection("Integration")]
 public class DashboardSummaryVolumeEndpointTests
 {
@@ -54,8 +41,8 @@ public class DashboardSummaryVolumeEndpointTests
         var companyId = Guid.NewGuid();
 
         var employeeIds = await SeedEmployeesAsync(companyId, employeeCount);
-        var expectedPendingLeave = employeeCount / 5;   // ~20%
-        var expectedOverdueTasks = employeeCount / 10;  // ~10%
+        var expectedPendingLeave = employeeCount / 5;
+        var expectedOverdueTasks = employeeCount / 10;
         await SeedPendingLeaveAsync(companyId, employeeIds.Take(expectedPendingLeave));
         await SeedOverdueTasksAsync(companyId, employeeIds.Take(expectedOverdueTasks));
 
@@ -63,10 +50,6 @@ public class DashboardSummaryVolumeEndpointTests
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
-        // HrAdministrator -> company-wide provider scoping for a single summary request.
-        // Uses the HR summary endpoint (WorkloadScope.Hr): the Manager summary endpoint always
-        // applies manager-team scoping regardless of caller roles (see GetManagerDashboardSummaryHandler),
-        // so it would never see company-wide volume for a caller with no reporting sub-tree.
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator, companyId);
 
         var stopwatch = Stopwatch.StartNew();

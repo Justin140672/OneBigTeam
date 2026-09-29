@@ -35,9 +35,6 @@ public class HrApiHttpClientFactoryTests
             = new Microsoft.Extensions.FileProviders.NullFileProvider();
     }
 
-    // Records the Authorization header (or null) seen on every request it handles, keyed by an
-    // opaque "caller id" the test stamps onto the request via a custom header, so assertions can
-    // check "this caller's requests only ever carried this caller's token" even under concurrency.
     private sealed class CapturingHandler : HttpMessageHandler
     {
         public ConcurrentBag<(string CallerId, string? AuthorizationHeader)> Requests { get; } = new();
@@ -84,7 +81,6 @@ public class HrApiHttpClientFactoryTests
         return client.DefaultRequestHeaders.Authorization?.ToString();
     }
 
-    // ── Scenario A: concurrent live requests across separate real IServiceScopes ────────────────
 
     [Fact]
     public async Task CreateClient_Attaches_Only_Its_Own_Scopes_Token_Across_Concurrent_Real_Scopes()
@@ -100,7 +96,6 @@ public class HrApiHttpClientFactoryTests
 
             scopeA.ServiceProvider.GetRequiredService<CircuitSessionState>().SetToken("token-a");
             scopeB.ServiceProvider.GetRequiredService<CircuitSessionState>().SetToken("token-b");
-            // scopeAnonymous: no token set at all — simulates an unauthenticated third circuit.
 
             var factoryA = scopeA.ServiceProvider.GetRequiredService<HrApiHttpClientFactory>();
             var factoryB = scopeB.ServiceProvider.GetRequiredService<HrApiHttpClientFactory>();
@@ -120,8 +115,6 @@ public class HrApiHttpClientFactoryTests
             Assert.Null(results[2]);
         }
 
-        // Cross-check every captured request against the handler's own record: no caller ever saw
-        // a token that wasn't theirs.
         foreach (var (callerId, authorizationHeader) in handler.Requests)
         {
             if (callerId.StartsWith("a-", StringComparison.Ordinal))
@@ -139,8 +132,6 @@ public class HrApiHttpClientFactoryTests
         }
     }
 
-    // ── Scenario B: captured via live HttpContext, then resolved again later in the SAME scope ──
-    // ── with no live HttpContext, across a real ExecutionContext boundary ────────────────────────
 
     [Fact]
     public async Task CreateClient_Later_In_Same_Scope_Still_Attaches_Captured_Token_Across_ExecutionContext_Boundary()
@@ -149,19 +140,12 @@ public class HrApiHttpClientFactoryTests
         using var rootDisposable = root;
         using var scope = root.CreateScope();
 
-        // The real IHttpContextAccessor from AddHttpContextAccessor() has no ambient context in this
-        // unit test host, so drive SupabaseSessionAccessor directly with a fake instead, wired to the
-        // SAME CircuitSessionState instance the scope will later resolve HrApiHttpClientFactory from
-        // — exactly like the real DI graph (both are Scoped, from the same scope).
         var fakeAccessor = new FakeHttpContextAccessor { HttpContext = BuildHttpContextWithCookie("token-a") };
         var sessionState = scope.ServiceProvider.GetRequiredService<CircuitSessionState>();
         var sessionAccessor = new SupabaseSessionAccessor(fakeAccessor, sessionState);
 
-        // First async invocation: reads the live cookie, which populates CircuitSessionState as a
-        // side effect (mirroring the initial pre-render HTTP request in the real app).
         Assert.Equal("token-a", sessionAccessor.AccessToken);
 
-        // Later interactive circuit event handling has no live HttpContext at all.
         fakeAccessor.HttpContext = null;
 
         // Simulate a genuinely separate top-level async operation on the SAME scope, deliberately not
@@ -190,7 +174,6 @@ public class HrApiHttpClientFactoryTests
         Assert.Contains(handler.Requests, r => r.CallerId == "later-same-scope" && r.AuthorizationHeader == "Bearer token-a");
     }
 
-    // ── Scenario C: logout (ClearSessionCookie) fails closed for later calls on the same scope ───
 
     [Fact]
     public async Task CreateClient_Sends_No_Authorization_After_Logout_Clears_The_Same_Scopes_SessionState()
@@ -203,21 +186,15 @@ public class HrApiHttpClientFactoryTests
         var fakeAccessor = new FakeHttpContextAccessor { HttpContext = BuildHttpContextWithCookie("token-a") };
         var sessionAccessor = new SupabaseSessionAccessor(fakeAccessor, sessionState);
 
-        // Capture token-a for this scope, exactly like the initial authenticated request.
         Assert.Equal("token-a", sessionAccessor.AccessToken);
 
         var factory = scope.ServiceProvider.GetRequiredService<HrApiHttpClientFactory>();
         var beforeLogout = await SendTaggedRequestAsync(factory, "before-logout");
         Assert.Equal("Bearer token-a", beforeLogout);
 
-        // Simulate the /logout minimal API endpoint: a real HttpContext for the logout request/response
-        // itself, and the SAME scope's CircuitSessionState passed through so it is cleared together
-        // with the cookie.
         var logoutContext = new DefaultHttpContext();
         SupabaseSessionAccessor.ClearSessionCookie(logoutContext, new HostEnvironmentStub(), sessionState);
 
-        // Later call on the same scope, with no live HttpContext at all (a racing background
-        // continuation) — must fail closed, never resume sending token-a.
         fakeAccessor.HttpContext = null;
         var afterLogout = await SendTaggedRequestAsync(factory, "after-logout");
 
@@ -225,7 +202,6 @@ public class HrApiHttpClientFactoryTests
         Assert.Contains(handler.Requests, r => r.CallerId == "after-logout" && r.AuthorizationHeader == null);
     }
 
-    // ── Concurrent two-circuit interleaving stress test ─────────────────────────────────────────
 
     [Fact]
     public async Task Two_Concurrent_Circuits_Never_Observe_Each_Others_Token_Across_Many_Interleavings()
@@ -263,7 +239,6 @@ public class HrApiHttpClientFactoryTests
             Assert.Equal(expected, authorizationHeader);
         }
 
-        // Belt-and-braces: check the handler's own captured record too, keyed by tag prefix.
         foreach (var (callerId, authorizationHeader) in handler.Requests)
         {
             if (callerId.StartsWith("tab-a-", StringComparison.Ordinal))

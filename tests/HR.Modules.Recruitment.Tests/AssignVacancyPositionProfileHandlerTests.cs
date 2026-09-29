@@ -85,7 +85,7 @@ public class AssignVacancyPositionProfileHandlerTests
         var result = await handler(db, auditPublisher: auditPublisher).HandleAsync(
             new AssignVacancyPositionProfileRequest
             {
-                CompanyId = Guid.NewGuid(), // different company than the vacancy
+                CompanyId = Guid.NewGuid(),
                 VacancyId = vacancy.Id,
                 PositionProfileId = Guid.NewGuid(),
             },
@@ -122,7 +122,7 @@ public class AssignVacancyPositionProfileHandlerTests
         Assert.Empty(auditPublisher.Published);
 
         var saved = await db.Vacancies.SingleAsync(v => v.Id == vacancy.Id);
-        Assert.Equal(originalPositionProfileId, saved.PositionProfileId); // unchanged
+        Assert.Equal(originalPositionProfileId, saved.PositionProfileId);
     }
 
     [Fact]
@@ -136,7 +136,7 @@ public class AssignVacancyPositionProfileHandlerTests
 
         var positionProfileId = Guid.NewGuid();
         var reader = new FakePositionProfileReader(
-            matchingCompanyId: Guid.NewGuid(), // a different company than the request below
+            matchingCompanyId: Guid.NewGuid(),
             matchingPositionProfileId: positionProfileId);
         var auditPublisher = new FakeAuditPublisher();
 

@@ -7,7 +7,6 @@ using System.Text;
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
-// Add services to the container.
 builder.Services.AddRazorComponents();
 
 builder.Services.Configure<PricingOptions>(builder.Configuration);
@@ -15,36 +14,16 @@ builder.Services.AddSingleton<IMarketingAnalytics, LoggingMarketingAnalytics>();
 builder.Services.AddMemoryCache();
 builder.Services.AddScoped<SubscriptionPricingProvider>();
 
-// Managed marketing content (features + roadmap) served from HR.Modules.Marketing via HR.Api.
-// Singleton so the service can retain a last-known-good copy for graceful degradation; it caches
-// successful responses for 5 minutes (see MarketingContentService).
 builder.Services.AddSingleton<MarketingContentService>();
 
-// Named client for the server-side "Start free trial" signup proxy (SignUp.razor) — calls
-// HR.Api directly from the server, so the browser never needs cross-origin access to the API.
 builder.Services.AddHttpClient("hrapi", c =>
 {
     c.BaseAddress = new Uri(
         builder.Configuration["services:api:https:0"] ??
         builder.Configuration["services:api:http:0"] ??
         throw new InvalidOperationException("API base URL is missing. Expected services:api:https:0 or services:api:http:0."));
-    // Keep above the standard resilience handler's 120s total budget (ServiceDefaults) so the
-    // client timeout never truncates a legitimate retry sequence on a slow host.
     c.Timeout = TimeSpan.FromSeconds(130);
 })
-// SocketsHttpHandler's default PooledConnectionLifetime is infinite, so a connection idle long
-// enough (e.g. this client only calling out on an occasional signup/resend/contact submission)
-// can be silently closed server-side by Kestrel's own keep-alive timeout while the pool still
-// considers it valid — the next request reused from the pool then fails mid-flight with an
-// OperationCanceledException while the server is reading the request body. Bounding the lifetime
-// well under Kestrel's default 130s keep-alive timeout forces proactive recycling instead.
-//
-// CertificateRevocationCheckMode = NoCheck: every new connection (including the periodic
-// recycling above) re-runs the TLS handshake, which by default performs an online CRL/OCSP
-// revocation check against Aspire's local HTTPS dev certificate. That check can't complete
-// against a dev cert and stalls for ~15s before SocketsHttpHandler gives up and proceeds anyway
-// — this is purely internal service-to-service traffic on localhost, so skipping the check is
-// safe and removes that stall entirely.
 .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
 {
     PooledConnectionLifetime = TimeSpan.FromSeconds(60),
@@ -56,7 +35,6 @@ builder.Services.AddHttpClient("hrapi", c =>
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
@@ -119,8 +97,6 @@ app.MapPost("/signup-submit", async (HttpRequest request, IHttpClientFactory htt
         Password = form["password"].ToString(),
     };
 
-    // Round-trip everything except the password on a correctable error, so the visitor doesn't
-    // have to retype the whole form (mirrors /contact-submit's retry-URL pattern below).
     string BuildRetryUrl(string errorMessage, bool existingEmail = false, string? emailError = null) =>
         "/signup?"
         + $"error={Uri.EscapeDataString(errorMessage)}"
@@ -187,10 +163,6 @@ app.MapPost("/signup-submit", async (HttpRequest request, IHttpClientFactory htt
     return Results.Redirect($"/check-your-email?email={Uri.EscapeDataString(signUp.Email)}");
 });
 
-// Server-side proxy for the "Resend verification email" button on CheckYourEmail.razor. Mirrors
-// /signup-submit's shape: reads the posted form, calls HR.Api's public /api/resend-verification
-// endpoint (which never leaks whether the email is actually registered), then redirects back to
-// the check-your-email page with a "resent" flag so the page can show a brief confirmation.
 app.MapPost("/resend-verification", async (HttpRequest request, IHttpClientFactory httpClientFactory) =>
 {
     var form = await request.ReadFormAsync();
@@ -202,11 +174,6 @@ app.MapPost("/resend-verification", async (HttpRequest request, IHttpClientFacto
     return Results.Redirect($"/check-your-email?email={Uri.EscapeDataString(email)}&resent=true");
 });
 
-// Server-side proxy for the contact form (Contact.razor) — same shape as /signup-submit: a plain
-// HTML <form> post (this app renders statically, no interactive circuit) forwarded to HR.Api's
-// public /api/contact endpoint, which relays the enquiry to Postmark. On failure, the originally
-// entered values are round-tripped back via query string so the visitor doesn't have to retype
-// everything.
 app.MapPost("/contact-submit", async (HttpRequest request, IHttpClientFactory httpClientFactory) =>
 {
     var form = await request.ReadFormAsync();
@@ -215,7 +182,7 @@ app.MapPost("/contact-submit", async (HttpRequest request, IHttpClientFactory ht
     var company = form["company"].ToString();
     var employeeCountRaw = form["employee-count"].ToString();
     var message = form["message"].ToString();
-    var website = form["website"].ToString(); // honeypot — real visitors never populate this
+    var website = form["website"].ToString();
 
     int? employeeCount = int.TryParse(employeeCountRaw, out var parsedCount) ? parsedCount : null;
 
@@ -274,7 +241,6 @@ static async Task<SignUpProblem?> TryReadSignUpProblemAsync(HttpResponseMessage 
     }
     catch (NotSupportedException)
     {
-        // Non-JSON body (e.g. a proxy/gateway error page) — fall back to the generic message.
         return null;
     }
 }

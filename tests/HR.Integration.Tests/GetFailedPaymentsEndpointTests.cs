@@ -5,14 +5,6 @@ using HR.Integration.Tests.Infrastructure;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Same "platform:admin" policy + allow-list gate pattern as ListCustomersEndpointTests /
-/// GetCustomerBillingHistoryEndpointTests — see their remarks. No live Stripe API calls happen in
-/// this test host: appsettings.Development.json has no real Stripe:SecretKey configured, so every
-/// scenario here exercises the "StripeConfigured = false" branch of GetFailedPaymentsHandler.
-/// Real-Stripe-response mapping/join/filtering is covered by GetFailedPaymentsHandlerTests in
-/// HR.Modules.Companies.Tests via FakeStripeGateway.
-/// </summary>
 [Collection("Integration")]
 public class GetFailedPaymentsEndpointTests
 {
@@ -54,8 +46,6 @@ public class GetFailedPaymentsEndpointTests
 
         var response = await client.GetAsync("/api/companies/admin/failed-payments");
 
-        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
-        // is Forbidden (403), not Unauthorized (401).
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 

@@ -21,9 +21,6 @@ public class OnEmployeePositionChangedHandlerTests(IdentityDatabaseFixture fixtu
     {
         var db = fixture.BuildContext();
         reader ??= new FakePositionProfileReader();
-        // Defaults to "authoritative" being absent (matches nothing) — individual tests that care
-        // about the authoritative-current-position guard supply their own audienceReader reflecting
-        // the employee's true current position so the handler's mutation actually proceeds.
         audienceReader ??= new FakeEmployeeAudienceReader([]);
         return new Handler(db, Clock, auditPublisher, new PositionSync(db, reader), audienceReader, NullLogger<Handler>.Instance);
     }
@@ -75,7 +72,7 @@ public class OnEmployeePositionChangedHandlerTests(IdentityDatabaseFixture fixtu
         Assert.Equal(previousPositionId, typed.PreviousPositionId);
         Assert.Equal(newPositionId, typed.NewPositionId);
         Assert.Contains(SystemRoles.Employee, typed.BeforeRoleIds);
-        Assert.Empty(typed.AfterRoleIds); // new position has no configured role defaults yet
+        Assert.Empty(typed.AfterRoleIds);
     }
 
     [Fact]
@@ -84,14 +81,13 @@ public class OnEmployeePositionChangedHandlerTests(IdentityDatabaseFixture fixtu
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var oldPositionId = Guid.NewGuid();
-        var originalPositionId = Guid.NewGuid(); // employee is returning to this one
+        var originalPositionId = Guid.NewGuid();
 
         await using (var db = fixture.BuildContext())
         {
             db.Positions.Add(Position.Create(oldPositionId, companyId, "Team Lead", Now));
             db.Positions.Add(Position.Create(originalPositionId, companyId, "Developer", Now));
             db.UserPositions.Add(UserPosition.Create(employeeId, oldPositionId, Now.AddDays(-60)));
-            // Employee held `originalPositionId` before, then moved away (now expired).
             db.UserPositions.Add(UserPosition.Create(employeeId, originalPositionId, Now.AddDays(-120), Now.AddDays(-60)));
             await db.SaveChangesAsync();
         }
@@ -114,7 +110,7 @@ public class OnEmployeePositionChangedHandlerTests(IdentityDatabaseFixture fixtu
         var assignments = await db2.UserPositions
             .Where(up => up.UserId == employeeId && up.PositionId == originalPositionId)
             .ToListAsync();
-        Assert.Single(assignments); // reopened, not duplicated
+        Assert.Single(assignments);
         Assert.Null(assignments[0].ExpiresAt);
     }
 
@@ -145,7 +141,7 @@ public class OnEmployeePositionChangedHandlerTests(IdentityDatabaseFixture fixtu
 
         await using var db2 = fixture.BuildContext();
         var previousAssignment = await db2.UserPositions.SingleAsync(up => up.PositionId == previousPositionId);
-        Assert.Equal(expiredAt, previousAssignment.ExpiresAt); // left untouched, not re-set to `now`
+        Assert.Equal(expiredAt, previousAssignment.ExpiresAt);
     }
 
     [Fact]
@@ -166,8 +162,6 @@ public class OnEmployeePositionChangedHandlerTests(IdentityDatabaseFixture fixtu
         {
             db.Positions.Add(Position.Create(positionA, companyId, "Position A", Now));
             db.Positions.Add(Position.Create(positionC, companyId, "Position C", Now));
-            // A is still active (the delayed event hasn't been processed yet); C is the real, current
-            // active assignment already applied by the (later-arriving-but-earlier-processed) B->C event.
             db.UserPositions.Add(UserPosition.Create(employeeId, positionA, Now.AddDays(-30)));
             db.UserPositions.Add(UserPosition.Create(employeeId, positionC, Now));
             await db.SaveChangesAsync();
@@ -185,19 +179,18 @@ public class OnEmployeePositionChangedHandlerTests(IdentityDatabaseFixture fixtu
         var auditPublisher = new FakeAuditEventPublisher();
         var handler = BuildHandler(auditPublisher, reader, audienceReader);
 
-        // Stale event: claims a transfer A -> B, but the employee's current position is already C.
         await handler.HandleAsync(
             new EmployeePositionChangedIntegrationEvent(companyId, employeeId, positionA, positionB, Now.AddMinutes(1)),
             CancellationToken.None);
 
         await using var db2 = fixture.BuildContext();
         var assignmentA = await db2.UserPositions.SingleAsync(up => up.PositionId == positionA);
-        Assert.Null(assignmentA.ExpiresAt); // NOT expired — the event was stale, so A is left untouched
+        Assert.Null(assignmentA.ExpiresAt);
 
-        Assert.False(await db2.UserPositions.AnyAsync(up => up.PositionId == positionB)); // B never created/reopened
+        Assert.False(await db2.UserPositions.AnyAsync(up => up.PositionId == positionB));
 
         var assignmentC = await db2.UserPositions.SingleAsync(up => up.PositionId == positionC);
-        Assert.Null(assignmentC.ExpiresAt); // untouched, still the real current assignment
+        Assert.Null(assignmentC.ExpiresAt);
 
         Assert.Empty(auditPublisher.PublishedEvents);
     }
@@ -205,9 +198,6 @@ public class OnEmployeePositionChangedHandlerTests(IdentityDatabaseFixture fixtu
     [Fact]
     public async Task HandleAsync_Skips_Entirely_When_Employees_Current_Position_Cannot_Be_Resolved()
     {
-        // The audience reader returning a null profile (employee not found / transient read failure)
-        // must be treated the same as a mismatch — no mutation, no audit event — rather than falling
-        // back to trusting the event's own NewPositionProfileId.
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var previousPositionId = Guid.NewGuid();
@@ -225,7 +215,6 @@ public class OnEmployeePositionChangedHandlerTests(IdentityDatabaseFixture fixtu
             [newPositionId] = new(newPositionId, "New Position", null, null, true, null, null),
         };
         var reader = new FakePositionProfileReader(summaries: summaries);
-        // No audience profile registered for employeeId -> GetEmployeeAudienceAsync resolves null.
         var audienceReader = new FakeEmployeeAudienceReader([employeeId]);
 
         var auditPublisher = new FakeAuditEventPublisher();
@@ -237,9 +226,9 @@ public class OnEmployeePositionChangedHandlerTests(IdentityDatabaseFixture fixtu
 
         await using var db2 = fixture.BuildContext();
         var previousAssignment = await db2.UserPositions.SingleAsync(up => up.PositionId == previousPositionId);
-        Assert.Null(previousAssignment.ExpiresAt); // untouched
+        Assert.Null(previousAssignment.ExpiresAt);
 
-        Assert.False(await db2.UserPositions.AnyAsync(up => up.PositionId == newPositionId)); // never created
+        Assert.False(await db2.UserPositions.AnyAsync(up => up.PositionId == newPositionId));
 
         Assert.Empty(auditPublisher.PublishedEvents);
     }

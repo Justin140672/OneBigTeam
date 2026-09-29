@@ -7,11 +7,6 @@ public sealed class CustomerSupportViewService(HrApiHttpClientFactory httpClient
 {
     private HttpClient Http => httpClientFactory.CreateClient();
 
-    /// <summary>
-    /// Returns null when the call fails, the caller isn't authorised (401/403), or the company
-    /// isn't found (404) — same null-means-"show error state" contract as
-    /// CustomerDetailsService.GetCustomerDetailsOrNullAsync.
-    /// </summary>
     public async Task<CustomerSupportViewResponse?> GetSupportViewOrNullAsync(
         Guid companyId,
         CancellationToken cancellationToken = default)

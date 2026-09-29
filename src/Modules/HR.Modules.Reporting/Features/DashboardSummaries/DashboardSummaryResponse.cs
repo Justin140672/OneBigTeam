@@ -1,11 +1,5 @@
 namespace HR.Modules.Reporting.Features.DashboardSummaries;
 
-/// <summary>
-/// DSH-06 bounded dashboard summary envelope. Shared by the HR and Manager dashboard summary
-/// endpoints — both compose the same cross-module <see cref="HR.Infrastructure.Abstractions.IWorkloadActionProvider"/>
-/// fan-out via <see cref="DashboardSummaryComposer"/>; they differ only in the endpoint-level
-/// authorization gate, not in the response shape.
-/// </summary>
 internal sealed record DashboardSummaryResponse(
     IReadOnlyList<DashboardCategoryResult> Categories,
     int TotalActionableCount,

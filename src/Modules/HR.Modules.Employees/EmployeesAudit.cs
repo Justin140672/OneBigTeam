@@ -28,7 +28,6 @@ internal sealed record CompensationRecordCreatedAuditEvent(
     Guid? IAuditEvent.CorrelationId => null;
     string? IAuditEvent.Summary => "Compensation record created";
     object? IAuditEvent.Before => null;
-    // AUD-03: Salary amount and Reason (free-text) are prohibited — record safe structured fields only.
     object? IAuditEvent.After => new { EffectiveFrom, SalaryType, Currency };
     object? IAuditEvent.Metadata => null;
 }
@@ -55,7 +54,6 @@ internal sealed record CompensationRecordImportedAuditEvent(
     Guid? IAuditEvent.CorrelationId => ImportBatchId;
     string? IAuditEvent.Summary => "Compensation record created via import";
     object? IAuditEvent.Before => null;
-    // AUD-03: Salary amount and Reason (free-text) are prohibited.
     object? IAuditEvent.After => new { EffectiveFrom, SalaryType, Currency };
     object? IAuditEvent.Metadata => new { Source = "Import", ImportBatchId };
 }
@@ -83,8 +81,6 @@ internal sealed record CompensationRecordBulkAppliedAuditEvent(
     Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
     Guid? IAuditEvent.CorrelationId => BulkOperationId;
     string? IAuditEvent.Summary => "Compensation record created via bulk adjustment";
-    // NFR-01: Salary amounts and Reason (free-text) are prohibited — record the direction of the
-    // change (never the amount or the delta) so the audit trail still shows compensation changed.
     private string ChangeDirection =>
         Salary > PreviousSalary ? "Increase"
         : Salary < PreviousSalary ? "Decrease"
@@ -137,7 +133,6 @@ internal sealed record CompensationRecordUpdatedAuditEvent(
     Guid? IAuditEvent.CorrelationId => null;
     string? IAuditEvent.Summary => "Compensation record updated";
     object? IAuditEvent.Before => null;
-    // AUD-03: Salary amount and Reason (free-text) are prohibited.
     object? IAuditEvent.After => new { EffectiveFrom, SalaryType, Currency };
     object? IAuditEvent.Metadata => null;
 }
@@ -337,9 +332,6 @@ internal sealed record EmployeeProfileUpdatedAuditEvent(
     Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
     Guid? IAuditEvent.CorrelationId => CorrelationId;
     string? IAuditEvent.Summary => "Employee profile updated";
-    // NFR-01: PersonalEmail and DateOfBirth are prohibited audit fields — project only the
-    // non-sensitive, diff-able profile fields into the before/after snapshots so
-    // AuditPayloadRedactionGuard passes the payload through unchanged.
     object? IAuditEvent.Before => ProjectProfile(Before);
     object? IAuditEvent.After => ProjectProfile(After);
     object? IAuditEvent.Metadata => null;
@@ -427,8 +419,6 @@ internal sealed record ContactDetailsUpdatedAuditEvent(
     Guid? IAuditEvent.ActorEmployeeId => ActorEmployeeId;
     Guid? IAuditEvent.CorrelationId => null;
     string? IAuditEvent.Summary => "Employee contact details updated";
-    // NFR-01: PersonalEmail is a prohibited audit field — project only the non-sensitive address
-    // and phone fields so AuditPayloadRedactionGuard passes the payload through unchanged.
     object? IAuditEvent.Before => ProjectContact(Before);
     object? IAuditEvent.After => ProjectContact(After);
     object? IAuditEvent.Metadata => null;
@@ -602,10 +592,6 @@ internal sealed record EmployeePromotionRequestedAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
-// Published by EmployeePromotionFinalizer once a promotion has been applied to the employee
-// (either immediately from PromoteEmployeeHandler for a same-day/backdated effective date, or
-// later by ProcessPromotionsJob) — system-attributed (no actor), mirroring
-// EmployeeDepartureFinalisedAuditEvent's convention exactly.
 internal sealed record EmployeePromotionCompletedAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,
@@ -628,9 +614,6 @@ internal sealed record EmployeePromotionCompletedAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
-// Published by BackfillEmployeeNumbers' commit endpoint, one per employee, after the whole batch
-// transaction has committed successfully. Employee number is not a sensitive value in this
-// codebase's classification (salary/bank/NI numbers are), so it is safe to record in full.
 internal sealed record EmployeeNumberBackfilledAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,
@@ -652,10 +635,6 @@ internal sealed record EmployeeNumberBackfilledAuditEvent(
     object? IAuditEvent.Metadata => new { BackfillOperationId };
 }
 
-// Published by ProcessLeavingEmployeesJob (Hangfire) once an employee's leaving date has passed
-// and their departure has been finalised. There is no ActorUserId/ActorEmployeeId — this is a
-// system-driven transition, not a user action — mirroring how other unattended-job audit events
-// in this codebase represent the system as the actor (null).
 internal sealed record EmployeeDepartureFinalisedAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,

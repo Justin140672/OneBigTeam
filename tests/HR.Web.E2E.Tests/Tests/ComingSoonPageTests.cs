@@ -4,12 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the static marketing page at /roadmap (ComingSoon.razor, renamed from "Coming Soon" to
-/// "Product Roadmap"), the legacy /coming-soon redirect, the footer nav link used to reach it,
-/// and the "Coming soon" / "Planned" grouped feature-card sections sourced from
-/// UpcomingFeatureCatalog.
-/// </summary>
 public sealed class ComingSoonPageTests(ParallelBlankPersonaFixture fixture)
     : RoleE2ETestBase<ParallelBlankPersonaFixture>(fixture)
 {
@@ -64,13 +58,6 @@ public sealed class ComingSoonPageTests(ParallelBlankPersonaFixture fixture)
             .ToHaveTextAsync("Product Roadmap");
     }
 
-    // The roadmap page was simplified to a single "Coming soon" group (see ComingSoon.razor's
-    // OnInitializedAsync — every non-"Available" item is grouped under one "Coming soon" label; there
-    // is no longer a separate "Planned" section) and the underlying catalog's item titles were
-    // updated (see HR.SharedKernel.PhaseTwoRoadmapCatalog: "AI-powered position profiles" ->
-    // "AI-generated Live Job Descriptions", "Employee webhooks" -> "Webhooks & Integrations",
-    // "AI help assistant" -> "AI Help Assistant"). This test now reflects the current single-section
-    // structure and card titles instead of the earlier multi-section roadmap.
     [Fact]
     public async Task ComingSoonSection_RendersExpectedCards()
     {

@@ -78,8 +78,6 @@ public class StartOffboardingBackdatedDepartureEndpointTests
         var employeeId = await CreateEmployeeAsync(client, companyId);
         await AssignAssetAsync(client, companyId, employeeId);
 
-        // New companies default AutoDisableAccessOnLeavingDate to true (see CompanySettings.Create),
-        // so no explicit PUT to /hr-settings is needed here.
         var backdatedLastWorkingDay = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-1);
 
         var response = await client.PostAsJsonAsync(

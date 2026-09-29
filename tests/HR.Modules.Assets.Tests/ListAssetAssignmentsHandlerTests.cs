@@ -104,7 +104,6 @@ public class ListAssetAssignmentsHandlerTests
         var employee1 = Guid.NewGuid();
         var employee2 = Guid.NewGuid();
 
-        // Add earlier assignment first
         var a1 = AssetAssignment.Create(Guid.NewGuid(), companyId, asset.Id, employee1, Guid.NewGuid(), null, FixedOffset.AddDays(-10));
         a1.Return(FixedOffset.AddDays(-1));
         db.AssetAssignments.Add(a1);
@@ -120,7 +119,6 @@ public class ListAssetAssignmentsHandlerTests
             CancellationToken.None);
 
         Assert.Equal(2, result.Count);
-        // Most recent first
         Assert.Equal(employee2, result[0].EmployeeId);
         Assert.Equal(employee1, result[1].EmployeeId);
     }

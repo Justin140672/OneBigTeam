@@ -82,7 +82,6 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
         return doc;
     }
 
-    // Produces a PDF file with valid magic bytes so magic-byte validation passes.
     private static IFormFile FakePdfFile(string fileName = "policy-v2.pdf", int extraSize = 1020) =>
         FakeFile(fileName, "application/pdf", PdfBytes(extraSize));
 
@@ -93,10 +92,9 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
             ContentType = contentType,
         };
 
-    // %PDF- followed by padding
     private static byte[] PdfBytes(int extraSize = 1020)
     {
-        var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D }; // %PDF-
+        var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };
         var bytes = new byte[magic.Length + extraSize];
         magic.CopyTo(bytes, 0);
         return bytes;
@@ -199,8 +197,6 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
     [Fact]
     public async Task HandleAsync_Stores_New_Version_With_Pending_ScanStatus()
     {
-        // Virus scanning now happens asynchronously (ScanUploadedFileJob, enqueued after
-        // persistence) rather than inline during upload.
         await using var db = BuildContext();
         var companyId  = Guid.NewGuid();
         var category   = await SeedCategory(db, companyId);
@@ -234,8 +230,6 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        // Uploading a new version enqueues a scan job for both the document (whose
-        // CurrentFileReference/ScanStatus were just reset to Pending) and the new version row.
         Assert.Equal(2, backgroundJobs.CreatedJobs.Count);
     }
 
@@ -249,7 +243,7 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
         var handler  = BuildHandler(db);
 
         var result = await handler.HandleAsync(
-            BuildRequest(Guid.NewGuid(), doc.Id), // different company in the request
+            BuildRequest(Guid.NewGuid(), doc.Id),
             Guid.NewGuid(),
             CancellationToken.None);
 
@@ -412,7 +406,6 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var category  = await SeedCategory(db, companyId);
-        // never published — stays Draft
         var doc = await SeedDocument(db, companyId, category.Id, requiresAcknowledgement: true, published: false);
 
         var audienceReader = new FakeEmployeeAudienceReader { EligibleEmployeeIds = [Guid.NewGuid()] };
@@ -447,8 +440,6 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
             Guid.NewGuid(), companyId, doc.Id, employeeId, 1, "Original statement", null, true, originalAcknowledgedAt));
         await db.SaveChangesAsync();
 
-        // Reacknowledgement required this time — exercises the task-creation branch, which also
-        // must never touch the version-1 row.
         var audienceReader = new FakeEmployeeAudienceReader { EligibleEmployeeIds = [employeeId] };
         var handler = BuildHandler(db, audienceReader: audienceReader);
 
@@ -482,7 +473,7 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/v1.pdf", "v1.pdf", 100, "application/pdf",
             null, null, SharedCompanyDocumentReviewFrequency.None, null, null, false, null, null, Guid.NewGuid(), Now);
         db.SharedCompanyDocuments.Add(doc);
-        await db.BaseSaveChangesAsync(); // seed without throwing
+        await db.BaseSaveChangesAsync();
 
         var storage = new FakeDocumentStorageService();
         var handler = BuildHandler(db, storage: storage);
@@ -532,9 +523,6 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
         Assert.True(published.RequiresReacknowledgement);
         Assert.Equal(uploadedBy,              published.UploadedBy);
 
-        // Safety: the raw storage key must never appear in any published audit event's field
-        // values — only FileName, FileSize, VersionNumber, VersionNote and identifiers are
-        // recorded, never the storage key or a signed download URL.
         var storageKey = storage.Uploads[0].StorageKey;
         Assert.NotEqual(storageKey, published.FileName);
         Assert.All(auditPublisher.Published, evt =>
@@ -547,10 +535,6 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
     [Fact]
     public async Task HandleAsync_WithRequiresReacknowledgement_CancelsPriorVersionsOpenAcknowledgeTasks()
     {
-        // Regression test: an employee who hadn't yet acknowledged the previous version used to
-        // end up with two open Acknowledge tasks for the same document once a new version
-        // requiring re-acknowledgement was uploaded — ITaskCanceller.CancelAllBySourceEntityAsync
-        // now cancels every still-open task for this document before the new ones are created.
         await using var db = BuildContext();
         var companyId  = Guid.NewGuid();
         var category   = await SeedCategory(db, companyId);
@@ -582,8 +566,6 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
         var doc = await SeedDocument(db, companyId, category.Id, requiresAcknowledgement: true, published: true);
 
         var v1 = await db.SharedCompanyDocumentVersions.SingleAsync(v => v.SharedCompanyDocumentId == doc.Id && v.VersionNumber == 1);
-        // Domain type has no public setter for AcknowledgementStatement outside Create, so seed it
-        // via a fresh row replacing the existing one with the value the handler should copy forward.
         db.SharedCompanyDocumentVersions.Remove(v1);
         db.SharedCompanyDocumentVersions.Add(SharedCompanyDocumentVersion.Create(
             Guid.NewGuid(), companyId, doc.Id, 1, "key/v1.pdf", "v1.pdf", 100, "application/pdf",
@@ -641,8 +623,6 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
             .SingleAsync(v => v.SharedCompanyDocumentId == doc.Id && v.VersionNumber == 2);
         Assert.Equal("HR-edited wording for version 2.", newVersion.AcknowledgementStatement);
 
-        // The previous version's own row must remain untouched — it still shows what was in effect
-        // when it was created, independent of this override.
         var previousVersion = await db.SharedCompanyDocumentVersions
             .SingleAsync(v => v.SharedCompanyDocumentId == doc.Id && v.VersionNumber == 1);
         Assert.Equal("Original wording from version 1.", previousVersion.AcknowledgementStatement);
@@ -741,7 +721,6 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
         Assert.Null(stored.AcknowledgementStatement);
     }
 
-    // Subclass used only in the orphan-cleanup test to simulate a DB save failure.
     private sealed class ThrowingDocumentsDbContext(DbContextOptions<DocumentsDbContext> options)
         : DocumentsDbContext(options)
     {

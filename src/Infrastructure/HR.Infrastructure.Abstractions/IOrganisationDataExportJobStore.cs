@@ -1,10 +1,5 @@
 namespace HR.Infrastructure.Abstractions;
 
-/// <summary>
-/// Reporting-owned contract that lets the Infrastructure background job read and update a single
-/// OrganisationDataExport row without touching ReportingDbContext directly. Implemented by an
-/// internal service in HR.Modules.Reporting, DI-registered in ReportingModule.
-/// </summary>
 public interface IOrganisationDataExportJobStore
 {
     Task<OrganisationDataExportJobView?> GetAsync(Guid exportId, CancellationToken cancellationToken);
@@ -20,28 +15,12 @@ public interface IOrganisationDataExportJobStore
     /// </summary>
     Task<bool> BeginAttemptAsync(Guid exportId, Guid ownerToken, CancellationToken cancellationToken);
 
-    /// <summary>
-    /// Follow-up A: heartbeat — extend <paramref name="ownerToken"/>'s lease while the build job works.
-    /// Returns <c>false</c> when the worker has been superseded or the export is no longer in progress,
-    /// signalling the caller to abandon its attempt without completing or overwriting the archive.
-    /// </summary>
     Task<bool> RenewLeaseAsync(Guid exportId, Guid ownerToken, CancellationToken cancellationToken);
 
-    /// <summary>
-    /// Follow-up A: complete the export. Returns <c>false</c> when <paramref name="ownerToken"/> no
-    /// longer owns the lease (a replacement worker has taken over), so a superseded worker cannot
-    /// publish a stale archive.
-    /// </summary>
     Task<bool> MarkCompletedAsync(Guid exportId, Guid ownerToken, string storageKey, long fileSizeBytes, CancellationToken cancellationToken);
 
-    /// <summary>System/recovery-driven failure — not tied to a worker's ownership lease.</summary>
     Task MarkFailedAsync(Guid exportId, string failureReason, CancellationToken cancellationToken);
 
-    /// <summary>
-    /// Follow-up D: worker-driven transient failure. Returns <c>false</c> when <paramref name="ownerToken"/>
-    /// no longer owns the lease (a replacement worker has taken over), so a superseded worker cannot
-    /// write a failure over an export that has moved on.
-    /// </summary>
     Task<bool> MarkFailedAsync(Guid exportId, Guid ownerToken, string failureReason, CancellationToken cancellationToken);
 
     /// <summary>
@@ -56,35 +35,14 @@ public interface IOrganisationDataExportJobStore
     /// <summary>Ticket 3: return a stalled InProgress export to Pending so it can be re-enqueued.</summary>
     Task ResetForRetryAsync(Guid exportId, CancellationToken cancellationToken);
 
-    /// <summary>
-    /// Follow-up H: atomically claim recovery ownership of an apparently stalled InProgress export.
-    /// Rechecks status and lease expiry under an optimistic-concurrency guard. Returns <c>false</c>
-    /// when the export has completed/failed, the original worker renewed its lease, ownership changed,
-    /// or another recovery sweep won the race — the caller must then abandon recovery without touching
-    /// any files. On success the caller holds the lease and may safely clean up and reset/fail it.
-    /// </summary>
     Task<bool> ClaimForRecoveryAsync(Guid exportId, Guid recoveryToken, CancellationToken cancellationToken);
 
-    /// <summary>
-    /// Follow-up H: reset a stalled InProgress export to Pending, but only for the recovery sweep that
-    /// currently holds the lease via <see cref="ClaimForRecoveryAsync"/>. Returns <c>false</c> if
-    /// ownership has since changed.
-    /// </summary>
     Task<bool> ResetForRetryAsync(Guid exportId, Guid recoveryToken, CancellationToken cancellationToken);
 
-    /// <summary>
-    /// Follow-up I: terminal exports (Failed / Expired / Completed) whose orphan attempt archives have
-    /// not yet been swept from storage, oldest first, capped at <paramref name="batchSize"/>.
-    /// </summary>
     Task<IReadOnlyList<OrganisationDataExportJobView>> GetArtefactCleanupCandidatesAsync(int batchSize, CancellationToken cancellationToken);
 
-    /// <summary>
-    /// Follow-up I: recently-cleaned terminal exports, re-checked in bounded batches so an attempt
-    /// archive uploaded by a superseded worker <i>after</i> an earlier sweep is still removed.
-    /// </summary>
     Task<IReadOnlyList<OrganisationDataExportJobView>> GetRecentlyCleanedArtefactsAsync(int batchSize, CancellationToken cancellationToken);
 
-    /// <summary>Follow-up I: record that every orphan attempt archive for this terminal export has been removed.</summary>
     Task MarkAttemptFilesCleanedAsync(Guid exportId, CancellationToken cancellationToken);
 
     /// <summary>
@@ -112,7 +70,6 @@ public interface IOrganisationDataExportJobStore
         DateTimeOffset leaseExpiredAsOf,
         CancellationToken cancellationToken);
 
-    /// <summary>Completed exports past their expiry, for the recurring purge job.</summary>
     Task<IReadOnlyList<OrganisationDataExportJobView>> GetExpiredAsync(CancellationToken cancellationToken);
 
     Task MarkExpiredAsync(Guid exportId, CancellationToken cancellationToken);

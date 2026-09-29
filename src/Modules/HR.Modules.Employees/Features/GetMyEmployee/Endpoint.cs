@@ -14,12 +14,6 @@ internal sealed class Endpoint(GetMyEmployeeHandler handler, ICurrentUser curren
 
     public override async Task HandleAsync(CancellationToken cancellationToken)
     {
-        // NOT User.FindFirst("sub") — that's the raw Supabase Auth user id, which only matches
-        // Employee.Id (and this app's UserId convention generally) for real production users who
-        // have no UserProfile row yet (see SupabaseCurrentUserResolutionMiddleware's fallback).
-        // Every dev persona (and every real user post-signup) has a UserProfile row, so
-        // ICurrentUser.UserId correctly resolves to profile.Id instead — the id Employee.Id/seed
-        // data and every other endpoint in this app actually key off.
         var userId = currentUser.UserId;
         if (userId is null)
         {

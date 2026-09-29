@@ -42,7 +42,6 @@ public class EmployeeLeavingProcessTests
         Assert.Equal(LeavingProcessStatus.InProgress, leavingProcess.Status);
     }
 
-    // Spec SPEC-OFF-01
     [Fact]
     public void Amend_Sets_Notes_When_Provided()
     {

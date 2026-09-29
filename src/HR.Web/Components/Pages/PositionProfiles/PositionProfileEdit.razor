@@ -291,9 +291,6 @@
                 _loadedVersion = profile.Version;
             }
 
-            // Inherited-role defaults are edited on the "Inherited Roles" tab but persisted by this
-            // page's single Save (see SaveCoreAsync). The mandatory "Employee" role is implicit and
-            // never stored, so keep it out of the editable list.
             var roleDefaults = await PositionProfileService.ListPositionRoleDefaultsAsync(CompanyId);
             Model.InheritedRoleIds = roleDefaults?.Positions
                 .FirstOrDefault(p => p.PositionProfileId == Id!.Value)?.RoleIds
@@ -378,8 +375,6 @@
             if (saveResult.NewVersion is { } newVersion)
                 _loadedVersion = newVersion;
 
-            // Persist the Inherited Roles tab's selection as part of the same Save. Employee is
-            // implicit and never stored. Idempotent PUT of the whole list.
             var roleIds = Model.InheritedRoleIds
                 .Where(id => id != SystemRoleOptions.EmployeeRoleId)
                 .Distinct()

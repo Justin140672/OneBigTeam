@@ -19,7 +19,6 @@ public class GetMyNotificationsValidatorTests
         Assert.True(Validator.Validate(ValidRequest()).IsValid);
     }
 
-    // ── CompanyId ──────────────────────────────────────────────────────────
 
     [Fact]
     public void Validate_EmptyCompanyId_Fails()
@@ -35,7 +34,6 @@ public class GetMyNotificationsValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(GetMyNotificationsRequest.CompanyId));
     }
 
-    // ── PageNumber ─────────────────────────────────────────────────────────
 
     [Fact]
     public void Validate_PageNumber_Zero_Fails()
@@ -75,7 +73,6 @@ public class GetMyNotificationsValidatorTests
         Assert.True(result.IsValid);
     }
 
-    // ── PageSize ───────────────────────────────────────────────────────────
 
     [Fact]
     public void Validate_PageSize_Zero_Fails()
@@ -127,7 +124,6 @@ public class GetMyNotificationsValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(GetMyNotificationsRequest.PageSize));
     }
 
-    // ── CreatedFrom / CreatedTo ────────────────────────────────────────────
 
     [Fact]
     public void Validate_CreatedTo_Before_CreatedFrom_Fails()

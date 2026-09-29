@@ -23,7 +23,6 @@ public class GetEmployeeProfilePhotoHandlerTests
         var photo = EmployeeProfilePhoto.Create(
             Guid.NewGuid(), companyId, employeeId, "avatar.png", 333, "image/png",
             storageKey, employeeId, DateTimeOffset.UtcNow);
-        // Default download-success fixtures assume a clean scan.
         photo.MarkScanClean(DateTimeOffset.UtcNow);
         db.EmployeeProfilePhotos.Add(photo);
         db.SaveChanges();
@@ -107,8 +106,6 @@ public class GetEmployeeProfilePhotoHandlerTests
         Assert.Equal("not_found", result.Error.Code);
     }
 
-    // Theory parameters must be a publicly accessible type (xUnit requires public test methods),
-    // but FileScanStatus is internal — pass the enum's underlying int value instead and cast.
     [Theory]
     [InlineData((int)FileScanStatus.Pending, "This document is currently being security checked.")]
     [InlineData((int)FileScanStatus.Scanning, "This document is currently being security checked.")]
@@ -127,7 +124,7 @@ public class GetEmployeeProfilePhotoHandlerTests
             "employees/key.png", employeeId, DateTimeOffset.UtcNow);
         switch (status)
         {
-            case FileScanStatus.Pending: break; // Create() defaults to Pending
+            case FileScanStatus.Pending: break;
             case FileScanStatus.Scanning: photo.MarkScanning(DateTimeOffset.UtcNow); break;
             case FileScanStatus.Infected: photo.MarkScanInfected("EICAR.Test.File", DateTimeOffset.UtcNow); break;
             case FileScanStatus.Failed: photo.MarkScanFailed("scanner unreachable", DateTimeOffset.UtcNow); break;

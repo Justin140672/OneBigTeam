@@ -13,7 +13,6 @@ public class CompleteTaskEndpointTests(ApiWebApplicationFactory factory)
 {
     private static readonly Guid SeededCompanyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    // ── Auth ───────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Complete_Task_Returns_Unauthorized_When_No_Auth_Header()
@@ -27,7 +26,6 @@ public class CompleteTaskEndpointTests(ApiWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ── Not found ──────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Complete_Task_Returns_NotFound_When_Task_Does_Not_Exist()
@@ -41,7 +39,6 @@ public class CompleteTaskEndpointTests(ApiWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    // ── Conflict ───────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Complete_Task_Returns_Conflict_When_Task_Is_Cancelled()
@@ -49,11 +46,6 @@ public class CompleteTaskEndpointTests(ApiWebApplicationFactory factory)
         var userId = Guid.NewGuid();
         using var client = await AuthenticatedClient(userId);
 
-        // SEC-003 (see CompleteTaskHandler): only the assignee, their manager, or an HR
-        // Administrator may act on a task at all — an unassigned task can only be reached by
-        // an HR override. This test is specifically about the cancelled-status Conflict path,
-        // so the task must be assigned to the calling user to get past the authorization
-        // check and actually exercise that path.
         var cancelledTaskId = await SeedCancelledTaskAsync(userId);
 
         var response = await client.PostAsync(
@@ -63,7 +55,6 @@ public class CompleteTaskEndpointTests(ApiWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
 
-    // ── Happy path ─────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Complete_Task_Returns_Completed_Status()
@@ -71,7 +62,6 @@ public class CompleteTaskEndpointTests(ApiWebApplicationFactory factory)
         var userId = Guid.NewGuid();
         using var client = await AuthenticatedClient(userId);
 
-        // Assigned to the calling user — see SEC-003 note above.
         var taskId = await CreateTaskAsync("Task to complete", userId);
 
         var response = await client.PostAsync(
@@ -91,7 +81,6 @@ public class CompleteTaskEndpointTests(ApiWebApplicationFactory factory)
         var userId = Guid.NewGuid();
         using var client = await AuthenticatedClient(userId);
 
-        // Assigned to the calling user — see SEC-003 note above.
         var taskId = await CreateTaskAsync("Task to complete twice", userId);
 
         await client.PostAsync($"/api/companies/{SeededCompanyId}/tasks/{taskId}/complete", EmptyJson());
@@ -102,7 +91,6 @@ public class CompleteTaskEndpointTests(ApiWebApplicationFactory factory)
         Assert.Equal("Completed", payload!.Status);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId)
     {

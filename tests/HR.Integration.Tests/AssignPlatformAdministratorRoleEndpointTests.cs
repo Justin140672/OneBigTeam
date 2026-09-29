@@ -8,10 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// See CreatePlatformAdministratorEndpointTests for notes on the "platform:admin" policy /
-/// handler-level PlatformOwner gate and the 401-for-both-anonymous-and-non-owner behavior.
-/// </summary>
 [Collection("Integration")]
 public class AssignPlatformAdministratorRoleEndpointTests
 {
@@ -41,8 +37,6 @@ public class AssignPlatformAdministratorRoleEndpointTests
         var response = await client.PostAsJsonAsync(
             $"/api/platform-administrators/{Guid.NewGuid()}/role", new { role = "PlatformOwner" });
 
-        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
-        // is Forbidden (403), not Unauthorized (401).
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 

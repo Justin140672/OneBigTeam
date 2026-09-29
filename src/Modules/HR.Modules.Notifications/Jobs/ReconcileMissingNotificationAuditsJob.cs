@@ -85,16 +85,10 @@ internal sealed class ReconcileMissingNotificationAuditsJob(
             var cursor = await db.NotificationAuditReconciliationCursors
                 .FirstOrDefaultAsync(c => c.CompanyId == companyId, cancellationToken);
 
-            // A cursor left over from a previous, now-expired window (its resume point predates the
-            // current lookback start) is stale: the window has slid forward, so resume from the
-            // start of the current window rather than a position that no longer exists.
             var resumeFromStart = cursor is null || cursor.LastScannedCreatedAt < lookback;
             var resumeCreatedAt = resumeFromStart ? lookback : cursor!.LastScannedCreatedAt;
             var resumeId = resumeFromStart ? Guid.Empty : cursor!.LastScannedNotificationId;
 
-            // Keyset pagination: strictly-after the last scanned (CreatedAt, Id) pair. Using
-            // resumeFromStart lets the first page of a fresh window include a notification whose
-            // CreatedAt exactly equals lookback (inclusive lower bound), matching prior behaviour.
             var candidates = await db.Notifications
                 .AsNoTracking()
                 .Where(n => n.CompanyId == companyId && n.CreatedAt >= lookback && n.CreatedAt < cutoff)
@@ -108,9 +102,6 @@ internal sealed class ReconcileMissingNotificationAuditsJob(
 
             if (candidates.Count == 0)
             {
-                // Caught up to the end of the current window — reset so the next run restarts from
-                // the (now further-forward-slid) beginning of the window instead of resuming from a
-                // position that no longer yields anything.
                 if (cursor is not null)
                 {
                     cursor.Reset(now);
@@ -126,8 +117,6 @@ internal sealed class ReconcileMissingNotificationAuditsJob(
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                // Deterministic EventId (see NotificationCreatedAuditEvent) — the notification id
-                // itself is the audit event id, so existence can be checked directly.
                 var alreadyAudited = await auditEventExistenceReader.ExistsAsync(candidate.Id, cancellationToken);
                 if (!alreadyAudited)
                 {

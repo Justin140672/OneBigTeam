@@ -105,8 +105,6 @@ public class EmployeeRenumberSideEffectJobTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => job.ProcessAsync(message.Id, companyId));
 
         var reloaded = await context.OutboxMessages.SingleAsync(m => m.Id == message.Id);
-        // Below MaxAttempts (4) â€” MarkProcessing bumped AttemptCount to 1, but the row is NOT
-        // marked Failed yet since this isn't the final attempt.
         Assert.Equal(1, reloaded.AttemptCount);
         Assert.Equal(OutboxMessage.StatusProcessing, reloaded.Status);
         Assert.Null(reloaded.FailedAt);
@@ -126,8 +124,6 @@ public class EmployeeRenumberSideEffectJobTests
             context, renumberingService, new FakeClock(new DateTime(2026, 8, 25, 11, 0, 0, DateTimeKind.Utc)),
             NullLogger<EmployeeRenumberSideEffectJob>.Instance);
 
-        // Drive AttemptCount up to MaxAttempts (4) by repeatedly invoking ProcessAsync against a
-        // service that always throws â€” each call increments AttemptCount by one via MarkProcessing.
         for (var attempt = 1; attempt < EmployeeRenumberSideEffectJob.MaxAttempts; attempt++)
         {
             await Assert.ThrowsAsync<InvalidOperationException>(() => job.ProcessAsync(message.Id, companyId));
@@ -137,7 +133,6 @@ public class EmployeeRenumberSideEffectJobTests
         Assert.Equal(EmployeeRenumberSideEffectJob.MaxAttempts - 1, beforeFinal.AttemptCount);
         Assert.Equal(OutboxMessage.StatusProcessing, beforeFinal.Status);
 
-        // Final attempt: AttemptCount reaches MaxAttempts, so this is the final attempt.
         await Assert.ThrowsAsync<InvalidOperationException>(() => job.ProcessAsync(message.Id, companyId));
 
         var reloaded = await context.OutboxMessages.SingleAsync(m => m.Id == message.Id);
@@ -148,9 +143,6 @@ public class EmployeeRenumberSideEffectJobTests
         Assert.Equal(EmployeeRenumberSideEffectJob.MaxAttempts, renumberingService.CallCount);
     }
 
-    // OBT-REM-11: the caller-supplied companyId (used to scope the Hangfire failure audit to a
-    // tenant) must be verified against the entity actually loaded, so a caller cannot enqueue a
-    // job whose job-argument company id disagrees with the outbox row it operates on.
     [Fact]
     public async Task ProcessAsync_Throws_When_Supplied_CompanyId_Does_Not_Match_Outbox_Message()
     {

@@ -23,7 +23,6 @@ public class DownloadCandidateDocumentHandlerTests
         var companyId = Guid.NewGuid();
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
         var document = CandidateDocument.Create(Guid.NewGuid(), companyId, candidate.Id, "Resume", "resume.pdf", 1024, "application/pdf", "storage/key/resume.pdf", Guid.NewGuid(), Now);
-        // [P1] Only a document whose malware scan is Clean is downloadable.
         document.BeginScanAttempt(Now);
         document.MarkScanClean(Now);
         db.Candidates.Add(candidate);
@@ -39,7 +38,6 @@ public class DownloadCandidateDocumentHandlerTests
         Assert.Equal(new[] { document.StorageKey }, storage.DownloadUrlRequests);
     }
 
-    // ── [P1] Malware-scan gating ──────────────────────────────────────────────────────────────
 
     [Theory]
     [InlineData(nameof(CandidateDocumentScanStatus.Pending), "document_scan_pending")]

@@ -76,7 +76,6 @@ public class CloseSicknessRecordEndpointTests
         var categoryId = await CreateCategory(client, companyId);
         var recordId = await CreateSicknessRecord(client, companyId, employeeId, categoryId);
 
-        // 2026-07-01 (Wed) to 2026-07-03 (Fri) = 3 working days
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/sickness-records/{recordId}/close",
             new
@@ -106,7 +105,6 @@ public class CloseSicknessRecordEndpointTests
         var categoryId = await CreateCategory(client, companyId);
         var recordId = await CreateSicknessRecord(client, companyId, employeeId, categoryId);
 
-        // Close it once
         var firstClose = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/sickness-records/{recordId}/close",
             new
@@ -119,7 +117,6 @@ public class CloseSicknessRecordEndpointTests
             });
         Assert.Equal(HttpStatusCode.OK, firstClose.StatusCode);
 
-        // Try to close again
         var secondClose = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/sickness-records/{recordId}/close",
             new
@@ -170,7 +167,7 @@ public class CloseSicknessRecordEndpointTests
                 companyId,
                 employeeId,
                 id = recordId,
-                endDate = "2026-06-30", // before startDate 2026-07-01
+                endDate = "2026-06-30",
                 endDayPart = 0
             });
 

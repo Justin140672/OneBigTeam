@@ -36,8 +36,6 @@ public sealed class SensitiveDataProtectionReadinessTests : IClassFixture<ApiWeb
         var body = await response.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(body);
 
-        // The base ApiWebApplicationFactory host runs as Development, so the readiness endpoint
-        // includes full per-check detail without needing the X-Health-Token header.
         Assert.True(doc.RootElement.TryGetProperty("checks", out var checks));
 
         var encryptionCheck = checks.EnumerateArray()

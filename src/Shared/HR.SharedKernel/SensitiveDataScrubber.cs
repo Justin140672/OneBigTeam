@@ -2,24 +2,6 @@ using System.Text.RegularExpressions;
 
 namespace HR.SharedKernel;
 
-/// <summary>
-/// NFR-01: single source of truth for sensitive-data classification, shared by the audit
-/// payload redaction guard, structured-logging enricher and OpenTelemetry trace processor.
-///
-/// Two independent checks are provided:
-/// <list type="bullet">
-/// <item><description>
-/// <see cref="IsProhibitedFieldName"/> — the field/property/tag <b>name</b> is inherently
-/// sensitive (e.g. <c>salary</c>, <c>nationalInsuranceNumber</c>, <c>bankAccountNumber</c>,
-/// <c>password</c>, <c>token</c>).
-/// </description></item>
-/// <item><description>
-/// <see cref="ContainsSensitiveValue"/> / <see cref="ScrubText"/> — the <b>value</b> looks
-/// like a sensitive token regardless of the field it sits in (NI number, IBAN, sort code,
-/// bank/card number, bearer token, JWT, bcrypt/argon hash).
-/// </description></item>
-/// </list>
-/// </summary>
 public static class SensitiveDataScrubber
 {
     public const string Redacted = "***REDACTED***";
@@ -32,7 +14,6 @@ public static class SensitiveDataScrubber
     /// </summary>
     public const string ProtectedValuePrefix = "OBTENC1:";
 
-    /// <summary>Returns true when <paramref name="value"/> is an already-encrypted protected token.</summary>
     public static bool IsProtectedValue(string? value) =>
         !string.IsNullOrEmpty(value) && value.StartsWith(ProtectedValuePrefix, StringComparison.Ordinal);
 
@@ -43,23 +24,17 @@ public static class SensitiveDataScrubber
     /// </summary>
     public static readonly IReadOnlyCollection<string> ProhibitedFieldNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
-        // Compensation / financial amounts
         "salary", "previousSalary", "currentSalary", "newSalary", "oldSalary",
         "salaryAmount", "annualSalary", "baseSalary", "proposedSalary", "grossSalary",
         "compensation", "compensationAmount", "payAmount", "hourlyRate", "dayRate",
         "bonus", "bonusAmount",
-        // Tax / government identifiers
         "nationalInsuranceNumber", "niNumber", "ni", "nino", "taxCode", "taxIdentifier", "utr",
-        // Banking
         "bankAccountNumber", "accountNumber", "sortCode", "iban", "bankAccount", "bic", "swift",
         "cardNumber", "cvv",
-        // Authentication / credentials
         "password", "passwordHash", "token", "secret", "clientSecret", "apiKey",
         "refreshToken", "accessToken", "bearerToken", "authorization", "credentials",
         "privateKey", "connectionString",
-        // Personal identifiers / contact
         "dateOfBirth", "dob", "personalEmail", "personalPhone", "personalPhoneNumber", "homeAddress",
-        // Medical / sickness
         "medicalNote", "sicknessNote", "diagnosisNote", "diagnosisCode",
         // Equality & diversity monitoring (special-category data — Ticket 3).
         // Exact names only: the audit redaction guard rejects (drops) a payload containing any of
@@ -73,9 +48,6 @@ public static class SensitiveDataScrubber
         "religionOrBelief", "religionOrBeliefSelfDescribed", "religion",
     };
 
-    /// <summary>
-    /// Substrings that make any compound field name sensitive (e.g. <c>BankAccountSortCode</c>).
-    /// </summary>
     public static readonly IReadOnlyCollection<string> ProhibitedNameFragments = new[]
     {
         "nationalinsurance", "national_insurance",
@@ -101,23 +73,17 @@ public static class SensitiveDataScrubber
         ("Iban", new Regex(
             @"\b[A-Z]{2}\d{2}[A-Z0-9]{11,30}\b",
             RegexOptions.Compiled)),
-        // UK sort code 12-34-56.
         ("SortCode", new Regex(@"\b\d{2}-\d{2}-\d{2}\b", RegexOptions.Compiled)),
-        // Bank account / payment card number: 12-19 consecutive digits.
         ("BankOrCardNumber", new Regex(@"\b\d{12,19}\b", RegexOptions.Compiled)),
-        // Bearer token in an Authorization header value.
         ("BearerToken", new Regex(
             @"(?i)\bbearer\s+[A-Za-z0-9\-._~+/]+=*",
             RegexOptions.Compiled)),
-        // JSON Web Token.
         ("Jwt", new Regex(
             @"\beyJ[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\.[A-Za-z0-9_-]{5,}\b",
             RegexOptions.Compiled)),
-        // bcrypt password hash.
         ("BcryptHash", new Regex(
             @"\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}",
             RegexOptions.Compiled)),
-        // argon2 / PHC-style password hash.
         ("Argon2Hash", new Regex(
             @"\$argon2(id|i|d)\$[^\s""]+",
             RegexOptions.IgnoreCase | RegexOptions.Compiled)),
@@ -140,17 +106,11 @@ public static class SensitiveDataScrubber
         return false;
     }
 
-    /// <summary>Returns the name of the first sensitive value pattern matched, or null.</summary>
     public static string? MatchSensitiveValue(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
             return null;
 
-        // A value that is exactly a GUID is never a bank account / card / NI number / token —
-        // but a GUID's 12-hex final segment (or an all-zero seeded id like
-        // 00000000-0000-0000-0000-000000000001) trivially trips the "12-19 consecutive digits"
-        // BankOrCardNumber pattern. Audit payloads and structured logs are full of GUID entity
-        // ids, so treat a standalone GUID as non-sensitive rather than over-matching it.
         var trimmed = value.Trim();
         if (Guid.TryParse(trimmed, out _))
             return null;
@@ -166,11 +126,6 @@ public static class SensitiveDataScrubber
 
     public static bool ContainsSensitiveValue(string? value) => MatchSensitiveValue(value) is not null;
 
-    /// <summary>
-    /// Masks an email address for logging: keeps up to the first two characters of the local part
-    /// and the full domain (e.g. <c>ja***@example.com</c>). Returns <see cref="Redacted"/> when the
-    /// value is null/blank or not a recognisable <c>local@domain</c> address.
-    /// </summary>
     public static string MaskEmail(string? email)
     {
         if (string.IsNullOrWhiteSpace(email))
@@ -187,7 +142,6 @@ public static class SensitiveDataScrubber
         return $"{visible}***@{domain}";
     }
 
-    /// <summary>Replaces every sensitive-looking token in <paramref name="text"/> with <see cref="Redacted"/>.</summary>
     public static string ScrubText(string? text)
     {
         if (string.IsNullOrEmpty(text))

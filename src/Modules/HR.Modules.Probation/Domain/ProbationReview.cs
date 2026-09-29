@@ -15,11 +15,6 @@ internal sealed class ProbationReview
     public ProbationOutcome? Outcome { get; private set; }
     public string? Notes { get; private set; }
 
-    /// <summary>
-    /// Set when this review is cancelled because it was superseded by a replacement review
-    /// (e.g. a FinalDecision review rescheduled to a new expected end date after an extension).
-    /// Null for reviews that were never superseded.
-    /// </summary>
     public Guid? SupersededByReviewId { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -55,12 +50,6 @@ internal sealed class ProbationReview
         UpdatedAt = now;
     }
 
-    /// <summary>
-    /// Cancels a still-pending review because it has been superseded by a replacement review
-    /// (e.g. probation extended, so the original FinalDecision due date no longer applies).
-    /// No-op if the review is already Cancelled or Completed, so callers can call this
-    /// unconditionally without checking status first.
-    /// </summary>
     public void Cancel(Guid? supersededByReviewId, DateTimeOffset now)
     {
         if (Status != ProbationReviewStatus.Pending)

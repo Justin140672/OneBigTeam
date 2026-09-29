@@ -31,17 +31,10 @@ namespace HR.Web.Services;
 // AppSessionAuthStateProvider.ApplyState for the consumer of this state.
 public enum CircuitAuthStatus
 {
-    // Never seeded with any real token yet (fresh circuit, or a circuit that has only ever seen
-    // anonymous connections). A first authenticated token must still be accepted normally.
     Uninitialized,
 
-    // Currently holds a valid token for its current identity.
     Authenticated,
 
-    // Was authenticated and was then invalidated (anonymous reconnect, or a different identity
-    // arriving on a live circuit). Sticky: once Invalidated, this instance must never accept
-    // another token — only a genuinely new circuit (a brand-new CircuitSessionState instance via
-    // DI scoping) can authenticate again.
     Invalidated,
 }
 

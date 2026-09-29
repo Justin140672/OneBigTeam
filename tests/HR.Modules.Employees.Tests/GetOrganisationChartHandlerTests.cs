@@ -58,9 +58,6 @@ public class GetOrganisationChartHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_Employees_Of_All_Statuses_When_No_Status_Filter_Applied()
     {
-        // Status is an optional filter, not a hardcoded restriction — with none supplied, every
-        // employee regardless of status is returned (the Organisation Chart page itself defaults
-        // its own Status dropdown to Active, but the handler stays a generic, flexible filter).
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
@@ -116,8 +113,6 @@ public class GetOrganisationChartHandlerTests
         });
     }
 
-    // Transitions the given employee (starting Draft) via `transition`, then confirms an explicit
-    // Status = Active request excludes them (they never reach Active themselves in these cases).
     private static async Task AssertStatusFilteredAsync(Action<Employee> transition)
     {
         await using var context = BuildContext();
@@ -264,8 +259,6 @@ public class GetOrganisationChartHandlerTests
     [Fact]
     public async Task HandleAsync_ProfilePhotoUrl_Is_Null_For_Employee_Without_Live_Photo()
     {
-        // FakeProfilePhotoReader has no entry seeded for this employee — the reader's
-        // "not found = absent" convention must surface as a null ProfilePhotoUrl, not an exception.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);

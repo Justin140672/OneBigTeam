@@ -1,12 +1,6 @@
 namespace HR.Web.Models;
 
-// DSH-04: client-side mirrors of the authoritative recruitment dashboard metric endpoints
-// (specifications/product-specifications/recruitment-dashboard-metrics.md). Every endpoint returns
-// { count, items[] } where count == items.Count by construction, so a tile and its drill-down list
-// can never disagree. JSON string enums via HrApiJsonOptions.Default, matching the codebase convention.
 
-// Uniform application row shared by the new-applications, candidates-in-progress and
-// offers-awaiting-response metrics.
 public sealed record RecruitmentMetricApplicationItem(
     Guid ApplicationId,
     Guid CandidateId,
@@ -46,5 +40,4 @@ public sealed record InterviewsRequiringActionMetricResponse(
     int Count,
     IReadOnlyList<RecruitmentMetricInterviewItem> Items);
 
-// Flattened row for the dashboard drill-down dialog (RecruitmentMetricDrillDownDialog).
 public sealed record RecruitmentMetricDrillDownRow(string Name, string VacancyTitle, DateTime Date);

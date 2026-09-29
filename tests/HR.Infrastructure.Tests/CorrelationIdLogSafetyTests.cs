@@ -8,15 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Infrastructure.Tests;
 
-/// <summary>
-/// CodeQL #63-#65, #67 (log forging via the caller-supplied X-Correlation-ID header): the
-/// correlation id flows from <see cref="CorrelationIdMiddleware"/> into the ambient
-/// <see cref="IExecutionContext"/> and from there into every log line and log scope written by
-/// <see cref="IntegrationEventPublisher"/> (#67) and the attachment cleanup paths (#63-#65). These
-/// tests pin the length/character allow-list (including the <c>\z</c> anchor fix — "abc" + LF used
-/// to be accepted by a <c>$</c>-anchored regex) and prove end to end that a hostile header is
-/// replaced by a server-generated GUID before it can reach any log entry.
-/// </summary>
 public class CorrelationIdLogSafetyTests
 {
     private const char LineSeparator = (char)0x2028;

@@ -6,7 +6,6 @@ using HR.SharedKernel;
 
 namespace HR.Web.Models;
 
-// ── LIST ──────────────────────────────────────────────────────────────────────
 
 public record ListEmployeesResponse(
     List<EmployeeListItemModel> Items,
@@ -39,7 +38,6 @@ public record EmployeeListItemModel(
     public string FullName => $"{FirstName} {LastName}";
 }
 
-// ── DIRECTORY SEARCH (top-bar employee search) ────────────────────────────────
 
 public record EmployeeDirectorySearchResponse(IReadOnlyList<EmployeeDirectorySearchItem> Items);
 
@@ -55,7 +53,6 @@ public record EmployeeDirectorySearchItem(
     public string FullName => $"{FirstName} {LastName}";
 }
 
-// ── GET ───────────────────────────────────────────────────────────────────────
 
 public record GetEmployeeResponse(
     Guid Id,
@@ -114,8 +111,6 @@ public record GetEmployeeResponse(
     // Ticket 2: optimistic-concurrency token echoed back on the next employee edit save.
     int Version = 0);
 
-// Ordered from the top of the org down to the employee's immediate manager; does not include
-// the employee themselves.
 public sealed record ReportingChainItemModel(Guid EmployeeId, string Name, string? JobTitle);
 
 // ── GET (manager team-view: operational fields only) ────────────────────────────
@@ -152,7 +147,6 @@ public sealed record GetEmployeeTeamViewResponse(
     bool ShowOffboardingTab,
     bool ShowLeavingTab);
 
-// ── PERSONAL DETAILS ──────────────────────────────────────────────────────────
 
 public sealed record GetMyPersonalDetailsResponse(
     Guid EmployeeId,
@@ -167,7 +161,6 @@ public sealed record RequestPersonalDetailsChangeRequest(string Notes);
 
 public sealed record RequestPersonalDetailsChangeResponse(Guid TaskId);
 
-// ── EDIT MODELS ───────────────────────────────────────────────────────────────
 
 public sealed class EmployeeProfileEditModel
 {
@@ -204,21 +197,14 @@ public sealed class EmployeeProfileEditModel
         get => _postCode;
         set => _postCode = value.ToUpperInvariant();
     }
-    // Not user-editable (UK-only for now) — no Country input is rendered on the employee form.
-    // Defaults here for new employees; an existing non-empty value is preserved on load.
     public string Country { get; set; } = "United Kingdom";
 
-    // Populated from the company's settings after load; not bound to any input — used only as
-    // the pattern source for the [DynamicRegex] attributes above.
     public string? PostcodeRegexPattern { get; set; }
     public string? TelephoneRegexPattern { get; set; }
     public string? MobileRegexPattern { get; set; }
     [RequiredUnless(nameof(EmployeeNumberAutoAssigned), ErrorMessage = "Employee number is required.")]
     public string EmployeeNumber { get; set; } = string.Empty;
 
-    // Set by EmployeeEdit for a brand-new employee when the company's numbering mode is
-    // Automatic — the Employee Number field is hidden in that case and this flag lets
-    // RequiredUnless skip validation instead of blocking Save with an empty required field.
     public bool EmployeeNumberAutoAssigned { get; set; }
     [Required(ErrorMessage = "Employment type is required.")]
     public Guid? EmploymentTypeId { get; set; }
@@ -262,9 +248,6 @@ public record UpdateEmployeeProfileRequest(
     bool HasSystemAccess,
     WorkingDays? WorkingDaysOverride,
     decimal? HoursPerDayOverride,
-    // Optional — see UpdateEmploymentDetailsRequest.CorrelationId's remarks. Lets
-    // EmployeeEdit.razor's combined Save merge this profile update with the Employment tab's
-    // update into a single audit history entry.
     Guid? CorrelationId = null,
     // Ticket 2: the Employee.Version loaded before editing. When set, the save is rejected with a
     // concurrency conflict if the record changed in the meantime.
@@ -284,7 +267,6 @@ public record UpdateEmployeeProfileResponse(
     DateTimeOffset UpdatedAt,
     int Version = 0);
 
-// ── CREATE ────────────────────────────────────────────────────────────────────
 
 public sealed class CreateEmployeeFormModel
 {
@@ -332,7 +314,6 @@ public record CreateEmployeeResponse(
     string Status,
     DateTimeOffset CreatedAt);
 
-// ── CONTACT DETAILS ───────────────────────────────────────────────────────────
 
 public sealed record GetMyContactDetailsResponse(
     string WorkEmail,
@@ -360,7 +341,6 @@ public sealed record UpdateMyContactDetailsRequest(
     string Country,
     int? ExpectedVersion = null);
 
-// ── EMERGENCY CONTACTS ────────────────────────────────────────────────────────
 
 public sealed record EmergencyContactItem(
     Guid Id,
@@ -386,7 +366,6 @@ public sealed record UpdateEmergencyContactRequest(
     string PhoneNumber,
     string? Email);
 
-// ── EMPLOYMENT DETAILS ────────────────────────────────────────────────────────
 
 public record UpdateEmploymentDetailsRequest(
     Guid CompanyId,
@@ -407,18 +386,10 @@ public record UpdateEmploymentDetailsRequest(
     string? Notes,
     NoticePeriodUnit? NoticePeriodUnitOverride = null,
     int? NoticePeriodLengthOverride = null,
-    // Ticket: "merge Employee + Employment tab audit entries when saved together". Optional —
-    // when EmployeeEdit.razor's SaveCoreAsync saves both tabs in one click, it generates one Guid
-    // and passes it into both this request and UpdateEmployeeProfileRequest, so
-    // GetEmployeeAuditHistoryHandler can merge the two resulting audit rows into a single entry.
-    // Left null (the default) by EmployeeEmploymentTab.SaveAsync's other callers, if any, so their
-    // audit entries remain separate exactly as before.
     Guid? CorrelationId = null,
     // Ticket 2: optimistic-concurrency token loaded before editing.
     int? ExpectedVersion = null);
 
-// Item 5: atomic combined Employee Profile + Employment save. One request, one version guarding
-// the shared Employee aggregate, one merged audit entry.
 public record UpdateEmployeeProfileAndEmploymentRequest(
     Guid CompanyId,
     Guid Id,
@@ -461,7 +432,6 @@ public record UpdateEmployeeProfileAndEmploymentRequest(
 
 public record UpdateEmployeeProfileAndEmploymentResponse(int Version = 0);
 
-// ── LEAVING PROCESS ────────────────────────────────────────────────────────────
 
 public sealed record StartLeavingProcessRequest(
     Guid CompanyId,
@@ -471,7 +441,6 @@ public sealed record StartLeavingProcessRequest(
     DateOnly LastWorkingDay,
     string LeavingReason,
     bool ConfirmBackdatedLeavingDate = false,
-    // Mandatory when LeavingReason is "Other"; optional explanatory notes otherwise.
     string? Notes = null);
 
 public sealed record StartLeavingProcessResponse(
@@ -505,9 +474,6 @@ public sealed record LeavingProcessResponse(
     string? CancellationReason = null,
     string? Notes = null);
 
-// Section 7 of the leaving/offboarding workspace: distinguishes "no leaving process has ever been
-// started" (NotFound) from "we couldn't load it" (Failed) so the UI never shows an empty state when
-// retrieval actually failed. Exactly one of NotFound/Failed/(Process != null) is true.
 public sealed record LeavingProcessLookupResult(LeavingProcessResponse? Process, bool NotFound, bool Failed)
 {
     public static LeavingProcessLookupResult SuccessResult(LeavingProcessResponse? process) => new(process, false, false);
@@ -524,7 +490,6 @@ public sealed record AmendLeavingProcessRequest(
     bool ConfirmBackdatedLeavingDate = false,
     // Ticket 2: optimistic-concurrency token loaded before editing.
     int? ExpectedVersion = null,
-    // Mandatory when LeavingReason is "Other"; optional explanatory notes otherwise.
     string? Notes = null);
 
 public sealed record AmendLeavingProcessResponse(
@@ -556,7 +521,6 @@ public sealed record CancelLeavingProcessResponse(
     string Status,
     bool OffboardingTasksCancelled);
 
-// ── LEAVING PROCESS HISTORY ───────────────────────────────────────────────────
 
 public sealed record GetLeavingProcessHistoryResponse(IReadOnlyList<LeavingProcessHistoryItem> Items);
 
@@ -576,9 +540,7 @@ public sealed record LeavingProcessHistoryItem(
     DateTimeOffset UpdatedAt,
     bool IsCurrent);
 
-// ── NATIONALITIES ─────────────────────────────────────────────────────────────
 
-// ── COMPLETE INITIAL EMPLOYEE SETUP ─────────────────────────────────────────────
 
 public record CompleteInitialEmployeeSetupRequest(
     string FirstName,
@@ -607,11 +569,6 @@ public record ListNationalitiesResponse(IReadOnlyList<NationalityListItem> Items
 
 public record NationalityListItem(int Id, string Name);
 
-// ── EQUALITY & DIVERSITY (self-service) ───────────────────────────────────────
-//
-// Local mirrors of HR.Modules.Employees' internal enums (they cannot be referenced from
-// HR.Web). Enum members are serialized/deserialized by NAME (see HrApiJsonOptions.Default).
-// null or "NotSpecified" both mean "not answered".
 
 public enum GenderIdentityChoice { NotSpecified, Man, Woman, NonBinary, SelfDescribed, PreferNotToSay }
 
@@ -669,8 +626,6 @@ public sealed record SaveMyEqualityDataRequest(
 
 public sealed record EqualityFieldOption<T>(T Value, string Label);
 
-// ── EQUALITY & DIVERSITY: ANONYMOUS AGGREGATE REPORT ────────────────────────────
-// Counts and percentages only — never employee identifiers or row-level data.
 
 public sealed record GetEqualityDiversityReportResponse(
     int TotalEmployees,
@@ -691,7 +646,6 @@ public sealed record EqualityReportRowModel(
     decimal Percentage,
     bool Suppressed);
 
-// ── DASHBOARD: HEADCOUNT SUMMARY ────────────────────────────────────────────────
 
 public sealed record GetHeadcountSummaryResponse(IReadOnlyList<HeadcountSummaryItem> Items);
 
@@ -700,7 +654,6 @@ public sealed record HeadcountSummaryItem(
     string DepartmentName,
     int EmployeeCount);
 
-// ── DASHBOARD: NEW HIRES TREND ──────────────────────────────────────────────────
 
 public sealed record GetNewHiresTrendResponse(IReadOnlyList<NewHiresTrendItem> Items);
 
@@ -710,7 +663,6 @@ public sealed record NewHiresTrendItem(
     string MonthLabel,
     int NewHireCount);
 
-// ── DASHBOARD: RECENT EMPLOYEE CHANGES ──────────────────────────────────────────
 
 public sealed record GetRecentEmployeeChangesResponse(IReadOnlyList<RecentEmployeeChangeItem> Items);
 
@@ -720,7 +672,6 @@ public sealed record RecentEmployeeChangeItem(
     string Action,
     string ActorName);
 
-// ── DASHBOARD: MY TEAM ──────────────────────────────────────────────────────────
 
 public sealed record GetMyTeamResponse(IReadOnlyList<TeamMemberItem> Items);
 
@@ -733,7 +684,6 @@ public sealed record TeamMemberItem(
     string? ProfilePhotoUrl,
     string Status);
 
-// ── MY TEAM: FULL ROSTER (behind "View all team") ───────────────────────────────
 
 public sealed record GetMyTeamRosterResponse(IReadOnlyList<TeamRosterItem> Items);
 
@@ -745,15 +695,11 @@ public sealed record TeamRosterItem(
     string? JobTitle,
     string WorkEmail,
     string? ProfilePhotoUrl,
-    // Raw HR.Modules.Employees.Domain.EmploymentStatus name (Draft/Active/Suspended/Leaving —
-    // FormerEmployee is excluded server-side, never returned here). Humanize for display, don't
-    // show the raw identifier.
     string Status)
 {
     public string FullName => $"{FirstName} {LastName}";
 }
 
-// ── DASHBOARD: TEAM STATUS SUMMARY ──────────────────────────────────────────────
 
 public sealed record TeamStatusSummaryResponse(
     int TeamSize,
@@ -777,7 +723,6 @@ public sealed record TeamStatusMemberItem(
     bool ScheduledToday,
     string PrimaryStatus);
 
-// ── DASHBOARD: GENDER SPLIT ──────────────────────────────────────────────────
 
 public sealed record GetGenderSplitResponse(IReadOnlyList<GenderSplitItem> Items);
 
@@ -786,7 +731,6 @@ public sealed record GenderSplitItem(
     int EmployeeCount,
     double Percentage);
 
-// ── DASHBOARD: EMPLOYMENT TYPE SPLIT ─────────────────────────────────────────
 
 public sealed record GetEmploymentTypeSplitResponse(IReadOnlyList<EmploymentTypeSplitItem> Items);
 

@@ -5,14 +5,12 @@ namespace HR.Modules.DataImport.Services;
 
 internal sealed class ImportFileValidator : IImportFileValidator
 {
-    // Maps a declared content type to the magic byte sequences that identify it.
-    // XLSX is a ZIP/OOXML container, so it shares the PK signatures used for other Office Open XML formats.
     private static readonly Dictionary<string, byte[][]> MagicBytes = new(StringComparer.OrdinalIgnoreCase)
     {
         ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"] =
         [
-            [0x50, 0x4B, 0x03, 0x04], // PK (ZIP)
-            [0x50, 0x4B, 0x05, 0x06], // PK empty archive
+            [0x50, 0x4B, 0x03, 0x04],
+            [0x50, 0x4B, 0x05, 0x06],
         ],
     };
 
@@ -57,7 +55,7 @@ internal sealed class ImportFileValidator : IImportFileValidator
         var normalizedContentType = contentType.Split(';')[0].Trim();
 
         if (!MagicBytes.TryGetValue(normalizedContentType, out var signatures))
-            return Result.Success(); // no known signature for this content type; defer to other checks
+            return Result.Success();
 
         Span<byte> header = stackalloc byte[4];
         var read = content.Read(header);

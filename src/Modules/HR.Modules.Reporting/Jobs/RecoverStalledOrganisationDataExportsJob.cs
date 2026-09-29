@@ -69,9 +69,6 @@ internal sealed class RecoverStalledOrganisationDataExportsJob(
                 continue;
             }
 
-            // Follow-up H: InProgress and apparently stale. Atomically claim recovery ownership before
-            // touching any files. The claim rechecks status + lease expiry, so it is abandoned if the
-            // original worker has completed, renewed its lease, or another recovery sweep won the race.
             var recoveryToken = Guid.NewGuid();
             if (!await jobStore.ClaimForRecoveryAsync(export.Id, recoveryToken, cancellationToken))
             {
@@ -81,8 +78,6 @@ internal sealed class RecoverStalledOrganisationDataExportsJob(
                 continue;
             }
 
-            // We now hold the lease. Any attempt archives belong to dead/superseded workers and are
-            // safe to sweep — but never the published archive (guarded in CleanUpAttemptFilesAsync).
             await CleanUpAttemptFilesAsync(export, cancellationToken);
 
             if (export.AttemptCount < OrganisationDataExport.MaxAttempts)
@@ -122,7 +117,6 @@ internal sealed class RecoverStalledOrganisationDataExportsJob(
             var keys = await storage.ListAttemptKeysAsync(export.CompanyId, export.Id, cancellationToken);
             foreach (var key in keys)
             {
-                // Follow-up H: never delete a published archive during recovery cleanup.
                 if (!string.IsNullOrWhiteSpace(export.StorageKey) &&
                     string.Equals(key, export.StorageKey, StringComparison.Ordinal))
                     continue;

@@ -3,11 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the Leave Policy list/edit pages: loading, creating, editing, and the two ways to
-/// mark a policy as the company's default (the "Is Default" checkbox on the edit form, and the
-/// "Set as Default" toolbar action on the list).
-/// </summary>
 public sealed class LeavePolicyManagementTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -86,7 +81,6 @@ public sealed class LeavePolicyManagementTests(HrAdminPersonaFixture fixture) : 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}{updatedHref}");
         await _page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
 
-        // Reload directly to confirm the change persisted server-side, not just in local state.
         await _page.ReloadAsync();
         await _page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
 
@@ -132,7 +126,6 @@ public sealed class LeavePolicyManagementTests(HrAdminPersonaFixture fixture) : 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Create two new, non-default policies for this run.
         await polList.GoToAsync(AcmeId);
         await polList.ClickNewAsync();
         await polEdit.FillNameAsync(first);

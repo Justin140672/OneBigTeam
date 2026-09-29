@@ -136,7 +136,6 @@ public class RecruitmentDataExportSourceTests
         Assert.Null(rowsById[legacyApp.Id.ToString()][sourceIndex]);
         Assert.Equal("false", rowsById[legacyApp.Id.ToString()][isInternalIndex]);
 
-        // Hired external candidate has Candidate.EmployeeId set but is still external.
         Assert.Equal("JobBoard", rowsById[hiredApp.Id.ToString()][sourceIndex]);
         Assert.Equal("false", rowsById[hiredApp.Id.ToString()][isInternalIndex]);
     }

@@ -3,9 +3,6 @@ using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Identity.Features.ListInvitableEmployees;
 
-// ADM-01: drives the "select an existing employee" step of the in-admin Invite user workflow.
-// Gated by users:manage (the same policy as InviteEmployeeUser) since it is part of a mutation flow
-// and reveals which employees have no account yet.
 internal sealed class Endpoint(ListInvitableEmployeesHandler handler)
     : Endpoint<ListInvitableEmployeesRequest, ListInvitableEmployeesResponse>
 {

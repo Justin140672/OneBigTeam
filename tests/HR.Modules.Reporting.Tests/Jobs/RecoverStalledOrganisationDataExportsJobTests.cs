@@ -181,8 +181,8 @@ public class RecoverStalledOrganisationDataExportsJobTests
         store.ClaimResults[row.Id] = new Queue<bool>([true, false]);
         var client = new RecordingBackgroundJobClient();
 
-        await Build(store, client).ExecuteAsync(); // wins
-        await Build(store, client).ExecuteAsync(); // loses the claim
+        await Build(store, client).ExecuteAsync();
+        await Build(store, client).ExecuteAsync();
 
         Assert.Equal(2, store.ClaimForRecoveryCalls.Count);
         Assert.Equal(new[] { row.Id }, store.ResetForRetryCalls);
@@ -261,7 +261,7 @@ public class RecoverStalledOrganisationDataExportsJobTests
         try
         {
             var workspaceFactory = new OrganisationDataExportWorkspaceFactory(rootOverride: root);
-            var store = new FakeRecoveryJobStore(); // nothing recoverable
+            var store = new FakeRecoveryJobStore();
             var client = new RecordingBackgroundJobClient();
 
             await Build(store, client, workspaceFactory: workspaceFactory).ExecuteAsync();
@@ -285,10 +285,8 @@ public class RecoverStalledOrganisationDataExportsJobTests
         public DateTimeOffset PendingCutoff { get; private set; }
         public DateTimeOffset LeaseExpiredAsOf { get; private set; }
 
-        /// <summary>Follow-up H: per-export claim outcome. Missing entry defaults to <c>true</c>.</summary>
         public Dictionary<Guid, Queue<bool>> ClaimResults { get; } = [];
 
-        /// <summary>Follow-up H: per-export reset outcome. Missing entry defaults to <c>true</c>.</summary>
         public HashSet<Guid> RefuseResetFor { get; } = [];
 
         public Task<IReadOnlyList<OrganisationDataExportJobView>> GetRecoverableAsync(

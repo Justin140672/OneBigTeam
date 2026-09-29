@@ -22,7 +22,6 @@ internal sealed class FakeEmployeeApplicantReader : IEmployeeApplicantReader
             Set(profile);
     }
 
-    /// <summary>Adds or replaces the profile for (profile.CompanyId, profile.EmployeeId).</summary>
     public void Set(EmployeeApplicantProfile profile) =>
         _profiles[(profile.CompanyId, profile.EmployeeId)] = profile;
 

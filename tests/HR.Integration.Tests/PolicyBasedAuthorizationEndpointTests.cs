@@ -4,15 +4,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// IAM-06: end-to-end proof that a representative sample of real endpoints gated by
-/// <see cref="HR.Modules.Identity.Authorization.PolicyCatalog"/> policies actually enforce
-/// permission-based access through the live ASP.NET Core authorization pipeline (as opposed to the
-/// unit-level <c>PolicyMatrixTests</c>/<c>PermissionAuthorizationHandlerTests</c>, which exercise the
-/// data and the handler in isolation). The `GetEffectiveAccessEndpointTests` file already covers the
-/// "users:manage" policy end-to-end (the endpoint most directly connected to this ticket), so this
-/// file covers two additional policies instead of duplicating that coverage.
-/// </summary>
 [Collection("Integration")]
 public class PolicyBasedAuthorizationEndpointTests
 {
@@ -32,8 +23,6 @@ public class PolicyBasedAuthorizationEndpointTests
         return client;
     }
 
-    // --- "asset:view" (granted to Employee, Manager, HrAdministrator — not Recruiter) ---
-    // GET /api/companies/{companyId}/employees/{employeeId}/assets
 
     [Fact]
     public async Task Get_EmployeeAssets_Returns_Unauthorized_For_Anonymous_Request()
@@ -50,7 +39,6 @@ public class PolicyBasedAuthorizationEndpointTests
     public async Task Get_EmployeeAssets_Returns_Forbidden_For_Role_Without_AssetView_Permission()
     {
         var companyId = Guid.NewGuid();
-        // Recruiter does not hold "asset:view" per RolePermissionConfiguration.cs.
         using var client = await AuthenticatedClient(companyId, Guid.NewGuid(), SystemRoles.Recruiter);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/employees/{Guid.NewGuid()}/assets");
@@ -62,9 +50,6 @@ public class PolicyBasedAuthorizationEndpointTests
     public async Task Get_EmployeeAssets_Returns_OK_For_Role_With_AssetView_Permission()
     {
         var companyId = Guid.NewGuid();
-        // Employee holds "asset:view" per RolePermissionConfiguration.cs.
-        // The employee lists their own assets (self-service); listing another employee's assets is
-        // additionally restricted to that employee's direct manager or an HR Administrator.
         var userId = Guid.NewGuid();
         using var client = await AuthenticatedClient(companyId, userId, SystemRoles.Employee);
 
@@ -73,8 +58,6 @@ public class PolicyBasedAuthorizationEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    // --- "leave:approve" (granted to Manager, HrAdministrator — not Employee) ---
-    // GET /api/companies/{companyId}/leave-policies
 
     [Fact]
     public async Task Get_LeavePolicies_Returns_Unauthorized_For_Anonymous_Request()
@@ -91,7 +74,6 @@ public class PolicyBasedAuthorizationEndpointTests
     public async Task Get_LeavePolicies_Returns_Forbidden_For_Role_Without_LeaveApprove_Permission()
     {
         var companyId = Guid.NewGuid();
-        // Employee does not hold "leave:approve" per RolePermissionConfiguration.cs.
         using var client = await AuthenticatedClient(companyId, Guid.NewGuid(), SystemRoles.Employee);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/leave-policies");
@@ -103,7 +85,6 @@ public class PolicyBasedAuthorizationEndpointTests
     public async Task Get_LeavePolicies_Returns_OK_For_Role_With_LeaveApprove_Permission()
     {
         var companyId = Guid.NewGuid();
-        // Manager holds "leave:approve" per RolePermissionConfiguration.cs.
         using var client = await AuthenticatedClient(companyId, Guid.NewGuid(), SystemRoles.Manager);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/leave-policies");

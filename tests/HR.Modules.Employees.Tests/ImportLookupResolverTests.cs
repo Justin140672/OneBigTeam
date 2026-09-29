@@ -211,9 +211,6 @@ public class ImportLookupResolverTests
     public async Task GetOrCreatePositionProfileAsync_Skips_When_Department_Location_Or_DefaultLeavePolicy_Missing(
         bool hasDepartment, bool hasLocation, bool hasDefaultLeavePolicy)
     {
-        // PositionProfile requires a mandatory DefaultLeavePolicyId in addition to Department and Location.
-        // The resolver can only auto-create a PositionProfile during import when all three are resolvable;
-        // otherwise it skips and callers must create the position profile up front via CreatePositionProfile.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var defaultLeavePolicyId = hasDefaultLeavePolicy ? Guid.NewGuid() : (Guid?)null;

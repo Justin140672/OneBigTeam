@@ -3,27 +3,12 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the Employee List page's UI rework (Components/Pages/Employees/EmployeeList.razor):
-/// search + clear search, the Department/Status filter panel and chips, single/multi row
-/// selection reflected in the "Update selected" bulk-action label, row-wide profile navigation
-/// via the combined "Employee" identity cell, long-value cell handling, and responsive column
-/// visibility at common breakpoints.
-///
-/// Every scenario that mutates data (new employees/departments) uses a unique suffix so it can't
-/// collide with other test classes running against the same shared, long-lived E2E database.
-/// </summary>
 public sealed class EmployeeListUiTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private const string LauraEmail = "laura.bennett@acme.example";
 
-    // Search/filter/selection tests only need "a row that matches my search" — they use the shared
-    // read-only pool employee SeededE2eEmployees.ListUi[0] ("E2E SeedListUiA") rather than paying
-    // the full New Employee form. None of them mutate the row (grid selection is client-side).
-    // The one test that genuinely needs an employee bearing a specific, freshly-created long
-    // Position Profile title still creates one via the full form (positionProfile != null).
     private async Task<string> CreateEmployeeAsync(
         EmployeeListPage empList, EmployeeEditPage empEdit, string uniqueSuffix, string? positionProfile = null)
     {
@@ -51,7 +36,6 @@ public sealed class EmployeeListUiTests(HrAdminPersonaFixture fixture) : RoleE2E
         return lastName;
     }
 
-    // ── Search / clear search ─────────────────────────────────────────────────
 
     [Fact]
     public async Task Search_FiltersGridToMatchingEmployee()
@@ -103,7 +87,6 @@ public sealed class EmployeeListUiTests(HrAdminPersonaFixture fixture) : RoleE2E
             "Expected Clear search button to disappear again once the search box is cleared");
     }
 
-    // ── Result summary ─────────────────────────────────────────────────────────
 
     [Fact]
     public async Task ResultSummary_ReflectsSearchNarrowingToASingleEmployee()
@@ -126,7 +109,6 @@ public sealed class EmployeeListUiTests(HrAdminPersonaFixture fixture) : RoleE2E
         Assert.Contains("1 employee", summary);
     }
 
-    // ── Filters panel + chips ───────────────────────────────────────────────────
 
     [Fact]
     public async Task StatusFilter_NarrowsGrid_ShowsChip_AndBadgesActiveCount()
@@ -164,10 +146,6 @@ public sealed class EmployeeListUiTests(HrAdminPersonaFixture fixture) : RoleE2E
         await empList.GoToAsync(AcmeId);
         await empList.OpenFiltersPanelAsync();
 
-        // Engineering is a seeded department on the shared Acme dataset (used across many other
-        // E2E suites, e.g. compensation/position-profile tests) — reused here rather than
-        // creating a fresh one, since this test only needs the filter mechanism to work, not a
-        // specific department's contents.
         await empList.SelectDepartmentFilterAsync("Engineering");
 
         Assert.True(await empList.GetActiveFilterCountAsync() >= 1);
@@ -201,7 +179,6 @@ public sealed class EmployeeListUiTests(HrAdminPersonaFixture fixture) : RoleE2E
         Assert.Equal(0, await empList.GetActiveFilterCountAsync());
     }
 
-    // ── Row selection / "Update selected" label ─────────────────────────────────
 
     [Fact]
     public async Task SingleRowSelection_ShowsCountOfOneOnUpdateSelectedButton_AndRevertsWhenUnchecked()
@@ -242,7 +219,6 @@ public sealed class EmployeeListUiTests(HrAdminPersonaFixture fixture) : RoleE2E
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Two dedicated read-only pool employees sharing the "SeedListUi" prefix.
         var firstLastName = SeededE2eEmployees.ListUi[0].LastName;
         var secondLastName = SeededE2eEmployees.ListUi[1].LastName;
 
@@ -256,7 +232,6 @@ public sealed class EmployeeListUiTests(HrAdminPersonaFixture fixture) : RoleE2E
         Assert.Contains("(2)", text);
     }
 
-    // ── Row-wide navigation vs. checkbox-only toggle ─────────────────────────────
 
     [Fact]
     public async Task ClickingEmployeeIdentityCell_NavigatesToProfile()
@@ -319,7 +294,6 @@ public sealed class EmployeeListUiTests(HrAdminPersonaFixture fixture) : RoleE2E
         var urlBeforeClick = _page.Url;
         await empList.ClickRowCheckboxCellAsync(lastName);
 
-        // Give any (incorrect) navigation a moment to happen before asserting it didn't.
         await _page.WaitForTimeoutAsync(500);
         Assert.Equal(urlBeforeClick, _page.Url);
 
@@ -327,18 +301,6 @@ public sealed class EmployeeListUiTests(HrAdminPersonaFixture fixture) : RoleE2E
         Assert.Contains("(1)", buttonText);
     }
 
-    // ── Long values in cells (Department/Position) ───────────────────────────────
-    //
-    // Read EmployeeList.razor's markup and app.css directly before writing this test: the
-    // "Employee" identity cell's name span (.employee-cell-name) and the plain Department/Position
-    // GridColumn cells rely on CSS overflow:hidden + text-overflow:ellipsis for visual truncation.
-    // Neither the identity-cell template nor the plain GridColumn definitions set a "title"
-    // attribute (no ClipMode="EllipsisWithTooltip" configured on HrGrid, no explicit title= in the
-    // Employee Template) — so there is NO tooltip that exposes the full value on hover for a long
-    // Department/Position value. The one confirmed accessible-reveal mechanism is the grid's own
-    // horizontal scroll (".hr-grid { overflow-x: auto; }" in app.css, applied to .employee-grid
-    // since HrGrid always adds the "hr-grid" class — see HrGrid.cs), and the full, untruncated text
-    // is always present in the DOM (readable via TextContent) even while visually clipped.
     [Fact]
     public async Task LongPositionProfileTitle_IsNotClippedInTheDom_AndGridSupportsHorizontalScrollToReveal()
     {
@@ -370,23 +332,18 @@ public sealed class EmployeeListUiTests(HrAdminPersonaFixture fixture) : RoleE2E
             .First;
         await rowCell.WaitForAsync(new() { Timeout = 15_000 });
 
-        // The full, untruncated Position title is present in the DOM regardless of any visual
-        // ellipsis clipping — proven by TextContent, not by the visible rendered width.
         var cellText = (await rowCell.TextContentAsync())?.Trim();
         Assert.Equal(longTitle, cellText);
 
-        // No title/tooltip attribute exposes the full value on hover — this is a genuine gap (see
-        // the comment above this test). Confirmed here rather than asserted as "working" behaviour.
         var cellTitleAttr = await rowCell.GetAttributeAsync("title");
         Assert.Null(cellTitleAttr);
     }
 
-    // ── Responsive column visibility ──────────────────────────────────────────────
 
     [Theory]
-    [InlineData(1280, 800)] // desktop — all columns visible
-    [InlineData(768, 1024)] // tablet — below 992px breakpoint: Manager/Start Date/User Account hidden
-    [InlineData(390, 844)]  // mobile — below 576px breakpoint: Work Email/Position additionally hidden
+    [InlineData(1280, 800)]
+    [InlineData(768, 1024)]
+    [InlineData(390, 844)]
     public async Task Grid_RemainsUsable_WithEmployeeAndStatusColumnsAlwaysVisible_AtCommonBreakpoints(
         int width, int height)
     {
@@ -399,13 +356,11 @@ public sealed class EmployeeListUiTests(HrAdminPersonaFixture fixture) : RoleE2E
         await _page.SetViewportSizeAsync(width, height);
         await empList.GoToAsync(AcmeId);
 
-        // "Employee" (2nd column) and "Status" (8th column) are never hidden by the responsive CSS
-        // rules (see app.css's nth-child selectors — only columns 3, 5, 6, 7, 9 are ever targeted).
         var headerCells = _page.Locator(".e-grid .e-headercell");
         await headerCells.First.WaitForAsync(new() { Timeout = 15_000 });
 
-        var employeeHeader = headerCells.Nth(1); // 0-indexed: 0 checkbox, 1 Employee
-        var statusHeader = headerCells.Nth(7);    // 0 checkbox,1 Employee,2 Email,3 Dept,4 Position,5 Manager,6 StartDate,7 Status
+        var employeeHeader = headerCells.Nth(1);
+        var statusHeader = headerCells.Nth(7);
 
         Assert.True(await employeeHeader.IsVisibleAsync(), "Expected the Employee column to remain visible at all breakpoints");
         Assert.True(await statusHeader.IsVisibleAsync(), "Expected the Status column to remain visible at all breakpoints");
@@ -427,10 +382,6 @@ public sealed class EmployeeListUiTests(HrAdminPersonaFixture fixture) : RoleE2E
                 $"Expected the Position column to be hidden below 576px (viewport width {width})");
         }
 
-        // Regardless of hidden columns, the grid's own horizontal scroll (".hr-grid { overflow-x:
-        // auto; }") and the "More" > "Columns" chooser remain available as accessible ways to
-        // reveal anything not currently visible — confirm the overflow-x style is actually applied
-        // to this grid instance (rather than assuming from the CSS file alone).
         var overflowX = await _page.Locator(".employee-grid").First.EvaluateAsync<string>(
             "el => getComputedStyle(el).overflowX");
         Assert.Equal("auto", overflowX);

@@ -100,7 +100,6 @@ public class UpdateEmploymentDetailsConcurrencyEndpointTests
         var payload = await response.Content.ReadFromJsonAsync<EmploymentPayload>();
         Assert.Equal(version + 1, payload!.Version);
 
-        // And another save with the returned version also succeeds.
         var next = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employee.Id}/employment",
             EmploymentBody(companyId, employee.Id, "EMP-HAPPY2", notes: "happy2", expectedVersion: payload.Version));
@@ -159,7 +158,6 @@ public class UpdateEmploymentDetailsConcurrencyEndpointTests
             $"/api/companies/{companyId}/employees/{employee.Id}/employment",
             EmploymentBody(companyId, employee.Id, employeeNumber: "", notes: null, expectedVersion: null));
 
-        // FastEndpoints request-validation failures surface as 422, not 400.
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 

@@ -2,11 +2,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Companies.Tests.Infrastructure;
 
-/// <summary>
-/// Minimal test double for <see cref="ICompanyUserCountReader"/> — returns a pre-configured
-/// count so GetCustomerSupportViewHandler tests can assert UserCount without a real
-/// identity.user_profiles query.
-/// </summary>
 internal sealed class FakeCompanyUserCountReader : ICompanyUserCountReader
 {
     public int CountToReturn { get; set; }

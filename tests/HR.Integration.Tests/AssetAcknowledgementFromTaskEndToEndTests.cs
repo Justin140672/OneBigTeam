@@ -9,11 +9,6 @@ using HR.SharedKernel;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Verifies that completing a task whose Source is Asset and ActionType is Acknowledge
-/// calls AssetAcknowledgementService, marking the assignment as acknowledged and then
-/// creating a follow-up Return task.
-/// </summary>
 [Collection("Integration")]
 public class AssetAcknowledgementFromTaskEndToEndTests
 {
@@ -101,7 +96,6 @@ public class AssetAcknowledgementFromTaskEndToEndTests
         Assert.Equal("Open", returnTask!.Status);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)
     {

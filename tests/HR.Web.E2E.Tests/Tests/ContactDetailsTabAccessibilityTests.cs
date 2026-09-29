@@ -38,7 +38,6 @@ public sealed class ContactDetailsTabAccessibilityTests(EmployeePersonaFixture f
         return contact;
     }
 
-    // ── a. Initial state ─────────────────────────────────────────────────────
 
     [Fact]
     public async Task ContactDetailsTab_InitialState_HasNoSeriousViolations()
@@ -49,7 +48,6 @@ public sealed class ContactDetailsTabAccessibilityTests(EmployeePersonaFixture f
             _page, "my profile — Contact Details tab (initial)");
     }
 
-    // ── b. Validation-error state ────────────────────────────────────────────
 
     [Fact]
     public async Task ContactDetailsTab_ValidationErrorState_HasNoSeriousViolations()
@@ -69,7 +67,6 @@ public sealed class ContactDetailsTabAccessibilityTests(EmployeePersonaFixture f
             _page, "my profile — Contact Details tab (validation error)");
     }
 
-    // ── c. Save-success state ────────────────────────────────────────────────
 
     [Fact]
     public async Task ContactDetailsTab_SaveSuccessState_HasNoSeriousViolations()
@@ -90,7 +87,6 @@ public sealed class ContactDetailsTabAccessibilityTests(EmployeePersonaFixture f
             _page, "my profile — Contact Details tab (save success)");
     }
 
-    // ── d. Keyboard-only journey: logical order, named controls, no focus yank ─
 
     [Fact]
     public async Task ContactDetailsTab_KeyboardJourney_HasLogicalOrderAndDoesNotYankFocusToBanner()
@@ -102,11 +98,6 @@ public sealed class ContactDetailsTabAccessibilityTests(EmployeePersonaFixture f
         await contact.FillPostCodeAsync("EC1A 1BB");
         await contact.FillPersonalEmailAsync($"e2e.{Guid.NewGuid():N}@personal.example.com");
 
-        // Start from the first editable field and Tab forward through the form. Every focusable
-        // control we land on inside the form must expose an accessible name, and we must reach the
-        // Save button within a sane number of tab stops (proving the order is not broken/looping).
-        // Scoped to the navigation flow itself — not the Save button's own click/focus behaviour
-        // after activation, which is covered separately.
         await contact.FocusFirstFieldAsync();
 
         var reachedSave = false;
@@ -136,7 +127,6 @@ public sealed class ContactDetailsTabAccessibilityTests(EmployeePersonaFixture f
             "Expected to Tab through several named form controls before the Save button.");
     }
 
-    // ── e. Validation-failure moves focus to the first invalid field ─────────
 
     [Fact]
     public async Task ContactDetailsTab_ValidationFailure_MovesFocusToFirstInvalidField()
@@ -158,7 +148,6 @@ public sealed class ContactDetailsTabAccessibilityTests(EmployeePersonaFixture f
             "After a failed submit, focus should move to the first invalid field (Post Code).");
     }
 
-    // ── f. Concurrency conflict banner is an alert; reload restores field focus ─
 
     [Fact]
     public async Task ContactDetailsTab_ConcurrencyConflict_BannerIsAlert_AndReloadFocusesFirstField()
@@ -170,7 +159,6 @@ public sealed class ContactDetailsTabAccessibilityTests(EmployeePersonaFixture f
         await contact.FillPostCodeAsync("EC1A 1BB");
         await contact.FillMobilePhoneAsync("07700 900801");
 
-        // Second tab in the same authenticated context saves first, bumping the record version.
         var otherPage = await _context.NewPageAsync();
         try
         {
@@ -196,15 +184,12 @@ public sealed class ContactDetailsTabAccessibilityTests(EmployeePersonaFixture f
 
         await contact.ClickReloadLatestValuesAsync();
 
-        // The tab moves focus to the first form field (Personal Email) after adopting fresh values.
         await Assertions.Expect(_page.GetByPlaceholder("e.g. name@personal.com")).ToBeFocusedAsync();
         Assert.Equal("cd-personal-email", await contact.FocusedElementIdAsync());
     }
 
     // ── Ticket 7 follow-up ───────────────────────────────────────────────────
 
-    /// <summary>Fills the mandatory fields plus a unique personal email so every saving test writes
-    /// isolated data and can run at maxParallelThreads=15.</summary>
     private static async Task FillValidUniqueAsync(ContactDetailsTab contact)
     {
         await contact.FillAddressLine1Async($"{Guid.NewGuid():N} Test Street");
@@ -231,25 +216,20 @@ public sealed class ContactDetailsTabAccessibilityTests(EmployeePersonaFixture f
     {
         var contact = await OpenContactDetailsAsync();
 
-        // Type into the first fields with the real keyboard, Tab between them — no .Fill. Personal
-        // Email is pre-populated with the employee's existing address, so select-all + delete before
-        // typing — otherwise the new address is appended onto the end of the existing one, producing
-        // an invalid combined email.
         await contact.FocusFirstFieldAsync();
         await _page.Keyboard.PressAsync("Control+A");
         await _page.Keyboard.PressAsync("Delete");
         await _page.Keyboard.TypeAsync($"e2e.{Guid.NewGuid():N}@personal.example.com");
-        await _page.Keyboard.PressAsync("Tab"); // → Address Line 1
+        await _page.Keyboard.PressAsync("Tab");
         await _page.Keyboard.TypeAsync($"{Guid.NewGuid():N} Keyboard Way");
-        await _page.Keyboard.PressAsync("Tab"); // → Address Line 2
-        await _page.Keyboard.PressAsync("Tab"); // → City
+        await _page.Keyboard.PressAsync("Tab");
+        await _page.Keyboard.PressAsync("Tab");
         await _page.Keyboard.TypeAsync("London");
-        await _page.Keyboard.PressAsync("Tab"); // → County
-        await _page.Keyboard.PressAsync("Tab"); // → Post Code
+        await _page.Keyboard.PressAsync("Tab");
+        await _page.Keyboard.PressAsync("Tab");
         await _page.Keyboard.TypeAsync("EC1A 1BB");
         await _page.Keyboard.PressAsync("Tab");
 
-        // Edit an already-populated field via keyboard: select-all + retype.
         var city = _page.GetByPlaceholder("e.g. London");
         await city.ClickAsync();
         await _page.Keyboard.PressAsync("Control+A");
@@ -257,9 +237,6 @@ public sealed class ContactDetailsTabAccessibilityTests(EmployeePersonaFixture f
         await _page.Keyboard.TypeAsync("Manchester");
         await _page.Keyboard.PressAsync("Tab");
 
-        // Continue tabbing forward to confirm the navigation flow reaches the Save button after a
-        // full real-keyboard entry/edit pass — the Save button's own click/focus behaviour after
-        // activation is covered separately (ContactDetailsTab_KeyboardJourney_...), not here.
         var reachedSave = false;
         for (var i = 0; i < 10 && !reachedSave; i++)
         {
@@ -289,7 +266,6 @@ public sealed class ContactDetailsTabAccessibilityTests(EmployeePersonaFixture f
         await Assertions.Expect(_page.Locator(".validation-message").First).ToBeVisibleAsync();
         Assert.True(await contact.ActiveElementIsInFieldGroupOfAsync("cd-post-code"));
 
-        // Correct the postcode from the keyboard where focus already is.
         await _page.Keyboard.PressAsync("Control+A");
         await _page.Keyboard.PressAsync("Delete");
         await _page.Keyboard.TypeAsync("EC1A 1BB");

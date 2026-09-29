@@ -9,7 +9,6 @@ public class RecruitmentStageServiceTests
 {
     private static RecruitmentStageEditModel SampleModel() => new() { Name = "Interview" };
 
-    // ── UpdateAsync(ApiSaveResult) — ANY 409 is a save conflict (no "code" needed) ──
 
     [Fact]
     public async Task UpdateAsync_Returns_Ok_When_Api_Returns_Success()
@@ -84,7 +83,6 @@ public class RecruitmentStageServiceTests
         Assert.NotNull(result.ErrorMessage);
     }
 
-    // ── CreateAsync ───────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task CreateAsync_Returns_Failure_When_Api_Returns_Unauthorized()
@@ -99,7 +97,6 @@ public class RecruitmentStageServiceTests
         Assert.Equal("Your session has expired. Please sign in again.", error);
     }
 
-    // ── ListStagesAsync (representative read) ────────────────────────────────────
 
     [Fact]
     public async Task ListStagesAsync_Returns_Value_When_Api_Returns_Ok()

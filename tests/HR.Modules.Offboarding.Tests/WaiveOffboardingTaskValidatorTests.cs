@@ -65,8 +65,6 @@ public class WaiveOffboardingTaskValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(WaiveOffboardingTaskRequest.Reason));
     }
 
-    // NotEmpty() treats whitespace-only strings as empty, distinct from a bare length check —
-    // pins that behaviour explicitly rather than relying on the null/empty cases above alone.
     [Fact]
     public void Validate_Fails_When_Reason_Is_Whitespace_Only()
     {

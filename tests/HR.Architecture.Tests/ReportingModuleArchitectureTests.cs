@@ -53,8 +53,6 @@ public class ReportingModuleArchitectureTests
     [Fact]
     public void Reporting_Module_Entity_Types_Are_Not_Public()
     {
-        // No persisted entities exist yet in this phase, but if/when EF entities are added
-        // to ReportingDbContext they must remain internal like every other module.
         using var context = BuildContext();
 
         var publicEntityClrTypes = context.Model
@@ -91,8 +89,6 @@ public class ReportingModuleArchitectureTests
     [Fact]
     public void Reporting_Module_Does_Not_Reference_Other_Modules()
     {
-        // Contracts assemblies (e.g. HR.Modules.Employees.Contracts) are the sanctioned exception to
-        // the "no module-to-module references" rule — see ModuleDependencyBoundariesTests.
         var forbiddenReferences = ModuleAssembly
             .GetReferencedAssemblies()
             .Where(reference =>

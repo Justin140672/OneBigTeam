@@ -21,10 +21,6 @@ public class Iam08CompanyAdministratorPermissionsTests(IdentityDatabaseFixture f
     private static readonly DateTimeOffset Now = new(2026, 9, 3, 12, 0, 0, TimeSpan.Zero);
     private static readonly FakeClock Clock = new(Now.UtcDateTime);
 
-    // Kept in sync with
-    // src/Modules/HR.Modules.Identity/Migrations/20260903114519_IAM08_ReconcileCompanyAdministratorPermissions.cs
-    // and, for the OBT-IAM-09 narrowing (onboarding:view/manage, support:manage removed), with
-    // src/Modules/HR.Modules.Identity/Migrations/*_OBT_IAM09_RemoveCompanyAdministratorOnboardingSupport.cs
     private const string ReconcileSql = """
         DELETE FROM identity.role_permissions
         WHERE role_id = '00000000-0000-0000-0000-000000000006'
@@ -44,9 +40,6 @@ public class Iam08CompanyAdministratorPermissionsTests(IdentityDatabaseFixture f
 
     private IdentityAuthorizationService BuildService() => new(fixture.BuildContext(), Clock);
 
-    // ---------------------------------------------------------------------
-    // Reconciliation migration DELETE — idempotent + correct
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task ReconcileSql_Removes_Obsolete_Grants_Keeps_AllowList_And_Is_Idempotent()
@@ -90,9 +83,6 @@ public class Iam08CompanyAdministratorPermissionsTests(IdentityDatabaseFixture f
             Assert.DoesNotContain(permissionId, remaining);
     }
 
-    // ---------------------------------------------------------------------
-    // Effective-access override semantics (api/me is computed from these)
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task Expired_Grant_Override_Grants_Nothing()
@@ -115,9 +105,6 @@ public class Iam08CompanyAdministratorPermissionsTests(IdentityDatabaseFixture f
         Assert.Empty(await svc.GetEffectivePermissionsAsync(userId));
     }
 
-    // ---------------------------------------------------------------------
-    // Removing HrAdministrator drops the inherited employee permissions/role
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task Removing_HrAdministrator_UserRole_Drops_Employee_Permissions_And_Role()

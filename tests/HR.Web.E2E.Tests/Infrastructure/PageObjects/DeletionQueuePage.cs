@@ -2,21 +2,8 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for HR.Admin.Web's DeletionQueue.razor (/deletion-queue) — the platform-admin-only
-/// list of companies that currently have, or have ever had, a permanent deletion scheduled. Each
-/// pending row exposes "Cancel deletion" / "Begin deletion" actions, both going through the shared
-/// AdminActionConfirmDialog (mandatory reason, min 5 chars) also used by CustomerDetails.razor's
-/// Subscription management panel — see CustomerDetailsPage for that dialog's sibling usage.
-///
-/// Executing/cancelling here are status-only, reversible-in-principle actions and never destroy
-/// real employee/document/company data — see DeletionQueue.razor's intro copy and
-/// AdminActionConfirmDialog's "Execute now" warning text, which some tests assert on directly.
-/// </summary>
 public sealed class DeletionQueuePage(IPage page, string baseUrl)
 {
-    // DeletionQueue.razor renders exactly one of: loading text, the "not authorised" dashboard-error
-    // div, the empty-state paragraph, or the table — wait for any "settled" state.
     private const string SettledSelector = ".dashboard-error, .activity-empty, table.billing-history-table";
 
     public async Task GoToAsync()
@@ -57,7 +44,6 @@ public sealed class DeletionQueuePage(IPage page, string baseUrl)
 
     public Task<string?> GetCountdownTextAsync(string companyNameFragment)
     {
-        // Countdown is rendered in the 3rd <td> (Company, Scheduled, Countdown, Status, actions).
         var cell = RowByCompany(companyNameFragment).Locator("td").Nth(2);
         return cell.TextContentAsync();
     }
@@ -70,16 +56,11 @@ public sealed class DeletionQueuePage(IPage page, string baseUrl)
 
     public async Task ClickExecuteNowAsync(string companyNameFragment)
     {
-        // The row's danger action is labelled "Begin deletion" (DeletionQueue.razor) — it opens the
-        // "Begin controlled deletion" confirm dialog. (Historically "Execute now".)
         await RowByCompany(companyNameFragment)
             .GetByRole(AriaRole.Button, new() { Name = "Begin deletion", Exact = true }).ClickAsync();
         await ExecuteDeletionDialog.WaitForAsync(new() { Timeout = 15_000 });
     }
 
-    // The shared AdminActionConfirmDialog, addressed by its per-action title so tests can
-    // disambiguate "Cancel deletion" from "Begin controlled deletion" — see AdminActionConfirmDialog.razor
-    // and DeletionQueue.razor's DialogTitle.
     private ILocator DialogByTitle(string title) => page.GetByRole(AriaRole.Dialog, new() { Name = title });
 
     public ILocator CancelDeletionDialog => DialogByTitle("Cancel deletion");

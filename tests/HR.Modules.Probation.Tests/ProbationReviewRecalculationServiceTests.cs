@@ -87,8 +87,6 @@ public class ProbationReviewRecalculationServiceTests
         Assert.Equal("All good.", reloaded.Notes);
         Assert.Null(reloaded.SupersededByReviewId);
 
-        // A fresh ManagerCheckIn should still be created for the new schedule — the completed one
-        // is historical and not a substitute for the recalculated pending review.
         Assert.Contains(
             await context.ProbationReviews.Where(r => r.Status == ProbationReviewStatus.Pending).ToListAsync(),
             r => r.ReviewType == ProbationReviewType.ManagerCheckIn);
@@ -154,7 +152,6 @@ public class ProbationReviewRecalculationServiceTests
     public async Task RecalculateAsync_Cancels_Stale_Pending_Review_When_New_Schedule_Drops_That_Type()
     {
         await using var context = BuildContext();
-        // Original schedule has both ManagerCheckIn and HrReview.
         var record = await SeedRecord(context, expectedEndDate: new DateOnly(2026, 4, 1));
 
         var oldManagerCheckIn = ProbationReview.Create(
@@ -166,7 +163,6 @@ public class ProbationReviewRecalculationServiceTests
         context.ProbationReviews.AddRange(oldManagerCheckIn, oldHrReview);
         await context.SaveChangesAsync();
 
-        // End date moves much closer: only ManagerCheckIn (day 30) survives + FinalDecision.
         UpdateExpectedEndDate(record, StartDate.AddDays(40));
         await context.SaveChangesAsync();
 
@@ -175,7 +171,7 @@ public class ProbationReviewRecalculationServiceTests
 
         var reloadedOldHrReview = await context.ProbationReviews.SingleAsync(r => r.Id == oldHrReview.Id);
         Assert.Equal(ProbationReviewStatus.Cancelled, reloadedOldHrReview.Status);
-        Assert.Null(reloadedOldHrReview.SupersededByReviewId); // no replacement of the same type
+        Assert.Null(reloadedOldHrReview.SupersededByReviewId);
 
         Assert.DoesNotContain(
             await context.ProbationReviews.ToListAsync(),

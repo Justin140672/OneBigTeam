@@ -5,15 +5,6 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace HR.Modules.Documents.Services;
 
-/// <summary>
-/// OBT-721 Workload &amp; HR Actions Report provider for employee documents expiring soon. HR-only,
-/// same source as <see cref="MissingRequiredEmployeeDocumentsWorkloadActionProvider"/>
-/// (IDocumentComplianceReportReader). That reader only exposes an ExpiringSoonCount per employee
-/// (no per-document names/expiry dates, unlike MissingDocumentTypeNames) — a single summary
-/// WorkloadAction per affected employee is surfaced rather than one per document, documented here
-/// as an interpretation given the reader's current shape (same "document rather than block"
-/// approach used by VacanciesAwaitingActionWorkloadActionProvider for its own reader gaps).
-/// </summary>
 internal sealed class EmployeeDocumentsExpiringSoonWorkloadActionProvider(
     IDocumentComplianceReportReader documentComplianceReportReader,
     IEmployeeDepartmentReader employeeDepartmentReader,

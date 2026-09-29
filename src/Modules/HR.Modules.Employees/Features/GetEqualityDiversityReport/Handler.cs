@@ -6,13 +6,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Employees.Features.GetEqualityDiversityReport;
 
-/// <summary>
-/// Builds anonymous, aggregated workforce equality statistics. Reads the encrypted equality
-/// answers back through EF materialization (transparently decrypted in memory by the
-/// <see cref="EmployeesDbContext"/> value converter) — there is no second unprotected copy.
-/// Only counts and percentages leave this handler; small groups are collapsed into a
-/// "Not reported" bucket so a single person can never be identified from the numbers.
-/// </summary>
 internal sealed class GetEqualityDiversityReportHandler(
     EmployeesDbContext db,
     IClock clock,
@@ -45,8 +38,6 @@ internal sealed class GetEqualityDiversityReportHandler(
 
         var today = DateOnly.FromDateTime(clock.UtcNow);
 
-        // "Provided monitoring information" = has at least one saved equality record. A record that
-        // only contains "prefer not to say" answers still counts as having engaged with monitoring.
         var respondentCount = employees.Count(e => byEmployee.ContainsKey(e.Id));
         var respondentPercentage = Percentage(respondentCount, total);
 
@@ -95,15 +86,12 @@ internal sealed class GetEqualityDiversityReportHandler(
             var visible = new List<KeyValuePair<string, int>>();
             foreach (var kvp in counts)
             {
-                // "Not stated" / "Not reported" are already aggregate buckets — never suppress them.
                 if (kvp.Value > 0 && kvp.Value < threshold && kvp.Key is not (NotStated or NotReported))
                     suppressedCount += kvp.Value;
                 else
                     visible.Add(kvp);
             }
 
-            // Secondary suppression: if the "Not reported" bucket itself is non-zero but still below
-            // the threshold, fold the smallest visible real group into it so it cannot be inverted.
             while (suppressedCount > 0 && suppressedCount < threshold)
             {
                 var smallest = visible

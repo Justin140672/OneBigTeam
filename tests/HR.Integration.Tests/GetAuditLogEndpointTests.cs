@@ -10,13 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Same "platform:admin" policy + allow-list gate pattern as ListCustomersEndpointTests /
-/// GetFailedPaymentsEndpointTests — see their remarks. Audit rows are seeded by exercising real
-/// platform-admin write endpoints (ExtendCustomerTrial / GenerateSupportSession) rather than hand
-/// -constructing AuditEvent rows directly, since AuditEvent only exposes an internal
-/// From(IAuditEvent) factory (see AuditHistoryIntegrationTests for the same convention).
-/// </summary>
 [Collection("Integration")]
 public class GetAuditLogEndpointTests
 {
@@ -67,9 +60,6 @@ public class GetAuditLogEndpointTests
         return company.Id;
     }
 
-    /// <summary>Triggers the ExtendCustomerTrial endpoint, which publishes a real
-    /// "subscription.trial-extended" audit event scoped to <paramref name="companyId"/> with
-    /// <paramref name="actorUserId"/> as ActorUserId.</summary>
     private async Task ExtendTrialAsync(Guid companyId, Guid actorUserId, DateTimeOffset now)
     {
         using var client = ClientFor(actorUserId, AllowListedEmail);
@@ -80,9 +70,6 @@ public class GetAuditLogEndpointTests
         response.EnsureSuccessStatusCode();
     }
 
-    /// <summary>Triggers the GenerateSupportSession endpoint, which publishes a real
-    /// "support.session-generated" audit event scoped to <paramref name="companyId"/> with
-    /// <paramref name="actorUserId"/> as ActorUserId.</summary>
     private async Task GenerateSupportSessionAsync(Guid companyId, Guid actorUserId)
     {
         using var client = ClientFor(actorUserId, AllowListedEmail);
@@ -110,8 +97,6 @@ public class GetAuditLogEndpointTests
 
         var response = await client.GetAsync(Url);
 
-        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
-        // is Forbidden (403), not Unauthorized (401).
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 

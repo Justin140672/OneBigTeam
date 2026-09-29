@@ -57,7 +57,6 @@ public class RequestPasswordResetValidatorTests
     public void Validate_Passes_When_Email_Is_Exactly_MaxLength()
     {
         var validator = new RequestPasswordResetValidator();
-        // "a...@example.com" - 256 chars total.
         var localPart = new string('a', 256 - "@example.com".Length);
         var request = ValidRequest() with { Email = $"{localPart}@example.com" };
 

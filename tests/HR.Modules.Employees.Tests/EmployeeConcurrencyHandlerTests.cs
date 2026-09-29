@@ -76,7 +76,6 @@ public class EmployeeConcurrencyHandlerTests
             ExpectedVersion = expectedVersion,
         };
 
-    // ── Employee.IncrementVersion ───────────────────────────────────────────────
 
     [Fact]
     public void IncrementVersion_Increments_Version_By_One()
@@ -91,7 +90,6 @@ public class EmployeeConcurrencyHandlerTests
         Assert.Equal(3, employee.Version);
     }
 
-    // ── UpdateEmployeeProfile ──────────────────────────────────────────────────
 
     [Fact]
     public async Task Profile_Matching_ExpectedVersion_Succeeds_And_Bumps_Version()
@@ -156,11 +154,9 @@ public class EmployeeConcurrencyHandlerTests
             await seed.SaveChangesAsync();
         }
 
-        // Context A loads and tracks the row while Version == 1.
         await using var ctxA = new EmployeesDbContext(Options(dbName));
         await ctxA.Employees.SingleAsync();
 
-        // Context B wins the race: saves first, bumping the store's Version to 2.
         await using (var ctxB = new EmployeesDbContext(Options(dbName)))
         {
             var winner = await ProfileHandler(ctxB).HandleAsync(
@@ -168,7 +164,6 @@ public class EmployeeConcurrencyHandlerTests
             Assert.True(winner.IsSuccess);
         }
 
-        // Context A now saves with the stale ExpectedVersion == 1.
         var result = await ProfileHandler(ctxA).HandleAsync(
             ProfileRequest(companyId, employee.Id, expectedVersion: 1, firstName: "Loser"), Guid.NewGuid(), CancellationToken.None);
 
@@ -181,7 +176,6 @@ public class EmployeeConcurrencyHandlerTests
         Assert.Equal(2, saved.Version);
     }
 
-    // ── UpdateEmploymentDetails ────────────────────────────────────────────────
 
     [Fact]
     public async Task Employment_Matching_ExpectedVersion_Succeeds_And_Bumps_Version()
@@ -265,7 +259,6 @@ public class EmployeeConcurrencyHandlerTests
         Assert.Equal(2, saved.Version);
     }
 
-    // ── UpdateMyContactDetails (self-service) ──────────────────────────────────
 
     [Fact]
     public async Task Contact_Matching_ExpectedVersion_Succeeds_And_Bumps_Version()
@@ -330,7 +323,6 @@ public class EmployeeConcurrencyHandlerTests
         await using var ctxA = new EmployeesDbContext(Options(dbName));
         await ctxA.Employees.SingleAsync();
 
-        // Concurrent writer: an HR admin edits the same employee's profile, bumping Version to 2.
         await using (var ctxB = new EmployeesDbContext(Options(dbName)))
         {
             var winner = await ProfileHandler(ctxB).HandleAsync(

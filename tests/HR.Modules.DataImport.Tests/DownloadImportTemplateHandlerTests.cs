@@ -107,14 +107,6 @@ public class DownloadImportTemplateHandlerTests
         Assert.Contains("Daily", listValue);
     }
 
-    // Regression test for a workbook-corruption bug: ClosedXML's validation.List() writes an
-    // *unquoted* comma-separated string straight into formula1 unless the caller wraps it in
-    // literal quotes itself. Excel requires an explicit-list formula1 to be a quoted string
-    // literal ("A,B,C") — unquoted, it's parsed as an invalid range reference, and Excel drops
-    // the data validation with a "Removed Feature: Data validation" repair prompt on open.
-    // ClosedXML's own object model silently round-trips the bad value (it strips/re-adds quotes
-    // when reading validation.Value back), so the higher-level test above wouldn't catch this —
-    // only inspecting the raw sheet XML does.
     [Fact]
     public void Handle_SalaryType_DataValidation_Formula_Is_A_Quoted_List_Literal()
     {

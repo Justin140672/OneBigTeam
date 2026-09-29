@@ -8,9 +8,6 @@ internal sealed class GetRecentEmployeeChangesHandler(
     IAuditHistoryReader auditHistoryReader,
     IEmployeeNameReader employeeNameReader)
 {
-    // "Employee" is the audit EntityType recorded by the Employees module for
-    // EmployeeCreated/EmployeeUpdated/EmployeeTerminated (see Employee module's audit writes) —
-    // matches the "Employees" grouping used by GetEmployeeAuditHistoryHandler.ModuleMap.
     private static readonly string[] EmployeeEntityTypes = ["Employee"];
 
     private const int MaxItems = 15;

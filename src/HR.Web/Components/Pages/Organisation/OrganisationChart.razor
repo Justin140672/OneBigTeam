@@ -154,9 +154,6 @@
     // the Employee List's own status filter is for).
     private const string ActiveStatusFilter = "Active";
 
-    // Guid.Empty is the "All Departments" sentinel item prepended below — SfDropDownList needs a
-    // real item in its DataSource to display/select "no filter", the same way StatusOptions used
-    // to use "" for "All Statuses" (see the Employment Status filter this replaced).
     private List<DepartmentListItemModel> _departmentOptions =>
         new List<DepartmentListItemModel> { new(Guid.Empty, "All Departments", null, null, true) }
             .Concat(_departments)
@@ -167,16 +164,10 @@
 
     private SfDiagramComponent? _diagram;
 
-    // Set from "?employeeId=" when arriving via the Employee Overview's "View Org Chart" button —
-    // drives both the highlighted card border (NodeTemplate above) and the auto-centering once
-    // the diagram finishes laying itself out (OnDataLoaded).
     private string? _focusEmployeeId;
 
     private IReadOnlyList<OrganisationChartNode> _tree = [];
 
-    // Absolute zoom scale (1.0 = 100%), two-way bound to <ScrollSettings> so it also picks up
-    // zoom changes from mouse-wheel/pinch, not just our own toolbar buttons. Restored from
-    // localStorage on first render (OnAfterRenderAsync) and persisted on every change.
     private double _currentZoom = 1;
     private const double MinZoom = 0.1;
     private const double MaxZoom = 4;
@@ -232,9 +223,6 @@
             _error = null;
             _employees = response.Items.ToList();
 
-            // Route the flat API data through the hierarchy builder first so the diagram only
-            // ever sees clean, acyclic parent links — dangling/self/circular manager references
-            // are already resolved there, not something the diagram itself has to cope with.
             _tree = HierarchyBuilder.Build(response.Items);
             _diagramItems = Flatten(_tree, managerId: null);
         }
@@ -244,8 +232,6 @@
 
     private async Task OnDepartmentFilterChanged(Guid? value)
     {
-        // Guid.Empty is the "All Departments" sentinel item — treat it as "no filter", same as
-        // selecting the placeholder would if this dropdown supported one.
         _selectedDepartmentId = value is null || value == Guid.Empty ? null : value;
         await LoadChartAsync();
     }
@@ -279,8 +265,6 @@
         return items;
     }
 
-    // Defines default rendering for each node — an HTML-shaped node so NodeTemplate above (the
-    // card markup) is what actually renders, rather than a default diagram shape.
     private void OnNodeCreating(IDiagramObject obj)
     {
         if (obj is not Node node) return;
@@ -293,8 +277,6 @@
         node.Shape = new Shape { Type = NodeShapes.HTML };
     }
 
-    // Fallback shown when an employee has no uploaded/approved profile photo (ProfilePhotoUrl
-    // is null) — the node renders an initials circle instead of the <img>.
     private static string GetInitials(string name)
     {
         var parts = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -306,7 +288,6 @@
         };
     }
 
-    // Clean orthogonal connector lines with no arrowheads, matching a typical org-chart look.
     private void OnConnectorCreating(IDiagramObject obj)
     {
         if (obj is not Connector connector) return;
@@ -318,31 +299,18 @@
         connector.SourceDecorator!.Shape = DecoratorShape.None;
     }
 
-    // Clicking a card opens that employee's profile. Two paths to the same place: the Diagram's
-    // own Click event (ActualObject tells us which node/HTML-shape was hit) and a plain @onclick
-    // directly on the card markup in NodeTemplate above — HTML-shaped nodes are just regular
-    // Blazor-rendered DOM content, but the Diagram's own pan/zoom interaction layer can sit over
-    // that content and swallow the click before it bubbles, depending on version/interaction
-    // mode. Keeping both means whichever one the current interaction mode actually delivers is
-    // enough; NavigateTo-ing to the same URL twice in one render is harmless.
     private void OnDiagramClick(Syncfusion.Blazor.Diagram.ClickEventArgs args)
     {
         if (args.ActualObject is Node node && node.Data is OrganisationChartDiagramItem item)
             NavigateToEmployee(item);
     }
 
-    // Opens in VIEW mode (not edit) — arriving from the org chart is a "look someone up" action,
-    // not an intent to edit — with a returnUrl back to this chart so Close navigates back here
-    // instead of the Employee List (see EditPageBase.ReturnUrl / EmployeeEdit.razor's ListUrl).
     private void NavigateToEmployee(OrganisationChartDiagramItem item)
     {
         var returnUrl = Uri.EscapeDataString($"/companies/{CompanyId}/organisation-chart");
         Navigation.NavigateTo($"/companies/{CompanyId}/employees/{item.Id}?returnUrl={returnUrl}");
     }
 
-    // Fires once the diagram has finished laying itself out from DataSourceSettings — the
-    // earliest safe point at which _diagram.Nodes is actually populated. Centers the viewport on
-    // the employee we arrived here to look at, if any.
     private void OnDataLoaded(object args) => CenterOnEmployee(_focusEmployeeId);
 
     private void CenterOnEmployee(string? employeeId)
@@ -359,10 +327,6 @@
             node.Height));
     }
 
-    // The relative-factor Zoom() call (rather than setting _currentZoom directly) is the
-    // documented way to change zoom programmatically; the resulting new zoom level comes back
-    // through OnCurrentZoomChangedAsync (ScrollSettings' two-way binding), which is also what
-    // keeps _currentZoom in sync with mouse-wheel/pinch zooming.
     private void ZoomIn()
     {
         _diagram?.Zoom(1.2, null!);
@@ -383,18 +347,12 @@
         });
     }
 
-    // Fires for every zoom change regardless of source (toolbar buttons, mouse wheel, pinch) —
-    // keeps _currentZoom (and the % label) accurate and persists it so the chart reopens at the
-    // same zoom level next time.
     private async Task OnCurrentZoomChangedAsync(double value)
     {
         _currentZoom = value;
         await JS.InvokeVoidAsync("setOrgChartZoom", value);
     }
 
-    // Live search as the user types — matches by name or employee number and, on a hit,
-    // highlights and centers that employee's card using the same mechanism as the "View Org
-    // Chart" deep link (CenterOnEmployee/_focusEmployeeId).
     private void OnSearchChanged(string? value)
     {
         _searchTerm = value;

@@ -21,7 +21,6 @@ public class DocumentTypeMutationEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    // ── UpdateDocumentType ───────────────────────────────────────────────────────
 
     [Fact]
     public async Task UpdateDocumentType_Returns_Unauthorized_Without_Auth()
@@ -97,7 +96,6 @@ public class DocumentTypeMutationEndpointTests
         var companyId    = Guid.NewGuid();
         using var client = await AdminClient(companyId);
 
-        // Create two types in the same isolated company
         var resp1 = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/document-types",
             new { name = "Type Alpha", allowEmployeeUpload = false });
@@ -109,7 +107,6 @@ public class DocumentTypeMutationEndpointTests
         resp2.EnsureSuccessStatusCode();
         var beta = await resp2.Content.ReadFromJsonAsync<DocTypePayload>();
 
-        // Try to rename Beta to Alpha
         var conflictResp = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/document-types/{beta!.Id}",
             new { companyId, documentTypeId = beta.Id, name = "Type Alpha", allowEmployeeUpload = false, expectedVersion = 1 });
@@ -117,7 +114,6 @@ public class DocumentTypeMutationEndpointTests
         Assert.Equal(HttpStatusCode.Conflict, conflictResp.StatusCode);
     }
 
-    // ── DeactivateDocumentType ───────────────────────────────────────────────────
 
     [Fact]
     public async Task DeactivateDocumentType_Returns_Unauthorized_Without_Auth()
@@ -169,14 +165,12 @@ public class DocumentTypeMutationEndpointTests
             $"/api/companies/{companyId}/document-types/{created!.Id}");
         Assert.Equal(HttpStatusCode.NoContent, deleteResp.StatusCode);
 
-        // Deactivated types should not appear in the active list
         var listResp = await client.GetAsync(
             $"/api/companies/{companyId}/document-types");
         var listPayload = await listResp.Content.ReadFromJsonAsync<DocTypeListPayload>();
         Assert.DoesNotContain(listPayload!.Items, dt => dt.Id == created.Id);
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AdminClient(Guid companyId)
     {

@@ -144,8 +144,6 @@ internal sealed class GetEmployeeHandler
             result.PositionNoticePeriodLengthOverride,
             cancellationToken);
 
-        // These four all go through other modules' own DbContexts (or no DbContext at all), so
-        // they're safe to run concurrently.
         await Task.WhenAll(onboardingStatusTask, probationStatusTask, offboardingStatusTask, effectiveNoticePeriodTask);
 
         var onboardingStatus = onboardingStatusTask.Result;
@@ -153,24 +151,13 @@ internal sealed class GetEmployeeHandler
         var offboardingStatus = offboardingStatusTask.Result;
         var effectiveNoticePeriod = effectiveNoticePeriodTask.Result;
 
-        // Sequential — both hit this same EmployeesDbContext instance, which EF Core does not
-        // allow to be used by more than one in-flight operation at a time.
         var reportingChain = await BuildReportingChainAsync(
             request.CompanyId, result.Id, result.ManagerId, cancellationToken);
-        // EmployeeLeavingProcess is owned by this same module/DbContext (unlike onboarding/
-        // probation/offboarding status, which live in other modules and are read through
-        // Infrastructure.Abstractions reader ports), so this is a direct query rather than a
-        // cross-module reader.
-        // Any attempt at all — not just InProgress — keeps the unified workspace reachable so a
-        // completed or cancelled departure remains visible as history (SPEC-OFF-01: "Historical
-        // attempts must remain accessible and clearly distinguished from the current attempt").
         var hasAnyLeavingProcess = await _dbContext.EmployeeLeavingProcesses
             .AsNoTracking()
             .AnyAsync(
                 p => p.CompanyId == request.CompanyId && p.EmployeeId == result.Id,
                 cancellationToken);
-        // Separate from tab visibility: gates the "Start leaving process" action, which must stay
-        // available after a cancelled/completed attempt so a later departure can create a new one.
         var hasInProgressLeavingProcess = await _dbContext.EmployeeLeavingProcesses
             .AsNoTracking()
             .AnyAsync(
@@ -179,9 +166,6 @@ internal sealed class GetEmployeeHandler
                     && p.Status == LeavingProcessStatus.InProgress,
                 cancellationToken);
 
-        // Single source of truth for "should the employee profile show this lifecycle tab" — the
-        // frontend reads these fields rather than re-deriving them from separately-fetched status
-        // calls, so these predicates must stay the only place this logic is expressed.
         var showOnboardingTab = onboardingStatus is not null && onboardingStatus.Status != "Completed";
         var showProbationTab = probationStatus is not null
             && probationStatus.Status is "Active" or "ReviewDue" or "Extended";
@@ -247,8 +231,6 @@ internal sealed class GetEmployeeHandler
             result.Version));
     }
 
-    // Walks the ManagerId chain from the employee's own manager up to the root, using an
-    // in-memory visited set so a corrupt/circular manager reference can't cause an infinite loop.
     private async Task<IReadOnlyList<ReportingChainItem>> BuildReportingChainAsync(
         Guid companyId, Guid employeeId, Guid? managerId, CancellationToken cancellationToken)
     {

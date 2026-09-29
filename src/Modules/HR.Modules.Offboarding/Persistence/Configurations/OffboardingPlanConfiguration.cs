@@ -65,22 +65,12 @@ internal sealed class OffboardingPlanConfiguration : IEntityTypeConfiguration<Of
         builder.HasIndex(p => new { p.CompanyId, p.EmployeeId });
         builder.HasIndex(p => new { p.CompanyId, p.Status });
 
-        // OFF-05: lets HR list/query "needs reconciliation" plans cheaply, company-wide.
         builder.HasIndex(p => new { p.CompanyId, p.RequiresHrReconciliation })
             .HasDatabaseName("ix_offboarding_plans_company_id_requires_hr_reconciliation");
 
-        // OFF-07: lets HR list/query the "incomplete offboarding at departure" exception queue
-        // cheaply, company-wide — mirrors the RequiresHrReconciliation index above.
         builder.HasIndex(p => new { p.CompanyId, p.HasIncompleteOffboardingAtDeparture })
             .HasDatabaseName("ix_offboarding_plans_company_id_incomplete_at_departure");
 
-        // OFF-03: database-level backstop against duplicate active plans for the same employee.
-        // "Active" here means anything not yet in a terminal state (Completed/Cancelled) — an
-        // employee may accumulate any number of Completed/Cancelled historical plans, but never
-        // more than one NotStarted/InProgress plan at a time. This is what makes concurrent/repeated
-        // "start offboarding" attempts (manual or automatic) safe: the in-memory pre-check in
-        // StartOffboardingHandler is only a fast-path optimisation, this index is the real guarantee
-        // under concurrency, and a violation is caught there and turned into a Conflict result.
         builder.HasIndex(p => new { p.CompanyId, p.EmployeeId })
             .IsUnique()
             .HasFilter("status NOT IN ('Completed', 'Cancelled')")

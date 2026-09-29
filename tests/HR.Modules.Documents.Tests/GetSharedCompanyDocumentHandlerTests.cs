@@ -107,9 +107,6 @@ public class GetSharedCompanyDocumentHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_Raw_AcknowledgementDueDate_And_Statement()
     {
-        // The HR detail view feeds the edit dialog, so it must return the raw stored statement
-        // (including null when HR hasn't written one) rather than a resolved default — only the
-        // employee-facing GetPublishedSharedCompanyDocument response applies the default fallback.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var category  = await SeedCategory(db, companyId);

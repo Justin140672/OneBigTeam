@@ -1,10 +1,5 @@
 namespace HR.Web.Services;
 
-/// <summary>
-/// The three ways HR can express a bulk compensation adjustment in the bulk-update screen's
-/// preview grid. The API itself only ever receives the final calculated ProposedSalary per
-/// employee — this enum and the calculator below exist purely to drive the UI preview.
-/// </summary>
 public enum CompensationAdjustmentMode
 {
     PercentageIncrease,
@@ -20,11 +15,6 @@ public enum CompensationAdjustmentMode
 /// </summary>
 public static class CompensationAdjustmentCalculator
 {
-    /// <summary>
-    /// Calculates the proposed salary for a single employee given the current salary, the
-    /// adjustment mode, and the mode-specific input value. For SetDirectly, <paramref name="value"/>
-    /// is itself the proposed salary.
-    /// </summary>
     public static decimal CalculateProposedSalary(decimal currentSalary, CompensationAdjustmentMode mode, decimal value)
     {
         return mode switch
@@ -39,10 +29,6 @@ public static class CompensationAdjustmentCalculator
     public static decimal CalculateDifference(decimal currentSalary, decimal proposedSalary) =>
         Round(proposedSalary - currentSalary);
 
-    /// <summary>
-    /// Returns null when the current salary is zero (percentage change is undefined) rather than
-    /// dividing by zero.
-    /// </summary>
     public static decimal? CalculatePercentageChange(decimal currentSalary, decimal proposedSalary)
     {
         if (currentSalary == 0)

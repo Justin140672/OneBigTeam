@@ -123,8 +123,6 @@ public class CreateSicknessCategoryHandlerTests
         Assert.True(result.IsSuccess);
     }
 
-    // SICK-06: category CRUD previously had no audit trail at all; actor is resolved server-side
-    // from the authenticated caller (threaded via CreateSicknessCategoryRequest.ActorEmployeeId).
     [Fact]
     public async Task HandleAsync_Publishes_Audit_Event_With_ActorEmployeeId_And_Structured_Payload()
     {

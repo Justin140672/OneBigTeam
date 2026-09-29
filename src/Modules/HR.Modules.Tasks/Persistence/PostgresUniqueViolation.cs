@@ -20,8 +20,6 @@ internal static class PostgresUniqueViolation
 
     public static bool Is(DbUpdateException exception, string? constraintName = null)
     {
-        // Npgsql surfaces the underlying PostgresException as the inner exception. Match on the
-        // stable SQLSTATE rather than a localised message where possible.
         var inner = exception.InnerException;
         var isUniqueViolation =
             (inner is not null

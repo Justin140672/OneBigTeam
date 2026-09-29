@@ -9,18 +9,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Features.GetManagerTeamStatusSummary;
 
-/// <summary>
-/// DSH-05 coordinating query for the Manager Dashboard "Team Status" widget. Composes this
-/// module's own employee/hierarchy/working-pattern data with per-module cross-module contract
-/// readers (leave, sickness, probation) into one authoritative summary — without
-/// HR.Modules.Employees referencing any other module's implementation.
-///
-/// Scope is the manager's entire reporting sub-tree, resolved fresh by
-/// <see cref="IDirectReportsReader.GetAllDescendantIdsAsync"/>
-/// (specifications/architecture/11-manager-hierarchy-scope.md). Status is computed for "today" in
-/// the company time zone. Counts and drill-down come from the same member list so they always
-/// agree.
-/// </summary>
 internal sealed class GetManagerTeamStatusSummaryHandler(
     EmployeesDbContext dbContext,
     IDirectReportsReader directReportsReader,
@@ -43,8 +31,6 @@ internal sealed class GetManagerTeamStatusSummaryHandler(
 
         var subtreeSet = subtreeIds.ToHashSet();
 
-        // Counted population: exclude non-active (Draft / Suspended / Leaving / former), not-yet-
-        // started, and already-left employees.
         var candidates = await dbContext.Employees
             .AsNoTracking()
             .Where(e => e.CompanyId == companyId
@@ -135,8 +121,6 @@ internal sealed class GetManagerTeamStatusSummaryHandler(
             Members: members);
     }
 
-    // Mirrors WorkingPatternProvider: an override level only applies when BOTH its working-days
-    // and hours-per-day values are present; otherwise fall through to the next level.
     private static WorkingPattern ResolvePattern(
         WorkingDays? employeeDays, decimal? employeeHours,
         (WorkingDays? Days, decimal? Hours) profile,

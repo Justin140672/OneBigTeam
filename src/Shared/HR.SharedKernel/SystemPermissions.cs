@@ -1,9 +1,5 @@
 namespace HR.SharedKernel;
 
-/// <summary>
-/// Well-known permission GUIDs that are shared across modules.
-/// These must match the values seeded in the identity.permissions table.
-/// </summary>
 public static class SystemPermissions
 {
     public static readonly Guid EmployeeEdit   = new("00000000-0000-0000-0001-000000000004");
@@ -15,7 +11,5 @@ public static class SystemPermissions
     // /EmployeeCreate above (HR.Web cannot reference the Identity module directly).
     public static readonly Guid ProbationManage = new("00000000-0000-0000-0001-000000000023");
 
-    // Mirrors HR.Modules.Identity.Domain.SystemPermissions.RecruitmentManage ("recruitment:manage") —
-    // HR.Web uses it to show the internal-appointment Appoint action only to users who can call it.
     public static readonly Guid RecruitmentManage = new("00000000-0000-0000-0001-000000000026");
 }

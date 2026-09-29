@@ -42,11 +42,8 @@ public class EmployeeCreatedHandlerTests
         Assert.Equal(employeeId, balances[0].EmployeeId);
         Assert.Equal(activeType.Id, balances[0].LeaveTypeId);
         Assert.Equal(policyId, balances[0].LeavePolicyId);
-        // StartDate 2026-06-01 is mid-year on a Jan-Dec leave year: 25 * 214/365 = 14.657... rounded to nearest half day = 14.5 (pro-rated).
         Assert.Equal(14.5m, balances[0].EntitlementDays);
         Assert.Equal(FixedUtcNow.Year, balances[0].PolicyYear);
-        // A mid-year joiner accrues (for Monthly/Fortnightly leave types) from their own start
-        // date, not the policy year start - see LeaveBalance.AccrualStartDate (LEAVE-04).
         Assert.Equal(new DateOnly(2026, 6, 1), balances[0].AccrualStartDate);
     }
 
@@ -75,8 +72,6 @@ public class EmployeeCreatedHandlerTests
 
         var balance = await context.LeaveBalances.SingleAsync();
         Assert.Equal(25, balance.EntitlementDays);
-        // Continuing/starting-on-day-one employee: accrual start date is the policy year start
-        // itself, since their start date is not later than it (LEAVE-04).
         Assert.Equal(new DateOnly(2026, 1, 1), balance.AccrualStartDate);
     }
 
@@ -104,7 +99,7 @@ public class EmployeeCreatedHandlerTests
             CancellationToken.None);
 
         var balance = await context.LeaveBalances.SingleAsync();
-        Assert.Equal(0.5m, balance.EntitlementDays); // 25 * 5/365 = 0.342... rounded to nearest half day = 0.5
+        Assert.Equal(0.5m, balance.EntitlementDays);
     }
 
     [Fact]
@@ -126,7 +121,6 @@ public class EmployeeCreatedHandlerTests
                 DateOnly.FromDateTime(fixedNow), now));
         await context.SaveChangesAsync();
 
-        // Company leave year runs April-March (not Jan-Dec).
         var settings = new CompanyLeaveSettings(true, LeaveYearStartMonth: 4, 25, WorkingPattern.Default);
         var handler = new EmployeeCreatedHandler(context, new FakeClock(fixedNow), new FakeCompanyLeaveSettingsReader(settings));
         await handler.HandleAsync(
@@ -134,7 +128,7 @@ public class EmployeeCreatedHandlerTests
             CancellationToken.None);
 
         var balance = await context.LeaveBalances.SingleAsync();
-        Assert.Equal(12.5m, balance.EntitlementDays); // 25 * 182/365 = 12.4657... rounded to nearest half day = 12.5
+        Assert.Equal(12.5m, balance.EntitlementDays);
     }
 
     [Fact]
@@ -146,9 +140,6 @@ public class EmployeeCreatedHandlerTests
         var policyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        // A part-time leave type reflects a lower full-year entitlement (however that figure was
-        // derived from the employee's working pattern) — pro-rating must still apply the same
-        // fraction-of-year math on top of it.
         var partTimeAnnualType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 15,
             AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now);
 
@@ -164,15 +155,12 @@ public class EmployeeCreatedHandlerTests
             CancellationToken.None);
 
         var balance = await context.LeaveBalances.SingleAsync();
-        Assert.Equal(9.0m, balance.EntitlementDays); // 15 * 214/365 = 8.7945... rounded to nearest half day = 9.0
+        Assert.Equal(9.0m, balance.EntitlementDays);
     }
 
     [Fact]
     public async Task HandleAsync_Produces_Identical_Entitlement_For_Imported_And_Manually_Created_Employee()
     {
-        // Manual creation and import both publish EmployeeCreatedIntegrationEvent and are consumed
-        // by the exact same handler — this proves there is no separate calculation path for
-        // imports (IsImported only differs in the event payload, entitlement math is untouched).
         await using var manualContext = BuildContext();
         await using var importedContext = BuildContext();
         var companyId = Guid.NewGuid();
@@ -281,7 +269,7 @@ public class EmployeeCreatedHandlerTests
         var balances = await context.LeaveBalances.ToListAsync();
         Assert.Single(balances);
         Assert.Equal(defaultPolicyId, balances[0].LeavePolicyId);
-        Assert.Equal(14.5m, balances[0].EntitlementDays); // mid-year starter, pro-rated
+        Assert.Equal(14.5m, balances[0].EntitlementDays);
     }
 
     [Fact]
@@ -367,7 +355,7 @@ public class EmployeeCreatedHandlerTests
         var annualBalance = balances.Single(b => b.LeaveTypeId == annualType.Id);
 
         Assert.Equal(0, toilBalance.EntitlementDays);
-        Assert.Equal(14.5m, annualBalance.EntitlementDays); // mid-year starter, pro-rated; TOIL always 0
+        Assert.Equal(14.5m, annualBalance.EntitlementDays);
     }
 
     private static LeaveDbContext BuildContext()

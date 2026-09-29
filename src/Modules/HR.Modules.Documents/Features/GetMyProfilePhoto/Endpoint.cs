@@ -14,10 +14,6 @@ internal sealed class Endpoint(GetMyProfilePhotoHandler handler, ICurrentUser cu
 
     public override async Task HandleAsync(CancellationToken cancellationToken)
     {
-        // Reads the DB-resolved user id via ICurrentUser, not a raw ClaimTypes.NameIdentifier claim
-        // — the JWT bearer handler is configured with MapInboundClaims = false (see HR.Api's
-        // ConfigureSupabaseJwtBearer), so real Supabase-issued tokens never populate that mapped
-        // claim type; relying on it directly would Unauthorized every request unconditionally.
         if (currentUser.UserId is not Guid employeeId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());

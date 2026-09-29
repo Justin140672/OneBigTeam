@@ -41,7 +41,7 @@ public class UploadMyProfilePhotoEndpointTests
         var companyId = Guid.NewGuid();
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, Guid.NewGuid().ToString());
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString()); // different company
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/me/profile-photo",
@@ -85,7 +85,7 @@ public class UploadMyProfilePhotoEndpointTests
         var employeeId = Guid.NewGuid();
         using var client = await SelfClient(companyId, employeeId);
 
-        var oversized = new byte[6 * 1024 * 1024]; // exceeds the default 5 MB limit
+        var oversized = new byte[6 * 1024 * 1024];
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/me/profile-photo",
@@ -115,7 +115,6 @@ public class UploadMyProfilePhotoEndpointTests
         var employeeId = Guid.NewGuid();
         using var client = await SelfClient(companyId, employeeId);
 
-        // Extension/content type claim PNG, but the bytes are not a PNG (spoofed/renamed file).
         var spoofed = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
         var response = await client.PostAsync(
@@ -222,12 +221,6 @@ public class UploadMyProfilePhotoEndpointTests
     [Fact]
     public async Task Post_ReUpload_While_Pending_Does_Not_Create_A_Second_Open_Review_Task()
     {
-        // Defect fix: re-uploading a replacement photo while the first submission is still pending
-        // review previously created a SECOND open review task pointing at the same submission,
-        // because ITaskCreator.CreateAsync had no way to know the "new" task was really the same
-        // review being refreshed. UploadMyProfilePhotoHandler now passes a deterministic
-        // idempotency key derived from the pending photo's (stable) Id, so a re-upload while
-        // pending must be a no-op for task creation.
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         using var client = await SelfClient(companyId, employeeId);
@@ -244,7 +237,6 @@ public class UploadMyProfilePhotoEndpointTests
         Assert.Equal(HttpStatusCode.OK, second.StatusCode);
         var secondPayload = await second.Content.ReadFromJsonAsync<ProfilePhotoPayload>();
 
-        // Same logical pending submission across both uploads.
         Assert.Equal(firstPayload!.Id, secondPayload!.Id);
 
         using var scope = _factory.Services.CreateScope();
@@ -262,7 +254,6 @@ public class UploadMyProfilePhotoEndpointTests
         Assert.Equal(TaskItemStatus.Open, reviewTasks[0].Status);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> SelfClient(Guid companyId, Guid employeeId)
     {
@@ -286,18 +277,16 @@ public class UploadMyProfilePhotoEndpointTests
         return form;
     }
 
-    // Builds a minimal-but-valid PNG byte stream: signature + IHDR chunk carrying the given
-    // width/height at the big-endian offsets ImageUploadValidator reads (16/20).
     private static byte[] BuildPngBytes(int width, int height)
     {
         var bytes = new List<byte>();
-        bytes.AddRange(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }); // signature
-        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x0D }); // IHDR chunk data length
+        bytes.AddRange(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
+        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x0D });
         bytes.AddRange("IHDR"u8.ToArray());
         bytes.AddRange(BigEndianUInt32(width));
         bytes.AddRange(BigEndianUInt32(height));
-        bytes.AddRange(new byte[] { 0x08, 0x06, 0x00, 0x00, 0x00 }); // bit depth, color type, compression, filter, interlace
-        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 }); // dummy CRC (not validated)
+        bytes.AddRange(new byte[] { 0x08, 0x06, 0x00, 0x00, 0x00 });
+        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 });
         return [.. bytes];
     }
 

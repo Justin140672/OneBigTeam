@@ -88,9 +88,6 @@ public class RecordMySicknessHandlerTests
         Assert.Equal(SicknessStatus.Active, result.Value.Status);
         Assert.Equal(StartDate, result.Value.StartDate);
         Assert.Equal(SicknessDayPart.FullDay, result.Value.StartDayPart);
-        // Fit note requirement is mandatory now (default 7 days — see
-        // CompanySettings.FitNoteRequiredAfterDays), and with no end date yet we can't tell if
-        // the threshold will be met, so this defaults to Pending rather than NotRequired.
         Assert.Equal(SicknessEvidenceStatus.Pending, result.Value.EvidenceStatus);
         Assert.Equal("Feeling unwell", result.Value.Notes);
 
@@ -236,7 +233,7 @@ public class RecordMySicknessHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Category_Belongs_To_Different_Company()
     {
         await using var db = BuildContext();
-        var categoryId = await SeedCategory(db, Guid.NewGuid()); // different company
+        var categoryId = await SeedCategory(db, Guid.NewGuid());
 
         var result = await BuildHandler(db).HandleAsync(new RecordMySicknessRequest
         {
@@ -280,7 +277,6 @@ public class RecordMySicknessHandlerTests
         var employeeId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
 
-        // Create the first (open) record
         var firstResult = await BuildHandler(db).HandleAsync(new RecordMySicknessRequest
         {
             CompanyId = companyId,
@@ -292,7 +288,6 @@ public class RecordMySicknessHandlerTests
 
         Assert.True(firstResult.IsSuccess);
 
-        // Attempt to create a second open record for the same employee
         var secondResult = await BuildHandler(db).HandleAsync(new RecordMySicknessRequest
         {
             CompanyId = companyId,
@@ -364,7 +359,6 @@ public class RecordMySicknessHandlerTests
         var categoryId = await SeedCategory(db, companyId);
         var auditPublisher = new FakeAuditEventPublisher();
 
-        // First record succeeds
         await BuildHandler(db, auditPublisher: auditPublisher).HandleAsync(new RecordMySicknessRequest
         {
             CompanyId = companyId,
@@ -376,7 +370,6 @@ public class RecordMySicknessHandlerTests
 
         auditPublisher.PublishedEvents.Clear();
 
-        // Second record conflicts
         var result = await BuildHandler(db, auditPublisher: auditPublisher).HandleAsync(new RecordMySicknessRequest
         {
             CompanyId = companyId,
@@ -454,16 +447,11 @@ public class RecordMySicknessHandlerTests
     [Fact]
     public async Task HandleAsync_CreatesEvidenceRequest_Immediately_ForBackdatedOpenAbsence_AlreadyOverThreshold()
     {
-        // Backdated open (no end date) absence: StartDate far enough in the past relative to
-        // FixedUtcNow (2026-07-01) that calendar days already exceed the default threshold (7).
-        // This must be caught immediately at creation time rather than waiting for the next
-        // FitNoteRequestJob run.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
 
-        // 2026-06-20 to 2026-07-01 (FixedUtcNow date) = 12 calendar days elapsed, threshold 7 → met
         var result = await BuildHandler(db).HandleAsync(new RecordMySicknessRequest
         {
             CompanyId = companyId,
@@ -482,15 +470,13 @@ public class RecordMySicknessHandlerTests
     [Fact]
     public async Task HandleAsync_CreatesEvidenceRequest_Immediately_ForClosedBackdatedImportedAbsence()
     {
-        // Already-closed backdated/imported record: StartDate and EndDate both in the past, span
-        // meets threshold. This must also be caught immediately at creation time.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var categoryId = await SeedCategory(db, companyId);
 
         var start = new DateOnly(2026, 6, 1);
-        var end = new DateOnly(2026, 6, 10); // 10 calendar days elapsed, threshold 7 → met
+        var end = new DateOnly(2026, 6, 10);
         var result = await BuildHandler(db).HandleAsync(new RecordMySicknessRequest
         {
             CompanyId = companyId,
@@ -509,8 +495,6 @@ public class RecordMySicknessHandlerTests
         Assert.Equal(end.AddDays(7), request.DueDate);
     }
 
-    // SICK-06: RecordMySickness is self-service — the actor and subject employee must coincide
-    // by design (the endpoint threads the authenticated employee's own id as ActorEmployeeId).
     [Fact]
     public async Task HandleAsync_Audit_ActorEmployeeId_Equals_Subject_Employee_For_SelfService()
     {

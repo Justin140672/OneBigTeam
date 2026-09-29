@@ -35,15 +35,12 @@
 
     private async Task SwitchToAsync(string key, string url)
     {
-        // Same try/catch-swallow style as the existing theme/orgChartZoom localStorage helpers —
-        // a failed write (e.g. storage disabled) should never block navigation.
         try
         {
             await JS.InvokeVoidAsync("setLastDashboard", key);
         }
         catch
         {
-            // ignore
         }
 
         Navigation.NavigateTo(url);

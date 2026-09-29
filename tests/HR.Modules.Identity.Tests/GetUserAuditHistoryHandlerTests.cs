@@ -31,7 +31,7 @@ public class GetUserAuditHistoryHandlerTests
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
         Assert.Equal((companyId, employeeId), guard.LastCall);
-        Assert.False(auditHistoryReader.WasCalled); // guard short-circuited before any audit read
+        Assert.False(auditHistoryReader.WasCalled);
     }
 
     [Fact]

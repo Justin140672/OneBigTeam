@@ -4,10 +4,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Companies.Tests;
 
-/// <summary>
-/// SET-02 counterpart to GetCompanySettingsHistoryHandlerTests — same shape, but scoped to the
-/// "hr-settings.updated" event type instead.
-/// </summary>
 public class GetHrSettingsHistoryHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 6, 30, 10, 0, 0, TimeSpan.Zero);

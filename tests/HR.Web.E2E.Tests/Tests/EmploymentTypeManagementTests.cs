@@ -4,12 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies HR Administrator CRUD workflows for employment types:
-/// - Create a new employment type and verify it appears in the list.
-/// - Deactivate an employment type.
-/// - A plain Employee is redirected away from the employment types page (no manage access).
-/// </summary>
 public sealed class EmploymentTypeManagementTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -52,18 +46,15 @@ public sealed class EmploymentTypeManagementTests(HrAdminPersonaFixture fixture)
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Create first
         await typeList.GoToAsync(AcmeId);
         await typeList.ClickNewAsync();
         await typeEdit.FillNameAsync(typeName);
         await typeEdit.SaveAsync();
 
-        // Now deactivate
         await typeList.GoToAsync(AcmeId);
         Assert.True(await typeList.IsActiveAsync(typeName), "Expected newly created type to be Active");
         await typeList.DeactivateAsync(typeName);
 
-        // Show inactive and verify
         await typeList.ShowInactiveAsync();
 
         Assert.True(await typeList.HasItemAsync(typeName),
@@ -104,7 +95,6 @@ public sealed class EmploymentTypeManagementTests(HrAdminPersonaFixture fixture)
         await _page.GotoAsync($"{_fixture.WebBaseUrl}{updatedHref}");
         await _page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
 
-        // Reload the page directly to confirm the change persisted server-side, not just in local state.
         await _page.ReloadAsync();
         await _page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
 
@@ -120,11 +110,8 @@ public sealed class EmploymentTypeManagementTests(HrAdminPersonaFixture fixture)
         await login.LoginAsync(TomEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/employment-types");
-        // See WaitForUrlToStopContainingAsync's doc comment: the redirect is a client-side Blazor
-        // NavigateTo, not a full navigation, so NetworkIdle is not a reliable completion signal.
         await WaitForUrlToStopContainingAsync("/employment-types");
 
-        // Tom has no manage permissions, so the page should redirect (e.g. to /login or home)
         var finalUrl = _page.Url;
         Assert.False(finalUrl.Contains("/employment-types"),
             $"Expected a plain employee to be redirected away from the employment types page, but ended up at: {finalUrl}");

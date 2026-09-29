@@ -107,7 +107,6 @@ public class GetOnboardingStatusEndpointTests
         Assert.Equal("Completed", payload.Status);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {

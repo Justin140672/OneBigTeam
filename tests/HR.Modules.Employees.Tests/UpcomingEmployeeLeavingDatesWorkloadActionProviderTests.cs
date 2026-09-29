@@ -8,11 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Tests;
 
-/// <summary>
-/// OBT-721 workload action provider tests for upcoming employee leaving dates. HR-only, same tier
-/// as UpcomingEmployeeStartDatesWorkloadActionProvider. Only in-progress leaving processes with a
-/// LastWorkingDay on or after today are surfaced.
-/// </summary>
 public class UpcomingEmployeeLeavingDatesWorkloadActionProviderTests
 {
     private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow.Date);

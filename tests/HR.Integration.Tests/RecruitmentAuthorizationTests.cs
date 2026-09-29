@@ -5,20 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Proves the recruitment:manage / recruitment:view / candidate:view FastEndpoints policy
-/// declarations actually enforce access end-to-end over real HTTP. Unit tests on handlers cannot
-/// exercise policy middleware, so this coverage lives exclusively at this layer.
-///
-/// Vacancy-only reads (recruitment:view) remain visible to any authenticated employee (internal
-/// job board visibility). Candidate/application/interview/document reads (candidate:view) and
-/// recruitment writes — creating/updating vacancies and candidates, applications, interviews,
-/// offers, hires (recruitment:manage) — are Recruiter-only: recruitment is a distinct function
-/// with its own role, and HR Administrator does not automatically inherit it, the same
-/// non-overlap principle as company:manage/shared-document management elsewhere in this system.
-/// Company Administrator is scoped to company profile/settings and does not hold recruitment
-/// permissions either.
-/// </summary>
 [Collection("Integration")]
 public class RecruitmentAuthorizationTests
 {
@@ -59,9 +45,6 @@ public class RecruitmentAuthorizationTests
 
     private async Task<(Guid VacancyId, Guid CandidateId, Guid ApplicationId)> SeedApplicationAsync(HttpClient client, Guid companyId)
     {
-        // PositionProfileId is required on Vacancy creation (recruitment:manage) but seeding one
-        // requires employee:manage, a permission Recruiter does not hold, so it is seeded directly
-        // via EF (EmployeeReferenceDataSeeder) rather than through the HTTP-authenticated client.
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
 
         var vacancyResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/vacancies", new
@@ -201,7 +184,6 @@ public class RecruitmentAuthorizationTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ── candidate:view — plain Employee/Manager forbidden from candidate reads ───
 
     [Fact]
     public async Task PlainEmployee_Gets_Forbidden_Listing_Candidates()
@@ -236,9 +218,6 @@ public class RecruitmentAuthorizationTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // Company Administrator is scoped to company profile/settings management only and does
-    // not hold candidate:view — see the narrowing in
-    // HR.Modules.Identity.IdentityModule.AddRolePolicies.
     [Fact]
     public async Task CompanyAdministrator_Gets_Forbidden_Listing_Candidates()
     {
@@ -332,10 +311,6 @@ public class RecruitmentAuthorizationTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── recruitment:manage — Recruiter-only writes; HR Administrator forbidden ────
-    // SeedApplicationAsync (uses recruitment:manage internally to create the vacancy/candidate/
-    // application) already proves Recruiter succeeds at these writes everywhere else in this
-    // file, so this section only needs to prove HR Administrator is now blocked from them.
 
     [Fact]
     public async Task HrAdministrator_Gets_Forbidden_Creating_A_Vacancy()
@@ -370,7 +345,6 @@ public class RecruitmentAuthorizationTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── candidate:view — Recruiter-only; HR Administrator no longer included ──────
 
     [Fact]
     public async Task Recruiter_Gets_Ok_Listing_Candidates()
@@ -478,7 +452,6 @@ public class RecruitmentAuthorizationTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── Anonymous requests are unauthorized, not forbidden ────────────────────────
 
     [Fact]
     public async Task Anonymous_Gets_Unauthorized_Listing_Candidates()

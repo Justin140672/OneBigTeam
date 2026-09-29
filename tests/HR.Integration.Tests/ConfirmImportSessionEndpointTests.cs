@@ -21,13 +21,7 @@ public class ConfirmImportSessionEndpointTests
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.HrAdministrator);
-            // CompanyAdministrator is additionally required by the Automatic-mode scenarios added
-            // below, which call PUT .../settings (company:manage) to switch the company into
-            // Automatic employee-numbering mode before uploading/confirming an import.
             await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.CompanyAdministrator);
-            // Employee is additionally required by this file's own CreateCompanyAsync test helper
-            // (POST /api/companies, "role:employee" policy) — unrelated to DataImport's own
-            // employee:manage policy, just a pre-existing setup helper this persona also needs.
             await TestRoleSeeder.AssignRoleAsync(factory, ImportAdmin, SystemRoles.Employee);
         }).GetAwaiter().GetResult();
     }
@@ -35,12 +29,6 @@ public class ConfirmImportSessionEndpointTests
     [Fact]
     public async Task Returns_Ok_And_Creates_Employees_For_All_Valid_Rows()
     {
-        // ValidCsv() supplies an explicit Employee Number per row, which only passes staging
-        // validation in Manual mode. A company with no persisted company_settings row now
-        // defaults to Automatic (CompanySettings.CreateDefault / CompanyEmployeeNumberSettingsReader
-        // — matches what every real company gets via CompanyProvisioner at signup), so this test
-        // needs a real company (SetEmployeeNumberModeAsync requires one) switched to Manual mode
-        // explicitly rather than relying on it being the implicit default.
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ImportAdmin.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
@@ -74,10 +62,6 @@ public class ConfirmImportSessionEndpointTests
         var john = Assert.Single(employees!.Items, e => e.WorkEmail == "john.doe@example.com");
         Assert.Contains(employees.Items, e => e.WorkEmail == "jane.doe@example.com");
 
-        // Imported employees go through the same EmployeeCreatedIntegrationEvent (IsImported:
-        // true) as directly-created ones — ConfirmImportSessionHandler publishes it once per
-        // successfully-imported row (see EmployeeImportWriter's own doc comment) — so an "Employee
-        // joined" timeline entry must exist here too, with the import-specific summary text.
         var timelineResponse = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{john.Id}/timeline");
         timelineResponse.EnsureSuccessStatusCode();
@@ -119,7 +103,6 @@ public class ConfirmImportSessionEndpointTests
         mismatchedClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ImportAdmin.ToString());
         mismatchedClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
 
-        // Route company differs from the authenticated user's company_id claim (cross-tenant).
         var response = await mismatchedClient.PostAsync(ConfirmUrl(companyId, sessionId), EmptyJson());
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -139,8 +122,6 @@ public class ConfirmImportSessionEndpointTests
 
         using var callerClient = await AdminClient(callerCompanyId);
 
-        // Caller's claim matches the route company (passes the auth check), but the session
-        // was created under a different company, so the handler cannot find it for this caller.
         var response = await callerClient.PostAsync(ConfirmUrl(callerCompanyId, sessionId), EmptyJson());
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -152,7 +133,6 @@ public class ConfirmImportSessionEndpointTests
         var companyId = Guid.NewGuid();
         using var client = await AdminClient(companyId);
 
-        // Uploaded but never validated: session is still Pending, which is not a confirmable state.
         var sessionId = await UploadAsync(client, companyId, ValidCsv());
 
         var response = await client.PostAsync(ConfirmUrl(companyId, sessionId), EmptyJson());
@@ -163,8 +143,6 @@ public class ConfirmImportSessionEndpointTests
     [Fact]
     public async Task Returns_Conflict_When_Session_Has_Already_Been_Confirmed()
     {
-        // See Returns_Ok_And_Creates_Employees_For_All_Valid_Rows above: ValidCsv()'s explicit
-        // Employee Numbers require Manual mode, which needs a real company row to switch onto.
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ImportAdmin.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
@@ -182,8 +160,6 @@ public class ConfirmImportSessionEndpointTests
         var firstConfirm = await client.PostAsync(ConfirmUrl(companyId, sessionId), EmptyJson());
         Assert.Equal(HttpStatusCode.OK, firstConfirm.StatusCode);
 
-        // A session that landed on "Imported" (zero failures) is no longer in a confirmable
-        // state, since Validated/CompletedWithErrors are the only two accepted statuses.
         var secondConfirm = await client.PostAsync(ConfirmUrl(companyId, sessionId), EmptyJson());
 
         Assert.Equal(HttpStatusCode.Conflict, secondConfirm.StatusCode);
@@ -195,9 +171,6 @@ public class ConfirmImportSessionEndpointTests
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ImportAdmin.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
-        // UpdateCompanySettings (used by SetEmployeeNumberModeAsync below) requires a real
-        // companies.companies row — unlike upload/validate/confirm, which never check the Company
-        // table directly and so can use an arbitrary companyId elsewhere in this file.
         var companyId = await CreateCompanyAsync(client);
         client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
@@ -282,8 +255,6 @@ public class ConfirmImportSessionEndpointTests
         Assert.Equal(3, payload.CreatedRows[1].RowNumber);
         Assert.Equal("EMP-002", payload.CreatedRows[1].EmployeeNumber);
 
-        // The confirm response reports what the writer/generator returned in-memory — re-fetch
-        // each employee to prove the generated number was actually persisted, not just echoed back.
         var johnResponse = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{payload.CreatedRows[0].EmployeeId}");
         johnResponse.EnsureSuccessStatusCode();
@@ -297,18 +268,12 @@ public class ConfirmImportSessionEndpointTests
         Assert.Equal("EMP-002", jane!.EmployeeNumber);
     }
 
-    // POST /api/companies (CreateCompany) was removed in 78a43344; this now provisions the
-    // company directly via CompaniesDbContext, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
     private async Task<Guid> CreateCompanyAsync(HttpClient client)
     {
         _ = client;
         return await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Import EmployeeNumber Test Co {Guid.NewGuid():N}");
     }
 
-    // Was calling PUT /api/companies/{id}/settings (UpdateCompanySettingsHandler), which only
-    // persists TimeZone/Locale and silently ignores every other field in the request body
-    // (including employeeNumberMode) — it still returned 200 OK. The actual employee-number/HR
-    // settings live behind PUT /api/companies/{id}/hr-settings (UpdateHrSettingsHandler).
     private static async Task SetEmployeeNumberModeAsync(
         HttpClient client, Guid companyId, string mode, string? prefix = null, int nextEmployeeNumber = 1, int minimumLength = 1)
     {
@@ -337,14 +302,6 @@ public class ConfirmImportSessionEndpointTests
         return client;
     }
 
-    /// <summary>
-    /// DefaultLeavePolicyId is now mandatory on PositionProfile, so
-    /// ImportLookupResolver.GetOrCreatePositionProfileAsync can only auto-create a position
-    /// profile for a CSV row when the company already has a default leave policy configured
-    /// (the first policy created for a company is automatically its default — see
-    /// CreateLeavePolicyHandler). Without this, rows referencing a not-yet-existing position
-    /// profile are silently skipped and the row fails.
-    /// </summary>
     private static async Task EnsureDefaultLeavePolicyAsync(HttpClient client, Guid companyId)
     {
         var response = await client.PostAsJsonAsync(
@@ -386,9 +343,6 @@ public class ConfirmImportSessionEndpointTests
         return content;
     }
 
-    // Builds a minimal XLSX workbook (via ClosedXML) from comma-delimited "csv-shaped" header/data
-    // lines, so existing test fixtures (written as csv-style strings for readability) can still be
-    // uploaded against the now xlsx-only import endpoint.
     private static byte[] BuildXlsxBytes(string csvShapedContent)
     {
         var lines = csvShapedContent

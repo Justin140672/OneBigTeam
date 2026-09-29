@@ -72,8 +72,6 @@ public class GetRecruitmentKanbanEndpointTests
     [Fact]
     public async Task Get_Kanban_Returns_Forbidden_For_Plain_Employee()
     {
-        // The Kanban board is Recruiter-only (recruitment:manage) — it's an operational recruiting
-        // tool, not general vacancy visibility, unlike recruitment:view elsewhere in this module.
         var companyId = Guid.NewGuid();
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
         var vacancyId = await SeedVacancyAsync(companyId, referenceData.PositionProfileId);

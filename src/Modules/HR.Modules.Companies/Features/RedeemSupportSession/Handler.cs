@@ -43,8 +43,6 @@ internal sealed class RedeemSupportSessionHandler(
 
         var tokenHash = HashToken(request.Token);
 
-        // Tracked (not AsNoTracking) — SaveChangesWithConcurrencyAsync below needs EF change
-        // tracking to pin the OriginalValue of Version and detect a concurrent redeemer.
         var supportSession = await dbContext.SupportSessions
             .SingleOrDefaultAsync(s => s.TokenHash == tokenHash, cancellationToken);
 
@@ -63,12 +61,6 @@ internal sealed class RedeemSupportSessionHandler(
             return Result.Failure<RedeemSupportSessionResponse>(redeemResult.Error);
         }
 
-        // P1: atomic, race-safe redemption via the shared optimistic-concurrency pattern (Ticket
-        // 2 — see SupportSession.Version's remarks). Two simultaneous redemption requests for the
-        // same token must never both succeed: whichever request's SaveChangesAsync commits first
-        // advances Version, so the loser's pinned OriginalValue no longer matches the stored row,
-        // its UPDATE affects zero rows, and EF raises DbUpdateConcurrencyException — translated
-        // here to a validation failure rather than a silent double-success.
         var saveResult = await dbContext.SaveChangesWithConcurrencyAsync(
             supportSession, expectedVersion, "This support session has already been redeemed.", cancellationToken);
 

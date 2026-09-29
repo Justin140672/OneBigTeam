@@ -3,18 +3,10 @@ using HR.Web.Services;
 
 namespace HR.Web.Tests;
 
-/// <summary>
-/// Shared logic extracted from the former duplicated AttentionQueueWidget / ManagerAttentionQueueWidget
-/// (HR + manager dashboard "attention queue" panels) into <see cref="AttentionQueueSupport"/> and
-/// <see cref="AttentionQueueItem"/>. Per this repo's convention, bUnit is not used (no existing
-/// component-test pattern in tests/HR.Web.Tests) — these tests exercise the pure, Blazor-agnostic
-/// view-model/classification/conversion functions directly.
-/// </summary>
 public class AttentionQueueSupportTests
 {
     private static readonly DateOnly Today = new(2026, 9, 16);
 
-    // ---------- DueBadge boundary tests ----------
 
     [Fact]
     public void DueBadge_DateBeforeToday_IsOverdue()
@@ -74,17 +66,14 @@ public class AttentionQueueSupportTests
         Assert.Equal("today", css);
     }
 
-    // ---------- ResolveActionLabel ----------
 
     [Fact]
     public void ResolveActionLabel_TaskIdPresent_AlwaysReturnsOpenTask()
     {
-        // Even when the deep link/category would otherwise resolve to something else, a task wins.
         var label = AttentionQueueSupport.ResolveActionLabel(Guid.NewGuid(), "/employees/123", "SomethingElse");
         Assert.Equal("Open task", label);
     }
 
-    // ---------- ResolveActionLabel: task-backed category/title-specific wording ----------
 
     [Fact]
     public void ResolveActionLabel_TaskId_LeaveCategory_ReturnsReviewLeaveRequest()
@@ -179,7 +168,6 @@ public class AttentionQueueSupportTests
         Assert.Equal("View details", label);
     }
 
-    // ---------- AttentionQueueItem computed properties ----------
 
     private static AttentionQueueItem Item(
         Guid? employeeId = null,
@@ -218,7 +206,6 @@ public class AttentionQueueSupportTests
         Assert.False(Item(taskId: null, deepLinkUrl: deepLink).HasTarget);
     }
 
-    // ---------- IsOwnerActionable / IsReadOnlyByDesign ----------
 
     [Fact]
     public void HasTarget_TaskIdSet_But_NotOwnerActionable_IsFalse()
@@ -317,7 +304,6 @@ public class AttentionQueueSupportTests
             isOverdue: true,
             dueDate: due);
 
-        // Category repeats "Overdue" -> dropped. Status doesn't -> kept. Due date appended because overdue.
         Assert.Equal($"Jane Doe · In progress · Due {due:d MMM}", item.MetaText);
     }
 
@@ -447,7 +433,6 @@ public class AttentionQueueSupportTests
             item.AccessibleLabel);
     }
 
-    // ---------- Convert ----------
 
     private static DashboardActionItemModel RawItem(
         Guid? employeeId = null,
@@ -581,9 +566,7 @@ public class AttentionQueueSupportTests
         var (_, items) = AttentionQueueSupport.Convert(response, Today);
         var item = Assert.Single(items);
 
-        // ActionTitle falls back to Category when ActionType is blank.
         Assert.Equal("Leave requests", item.ActionTitle);
-        // StatusLabel falls back to ActionType (also blank here, so ends up empty).
         Assert.Equal("", item.StatusLabel);
     }
 
@@ -625,9 +608,6 @@ public class AttentionQueueSupportTests
         Assert.False(item.IsReadOnlyByDesign);
     }
 
-    // ---------- Manager per-employee alert-count dictionary construction ----------
-    // (mirrors ManagerAttentionQueueWidget.RecomputeAsync's inline dictionary build, which is not
-    // itself extracted into a testable pure function — see report.)
 
     [Fact]
     public void AlertCountDictionary_BuiltFromConvertedItems_CountsPerEmployee_SkippingNullEmployeeId()
@@ -651,8 +631,6 @@ public class AttentionQueueSupportTests
 
         var (_, items) = AttentionQueueSupport.Convert(response, Today);
 
-        // Same construction as ManagerAttentionQueueWidget.RecomputeAsync: group raw items by
-        // EmployeeId, skipping items with no employee, into a count-per-employee dictionary.
         var counts = new Dictionary<Guid, int>();
         foreach (var item in items)
         {

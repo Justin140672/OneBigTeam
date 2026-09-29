@@ -7,13 +7,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Infrastructure.Tests.Email;
 
-/// <summary>
-/// TEST-004 — Postmark adapter hardening. A permanent rejection (non-2xx, or ErrorCode != 0)
-/// must surface as a terminal <see cref="HttpRequestException"/> carrying a 4xx status; a transient
-/// fault (5xx / timeout / transport error) must surface in a way a retry policy can distinguish
-/// (5xx status on the exception, or a raw transport / cancellation exception). No secret token or
-/// email body may appear in logs.
-/// </summary>
 public class PostmarkEmailSenderTests
 {
     private static PostmarkEmailSender Build(FakeHttpMessageHandler handler, Microsoft.Extensions.Logging.ILogger<PostmarkEmailSender>? logger = null)
@@ -51,10 +44,9 @@ public class PostmarkEmailSenderTests
         Assert.Equal("super-secret-server-token", request.Headers.GetValues("X-Postmark-Server-Token").Single());
     }
 
-    // ---- terminal failures --------------------------------------------------------------
 
     [Theory]
-    [InlineData(HttpStatusCode.UnprocessableEntity)] // 422 — Postmark's inactive-recipient / bad-request shape
+    [InlineData(HttpStatusCode.UnprocessableEntity)]
     [InlineData(HttpStatusCode.BadRequest)]
     [InlineData(HttpStatusCode.Unauthorized)]
     public async Task SendAsync_4xx_Rejection_Is_Terminal_With_Client_Status(HttpStatusCode status)
@@ -73,7 +65,6 @@ public class PostmarkEmailSenderTests
         Assert.True((int)ex.StatusCode! is >= 400 and < 500, "4xx must be treated as terminal, not retried");
     }
 
-    // ---- transient failures -----------------------------------------------------------
 
     [Theory]
     [InlineData(HttpStatusCode.InternalServerError)]
@@ -107,7 +98,7 @@ public class PostmarkEmailSenderTests
         var ex = await Assert.ThrowsAsync<HttpRequestException>(
             () => sender.SendAsync("ada@customer-mail.co", "Welcome", "<p>hi</p>"));
 
-        Assert.Null(ex.StatusCode); // no HTTP response at all — a transport-level, retryable fault
+        Assert.Null(ex.StatusCode);
     }
 
     [Fact]
@@ -138,7 +129,6 @@ public class PostmarkEmailSenderTests
         Assert.Equal(HttpStatusCode.UnprocessableEntity, ex.StatusCode);
     }
 
-    // ---- sensitive value scrubbing --------------------------------------------------
 
     [Fact]
     public async Task SendAsync_Failure_Does_Not_Log_Server_Token_Email_Or_Body()
@@ -159,13 +149,11 @@ public class PostmarkEmailSenderTests
         Assert.DoesNotContain("pkce_secret_9f8e7d6c", logger.Text);
         Assert.DoesNotContain("eyJhbGciOiJIUzI1NiJ9", logger.Text);
         Assert.DoesNotContain("ada@customer-mail.co", logger.Text);
-        // still useful for diagnosis — as stable diagnostics, not Postmark's free-form message
         Assert.Contains("406", logger.Text);
         Assert.Contains("InactiveRecipient", logger.Text);
         Assert.DoesNotContain("Inactive recipient", logger.Text);
     }
 
-    // ---- provider message / subject personal-data leakage (P2) ------------------------------
 
     public static TheoryData<string, string[]> ProviderMessagesEchoingAddresses => new()
     {
@@ -203,8 +191,6 @@ public class PostmarkEmailSenderTests
             ex = await Assert.ThrowsAsync<HttpRequestException>(
                 () => sender.SendAsync("recipient.person@customer-mail.co", "Welcome", TokenBody));
 
-            // Callers (EmailDeliveryJob / SendOperationalAlertEmailJob) log the thrown exception —
-            // capture it through the same logger so the exception channel is inspected too.
             logger.LogWarning(ex, "caller logged delivery failure");
         }
 
@@ -217,7 +203,6 @@ public class PostmarkEmailSenderTests
         Assert.DoesNotContain("super-secret-server-token", all);
         Assert.DoesNotContain('@', all);
 
-        // Status and ErrorCode stay diagnosable — as structured properties and in the exception.
         var entry = logger.Entries.First(e => e.Message.StartsWith("Postmark email send failed", StringComparison.Ordinal));
         Assert.Equal("422", entry.StateValue("StatusCode"));
         Assert.Equal("406", entry.StateValue("PostmarkErrorCode"));

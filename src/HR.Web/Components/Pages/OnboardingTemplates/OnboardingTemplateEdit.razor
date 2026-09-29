@@ -220,8 +220,6 @@
         }
     }
 
-    // Shared task mapping used by both LoadAsync and ReloadServerStateAsync so a conflict-reload
-    // rebuilds the checklist exactly as the initial load does (no drift between the two paths).
     private static List<OnboardingTemplateTaskEditModel> MapTasks(GetOnboardingTemplateResponse template)
         => template.Tasks
             .OrderBy(t => t.DisplayOrder)
@@ -311,8 +309,6 @@
         if (_pendingFocusIndex is int idx)
         {
             _pendingFocusIndex = null;
-            // First task has "Move up" disabled, last has "Move down" disabled — focus the
-            // button that's still operable so repeated presses keep working.
             var refs = idx == 0 ? _downRefs : _upRefs;
             if (refs.TryGetValue(idx, out var el))
             {
@@ -417,8 +413,6 @@
             Model.Version = template.Version;
             Model.Tasks = MapTasks(template);
 
-            // The old task list is gone — drop references into it and re-baseline so the page
-            // isn't left falsely dirty (base ReloadLatestValuesAsync does not call this).
             _expandedTask = null;
             _pendingFocusIndex = null;
             CaptureBaseline();

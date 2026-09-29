@@ -2,7 +2,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Identity.Tests.Infrastructure;
 
-/// <summary>ADM-03: records RaiseAsync calls for repeated-denial security alert assertions.</summary>
 internal sealed class CapturingAdministrativeAlertWriter : IAdministrativeAlertWriter
 {
     private readonly List<RaiseAdministrativeAlertCommand> _commands = [];

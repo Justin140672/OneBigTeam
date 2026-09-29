@@ -24,9 +24,6 @@ internal sealed class CandidateDocumentDeletionOperationConfiguration
         builder.Property(o => o.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(o => o.CompletedAt).HasColumnName("completed_at");
 
-        // Follow-up review finding: set when the owning CandidateDocument row was durably saved (or
-        // when a compensating delete resolved this row) — a Reserved intent is fulfilled and will
-        // never need cleanup. See CandidateDocumentDeletionOperation class remarks.
         builder.Property(o => o.ConfirmedAt).HasColumnName("confirmed_at");
 
         // Ticket 19 (P2): claim/lease + terminal-failure columns.

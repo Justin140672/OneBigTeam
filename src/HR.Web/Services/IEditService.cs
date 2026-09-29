@@ -2,9 +2,6 @@ using HR.SharedKernel.Idempotency;
 
 namespace HR.Web.Services;
 
-// Common shape shared by every "simple" edit page's service (Department, EmploymentType, etc.):
-// load one entity by id, create it, or update it. Lets EditPageBase<TModel, TKey> push the
-// load/save orchestration that would otherwise be duplicated in every page's LoadAsync/SaveCoreAsync.
 public interface IEditService<TModel, TKey>
 {
     Task<TModel?> GetByIdAsync(Guid companyId, TKey id);
@@ -12,7 +9,6 @@ public interface IEditService<TModel, TKey>
     Task<(TModel? Result, string? Error)> UpdateAsync(Guid companyId, TKey id, TModel model);
 }
 
-// Split out — not every entity supports deactivation (e.g. PublicHoliday has no delete today).
 public interface IDeactivatableEditService<TModel, TKey> : IEditService<TModel, TKey>
 {
     Task<string?> DeactivateAsync(Guid companyId, TKey id);
@@ -56,9 +52,6 @@ public interface IIdempotentCreateService<TModel>
     object BuildRequestSnapshot(Guid companyId, TModel model);
 }
 
-// Implemented by a "simple" edit model whose service round-trips an optimistic-concurrency token.
-// EditPageBase<TModel, TKey> reads Version after loading (as the expected version for the next
-// save) and writes the post-save version back onto it.
 public interface IHasVersion
 {
     int Version { get; set; }

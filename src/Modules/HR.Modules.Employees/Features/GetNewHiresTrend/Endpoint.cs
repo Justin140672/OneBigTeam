@@ -9,7 +9,6 @@ internal sealed class Endpoint(
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/employees/new-hires-trend");
-        // ADM-05: workforce analytics — Manager / Recruiter / HR Administrator only.
         Policies("employee:read");
     }
 

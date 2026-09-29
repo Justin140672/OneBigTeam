@@ -2,10 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the Employee Leaver report
-/// (/companies/{companyId}/reporting/employee-leavers — EmployeeLeaverReportPage.razor).
-/// </summary>
 public sealed class EmployeeLeaverReportPage(IPage page, string baseUrl)
 {
     private const string RowsRenderedSelector = ".e-grid .e-row, .e-grid .e-emptyrow";
@@ -33,7 +29,6 @@ public sealed class EmployeeLeaverReportPage(IPage page, string baseUrl)
         return await page.Locator(".e-grid .e-row").CountAsync();
     }
 
-    // ── Filter panel (ReportFilterPanel — Department/PositionProfile/DateRange only) ──
 
     private ILocator FilterField(string labelText) =>
         page.Locator(".card-body .col-md-3").Filter(new() { HasText = labelText }).First;
@@ -55,7 +50,6 @@ public sealed class EmployeeLeaverReportPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 
-    // ── Export ─────────────────────────────────────────────────────────────────
 
     public async Task<IDownload> ExportAsync(string formatLabel)
     {

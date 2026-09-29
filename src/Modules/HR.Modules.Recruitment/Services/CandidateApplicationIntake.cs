@@ -9,8 +9,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Recruitment.Services;
 
-/// <summary>Input to <see cref="CandidateApplicationIntake"/>. Tenant and actor are always resolved
-/// server-side by the calling slice, never taken from the client body.</summary>
 internal sealed record CandidateApplicationIntakeCommand(
     Guid CompanyId,
     Guid VacancyId,
@@ -30,8 +28,6 @@ internal sealed record CandidateApplicationIntakeCreated(
     Application Application,
     CandidateDocument? CvDocument);
 
-/// <summary>Exactly one of <see cref="Created"/>, <see cref="DuplicateCandidate"/> or
-/// <see cref="Error"/> is set.</summary>
 internal sealed class CandidateApplicationIntakeOutcome
 {
     private CandidateApplicationIntakeOutcome() { }
@@ -92,8 +88,6 @@ internal sealed class CandidateApplicationIntake(
             return CandidateApplicationIntakeOutcome.Failure(
                 Error.NotFound($"Vacancy '{command.VacancyId}' was not found."));
 
-        // Same rule as CreateApplication (ticket #78): the recruiter must exist in this company; an
-        // inactive recruiter is still a valid historical attribution.
         if (command.Source == ApplicationSource.ExternalRecruiter)
         {
             var recruiterExists = await db.ExternalRecruiters
@@ -115,15 +109,12 @@ internal sealed class CandidateApplicationIntake(
         var email = command.Email.Trim();
         var normalisedEmail = CandidateEmail.Normalise(email);
 
-        // Cheap pre-check outside the transaction so the common duplicate case never uploads a file.
-        // Re-checked under the advisory lock below — this one alone is not race-safe.
         var existing = await CandidateEmailUniqueness.FindExistingAsync(db, companyId, normalisedEmail, cancellationToken);
         if (existing is not null)
             return CandidateApplicationIntakeOutcome.Duplicate(existing);
 
         var now = clock.UtcNowOffset();
 
-        // Defensive, as in CreateApplication: normally already seeded when the vacancy was created.
         await stageSeeder.EnsureDefaultStagesSeededAsync(companyId, now, cancellationToken);
 
         var initialStageId = await db.RecruitmentStages
@@ -151,14 +142,10 @@ internal sealed class CandidateApplicationIntake(
 
         try
         {
-            // Disposed (and therefore rolled back unless committed) when this try block exits,
-            // before the catch below or the duplicate compensation runs.
             await using var transaction = db.Database.IsRelational()
                 ? await db.Database.BeginTransactionAsync(cancellationToken)
                 : null;
 
-            // Serialises concurrent creations for the same company + normalised email (this intake
-            // and the legacy CreateCandidate slice use the same key) until commit/rollback.
             await CandidateEmailUniqueness.AcquireCreationLockAsync(db, companyId, normalisedEmail, cancellationToken);
 
             raceWinner = await CandidateEmailUniqueness.FindExistingAsync(db, companyId, normalisedEmail, cancellationToken);
@@ -174,14 +161,11 @@ internal sealed class CandidateApplicationIntake(
         }
         catch (DbUpdateException ex) when (CandidateEmailUniqueness.IsViolation(ex))
         {
-            // Final safeguard: a writer that does not take the creation lock (e.g. an UpdateCandidate
-            // email change) claimed this email first. Report it exactly like the lock re-check does.
             created = null;
             hitUniqueIndex = true;
         }
         catch
         {
-            // Clear the tracker so compensation's own save cannot re-attempt the failed inserts.
             db.ChangeTracker.Clear();
             if (staged is not null)
                 await staging.CompensateAsync(staged);
@@ -190,8 +174,6 @@ internal sealed class CandidateApplicationIntake(
 
         if (created is null)
         {
-            // Another writer created a candidate with this email between the pre-check and the lock
-            // (or, if the unique index fired, before our insert).
             db.ChangeTracker.Clear();
             if (staged is not null)
                 await staging.CompensateAsync(staged);
@@ -255,8 +237,6 @@ internal sealed class CandidateApplicationIntake(
                 CandidateDocumentKind.Cv);
             db.CandidateDocuments.Add(cvDocument);
 
-            // The intent is still tracked from the staging save; confirming it in this same save is
-            // what marks the blob as owned.
             staged.Intent.MarkConfirmed(now);
         }
 

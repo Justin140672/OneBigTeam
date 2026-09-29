@@ -10,7 +10,6 @@ public class AssetServiceTests
     private static UpdateAssetRequest SampleRequest(Guid companyId, Guid id) =>
         new(companyId, id, "AST-001", Guid.NewGuid(), "MacBook Pro", "Apple", "M3", "SN123", null, null, 2);
 
-    // ── UpdateAsync(ApiSaveResult) ───────────────────────────────────────────────
 
     [Fact]
     public async Task UpdateAsync_Returns_Ok_When_Api_Returns_Success()
@@ -91,7 +90,6 @@ public class AssetServiceTests
         Assert.NotNull(result.ErrorMessage);
     }
 
-    // ── RetireAssetAsync ─────────────────────────────────────────────────────────
 
     [Fact]
     public async Task RetireAssetAsync_Returns_Null_When_Api_Returns_NoContent()
@@ -115,7 +113,6 @@ public class AssetServiceTests
         Assert.Equal("Asset not found.", error);
     }
 
-    // ── GetAssetAsync (representative read) ──────────────────────────────────────
 
     [Fact]
     public async Task GetAssetAsync_Returns_Value_When_Api_Returns_Ok()
@@ -140,7 +137,6 @@ public class AssetServiceTests
         Assert.Null(result);
     }
 
-    // ── Cancellation ─────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task GetAssetAsync_Propagates_Cancellation_When_Token_Already_Cancelled()

@@ -44,34 +44,15 @@ public static class OffboardingModule
         services.AddScoped<OffboardingReminderJob>();
         services.AddScoped<IWorkloadActionProvider, OutstandingOffboardingTasksWorkloadActionProvider>();
 
-        // OFF-03: creates the Tasks-module TaskItem for OffboardingTasks that don't have one yet —
-        // used by StartOffboardingHandler right after the plan/tasks are committed, and again by
-        // OffboardingPlanCreationReconciliationJob to retry anything that failed the first time.
         services.AddScoped<OffboardingTaskSynchronizer>();
 
-        // OFF-01: second consumer of EmployeeLeavingProcessCancelledIntegrationEvent (alongside
-        // the Leave module's), plus the daily reconciliation job that catches up on anything this
-        // consumer (or Employees' own direct, synchronous call) failed to fully synchronise with
-        // the Tasks module.
         services.AddScoped<IIntegrationEventHandler<EmployeeLeavingProcessCancelledIntegrationEvent>, CancelOffboardingOnLeavingProcessCancelledHandler>();
         services.AddScoped<OffboardingCancellationReconciliationJob>();
 
-        // OFF-03: daily reconciliation for (a) leaving processes with no active offboarding plan
-        // (the automatic trigger from Employees' StartLeavingProcessHandler failed or was lost) and
-        // (b) offboarding plans whose OffboardingTasks are missing their corresponding Tasks-module
-        // TaskItems (a partial failure between the durable Offboarding write and the cross-module
-        // sync).
         services.AddScoped<OffboardingPlanCreationReconciliationJob>();
 
-        // OFF-02: consumer of EmployeeLeavingDateSetIntegrationEvent (published on both leaving
-        // process start and amendment) — keeps the active plan's LastWorkingDay and outstanding
-        // task due dates aligned whenever HR changes the employee's leaving date/last working day.
         services.AddScoped<IIntegrationEventHandler<EmployeeLeavingDateSetIntegrationEvent>, RescheduleOffboardingOnLeavingDateChangedHandler>();
 
-        // OFF-07: consumer of EmployeeDepartureFinalisedIntegrationEvent — raises a persistent HR
-        // exception on the plan (HasIncompleteOffboardingAtDeparture) whenever an employee's
-        // departure is finalised while mandatory offboarding tasks remain outstanding, rather than
-        // relying solely on Employees' one-time manager notification.
         services.AddScoped<IIntegrationEventHandler<EmployeeDepartureFinalisedIntegrationEvent>, MarkOffboardingIncompleteOnDepartureFinalisedHandler>();
         services.AddScoped<Jobs.IdempotencyMaintenanceJob>();
 

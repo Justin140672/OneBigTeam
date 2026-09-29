@@ -12,7 +12,7 @@ namespace HR.Modules.Notifications.Tests;
 public sealed class PurgeExpiredReadNotificationsJobTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 31, 3, 0, 0, TimeSpan.Zero);
-    private const int RetentionDays = PurgeExpiredReadNotificationsJob.DefaultRetentionDays; // 365
+    private const int RetentionDays = PurgeExpiredReadNotificationsJob.DefaultRetentionDays;
     private static readonly DateTimeOffset Cutoff = Now.AddDays(-RetentionDays);
 
     private readonly DbContextOptions<NotificationsDbContext> _options =
@@ -187,7 +187,6 @@ public sealed class PurgeExpiredReadNotificationsJobTests
             await seed.SaveChangesAsync();
         }
 
-        // Dry-run
         var dryAudit = new FakeAuditPublisher();
         await using (var ctx = NewContext())
         {
@@ -198,7 +197,6 @@ public sealed class PurgeExpiredReadNotificationsJobTests
             Assert.True(await verify.Notifications.AnyAsync(n => n.Id == oldUnread.Id));
         }
 
-        // Live
         var liveAudit = new FakeAuditPublisher();
         await using (var ctx = NewContext())
         {
@@ -247,7 +245,6 @@ public sealed class PurgeExpiredReadNotificationsJobTests
     public async Task Retention_Days_Override_Changes_Eligibility()
     {
         var companyId = Guid.NewGuid();
-        // 100 days old: safe under 365-day window, eligible under a 90-day window.
         var n = Read(companyId, Now.AddDays(-100));
 
         await using (var seed = NewContext())

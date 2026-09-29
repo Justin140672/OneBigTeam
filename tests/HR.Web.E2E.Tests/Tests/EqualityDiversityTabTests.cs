@@ -4,19 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the self-service "Equality &amp; Diversity" tab on the My Profile page
-/// (src/HR.Web/Components/Pages/Employees/MyProfileEqualityDiversityTab.razor):
-/// - the tab loads and shows the "voluntary" explanatory text
-/// - answers can be selected and saved, showing a success banner
-/// - saved answers persist across re-opening the tab
-/// - "Prefer not to say" can be chosen and saved
-/// - "Clear my answers" (native confirm) resets the questionnaire
-/// - partial completion saves successfully
-///
-/// Follows EmergencyContactsTabTests / PersonalDetailsTabTests: EmployeePersonaFixture, explicit
-/// login as Tom Williams, MyProfilePage for navigation.
-/// </summary>
 public sealed class EqualityDiversityTabTests(EmployeePersonaFixture fixture)
     : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
@@ -73,7 +60,6 @@ public sealed class EqualityDiversityTabTests(EmployeePersonaFixture fixture)
         Assert.True(await ed.IsSuccessBannerVisibleAsync(),
             "Expected a success banner after saving equality & diversity answers");
 
-        // Re-open the tab (leave then back) and confirm the answers persisted.
         await profile.OpenEmergencyContactsTabAsync();
         await profile.OpenEqualityDiversityTabAsync();
         await ed.WaitForLoadAsync();
@@ -111,7 +97,6 @@ public sealed class EqualityDiversityTabTests(EmployeePersonaFixture fixture)
     {
         var (profile, ed) = await OpenTabAsync();
 
-        // Accept the native window.confirm raised by "Clear my answers".
         ed.AcceptConfirmDialogs();
 
         await ed.SelectAsync(EqualityDiversityTab.GenderField, "Woman");
@@ -123,11 +108,9 @@ public sealed class EqualityDiversityTabTests(EmployeePersonaFixture fixture)
         Assert.Contains("cleared", await ed.GetSuccessBannerTextAsync(),
             StringComparison.OrdinalIgnoreCase);
 
-        // Fields fall back to the "Not answered" placeholder after a clear.
         Assert.Equal("Not answered", await ed.GetSelectedValueAsync(EqualityDiversityTab.GenderField));
         Assert.Equal("Not answered", await ed.GetSelectedValueAsync(EqualityDiversityTab.ReligionField));
 
-        // And the clear persists on re-open.
         await profile.OpenEmergencyContactsTabAsync();
         await profile.OpenEqualityDiversityTabAsync();
         await ed.WaitForLoadAsync();
@@ -140,13 +123,10 @@ public sealed class EqualityDiversityTabTests(EmployeePersonaFixture fixture)
     {
         var (profile, ed) = await OpenTabAsync();
 
-        // Tom's profile is seeded with equality answers (see EmployeesModule.SeedEmployeesAsync) —
-        // clear them so this test starts from a known-empty questionnaire.
         ed.AcceptConfirmDialogs();
         await ed.ClearAnswersAsync();
         await ed.WaitForLoadAsync();
 
-        // Only two of the six questions answered.
         await ed.SelectAsync(EqualityDiversityTab.DisabilityField, "Yes");
         await ed.SelectAsync(EqualityDiversityTab.OrientationField, "Bisexual");
 

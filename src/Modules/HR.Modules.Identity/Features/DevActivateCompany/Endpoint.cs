@@ -8,14 +8,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Identity.Features.DevActivateCompany;
 
-// Dev-only replacement for the removed /api/dev/confirm-email stub (Features/ConfirmEmail).
-// Local dev/demo testing of "what does the app look like once a company is Active" doesn't need a
-// real verified Supabase user — the dev-persona switcher (DevAuthHandler/DevPersonaStore in
-// HR.Api) already provides a usable local session separately, untouched by this whole epic. This
-// endpoint just needs to flip the target company's status directly via the same sanctioned
-// ICompanyProvisioner cross-module contract VerifyEmail uses, without any Supabase/identity
-// interaction. 404s outside Development or when DevTools not explicitly enabled,
-// mirroring every other /api/dev/* endpoint.
 internal sealed class Endpoint(
     ICompanyProvisioner companyProvisioner,
     IWebHostEnvironment environment,

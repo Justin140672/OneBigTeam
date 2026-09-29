@@ -84,7 +84,7 @@ public class ListCandidateDocumentsEndpointTests
 
         Assert.NotNull(payload);
         Assert.Equal(2, payload!.Items.Count);
-        Assert.Equal("Cover Letter", payload.Items[0].Title); // newest first
+        Assert.Equal("Cover Letter", payload.Items[0].Title);
     }
 
     [Fact]
@@ -127,7 +127,7 @@ public class ListCandidateDocumentsEndpointTests
         var payload = await ListAsync(client, companyId, candidateId);
 
         Assert.Equal(3, payload.Items.Count);
-        Assert.Equal(new[] { coverLetterId, replacementCvId, originalCvId }, payload.Items.Select(i => i.Id)); // newest first
+        Assert.Equal(new[] { coverLetterId, replacementCvId, originalCvId }, payload.Items.Select(i => i.Id));
 
         var coverLetter = payload.Items[0];
         Assert.Equal("Other", coverLetter.Kind);
@@ -137,7 +137,6 @@ public class ListCandidateDocumentsEndpointTests
         Assert.Equal("emma-cv-v2.pdf", replacement.FileName);
         Assert.True(replacement.IsCurrentCv);
 
-        // The original CV is retained (not overwritten) and is no longer current.
         var original = payload.Items[2];
         Assert.Equal("emma-cv-v1.pdf", original.FileName);
         Assert.Equal("Cv", original.Kind);
@@ -159,7 +158,6 @@ public class ListCandidateDocumentsEndpointTests
             _factory, companyId, first.CandidateId, Now.AddMinutes(1), "New CV", "cv-v2.pdf", CandidateDocumentKind.Cv);
         using var client = await ClientAs(RecruiterUser, companyId);
 
-        // Both applications were submitted with the old CV.
         await PutCvAsync(client, companyId, first.VacancyId, first.ApplicationId, oldCvId, expectedVersion: 1);
         await PutCvAsync(client, companyId, secondVacancyId, secondApplicationId, oldCvId, expectedVersion: 1);
 
@@ -167,7 +165,6 @@ public class ListCandidateDocumentsEndpointTests
         Assert.Equal(2, bothOnOld.Items.Single(i => i.Id == oldCvId).ReferencingApplicationCount);
         Assert.Equal(0, bothOnOld.Items.Single(i => i.Id == newCvId).ReferencingApplicationCount);
 
-        // Replace only the first application's CV with the new document.
         await PutCvAsync(client, companyId, first.VacancyId, first.ApplicationId, newCvId, expectedVersion: 2);
 
         var payload = await ListAsync(client, companyId, first.CandidateId);
@@ -175,14 +172,12 @@ public class ListCandidateDocumentsEndpointTests
         Assert.Equal(2, payload.Items.Count);
         var oldCv = payload.Items.Single(i => i.Id == oldCvId);
         var newCv = payload.Items.Single(i => i.Id == newCvId);
-        // The second application still references the old CV, so it is retained and counted.
         Assert.Equal(1, oldCv.ReferencingApplicationCount);
         Assert.False(oldCv.IsCurrentCv);
         Assert.Equal(1, newCv.ReferencingApplicationCount);
         Assert.True(newCv.IsCurrentCv);
     }
 
-    // ---- Helpers --------------------------------------------------------------------------------
 
     private static async Task<ListPayload> ListAsync(HttpClient client, Guid companyId, Guid candidateId)
     {
@@ -195,7 +190,7 @@ public class ListCandidateDocumentsEndpointTests
         HttpClient client, Guid companyId, Guid candidateId, string fileName, string? kind)
     {
         var bytes = new byte[2048];
-        bytes[0] = 0x25; bytes[1] = 0x50; bytes[2] = 0x44; bytes[3] = 0x46; // %PDF
+        bytes[0] = 0x25; bytes[1] = 0x50; bytes[2] = 0x44; bytes[3] = 0x46;
 
         using var content = new MultipartFormDataContent
         {
@@ -223,11 +218,6 @@ public class ListCandidateDocumentsEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    /// <summary>
-    /// A second application for the SAME candidate (on a new vacancy) in the same company.
-    /// RecruitmentTestSeeder.SeedApplicationAsync always creates a fresh candidate, so this reuses
-    /// the candidate and the stage it seeded instead.
-    /// </summary>
     private async Task<(Guid VacancyId, Guid ApplicationId)> SeedSecondApplicationForCandidateAsync(
         Guid companyId, Guid candidateId, Guid stageId)
     {

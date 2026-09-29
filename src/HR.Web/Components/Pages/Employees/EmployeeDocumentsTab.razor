@@ -246,10 +246,6 @@ else
 
     private void OpenUploadRequested(DocumentRequestListItem request)
     {
-        // _uploadRequestedOpen also has to flip true here (not just the dialog's own
-        // internal Open()) — the dialog's OnParametersSet force-closes itself whenever this
-        // parent re-renders with IsOpen still false, which would otherwise immediately
-        // undo the Open() call on the very next unrelated render.
         _uploadRequestedOpen = true;
         _uploadRequestedDialog?.Open(request);
     }
@@ -328,7 +324,6 @@ else
 
     private (string Css, string Label) GetRequestBadge(DocumentRequestListItem r)
     {
-        // Use company-local date for business-calendar document request due-date comparisons.
         var today = CompanyTimeProvider.Today;
         if (r.Status == "Requested" && r.DueDate.HasValue && r.DueDate.Value < today)
             return ("text-bg-danger",    "Overdue");
@@ -347,7 +342,6 @@ else
     {
         if (doc.ExpiryDate.HasValue)
         {
-            // Use company-local date for business-calendar document expiry status checks.
             var today = CompanyTimeProvider.Today;
             if (doc.ExpiryDate < today)
                 return ("text-bg-danger",  "Expired");

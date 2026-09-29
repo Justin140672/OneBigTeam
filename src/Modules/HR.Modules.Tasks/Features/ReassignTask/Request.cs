@@ -7,7 +7,6 @@ internal sealed record ReassignTaskRequest
     public Guid? AssignedEmployeeId { get; init; }
     public Guid? AssignedUserId { get; init; }
 
-    // Populated by the endpoint from the authenticated user's sub claim.
     internal Guid? ActorUserId { get; init; }
 
     // Populated by the endpoint from the optional "Idempotency-Key" request header (ticket 3, P1

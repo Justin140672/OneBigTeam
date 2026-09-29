@@ -3,12 +3,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// The HR-only Employee Search palette (Ctrl+K), rendered in the top bar only for HR
-/// administrators (see AdminQuickNav.razor's <c>@if (Session.IsHrAdministrator)</c>). Locators are
-/// role/aria based per the E2E locator conventions: the trigger button, the palette dialog and
-/// each result option (an employee row).
-/// </summary>
 public sealed class AdminQuickNavComponent(IPage page)
 {
     public ILocator Trigger => page.GetByRole(AriaRole.Button, new() { Name = "Search employees" });
@@ -33,13 +27,6 @@ public sealed class AdminQuickNavComponent(IPage page)
         await page.Keyboard.PressAsync("Control+k");
     }
 
-    /// <summary>
-    /// Opens the palette robustly. app.js's global Ctrl+K keydown listener only forwards to the
-    /// component once its first interactive render has registered a DotNetObjectReference
-    /// (registerAdminQuickNav) — a press that lands before that is silently dropped with no retry.
-    /// So wait for the trigger button to render (the same OnAfterRenderAsync(firstRender) that
-    /// registers the handler) and re-press Ctrl+K until the dialog appears.
-    /// </summary>
     public async Task OpenAsync()
     {
         await Trigger.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
@@ -54,7 +41,6 @@ public sealed class AdminQuickNavComponent(IPage page)
             }
             catch (TimeoutException)
             {
-                // The DotNet handler isn't live yet — press again on the next tick.
             }
         }
 
@@ -70,25 +56,18 @@ public sealed class AdminQuickNavComponent(IPage page)
         await Dialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
 
-    /// <summary>Types (replacing) the search term. The component debounces the query ~250 ms.</summary>
     public async Task SearchAsync(string term)
     {
         await Input.FillAsync(term);
     }
 
-    /// <summary>Ticks / unticks the "Include leavers / archived employees" checkbox, re-running the query.</summary>
     public async Task SetIncludeLeaversAsync(bool included)
     {
         await IncludeLeaversCheckbox.SetCheckedAsync(included);
     }
 
-    /// <summary>All result rows whose visible text contains <paramref name="text"/> (name, employee number, position…).</summary>
     public ILocator ResultsContaining(string text) => Options.Filter(new() { HasText = text });
 
-    /// <summary>
-    /// Waits for the debounced query to settle — either at least one result row or the explicit
-    /// "No matching employees" empty state is shown.
-    /// </summary>
     public async Task WaitForResultsSettledAsync(int timeoutMs = 10_000)
     {
         await Options.First.Or(NoMatchesMessage).WaitForAsync(
@@ -100,7 +79,6 @@ public sealed class AdminQuickNavComponent(IPage page)
         return await ResultsContaining(text).First.WaitUntilVisibleAsync(timeoutMs);
     }
 
-    /// <summary>Asserts that, once the query has settled, no result row matches <paramref name="text"/>.</summary>
     public async Task AssertNoResultAsync(string text, int timeoutMs = 10_000)
     {
         await WaitForResultsSettledAsync(timeoutMs);

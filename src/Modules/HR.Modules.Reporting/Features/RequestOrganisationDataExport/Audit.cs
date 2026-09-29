@@ -2,10 +2,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Reporting.Features.RequestOrganisationDataExport;
 
-/// <summary>
-/// Story 2: a company administrator requested a full organisation data export. Carries no exported
-/// data — only the export id and requesting user.
-/// </summary>
 internal sealed record OrganisationDataExportRequestedAuditEvent(
     Guid CompanyId,
     Guid ExportId,

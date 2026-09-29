@@ -31,7 +31,6 @@ public class CompanySettingsDocumentReminderSettingsTests
     [Fact]
     public void UpdateDocumentReminderSettings_Allows_Disabling_Reminders()
     {
-        // Negated branch of the enabled flag.
         var settings = CompanySettings.CreateDefault(Guid.NewGuid(), DateTimeOffset.UtcNow);
 
         settings.UpdateDocumentReminderSettings(false, null, null, null, DateTimeOffset.UtcNow);

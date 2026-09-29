@@ -3,16 +3,8 @@ using HR.Modules.Sickness.Tests.Infrastructure;
 
 namespace HR.Modules.Sickness.Tests.Services;
 
-/// <summary>
-/// DSH-02: <c>SicknessResourceAuthorizer.CanViewManagerTeamAsync</c> gates the browser-supplied
-/// <c>{managerId}</c> route value on GetTeamSicknessToday. The caller may view that manager's team
-/// only if they ARE that manager, sit ABOVE them in the reporting tree, or hold company-wide
-/// (HR administrator / sickness.manage) access. See
-/// specifications/architecture/11-manager-hierarchy-scope.md.
-/// </summary>
 public class SicknessResourceAuthorizerCanViewManagerTeamTests
 {
-    // Mirrors HR.Modules.Sickness.Services.SicknessResourceAuthorizer.SicknessManagePermissionId.
     private static readonly Guid SicknessManagePermissionId = new("00000000-0000-0000-0001-000000000015");
     private static readonly Guid CompanyId = Guid.NewGuid();
 

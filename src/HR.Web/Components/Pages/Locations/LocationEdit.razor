@@ -107,10 +107,6 @@
     {
         var list = await LocationTypeService.ListLocationTypesAsync(CompanyId);
 
-        // "Remote" is a valid location type elsewhere in the app (e.g. employee assignment),
-        // but a Location record itself represents a physical site, so it shouldn't be
-        // selectable here. Filtered client-side only for this picker — the shared location
-        // type list/model is untouched so "Remote" still appears everywhere else.
         _locationTypes = (list?.Items ?? [])
             .Where(t => !string.Equals(t.Name, "Remote", StringComparison.OrdinalIgnoreCase))
             .ToList();

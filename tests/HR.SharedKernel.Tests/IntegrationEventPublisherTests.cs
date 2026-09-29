@@ -189,7 +189,7 @@ public class IntegrationEventPublisherTests
 
         Assert.False(result);
         Assert.True(throwingRequired.Invoked);
-        Assert.True(recording.Invoked); // never blocked by the required handler's failure
+        Assert.True(recording.Invoked);
     }
 
     [Fact]
@@ -229,8 +229,6 @@ public class IntegrationEventPublisherTests
     [Fact]
     public async Task PublishAsync_Nested_During_Handling_Of_Another_Event_Shares_CorrelationId_And_Chains_CausationId()
     {
-        // A handler for TestIntegrationEvent (message A) itself publishes OtherIntegrationEvent
-        // (message B) mid-handling. B must carry A's CorrelationId and CausationId == A's MessageId.
         var logger = new SpyLogger<IntegrationEventPublisher>();
         var accessor = new ExecutionContextAccessor();
         var services = new ServiceCollection();
@@ -241,8 +239,6 @@ public class IntegrationEventPublisherTests
         var capturingInner = new CapturingHandler(accessor);
         services.AddSingleton<IIntegrationEventHandler<OtherIntegrationEvent>>(capturingInner);
 
-        // NestedPublishingHandler needs a reference to the exact publisher instance that will
-        // dispatch it, so build the publisher first, then register a handler wrapping it.
         var provider = services.BuildServiceProvider();
         var publisher = new IntegrationEventPublisher(provider, logger, accessor);
         services.AddSingleton<IIntegrationEventHandler<TestIntegrationEvent>>(new NestedPublishingHandler(publisher));
@@ -276,7 +272,6 @@ public class IntegrationEventPublisherTests
         {
             await publisher.PublishAsync(new TestIntegrationEvent(), CancellationToken.None);
 
-            // Popped back to whatever was ambient before dispatch started — the caller's own context.
             Assert.Same(callerContext, accessor.Current);
         }
 
@@ -305,10 +300,6 @@ public class IntegrationEventPublisherTests
     [Fact]
     public async Task PublishAsync_CancelledMidDispatch_StopsRunningLaterHandlers()
     {
-        // The cancelling handler cancels the token itself mid-handler (simulating an external
-        // cancellation observed partway through dispatch) rather than the test cancelling up
-        // front, so the handler registered BEFORE it still runs normally and only the handler
-        // registered AFTER it must be skipped.
         var recordingBefore = new RecordingHandler();
         var logger = new SpyLogger<IntegrationEventPublisher>();
         using var cts = new CancellationTokenSource();
@@ -340,8 +331,6 @@ public class IntegrationEventPublisherTests
     [Fact]
     public async Task PublishAsync_NonCancellationHandlerFailure_IsStillIsolatedAndDoesNotThrow()
     {
-        // Ordinary handler exceptions must keep being caught/logged/continued exactly as before —
-        // only genuine cancellation of the supplied token gets the new stop-and-rethrow behaviour.
         var throwing = new ThrowingHandler();
         var recording = new RecordingHandler();
         var logger = new SpyLogger<IntegrationEventPublisher>();
@@ -426,9 +415,6 @@ public class IntegrationEventPublisherTests
         }
     }
 
-    // Captures whatever execution context is ambient (via the same IExecutionContextAccessor
-    // instance the publisher under test was constructed with) at the moment it handles an event —
-    // this is how a test proves what correlation/causation identity the publisher assigned.
     private sealed class CapturingHandler(IExecutionContextAccessor accessor) :
         IIntegrationEventHandler<TestIntegrationEvent>, IIntegrationEventHandler<OtherIntegrationEvent>
     {

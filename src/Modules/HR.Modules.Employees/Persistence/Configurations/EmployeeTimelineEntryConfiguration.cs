@@ -76,15 +76,6 @@ internal sealed class EmployeeTimelineEntryConfiguration : IEntityTypeConfigurat
         builder.HasIndex(e => e.CompanyId);
         builder.HasIndex(e => new { e.CompanyId, e.EmployeeId });
 
-        // Dedup strategy: the natural key for "don't write the same source event twice" is
-        // (company_id, source_module, event_type, source_record_id) — but SourceRecordId is
-        // nullable (some event types, e.g. ManagerChanged, have no dedicated source entity to
-        // point at). Postgres unique indexes treat NULLs as distinct from one another, so a single
-        // unique index across a nullable column would silently fail to prevent duplicates for the
-        // null case. Two partial/filtered unique indexes cover both cases instead:
-        //   1. When source_record_id IS NOT NULL, dedup on the natural key above.
-        //   2. When source_record_id IS NULL, dedup on (company_id, employee_id, event_type,
-        //      event_date) instead, since that's the closest available substitute for a natural key.
         builder.HasIndex(e => new { e.CompanyId, e.SourceModule, e.EventType, e.SourceRecordId })
             .IsUnique()
             .HasFilter("source_record_id IS NOT NULL");

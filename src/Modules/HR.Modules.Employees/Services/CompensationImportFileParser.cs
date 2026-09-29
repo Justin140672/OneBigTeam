@@ -2,11 +2,6 @@ using ClosedXML.Excel;
 
 namespace HR.Modules.Employees.Services;
 
-/// <summary>
-/// A single raw (unvalidated) row parsed from a compensation-import .xlsx workbook, matching the
-/// columns produced by <see cref="CompensationImportTemplateBuilder"/>. RowNumber matches the row
-/// as it appears in the source file (header is row 1, so the first data row is row 2).
-/// </summary>
 internal sealed record CompensationImportParsedRow(
     int RowNumber,
     string EmployeeNumber,
@@ -16,12 +11,6 @@ internal sealed record CompensationImportParsedRow(
     string? Reason,
     string? Notes);
 
-/// <summary>
-/// Parses a compensation-import file. Only .xlsx is supported — this mirrors
-/// HR.Modules.DataImport's EmployeeImportFileParser xlsx-reading approach (ClosedXML, first
-/// worksheet, header-name driven column lookup) but is scoped to compensation import so this
-/// module doesn't need a direct reference to HR.Modules.DataImport.
-/// </summary>
 internal static class CompensationImportFileParser
 {
     public static IReadOnlyList<CompensationImportParsedRow> Parse(Stream content)

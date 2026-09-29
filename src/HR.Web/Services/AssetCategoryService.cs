@@ -43,7 +43,6 @@ public class AssetCategoryService(HrApiHttpClientFactory httpClientFactory)
         return result.Success ? null : (result.DisplayMessage ?? "Failed to deactivate asset category.");
     }
 
-    // No dedicated backend GetById endpoint — the list already returns full item detail.
     async Task<AssetCategoryEditModel?> IEditService<AssetCategoryEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
     {
         var list = await ListAssetCategoriesAsync(companyId, includeInactive: true);

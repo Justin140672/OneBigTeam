@@ -163,8 +163,6 @@ public class GetCurrentCompensationHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Only_Record_Is_Past_And_Closed_Before_Today()
     {
-        // (a) Employee has only a past/closed compensation record (EffectiveTo before today) —
-        // there is no "current" compensation, so this must be NotFound rather than returning the closed record.
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
         var companyId = Guid.NewGuid();
@@ -187,7 +185,6 @@ public class GetCurrentCompensationHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_The_Single_Currently_Effective_Open_Record()
     {
-        // (b) Employee has a single currently-effective open record (EffectiveFrom <= today, EffectiveTo null).
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
         var companyId = Guid.NewGuid();
@@ -210,8 +207,6 @@ public class GetCurrentCompensationHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_Current_Record_Not_Future_Dated_Record_On_Top()
     {
-        // (c) Employee has a current record AND a future-dated record on top — handler must return
-        // the current one, not the future one.
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
         var companyId = Guid.NewGuid();

@@ -10,7 +10,6 @@ namespace HR.Modules.Documents.Tests;
 
 public class ListSharedCompanyDocumentsDueForReviewHandlerTests
 {
-    // Today is 2026-07-16.
     private static readonly DateTime FixedUtcNow = new(2026, 7, 16, 0, 0, 0, DateTimeKind.Utc);
     private static readonly DateOnly Today        = DateOnly.FromDateTime(FixedUtcNow);
     private static readonly DateTimeOffset Now    = new(FixedUtcNow, TimeSpan.Zero);
@@ -177,9 +176,6 @@ public class ListSharedCompanyDocumentsDueForReviewHandlerTests
     [Fact]
     public async Task HandleAsync_Includes_Document_Reverted_To_Draft_After_Publish()
     {
-        // RevertToDraft moves a Published document back to Draft without touching Status filters
-        // beyond Archived/Expired — confirms a document that has cycled Draft -> Published -> Draft
-        // is still surfaced like any other non-terminal-status document.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var category  = await SeedCategory(db, companyId);

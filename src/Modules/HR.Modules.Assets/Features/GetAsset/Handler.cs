@@ -18,8 +18,6 @@ internal sealed class GetAssetHandler(AssetsDbContext db, AssetResourceAuthorize
         if (asset is null)
             return Result.Failure<GetAssetResponse>(Error.NotFound("Asset not found."));
 
-        // Resource-level authorization: assigned asset -> self, direct manager or HR administrator;
-        // unassigned asset -> HR administrator only.
         if (callerUserId is not { } callerId)
             return Result.Failure<GetAssetResponse>(Error.Forbidden("You do not have permission to view this asset."));
 

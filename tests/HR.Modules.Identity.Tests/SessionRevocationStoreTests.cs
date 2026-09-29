@@ -85,8 +85,6 @@ public sealed class SessionRevocationStoreTests
         await using (var context = _fixture.BuildContext())
         {
             var store = new SessionRevocationStore(context);
-            // Simulates an out-of-order concurrent logout write arriving after a later one already
-            // landed — must never un-revoke a session a later logout already covered.
             await store.RevokeAsync(userId, earlierInstant, CancellationToken.None);
         }
 

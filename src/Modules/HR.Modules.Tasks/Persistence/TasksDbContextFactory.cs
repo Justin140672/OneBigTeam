@@ -4,11 +4,6 @@ using Microsoft.EntityFrameworkCore.Design;
 
 namespace HR.Modules.Tasks.Persistence;
 
-/// <summary>
-/// Design-time factory used by EF Core tooling (dotnet ef migrations).
-/// Set the TASKS_CONNECTION_STRING environment variable or update the fallback
-/// to point at your local Postgres instance before running migrations.
-/// </summary>
 internal sealed class TasksDbContextFactory : IDesignTimeDbContextFactory<TasksDbContext>
 {
     public TasksDbContext CreateDbContext(string[] args)

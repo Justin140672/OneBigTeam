@@ -161,7 +161,6 @@ public class ResendInviteHandlerTests(IdentityDatabaseFixture fixture)
         Assert.True(result.IsSuccess);
         Assert.False(result.Value.EmailSent);
 
-        // Token must still be regenerated even when email fails.
         await using var db2 = fixture.BuildContext();
         var reloaded = await db2.UserInvites.FirstAsync(i => i.Id == invite.Id);
         Assert.NotEqual(originalToken, reloaded.Token);

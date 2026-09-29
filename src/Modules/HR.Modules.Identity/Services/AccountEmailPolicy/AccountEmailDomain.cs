@@ -19,13 +19,8 @@ internal static class AccountEmailDomain
     private const int MaxDomainLength = 253;
     private const int MaxLabelLength = 63;
 
-    // UseStd3AsciiRules rejects characters that are not valid in host names (e.g. '_', '/', '[').
     private static readonly IdnMapping Idn = new() { AllowUnassigned = false, UseStd3AsciiRules = true };
 
-    /// <summary>
-    /// Extracts and normalises the domain of <paramref name="email"/>. Returns false (and an empty
-    /// <paramref name="domain"/>) when the address is malformed.
-    /// </summary>
     public static bool TryExtractDomain(string? email, out string domain)
     {
         domain = string.Empty;
@@ -49,10 +44,6 @@ internal static class AccountEmailDomain
         return TryNormalizeDomain(trimmed[(at + 1)..], out domain);
     }
 
-    /// <summary>
-    /// Normalises a bare domain (e.g. a denylist entry or the part after '@'). Returns false (and
-    /// an empty <paramref name="domain"/>) when the value is not a syntactically valid host name.
-    /// </summary>
     public static bool TryNormalizeDomain(string? value, out string domain)
     {
         domain = string.Empty;
@@ -62,7 +53,6 @@ internal static class AccountEmailDomain
 
         var candidate = value.Trim();
 
-        // A single trailing dot denotes the DNS root ("gmail.com.") and is the same domain.
         if (candidate.EndsWith('.'))
             candidate = candidate[..^1];
 
@@ -72,9 +62,6 @@ internal static class AccountEmailDomain
         string ascii;
         try
         {
-            // Converts Unicode labels to punycode and applies IDNA mapping (case folding, full-width
-            // to ASCII, ...), so visually-equivalent spellings of a blocked domain normalise to the
-            // same value as the plain ASCII entry on the denylist.
             ascii = Idn.GetAscii(candidate);
         }
         catch (ArgumentException)
@@ -95,8 +82,6 @@ internal static class AccountEmailDomain
 
         var labels = ascii.Split('.');
 
-        // Require at least "name.tld" — single-label hosts ("localhost") are never an organisation
-        // email domain.
         if (labels.Length < 2)
             return false;
 
@@ -112,8 +97,6 @@ internal static class AccountEmailDomain
                 return false;
         }
 
-        // An all-numeric final label means an IP address literal (e.g. user@192.168.0.1), not a
-        // registrable domain.
         if (labels[^1].All(char.IsAsciiDigit))
             return false;
 

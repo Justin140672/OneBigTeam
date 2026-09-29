@@ -50,12 +50,6 @@ public class ListOnboardingTemplatesEndpointTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    /// <summary>
-    /// ListOnboardingTemplatesHandler lazily seeds a default "Standard Onboarding" template for
-    /// any company that has never had one (OnboardingTemplateSeeder.EnsureDefaultTemplateSeededAsync,
-    /// called unconditionally at the top of the handler) — so a company that has never created its
-    /// own template still isn't truly empty; it always has exactly this one.
-    /// </summary>
     [Fact]
     public async Task Get_OnboardingTemplates_Returns_Only_The_Seeded_Default_When_No_Templates_Created()
     {
@@ -157,8 +151,6 @@ public class ListOnboardingTemplatesEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<ListOnboardingTemplatesPayload>();
         Assert.NotNull(payload);
-        // Only this company's own lazily-seeded default — never the other company's
-        // manually-created "Other Company Onboarding" template.
         var item = Assert.Single(payload!.Items);
         Assert.Equal("Standard Onboarding", item.Name);
     }

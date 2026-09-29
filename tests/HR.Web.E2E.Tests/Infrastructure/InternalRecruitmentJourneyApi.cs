@@ -28,16 +28,12 @@ internal static class InternalRecruitmentJourneyApi
 {
     private static readonly Guid AcmeId = InternalVacancyApplyApi.AcmeId;
 
-    // Acme seeded reference data (EmployeesModule.SeedEmployeesAsync). The fresh applicant from
-    // InternalVacancyApplyApi.CreateActiveEmployeeWithLoginAsync starts in Engineering / London Office,
-    // so a vacancy on a Sales / Home profile moves them to a different department AND location.
     public static readonly Guid SalesDepartmentId = Guid.Parse("10000000-0000-0000-0000-000000000004");
     public const string SalesDepartmentName = "Sales";
     public static readonly Guid HomeLocationId = Guid.Parse("70000000-0000-0000-0000-000000000002");
     public const string HomeLocationName = "Home";
     private static readonly Guid DefaultLeavePolicyId = Guid.Parse("C0000000-0000-0000-0000-000000000001");
 
-    // Beta Corp seeded data (a second tenant). Used only as FOREIGN identifiers.
     public static readonly Guid BetaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
     public static readonly Guid BetaAliceEmployeeId = Guid.Parse("30000000-0000-0000-0000-000000000011");
     public static readonly Guid BetaBackendVacancyId = Guid.Parse("e0000000-0000-0000-0000-000000000011");
@@ -51,12 +47,6 @@ internal static class InternalRecruitmentJourneyApi
         Closed,
     }
 
-    /// <summary>
-    /// Creates a fresh position profile (HR admin) in <paramref name="departmentId"/> /
-    /// <paramref name="locationId"/> (defaults: Sales / Home), then a vacancy on it (Recruiter) with
-    /// James as hiring manager, advertised internally or not, and drives it to <paramref name="state"/>
-    /// (publish → Open; publish then close → Closed).
-    /// </summary>
     public static async Task<InternalVacancyApplyApi.FreshVacancy> CreateVacancyAsync(
         HttpClient hrAdminApi,
         HttpClient recruiterApi,
@@ -135,7 +125,6 @@ internal static class InternalRecruitmentJourneyApi
         DateOnly? ContinuousServiceDate,
         Guid? EmploymentTypeId);
 
-    /// <summary>GET /api/companies/{companyId}/employees/{id} (HR Administrator client).</summary>
     public static async Task<EmployeeRecord> GetEmployeeRecordAsync(HttpClient hrAdminApi, Guid employeeId)
     {
         var response = await hrAdminApi.GetAsync($"/api/companies/{AcmeId}/employees/{employeeId}");
@@ -146,10 +135,8 @@ internal static class InternalRecruitmentJourneyApi
         return employee!;
     }
 
-    /// <summary>The candidate fields that prove an internal application is linked to the right employee.</summary>
     public sealed record CandidateRecord(Guid Id, string FirstName, string LastName, string Email, Guid? EmployeeId);
 
-    /// <summary>GET /api/companies/{companyId}/candidates/{candidateId} (candidate:view — Recruiter).</summary>
     public static async Task<CandidateRecord> GetCandidateAsync(HttpClient recruiterApi, Guid candidateId)
     {
         var response = await recruiterApi.GetAsync($"/api/companies/{AcmeId}/candidates/{candidateId}");
@@ -160,21 +147,10 @@ internal static class InternalRecruitmentJourneyApi
         return candidate!;
     }
 
-    /// <summary>
-    /// GET .../vacancies/{vacancyId}/applications/{applicationId} for an Acme application — stage,
-    /// internal flag and submitted/current CV (the shared CandidateCvApi snapshot).
-    /// </summary>
     public static Task<ApplicationCvSnapshot> GetApplicationAsync(HttpClient recruiterApi, Guid vacancyId, Guid applicationId) =>
         CandidateCvApi.GetApplicationAsync(recruiterApi, AcmeId, vacancyId, applicationId);
 
-    // ── Raw (non-asserting) requests for the security-boundary probes ───────────────────────
 
-    /// <summary>
-    /// POST /api/companies/{companyId}/internal-vacancies/{vacancyId}/applications as whoever
-    /// <paramref name="employeeApi"/> is signed in as — the same multipart shape the Apply button
-    /// sends (single "CvFile" part), plus any <paramref name="extraFormFields"/> a malicious client
-    /// might add (identity fields the endpoint must ignore). Does NOT assert success.
-    /// </summary>
     public static async Task<HttpResponseMessage> PostInternalApplicationAsync(
         HttpClient employeeApi,
         Guid companyId,
@@ -194,10 +170,6 @@ internal static class InternalRecruitmentJourneyApi
             $"/api/companies/{companyId}/internal-vacancies/{vacancyId}/applications", content);
     }
 
-    /// <summary>
-    /// POST .../applications/{applicationId}/appoint with an explicit manager or "no manager",
-    /// effective today. Does NOT assert success.
-    /// </summary>
     public static Task<HttpResponseMessage> PostAppointAsync(
         HttpClient appointerApi, Guid companyId, Guid vacancyId, Guid applicationId, Guid? managerId)
     {
@@ -215,7 +187,6 @@ internal static class InternalRecruitmentJourneyApi
             });
     }
 
-    /// <summary>POST .../vacancies/{vacancyId}/applications/new-candidate (multipart, no CV). Does NOT assert success.</summary>
     public static async Task<HttpResponseMessage> PostNewCandidateApplicationAsync(
         HttpClient recruiterApi, Guid companyId, Guid vacancyId, string lastName)
     {
@@ -229,24 +200,18 @@ internal static class InternalRecruitmentJourneyApi
             $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/new-candidate", content);
     }
 
-    /// <summary>POST .../vacancies/{vacancyId}/applications for an existing candidate. Does NOT assert success.</summary>
     public static Task<HttpResponseMessage> PostExistingCandidateApplicationAsync(
         HttpClient recruiterApi, Guid companyId, Guid vacancyId, Guid candidateId) =>
         recruiterApi.PostAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}/applications",
             new { CandidateId = candidateId });
 
-    /// <summary>PUT .../applications/{applicationId}/cv. Does NOT assert success.</summary>
     public static Task<HttpResponseMessage> PutApplicationCvAsync(
         HttpClient recruiterApi, Guid companyId, Guid vacancyId, Guid applicationId, Guid cvDocumentId, int expectedVersion) =>
         recruiterApi.PutAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/cv",
             new { CvDocumentId = cvDocumentId, ExpectedVersion = expectedVersion });
 
-    /// <summary>
-    /// Reads the machine-readable "code" of an internal-apply rejection (the endpoint's
-    /// <c>{ error, code }</c> JSON body — e.g. "already_applied"), or null when the body has none.
-    /// </summary>
     public static async Task<string?> ReadRejectionCodeAsync(HttpResponseMessage response)
     {
         var body = await response.Content.ReadAsStringAsync();
@@ -266,7 +231,6 @@ internal static class InternalRecruitmentJourneyApi
         }
     }
 
-    /// <summary>Asserts <paramref name="response"/> has exactly <paramref name="expected"/>, surfacing the body on failure.</summary>
     public static async Task AssertStatusAsync(HttpResponseMessage response, HttpStatusCode expected, string because)
     {
         if (response.StatusCode == expected) return;

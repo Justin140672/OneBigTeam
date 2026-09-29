@@ -253,14 +253,8 @@
         }
     }
 
-    // Uses the same hardNavigate pattern as MainLayout's OnPersonaSwitchAsync — a genuine browser
-    // navigation is required to reach /logout since Blazor Server's interactive circuit can't
-    // set/clear the Supabase session cookie mid-render. This is the ONLY other way out of this
-    // blocking dialog besides a successful save.
     private async Task LogoutAsync() => await JS.InvokeVoidAsync("hardNavigate", "/logout");
 
-    // Mirrors the server-side validator's rule (DateOfBirth must be strictly after 1900-01-01) so
-    // the client catches the placeholder DOB before it ever reaches the server.
     private sealed class DateAfter1900Attribute : System.ComponentModel.DataAnnotations.ValidationAttribute
     {
         protected override System.ComponentModel.DataAnnotations.ValidationResult? IsValid(
@@ -277,8 +271,6 @@
         }
     }
 
-    // [EmailAddress] treats "" as invalid (only null passes). This optional field defaults to
-    // string.Empty, so validate the format only when the user actually typed something.
     private sealed class OptionalEmailAttribute : System.ComponentModel.DataAnnotations.ValidationAttribute
     {
         private static readonly System.ComponentModel.DataAnnotations.EmailAddressAttribute _email = new();
@@ -315,9 +307,6 @@
         public string Gender { get; set; } = string.Empty;
         public string GenderOther { get; set; } = string.Empty;
 
-        // Optional field. [EmailAddress] alone rejects "" (an empty non-null string is invalid to
-        // it — only null passes), so it would flag this field on every submit that leaves personal
-        // email blank. OptionalEmail skips blank and validates the format otherwise.
         [OptionalEmail(ErrorMessage = "Enter a valid email address.")]
         public string PersonalEmail { get; set; } = string.Empty;
 
@@ -342,7 +331,6 @@
             set => _postCode = value.ToUpperInvariant();
         }
 
-        // Not user-editable (UK-only for now) — no input rendered. Sent to the server as-is.
         public string Country { get; set; } = "United Kingdom";
 
         public string? PostcodeRegexPattern { get; set; }

@@ -11,12 +11,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Companies.Features.GetCustomerDetails;
 
-/// <summary>
-/// Same defense-in-depth allow-list gate as GetCustomerDashboardHandler/ListCustomersHandler (see
-/// their remarks) — no first-class platform-administrator identity model exists yet, so the
-/// caller's email must additionally appear in the "PlatformAdmin:AllowedEmails" configuration
-/// allow-list.
-/// </summary>
 internal sealed class GetCustomerDetailsHandler(
     CompaniesDbContext dbContext,
     HR.SharedKernel.ICurrentUser currentUser,
@@ -52,15 +46,6 @@ internal sealed class GetCustomerDetailsHandler(
             .AsNoTracking()
             .SingleOrDefaultAsync(s => s.CompanyId == request.CompanyId, cancellationToken);
 
-        // Sequential, not Task.WhenAll — activeEmployeeCount and totalEmployeeCount both go
-        // through IEmployeeDirectoryReader, which is backed by one scoped (request-shared)
-        // EmployeesDbContext. EF Core's DbContext is not safe for concurrent operations on the
-        // same instance; running these two "in parallel" via WhenAll throws
-        // "A second operation was started on this context instance before a previous operation
-        // completed." The handler had no try/catch, so that exception surfaced as an
-        // unhandled 500 — which the frontend's null-means-"show error" contract for this
-        // endpoint renders identically to a genuine 401/403, misleadingly showing the "not
-        // authorised" banner for what was actually a crash.
         var activeEmployeeCount = await employeeDirectoryReader.GetEmployeeDirectoryAsync(
             company.Id,
             new ReportFilterCriteria(EmployeeStatus: "Active"),

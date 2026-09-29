@@ -55,10 +55,6 @@ internal sealed class ValidateImportSessionHandler(
             session.Fail($"The file could not be read: {ex.Message}", clock.UtcNowOffset());
             await db.SaveChangesAsync(cancellationToken);
 
-            // Security review finding #2: the raw file is never read again once validation has
-            // failed, so delete it immediately (best-effort); PurgeImportSessionFilesJob is the
-            // durable safety net if this inline attempt itself fails or the process crashes
-            // before it runs.
             await TryDeleteSessionFileAsync(session, cancellationToken);
 
             return Result.Failure<ValidateImportSessionResponse>(
@@ -142,11 +138,6 @@ internal sealed class ValidateImportSessionHandler(
 
         await db.SaveChangesAsync(cancellationToken);
 
-        // Security review finding #2: ConfirmImportSession works entirely from the staging rows
-        // persisted above, never from the raw workbook, so the file is no longer needed by the
-        // workflow the moment validation completes — delete it now rather than waiting for the
-        // sweep job. Best-effort: a failure here just leaves FileDeletedAt unset for
-        // PurgeImportSessionFilesJob to retry.
         await TryDeleteSessionFileAsync(session, cancellationToken);
 
         return Result.Success(new ValidateImportSessionResponse(
@@ -160,12 +151,6 @@ internal sealed class ValidateImportSessionHandler(
     private static string? GetField(ParsedImportRow row, string field) =>
         row.Fields.TryGetValue(field, out var value) ? value : null;
 
-    /// <summary>
-    /// Best-effort, idempotent, retryable deletion of a session's raw uploaded file. Deletion
-    /// status (FileDeletedAt / FileDeletionAttemptCount) is recorded on the session separately
-    /// from its business Status, so this can safely run again from here or from
-    /// PurgeImportSessionFilesJob without risk of double-processing.
-    /// </summary>
     private async Task TryDeleteSessionFileAsync(ImportSession session, CancellationToken cancellationToken)
     {
         if (session.FileDeletedAt is not null || string.IsNullOrWhiteSpace(session.StorageKey))
@@ -179,9 +164,6 @@ internal sealed class ValidateImportSessionHandler(
         }
         catch (Exception ex)
         {
-            // Not treated as a hard failure — deletion is a cleanup concern, not a business
-            // outcome. PurgeImportSessionFilesJob retries and logs an exhausted-attempts error if
-            // this keeps failing.
             logger.LogWarning(ex,
                 "Failed to delete import session {ImportSessionId} raw file (storage key {StorageKey}) inline after validation; will retry via the sweep job.",
                 session.Id, session.StorageKey);

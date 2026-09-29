@@ -3,23 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the Employee Edit page's profile photo header (EmployeeProfilePhotoHeader,
-/// HR-only, rendered near the top of the page for users with CanManageEmployees):
-/// - An employee with no current photo shows the initials placeholder, not an &lt;img&gt;.
-/// - HR uploading a photo directly (via "Upload / Replace Photo") writes straight to the
-///   current/approved photo — no pending-review step — and the header immediately reflects it.
-/// - A photo submitted through the self-service flow (MyProfilePhotoHeader on MyProfile.razor)
-///   sits pending until HR approves it from this header, after which the header shows the
-///   newly-approved photo.
-///
-/// Uses seeded Acme employees (see EmployeesModule.cs seed data):
-///   - Emma Jones   (30000000-0000-0000-0000-000000000009) — untouched by any other photo test,
-///     used only to assert the "no photo yet" initial state.
-///   - Priya Sharma (30000000-0000-0000-0000-000000000003) — used for the HR-direct-upload test.
-///   - Carlos Rivera (30000000-0000-0000-0000-000000000010) — self-uploads a pending photo, then
-///     HR (Laura) approves it.
-/// </summary>
 public sealed class EmployeeCurrentProfilePhotoTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -92,7 +75,6 @@ public sealed class EmployeeCurrentProfilePhotoTests(CrossUserFixture fixture) :
         {
             await File.WriteAllBytesAsync(tempFile, BuildTestPng());
 
-            // ── Step 1: Carlos submits a photo via self-service — this always goes pending. ──
             await login.GoToAsync();
             await login.LoginAsync(CarlosEmail);
 
@@ -102,7 +84,6 @@ public sealed class EmployeeCurrentProfilePhotoTests(CrossUserFixture fixture) :
             Assert.True(await myProfile.HasPendingProfilePhotoBannerAsync(),
                 "Expected a 'Pending approval' banner after Carlos's self-service upload");
 
-            // ── Step 2: HR (Laura) reviews and approves it from the Employee Edit page. ──
             await login.SwitchAccountAsync(LauraEmail);
 
             await empEdit.GoToAsync(AcmeId, CarlosId);
@@ -124,24 +105,16 @@ public sealed class EmployeeCurrentProfilePhotoTests(CrossUserFixture fixture) :
         }
     }
 
-    /// <summary>
-    /// Builds a minimal-but-valid PNG (signature + IHDR chunk carrying width/height) at the
-    /// server's minimum allowed dimensions (100x100 — see ImageUploadOptions.MinWidthPx /
-    /// MinHeightPx). It has no IDAT pixel data, so it isn't a fully decodable image, but that's
-    /// fine here: ProfilePhotoAvatar renders the &lt;img&gt; with an explicit inline width/height
-    /// style regardless of decode success, and these tests only assert on which element
-    /// (&lt;img&gt; vs. the initials &lt;span&gt;) is shown — never on the pixel content.
-    /// </summary>
     private static byte[] BuildTestPng(int width = 200, int height = 200)
     {
         var bytes = new List<byte>();
-        bytes.AddRange(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }); // PNG signature
-        bytes.AddRange(BigEndianUInt32(13)); // IHDR chunk data length
+        bytes.AddRange(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
+        bytes.AddRange(BigEndianUInt32(13));
         bytes.AddRange("IHDR"u8.ToArray());
         bytes.AddRange(BigEndianUInt32(width));
         bytes.AddRange(BigEndianUInt32(height));
-        bytes.AddRange(new byte[] { 0x08, 0x06, 0x00, 0x00, 0x00 }); // bit depth, color type, compression, filter, interlace
-        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 }); // dummy CRC (not validated server-side)
+        bytes.AddRange(new byte[] { 0x08, 0x06, 0x00, 0x00, 0x00 });
+        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 });
         return [.. bytes];
     }
 

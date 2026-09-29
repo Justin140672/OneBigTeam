@@ -66,8 +66,6 @@ public class EmployeeImportWriterTests
     [Fact]
     public async Task CreateEmployeeAsync_Leaves_Employee_Draft_When_StartDate_Is_In_The_Future()
     {
-        // StartDate (2026-07-01) is after FixedUtcNow (2026-06-08) in this test fixture — an
-        // imported employee who hasn't started yet must stay Draft, not be force-activated.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var writer = BuildWriter(context);
@@ -177,12 +175,6 @@ public class EmployeeImportWriterTests
         var generator = new FakeEmployeeNumberGenerator(counter => $"AUTO-{counter:D5}");
         var writer = BuildWriter(context, employeeNumberGenerator: generator);
 
-        // BuildCreateRequest's own `employeeNumber ?? "EMP-0001"` default is a test-authoring
-        // convenience for scenarios that don't care about the employee number — passing an
-        // explicit blank string is how this test simulates the real "no EmployeeNumber supplied"
-        // shape that EmployeeImportWriter actually receives for Automatic-mode rows (see
-        // ConfirmImportSessionHandler, which passes row.EmployeeNumber verbatim, and that staged
-        // value is "" rather than null for Automatic-mode rows).
         var request = BuildCreateRequest(companyId, employeeNumber: "");
 
         var result = await writer.CreateEmployeeAsync(request, CancellationToken.None);
@@ -294,7 +286,6 @@ public class EmployeeImportWriterTests
     [Fact]
     public async Task TryAssignManagerAsync_Returns_False_For_Direct_Circular_Assignment()
     {
-        // A -> B (B reports to A), then try to assign B as manager of A.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
@@ -317,7 +308,6 @@ public class EmployeeImportWriterTests
     [Fact]
     public async Task TryAssignManagerAsync_Returns_False_For_Deep_Circular_Assignment()
     {
-        // A -> B -> C, then try to assign C as manager of A.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
@@ -369,7 +359,6 @@ public class EmployeeImportWriterTests
         Assert.False(assigned);
     }
 
-    // ---- UpdateEmployeeAsync ----
 
     private static readonly DateTime SeedNow = new(2026, 1, 2, 9, 0, 0, DateTimeKind.Utc);
 

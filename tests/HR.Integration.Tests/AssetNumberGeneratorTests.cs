@@ -9,11 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Exercises <see cref="AssetNumberGenerator"/> against the shared real Postgres testcontainer
-/// (raw UPDATE ... RETURNING round-trip), following the CompaniesDbContext scope pattern from
-/// AdminCancelSubscriptionEndpointTests.
-/// </summary>
 [Collection("Integration")]
 public class AssetNumberGeneratorTests
 {

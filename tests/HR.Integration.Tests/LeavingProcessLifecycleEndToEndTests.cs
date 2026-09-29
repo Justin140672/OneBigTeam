@@ -6,19 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Verifies the complete Employee Leaving Process lifecycle as a single coherent flow, mirroring
-/// the structure of ProbationLifecycleEndToEndTests:
-///
-///   Start leaving process → employee status becomes Leaving, offboarding auto-starts, audit
-///   event recorded → Amend leaving date/reason (reads back OffboardingAlreadyStarted=true)
-///
-/// and, in separate scenarios within the same class:
-///
-///   Start → Cancel → employee reactivates, offboarding's outstanding tasks are cancelled
-///   Start (with an already-past leaving date) → ProcessLeavingEmployeesJob → employee becomes
-///   FormerEmployee and the leaving process completes.
-/// </summary>
 [Collection("Integration")]
 public class LeavingProcessLifecycleEndToEndTests
 {
@@ -26,8 +13,6 @@ public class LeavingProcessLifecycleEndToEndTests
 
     private static readonly Guid AdminUser = new("ee000001-0000-0000-0000-000000000001");
 
-    // Relative to "today" rather than hardcoded literals — see StartLeavingProcessEndpointTests'
-    // identical fields for why a fixed near-term literal eventually becomes "backdated".
     private static readonly DateOnly LeavingDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
     private static readonly DateOnly LastWorkingDay = LeavingDate.AddDays(-1);
 
@@ -71,7 +56,6 @@ public class LeavingProcessLifecycleEndToEndTests
 
         var employeeId = await CreateEmployeeAsync(client, companyId, "Leaver");
 
-        // ── Step 1: Start the leaving process ─────────────────────────────────
         var startResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leaving-process",
             new
@@ -85,11 +69,9 @@ public class LeavingProcessLifecycleEndToEndTests
             });
         startResp.EnsureSuccessStatusCode();
 
-        // ── Step 2: Employee status is now Leaving ────────────────────────────
         var employeeAfterStart = await GetEmployeeAsync(client, companyId, employeeId);
         Assert.Equal("Leaving", employeeAfterStart.Status);
 
-        // ── Step 3: An Offboarding plan was auto-created ──────────────────────
         var statusResp = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/offboarding-status");
         statusResp.EnsureSuccessStatusCode();
@@ -102,25 +84,16 @@ public class LeavingProcessLifecycleEndToEndTests
         Assert.True(overviewAfterStart.HasPlan);
         Assert.NotEmpty(overviewAfterStart.Tasks);
 
-        // ── Step 4: LeavingProcessStartedAuditEvent is queryable via audit history ────────────
         var historyResp = await client.GetAsync($"/api/companies/{companyId}/employees/{employeeId}/audit-history");
         historyResp.EnsureSuccessStatusCode();
         var history = await historyResp.Content.ReadFromJsonAsync<AuditHistoryPayload>();
         Assert.NotNull(history);
         var startedEntry = Assert.Single(history!.Items, i => i.Action == "Leaving process started");
 
-        // LeavingProcessStartedAuditEvent now sets ActorEmployeeId (from the "sub" claim, same as
-        // every other handler in this module), so this is no longer attributed to "System". The
-        // AdminUser has no seeded Employee record in this test, so the name itself can't resolve
-        // ("Unknown" is expected) — proving it isn't "System" confirms the acting employee id is
-        // actually reaching the audit event, mirroring AuditHistoryIntegrationTests's pattern.
         Assert.NotEqual("System", startedEntry.User);
 
-        // EmployeeLeavingProcess now has a ModuleMap entry, so it surfaces under the same friendly
-        // "Employees" grouping as "Employee"/"Compensation" rather than its raw EntityType.
         Assert.Equal("Employees", startedEntry.Module);
 
-        // ── Step 5: Amend the leaving process ─────────────────────────────────
         var amendResp = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leaving-process",
             new
@@ -140,8 +113,6 @@ public class LeavingProcessLifecycleEndToEndTests
         Assert.Equal(LeavingDate.AddDays(30), amendPayload.LastWorkingDay);
         Assert.Equal("MutualAgreement", amendPayload.LeavingReason);
 
-        // Offboarding was already auto-started in Step 3, so AmendLeavingProcessHandler's
-        // IOffboardingStatusReader lookup must read that back as true.
         Assert.True(amendPayload.OffboardingAlreadyStarted);
     }
 
@@ -166,7 +137,6 @@ public class LeavingProcessLifecycleEndToEndTests
             });
         startResp.EnsureSuccessStatusCode();
 
-        // Offboarding auto-started alongside the leaving process — sanity-check before cancelling.
         var overviewBeforeCancel = await GetOffboardingOverviewAsync(client, companyId, employeeId);
         Assert.Equal("InProgress", overviewBeforeCancel.PlanStatus);
         Assert.Contains(overviewBeforeCancel.Tasks, t => t.Status == "Pending");
@@ -184,10 +154,6 @@ public class LeavingProcessLifecycleEndToEndTests
         var employeeAfterCancel = await GetEmployeeAsync(client, companyId, employeeId);
         Assert.Equal("Active", employeeAfterCancel.Status);
 
-        // OffboardingPlanCoordinator.CancelOutstandingTasksAsync moves the plan itself to
-        // Cancelled and cancels every outstanding task (OffboardingTask.CancelBecauseLeavingProcessCancelled,
-        // reported as a distinct "Cancelled" status, separate from "Skipped") — both observable via
-        // the overview endpoint.
         var overviewAfterCancel = await GetOffboardingOverviewAsync(client, companyId, employeeId);
         Assert.Equal("Cancelled", overviewAfterCancel.PlanStatus);
         Assert.NotEmpty(overviewAfterCancel.Tasks);
@@ -202,9 +168,6 @@ public class LeavingProcessLifecycleEndToEndTests
 
         var employeeId = await CreateEmployeeAsync(client, companyId, "Departed");
 
-        // Neither StartLeavingProcessValidator nor the EmployeeLeavingProcess domain entity
-        // enforce "LeavingDate must be in the future" — a real POST with an already-past date is
-        // enough to exercise ProcessLeavingEmployeesJob, no DB backdating/reflection required.
         var yesterday = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1));
         var resignationReceived = yesterday.AddDays(-14);
 
@@ -238,7 +201,6 @@ public class LeavingProcessLifecycleEndToEndTests
         Assert.Equal("Completed", leavingProcess!.Status);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
 
     private async Task RunProcessLeavingEmployeesJobAsync()
     {

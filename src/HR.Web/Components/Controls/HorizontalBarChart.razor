@@ -32,11 +32,6 @@ else
     [Parameter] public string EmptyText { get; set; } = "No data available.";
     [Parameter] public string AriaLabel { get; set; } = "Chart";
 
-    /// <summary>
-    /// Optional explicit accessible summary. When not supplied (DSH-07) the component builds
-    /// one from <see cref="AriaLabel"/> plus every bar's label and value so a screen-reader
-    /// user gets the actual figures, not just the chart title.
-    /// </summary>
     [Parameter] public string? SummaryText { get; set; }
 
     private string FullAriaLabel =>

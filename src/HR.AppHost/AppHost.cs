@@ -15,11 +15,6 @@ if (isE2ETesting && !string.Equals(builder.Environment.EnvironmentName, "Develop
 		+ "Test authentication is only allowed under Development. Refusing to start.");
 }
 
-// Pinned to the standard Postgres port rather than Aspire's dynamic port allocation — on this
-// machine, Windows/Hyper-V reserves large chunks of the ephemeral port range (see
-// `netsh interface ipv4 show excludedportrange protocol=tcp`), and Aspire's dynamic picker
-// occasionally lands in one of those excluded ranges, causing "Unable to allocate a network
-// port for service 'postgres'" and leaving the whole app without a working DB connection.
 var postgres = builder.AddPostgres("postgres").WithHostPort(5432);
 
 // Persist local dev data across AppHost restarts — without this, every restart recreates an
@@ -35,22 +30,11 @@ if (!isE2ETesting)
 }
 else
 {
-	// The E2E suite runs one shared Postgres behind one shared api instance while up to 15 xUnit
-	// threads drive concurrent Playwright circuits. HR.Api raises its Npgsql pool ceiling to 400
-	// under E2E (see its Program.cs), and Hangfire + migrations add more on top — all of which is
-	// capped by the container's own server-side limit. Postgres' stock max_connections=100 is well
-	// below that, so a burst hits "sorry, too many clients already" and surfaces as the generic
-	// 20s Playwright locator timeouts this infrastructure keeps fighting. Lift the server ceiling
-	// clear of the client pool. (Only max_connections — raising shared_buffers would need the
-	// container's /dev/shm bumped too, and the stock 128MB is fine for ~500 idle-ish sessions.)
 	postgres = postgres.WithArgs("-c", "max_connections=500");
 }
 
 var hrDatabase = postgres.AddDatabase("hr");
 
-// ClamAV daemon for virus-scanning uploaded documents/photos (Documents module,
-// ScanUploadedFileJob) — exposed on its default clamd port. Local/dev environments without this
-// configured fall back to NoOpVirusScanService (see DocumentsModule.AddStorageService).
 var clamAv = builder.AddContainer("clamav", "clamav/clamav", "stable")
 	.WithEndpoint(port: 3310, targetPort: 3310, name: "clamd");
 
@@ -61,31 +45,12 @@ var api = isE2ETesting
 api
     .WithReference(hrDatabase)
     .WaitFor(hrDatabase)
-    // clamd speaks raw TCP (INSTREAM protocol), not HTTP, so Aspire's default HTTP-based service
-    // discovery URL format doesn't apply here — bind the container's "clamd" endpoint host/port
-    // directly onto the config keys ClamAvOptions/DocumentsModule.AddStorageService bind to
-    // ("Documents:ClamAv:Host" / ":Port"), so the real ClamAvVirusScanService is registered
-    // instead of silently falling back to NoOpVirusScanService.
     .WithEnvironment("Documents__ClamAv__Host", clamAv.GetEndpoint("clamd").Property(EndpointProperty.Host))
     .WithEnvironment("Documents__ClamAv__Port", clamAv.GetEndpoint("clamd").Property(EndpointProperty.Port))
     .WaitFor(clamAv);
 
 if (isE2ETesting)
 {
-	// The identity-login rate limit (default 8 requests/minute, partitioned by client IP + email —
-	// see IdentityRateLimiting) is P1 abuse protection sized for real anonymous traffic. Under E2E
-	// every Playwright circuit shares the same machine's IP, and PersonaLoginCache's cache-invalidate
-	// path (a cached session's app-shell wait can still legitimately time out under 15-thread
-	// contention, not just on a genuinely stale session) can fire more than one real POST /api/login
-	// for the SAME persona email within the same 1-minute window — especially laura.bennett
-	// (HrAdminPersonaFixture), used by ~110 of the ~170 E2E test classes vs. single digits/dozens for
-	// the other three personas, so her IP+email partition is the one most likely to exhaust an 8/min
-	// budget. Once exhausted, every further login attempt gets an instant 429 instead of a real
-	// response, which RealFormLoginAsync doesn't distinguish from "still rendering" — it just times
-	// out waiting for the app shell or a login error, misdiagnosed as load/timing rather than what it
-	// actually is. Raised well above anything a single E2E run's login traffic (real logins are capped
-	// at 6 concurrent via PersonaLoginCache's own gate, plus its retry backoff) could plausibly hit;
-	// production's default 8/min is untouched since this only applies to the E2E-launched api process.
 	api.WithEnvironment("Identity__RateLimits__identity-login__PermitLimit", "100");
 }
 
@@ -108,10 +73,6 @@ adminWeb
 	.WithReference(api)
 	.WaitFor(api);
 
-// Public marketing site — static content, plus a server-side "Start free trial" signup proxy
-// (Phase B of the Getting Started + Subscription/Billing epic) that calls HR.Api's public /api/signup
-// endpoint directly, avoiding any need for browser-side CORS. References web to resolve its URL for
-// the "Log in" link and the post-signup redirect into "/getting-started".
 var marketing = isE2ETesting
 	? builder.AddProject<Projects.HR_Marketing>("marketing", launchProfileName: "http")
 	: builder.AddProject<Projects.HR_Marketing>("marketing");
@@ -121,11 +82,6 @@ marketing
 	.WithReference(api)
 	.WaitFor(api);
 
-// Reverse reference so HR.Web gets Aspire's own "services:marketing:https:0"/"...:http:0"
-// service-discovery config keys injected — needed for VerifyEmailError.razor's "resend
-// verification" bridge back to the marketing site's /check-your-email page, which previously had
-// no way to resolve marketing's actual (dynamically-assigned) URL and fell back to a hardcoded,
-// frequently-wrong "http://localhost:5166" (Marketing:BaseUrl in appsettings.Development.json).
 web.WithReference(marketing);
 
 builder.Build().Run();

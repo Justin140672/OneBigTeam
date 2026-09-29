@@ -3,11 +3,6 @@ using HR.SharedKernel.Html;
 
 namespace HR.Modules.Support.Tests;
 
-/// <summary>
-/// P1 stored-XSS fix: <see cref="SupportResponse.Create"/> always sanitises the body with the shared
-/// support allow-list, and <see cref="SupportResponse.ResanitiseBody"/> cleans legacy rows
-/// idempotently (the guard the backfill job relies on to write nothing once a row is clean).
-/// </summary>
 public class SupportResponseTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 25, 9, 0, 0, TimeSpan.Zero);
@@ -19,10 +14,6 @@ public class SupportResponseTests
     private static SupportResponse Create(string body) =>
         SupportResponse.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), false, body, Now);
 
-    /// <summary>
-    /// Simulates a row persisted before write-time sanitisation existed: BodyHtml has a private
-    /// setter and Create always sanitises, so the raw value is written by reflection.
-    /// </summary>
     internal static void OverwriteBodyWithRawLegacyValue(SupportResponse response, string rawBody) =>
         typeof(SupportResponse).GetProperty(nameof(SupportResponse.BodyHtml))!.SetValue(response, rawBody);
 
@@ -86,14 +77,13 @@ public class SupportResponseTests
     {
         var response = Create("placeholder");
         OverwriteBodyWithRawLegacyValue(response, MaliciousBody);
-        Assert.Equal(MaliciousBody, response.BodyHtml); // precondition: raw legacy content in place
+        Assert.Equal(MaliciousBody, response.BodyHtml);
 
         Assert.True(response.ResanitiseBody());
         AssertBodyIsClean(response.BodyHtml);
         Assert.Contains("<strong>there</strong>", response.BodyHtml);
         var afterFirst = response.BodyHtml;
 
-        // Repeat-call guard: already clean, so nothing changes and it reports no change.
         Assert.False(response.ResanitiseBody());
         Assert.Equal(afterFirst, response.BodyHtml);
     }
@@ -101,8 +91,6 @@ public class SupportResponseTests
     [Fact]
     public void ResanitiseBody_Returns_True_When_Only_Surrounding_Whitespace_Differs()
     {
-        // Sanitize trims its output, so a legacy row with padding counts as "changed" — pinned so
-        // the backfill's updated-row count is predictable.
         var response = Create("placeholder");
         OverwriteBodyWithRawLegacyValue(response, "  <p>ok</p>  ");
 

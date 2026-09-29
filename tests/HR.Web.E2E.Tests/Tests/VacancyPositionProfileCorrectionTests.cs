@@ -99,7 +99,6 @@ public sealed class VacancyPositionProfileCorrectionTests(RecruiterPersonaFixtur
 
         Assert.EndsWith("/vacancies", _page.Url);
 
-        // Re-open the vacancy and confirm the Position Profile change was actually persisted.
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickVacancyAsync(vacancyTitle);
 
@@ -121,19 +120,10 @@ public sealed class VacancyPositionProfileCorrectionTests(RecruiterPersonaFixtur
         Assert.True(await vacancyDetail.HasErrorAsync(),
             "Expected a validation error when saving an authorised correction with an empty Correction Reason");
 
-        // Stayed on the vacancy's own edit route rather than the bare list URL a successful save
-        // would have redirected to (EditPageBase.OnSavedAsync navigates to ListUrl on success).
         Assert.False(_page.Url.TrimEnd('/').EndsWith("/vacancies"),
             "Expected the save to have failed client/server validation rather than navigating to the vacancy list");
     }
 
-    /// <summary>
-    /// Creates a fresh vacancy linked to "Senior Software Engineer" (seeded for Acme — see
-    /// EmployeesModule.SeedEmployeesAsync) and adds a candidate application to it, which drives
-    /// UpdateVacancyHandler.CanChangePositionProfile to false (applicationCount &gt; 0) without
-    /// needing to walk the vacancy through Open status. Leaves the caller on the vacancy's detail
-    /// page (Overview tab), logged in as Marcus Diallo (Recruiter).
-    /// </summary>
     private async Task<(string VacancyTitle, VacancyDetailPage VacancyDetail)> ArrangeVacancyWithApplicationAsync()
     {
         var unique = Guid.NewGuid().ToString("N")[..8];

@@ -3,10 +3,6 @@ using HR.Modules.Companies.Contracts;
 
 namespace HR.Modules.Employees.Services;
 
-// Resolution order: Employee override (if both unit+length are set) -> Position Profile override
-// (if both unit+length are set) -> company default (always available via
-// ICompanyNoticePeriodSettingsReader). Mirrors ProbationDateResolver's style of accepting the raw
-// override values the caller already has in hand rather than re-querying the DB itself.
 internal sealed class EffectiveNoticePeriodResolver(ICompanyNoticePeriodSettingsReader companySettingsReader)
     : IEffectiveNoticePeriodResolver
 {
@@ -18,8 +14,6 @@ internal sealed class EffectiveNoticePeriodResolver(ICompanyNoticePeriodSettings
         int? positionProfileLengthOverride,
         CancellationToken cancellationToken)
     {
-        // Both-or-neither is enforced at the API boundary (validators), but a single mismatched
-        // value here is treated defensively as "not overridden at this level" rather than thrown.
         if (employeeUnitOverride.HasValue && employeeLengthOverride.HasValue)
             return new EffectiveNoticePeriod(employeeUnitOverride.Value, employeeLengthOverride.Value, NoticePeriodSource.Employee);
 

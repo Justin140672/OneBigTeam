@@ -181,7 +181,6 @@ public class AcknowledgeSharedCompanyDocumentHandlerTests
             Guid.NewGuid(), companyId, doc.Id, SharedCompanyDocumentAudienceRuleType.Department, departmentId));
         await db.SaveChangesAsync();
 
-        // Caller has no seeded audience entry, so their department is null — doesn't match.
         var result = await Handler(db).HandleAsync(
             new AcknowledgeSharedCompanyDocumentRequest { CompanyId = companyId, DocumentId = doc.Id }, caller,
             CancellationToken.None);
@@ -193,9 +192,6 @@ public class AcknowledgeSharedCompanyDocumentHandlerTests
     [Fact]
     public async Task HandleAsync_Reacknowledging_After_A_New_Version_Preserves_The_Old_Acknowledgement()
     {
-        // The core "version preservation" guarantee: replacing the file must never touch the
-        // acknowledgement row already recorded against the version the employee actually saw —
-        // it stays exactly as it was, at VersionNumber 1, alongside the new row at VersionNumber 2.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var category  = await SeedCategory(db, companyId);
@@ -333,9 +329,6 @@ public class AcknowledgeSharedCompanyDocumentHandlerTests
     [Fact]
     public async Task HandleAsync_Does_Not_Overwrite_The_Recorded_Statement_When_Acknowledged_Again_Idempotently()
     {
-        // Immutability in practice: the idempotent re-acknowledge path must return the existing
-        // row untouched, even if the document's statement has since been edited — the row keeps
-        // showing exactly what the employee agreed to at the time.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var category  = await SeedCategory(db, companyId);
@@ -496,10 +489,6 @@ public class AcknowledgeSharedCompanyDocumentHandlerTests
         Assert.True(published.IsConfirmed);
         Assert.Equal("I confirm I have read the updated expenses policy.", published.AcknowledgementStatement);
 
-        // The After payload — not just the record's own properties — is what actually gets
-        // rendered by GetSharedCompanyDocumentAuditHistoryHandler's BuildChanges, so assert its
-        // shape directly: VersionNumber, IsConfirmed and AcknowledgementStatement all now live in
-        // After (not Metadata, which is null for this event).
         IAuditEvent auditEvent = published;
         var afterJson = JsonSerializer.SerializeToElement(auditEvent.After);
         Assert.Equal(1, afterJson.GetProperty("VersionNumber").GetInt32());

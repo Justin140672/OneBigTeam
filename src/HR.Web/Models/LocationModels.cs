@@ -3,7 +3,6 @@ using HR.Web.Services;
 
 namespace HR.Web.Models;
 
-// ── LIST ──────────────────────────────────────────────────────────────────────
 
 public record ListLocationsResponse(List<LocationListItemModel> Items);
 
@@ -14,7 +13,6 @@ public record LocationListItemModel(
     bool IsActive,
     int Version = 0);
 
-// ── GET ───────────────────────────────────────────────────────────────────────
 
 public record GetLocationResponse(
     Guid Id,
@@ -25,7 +23,6 @@ public record GetLocationResponse(
     bool IsActive,
     int Version = 0);
 
-// ── CREATE ────────────────────────────────────────────────────────────────────
 
 public record CreateLocationRequest(
     Guid CompanyId,
@@ -42,7 +39,6 @@ public record CreateLocationResponse(
     bool IsActive,
     DateTimeOffset CreatedAt);
 
-// ── UPDATE ────────────────────────────────────────────────────────────────────
 
 public record UpdateLocationRequest(
     Guid CompanyId,
@@ -63,7 +59,6 @@ public record UpdateLocationResponse(
     DateTimeOffset UpdatedAt,
     int Version = 0);
 
-// ── EDIT MODEL ────────────────────────────────────────────────────────────────
 
 public sealed class LocationEditModel : IHasVersion
 {

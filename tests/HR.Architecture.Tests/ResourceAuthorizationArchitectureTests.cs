@@ -29,13 +29,6 @@ public class ResourceAuthorizationArchitectureTests
             typeof(HR.Modules.Employees.EmployeesModule).Assembly,
         ];
 
-    /// <summary>
-    /// Every FastEndpoints Endpoint class that resolves an employee-owned resource by an
-    /// employeeId (or a resource id whose owner is only known after a DB lookup) must take a
-    /// dependency on an approved "*ResourceAuthorizer" type, either directly on the Endpoint's own
-    /// constructor (target known from the route) or on the paired Handler's constructor (target
-    /// only known after loading the entity — e.g. GetTask/CompleteTask).
-    /// </summary>
     public static TheoryData<Type, Type> KnownEmployeeResourceEndpoints
     {
         get
@@ -44,7 +37,6 @@ public class ResourceAuthorizationArchitectureTests
 
             void Add<TEndpoint, TCheckedType>() => data.Add(typeof(TEndpoint), typeof(TCheckedType));
 
-            // Documents — target employeeId known from the route; authorizer used at the endpoint.
             Add<HR.Modules.Documents.Features.ListEmployeeDocuments.Endpoint,
                 HR.Modules.Documents.Features.ListEmployeeDocuments.Endpoint>();
             Add<HR.Modules.Documents.Features.GetEmployeeDocument.Endpoint,
@@ -60,9 +52,6 @@ public class ResourceAuthorizationArchitectureTests
             Add<HR.Modules.Documents.Features.SearchEmployeeDocuments.Endpoint,
                 HR.Modules.Documents.Features.SearchEmployeeDocuments.Endpoint>();
 
-            // Tasks — GetEmployeeTasks resolves target from the route (endpoint-level check);
-            // GetTask/CompleteTask only know the assignee after loading the task, so the check is
-            // on the paired handler instead.
             Add<HR.Modules.Tasks.Features.GetEmployeeTasks.Endpoint,
                 HR.Modules.Tasks.Features.GetEmployeeTasks.Endpoint>();
             Add<HR.Modules.Tasks.Features.GetTask.Endpoint,
@@ -70,9 +59,6 @@ public class ResourceAuthorizationArchitectureTests
             Add<HR.Modules.Tasks.Features.CompleteTask.Endpoint,
                 HR.Modules.Tasks.Features.CompleteTask.CompleteTaskHandler>();
 
-            // Employees — GetEmployee's target id is the route's own {id}, but ownership isn't
-            // known until the resource-authorizer check runs in the handler (see
-            // GetEmployeeHandler), so it is checked there rather than at the endpoint.
             Add<HR.Modules.Employees.Features.GetEmployee.Endpoint,
                 HR.Modules.Employees.Features.GetEmployee.GetEmployeeHandler>();
             Add<HR.Modules.Employees.Features.GetEmployeeTeamView.Endpoint,
@@ -98,12 +84,6 @@ public class ResourceAuthorizationArchitectureTests
             "employee-owned-resource endpoint (IAM-07).");
     }
 
-    /// <summary>
-    /// Guards against a future module reintroducing its own duplicated self/hierarchy/company-wide
-    /// evaluation logic instead of building on the shared abstraction: every "*ResourceAuthorizer"
-    /// type discovered in a module assembly must itself depend on
-    /// HR.SharedKernel.Authorization.EmployeeResourceAuthorizer.
-    /// </summary>
     [Fact]
     public void Every_Module_ResourceAuthorizer_Builds_On_The_Shared_EmployeeResourceAuthorizer()
     {

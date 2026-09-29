@@ -34,10 +34,6 @@ internal sealed class EmployeePromotedHandler(
 
         var (title, description) = PromotionTimelineText.Describe(isInternalAppointment, previousTitle, newTitle);
 
-        // sourceRecordId ties this to the promotion record itself — a future-dated promotion
-        // already has a pending entry written eagerly at submission time (see PromoteEmployee's
-        // Handler), so this dedupes against that rather than writing a second "Promoted" entry
-        // once ProcessPromotionsJob (or an immediate same-day finalization) actually completes it.
         await timelineWriter.TryAddAsync(
             EmployeeTimelineEntry.Create(
                 Guid.NewGuid(),

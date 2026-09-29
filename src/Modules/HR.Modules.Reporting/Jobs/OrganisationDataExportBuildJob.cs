@@ -52,11 +52,6 @@ internal sealed class OrganisationDataExportBuildJob(
     private const int StorageUploadMaxAttempts = 3;
     private static readonly TimeSpan StorageRetryBackoff = TimeSpan.FromMilliseconds(200);
 
-    /// <summary>
-    /// Follow-up G: how often the background loop renews the ownership lease. Comfortably shorter than
-    /// <see cref="OrganisationDataExport.LeaseDurationMinutes"/> so a healthy worker never lets the
-    /// lease lapse. Overridable in tests.
-    /// </summary>
     internal TimeSpan LeaseRenewInterval { get; init; } =
         TimeSpan.FromMinutes(OrganisationDataExport.LeaseDurationMinutes / 3.0);
 
@@ -76,7 +71,6 @@ internal sealed class OrganisationDataExportBuildJob(
             return;
         }
 
-        // OBT-REM-11: verify the caller-supplied companyId matches the export row being processed.
         if (view.CompanyId != companyId)
         {
             logger.LogError(
@@ -97,7 +91,6 @@ internal sealed class OrganisationDataExportBuildJob(
             throw new OrganisationDataExportSlotUnavailableException(exportId);
         }
 
-        // Follow-up A: each run takes out its own ownership lease.
         var ownerToken = Guid.NewGuid();
 
         if (!await jobStore.BeginAttemptAsync(exportId, ownerToken, cancellationToken))
@@ -126,7 +119,6 @@ internal sealed class OrganisationDataExportBuildJob(
             }
             catch (OperationCanceledException)
             {
-                // expected
             }
         }
 
@@ -166,7 +158,6 @@ internal sealed class OrganisationDataExportBuildJob(
             }
             catch (OperationCanceledException)
             {
-                // Normal: processing finished and the loop was cancelled.
             }
         }
 
@@ -347,8 +338,6 @@ internal sealed class OrganisationDataExportBuildJob(
             try
             {
                 archiveStream.Position = 0;
-                // NonDisposingStreamWrapper: a storage client that disposes its content stream must
-                // not close the temp file between retries.
                 using var uploadStream = new NonDisposingStreamWrapper(archiveStream);
                 return await storage.UploadAsync(companyId, exportId, attemptToken, uploadStream, cancellationToken);
             }

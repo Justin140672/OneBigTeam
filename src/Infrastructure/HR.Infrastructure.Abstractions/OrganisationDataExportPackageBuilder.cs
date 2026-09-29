@@ -17,17 +17,6 @@ public sealed class OrganisationDataExportPackageBuilder
 {
     private static readonly UTF8Encoding Utf8NoBom = new(encoderShouldEmitUTF8Identifier: false);
 
-    /// <summary>
-    /// Writes the export archive into <paramref name="output"/>. Returns the list of expected document
-    /// ZIP paths whose stream came back <c>null</c> (missing from storage); an empty list means every
-    /// document was embedded. When documents are missing the archive content is not usable and the
-    /// caller must discard <paramref name="output"/> and fail the export (preserving the pre-existing
-    /// fail-whole-export behaviour).
-    /// </summary>
-    /// <param name="onEntryWritten">
-    /// Invoked after every entry with the current archive length, so the caller can enforce a
-    /// temp-disk ceiling. May throw to abort the build.
-    /// </param>
     public async Task<IReadOnlyList<string>> BuildToStreamAsync(
         IAsyncEnumerable<DataExportTable> tables,
         IReadOnlyList<DocumentExportFileEntry> fileEntries,
@@ -73,8 +62,6 @@ public sealed class OrganisationDataExportPackageBuilder
 
                 await using (content.ConfigureAwait(false))
                 {
-                    // Once a document is missing the archive is doomed; keep draining the remaining
-                    // entries (one stream at a time) only to count every missing file for the alert.
                     if (missing.Count > 0)
                         continue;
 
@@ -92,11 +79,6 @@ public sealed class OrganisationDataExportPackageBuilder
         return missing;
     }
 
-    /// <summary>
-    /// Writes one RFC 4180 CSV. Streamed tables (<see cref="DataExportTable.RowStream"/>) are written
-    /// row-by-row straight to <paramref name="writer"/> and never buffered into a list, so an
-    /// effectively unbounded source stays memory-bounded. Byte output is identical to the eager path.
-    /// </summary>
     private static async Task WriteCsvAsync(TextWriter writer, DataExportTable table, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

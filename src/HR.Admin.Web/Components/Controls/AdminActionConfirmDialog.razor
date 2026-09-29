@@ -65,8 +65,6 @@
     {
         if (!Visible)
         {
-            // Reset transient dialog state whenever it's hidden, so re-opening it for a different
-            // action (or the same action again) starts from a clean slate.
             _reason = string.Empty;
             _newTrialExpiryDate = null;
             _validationError = null;

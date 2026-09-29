@@ -54,7 +54,7 @@ public class GetLeaveCalendarReportHandlerTests
         var otherDepartmentId = Guid.NewGuid();
         var matchingEmployeeId = Guid.NewGuid();
 
-        const int nonMatchingCount = 30_000; // exceeds DisplayRowLimit on its own
+        const int nonMatchingCount = 30_000;
         var nonMatchingItems = Enumerable.Range(0, nonMatchingCount).Select(_ => BuildItem(Guid.NewGuid())).ToList();
         var matchingItem = BuildItem(matchingEmployeeId);
         var allItems = nonMatchingItems.Append(matchingItem).ToList();
@@ -64,8 +64,6 @@ public class GetLeaveCalendarReportHandlerTests
         {
             [matchingEmployeeId] = new(matchingEmployeeId, "Match", matchingDepartmentId, "Engineering"),
         };
-        // Every non-matching employee falls back to "no department entry" (department reader
-        // returns nothing for them), so they are excluded when DepartmentId is supplied.
         var handler = new GetLeaveCalendarReportHandler(reader, new FakeEmployeeDepartmentReader(departments));
 
         var result = await handler.HandleAsync(
@@ -77,6 +75,6 @@ public class GetLeaveCalendarReportHandlerTests
         Assert.Equal(1, result.Value.TotalCount);
         var row = Assert.Single(result.Value.Items);
         Assert.Equal(matchingEmployeeId, row.EmployeeId);
-        _ = otherDepartmentId; // documents intent: never assigned, so those rows are excluded by omission
+        _ = otherDepartmentId;
     }
 }

@@ -44,7 +44,7 @@ public class UploadEmployeeProfilePhotoEndpointTests
         var employeeId = Guid.NewGuid();
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString()); // different company
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo",
@@ -58,7 +58,7 @@ public class UploadEmployeeProfilePhotoEndpointTests
     {
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        var callerId   = Guid.NewGuid(); // not the employee, no employee:manage grant
+        var callerId   = Guid.NewGuid();
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, callerId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
@@ -74,9 +74,6 @@ public class UploadEmployeeProfilePhotoEndpointTests
     [Fact]
     public async Task Post_Returns_Forbidden_For_Self_Upload_Without_Employee_Manage_Role()
     {
-        // This endpoint is HR-only: an employee uploading their own photo without the
-        // employee:manage role is forbidden. Self-service uploads go through
-        // UploadMyProfilePhoto instead (see UploadMyProfilePhotoEndpointTests).
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         using var client = await SelfClient(companyId, employeeId);
@@ -136,7 +133,7 @@ public class UploadEmployeeProfilePhotoEndpointTests
         var employeeId = Guid.NewGuid();
         using var client = await ManagerClient(companyId);
 
-        var oversized = new byte[6 * 1024 * 1024]; // exceeds the default 5 MB limit
+        var oversized = new byte[6 * 1024 * 1024];
 
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/profile-photo",
@@ -166,7 +163,6 @@ public class UploadEmployeeProfilePhotoEndpointTests
         var employeeId = Guid.NewGuid();
         using var client = await ManagerClient(companyId);
 
-        // Extension/content type claim PNG, but the bytes are not a PNG (spoofed/renamed file).
         var spoofed = new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
 
         var response = await client.PostAsync(
@@ -236,7 +232,6 @@ public class UploadEmployeeProfilePhotoEndpointTests
         Assert.Equal("second.png", rows[0].FileName);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> SelfClient(Guid companyId, Guid employeeId)
     {
@@ -269,18 +264,16 @@ public class UploadEmployeeProfilePhotoEndpointTests
         return form;
     }
 
-    // Builds a minimal-but-valid PNG byte stream: signature + IHDR chunk carrying the given
-    // width/height at the big-endian offsets ImageUploadValidator reads (16/20).
     private static byte[] BuildPngBytes(int width, int height)
     {
         var bytes = new List<byte>();
-        bytes.AddRange(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }); // signature
-        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x0D }); // IHDR chunk data length
+        bytes.AddRange(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A });
+        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x0D });
         bytes.AddRange("IHDR"u8.ToArray());
         bytes.AddRange(BigEndianUInt32(width));
         bytes.AddRange(BigEndianUInt32(height));
-        bytes.AddRange(new byte[] { 0x08, 0x06, 0x00, 0x00, 0x00 }); // bit depth, color type, compression, filter, interlace
-        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 }); // dummy CRC (not validated)
+        bytes.AddRange(new byte[] { 0x08, 0x06, 0x00, 0x00, 0x00 });
+        bytes.AddRange(new byte[] { 0x00, 0x00, 0x00, 0x00 });
         return [.. bytes];
     }
 

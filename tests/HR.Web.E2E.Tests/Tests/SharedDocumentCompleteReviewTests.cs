@@ -35,7 +35,7 @@ public sealed class SharedDocumentCompleteReviewTests(HrAdminPersonaFixture fixt
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private const string HrEmail = "laura.bennett@acme.example";
-    private const string TomEmail = "tom.williams@acme.example"; // plain Employee — no document management access
+    private const string TomEmail = "tom.williams@acme.example";
     private const string MarcusDiallo = "Marcus Diallo";
     private const string PolicyCategory = "Policy";
 
@@ -51,7 +51,6 @@ public sealed class SharedDocumentCompleteReviewTests(HrAdminPersonaFixture fixt
         var login  = new LoginPage(_page, _fixture.WebBaseUrl);
         var detail = new SharedDocumentDetailPage(_page, _fixture.WebBaseUrl);
 
-        // Create a document as HR first so there's a real detail route to target.
         await login.GoToAsync();
         await login.LoginAsync(HrEmail);
 
@@ -62,7 +61,6 @@ public sealed class SharedDocumentCompleteReviewTests(HrAdminPersonaFixture fixt
             await UploadDocumentAsync(title, tempFile);
             var documentId = await GetUploadedDocumentIdAsync(title);
 
-            // Now switch to the plain employee and try to reach the same document.
             await login.GoToAsync();
             await login.LoginAsync(TomEmail);
 
@@ -71,7 +69,6 @@ public sealed class SharedDocumentCompleteReviewTests(HrAdminPersonaFixture fixt
 
             if (_page.Url.Contains($"/shared-documents/{documentId}"))
             {
-                // Not redirected — then at least the management action must be absent.
                 Assert.False(await detail.IsReviewButtonVisibleAsync(),
                     "The Review Document action must not be visible to a plain employee");
             }
@@ -199,8 +196,6 @@ public sealed class SharedDocumentCompleteReviewTests(HrAdminPersonaFixture fixt
         var tempFile = Path.Combine(Path.GetTempPath(), $"shared-doc-{Guid.NewGuid():N}.pdf");
         try
         {
-            // Monthly, so the completed review's "next review date" is simply "today + 1 month" —
-            // deterministic regardless of whatever Next Review Date was originally uploaded with.
             await UploadDocumentAsync(title, tempFile, reviewFrequencyLabel: "Monthly");
 
             var documentId = await GetUploadedDocumentIdAsync(title);
@@ -225,8 +220,6 @@ public sealed class SharedDocumentCompleteReviewTests(HrAdminPersonaFixture fixt
             await Assertions.Expect(detail.FooterSummary)
                 .ToContainTextAsync($"Last reviewed by Laura Bennett on {expectedReviewedOn}", new() { Timeout = 15_000 });
 
-            // SharedDocumentDetail.razor renders ReviewDate as "d MMMM yyyy" (full month name) —
-            // distinct from the footer's "d MMM yyyy" (abbreviated) used for LastReviewedAt above.
             var expectedNextReviewDate = DateOnly.FromDateTime(DateTime.Today).AddMonths(1).ToString("d MMMM yyyy");
             Assert.Equal(expectedNextReviewDate, await detail.GetReviewDateTextAsync());
         }
@@ -264,8 +257,6 @@ public sealed class SharedDocumentCompleteReviewTests(HrAdminPersonaFixture fixt
             Assert.False(await detail.IsReviewDialogOpenAsync(),
                 "Expected the Complete Review dialog to close after clicking Cancel");
 
-            // Cancelling doesn't refetch the page's detail model, so re-navigating (a fresh load,
-            // not just in-memory state) is the more convincing proof nothing was persisted server-side.
             await detail.GoToAsync(AcmeId, documentId);
 
             Assert.Equal(reviewDateBeforeCancel, await detail.GetReviewDateTextAsync());
@@ -279,15 +270,6 @@ public sealed class SharedDocumentCompleteReviewTests(HrAdminPersonaFixture fixt
         }
     }
 
-    // Uploads a shared document from the Shared Documents list page (same flow as
-    // SharedDocumentUploadTests / SharedDocumentReviewFrequencyTests / SharedDocumentReviewOwnerTests),
-    // optionally selecting a Review Frequency (+ its required Next Review Date once the frequency
-    // isn't "None") and/or a Review Owner before submitting. Category, Review Frequency, and
-    // Review Owner are each reached by scoping to their own ".col-md-6" field group (rather than by
-    // combobox index) since Review Frequency's combobox can render before Category's — Category's
-    // is gated behind an async data load while Review Frequency's isn't — and Review Owner sits
-    // after the conditional "Custom Frequency (months)" field, whose presence would otherwise
-    // shift a plain Nth() index.
     private async Task UploadDocumentAsync(
         string title, string filePath,
         string? reviewFrequencyLabel = null,
@@ -334,8 +316,6 @@ public sealed class SharedDocumentCompleteReviewTests(HrAdminPersonaFixture fixt
         await _page.WaitForSelectorAsync($"text={title}", new() { Timeout = 15_000 });
     }
 
-    // Reads the document id straight from the list row's link href, avoiding a separate
-    // click+navigate+wait round trip (same pattern as e.g. SharedDocumentArchiveTests).
     private async Task<Guid> GetUploadedDocumentIdAsync(string title)
     {
         var href = await _page.Locator(".e-rowcell a").Filter(new() { HasText = title }).First.GetAttributeAsync("href");
@@ -343,7 +323,6 @@ public sealed class SharedDocumentCompleteReviewTests(HrAdminPersonaFixture fixt
         return Guid.Parse(href.Split('/').Last());
     }
 
-    // %PDF- followed by padding, so magic-byte content validation passes.
     private static byte[] BuildTestPdf()
     {
         var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };

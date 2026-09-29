@@ -80,9 +80,6 @@
     private bool _submitting;
     private string? _error;
 
-    // Generated once per confirmation "session" (i.e. once per dialog open) so a double-click, or a
-    // retry after an ambiguous failure within the same open dialog, reuses the same key rather than
-    // risking a duplicate batch.
     private Guid _idempotencyKey;
 
     protected override void OnParametersSet()

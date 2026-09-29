@@ -34,14 +34,6 @@ namespace HR.Web.E2E.Tests.Tests;
 /// </summary>
 public sealed class RealSupabaseLoginFlowTests : IAsyncLifetime
 {
-    // Laura Bennett — HR Administrator persona (Employee + HrAdministrator roles, see
-    // HR.Modules.Identity.IdentityModule seed data). Manager-only personas (e.g. James Okafor,
-    // previously used here) don't have sidebar access to the "People and users > Employees" item
-    // exercised by RealFormLogin_ThenCircuitDrivenApiCall_IsAuthenticated_NotTreatedAsAnonymous
-    // below, since that nav item requires employee:manage-equivalent HR-administrator permissions
-    // a plain Manager doesn't hold. Laura is used elsewhere across this suite (e.g.
-    // WorkloadActionsReportTests, HrDashboardTests) as the standard HR Administrator login for
-    // exactly this reason.
     private const string Email = "laura.bennett@acme.example";
 
     private AppFixture _app = null!;
@@ -71,18 +63,10 @@ public sealed class RealSupabaseLoginFlowTests : IAsyncLifetime
 
         await login.GoToAsync();
 
-        // Real interactive form submit -> real Supabase password-grant sign-in -> a genuine
-        // Supabase-signed JWT that HR.Api's JWT bearer validation must accept for the app shell's
-        // own bootstrap API calls to succeed. No faked/mocked auth path is involved anywhere in this
-        // call chain (see class remarks above).
         await login.RealFormLoginAsync(Email);
 
         await _page.WaitForSelectorAsync(".app-shell", new() { Timeout = 15_000 });
 
-        // Laura is HR Administrator; AppSession.LandingUrl's priority order (see its remarks) puts
-        // HR Administrator above Recruiter/Manager/Company Administrator, so Home.razor's
-        // post-login redirect lands her on /dashboard/hr, confirming this isn't just "some"
-        // authenticated session but specifically Laura Bennett's.
         await _page.WaitForURLAsync(new Regex("/dashboard/hr"), new() { Timeout = 15_000 });
         Assert.Contains("/dashboard/hr", _page.Url);
 
@@ -145,8 +129,6 @@ public sealed class RealSupabaseLoginFlowTests : IAsyncLifetime
         await grid.WaitForAsync(new() { Timeout = 15_000 });
         Assert.True(await grid.IsVisibleAsync());
 
-        // The shell itself must still show Laura Bennett as the authenticated user — proving this
-        // wasn't silently downgraded to an anonymous circuit somewhere along the way.
         var userInfo = _page.Locator(".top-bar-user-info");
         await userInfo.WaitForAsync(new() { Timeout = 10_000 });
         var displayedName = await userInfo.InnerTextAsync();

@@ -10,12 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Postgres integration coverage for DELETE /vacancies/{v}/applications/{a} (withdraw). See
-/// WithdrawApplicationHandlerTests in HR.Modules.Recruitment.Tests for the unit-level equivalent.
-/// Covers: anonymous 401, wrong-role 403, happy 200 + WithdrawnAt set + pending interview cancelled,
-/// unknown application 404, cross-company 404, already-withdrawn 400, terminal-stage 400.
-/// </summary>
 [Collection("Integration")]
 public class WithdrawApplicationEndpointTests
 {

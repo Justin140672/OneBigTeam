@@ -2,23 +2,8 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the employee edit/create page.
-/// Covers the new-employee form and the Employment tab of existing employees.
-/// Routes: /companies/{id}/employees/new  and  /companies/{id}/employees/{id}
-/// </summary>
 public sealed class EmployeeEditPage(IPage page, string baseUrl)
 {
-    // EmployeeEdit.razor's profile tabs are now two-level: an outer group strip
-    // (.employee-profile-groups — Overview / Career & Pay / Time Off / Tasks & Records / Assets /
-    // Activity) and, per group, an inner section strip (.employee-profile-sections). SfTab renders
-    // a group's inner strip only once that group is selected, so a section tab ("Leave",
-    // "Employment", …) isn't in the DOM until its group is opened. Select the group first.
-    // Groups whose single section is rendered directly under the group tab with NO inner
-    // ".employee-profile-sections" strip (see EmployeeEdit.razor — the "Assets" group's
-    // ContentTemplate renders <EmployeeAssetsTab> straight away, unlike Overview/Career & Pay/…
-    // which nest their own SfTab). For these, selecting the group tab IS opening the section —
-    // there is no section tab to click or wait for.
     internal static readonly IReadOnlySet<string> FlatSingleSectionGroups = new HashSet<string> { "Assets" };
 
     internal static readonly IReadOnlyDictionary<string, string> SectionGroups = new Dictionary<string, string>
@@ -35,11 +20,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         ["Documents"] = "Tasks & Records",
         ["Acknowledgement History"] = "Tasks & Records",
         ["Onboarding"] = "Tasks & Records",
-        // SPEC-OFF-01: "Offboarding" is no longer a distinct tab in the strip — it was merged into
-        // the single "Leaving & Offboarding" workspace (see EmployeeProfileNavigation.All). Kept as
-        // an alias here (both resolve to the same group/tab) purely so any test still passing the
-        // old "Offboarding" section name to NavigateToSectionAsync/IsSectionTabPresentAsync keeps
-        // compiling and resolving to the right tab, rather than throwing ArgumentException.
         ["Offboarding"] = "Tasks & Records",
         ["Leaving"] = "Tasks & Records",
         ["Leaving & Offboarding"] = "Tasks & Records",
@@ -49,11 +29,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         ["Audit"] = "Activity",
     };
 
-    // SPEC-OFF-01: the tab strip's actual accessible name for the merged workspace is
-    // "Leaving & Offboarding" (see EmployeeProfileNavigation.All), not "Leaving" or "Offboarding" —
-    // those two are kept as valid *input* keys above purely for backwards compatibility with
-    // existing test call sites, but any GetByRole(Name=...) lookup needs the real rendered label.
-    // Everything else's display name is just its own section name.
     private static readonly IReadOnlyDictionary<string, string> SectionDisplayNames = new Dictionary<string, string>
     {
         ["Leaving"] = "Leaving & Offboarding",
@@ -63,11 +38,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     private static string DisplayNameOf(string sectionName) =>
         SectionDisplayNames.TryGetValue(sectionName, out var display) ? display : sectionName;
 
-    /// <summary>
-    /// Opens a profile section by first selecting its owning group tab, then the section tab.
-    /// Both strips are scoped to their own <c>.e-tab-header</c> so the group locator can't also
-    /// match a nested section tab of the same name (e.g. "Assets").
-    /// </summary>
     public static async Task NavigateToSectionAsync(IPage page, string sectionName)
     {
         if (!SectionGroups.TryGetValue(sectionName, out var groupName))
@@ -78,8 +48,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await groupTab.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
         await groupTab.ClickAsync();
 
-        // A flat single-section group ("Assets") has no inner strip — the group tab click above
-        // already opened the section content. Nothing more to do.
         if (FlatSingleSectionGroups.Contains(groupName))
             return;
 
@@ -91,7 +59,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     private Task OpenSectionAsync(string sectionName) => NavigateToSectionAsync(page, sectionName);
 
-    /// <summary>Selects the group that owns <paramref name="sectionName"/> (no-op if already selected).</summary>
     public static async Task SelectOwningGroupAsync(IPage page, string sectionName)
     {
         if (!SectionGroups.TryGetValue(sectionName, out var groupName))
@@ -103,32 +70,14 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await groupTab.ClickAsync();
     }
 
-    /// <summary>
-    /// The section tab locator, scoped to the inner section strip's header. Select its owning
-    /// group first (<see cref="SelectOwningGroupAsync"/> / <see cref="NavigateToSectionAsync"/>) —
-    /// the strip isn't in the DOM until the group is chosen.
-    /// </summary>
     public static ILocator SectionTab(IPage page, string sectionName) =>
         page.Locator(".employee-profile-sections > .e-tab-header")
             .GetByRole(AriaRole.Tab, new() { Name = DisplayNameOf(sectionName), Exact = true });
 
-    /// <summary>
-    /// True when a section tab is present in its group's strip. Selects the owning group first,
-    /// so this works for the "is it visible" / "is it hidden" lifecycle assertions regardless of
-    /// which group was previously active.
-    /// </summary>
     public static async Task<bool> IsSectionTabPresentAsync(IPage page, string sectionName)
     {
         await SelectOwningGroupAsync(page, sectionName);
 
-        // A bare instant IsVisibleAsync() here can catch a transient render pass: a lifecycle tab's
-        // (Onboarding/Probation/Offboarding) visibility depends on its own async plan-status load
-        // that starts after the page's other "ready" signals (e.g. GoToAsync's Details-tab combobox
-        // wait) have already resolved — under headless timing that load can still be in flight the
-        // instant this method runs right after navigating/creating an employee. Poll briefly for the
-        // tab to appear rather than taking a single snapshot; a genuinely-absent tab still resolves
-        // correctly (just after this short window instead of instantly), so this doesn't change the
-        // outcome for the "tab should NOT be present" assertions elsewhere in this suite.
         var deadline = DateTime.UtcNow.AddSeconds(5);
         while (true)
         {
@@ -143,48 +92,27 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task GoToNewAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees/new");
-        // Wait for Syncfusion to initialise — span[role='combobox'] only appears after
-        // Blazor's interactive render, ensuring the form's event handlers are wired up.
         await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
     }
 
     public async Task GoToAsync(Guid companyId, Guid employeeId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees/{employeeId}");
-        // span[role='combobox'] (SfDropDownList) only appears after Blazor's interactive
-        // render, confirming the circuit is connected and event handlers are wired up.
         await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
     }
 
-    /// <summary>
-    /// Navigates directly to the employee's read-only "/view" route — the same place
-    /// ClickEmployeeAsync's row link lands on, without going through the employee list. Useful
-    /// for tests that just need to (re)land in view mode on a specific employee, rather than
-    /// recreating one via the full New Employee form each time.
-    /// </summary>
     public async Task GoToViewAsync(Guid companyId, Guid employeeId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees/{employeeId}/view");
         await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
     }
 
-    /// <summary>
-    /// Navigates directly to the employee edit page with a query string appended (e.g.
-    /// "tab=onboarding") — used to verify deep-link tab activation (see EmployeeEdit.razor's
-    /// LoadAsync, which maps the "tab" query parameter to an initial SfTab selected index).
-    /// </summary>
     public async Task GoToAsync(Guid companyId, Guid employeeId, string query)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/employees/{employeeId}?{query}");
-        // Deep-linking can land on any tab, and not every tab renders a combobox (Onboarding and
-        // Offboarding don't), so — unlike the other GoToAsync overloads above, which always land
-        // on "Details" (which does) — wait on the tab list itself instead. It's rendered by the
-        // same SfTab regardless of which tab query-string selects, so it's still a reliable
-        // signal that Blazor's interactive circuit has connected.
         await page.WaitForSelectorAsync("[role='tablist']", new() { Timeout = 20_000 });
     }
 
-    // ── New Employee — Personal Information ───────────────────────────────────
 
     public async Task FillFirstNameAsync(string value)
     {
@@ -207,8 +135,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task FillStartDateAsync(string ddMMyyyy)
     {
         var inputs = page.Locator(".e-date-wrapper input.e-input");
-        // Date of Birth renders before Start Date on the new employee form (EmployeeEdit.razor) —
-        // the start date picker is the second date input, not the first.
         await inputs.Nth(1).ClickAsync();
         await inputs.Nth(1).FillAsync(ddMMyyyy);
         await page.Keyboard.PressAsync("Tab");
@@ -216,26 +142,15 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     public async Task FillDateOfBirthAsync(string ddMMyyyy)
     {
-        // Date of birth is the first date picker on the new employee form.
         var inputs = page.Locator(".e-date-wrapper input.e-input");
         await inputs.First.ClickAsync();
         await inputs.First.FillAsync(ddMMyyyy);
         await page.Keyboard.PressAsync("Tab");
     }
 
-    /// <summary>Selects a value from a Syncfusion SfDropDownList identified by nearby label text.</summary>
     public Task SelectDropdownAsync(string labelText, string optionText) =>
         DropDownSelector.SelectAsync(page, page.Locator(".col-md-6, .col-md-4").Filter(new() { HasText = labelText }).First, optionText);
 
-    /// <summary>
-    /// Waits until the Syncfusion SfDropDownList identified by nearby label text shows a
-    /// non-blank value. Selecting a Position Profile server-round-trips to auto-populate the
-    /// Department and Location fields (see EmployeeEmploymentTab.OnPositionProfileChanged) — that
-    /// population is a second async step after the dropdown's own ValueChanged commit, so a test
-    /// that immediately saves right after picking a Position Profile can race ahead of it and
-    /// submit with Department/Location still blank. Callers that rely on the auto-population
-    /// (rather than picking Department/Location explicitly) should await this first.
-    /// </summary>
     public async Task WaitForDropdownPopulatedAsync(string labelText)
     {
         var input = page.Locator(".col-md-6, .col-md-4").Filter(new() { HasText = labelText }).First
@@ -243,22 +158,10 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await Microsoft.Playwright.Assertions.Expect(input).Not.ToHaveValueAsync("", new() { Timeout = 10_000 });
     }
 
-    // ── Employee Overview header ────────────────────────────────────────────────
 
-    /// <summary>
-    /// Returns the text of the employee status badge shown next to the employee's name at the
-    /// top of the page (e.g. "Active", "Leaving", "Former Employee" — see EmployeeEdit.razor's
-    /// StatusDisplayName). Scoped to the "rounded-pill" class combo distinguishing it from the
-    /// Reporting Chain card's own "Current Employee" badge and every lifecycle tab's own status
-    /// badge further down the page — see the Playwright locator conventions around bare-class
-    /// locators for why a plain ".badge" alone would be ambiguous here.
-    /// </summary>
     public async Task<string?> GetEmployeeStatusBadgeTextAsync()
     {
         var badge = page.Locator(".badge.rounded-pill").First;
-        // A bare instant IsVisibleAsync() right after a navigation/reload can race the badge's
-        // render and return null before it has actually appeared, rather than genuinely reflecting
-        // no badge being present.
         try
         {
             await badge.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
@@ -271,19 +174,9 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         return (await badge.TextContentAsync())?.Trim();
     }
 
-    // ── View mode / Edit mode (2026-08 profile redesign) ────────────────────────
-    // Existing employees now open read-only at ".../{Id}/view"; "Edit details" drops the
-    // suffix and reloads into the editable route. See EditPageBase.IsViewMode (URL-derived)
-    // and EmployeeEdit.razor's EnterEditMode/CancelEdit.
 
     public bool IsInViewModeUrl => page.Url.Contains("/view", StringComparison.OrdinalIgnoreCase);
 
-    // A bare instant IsVisibleAsync() here races the post-navigation render of GoToViewAsync/
-    // ClickAsync-driven route changes — the "Edit details" button only appears once EmployeeEdit
-    // .razor's own data fetch has resolved IsViewMode/CanManageEmployees, which under headless load
-    // can genuinely land a moment after the URL itself has already changed. A bounded wait avoids
-    // reporting "not visible" for a button that's genuinely there a moment later (same rationale as
-    // ClickEditDetailsButtonAsync's own wait below).
     public async Task<bool> IsEditDetailsButtonVisibleAsync()
     {
         try
@@ -298,16 +191,10 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>Clicks "Edit details" and waits for the resulting forceLoad reload to land on the editable route.</summary>
     public async Task ClickEditDetailsButtonAsync()
     {
         var button = page.Locator("[data-testid='edit-details-button']");
 
-        // The button only renders for IsViewMode && Session.CanManageEmployees (EmployeeEdit.razor)
-        // — a bare ClickAsync() here relies entirely on Playwright's own 30s default actionability
-        // timeout and gives no indication, on failure, of WHY it never appeared (still on the edit
-        // route because a prior navigation didn't land where expected, vs. a real rendering delay
-        // under load, vs. a permissions gap). Surface that distinction instead of a bare timeout.
         try
         {
             await button.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
@@ -346,15 +233,9 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await page.WaitForURLAsync("**/employees", new() { Timeout = 40_000 });
     }
 
-    /// <summary>The sticky Save/Cancel action bar (".employee-edit-sticky-bar") — only rendered in edit mode.</summary>
     public Task<bool> IsStickyActionBarVisibleAsync() =>
         page.Locator(".employee-edit-sticky-bar").IsVisibleAsync();
 
-    /// <summary>
-    /// Returns the accessible success confirmation banner's text (role="status" aria-live="polite",
-    /// shown for ~700ms after a successful save before the redirect navigates away — see
-    /// EmployeeEdit.razor's OnSavedAsync), or null if not currently visible.
-    /// </summary>
     public async Task<string?> GetSaveSuccessBannerTextAsync()
     {
         var banner = page.Locator("[role='status'][aria-live='polite'].alert-success");
@@ -390,7 +271,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public Task<bool> IsConcurrencyWarningVisibleAsync() =>
         ConcurrencyWarningBanner.IsVisibleAsync();
 
-    /// <summary>Clicks "Reload latest values" in the concurrency banner and waits for the banner to clear.</summary>
     public async Task ClickReloadLatestValuesAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }).ClickAsync();
@@ -398,12 +278,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
     }
 
-    /// <summary>
-    /// Bug fix (b): clears the required Details-tab "Last Name" field and blurs it, driving the
-    /// EditContext into an invalid state. EditPageBase.OnValidationStateChanged then drops any
-    /// standing concurrency banner. Waits for the field's own validation message to confirm the
-    /// invalid state actually registered before returning.
-    /// </summary>
     public async Task MakeDetailsFormInvalidAsync()
     {
         var lastName = page.GetByLabel("Last Name").First;
@@ -414,15 +288,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
 
-    // ── "More actions" dropdown (Organisation Chart / Start offboarding) ───────
 
-    // A bare instant IsVisibleAsync() here races the same post-navigation employee-data-load
-    // render as the "Edit details" button (see IsEditDetailsButtonVisibleAsync's own remarks
-    // just above for the identical race) — "More actions" only renders once EmployeeEdit.razor's
-    // own async load has resolved Session.CanManageEmployees/_employee, which under headless load
-    // can genuinely land a moment after GoToViewAsync's own (unrelated) combobox-based wait
-    // condition already returned. A bounded wait avoids reporting "not visible" for a button
-    // that's genuinely there a moment later.
     public async Task<bool> IsMoreActionsMenuVisibleAsync()
     {
         try
@@ -443,22 +309,10 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task ClickViewOrganisationChartMenuItemAsync()
     {
         await OpenMoreActionsMenuAsync();
-        // Id-based ("#org-chart", EmployeeEdit.razor's BuildMoreActionsItems), not role+name — same
-        // defensive choice as SharedDocumentDetailPage.ClickMoreActionsItemAsync's remarks, even
-        // though this dropdown's items are a stable field here rather than recomputed on every
-        // render, so the same rebuild race is less likely but not impossible.
         await page.Locator("#org-chart").ClickAsync();
         await page.WaitForURLAsync(new System.Text.RegularExpressions.Regex(@"/organisation-chart\?employeeId="), new() { Timeout = 15_000 });
     }
 
-    /// <summary>
-    /// True if the "Start offboarding" item is present in the (currently closed) "More actions"
-    /// menu — only rendered while no leaving process is active (see EmployeeEdit.razor's
-    /// BuildMoreActionsItems / `!_showLeavingTab`). Opens the menu to check, then closes it again
-    /// via Escape so callers aren't left with an open popup. Replaces the old header
-    /// "Start Leaving Process" button check now that the action lives in this overflow menu and
-    /// is labelled "Start offboarding".
-    /// </summary>
     public async Task<bool> HasStartOffboardingMenuItemAsync()
     {
         if (!await IsMoreActionsMenuVisibleAsync())
@@ -468,7 +322,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         bool visible;
         try
         {
-            // Id-based — see ClickViewOrganisationChartMenuItemAsync's remarks.
             await page.Locator("#start-offboarding")
                 .WaitForAsync(new() { Timeout = 3_000 });
             visible = true;
@@ -488,15 +341,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await page.Locator("#start-offboarding").ClickAsync();
     }
 
-    // ── Details tab field access (view-mode read-only checks / accessible labels) ─
 
-    /// <summary>
-    /// True if the given Details-tab text input (by its accessible label/aria-label, e.g. "First
-    /// Name") carries the HTML `readonly` attribute. Located by label rather than `id` — Syncfusion
-    /// always overwrites any custom `id` passed to HrTextBox with its own auto-generated one (see
-    /// HrTextBox's own remarks / EmployeeEdit.razor's HtmlAttributes["aria-label"] fields), so an
-    /// id-based CSS selector never reliably resolves.
-    /// </summary>
     public async Task<bool> IsTextFieldReadOnlyAsync(string fieldLabel) =>
         await page.GetByLabel(fieldLabel).First.GetAttributeAsync("readonly") is not null;
 
@@ -508,21 +353,12 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     private ILocator PreferredNameField => page.GetByPlaceholder("Defaults to first name");
 
-    /// <summary>
-    /// Switches to the Details section (Overview group → Details) so the Preferred Name field is in
-    /// the active — visible — tab panel. Callers that also touch the Employment tab (e.g. the atomic
-    /// profile+employment concurrency test) leave a different section active, and SfTab keeps
-    /// inactive panels in the DOM but hidden, so a bare FillAsync/InputValueAsync on the
-    /// Preferred Name field would auto-wait for visibility and time out. Mirrors
-    /// <see cref="SwitchToEmploymentSectionAsync"/>.
-    /// </summary>
     private async Task SwitchToDetailsSectionAsync()
     {
         await NavigateToSectionAsync(page, "Details");
         await PreferredNameField.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
     }
 
-    /// <summary>Sets the Details-tab "Preferred Name" field (placeholder "Defaults to first name"). Switches to the Details section first.</summary>
     public async Task FillPreferredNameAsync(string value)
     {
         await SwitchToDetailsSectionAsync();
@@ -536,13 +372,8 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         return await PreferredNameField.InputValueAsync();
     }
 
-    /// <summary>True if the "Fields marked * are required." explanatory note is visible on the Details tab.</summary>
     public async Task<bool> HasRequiredFieldsNoteAsync()
     {
-        // ClickEditDetailsButtonAsync's own wait only confirms SOME combobox rendered somewhere on
-        // the page, not specifically the Details tab's own content — this note can still be a
-        // render pass behind that at the moment a caller checks immediately afterward. Poll
-        // briefly rather than a single snapshot.
         var note = page.Locator("p").Filter(new() { HasText = "Fields marked" }).Filter(new() { HasText = "are required" }).First;
         try
         {
@@ -555,14 +386,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>
-    /// A bare IsVisibleAsync() snapshot here can fire before the card has actually rendered —
-    /// same "container mounts before Blazor content renders" race documented across other page
-    /// objects in this suite. Previously masked by the incidental delay of each caller's own full
-    /// New Employee form creation flow; surfaced once callers started reaching this page via a
-    /// much faster shared-employee navigation instead. Use an auto-retrying wait rather than a
-    /// one-shot check.
-    /// </summary>
     public async Task<bool> IsUsersAndAccessCardVisibleAsync()
     {
         try
@@ -580,13 +403,10 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public Task<bool> HasInviteExpiryNoteAsync() =>
         page.Locator("p").Filter(new() { HasText = "Invite links expire after 7 days" }).First.IsVisibleAsync();
 
-    // ── Employment Tab ─────────────────────────────────────────────────────────
 
     public async Task OpenEmploymentTabAsync()
     {
         await OpenSectionAsync("Employment");
-        // Wait for the Employment-tab-specific heading — the generic .card-header selector
-        // would resolve immediately against the Details tab's already-rendered card headers.
         await page.WaitForSelectorAsync(".card-header:has-text('Employment Details')", new() { Timeout = 15_000 });
 
         // The heading above is on the FIRST card of this tab; every combobox further down still
@@ -620,17 +440,9 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         }
         catch (TimeoutException)
         {
-            // Best-effort warm-up only — if this doesn't even open, the caller's own real
-            // DropDownSelector.SelectAsync call will surface the actual failure with its own
-            // (equally cold-start-aware) retry logic.
         }
     }
 
-    /// <summary>
-    /// Switches to the Employment section (Overview group → Employment) without the heavier
-    /// dropdown cold-start warm-up <see cref="OpenEmploymentTabAsync"/> performs — used by tests
-    /// that only need to reach the "HR Notes" text field, not the comboboxes further down.
-    /// </summary>
     public async Task SwitchToEmploymentSectionAsync()
     {
         await NavigateToSectionAsync(page, "Employment");
@@ -640,18 +452,10 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     private ILocator EmploymentNotesField =>
         page.GetByPlaceholder("Optional internal notes visible to HR only");
 
-    /// <summary>
-    /// Fills the Employment tab's "HR Notes" field (EmployeeEmploymentTab.razor, bound to
-    /// Model.Notes). Switches to the Employment section first.
-    /// </summary>
     public async Task FillEmploymentNotesAsync(string value)
     {
         await SwitchToEmploymentSectionAsync();
         await EmploymentNotesField.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
-        // HrTextBox is a Syncfusion multiline SfTextBox: a bare FillAsync sets the DOM value but its
-        // ValueChanged/@bind-Value doesn't always fire, so Model.Notes stays empty and the atomic
-        // save submits nothing. Type for real, then Tab to force the change/blur commit — the same
-        // technique the other Syncfusion-backed fill helpers in this page object use.
         await EmploymentNotesField.ClickAsync();
         await page.Keyboard.PressAsync("Control+A");
         await page.Keyboard.PressAsync("Delete");
@@ -662,7 +466,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await page.WaitForTimeoutAsync(300);
     }
 
-    /// <summary>Reads the current value of the Employment tab's "HR Notes" field. Switches to the Employment section first.</summary>
     public async Task<string> GetEmploymentNotesValueAsync()
     {
         await SwitchToEmploymentSectionAsync();
@@ -670,13 +473,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         return await EmploymentNotesField.InputValueAsync();
     }
 
-    /// <summary>
-    /// Reads the plain-text value of the "Current Compensation" card's read-only "Current
-    /// Salary"/"Hours"/"FTE"/"Effective From" rows (see EmployeeEmploymentTab.razor's
-    /// CurrentSalaryDisplay/CurrentHoursDisplay/CurrentFteDisplay/CurrentEffectiveFromDisplay) —
-    /// rendered as a plain &lt;table&gt; of &lt;th&gt;/&lt;td&gt; rows, not the form-control-plaintext
-    /// fields used elsewhere on this page.
-    /// </summary>
     public async Task<string?> GetEmploymentTabReadOnlyFieldAsync(string labelText)
     {
         var row = page.Locator("table.table-sm tr").Filter(new() { HasText = labelText }).First;
@@ -685,10 +481,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         return await value.IsVisibleAsync() ? (await value.TextContentAsync())?.Trim() : null;
     }
 
-    /// <summary>
-    /// Returns the trimmed card-header headings in DOM order on the (currently open) Employment
-    /// tab — used to assert the "Organisation" card renders above the "Dates" card.
-    /// </summary>
     public async Task<IReadOnlyList<string>> GetEmploymentTabCardHeadingsAsync()
     {
         var headers = await page.Locator(".card-header h5").AllAsync();
@@ -698,11 +490,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         return result;
     }
 
-    /// <summary>
-    /// Selects a manager from the Manager dropdown on the Employment tab. DropDownSelector itself
-    /// confirms Blazor's ValueChanged round-trip actually committed the selection before
-    /// returning — see its own doc comment.
-    /// </summary>
     public async Task SelectManagerAsync(string managerNameFragment)
     {
         var managerGroup = page.Locator(".col-md-4, .col-12")
@@ -711,13 +498,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await DropDownSelector.SelectAsync(page, managerGroup, managerNameFragment);
     }
 
-    /// <summary>
-    /// Clears the manager selection on the Employment tab by opening the Manager dropdown and
-    /// selecting its prepended "No Manager" sentinel item (Id = Guid.Empty) — replaces the old
-    /// ShowClearButton ("x" icon) approach, which was removed in favor of this explicit
-    /// no-selection list item (see EmployeeEmploymentTab.razor's ManagerOption list, which
-    /// prepends a Guid.Empty/"No Manager" entry rather than setting ShowClearButton="true").
-    /// </summary>
     public async Task ClearManagerAsync()
     {
         var managerGroup = page.Locator(".col-md-4, .col-12")
@@ -726,18 +506,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await DropDownSelector.SelectAsync(page, managerGroup, "No Manager");
     }
 
-    /// <summary>
-    /// Clicks the single page-level Save button (persistent across all tabs, below the SfTab).
-    /// Saves both the Details and Employment tabs together and navigates to the employee list on success.
-    /// </summary>
-    /// <remarks>
-    /// Previously this only waited for the spinner to clear, which is true whether the save
-    /// succeeded OR failed validation (e.g. EmployeeEmploymentTab.SaveCoreAsync's
-    /// EditContext.Validate() failing, or UpdateEmploymentDetailsHandler returning a Conflict) —
-    /// a failed save leaves the caller on the same edit page with stale/unsaved field values and
-    /// no exception, so any later assertion about what got saved fails far from the actual cause.
-    /// Explicitly checking for the error banner here turns that into an immediate, specific failure.
-    /// </remarks>
     public async Task ClickSaveChangesAsync()
     {
         var urlBeforeSave = page.Url;
@@ -752,38 +520,20 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             throw new Exception($"Save failed: {message}");
         }
 
-        // A successful save on an existing employee doesn't stop here: EmployeeEdit.razor's
-        // OnSavedAsync shows the success banner, waits 700ms, then issues its own forceLoad
-        // navigation (to the employee's "/view" route, or the list when closing) — asynchronously,
-        // well after the spinner above has already cleared. A caller that immediately issues its
-        // own navigation right after this method returns (e.g. GoToAsync to reload and re-check
-        // persisted state) races that in-flight forceLoad: two navigations firing close together
-        // can abort one another client-side (ERR_ABORTED), regardless of which "won" the redirect
-        // destination. Wait for the app's own post-save navigation to actually land before
-        // returning, so callers' subsequent navigations never overlap it.
         try
         {
             await page.WaitForURLAsync(url => url.ToString() != urlBeforeSave, new() { Timeout = 5_000 });
         }
         catch (TimeoutException)
         {
-            // No navigation happened (e.g. this Save button doesn't redirect in this context) —
-            // nothing to wait for.
         }
     }
 
-    // ── Save (new employee form) ───────────────────────────────────────────────
 
     public async Task SaveNewEmployeeAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
 
-        // A failed save (client validation or a server-side Conflict/error) leaves this on the same
-        // form with no navigation — waiting on the URL alone then surfaces as a generic 40s timeout
-        // with no indication of the real cause, unlike ClickSaveChangesAsync above (which already
-        // checks this). Give the spinner a moment to clear and check for an error banner before
-        // committing to the long navigation wait, so a genuine validation/server failure fails fast
-        // and loud instead of masquerading as a load-related timeout.
         try
         {
             await page.WaitForSelectorAsync(".alert-danger", new() { Timeout = 2_000 });
@@ -792,47 +542,30 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         }
         catch (TimeoutException)
         {
-            // No error banner appeared — proceed to the normal success-path wait below.
         }
 
-        // Navigates to the employee list on success. Bumped 20s -> 40s -> 60s: under the higher
-        // concurrent load from the many tests that now create fresh employees via this same
-        // full-form UI flow, this genuinely (not a logic bug — flow is identical to the
-        // long-established working pattern) takes longer than the previous budget often enough
-        // to time out. Same pattern as EmployeeListPage.ClickNewEmployeeAsync's navigation wait.
         await page.WaitForURLAsync("**/employees", new() { Timeout = 60_000 });
-        // With prerender:false the circuit connects after navigation, wait for the grid. ".e-grid"
-        // alone isn't enough — Syncfusion populates ".e-row"/".e-rowcell" on a separate JS tick
-        // after the grid element mounts, so callers that immediately click the new row (e.g.
-        // ManagerDashboardTests.CreateEmployeeReportingToDavidAsync) can race an empty grid.
         await page.WaitForSelectorAsync(".e-grid .e-row, .e-grid .e-emptyrow", new() { Timeout = 20_000 });
     }
 
     public async Task<bool> HasProbationSummaryAsync() =>
         await page.Locator("[data-testid='probation-summary']").IsVisibleAsync();
 
-    /// <summary>
-    /// Returns true if the "From Position Profile" read-only defaults summary card is visible
-    /// on the new-employee form (shown after a Position Profile is selected).
-    /// </summary>
     public async Task<bool> HasPositionProfileDefaultsSummaryAsync() =>
         await page.Locator("[data-testid='position-profile-defaults-summary']").IsVisibleAsync();
 
-    /// <summary>Reads the current value of the Department dropdown's visible text on the new-employee form.</summary>
     public async Task<string?> GetSelectedDepartmentTextAsync()
     {
         var group = page.Locator(".col-md-4").Filter(new() { HasText = "Department" }).First;
         return await group.Locator(".e-input-group input").First.InputValueAsync();
     }
 
-    /// <summary>Reads the current value of the Location dropdown's visible text (new-employee form or Employment tab).</summary>
     public async Task<string?> GetSelectedLocationTextAsync()
     {
         var group = page.Locator(".col-md-4").Filter(new() { HasText = "Location" }).First;
         return await group.Locator(".e-input-group input").First.InputValueAsync();
     }
 
-    /// <summary>Reads the current value of the Manager dropdown's visible text on the Employment tab.</summary>
     public async Task<string?> GetSelectedManagerTextAsync()
     {
         var group = page.Locator(".col-md-4, .col-12").Filter(new() { HasText = "Manager" }).First;
@@ -852,21 +585,9 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>
-    /// Returns true if a field-level validation message containing <paramref name="messageText"/>
-    /// is visible (e.g. "Employee number is required." from EmployeeProfileEditModel's
-    /// [Required(ErrorMessage = ...)] attributes) — used to verify a specific required field's
-    /// validation, rather than the generic "some error is present" check in <see cref="HasErrorAsync"/>.
-    /// </summary>
     public async Task<bool> HasValidationMessageAsync(string messageText) =>
         await page.Locator(".validation-message").Filter(new() { HasText = messageText }).First.IsVisibleAsync();
 
-    /// <summary>
-    /// Fills the Employee Number field on the Employment tab. A no-op when the company's numbering
-    /// mode is Automatic (the field isn't rendered and a number gets assigned on save instead) —
-    /// callers that don't care which mode is active can call this unconditionally rather than
-    /// checking <see cref="IsEmployeeNumberInputVisibleAsync"/> themselves first.
-    /// </summary>
     public async Task FillEmployeeNumberAsync(string value)
     {
         var field = page.GetByPlaceholder("e.g. EMP-001");
@@ -895,11 +616,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>
-    /// Reads the current Employee Number shown on an existing employee's Employment section
-    /// (Overview group → Employment). Works in both edit and view mode — the field renders
-    /// read-only in view mode but still exposes its value.
-    /// </summary>
     public async Task<string> GetEmployeeNumberFieldValueAsync()
     {
         await NavigateToSectionAsync(page, "Employment");
@@ -908,13 +624,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         return await field.InputValueAsync();
     }
 
-    /// <summary>
-    /// Returns true if the Employee Number text input is visible on the new-employee form —
-    /// false when the company's numbering mode is Automatic, in which case the informational
-    /// message below is shown instead (see <see cref="HasEmployeeNumberAutoAssignedMessageAsync"/>).
-    /// Polls briefly rather than taking a single IsVisibleAsync() snapshot — same
-    /// _companyEmployeeNumberMode async-load race as that method.
-    /// </summary>
     public async Task<bool> IsEmployeeNumberInputVisibleAsync()
     {
         try
@@ -928,13 +637,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>
-    /// Returns true if the "An employee number will be assigned automatically when this employee
-    /// is created." informational message is visible on the new-employee form (Automatic mode).
-    /// Polls briefly rather than taking a single IsVisibleAsync() snapshot — _companyEmployeeNumberMode
-    /// is resolved inside EmployeeEdit.razor's own LoadAsync, and GoToNewAsync's wait condition
-    /// (span[role='combobox']) can in principle be satisfied by an earlier render pass.
-    /// </summary>
     public async Task<bool> HasEmployeeNumberAutoAssignedMessageAsync()
     {
         try
@@ -949,13 +651,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>
-    /// Returns the "#EMP-001"-style employee number badge shown next to the status badge in the
-    /// header of an existing employee's edit page, or null if not present. Polls briefly rather
-    /// than taking a single instant snapshot of "span.text-muted" — the header summary is a
-    /// separate async-loaded render and GoToAsync's own wait condition (the Details tab's
-    /// combobox) can resolve on an earlier render pass before it appears.
-    /// </summary>
     public async Task<string?> GetEmployeeNumberHeaderTextAsync()
     {
         var deadline = DateTime.UtcNow.AddSeconds(10);
@@ -973,27 +668,12 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         return null;
     }
 
-    // ── Notice period override (Employment tab, "Dates" card) ──────────────────
-    //
-    // Mirrors the "Override company default notice period" toggle on the Position Profile
-    // edit page (see PositionProfileEditPage's own "Notice period override" section) — the
-    // same three Syncfusion component types (SfCheckBox/SfDropDownList/SfNumericTextBox),
-    // used the same way, just a different checkbox label ("Override notice period" rather
-    // than "...company default...") and an additional read-only "Notice source" summary
-    // alongside it (see EmployeeEmploymentTab.razor's Dates card).
 
-    /// <summary>
-    /// The "row g-3 mt-2" div containing the Unit dropdown and Length numeric field, which
-    /// is only present in the DOM while "Override notice period" is checked. Same xpath
-    /// sibling-traversal approach as PositionProfileEditPage.NoticePeriodOverrideRow, since
-    /// the Unit dropdown here has no adjacent &lt;label&gt; to scope by either.
-    /// </summary>
     private ILocator NoticePeriodOverrideRow =>
         page.Locator(".e-checkbox-wrapper")
             .Filter(new() { HasText = "Override notice period" })
             .Locator("xpath=following-sibling::div[contains(@class,'row')]");
 
-    /// <summary>Checks/unchecks "Override notice period" and waits for the reveal/hide of its fields.</summary>
     public async Task SetOverrideNoticePeriodAsync(bool overrideEnabled)
     {
         var checkbox = page.GetByLabel("Override notice period");
@@ -1003,20 +683,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             await checkbox.CheckAsync();
             await NoticePeriodOverrideRow.WaitForAsync(new() { Timeout = 10_000 });
 
-            // Comparing against PositionProfileEditPage's equivalent flow (same three component
-            // types, same order — checkbox, Unit dropdown, Length numeric — and reliably fast)
-            // shows the difference isn't this row's markup: PositionProfileEdit's page has two
-            // OTHER SfNumericTextBox fields (Probation Months Override, Salary Range) rendered
-            // unconditionally near the top of that form, so by the time its test reaches Notice
-            // Period Length, Syncfusion's numeric-textbox JS module has already paid its one-time
-            // per-page init cost on an earlier instance. The Employment tab has no such earlier
-            // SfNumericTextBox anywhere — this Length field is the first one ever mounted on the
-            // page, and (like the first-ever dropdown popup handled in OpenEmploymentTabAsync)
-            // that first-of-its-kind cold start is real and can run well past a casual budget.
-            // Pay it here, immediately once the field exists, rather than leaving it to
-            // TypeIntoNumericInputAsync's later, harder-deadline wait — this gives it the most
-            // possible elapsed time (the caller's subsequent Unit dropdown selection included)
-            // before anything actually needs it enabled.
             try
             {
                 await Assertions.Expect(NoticePeriodOverrideRow.Locator("input.e-numerictextbox").First)
@@ -1024,8 +690,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             }
             catch (PlaywrightException)
             {
-                // Best-effort warm-up only — TypeIntoNumericInputAsync has its own wait and will
-                // surface the real failure if it's still not enabled by the time it's needed.
             }
         }
         if (!overrideEnabled && isChecked)
@@ -1038,62 +702,45 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public Task<bool> IsOverrideNoticePeriodCheckedAsync() =>
         page.GetByLabel("Override notice period").IsCheckedAsync();
 
-    /// <summary>True once the Unit/Length fields have rendered (i.e. the override checkbox is checked).</summary>
     public Task<bool> IsNoticePeriodOverrideFieldsVisibleAsync() =>
         NoticePeriodOverrideRow.IsVisibleAsync();
 
-    /// <summary>Selects a value ("Weeks" or "Months") from the notice period override's Unit dropdown. Only present once the override checkbox is checked.</summary>
     public Task SelectNoticePeriodUnitAsync(string unitLabel) =>
         DropDownSelector.SelectAsync(page, NoticePeriodOverrideRow, unitLabel);
 
-    /// <summary>Returns the currently displayed value of the notice period override's Unit dropdown.</summary>
     public async Task<string> GetNoticePeriodUnitTextAsync()
     {
         var combobox = NoticePeriodOverrideRow.Locator("span[role='combobox']").First;
         return (await combobox.Locator("input").InputValueAsync()).Trim();
     }
 
-    /// <summary>Sets the notice period override's Length numeric field. Only present once the override checkbox is checked.</summary>
     public Task FillNoticePeriodLengthAsync(int length) =>
         TypeIntoNumericInputAsync(NoticePeriodOverrideRow.Locator("input.e-numerictextbox").First, length.ToString());
 
-    /// <summary>Returns the current value of the notice period override's Length numeric field.</summary>
     public async Task<int> GetNoticePeriodLengthAsync()
     {
         var value = await NoticePeriodOverrideRow.Locator("input.e-numerictextbox").First.InputValueAsync();
         return int.Parse(value);
     }
 
-    /// <summary>
-    /// The read-only "Notice source" summary card (a small &lt;dl&gt;) sitting alongside the
-    /// override toggle — shows the resolved Source ("Employee"/"Position Profile"/"Company
-    /// Default") and Notice Period (length + unit), reflecting EffectiveNoticePeriodResolver's
-    /// server-side resolution regardless of whether this employee's own override is set.
-    /// </summary>
     private ILocator NoticeSourceSummary =>
         page.Locator(".col-md-6").Filter(new() { HasText = "Notice source" }).First;
 
-    /// <summary>Returns the "Source" value from the Notice source summary (e.g. "Employee", "Position Profile", "Company Default").</summary>
     public async Task<string?> GetNoticeSourceLabelAsync()
     {
         var dd = NoticeSourceSummary.Locator("dd").First;
         return (await dd.TextContentAsync())?.Trim();
     }
 
-    /// <summary>Returns the "Notice Period" value from the Notice source summary (e.g. "3 Weeks").</summary>
     public async Task<string?> GetEffectiveNoticePeriodTextAsync()
     {
         var dd = NoticeSourceSummary.Locator("dd").Nth(1);
         return (await dd.TextContentAsync())?.Trim();
     }
 
-    // ── Close / unsaved-changes prompt (EditPageBase) ──────────────────────────
 
     private ILocator UnsavedChangesDialog => page.Locator("[role='dialog']:has-text('Unsaved Changes')");
 
-    // RequestClose's button label changed from "Close" to "Cancel" on both the new-employee form
-    // and the existing-employee edit mode (see EmployeeEdit.razor) — method name kept as-is since
-    // many existing callers already depend on it, only the underlying locator text changed.
     public Task ClickCloseAsync() =>
         page.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
 
@@ -1117,10 +764,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public Task CancelUnsavedChangesDialogAsync() =>
         UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
 
-    // ── Compensation Tab ────────────────────────────────────────────────────────
-    // Tab label is "Compensation History" (renamed from "Compensation" — the separate
-    // "Current Compensation" panel/card was removed entirely; the tab now shows only the
-    // Compensation History card/grid or the single unified empty-state message).
 
     public async Task OpenCompensationTabAsync()
     {
@@ -1130,11 +773,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             new() { Timeout = 15_000 });
     }
 
-    /// <summary>
-    /// True if a "Current Compensation" panel/card is rendered on the Compensation History tab —
-    /// expected to always be false now that panel was removed entirely; retained only so existing
-    /// callers asserting its absence still compile.
-    /// </summary>
     public Task<bool> HasCurrentCompensationPanelAsync() =>
         page.Locator("[data-testid='current-compensation-panel']").IsVisibleAsync();
 
@@ -1154,11 +792,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task FillAddCompensationEffectiveFromAsync(string ddMMyyyy)
     {
         var input = page.Locator(".add-compensation-dialog .e-date-wrapper input.e-input").First;
-        // SfDatePicker commits Model.EffectiveFrom on blur, over a Blazor Server round-trip. Under a
-        // loaded server that commit can lag behind the caller's next action — the dialog then fails
-        // DataAnnotations ("Please correct the highlighted fields") on submit even though the field
-        // looks filled. Verify the value actually landed in the input and retry the fill if not
-        // (same philosophy as FillNumericAndVerifyAsync).
         for (var attempt = 1; attempt <= 3; attempt++)
         {
             await input.ClickAsync();
@@ -1179,18 +812,11 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public Task SelectAddCompensationSalaryTypeAsync(string salaryType) =>
         DropDownSelector.SelectAsync(page, page.Locator(".add-compensation-dialog"), salaryType);
 
-    // Salary is an SfNumericTextBox with FloatLabelType.Auto, which renders its Placeholder
-    // prop as a floating label rather than a native HTML placeholder attribute, so
-    // GetByPlaceholder never matches it (see CompanyEditPage.NumericBoxByLabel for the same
-    // caveat). Salary is the first e-numerictextbox in the dialog (before Hours Per Week/FTE).
     public Task FillAddCompensationSalaryAsync(string value) =>
         FillNumericAndVerifyAsync(page.Locator(".add-compensation-dialog input.e-numerictextbox").First, value, decimal.Parse(value));
 
     public async Task FillAddCompensationCurrencyAsync(string value)
     {
-        // HrTextBox commits Model.Currency on blur over a Blazor Server round-trip — same lag-under-
-        // load risk as the Effective From date above. Verify + retry so submit doesn't fail
-        // DataAnnotations with the field looking filled.
         var input = page.Locator(".add-compensation-dialog").GetByPlaceholder("e.g. GBP");
         for (var attempt = 1; attempt <= 3; attempt++)
         {
@@ -1211,12 +837,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         var dialog = page.Locator("[role='dialog'].add-compensation-dialog");
         var addButton = page.Locator(".add-compensation-dialog .e-footer-content button:has-text('Add')");
 
-        // A single click on the SfDialog footer button can land in the render-vs-circuit-ready gap
-        // (documented for Syncfusion interop throughout this suite) and be silently swallowed —
-        // the dialog then just sits there visible until the caller's Hidden wait times out. Retry
-        // the click, re-checking for the dialog actually closing each time. If a genuine server/
-        // validation error came back instead, surface it rather than burning the whole retry
-        // budget on a submit that will never succeed.
         for (var attempt = 1; attempt <= 5; attempt++)
         {
             if (await dialog.CountAsync() == 0)
@@ -1238,10 +858,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
                 {
                     var message = (await page.Locator(".add-compensation-dialog .alert-danger").First.TextContentAsync())?.Trim() ?? "";
 
-                    // "Please correct the highlighted fields" is EditDialogBase's DataAnnotations
-                    // failure. The fields ARE filled in the DOM — a blur-committed value just hasn't
-                    // round-tripped to the bound model yet under load. Re-blur every field to force
-                    // the commit and retry, rather than failing the test on a transient race.
                     if (message.Contains("correct the highlighted", StringComparison.OrdinalIgnoreCase))
                     {
                         await ReblurAddCompensationFieldsAsync();
@@ -1249,7 +865,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
                         continue;
                     }
 
-                    // Any other message is a real server/business rejection — surface it.
                     throw new InvalidOperationException($"Add Compensation dialog rejected the submit: {message}");
                 }
 
@@ -1263,9 +878,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             throw new InvalidOperationException($"Add Compensation dialog never accepted the submit: {message}");
         }
 
-        // Same "dialog closing doesn't prove the grid's own reload has landed" race as
-        // SubmitEditCompensationDialogAsync above — callers that immediately read/act on the
-        // history grid (e.g. the newly added row, or a subsequent Delete) can race it.
         await page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 10_000 });
@@ -1275,12 +887,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public Task<bool> HasAddCompensationDialogErrorAsync() =>
         page.Locator(".add-compensation-dialog .alert-danger").IsVisibleAsync();
 
-    /// <summary>
-    /// Re-focuses then blurs each editable field in the Add Compensation dialog, forcing every
-    /// blur-committed Syncfusion/HrTextBox binding to flush its DOM value into the bound model.
-    /// Used to recover from a transient "correct the highlighted fields" validation failure where
-    /// the value is visibly present but hasn't round-tripped yet under a loaded server.
-    /// </summary>
     private async Task ReblurAddCompensationFieldsAsync()
     {
         var fields = new[]
@@ -1311,11 +917,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     public async Task ConfirmDeleteCompensationAsync()
     {
-        // Clicking "Yes" triggers an async delete + grid reload round-trip; ClickAsync only
-        // waits for the click event to dispatch, not for that round-trip, so callers that
-        // immediately check row visibility can race ahead of the reload. Wait for the button
-        // itself to disappear (it only renders for the row mid-confirmation) as a signal the
-        // grid has actually re-rendered with fresh data.
         var yesButton = page.Locator("[data-testid='compensation-history-grid']").GetByRole(AriaRole.Button, new() { Name = "Yes" });
         await yesButton.ClickAsync();
         await yesButton.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
@@ -1325,8 +926,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     {
         await page.Locator("[role='dialog'].edit-future-compensation-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
-        // See FillAddCompensationSalaryAsync — Salary is a FloatLabelType.Auto SfNumericTextBox,
-        // so it must be targeted by its e-numerictextbox class rather than GetByPlaceholder.
         await FillNumericAndVerifyAsync(page.Locator(".edit-future-compensation-dialog input.e-numerictextbox").First, value, decimal.Parse(value));
     }
 
@@ -1336,56 +935,25 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await page.Locator("[role='dialog'].edit-future-compensation-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
 
-        // The dialog closing only proves the save request was accepted, not that the
-        // Compensation History grid's own async reload has actually landed yet — a caller that
-        // immediately reads the row's text (e.g. to check the edited salary) can race that reload
-        // and still see the pre-edit value. Same class of race already fixed on
-        // ConfirmDeleteCompensationAsync just below.
         await page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 10_000 });
         await page.WaitForTimeoutAsync(300);
     }
 
-    // FillAsync sets a Syncfusion SfNumericTextBox's DOM value through CDP directly, which
-    // bypasses the component's own JS keyup/input listeners that sync the typed value back to
-    // the Blazor-bound model — so a value that visually "fills" never actually round-trips to
-    // the server (see CompanyEditPage.TypeIntoNumericInputAsync for the same issue). Click-to-
-    // focus, select-all, delete, then type each character for real.
     private async Task TypeIntoNumericInputAsync(ILocator input, string value)
     {
-        // Syncfusion renders SfNumericTextBox server-side with the native "disabled" attribute
-        // set, and only removes it once its own JS interop has initialized the component client
-        // side — the same freshly-mounted-widget race documented at length on DropDownSelector
-        // (aria-owns not present until interop finishes) and OpenEmploymentTabAsync, just showing
-        // up here as a literal disabled attribute instead of a missing aria attribute. A bare
-        // ClickAsync() falls back to Playwright's default 30s actionability wait, which recent
-        // evidence under a busy run shows isn't always enough for interop to catch up (see
-        // DropDownSelector's own widened click-retry budget) — wait for "enabled" explicitly with
-        // the same wider budget rather than relying on the implicit default.
         await input.WaitForAsync(new() { State = WaitForSelectorState.Attached });
         await Assertions.Expect(input).ToBeEnabledAsync(new() { Timeout = 90_000 });
         await input.ClickAsync();
         await page.Keyboard.PressAsync("Control+A");
         await page.Keyboard.PressAsync("Delete");
-        // Give the clear a moment to actually land before typing — observed corruption (e.g.
-        // "40000.00420004200042000") is consistent with Ctrl+A/Delete not reliably clearing the
-        // field before PressSequentially starts, so each retry of FillNumericAndVerifyAsync's
-        // wrapper just appends more text onto the still-present old value instead of replacing it.
-        // Same mitigation already applied to the equivalent race in
-        // BulkCompensationUpdateDialogPage.SetProposedSalaryAsync.
         await page.WaitForTimeoutAsync(150);
         if (value.Length > 0)
             await input.PressSequentiallyAsync(value, new() { Delay = 30 });
         await page.Keyboard.PressAsync("Tab");
     }
 
-    /// <summary>
-    /// Fills a numeric input and confirms the parsed value actually stuck before returning,
-    /// retrying if not — a bare "fire and forget" fill can race with Blazor's server round-trip
-    /// for the two-way bound value (see CompanyEditPage.FillNumericAndVerifyAsync for the same
-    /// issue, originally observed with DefaultHolidayAllowance reverting after save+reload).
-    /// </summary>
     private async Task FillNumericAndVerifyAsync(ILocator input, string value, decimal expected, int maxAttempts = 3)
     {
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
@@ -1404,7 +972,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             $"Numeric input value did not stick after {maxAttempts} attempts: expected '{expected}', got '{await input.InputValueAsync()}'.");
     }
 
-    // ── Promotion History Tab ───────────────────────────────────────────────────
 
     public async Task OpenPromotionHistoryTabAsync()
     {
@@ -1414,25 +981,15 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             new() { Timeout = 15_000 });
     }
 
-    /// <summary>
-    /// Returns true if the "No promotions recorded for this employee." empty state (HrEmptyState)
-    /// is visible — i.e. the employee has no promotion history yet.
-    /// </summary>
     public Task<bool> HasNoPromotionsMessageAsync() =>
         page.Locator(".hr-empty-state").Filter(new() { HasText = "No promotions recorded for this employee." }).IsVisibleAsync();
 
-    /// <summary>Returns true if the promotion history grid is currently rendered (i.e. at least one promotion exists).</summary>
     public Task<bool> HasPromotionHistoryGridAsync() =>
         page.Locator(".e-grid").IsVisibleAsync();
 
-    /// <summary>
-    /// Returns the promotion history grid row whose rendered text contains
-    /// <paramref name="textFragment"/> (e.g. a Reason or a position title).
-    /// </summary>
     public ILocator PromotionHistoryRow(string textFragment) =>
         page.Locator(".e-grid .e-row").Filter(new() { HasText = textFragment });
 
-    // ── Audit Tab ───────────────────────────────────────────────────────────────
 
     public async Task OpenAuditTabAsync()
     {
@@ -1441,11 +998,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             "[data-testid='audit-history-grid'], .alert-secondary",
             new() { Timeout = 15_000 });
 
-        // The grid container above mounts before Syncfusion populates its ".e-row" data on a
-        // separate JS tick (same "container before content" race fixed elsewhere in this suite) —
-        // a caller that immediately checks AuditHistoryRow(...).IsVisibleAsync() can otherwise see
-        // no rows for an employee who genuinely has audit history. Only applies when the grid
-        // itself rendered (not the ".alert-secondary" empty state, which never has any rows).
         if (await page.Locator("[data-testid='audit-history-grid']").IsVisibleAsync())
         {
             await page.WaitForSelectorAsync(
@@ -1460,9 +1012,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task ClickViewAuditRowAsync(string actionFragment)
     {
         await AuditHistoryRow(actionFragment).First.GetByText("View").ClickAsync();
-        // Ensure the resulting dialog has actually opened before returning, rather than leaving
-        // callers that immediately check HasAuditDetailDialogAsync() to race the open animation
-        // with a bare instant check.
         await page.Locator("[role='dialog'].audit-history-detail-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
     }
@@ -1480,47 +1029,27 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
     }
 
-    // ── Probation Tab ──────────────────────────────────────────────────────────
 
     public async Task OpenProbationTabAsync()
     {
         await OpenSectionAsync("Probation");
-        // EmployeeEdit.razor always renders a ".card" above the tab strip (e.g. the "Reporting
-        // Chain" card, for any employee who has a manager) — waiting on a bare
-        // ".card, .alert-secondary" selector resolves immediately against that pre-existing card
-        // instead of EmployeeProbationTab's own async-loaded content, so callers that immediately
-        // read the status badge can catch it while the tab's own spinner is still showing. Wait
-        // for the spinner to clear first, then for the tab's own content specifically (the
-        // period-summary progress bar, or the "no record" empty state).
         await page.WaitForSpinnerToClearAsync();
         await page.WaitForSelectorAsync(".progress, .alert-secondary", new() { Timeout = 15_000 });
     }
 
-    /// <summary>Returns true if the probation period summary panel (progress bar card) is visible.</summary>
     public async Task<bool> HasProbationPeriodSummaryPanelAsync() =>
         await page.Locator(".progress").IsVisibleAsync();
 
-    /// <summary>Returns true if the Syncfusion review history grid is visible on the Probation tab.</summary>
     public async Task<bool> HasProbationReviewsGridAsync() =>
         await page.Locator(".e-grid").IsVisibleAsync();
 
-    /// <summary>Returns the text of the probation status badge on the Probation tab summary panel.</summary>
     public async Task<string?> GetProbationStatusBadgeTextAsync()
     {
-        // ".card .badge" alone also matches the "Current Employee" badge in EmployeeEdit.razor's
-        // Reporting Chain card, which sits above the tab strip and comes first in DOM order — for
-        // any employee who has a manager, .First landed on that badge instead of the Probation
-        // Record card's own status badge. Scope to the card whose header says "Probation Record"
-        // specifically (see EmployeeProbationTab.razor).
         var badge = page.Locator(".card").Filter(new() { Has = page.Locator(".card-header:has-text('Probation Record')") })
             .Locator(".badge").First;
         return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
     }
 
-    /// <summary>
-    /// Returns the status badge text for the first review row in the review history grid
-    /// whose ReviewType cell contains <paramref name="reviewTypeFragment"/>.
-    /// </summary>
     public async Task<string?> GetReviewStatusInGridAsync(string reviewTypeFragment)
     {
         await page.WaitForSelectorAsync(".e-grid .e-row", new() { Timeout = 10_000 });
@@ -1532,7 +1061,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             if (text?.Contains(reviewTypeFragment, StringComparison.OrdinalIgnoreCase) != true)
                 continue;
 
-            // Status badge is within the row — grab the first badge element.
             var badge = row.Locator(".badge").First;
             if (await badge.IsVisibleAsync())
                 return (await badge.TextContentAsync())?.Trim();
@@ -1541,7 +1069,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         return null;
     }
 
-    // ── Tasks Tab ───────────────────────────────────────────────────────────────
 
     public async Task OpenTasksTabAsync()
     {
@@ -1549,10 +1076,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".e-grid, .task-cell, p", new() { Timeout = 15_000 });
     }
 
-    /// <summary>
-    /// Clicks the task row (by task id) in the admin Tasks tab grid, opening TaskViewDialog.
-    /// Use TaskViewPage.WaitForLoadedAsync (or its own methods) to read the opened task's content.
-    /// </summary>
     public async Task ClickTaskAsync(Guid taskId)
     {
         var row = page.Locator($"[data-testid='task-view-btn-{taskId}']");
@@ -1561,16 +1084,10 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".task-view-dialog", new() { Timeout = 15_000 });
     }
 
-    // ── Sickness Tab ────────────────────────────────────────────────────────────
 
     public async Task OpenSicknessTabAsync()
     {
         await OpenSectionAsync("Sickness");
-        // Same trap as OpenProbationTabAsync: EmployeeEdit.razor always renders a ".card" above
-        // the tab strip, so a bare ".card, .alert-secondary" wait resolves immediately against
-        // that pre-existing card instead of EmployeeSicknessTab's own async-loaded content — the
-        // ensuing HasSicknessGridAsync check then races Syncfusion's own JS render pass for the
-        // grid. Wait for the spinner to clear first, then for the grid itself.
         await page.WaitForSpinnerToClearAsync();
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 15_000 });
     }
@@ -1584,14 +1101,12 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("[role='dialog'].record-sickness-dialog", new() { Timeout = 10_000 });
     }
 
-    /// <summary>Selects a category in the (currently open) Record Sickness dialog.</summary>
     public Task SelectRecordSicknessCategoryAsync(string categoryName) =>
         DropDownSelector.SelectAsync(
             page,
             page.Locator("[role='dialog'].record-sickness-dialog .col-12").Filter(new() { HasText = "Category" }).First,
             categoryName);
 
-    /// <summary>Fills the Start Date field in the (currently open) Record Sickness dialog.</summary>
     public async Task FillRecordSicknessStartDateAsync(string ddMMyyyy)
     {
         var input = page.Locator("[role='dialog'].record-sickness-dialog .e-date-wrapper input.e-input").First;
@@ -1612,11 +1127,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task<bool> HasRecordSicknessErrorAsync() =>
         await page.Locator("[role='dialog'].record-sickness-dialog .alert-danger").IsVisibleAsync();
 
-    /// <summary>
-    /// Returns the status badge text for the sickness grid row whose Start Date column
-    /// contains <paramref name="startDateddMMMyyyy"/> (e.g. "05 Jul 2026", matching the
-    /// grid's "dd MMM yyyy" display format).
-    /// </summary>
     public async Task<string?> GetSicknessStatusBadgeForStartDateAsync(string startDateddMMMyyyy)
     {
         await page.WaitForSelectorAsync(".e-grid .e-row", new() { Timeout = 10_000 });
@@ -1629,7 +1139,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
     }
 
-    /// <summary>Clicks the "Close" action button on the grid row matching the given start date.</summary>
     public async Task StartCloseSicknessRecordAsync(string startDateddMMMyyyy)
     {
         await page.WaitForSelectorAsync(".e-grid .e-row", new() { Timeout = 10_000 });
@@ -1637,13 +1146,10 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         var row = page.Locator(".e-grid .e-row")
             .Filter(new() { HasText = startDateddMMMyyyy })
             .First;
-        // Button text is "Close" (the "Close record" title attribute is only a tooltip —
-        // accessible name computation prefers the visible text content).
         await row.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
         await page.WaitForSelectorAsync("[role='dialog'].close-sickness-record-dialog", new() { Timeout = 10_000 });
     }
 
-    /// <summary>Fills the End Date field in the (currently open) Close Sickness Record dialog.</summary>
     public async Task FillCloseSicknessEndDateAsync(string ddMMyyyy)
     {
         var input = page.Locator("[role='dialog'].close-sickness-record-dialog .e-date-wrapper input.e-input").First;
@@ -1661,42 +1167,28 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             .WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
 
-    // ── Onboarding Tab ──────────────────────────────────────────────────────────
 
     public async Task OpenOnboardingTabAsync()
     {
         await OpenSectionAsync("Onboarding");
-        // Wait for the tab content to render — either the progress panel's progress bar
-        // (a plan exists) or the "No onboarding plan found for this employee" empty state.
         await page.WaitForSelectorAsync(".progress, .hr-empty-state", new() { Timeout = 15_000 });
     }
 
-    /// <summary>Returns true if the onboarding progress panel (status badge + progress bar) is visible.</summary>
     public async Task<bool> HasOnboardingProgressPanelAsync() =>
         await page.Locator(".progress").IsVisibleAsync();
 
-    /// <summary>Returns true if the Onboarding Checklist card is visible.</summary>
     public async Task<bool> HasOnboardingChecklistAsync() =>
         await page.Locator(".card-header:has-text('Onboarding Checklist')").IsVisibleAsync();
 
-    /// <summary>Returns true if the Onboarding Timeline card is visible.</summary>
     public async Task<bool> HasOnboardingTimelineAsync() =>
         await page.Locator(".card-header:has-text('Onboarding Timeline')").IsVisibleAsync();
 
-    /// <summary>Returns the text of the onboarding plan status badge on the progress panel.</summary>
     public async Task<string?> GetOnboardingStatusBadgeTextAsync()
     {
-        // Scoped to the card containing the progress bar, not just any ".card .badge" — the
-        // Reporting Chain card (rendered above the tabs whenever the employee has a manager)
-        // also has a badge ("Current Employee"), and an unscoped .First would grab that instead.
         var badge = page.Locator(".card:has(.progress) .badge").First;
         return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
     }
 
-    /// <summary>
-    /// Returns the current onboarding progress percentage, read from the progress bar's
-    /// aria-valuenow attribute (more robust than scraping the "NN%" caption text).
-    /// </summary>
     public async Task<int> GetOnboardingProgressPercentAsync()
     {
         var bar = page.Locator(".progress .progress-bar");
@@ -1704,12 +1196,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         return int.TryParse(value, out var percent) ? percent : 0;
     }
 
-    /// <summary>
-    /// Returns the status badge text ("Pending"/"In Progress"/"Completed"/"Overdue"/"Skipped")
-    /// for the Onboarding Checklist row whose Task cell contains <paramref name="taskTitleFragment"/>.
-    /// Scoped to the "Onboarding Checklist" card specifically, since the Outstanding Document
-    /// Requests / Outstanding Asset Acknowledgements cards below it share the same table classes.
-    /// </summary>
     public async Task<string?> GetOnboardingChecklistTaskStatusAsync(string taskTitleFragment)
     {
         var checklistCard = page.Locator(".card").Filter(new() { HasText = "Onboarding Checklist" }).First;
@@ -1718,9 +1204,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
     }
 
-    // ── Profile Photo Header (EmployeeProfilePhotoHeader — HR-managed photo for another employee) ──
-    // Rendered near the top of the page (outside the tabs) whenever Session.CanManageEmployees
-    // is true; see EmployeeEdit.razor.
 
     private ILocator ProfilePhotoImage => page.Locator("img.hr-profile-avatar");
     private ILocator ProfilePhotoInitials => page.Locator("span.hr-profile-avatar--initials");
@@ -1728,20 +1211,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     private ILocator PendingProfilePhotoCard =>
         page.Locator(".alert-info").Filter(new() { HasText = "Pending Review" }).First;
 
-    /// <summary>
-    /// Returns true if the profile photo header is showing an actual photo (an &lt;img&gt;)
-    /// rather than the initials placeholder — i.e. the employee has an approved current photo.
-    /// Polls briefly (like <see cref="HasProfilePhotoInitialsAsync"/>) rather than taking a single
-    /// snapshot — see that method's own comment for why.
-    /// </summary>
-    /// <summary>
-    /// After an upload/approval: waits for the header to show the new photo. The photo only
-    /// becomes downloadable once the asynchronous virus-scan job (ScanUploadedFileJob, a Hangfire
-    /// job whose pickup latency depends on queue load) marks it Clean, and
-    /// EmployeeProfilePhotoHeader polls for it for up to 2 minutes — so this waits on that same
-    /// window rather than HasProfilePhotoImageAsync's short "is it already there" budget, which
-    /// was shorter than the product's own background-job latency.
-    /// </summary>
     public async Task<bool> WaitForProfilePhotoImageAfterScanAsync()
     {
         try
@@ -1768,14 +1237,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>
-    /// Returns true if the profile photo header is showing the initials placeholder — i.e. the
-    /// employee has no approved current photo yet (see ProfilePhotoAvatar's fallback rendering).
-    /// Polls briefly rather than taking a single IsVisibleAsync() snapshot — EmployeeProfilePhotoHeader
-    /// loads its current-photo state asynchronously and can render after GoToAsync's own wait
-    /// condition (the Details tab's combobox) has already resolved on an earlier render pass, same
-    /// race class as the Probation/Notes tabs.
-    /// </summary>
     public async Task<bool> HasProfilePhotoInitialsAsync()
     {
         try
@@ -1789,14 +1250,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>
-    /// HR uploads a photo directly via the "Upload / Replace Photo" button on the Employee Edit
-    /// page header. Unlike self-service uploads, this writes straight to the approved/current
-    /// photo table — no pending-review step. The dialog closes immediately; the header then polls
-    /// for the new photo, which only becomes downloadable once the async virus scan marks it Clean
-    /// — callers must wait via <see cref="WaitForProfilePhotoImageAfterScanAsync"/>, not assume the
-    /// new state is already rendered when this returns.
-    /// </summary>
     public async Task UploadProfilePhotoDirectAsync(string filePath)
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Upload / Replace Photo" }).ClickAsync();
@@ -1810,13 +1263,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
 
-    /// <summary>
-    /// Returns true if a pending profile photo review card ("Pending Review") is visible in the
-    /// header. Polls briefly rather than taking a single IsVisibleAsync() snapshot — same
-    /// EmployeeProfilePhotoHeader async-load race as HasProfilePhotoInitialsAsync/
-    /// HasProfilePhotoImageAsync, and this is typically checked right after a self-service upload
-    /// navigates HR here, before the header's own pending-photo fetch has necessarily finished.
-    /// </summary>
     public async Task<bool> HasPendingProfilePhotoCardAsync()
     {
         try
@@ -1830,11 +1276,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>
-    /// Approves the pending profile photo shown in the header's review card. Waits for the card
-    /// to disappear as the signal that the header has refreshed with the newly-approved photo
-    /// (ApproveAsync reloads both the pending and current photo before its final render).
-    /// </summary>
     public async Task ApprovePendingProfilePhotoAsync()
     {
         var card = PendingProfilePhotoCard;
@@ -1842,10 +1283,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await card.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
 
-    // ── Notes Tab ───────────────────────────────────────────────────────────────
-    // Only rendered when Session.IsHrAdministrator (see EmployeeEdit.razor, wrapped in an
-    // @if(Session.IsHrAdministrator) around the "Notes" TabHeader/TabContent, in addition to the
-    // page-level Session.CanManageEmployees guard applied to the whole edit page).
 
     public async Task OpenNotesTabAsync()
     {
@@ -1855,14 +1292,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             new() { Timeout = 15_000 });
     }
 
-    /// <summary>
-    /// Returns true if the "Notes" tab is present. Notes lives in the "Activity" group's inner
-    /// section strip (with Timeline and Audit), which SfTab only renders once that group is
-    /// selected — so select the owning group first rather than snapshotting a tab that isn't in
-    /// the DOM yet. It is also HR-administrator-gated (EmployeeEdit.razor's
-    /// @if(Session.IsHrAdministrator)) and that flag can land after GoToAsync's own wait
-    /// resolved, so retry briefly before giving up.
-    /// </summary>
     public async Task<bool> HasNotesTabAsync()
     {
         var deadline = DateTime.UtcNow.AddSeconds(15);
@@ -1875,7 +1304,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             }
             catch (PlaywrightException)
             {
-                // group tab not ready yet — fall through to the retry
             }
 
             if (DateTime.UtcNow > deadline)
@@ -1889,11 +1317,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         var dialog = page.Locator("[role='dialog'].add-employee-note-dialog");
         var addNoteBtn = page.Locator("[data-testid='add-note-btn']");
 
-        // A click landing while the previous dialog's close is still committing server-side
-        // (see SubmitAddNoteDialogAsync's own comment) can be a no-op against still-IsOpen=true
-        // state — a fixed debounce there reduces but doesn't eliminate the race, especially across
-        // many iterations in a row (e.g. a loop adding several notes), so retry the click here too
-        // rather than trusting a single attempt.
         for (var attempt = 0; attempt < 5; attempt++)
         {
             await addNoteBtn.ClickAsync();
@@ -1905,39 +1328,20 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             }
             catch (TimeoutException)
             {
-                // fall through and retry the click
             }
         }
 
         await dialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await WaitForCategoryComboboxAsync();
 
-        // The dialog root becoming visible only proves Syncfusion's SfDialog shell has opened —
-        // its own body content, including the Category SfDropDownList that
-        // SelectAddNoteCategoryAsync immediately targets next, is a separate, later render pass.
-        // Calling DropDownSelector against a combobox that hasn't mounted yet fails hard: Playwright's
-        // default (30s) actionability wait just spins waiting for an element that was never there
-        // to begin with, rather than timing out quickly the way an already-attached-but-not-yet-
-        // interactive element would. Wait for it explicitly here so callers never race this gap.
         async Task WaitForCategoryComboboxAsync() =>
             await dialog.Locator("span[role='combobox']").First.WaitForAsync(
                 new() { State = WaitForSelectorState.Attached, Timeout = 10_000 });
     }
 
-    /// <summary>
-    /// Selects a category from the Add Note dialog's Category dropdown. DropDownSelector itself
-    /// confirms Blazor's ValueChanged round-trip actually committed the selection before
-    /// returning — see its own doc comment.
-    /// </summary>
     public Task SelectAddNoteCategoryAsync(string categoryLabel) =>
         DropDownSelector.SelectAsync(page, page.Locator(".add-employee-note-dialog"), categoryLabel);
 
-    // Targets the placeholder text rather than [data-testid='add-note-text'] — that attribute is
-    // passed via HrTextBox's HtmlAttributes, which for a Multiline SfTextBox can land on the outer
-    // ".e-input-group" wrapper rather than the actual <textarea> (see AddEmployeeNoteDialog.razor),
-    // so filling by that selector can silently write into an element that isn't bound to
-    // Model.NoteText at all. GetByPlaceholder targets the real input directly, matching the
-    // pattern already used successfully elsewhere (e.g. PromoteEmployeeDialog.FillReasonAsync).
     public async Task FillAddNoteTextAsync(string text)
     {
         await page.GetByPlaceholder("Enter note details…").FillAsync(text);
@@ -1952,12 +1356,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         var dialog = page.Locator("[role='dialog'].add-employee-note-dialog");
         var addBtn = page.Locator(".add-employee-note-dialog .e-footer-content button:has-text('Add')");
 
-        // Same race as ClickAddNoteAsync's own retry loop (see its comment), just on the submit
-        // side instead of the reopen side: a click landing while the dialog's own open/prior-close
-        // commit is still in flight server-side can be silently swallowed with no error and no
-        // client-side signal — observed as the dialog just never transitioning to Hidden, not as a
-        // late-but-eventual close. That's indistinguishable from a genuinely failed submit by
-        // waiting alone, so retry the click itself rather than only waiting longer for one attempt.
         for (var attempt = 1; attempt <= 3; attempt++)
         {
             await addBtn.ClickAsync();
@@ -1968,30 +1366,18 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             }
             catch (TimeoutException) when (attempt < 3)
             {
-                // Click likely landed mid-commit and was a no-op — try again.
             }
         }
 
-        // The dialog goes visually Hidden (Syncfusion toggles the e-popup-close class client-side)
-        // ahead of the SignalR round-trip that actually commits IsOpen=false server-side — a caller
-        // that immediately reopens the dialog (e.g. a loop adding several notes in a row) can click
-        // "Add Note" before that commit lands, and the reopen is a no-op against still-IsOpen=true
-        // server state. Same race class as DropDownSelector's own popup-close debounce.
         await page.WaitForTimeoutAsync(250);
     }
 
     public Task<bool> HasAddNoteDialogErrorAsync() =>
         page.Locator(".add-employee-note-dialog .alert-danger").IsVisibleAsync();
 
-    /// <summary>
-    /// True if the Notes tab's grid rendered a pager at all — Syncfusion's SfGrid doesn't render
-    /// ".e-pagercontainer" when every row already fits on one page. Same convention as
-    /// EmployeeDirectoryReportPage.IsPagerVisibleAsync.
-    /// </summary>
     public Task<bool> IsNotesGridPagerVisibleAsync() =>
         page.Locator("[data-testid='employee-notes-grid'] .e-pagercontainer").IsVisibleAsync();
 
-    /// <summary>Returns the notes grid row whose rendered text contains <paramref name="textFragment"/>.</summary>
     public ILocator NoteCard(string textFragment) =>
         page.Locator("[data-testid='employee-notes-grid'] .e-row").Filter(new() { HasText = textFragment });
 
@@ -2020,7 +1406,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
     }
 
-    /// <summary>True if the note card containing <paramref name="textFragment"/> shows the "Superseded" badge.</summary>
     public Task<bool> NoteCardHasSupersededBadgeAsync(string textFragment) =>
         NoteCard(textFragment).First.Locator("[data-testid='note-superseded-badge']").IsVisibleAsync();
 

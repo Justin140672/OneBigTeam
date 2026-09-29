@@ -5,15 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// TICKET-03: Resource-level (self / direct-manager-only / HR-admin) authorization for Asset
-/// endpoints (GetAsset and ListEmployeeAssets) guarded by
-/// <c>HR.Modules.Assets.Services.AssetResourceAuthorizer</c>. Endpoint-level
-/// Policies("asset:view") only prove tenant/role membership; they never prove the caller has a
-/// relationship to the specific employee whose asset is being viewed, so these tests exercise
-/// that resource-ownership check end-to-end over real HTTP, mirroring LeaveResourceAuthorizationTests's
-/// pattern for the same class of bug.
-/// </summary>
 [Collection("Integration")]
 public class AssetResourceAuthorizationTests(ApiWebApplicationFactory factory)
 {
@@ -24,9 +15,6 @@ public class AssetResourceAuthorizationTests(ApiWebApplicationFactory factory)
     private static readonly Guid LocationId = Guid.Parse("70000000-0000-0000-0000-000000000001");
     private static readonly Guid PositionProfileId = Guid.Parse("20000000-0000-0000-0000-000000000002");
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // GetAsset (single asset view)
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task GetAsset_Returns_Unauthorized_For_Anonymous_Request()
@@ -129,8 +117,6 @@ public class AssetResourceAuthorizationTests(ApiWebApplicationFactory factory)
     [Fact]
     public async Task GetAsset_Returns_Forbidden_For_Manager_Viewing_Unassigned_Asset()
     {
-        // An unassigned asset has no EmployeeId bound to it, so even a manager
-        // should not be able to view it (unless HR admin).
         var manager = await CreateEmployeeAsync();
         var unassignedAssetId = await CreateUnassignedAssetAsync();
 
@@ -161,8 +147,6 @@ public class AssetResourceAuthorizationTests(ApiWebApplicationFactory factory)
     [Fact]
     public async Task GetAsset_Returns_Forbidden_For_Employee_Viewing_Own_Manager_Asset()
     {
-        // Denial case: being someone's report does not grant you view rights over your manager's
-        // resources — the hierarchy check is one-directional (manager -> report only).
         var manager = await CreateEmployeeAsync();
         var report = await CreateEmployeeAsync();
         var managerAssetId = await CreateAssetForEmployeeAsync(manager);
@@ -180,9 +164,6 @@ public class AssetResourceAuthorizationTests(ApiWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // ListEmployeeAssets (employee asset list)
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task ListEmployeeAssets_Returns_Unauthorized_For_Anonymous_Request()
@@ -302,8 +283,6 @@ public class AssetResourceAuthorizationTests(ApiWebApplicationFactory factory)
     [Fact]
     public async Task ListEmployeeAssets_Returns_Forbidden_For_Employee_Listing_Own_Manager_Assets()
     {
-        // Denial case: being someone's report does not grant you view rights over your manager's
-        // resources — the hierarchy check is one-directional (manager -> report only).
         var manager = await CreateEmployeeAsync();
         var report = await CreateEmployeeAsync();
         await CreateAssetForEmployeeAsync(manager);
@@ -328,7 +307,6 @@ public class AssetResourceAuthorizationTests(ApiWebApplicationFactory factory)
         var employee1 = await CreateEmployeeAsync();
         var employee2 = await CreateEmployeeAsync();
 
-        // Set up manager -> employee1 relationship only
         using (var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true))
         {
             await AssignManagerAsync(setupClient, employee1, manager);
@@ -338,20 +316,15 @@ public class AssetResourceAuthorizationTests(ApiWebApplicationFactory factory)
 
         using var managerClient = await AuthenticatedClient(manager);
 
-        // Manager should be able to list employee1's assets
         var response1 = await managerClient.GetAsync(
             $"/api/companies/{SeededCompanyId}/employees/{employee1}/assets");
         Assert.Equal(HttpStatusCode.OK, response1.StatusCode);
 
-        // Manager should NOT be able to list employee2's assets (not a report)
         var response2 = await managerClient.GetAsync(
             $"/api/companies/{SeededCompanyId}/employees/{employee2}/assets");
         Assert.Equal(HttpStatusCode.Forbidden, response2.StatusCode);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId, bool hrAdministrator = false)
     {
@@ -366,9 +339,6 @@ public class AssetResourceAuthorizationTests(ApiWebApplicationFactory factory)
         return client;
     }
 
-    /// <summary>
-    /// Creates a real employee via the employees API and returns its id.
-    /// </summary>
     private async Task<Guid> CreateEmployeeAsync()
     {
         using var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true);
@@ -398,22 +368,16 @@ public class AssetResourceAuthorizationTests(ApiWebApplicationFactory factory)
         return payload!.Id;
     }
 
-    /// <summary>
-    /// Creates an asset category and asset, then assigns it to the employee.
-    /// Returns the asset ID.
-    /// </summary>
     private async Task<Guid> CreateAssetForEmployeeAsync(Guid employeeId)
     {
         using var adminClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true);
 
-        // Create category
         var categoryResp = await adminClient.PostAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/asset-categories",
             new { companyId = SeededCompanyId, name = $"Category-{Guid.NewGuid():N}" });
         categoryResp.EnsureSuccessStatusCode();
         var category = await categoryResp.Content.ReadFromJsonAsync<IdPayload>();
 
-        // Create asset
         var assetResp = await adminClient.PostAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/assets",
             new
@@ -428,7 +392,6 @@ public class AssetResourceAuthorizationTests(ApiWebApplicationFactory factory)
         assetResp.EnsureSuccessStatusCode();
         var asset = await assetResp.Content.ReadFromJsonAsync<IdPayload>();
 
-        // Assign to employee
         var assignResp = await adminClient.PostAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/assets/{asset!.Id}/assignments",
             new
@@ -436,29 +399,23 @@ public class AssetResourceAuthorizationTests(ApiWebApplicationFactory factory)
                 companyId = SeededCompanyId,
                 assetId = asset.Id,
                 employeeId,
-                assignedBy = Guid.NewGuid() // Could use the admin user id, but tests don't validate this
+                assignedBy = Guid.NewGuid()
             });
         assignResp.EnsureSuccessStatusCode();
 
         return asset.Id;
     }
 
-    /// <summary>
-    /// Creates an asset category and asset, but does NOT assign it to any employee.
-    /// Returns the asset ID.
-    /// </summary>
     private async Task<Guid> CreateUnassignedAssetAsync()
     {
         using var adminClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true);
 
-        // Create category
         var categoryResp = await adminClient.PostAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/asset-categories",
             new { companyId = SeededCompanyId, name = $"Category-{Guid.NewGuid():N}" });
         categoryResp.EnsureSuccessStatusCode();
         var category = await categoryResp.Content.ReadFromJsonAsync<IdPayload>();
 
-        // Create asset (unassigned)
         var assetResp = await adminClient.PostAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/assets",
             new
@@ -484,9 +441,6 @@ public class AssetResourceAuthorizationTests(ApiWebApplicationFactory factory)
         response.EnsureSuccessStatusCode();
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Payload records
-    // ─────────────────────────────────────────────────────────────────────────
 
     private sealed record EmployeePayload(Guid Id);
     private sealed record IdPayload(Guid Id);

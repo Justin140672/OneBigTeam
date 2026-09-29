@@ -2,12 +2,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Offboarding;
 
-// OFF-08: plan creation/start — the counterpart to OffboardingPlanCompletedAuditEvent, giving HR a
-// documented starting point for the audit trail. ActorEmployeeId is the HR user who triggered
-// "Start Offboarding" from the UI (human path, via StartOffboarding's Endpoint/Request) or
-// OffboardingSystemActor.Id when the plan was auto-created as a side effect of Employees'
-// StartLeavingProcess (system path, via IOffboardingPlanCoordinator.StartAsync — see
-// OffboardingPlanCoordinator).
 internal sealed record OffboardingPlanStartedAuditEvent(
     Guid CompanyId,
     Guid OffboardingPlanId,
@@ -32,15 +26,6 @@ internal sealed record OffboardingPlanStartedAuditEvent(
     object? IAuditEvent.Metadata        => null;
 }
 
-// Published when a plan completes — the moment the Offboarding tab on the Employee Overview page
-// stops being shown (see EmployeeEdit.razor's _showOffboardingTab). This is what lets HR still
-// find completed offboarding history in the Audit tab afterward; nothing about the underlying
-// OffboardingPlan/OffboardingTask rows is deleted, only the tab disappears.
-//
-// OFF-08: ActorEmployeeId is the person whose task completion/skip resolved the plan's last
-// outstanding mandatory task (from TaskCompletionContext.CompletedBy, resolved server-side by
-// CompleteTaskHandler — never client-supplied), or OffboardingSystemActor.Id if that actor could
-// not be resolved (e.g. a legacy/waived task with no recorded actor tail).
 internal sealed record OffboardingPlanCompletedAuditEvent(
     Guid CompanyId,
     Guid OffboardingPlanId,
@@ -71,10 +56,6 @@ internal sealed record OffboardingPlanCompletedAuditEvent(
     object? IAuditEvent.Metadata        => null;
 }
 
-// OFF-08: published for every individual OffboardingTask completion — the task-level counterpart
-// to OffboardingPlanCompletedAuditEvent, giving HR a per-task trace (not just the plan-level
-// roll-up) including which Tasks-module/Assets-module entity the task was linked to. Actor is
-// TaskCompletionContext.CompletedBy, resolved server-side — never client-supplied.
 internal sealed record OffboardingTaskCompletedAuditEvent(
     Guid CompanyId,
     Guid OffboardingPlanId,
@@ -99,13 +80,6 @@ internal sealed record OffboardingTaskCompletedAuditEvent(
     object? IAuditEvent.Metadata        => null;
 }
 
-// OFF-08: task-level skip, mirroring OffboardingTaskCompletedAuditEvent. SkipReason is included
-// verbatim — offboarding task skip reasons are operational (e.g. "asset already returned via
-// Assets module", "employee's leaving process was withdrawn", HR-entered handover notes), never
-// health/financial/personal-sensitive content, so this does not need the same free-text redaction
-// SicknessAudit applies to clinical notes. Actor is Skip()'s actorUserId parameter (either a real
-// resolved user for a human skip, or OffboardingSystemActor.Id for a system-initiated skip such as
-// leaving-process cancellation cascades or CreateWaived).
 internal sealed record OffboardingTaskSkippedAuditEvent(
     Guid CompanyId,
     Guid OffboardingPlanId,
@@ -131,11 +105,6 @@ internal sealed record OffboardingTaskSkippedAuditEvent(
     object? IAuditEvent.Metadata        => null;
 }
 
-// Spec SPEC-OFF-01: published when an authorised HR user manually waives an offboarding task —
-// the task-level counterpart to OffboardingTaskSkippedAuditEvent, but for the distinct "HR decided
-// this obligation is not required" action rather than a system/legacy skip. Actor is always a real
-// resolved HR user (Waive() requires a non-system actorUserId in practice for this handler — see
-// WaiveOffboardingTaskHandler, which always resolves it server-side from the authenticated caller).
 internal sealed record OffboardingTaskWaivedAuditEvent(
     Guid CompanyId,
     Guid OffboardingPlanId,
@@ -159,15 +128,6 @@ internal sealed record OffboardingTaskWaivedAuditEvent(
     object? IAuditEvent.Metadata        => null;
 }
 
-// Published when an offboarding plan is cancelled as a side effect of the employee's Leaving
-// Process being cancelled (see IOffboardingPlanCoordinator.CancelOutstandingTasksAsync). Like
-// OffboardingPlanCompletedAuditEvent above, this is what lets HR still find the cancelled
-// offboarding history in the Audit tab afterward — no OffboardingPlan/OffboardingTask rows are
-// deleted, only their statuses change.
-//
-// OFF-08: ActorEmployeeId is always OffboardingSystemActor.Id — this is a cascade side effect of
-// leaving-process cancellation, not a direct offboarding action; the human who actually cancelled
-// the leaving process is already attributed on the originating EmployeesAudit event.
 internal sealed record OffboardingPlanCancelledAuditEvent(
     Guid CompanyId,
     Guid OffboardingPlanId,
@@ -188,14 +148,6 @@ internal sealed record OffboardingPlanCancelledAuditEvent(
     object? IAuditEvent.Metadata        => null;
 }
 
-// OFF-02: published when the active offboarding plan's LastWorkingDay (and its outstanding task
-// due dates) is reconciled after HR amends the employee's leaving date/last working day
-// (EmployeeLeavingDateSetIntegrationEvent). Only published when the plan's LastWorkingDay actually
-// changes — a replayed amendment carrying the same date is a no-op and produces no audit entry
-// (see IOffboardingPlanCoordinator.RescheduleOutstandingTasksAsync).
-// OFF-08: ActorEmployeeId is always OffboardingSystemActor.Id — same reasoning as
-// OffboardingPlanCancelledAuditEvent above; the human who amended the leaving date is already
-// attributed on the originating EmployeesAudit event for that action.
 internal sealed record OffboardingPlanRescheduledAuditEvent(
     Guid CompanyId,
     Guid OffboardingPlanId,
@@ -218,13 +170,6 @@ internal sealed record OffboardingPlanRescheduledAuditEvent(
     object? IAuditEvent.Metadata        => null;
 }
 
-// OFF-07: published when an employee's departure is finalised (Employees' EmployeeDepartureFinalizer)
-// while their offboarding plan still had unresolved mandatory tasks — the durable counterpart to
-// EmployeeDepartureFinalizer's one-time manager notification, giving HR a permanent audit trail of
-// exactly when and for whom offboarding was left incomplete at departure. Published at most once per
-// plan (see MarkOffboardingIncompleteOnDepartureFinalisedHandler's wasAlreadyFlagged guard).
-// OFF-08: ActorEmployeeId is always OffboardingSystemActor.Id — raised automatically by
-// EmployeeDepartureFinalizer's finalisation flow, never a direct HR action.
 internal sealed record OffboardingIncompleteAtDepartureAuditEvent(
     Guid CompanyId,
     Guid OffboardingPlanId,

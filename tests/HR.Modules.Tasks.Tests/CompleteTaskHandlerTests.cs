@@ -20,8 +20,6 @@ public class CompleteTaskHandlerTests
     private static readonly TaskCompletionDispatcher NoOpDispatcher =
         new(Enumerable.Empty<ITaskCompletionAction>());
 
-    /// <summary>Stub ITaskCompletionAction used to simulate a failing/succeeding dispatch action
-    /// for a given (Source, ActionType) pair, e.g. TaskSource.Leave / TaskActionType.Approve.</summary>
     private sealed class StubCompletionAction(TaskSource source, TaskActionType actionType, Result result) : ITaskCompletionAction
     {
         public TaskSource Source => source;
@@ -42,10 +40,6 @@ public class CompleteTaskHandlerTests
         TaskCompletionDispatcher? dispatcher = null,
         RecordingBackgroundJobClient? backgroundJobClient = null) =>
         new(context, notif ?? new FakeNotificationWriter(), Clock, audit ?? new FakeAuditPublisher(), dispatcher ?? NoOpDispatcher,
-            // Defaults to an HR-Administrator caller so tests unrelated to SEC-003/IAM-07
-            // authorization (pre-existing behavior around completion/notification/audit) don't
-            // need to wire up assignee/manager relationships just to get past the authorization
-            // check.
             new TasksResourceAuthorizer(
                 authorizationService ?? new FakeRoleAuthorizationService(HrAdministratorRoleId),
                 directReportsReader ?? new FakeDirectReportsReader()),
@@ -265,8 +259,6 @@ public class CompleteTaskHandlerTests
     [Fact]
     public async Task HandleAsync_Completes_Ordinary_Task_With_No_Registered_Action()
     {
-        // A plain task with a Source/ActionType that has no registered completion action (the
-        // ordinary/default case for most tasks) must still complete normally.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var completedBy = Guid.NewGuid();
@@ -484,7 +476,6 @@ public class CompleteTaskHandlerTests
         Assert.Empty(notif.Written);
     }
 
-    // ---- SEC-003: authorization matrix ----
 
     [Fact]
     public async Task HandleAsync_Returns_Forbidden_For_Unrelated_Peer_Employee()
@@ -656,7 +647,7 @@ public class CompleteTaskHandlerTests
         var companyId = Guid.NewGuid();
         var caller = Guid.NewGuid();
 
-        var task = MakeTask(companyId); // AssignedEmployeeId and AssignedUserId both null
+        var task = MakeTask(companyId);
         context.TaskItems.Add(task);
         await context.SaveChangesAsync();
 
@@ -680,7 +671,7 @@ public class CompleteTaskHandlerTests
         var companyId = Guid.NewGuid();
         var hrAdmin = Guid.NewGuid();
 
-        var task = MakeTask(companyId); // AssignedEmployeeId and AssignedUserId both null
+        var task = MakeTask(companyId);
         context.TaskItems.Add(task);
         await context.SaveChangesAsync();
 
@@ -731,8 +722,6 @@ public class CompleteTaskHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_Conflict_Not_Forbidden_When_Cancelled_Task_Completed_By_Authorized_Assignee()
     {
-        // Authorization is checked first, but for an authorized caller the pre-existing
-        // cancelled-task Conflict behavior must be unchanged.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var assignedEmployee = Guid.NewGuid();
@@ -763,8 +752,8 @@ public class CompleteTaskHandlerTests
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
-        var assignedEmployee = Guid.NewGuid(); // A
-        var skipLevelManager = Guid.NewGuid(); // C, A's manager's manager
+        var assignedEmployee = Guid.NewGuid();
+        var skipLevelManager = Guid.NewGuid();
 
         var task = TaskItem.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(),
@@ -773,8 +762,6 @@ public class CompleteTaskHandlerTests
         context.TaskItems.Add(task);
         await context.SaveChangesAsync();
 
-        // C's full descendant tree (via GetAllDescendantIdsAsync) includes A even though C is not
-        // A's direct manager.
         var handler = BuildHandler(
             context,
             authorizationService: new FakeRoleAuthorizationService(),
@@ -926,8 +913,6 @@ public class CompleteTaskHandlerTests
             new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = completedBy },
             CancellationToken.None);
 
-        // The task genuinely is completed — notification failures cannot permanently block
-        // business processing — so the handler still reports success to the caller.
         Assert.True(result.IsSuccess);
         Assert.Equal("Completed", result.Value!.Status);
 
@@ -1037,8 +1022,6 @@ public class CompleteTaskHandlerTests
             [new StubCompletionAction(TaskSource.Leave, TaskActionType.Approve,
                 Result.Failure(Error.Validation("must not be invoked")))]);
 
-        // A different caller/decision on the retry — must be ignored in favor of the original
-        // operation's persisted actor/decision.
         var result = await BuildHandler(context, dispatcher: alwaysFailingDispatcher).HandleAsync(
             new CompleteTaskRequest
             {
@@ -1049,12 +1032,10 @@ public class CompleteTaskHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal("Completed", result.Value!.Status);
 
-        // Only the one, pre-existing operation exists — no second row was created.
         var operation = await context.TaskCompletionOperations.AsNoTracking().SingleAsync(o => o.TaskId == task.Id);
         Assert.Equal(existingOperation.Id, operation.Id);
         Assert.Equal(TaskCompletionOperation.StatusProcessed, operation.Status);
 
-        // TaskItem is completed using the ORIGINAL operation's CompletedBy, not the retry's caller.
         var persisted = await context.TaskItems.AsNoTracking().SingleAsync(t => t.Id == task.Id);
         Assert.Equal(originalCompletedBy, persisted.CompletedBy);
     }
@@ -1138,9 +1119,6 @@ public class CompleteTaskHandlerTests
         Assert.Equal(operation.Id, capturedContext.DispatchOperationId);
     }
 
-    /// <summary>Stub ITaskCompletionAction that captures the TaskCompletionContext it was invoked
-    /// with, for assertions on values (e.g. DispatchOperationId) the plain StubCompletionAction
-    /// above doesn't expose.</summary>
     private sealed class CapturingCompletionAction(
         TaskSource source, TaskActionType actionType, Func<TaskCompletionContext, Result> onExecute)
         : ITaskCompletionAction

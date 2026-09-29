@@ -3,12 +3,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Companies.Tests.Infrastructure;
 
-/// <summary>
-/// Minimal test double for <see cref="IEmployeeStarterReader"/> — returns a pre-configured total
-/// count so <c>GetCustomerBillingBreakdownHandler</c> tests can assert
-/// <c>FutureStarters</c> without a real reporting query. Mirrors
-/// <see cref="FakeEmployeeDirectoryReader"/> in this same folder.
-/// </summary>
 internal sealed class FakeEmployeeStarterReader : IEmployeeStarterReader
 {
     public int TotalCountToReturn { get; set; }

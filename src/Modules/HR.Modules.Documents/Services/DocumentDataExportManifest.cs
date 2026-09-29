@@ -5,16 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Services;
 
-/// <summary>
-/// Story 2: contributes Documents-module metadata rows (documents, document types, employee-document
-/// links) to the organisation data export, plus the list of stored files to embed in the ZIP under
-/// documents/&lt;type&gt;/&lt;filename&gt;. company_id is enforced on every query and inside
-/// <see cref="OpenDocumentAsync"/>.
-///
-/// <see cref="OpenDocumentAsync"/> verifies the storage key belongs to a document in the requested
-/// company, then streams the bytes via <see cref="IDocumentStorageService.OpenReadStreamAsync"/>
-/// (null when the object is missing). The build job tolerates null streams.
-/// </summary>
 internal sealed class DocumentDataExportManifest(DocumentsDbContext db, IDocumentStorageService storage)
     : IDocumentDataExportManifest
 {
@@ -91,7 +81,6 @@ internal sealed class DocumentDataExportManifest(DocumentsDbContext db, IDocumen
 
     public async Task<Stream?> OpenDocumentAsync(Guid companyId, string storageKey, CancellationToken cancellationToken)
     {
-        // Ownership check: never open a key that does not belong to this company.
         var belongs = await db.Documents.AsNoTracking()
             .AnyAsync(d => d.CompanyId == companyId && d.StorageKey == storageKey, cancellationToken);
 

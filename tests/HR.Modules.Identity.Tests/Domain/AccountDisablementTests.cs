@@ -2,9 +2,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Modules.Identity.Tests.Domain;
 
-// P1 fix (departure access disablement): domain unit tests for AccountDisablement's
-// Pending -> Processing -> Processed|Failed state machine (mirrors
-// HR.Modules.Companies.Domain.OutboxMessage's shape).
 public class AccountDisablementTests
 {
     private static readonly DateTimeOffset RequestedAt = new(2026, 9, 11, 8, 0, 0, TimeSpan.Zero);
@@ -119,7 +116,6 @@ public class AccountDisablementTests
             request.MarkProcessing(RequestedAt.AddMinutes(1));
             request.MarkProcessed(RequestedAt.AddMinutes(2));
         }
-        // StatusPending: request is already Pending by construction.
 
         Assert.Throws<InvalidOperationException>(() => request.ResetForRetry());
     }
@@ -198,7 +194,6 @@ public class AccountDisablementTests
         for (var i = 0; i < 4; i++)
             request.MarkProcessing(RequestedAt.AddMinutes(i + 1));
 
-        // 4th attempt reaches the ceiling of 4.
         request.MarkFailed("boom", RequestedAt.AddMinutes(5), maxAutomaticAttempts: 4);
 
         Assert.True(request.IsTerminallyFailed);

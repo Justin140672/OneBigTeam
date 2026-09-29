@@ -44,9 +44,6 @@ internal sealed class PositionProfileOnboardingTemplateConfiguration : IEntityTy
         builder.HasIndex(p => p.PositionProfileId);
         builder.HasIndex(p => p.OnboardingTemplateId);
 
-        // Prevents assigning the same template to the same position profile twice while the
-        // assignment is active. Scoped to active rows only (partial index) so a template can be
-        // re-assigned after a prior assignment has been soft-removed.
         builder.HasIndex(p => new { p.CompanyId, p.PositionProfileId, p.OnboardingTemplateId })
             .IsUnique()
             .HasFilter("is_active");

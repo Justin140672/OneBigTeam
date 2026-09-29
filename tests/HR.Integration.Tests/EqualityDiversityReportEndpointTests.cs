@@ -32,7 +32,6 @@ public class EqualityDiversityReportEndpointTests
         return client;
     }
 
-    /// <summary>Seeds 15 employees: 7 White, 3 Mixed, 3 Asian equality records, 2 with none.</summary>
     private async Task<List<Guid>> SeedWorkforceAsync(Guid companyId)
     {
         using var scope = _factory.Services.CreateScope();
@@ -125,10 +124,8 @@ public class EqualityDiversityReportEndpointTests
                 .OrderBy(x => x),
             payload.Dimensions.Select(d => d.Key).OrderBy(x => x));
 
-        // Counts are whole numbers.
         Assert.All(payload.Dimensions.SelectMany(d => d.Rows), r => Assert.True(r.Count >= 0));
 
-        // No employee / company identifier anywhere in the payload.
         var raw = await response.Content.ReadAsStringAsync();
         foreach (var id in employeeIds)
             Assert.DoesNotContain(id.ToString(), raw, StringComparison.OrdinalIgnoreCase);
@@ -150,7 +147,6 @@ public class EqualityDiversityReportEndpointTests
         var ethnicity = Assert.Single(payload!.Dimensions, d => d.Key == "ethnicity");
         Assert.DoesNotContain(ethnicity.Rows, r => r.Value == "Mixed");
         Assert.DoesNotContain(ethnicity.Rows, r => r.Value == "Asian Or Asian British");
-        // "Not stated" is itself an aggregate bucket and is never suppressed, so exclude it here.
         Assert.DoesNotContain(ethnicity.Rows, r => r.Value != "Not stated" && r.Count is >= 1 and < 5 && !r.Suppressed);
 
         var notReported = Assert.Single(ethnicity.Rows, r => r.Value == "Not reported");

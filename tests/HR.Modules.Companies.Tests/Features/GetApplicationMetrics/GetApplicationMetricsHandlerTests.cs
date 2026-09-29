@@ -8,12 +8,6 @@ using Microsoft.Extensions.Configuration;
 
 namespace HR.Modules.Companies.Tests.Features.GetApplicationMetrics;
 
-/// <summary>
-/// Same "platform:admin" allow-list gate pattern as GetSystemHealthHandlerTests /
-/// ListBackgroundJobsHandlerTests — see their remarks. Uses an in-memory CompaniesDbContext (same
-/// approach as GetCustomerBillingHistoryHandlerTests) plus fake IPlatformDocumentActivityReader /
-/// IPlatformUserActivityReader / IBackgroundJobStatusReader.
-/// </summary>
 public class GetApplicationMetricsHandlerTests
 {
     private static readonly DateTimeOffset Now = DateTimeOffset.UtcNow;
@@ -113,17 +107,14 @@ public class GetApplicationMetricsHandlerTests
                 var inWindowDayB = today.AddDays(-1);
                 var outsideWindow = today.AddDays(-40);
 
-                // Two companies created on the same in-window day.
                 companiesContext.Companies.Add(Company.Create(
                     Guid.NewGuid(), "Co A1", new DateTimeOffset(inWindowDayA.ToDateTime(new TimeOnly(9, 0)), TimeSpan.Zero)));
                 companiesContext.Companies.Add(Company.Create(
                     Guid.NewGuid(), "Co A2", new DateTimeOffset(inWindowDayA.ToDateTime(new TimeOnly(15, 0)), TimeSpan.Zero)));
 
-                // One company on a different in-window day.
                 companiesContext.Companies.Add(Company.Create(
                     Guid.NewGuid(), "Co B", new DateTimeOffset(inWindowDayB.ToDateTime(new TimeOnly(12, 0)), TimeSpan.Zero)));
 
-                // One company outside the trailing 30-day window — must be excluded.
                 companiesContext.Companies.Add(Company.Create(
                     Guid.NewGuid(), "Co Outside", new DateTimeOffset(outsideWindow.ToDateTime(new TimeOnly(12, 0)), TimeSpan.Zero)));
 
@@ -263,7 +254,6 @@ public class GetApplicationMetricsHandlerTests
                 Assert.True(result.IsSuccess);
                 var trend = result.Value!.ActiveCompaniesTrend;
 
-                // The two pre-seeded snapshots plus the one the handler itself writes for "today".
                 Assert.True(trend.Count >= 2);
 
                 var earlierPoint = trend.Single(p => p.Date == earlierDate);

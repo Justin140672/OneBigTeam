@@ -62,7 +62,6 @@ public class SearchEmployeeDirectoryEndpointTests
         return $"/api/companies/{companyId}/employees/directory-search{qs}";
     }
 
-    // ── Happy path ────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_DirectorySearch_Returns_Ok_And_Matching_Employees_For_HrAdministrator()
@@ -86,7 +85,6 @@ public class SearchEmployeeDirectoryEndpointTests
         Assert.Equal("Zephyr", item.LastName);
     }
 
-    // ── Authorization ────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_DirectorySearch_Returns_Unauthorized_For_Anonymous_Request()
@@ -124,7 +122,6 @@ public class SearchEmployeeDirectoryEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── Company scoping ──────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_DirectorySearch_Does_Not_Return_Employees_From_Another_Company()
@@ -148,7 +145,6 @@ public class SearchEmployeeDirectoryEndpointTests
         Assert.Equal("Alpha", item.FirstName);
     }
 
-    // ── Leaver filtering ────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_DirectorySearch_Excludes_Leavers_Unless_IncludeLeavers_Requested()
@@ -156,7 +152,6 @@ public class SearchEmployeeDirectoryEndpointTests
         var companyId = Guid.NewGuid();
         using var client = await ClientFor(HrAdminA, companyId);
 
-        // Active / future-dated (Draft) employee — always visible.
         var (stayerId, _) = await CompensationTestHelpers.CreateEmployeeWithNumberAsync(
             client, companyId, firstName: "Stay", lastName: "Erson");
 
@@ -189,7 +184,6 @@ public class SearchEmployeeDirectoryEndpointTests
         Assert.Contains(inclPayload.Items, i => i.Id == leaverId);
     }
 
-    // ── Validation ──────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_DirectorySearch_Returns_ValidationError_When_Limit_Is_Zero()

@@ -3,15 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the admin "Upload Document" dialog on the employee Documents tab (UploadDocumentDialog.
-/// razor, EmployeeSelfUpload="false") is split into two tabs — "Document Details" (Title/Document
-/// Type/Description/Issue Date/Expiry Date) and "File" (the file input) — rather than a single flat
-/// form. Distinct from the self-service "Upload {DocumentType}" dialog covered by
-/// MyProfilePage.UploadRequestedDocumentAsync, and from the "Upload Document" dialog for shared
-/// company documents (UploadSharedCompanyDocumentDialog.razor, no tabs) covered by
-/// CompanyDocumentsTabTests — those are separate, unrelated dialogs sharing a similar name.
-/// </summary>
 public sealed class EmployeeAdminUploadDocumentDialogTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -37,8 +28,6 @@ public sealed class EmployeeAdminUploadDocumentDialogTests(HrAdminPersonaFixture
         Assert.True(await empAdmin.HasUploadDialogFileTabAsync(),
             "Expected a 'File' tab in the Upload Document dialog");
 
-        // The file input lives on the separate "File" tab, not alongside the Document Details
-        // fields on first open.
         Assert.False(await empAdmin.IsUploadDialogFileInputVisibleAsync(),
             "Did not expect the file input to be visible before switching to the 'File' tab");
     }
@@ -61,11 +50,9 @@ public sealed class EmployeeAdminUploadDocumentDialogTests(HrAdminPersonaFixture
         {
             await empAdmin.OpenUploadDocumentDialogAsync();
 
-            // Document Details tab.
             await empAdmin.FillUploadDialogTitleAsync(title);
             await empAdmin.SelectUploadDialogDocumentTypeAsync("Passport");
 
-            // File tab.
             await File.WriteAllBytesAsync(tempFile, [0x25, 0x50, 0x44, 0x46, 0x2D, 0x00, 0x00, 0x00]);
             await empAdmin.SelectUploadDialogFileAsync(tempFile);
 

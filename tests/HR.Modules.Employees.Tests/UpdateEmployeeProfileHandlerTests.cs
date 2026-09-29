@@ -95,9 +95,6 @@ public class UpdateEmployeeProfileHandlerTests
         Assert.Equal(employee.Id, auditEvent.EntityId);
         Assert.Equal(actorId, auditEvent.ActorEmployeeId);
 
-        // NFR-01: the audit event projects Before/After to a non-sensitive subset (no PersonalEmail
-        // or DateOfBirth) so AuditPayloadRedactionGuard passes them unchanged — assert on the
-        // serialised payload the audit trail actually persists.
         var beforeJson = System.Text.Json.JsonSerializer.Serialize(auditEvent.Before);
         var afterJson = System.Text.Json.JsonSerializer.Serialize(auditEvent.After);
         Assert.Contains("\"FirstName\":\"Alice\"", beforeJson);
@@ -253,7 +250,7 @@ public class UpdateEmployeeProfileHandlerTests
                 ExpectedVersion = 1,
                 FirstName = "Alice",
                 LastName = "Smith",
-                WorkEmail = "bob@example.com",  // taken by emp2
+                WorkEmail = "bob@example.com",
                 StartDate = StartDate
             },
             Guid.NewGuid(),
@@ -284,7 +281,7 @@ public class UpdateEmployeeProfileHandlerTests
                 ExpectedVersion = 1,
                 FirstName = "Alicia",
                 LastName = "Smith",
-                WorkEmail = "alice@example.com",  // same email, same employee
+                WorkEmail = "alice@example.com",
                 StartDate = StartDate
             },
             Guid.NewGuid(),
@@ -473,8 +470,6 @@ public class UpdateEmployeeProfileHandlerTests
         Assert.Equal(companyId, evt.CompanyId);
         Assert.Equal(employee.Id, evt.EmployeeId);
 
-        // The event carries no field-level detail — verify the serialized ToString/record doesn't
-        // surface the changed field name anywhere (defence-in-depth for the redaction rule).
         Assert.DoesNotContain("FirstName", evt.ToString());
         Assert.DoesNotContain("Alicia", evt.ToString());
     }

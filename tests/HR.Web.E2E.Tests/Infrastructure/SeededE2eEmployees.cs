@@ -1,40 +1,11 @@
 namespace HR.Web.E2E.Tests.Infrastructure;
 
-/// <summary>
-/// Deterministic, pre-seeded Acme employees created by
-/// <c>HR.Modules.Employees.EmployeesModule.SeedEmployeesAsync</c> (E2E test pool section, only
-/// when the API host runs with <c>E2E_TESTING=true</c> — never in the integration-test DB or any
-/// real environment). These exist so tests that need "an employee to act on" as arrange — not as
-/// the thing under test — can reference a stable row instead of paying the full New Employee form
-/// (4 combobox selections + 2 navigations) 15-25 times per class.
-///
-/// Every pool member: FirstName "E2E", Gender Male, Nationality British, DOB 1990-06-15,
-/// StartDate 2026-03-01, EmploymentType "Permanent", Position Profile "QA Engineer"
-/// (=> Engineering department + London Office), a starting Compensation record (£50,000) and an
-/// "Employee joined" timeline entry dated 2026-03-01, plus a NotStarted onboarding plan with the
-/// 3 default checklist tasks (Program.cs -> OnboardingModule.SeedE2eOnboardingPlansAsync) —
-/// mirroring what CreateEmployeeHandler / EmployeeCreatedHandler produce for a UI-created employee.
-///
-/// The GUIDs / emails / last names / David-Park manager flags below are duplicated verbatim from
-/// <c>EmployeesModule.E2eTestPool</c> (same cross-project hardcoded-constant pattern already used
-/// for CompanyId / LeavePolicyId across module seed methods). Keep the two in sync.
-/// GUID scheme: 3E2E0000-0000-0000-0000-0000000000NN (NN = two-digit index).
-/// </summary>
 public static class SeededE2eEmployees
 {
     public static readonly Guid AcmeCompanyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    /// <summary>Manager the ManagerDashboard pool members report to (David Park), assigned in the seed.</summary>
     public static readonly Guid ManagerDavidParkId = Guid.Parse("30000000-0000-0000-0000-000000000008");
 
-    /// <summary>
-    /// Nina Patel — E2E-only dedicated manager persona (Employee + Manager roles, no seeded reports),
-    /// for tests that need to GROW a manager's team at runtime (ManagerTeamProfileTests) without
-    /// polluting James Okafor's single-report team (Tom Williams) or David Park's, which other
-    /// classes assert on (ManagerDashboardTests' My Team widget shows only the first 8 reports by
-    /// last name). Seeded by EmployeesModule.SeedEmployeesAsync's E2E section, DevPersonaStore and
-    /// IdentityModule.SeedDevUserAsync under this same id. Keep in sync.
-    /// </summary>
     public static readonly Guid DedicatedManagerNinaPatelId = Guid.Parse("30000000-0000-0000-0000-000000000017");
     public const string DedicatedManagerNinaPatelEmail = "nina.patel@acme.example";
 
@@ -50,73 +21,61 @@ public static class SeededE2eEmployees
         $"e2e.seed{nn:D2}@acme.example",
         $"E2E-SEED-{nn:D2}");
 
-    // ── Single read-only consumer ────────────────────────────────────────────
     public static readonly Pooled ProfileViewEditMode = P(1, "SeedProfileView");
 
-    // ── Timeline tab (each test mutates its employee: notes / promotion) ─────
     public static readonly IReadOnlyList<Pooled> Timeline =
     [
         P(2, "SeedTimelineA"), P(3, "SeedTimelineB"), P(4, "SeedTimelineC"),
     ];
 
-    // ── Lifecycle tab visibility (tests 2 & 3 start a leaving process) ───────
     public static readonly IReadOnlyList<Pooled> LifecycleTabVisibility =
     [
         P(5, "SeedLifecycleA"), P(6, "SeedLifecycleB"),
     ];
 
-    // ── Employment tab notice-period override (mutates notice period; one per test) ──
     public static readonly IReadOnlyList<Pooled> NoticePeriodOverride =
     [
         P(7, "SeedNoticePeriodA"), P(8, "SeedNoticePeriodB"), P(9, "SeedNoticePeriodC"),
     ];
 
-    // ── Employee list UI (search / display only) ─────────────────────────────
     public static readonly IReadOnlyList<Pooled> ListUi =
     [
         P(10, "SeedListUiA"), P(11, "SeedListUiB"), P(12, "SeedListUiC"),
     ];
 
-    // ── Employee list bulk update (each test consumes a pair) ────────────────
     public static readonly IReadOnlyList<Pooled> ListBulkUpdate =
     [
         P(13, "SeedBulkA"), P(14, "SeedBulkB"), P(15, "SeedBulkC"), P(16, "SeedBulkD"),
         P(17, "SeedBulkE"), P(18, "SeedBulkF"), P(19, "SeedBulkG"), P(20, "SeedBulkH"),
     ];
 
-    // ── Manager dashboard (pre-assigned to David Park in the seed) ───────────
     public static readonly IReadOnlyList<Pooled> ManagerDashboard =
     [
         P(21, "SeedMgrDashA"), P(22, "SeedMgrDashB"), P(23, "SeedMgrDashC"),
     ];
 
-    // ── Login-as-employee consumers (Employee row seeded; login still via runtime EnsureEmployeeLoginAsync) ──
     public static readonly Pooled AssetAcknowledgement = P(24, "SeedAssetAck");
     public static readonly Pooled AssetReturn = P(25, "SeedAssetReturn");
     public static readonly Pooled SelfServiceDocument = P(26, "SeedSelfServiceDoc");
 
-    // ── Leaving process (each test consumes one by starting a leaving process) ──
     public static readonly IReadOnlyList<Pooled> LeavingProcess =
     [
         P(27, "SeedLeavingA"), P(28, "SeedLeavingB"), P(29, "SeedLeavingC"), P(30, "SeedLeavingD"),
         P(31, "SeedLeavingE"), P(32, "SeedLeavingF"), P(33, "SeedLeavingG"), P(34, "SeedLeavingH"),
     ];
 
-    // ── Offboarding tab (consume-one-per-test) ───────────────────────────────
     public static readonly IReadOnlyList<Pooled> OffboardingTab =
     [
         P(35, "SeedOffboardTabA"), P(36, "SeedOffboardTabB"),
         P(37, "SeedOffboardTabC"), P(38, "SeedOffboardTabD"),
     ];
 
-    // ── Offboarding confirmation (consume-one-per-test) ──────────────────────
     public static readonly IReadOnlyList<Pooled> OffboardingConfirmation =
     [
         P(39, "SeedOffboardConfA"), P(40, "SeedOffboardConfB"),
         P(41, "SeedOffboardConfC"), P(42, "SeedOffboardConfD"),
     ];
 
-    // ── Onboarding tab (each test consumes one — NotStarted plan + 3 default tasks) ──
     public static readonly IReadOnlyList<Pooled> OnboardingTab =
     [
         P(43, "SeedOnboardTabA"), P(44, "SeedOnboardTabB"), P(45, "SeedOnboardTabC"),
@@ -140,33 +99,16 @@ public static class SeededE2eEmployees
         P(53, "SeedContactSaveC"), P(54, "SeedContactSaveD"),
     ];
 
-    // ── Bulk employee invitations (each test consumes one — no linked user account, so every
-    // member is "eligible" for the invite flow exactly as seeded, without paying the New Employee
-    // form) ────────────────────────────────────────────────────────────────
     public static readonly IReadOnlyList<Pooled> BulkInvite =
     [
         P(55, "SeedInviteA"), P(56, "SeedInviteB"), P(57, "SeedInviteC"), P(58, "SeedInviteD"),
         P(59, "SeedInviteE"), P(60, "SeedInviteF"), P(61, "SeedInviteG"), P(62, "SeedInviteH"),
     ];
 
-    // ── Compensation tab future-dated edit (EmployeeCompensationTabTests) ────
-    // Dedicated (not shared with any other test file), same reasoning as EmployeeCompensationTabTests'
-    // own doc comment for why it doesn't reuse Tom Williams: adding/editing/deleting compensation
-    // rows on a widely-shared employee would race the ~40+ other test files mutating them in
-    // parallel. This member replaces that test's own full New-Employee-form arrange (4 combobox
-    // selections + 2 navigations) with the seeded pool employee, which already has a starting
-    // Compensation record — the test only adds/edits a distinct FUTURE-dated row, so the existing
-    // seeded record doesn't interfere.
     public static readonly Pooled CompensationEdit = P(63, "SeedCompEdit");
 
-    // ── Row-level Quick Invite happy path (UserAdministrationManagementTests) ─
-    // Dedicated: that test actually SENDS an invitation, which permanently removes its target from
-    // the invitable set. It previously shared the seeded "Emma Jones" with
-    // InviteUserFromAdminTests (which also sends to her), so whichever ran second in a run found her
-    // already invited and failed — order-dependent, not flaky.
     public static readonly Pooled QuickInvite = P(64, "SeedQuickInvite");
 
-    /// <summary>Every pool member, for callers that just need to enumerate them.</summary>
     public static IEnumerable<Pooled> All()
     {
         yield return ProfileViewEditMode;

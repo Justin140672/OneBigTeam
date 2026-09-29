@@ -20,34 +20,11 @@ internal sealed class CustomerSubscription
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    /// <summary>
-    /// OBT-REM-09: optimistic concurrency token. Two different Stripe webhook events for the same
-    /// subscription can be handled by concurrent requests; both may pass the "is this event newer"
-    /// check before either commits. Incrementing this on every mutation and mapping it as an EF Core
-    /// concurrency token means the loser of a concurrent SaveChangesAsync race gets a
-    /// DbUpdateConcurrencyException instead of silently overwriting newer state — the caller must
-    /// reload and re-evaluate rather than blindly retry. A plain persisted int column (matching
-    /// CompanySettings.Version), not Postgres xmin, per project convention.
-    /// </summary>
     public int Version { get; private set; }
 
-    /// <summary>
-    /// OBT-REM-09: durable last-applied Stripe event marker, stored on the subscription row itself
-    /// (rather than derived by querying ProcessedStripeEvents) so the ordering check and the
-    /// projection update are protected by the SAME optimistic-concurrency token in the SAME
-    /// transaction. This is what makes "compare and update the ordering marker" atomic with the
-    /// subscription projection change.
-    /// </summary>
     public string? LastAppliedStripeEventId { get; private set; }
     public DateTimeOffset? LastAppliedStripeEventCreatedAt { get; private set; }
 
-    /// <summary>
-    /// Support/admin override that forces read-only mode regardless of trial/subscription status.
-    /// Distinct from the automatic TrialExpired-driven read-only gate (see
-    /// SubscriptionStatusReader.GetStatusAsync) — this is an explicit platform-administrator
-    /// intervention (Subscription Management epic) for cases such as suspected abuse or a billing
-    /// dispute, independent of where the customer sits in the trial/paid lifecycle.
-    /// </summary>
     public bool AdminForcedReadOnly { get; private set; }
 
     /// <summary>
@@ -90,11 +67,6 @@ internal sealed class CustomerSubscription
 
     public bool IsUnderLegalHold => LegalHoldPlacedAt is not null;
 
-    /// <summary>
-    /// True while a deletion countdown is active and not yet cancelled or executed — the set of
-    /// companies the /deletion-queue page and the dashboard's "pending permanent deletions" stat
-    /// both count as pending.
-    /// </summary>
     public bool HasPendingDeletion =>
         DeletionScheduledAt is not null && DeletionCancelledAt is null && DeletionExecutedAt is null;
 
@@ -142,7 +114,6 @@ internal sealed class CustomerSubscription
         if (eventCreatedAt.Value < LastAppliedStripeEventCreatedAt.Value)
             return true;
 
-        // Equal timestamps — deterministic tie-break by event id.
         if (string.IsNullOrEmpty(eventId) || string.IsNullOrEmpty(LastAppliedStripeEventId))
             return false;
 
@@ -203,10 +174,6 @@ internal sealed class CustomerSubscription
         return true;
     }
 
-    /// <summary>
-    /// Activates a paid subscription following a successful Stripe checkout
-    /// (checkout.session.completed webhook).
-    /// </summary>
     public void ActivateSubscription(
         string stripeCustomerId,
         string stripeSubscriptionId,
@@ -225,11 +192,6 @@ internal sealed class CustomerSubscription
         RecordAppliedStripeEvent(stripeEventId, stripeEventCreatedAt, now);
     }
 
-    /// <summary>
-    /// Reconciles local state from a Stripe webhook payload (customer.subscription.updated/deleted).
-    /// Idempotent — safe to call repeatedly with the same payload. Callers must have already checked
-    /// <see cref="IsStaleStripeEvent"/> before invoking this — it does not re-check ordering itself.
-    /// </summary>
     public void UpdateFromStripe(
         SubscriptionStatus status,
         DateTimeOffset? currentPeriodEnd,
@@ -258,12 +220,6 @@ internal sealed class CustomerSubscription
         UpdatedAt = now;
     }
 
-    /// <summary>
-    /// Platform-administrator support action: pushes TrialExpiresAt out to a new date. Valid while
-    /// the subscription is still on a trial (Trial or TrialExpired) — a company already on a paid
-    /// subscription has no trial to extend. Reactivates an expired trial (TrialExpired -> Trial) so
-    /// the customer regains write access immediately.
-    /// </summary>
     public Result ExtendTrial(DateTimeOffset newTrialExpiresAt, DateTimeOffset now)
     {
         if (Status != SubscriptionStatus.Trial && Status != SubscriptionStatus.TrialExpired)
@@ -279,11 +235,6 @@ internal sealed class CustomerSubscription
         return Result.Success();
     }
 
-    /// <summary>
-    /// Platform-administrator support action mirroring the customer-initiated
-    /// RequestCancellation above, for support-driven cancellations (e.g. handling a customer
-    /// complaint over the phone).
-    /// </summary>
     public Result AdminCancelAtPeriodEnd(DateTimeOffset now)
     {
         if (Status != SubscriptionStatus.Active && Status != SubscriptionStatus.PastDue)
@@ -295,16 +246,6 @@ internal sealed class CustomerSubscription
         return Result.Success();
     }
 
-    /// <summary>
-    /// Platform-administrator support action to reinstate a subscription that is scheduled to
-    /// cancel (CancelAtPeriodEnd) or has already fully cancelled. When the underlying Stripe
-    /// subscription is still live (CancelAtPeriodEnd was pending), this simply reverses that flag —
-    /// same effect as Resume above. When the subscription has already reached the terminal
-    /// Canceled status (the Stripe subscription itself no longer exists), there is no live Stripe
-    /// subscription left to resume; this reactivates the local record to Active as a support
-    /// override so the customer regains access immediately while billing is reconciled manually
-    /// (see CompaniesModule remarks / lead report for this documented assumption).
-    /// </summary>
     public Result ReinstateCancelledSubscription(DateTimeOffset now)
     {
         if (Status != SubscriptionStatus.Canceled && !CancelAtPeriodEnd)
@@ -324,10 +265,6 @@ internal sealed class CustomerSubscription
         return Result.Success();
     }
 
-    /// <summary>
-    /// Platform-administrator support action: forces read-only mode independent of trial/billing
-    /// status (see AdminForcedReadOnly remarks).
-    /// </summary>
     public Result ForceReadOnly(DateTimeOffset now)
     {
         if (AdminForcedReadOnly)
@@ -339,9 +276,6 @@ internal sealed class CustomerSubscription
         return Result.Success();
     }
 
-    /// <summary>
-    /// Reverses ForceReadOnly above, restoring normal trial/billing-status-driven access.
-    /// </summary>
     public Result ResumeService(DateTimeOffset now)
     {
         if (!AdminForcedReadOnly)
@@ -353,13 +287,6 @@ internal sealed class CustomerSubscription
         return Result.Success();
     }
 
-    /// <summary>
-    /// Platform-administrator action: schedules this company for permanent deletion after a
-    /// countdown period. Re-schedulable — calling this again while a countdown is already pending
-    /// simply resets the target date (e.g. an admin extending or shortening the countdown), which
-    /// is why there's no "already scheduled" failure case. Not valid once deletion has already been
-    /// executed, since execution is treated as terminal (see ExecuteDeletion).
-    /// </summary>
     public Result ScheduleDeletion(Guid? scheduledByUserId, DateTimeOffset scheduledFor, DateTimeOffset now)
     {
         if (DeletionExecutedAt is not null)
@@ -376,10 +303,6 @@ internal sealed class CustomerSubscription
         return Result.Success();
     }
 
-    /// <summary>
-    /// Cancels a pending deletion countdown. The scheduled date/actor are retained (not cleared) so
-    /// the deletion queue can show the history of what was scheduled and when it was cancelled.
-    /// </summary>
     public Result CancelScheduledDeletion(DateTimeOffset now)
     {
         if (!HasPendingDeletion)
@@ -420,10 +343,6 @@ internal sealed class CustomerSubscription
         return Result.Success();
     }
 
-    /// <summary>
-    /// NFR-07: lifts an active legal hold, allowing normal retention processing to resume for this
-    /// company. The reason/actor are cleared; the audit trail retains the history.
-    /// </summary>
     public Result LiftLegalHold(DateTimeOffset now)
     {
         if (!IsUnderLegalHold)

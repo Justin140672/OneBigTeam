@@ -3,7 +3,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Notifications.Tests;
 
-// NOT-04: NotificationActionRouteBuilder — per-NotificationType navigation target computation.
 public class NotificationActionRouteBuilderTests
 {
     private static readonly Guid CompanyId = Guid.NewGuid();

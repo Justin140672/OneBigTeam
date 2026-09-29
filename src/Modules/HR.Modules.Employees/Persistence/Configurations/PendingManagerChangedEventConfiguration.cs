@@ -47,8 +47,6 @@ internal sealed class PendingManagerChangedEventConfiguration : IEntityTypeConfi
 
         builder.HasIndex(e => e.CompanyId);
 
-        // Supports ReconcilePendingManagerChangedEventsJob's scan for records still awaiting
-        // publication.
         builder.HasIndex(e => e.PublishedAt);
     }
 }

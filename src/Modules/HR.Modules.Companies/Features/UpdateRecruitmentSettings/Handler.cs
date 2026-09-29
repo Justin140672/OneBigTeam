@@ -6,12 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Companies.Features.UpdateRecruitmentSettings;
 
-/// <summary>
-/// SET-05: updates the company's recruitment approval/retention settings. Requires the
-/// "hr-settings:manage" policy — the same policy UpdateHrSettings requires — so a Recruiter (who
-/// only holds recruitment-scoped permissions, never hr-settings:manage) cannot change this
-/// company-wide configuration alone; only HR Administrator/Company Administrator roles can.
-/// </summary>
 internal sealed class UpdateRecruitmentSettingsHandler(
     CompaniesDbContext dbContext,
     IClock clock,
@@ -48,8 +42,6 @@ internal sealed class UpdateRecruitmentSettingsHandler(
 
         company.SetSettings(settings, now);
 
-        // SET-03-style optimistic concurrency — same shared CompanySettings row/version counter as
-        // UpdateHrSettings/UpdateCompanySettings.
         dbContext.Entry(settings).Property(s => s.Version).OriginalValue = request.Version;
 
         try

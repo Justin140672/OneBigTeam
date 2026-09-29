@@ -9,13 +9,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.ApproveVacancy;
 
-/// <summary>
-/// SET-05: explicit approval step, required before PublishVacancyHandler will allow the vacancy to
-/// be published when the company's VacancyApprovalRequired setting is on. Uses the "recruitment:manage"
-/// policy — the same policy vacancy CRUD/publish already require — so a Recruiter can still approve
-/// vacancies day-to-day; it is the separate hr-settings:manage-gated UpdateRecruitmentSettings
-/// endpoint that a Recruiter cannot touch (see SET-05's authorisation requirement).
-/// </summary>
 internal sealed class ApproveVacancyHandler(
     RecruitmentDbContext db,
     IClock clock,

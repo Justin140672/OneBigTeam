@@ -5,13 +5,6 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace HR.Modules.Documents.Services;
 
-/// <summary>
-/// OBT-721 Workload &amp; HR Actions Report provider for employees missing required documents.
-/// HR-only, reuses IDocumentComplianceReportReader (already used by
-/// GetDocumentComplianceReport/Handler.cs) so the compliance definition stays in one place. One
-/// WorkloadAction per missing document type per employee, since MissingDocumentTypeNames already
-/// names each outstanding document.
-/// </summary>
 internal sealed class MissingRequiredEmployeeDocumentsWorkloadActionProvider(
     IDocumentComplianceReportReader documentComplianceReportReader,
     IEmployeeDepartmentReader employeeDepartmentReader,

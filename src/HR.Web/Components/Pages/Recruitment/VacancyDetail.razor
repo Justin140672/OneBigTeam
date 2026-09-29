@@ -178,7 +178,6 @@
     private bool _publishing;
     private string? _publishError;
 
-    // Explicit, server-tracked selected tab for the Overview/Applications/Interviews SfTab above.
     private int _selectedTabIndex;
 
     private string PageTitle => IsNew ? "Add Vacancy"
@@ -217,11 +216,6 @@
         var profileResult = await PositionProfileService.ListPositionProfilesAsync(CompanyId);
         _positionProfiles = profileResult?.Items.ToList() ?? [];
 
-        // A brand-new vacancy can only be opened against a position profile that has no
-        // currently-active employee holding it — e.g. once an employee holding a profile has
-        // resigned/left, that profile becomes available again. Only applied when creating a new
-        // vacancy: an existing vacancy's already-assigned profile must stay selectable/visible
-        // regardless (see the explicit re-merge below for the disabled-dropdown edit-mode case).
         if (IsNew)
         {
             var activelyHeldProfileIds = _employees
@@ -229,10 +223,6 @@
                 .Select(e => e.PositionProfileId!.Value)
                 .ToHashSet();
 
-            // A position profile can only be recruited against by one live vacancy at a time — the
-            // authoritative check is CreateVacancyHandler's server-side rejection; this is purely a
-            // UX filter so the dropdown doesn't offer a choice the API will refuse. ListVacanciesAsync's
-            // excludeClosed only strips Closed, so Cancelled vacancies are excluded from the set here too.
             var vacanciesResult = await VacancyService.ListVacanciesAsync(CompanyId, excludeClosed: true);
             var profileIdsWithLiveVacancy = (vacanciesResult?.Items ?? [])
                 .Where(v => v.Status != "Cancelled")
@@ -244,10 +234,6 @@
                 .ToList();
         }
 
-        // Only active recruitment agencies are selectable, per ticket #81 (same rule as the removed
-        // VacancyRecruiterAssignment feature previously enforced). "Not assigned" is prepended below,
-        // per this codebase's convention of an explicit sentinel list item over Syncfusion's
-        // ShowClearButton for optional dropdowns.
         var recruitersResult = await ExternalRecruiterService.ListExternalRecruitersAsync(CompanyId, isActive: true, pageSize: 200);
         _externalRecruiters = (recruitersResult?.Items.ToList() ?? [])
             .OrderBy(r => r.AgencyName)
@@ -258,11 +244,6 @@
         {
             _vacancy = await VacancyService.GetVacancyAsync(CompanyId, Id!.Value);
 
-            // _positionProfiles is active-only (ListPositionProfilesAsync defaults to
-            // includeInactive: false), so if this vacancy's already-assigned profile has since
-            // gone inactive it won't be in that list. The Position Profile dropdown is disabled
-            // in edit mode, so without merging it in explicitly it would render blank instead of
-            // the correct title — same pattern as EmployeeEmploymentTab's manager merge.
             if (_vacancy?.PositionProfileId is { } profileId && _positionProfiles.All(p => p.Id != profileId))
             {
                 var profile = await PositionProfileService.GetPositionProfileAsync(CompanyId, profileId);
@@ -279,10 +260,6 @@
                 }
             }
 
-            // Same rationale as the Position Profile merge above: _externalRecruiters is active-only,
-            // so if this vacancy's currently-assigned agency has since gone inactive it won't be in
-            // that list, and the dropdown (disabled in view mode, enabled in edit mode) would render
-            // blank instead of the correct agency name without merging it in explicitly.
             if (_vacancy?.AssignedRecruiterId is { } assignedRecruiterId && _externalRecruiters.All(r => r.Id != assignedRecruiterId))
             {
                 var recruiter = await ExternalRecruiterService.GetExternalRecruiterAsync(CompanyId, assignedRecruiterId);

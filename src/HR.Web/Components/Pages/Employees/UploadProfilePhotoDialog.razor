@@ -40,8 +40,6 @@
 
     [Parameter] public string Title { get; set; } = "Upload Profile Photo";
 
-    // The caller supplies which upload endpoint to call (self vs. HR-direct) — keeps the dialog
-    // markup shared between MyProfile and EmployeeEdit without duplicating it.
     [Parameter, EditorRequired] public Func<IBrowserFile, CancellationToken, Task<string?>> UploadFunc { get; set; } = default!;
 
     private IBrowserFile? _selectedFile;

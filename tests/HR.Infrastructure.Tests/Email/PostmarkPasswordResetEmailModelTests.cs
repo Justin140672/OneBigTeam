@@ -33,7 +33,6 @@ public class PostmarkPasswordResetEmailModelTests
         Assert.Equal("One Big Team Ltd", model["company_name"]);
         Assert.Equal("1 Test Street, London", model["company_address"]);
 
-        // Exactly the nine fields the Postmark template contract defines.
         Assert.Equal(9, model.Count);
     }
 

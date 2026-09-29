@@ -10,7 +10,6 @@ internal sealed class FakeTaskCanceller : ITaskCanceller
     public List<CancelledCall> Calls { get; } = [];
     public List<CancelManyCall> CancelManyCalls { get; } = [];
 
-    /// <summary>Number of tasks CancelManyBySourceEntitiesAsync should report as cancelled — configure per test.</summary>
     public int CancelManyReturnCount { get; set; }
 
     public Task CancelBySourceEntityAsync(

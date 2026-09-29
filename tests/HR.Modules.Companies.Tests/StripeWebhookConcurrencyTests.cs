@@ -8,15 +8,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Companies.Tests;
 
-/// <summary>
-/// OBT-REM-09: EF InMemory-level coverage for the concurrency-safe Stripe webhook handler — the
-/// deterministic equal-timestamp tie-break, convergence regardless of delivery order (including an
-/// update racing a delete for the same subscription), and the <see cref="CustomerSubscription.IsStaleStripeEvent"/>
-/// domain rule directly. InMemory enforces the Version concurrency token (throws
-/// DbUpdateConcurrencyException on a stale write), so the handler's retry loop is exercised here too,
-/// but this does not exercise genuine overlapping database transactions — see
-/// HR.Integration.Tests/StripeWebhookConcurrencyTests.cs for real-Postgres concurrent delivery.
-/// </summary>
 public class StripeWebhookConcurrencyTests
 {
     private static readonly DateTime Now = new(2026, 9, 4, 10, 0, 0, DateTimeKind.Utc);
@@ -64,8 +55,6 @@ public class StripeWebhookConcurrencyTests
         await using (var c1 = Ctx())
             await Handler(c1, gw, Now.AddHours(2)).HandleAsync("p", "s", CancellationToken.None);
 
-        // Second, different event at the SAME timestamp — an ambiguous tie against evt_aaa. Stripe's
-        // live state (configured here) is what actually wins, not either payload's own fields.
         gw.WebhookEventToReturn = Updated("past_due", new DateTimeOffset(Now.AddMonths(3)), "evt_bbb", tie, cancel: true);
         gw.SubscriptionSnapshotsById["sub_1"] = new StripeSubscriptionSnapshot(
             "sub_1", "cus_1", "past_due", authoritativePeriodEnd, CancelAtPeriodEnd: true, PriceId: "price_1");
@@ -103,14 +92,11 @@ public class StripeWebhookConcurrencyTests
 
         await using var verify = Ctx();
         var persisted = await verify.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
-        // Same authoritative outcome regardless of delivery order — convergence via reconciliation,
-        // not via whichever event happens to sort higher ordinally.
         Assert.Equal(SubscriptionStatus.PastDue, persisted.Status);
         Assert.Equal(authoritativePeriodEnd, persisted.CurrentPeriodEnd);
         Assert.True(persisted.CancelAtPeriodEnd);
     }
 
-    // ---- Update vs. delete race for the same subscription — newer wins regardless of order ----
 
     [Fact]
     public async Task Update_then_older_delete_leaves_update_state_in_place()
@@ -124,13 +110,13 @@ public class StripeWebhookConcurrencyTests
         await using (var c1 = Ctx())
             await Handler(c1, gw, Now.AddHours(6)).HandleAsync("p", "s", CancellationToken.None);
 
-        gw.WebhookEventToReturn = Deleted("evt_del", new DateTimeOffset(Now.AddHours(1))); // older
+        gw.WebhookEventToReturn = Deleted("evt_del", new DateTimeOffset(Now.AddHours(1)));
         await using (var c2 = Ctx())
             await Handler(c2, gw, Now.AddHours(7)).HandleAsync("p", "s", CancellationToken.None);
 
         await using var verify = Ctx();
         var persisted = await verify.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
-        Assert.Equal(SubscriptionStatus.PastDue, persisted.Status); // delete lost, did not overwrite
+        Assert.Equal(SubscriptionStatus.PastDue, persisted.Status);
         Assert.False((await verify.ProcessedStripeEvents.SingleAsync(e => e.StripeEventId == "evt_del")).Applied);
     }
 
@@ -146,7 +132,7 @@ public class StripeWebhookConcurrencyTests
         await using (var c1 = Ctx())
             await Handler(c1, gw, Now.AddHours(2)).HandleAsync("p", "s", CancellationToken.None);
 
-        gw.WebhookEventToReturn = Deleted("evt_del", new DateTimeOffset(Now.AddHours(5))); // newer
+        gw.WebhookEventToReturn = Deleted("evt_del", new DateTimeOffset(Now.AddHours(5)));
         await using (var c2 = Ctx())
             await Handler(c2, gw, Now.AddHours(6)).HandleAsync("p", "s", CancellationToken.None);
 
@@ -165,7 +151,7 @@ public class StripeWebhookConcurrencyTests
         await using (var c1 = Ctx())
             await Handler(c1, gw, Now.AddHours(6)).HandleAsync("p", "s", CancellationToken.None);
 
-        gw.WebhookEventToReturn = Updated("active", new DateTimeOffset(Now.AddMonths(1)), "evt_upd", new DateTimeOffset(Now.AddHours(1))); // older
+        gw.WebhookEventToReturn = Updated("active", new DateTimeOffset(Now.AddMonths(1)), "evt_upd", new DateTimeOffset(Now.AddHours(1)));
         await using (var c2 = Ctx())
             await Handler(c2, gw, Now.AddHours(7)).HandleAsync("p", "s", CancellationToken.None);
 
@@ -175,7 +161,6 @@ public class StripeWebhookConcurrencyTests
         Assert.False((await verify.ProcessedStripeEvents.SingleAsync(e => e.StripeEventId == "evt_upd")).Applied);
     }
 
-    // ---- CustomerSubscription.IsStaleStripeEvent — direct domain-level coverage ----
 
     [Fact]
     public void IsStaleStripeEvent_returns_false_when_no_marker_yet()
@@ -230,8 +215,6 @@ public class StripeWebhookConcurrencyTests
         var tie = new DateTimeOffset(Now.AddHours(5));
         subscription.ActivateSubscription("cus", "sub", "price", null, new DateTimeOffset(Now), "evt_bbb", tie);
 
-        // Redelivery of the exact same event id/timestamp — the "<=" comparison treats it as stale
-        // (the idempotency check in the handler would normally short-circuit before this is reached).
         Assert.True(subscription.IsStaleStripeEvent("evt_bbb", tie));
     }
 

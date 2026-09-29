@@ -204,7 +204,6 @@ public class SearchEmployeeDirectoryHandlerTests
         var active = NewEmployee(companyId, "Anna", "Active");
         active.Activate(Now);
 
-        // Draft = created but not yet activated (e.g. future start date)
         var future = NewEmployee(companyId, "Fiona", "Future", startDate: new DateOnly(2027, 1, 1));
 
         context.Employees.AddRange(active, future);
@@ -268,7 +267,6 @@ public class SearchEmployeeDirectoryHandlerTests
             .HandleAsync(Request(companyId, limit: 3), CancellationToken.None);
 
         Assert.Equal(3, result.Value!.Items.Count);
-        // Take applies after ordering by LastName
         Assert.Equal(new[] { "Last00", "Last01", "Last02" }, result.Value.Items.Select(i => i.LastName).ToArray());
     }
 

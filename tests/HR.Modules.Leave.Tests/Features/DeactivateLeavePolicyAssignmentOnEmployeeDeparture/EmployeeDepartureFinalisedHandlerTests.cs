@@ -8,12 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Tests.Features.DeactivateLeavePolicyAssignmentOnEmployeeDeparture;
 
-// Reliability follow-up: this handler no longer deactivates the assignment inline (that work moved
-// to LeavePolicyDeactivationJob, exercised by LeavePolicyDeactivationJobTests) — it now only ever
-// records a durable LeavePolicyDeactivationOnDeparture request and enqueues the job to process it,
-// so a transient failure in the actual deactivation is retryable rather than silently dropped by
-// IntegrationEventPublisher's catch-and-log behaviour. See these types' own remarks for the full
-// rationale.
 public class EmployeeDepartureFinalisedHandlerTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 8, 10, 0, 0, DateTimeKind.Utc);
@@ -52,8 +46,6 @@ public class EmployeeDepartureFinalisedHandlerTests
             new EmployeeDepartureFinalisedIntegrationEvent(companyId, employeeId, new DateOnly(2026, 6, 9), occurredAt, AccessDisabled: true),
             CancellationToken.None);
 
-        // Assignment itself is untouched by the handler — only LeavePolicyDeactivationJob performs
-        // the actual deactivation.
         var savedAssignment = await context.EmployeeLeavePolicyAssignments.SingleAsync();
         Assert.True(savedAssignment.IsActive);
 
@@ -100,7 +92,6 @@ public class EmployeeDepartureFinalisedHandlerTests
         var jobClient = new RecordingBackgroundJobClient();
         var handler = BuildHandler(context, jobClient);
 
-        // Should not throw and should leave the (empty) tables untouched.
         await handler.HandleAsync(
             new EmployeeDepartureFinalisedIntegrationEvent(companyId, employeeId, new DateOnly(2026, 6, 9), Now, AccessDisabled: true),
             CancellationToken.None);
@@ -157,7 +148,6 @@ public class EmployeeDepartureFinalisedHandlerTests
         var jobClient = new RecordingBackgroundJobClient();
         var handler = BuildHandler(context, jobClient);
 
-        // Simulates redelivery of the same (or a reconciliation-republished) integration event.
         await handler.HandleAsync(
             new EmployeeDepartureFinalisedIntegrationEvent(companyId, employeeId, new DateOnly(2026, 6, 9), Now.AddDays(1), AccessDisabled: true),
             CancellationToken.None);

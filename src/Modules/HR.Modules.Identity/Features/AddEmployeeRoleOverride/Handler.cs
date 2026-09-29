@@ -8,11 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Features.AddEmployeeRoleOverride;
 
-// IAM-04: administers a single employee-level Grant/Deny role override. A user may hold at most
-// one override per role (enforced by the unique (user_id, role_id) index) — creating a new
-// override for a role that already has one replaces it in place rather than failing, which is how
-// "conflicting grant and deny records" are resolved deterministically: the most recent
-// administrator action always wins, there is no separate merge/precedence rule to reason about.
 internal sealed class AddEmployeeRoleOverrideHandler(
     IdentityDbContext db,
     IClock clock,
@@ -61,12 +56,6 @@ internal sealed class AddEmployeeRoleOverrideHandler(
             return Result.Failure<AddEmployeeRoleOverrideResponse>(
                 Error.Validation("ExpiresAt must be in the future for a temporary override."));
 
-        // IAM-04: self-created elevation overrides are prohibited outright — an administrator must
-        // never be able to grant themselves an extra role via an override, regardless of whether
-        // that role would otherwise be within their administrable set (the same self-elevation
-        // concern IAM-02 already closes for direct role edits, applied to this second grant path).
-        // A self-created Deny (voluntarily restricting one's own access) is not an elevation risk
-        // and remains allowed.
         if (actorUserId == request.UserId && request.OverrideType == EmployeeRoleOverrideType.Grant)
         {
             await PublishRejectionAsync(request, actorUserId, now, "self_elevation_denied");
@@ -74,9 +63,6 @@ internal sealed class AddEmployeeRoleOverrideHandler(
                 Error.Forbidden("You cannot grant yourself a permission override."));
         }
 
-        // Same role-administration boundary as UpdateUserRoles (IAM-02) and SetPositionRoleDefaults
-        // (IAM-03) — an HR Administrator cannot grant/deny Company Administrator via an override
-        // (or vice versa), closing a third path to the same privilege-escalation problem.
         var actorEffectiveRoles = actorUserId.HasValue
             ? await authorizationService.GetEffectiveRolesAsync(actorUserId.Value, cancellationToken)
             : new HashSet<Guid>();

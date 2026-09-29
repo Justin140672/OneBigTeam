@@ -2,10 +2,6 @@ using HR.Web.Components.Pages.Dashboards;
 
 namespace HR.Web.Tests;
 
-/// <summary>
-/// DSH-07: phrasing of the dashboards' visually-hidden polite aria-live announcements
-/// (<see cref="DashboardAnnouncements"/>). Pure string builders, no Blazor.
-/// </summary>
 public class DashboardAnnouncementsTests
 {
     [Fact]
@@ -102,7 +98,6 @@ public class DashboardAnnouncementsTests
     [Fact]
     public void Compose_DoesNotCollapseInternalSpacingOfIndividualParts()
     {
-        // Only the join is single-spaced; each part is used as-is.
         Assert.Equal("a b c", DashboardAnnouncements.Compose("a b", "c"));
     }
 }

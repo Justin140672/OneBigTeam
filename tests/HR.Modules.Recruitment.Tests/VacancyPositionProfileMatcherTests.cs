@@ -32,7 +32,7 @@ public class VacancyPositionProfileMatcherTests
     [Fact]
     public async Task MatchAsync_Returns_Unmatched_When_Reader_Returns_No_Candidates()
     {
-        var reader = new FakePositionProfileReader(); // defaults to an empty result -> no matches
+        var reader = new FakePositionProfileReader();
         var matcher = new VacancyPositionProfileMatcher(reader);
         var vacancy = CreateVacancy(Guid.NewGuid(), "Senior Software Engineer");
 
@@ -77,9 +77,6 @@ public class VacancyPositionProfileMatcherTests
     [Fact]
     public async Task MatchAsync_Always_Passes_Null_DepartmentId_Since_Vacancy_Has_No_Department_Of_Its_Own()
     {
-        // Judgment call (Refactor Duplicate Vacancy Fields): Vacancy.DepartmentId no longer exists, so
-        // the matcher can only ever perform a company-wide, title-only match — see
-        // VacancyPositionProfileMatcher's remarks.
         var companyId = Guid.NewGuid();
         var reader = new RecordingPositionProfileReader();
         var matcher = new VacancyPositionProfileMatcher(reader);
@@ -110,7 +107,6 @@ public class VacancyPositionProfileMatcherTests
         Assert.False(reader.WasCalled);
     }
 
-    /// <summary>Records the arguments it was last called with, so tests can assert pass-through behavior.</summary>
     private sealed class RecordingPositionProfileReader : IPositionProfileReader
     {
         public bool WasCalled { get; private set; }

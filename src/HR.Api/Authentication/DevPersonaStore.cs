@@ -2,12 +2,6 @@ namespace HR.Api.Authentication;
 
 public sealed record DevPersona(string UserId, string CompanyId, string Name, string JobTitle, string Email);
 
-/// <summary>
-/// Catalog of dev-only seed personas used to populate the persona switcher and to seed matching
-/// Supabase Auth users in Development (see IdentityModule.SeedDevSupabaseUsersAsync). Development
-/// now always authenticates through real Supabase (see the "Switch development to real Supabase
-/// auth" plan) — this store is no longer a claims source, only a catalog/registry.
-/// </summary>
 public sealed class DevPersonaStore
 {
     private const string Acme     = "00000000-0000-0000-0000-000000000001";
@@ -29,25 +23,11 @@ public sealed class DevPersonaStore
         new("30000000-0000-0000-0000-000000000012", BetaCorp, "Bob Taylor",    "Software Developer",  "bob.taylor@betacorp.example"),
         new("30000000-0000-0000-0000-000000000015", BetaCorp, "Grace Kim",     "HR Administrator",    "grace.kim@betacorp.example"),
         new("30000000-0000-0000-0000-000000000018", BetaCorp, "Charlie Wilson", "Company Administrator", "charlie.wilson@betacorp.example"),
-        // Dedicated to CrossTabLogoutEnforcementTests only — see that test's Email remarks for why a
-        // revocation test cannot reuse a persona any other E2E class also logs in as.
         new("30000000-0000-0000-0000-000000000016", Acme,     "Olivia Reyes",  "HR Administrator",    "olivia.reyes@acme.example"),
-        // Dedicated to ManagerTeamProfileTests only — a manager whose team those tests may grow
-        // (9+ extra direct reports, indirect reports) without polluting James Okafor's/David Park's
-        // shared seeded teams that other E2E classes assert on. Its Employee row is seeded only
-        // for the E2E run (EmployeesModule.SeedEmployeesAsync's E2E test pool section).
         new("30000000-0000-0000-0000-000000000017", Acme,     "Nina Patel",    "Team Lead",           "nina.patel@acme.example"),
-        // Dedicated to SubscriptionBillingJourneyTests.
-        // ActiveSubscription_Cancel_ShowsConfirmation_AndSchedulesCancellation only — Gamma
-        // Industries is a company no other test touches, so this test cannot race any other
-        // Beta-Corp-mutating subscription test (see CompaniesModule.SeedCompaniesAsync's remarks).
         new("30000000-0000-0000-0000-000000000019", Gamma,    "Diana Chen",    "Company Administrator", "diana.chen@gamma.example"),
     ];
 
-    // Personas created via the self-service SignUp flow (HR.Modules.Identity's SignUp feature) —
-    // registered here at runtime so /api/dev/persona/register and the persona switcher can find a
-    // brand-new company/admin's email for the real Supabase password-grant login. In-memory only
-    // (matches the rest of this dev-only stub); lost on API restart.
     private readonly List<DevPersona> _registeredPersonas = [];
 
     public IReadOnlyList<DevPersona> RegisteredPersonas => _registeredPersonas;
@@ -57,10 +37,6 @@ public sealed class DevPersonaStore
     public DevPersona? FindPersona(string userId) =>
         AllPersonas.FirstOrDefault(p => p.UserId == userId);
 
-    /// <summary>
-    /// Registers a brand-new persona (e.g. a self-service signup admin) so it can be looked up by
-    /// the persona switcher / register endpoint for its real Supabase login.
-    /// </summary>
     public void Register(DevPersona persona)
     {
         if (!AllPersonas.Any(p => p.UserId == persona.UserId))

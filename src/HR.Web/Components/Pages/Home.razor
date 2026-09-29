@@ -14,17 +14,6 @@
 </div>
 
 @code {
-    // Pure redirect shim — this route must stay alive because several existing call sites
-    // hardcode NavigateTo("/") as "somewhere safe for any authenticated user":
-    // MainLayout.OnPersonaSwitchAsync, Login.razor, TaskView.GoBack, MyProfile.razor's
-    // cross-tenant guard, and AppSession.MyProfileUrl's own fallback for users with no
-    // linked employee. Session.LandingUrl already encodes the full priority order
-    // (HR Administrator > Recruiter > Manager > Company Administrator > own profile).
-    //
-    // The localStorage "last selected dashboard" override can only be read once JS interop is
-    // available, which isn't the case yet in OnInitializedAsync (mirrors how MainLayout reads
-    // the "theme" localStorage key in its own OnAfterRenderAsync) — so the redirect itself
-    // happens in OnAfterRenderAsync(firstRender) below, not here.
     protected override async Task OnInitializedAsync()
     {
         await Session.InitialiseAsync();
@@ -34,30 +23,17 @@
     {
         if (!firstRender) return;
 
-        // Session.InitialiseAsync() fails open (see its remarks) when /api/me rejects the request —
-        // e.g. a stale/expired session cookie that still passes NoOpAuthenticationHandler's SSR-level
-        // presence-only check but fails HR.Api's real token validation. Without this guard,
-        // LandingUrl silently defaults to "/" (every role flag false, no linked employee) and this
-        // page would NavigateTo("/") — itself — forever, since it never had a session to redirect
-        // away with in the first place.
         if (!Session.IsLoaded)
         {
             Navigation.NavigateTo("/login", replace: true);
             return;
         }
 
-        // Getting Started always wins over a remembered dashboard preference — otherwise a stale
-        // "lastDashboard" value left in localStorage from a previous login in the same browser
-        // (e.g. a different company, or this same user before their checklist was reset) would
-        // silently skip the checklist for what should be a guaranteed first landing.
         var targetUrl = Session.LandingUrl;
         if (targetUrl != "/getting-started")
         {
             var lastDashboard = await JS.InvokeAsync<string>("getLastDashboard");
 
-            // Fall back to the priority-ordered LandingUrl when there's no stored preference, or
-            // the stored dashboard is no longer one the user is authorized for (e.g. a role was
-            // removed).
             if (!string.IsNullOrEmpty(lastDashboard) && Session.IsDashboardAvailable(lastDashboard))
                 targetUrl = AppSession.DashboardUrl(lastDashboard) ?? targetUrl;
         }

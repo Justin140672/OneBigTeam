@@ -9,8 +9,6 @@ internal sealed class Endpoint(GetEmployeeEmergencyContactsHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/employees/{employeeId:guid}/emergency-contacts");
-        // ADM-05: viewing another employee's emergency contacts is an administration action
-        // (self-service uses the /me/emergency-contacts endpoints).
         Policies("employee:manage");
     }
 

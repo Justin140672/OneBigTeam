@@ -32,27 +32,16 @@ public sealed class EditFutureCompensationDialog(IPage page)
     private ILocator SaveButton =>
         page.Locator(".edit-future-compensation-dialog .e-footer-content button:has-text('Save')");
 
-    // Bootstrap's `.alert-warning` alone is shared markup; scope on the component's own
-    // `.save-conflict-banner` class + role='alert' and additionally require the "Reload latest
-    // values" button so an unrelated warning alert can never satisfy strict mode. Match on
-    // structure, not text — a real 409 replaces the component's default Message with the razor's
-    // own copy, so a text filter would be brittle.
     private ILocator ConcurrencyWarningBanner =>
         page.Locator(".edit-future-compensation-dialog .save-conflict-banner[role='alert']")
             .Filter(new() { Has = page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }) });
 
-    /// <summary>Waits for the dialog (and its Salary field) to be interactable after the row's Edit action.</summary>
     public async Task WaitForOpenAsync()
     {
         await Dialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
         await Microsoft.Playwright.Assertions.Expect(SalaryInput).ToBeEnabledAsync(new() { Timeout = 30_000 });
     }
 
-    /// <summary>
-    /// Sets the Salary field (a FloatLabelType SfNumericTextBox — targeted by its e-numerictextbox
-    /// class, not a placeholder) and confirms the parsed value stuck, retrying under a laggy Blazor
-    /// Server round-trip. Mirrors EmployeeEditPage.FillEditCompensationSalaryAsync.
-    /// </summary>
     public async Task FillSalaryAsync(decimal value)
     {
         var text = value.ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -86,16 +75,11 @@ public sealed class EditFutureCompensationDialog(IPage page)
             : null;
     }
 
-    /// <summary>Clicks Save and waits for the dialog to close — the save succeeded.</summary>
     public async Task SubmitExpectingSuccessAsync()
     {
         await SaveButton.ClickAsync();
         await Dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
 
-        // The dialog closing only proves the save request was accepted, not that the Compensation
-        // History grid's own async reload has landed — a caller that immediately reads the row can
-        // otherwise still see the pre-edit value (same race handled in
-        // EmployeeEditPage.SubmitEditCompensationDialogAsync).
         await page.WaitForFunctionAsync(
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 10_000 });
@@ -117,14 +101,11 @@ public sealed class EditFutureCompensationDialog(IPage page)
     public Task<bool> IsConcurrencyWarningVisibleAsync() =>
         ConcurrencyWarningBanner.IsVisibleAsync();
 
-    /// <summary>Clicks "Reload latest values" in the banner and waits for it to clear.</summary>
     public async Task ClickReloadLatestValuesAsync()
     {
         await Dialog.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }).ClickAsync();
         await ConcurrencyWarningBanner.WaitForAsync(
             new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
-        // The reload round-trips CompensationService.GetCompensationHistoryAsync before
-        // repopulating the form; give the re-bound value a beat to land before callers read it.
         await page.WaitForTimeoutAsync(300);
     }
 

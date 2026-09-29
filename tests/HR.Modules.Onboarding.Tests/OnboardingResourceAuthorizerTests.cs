@@ -3,16 +3,8 @@ using HR.Modules.Onboarding.Tests.Infrastructure;
 
 namespace HR.Modules.Onboarding.Tests;
 
-/// <summary>
-/// DSH-02: <c>OnboardingResourceAuthorizer.CanViewManagerTeamAsync</c> gates the browser-supplied
-/// <c>{managerId}</c> route value on GetTeamOnboarding. The caller may view that manager's team only
-/// if they ARE that manager, sit ABOVE them in the reporting tree (managerId is one of the caller's
-/// descendants), or hold HR administrator access. See
-/// specifications/architecture/11-manager-hierarchy-scope.md.
-/// </summary>
 public class OnboardingResourceAuthorizerTests
 {
-    // Mirrors HR.Modules.Onboarding.Services.OnboardingResourceAuthorizer.HrAdministratorRoleId.
     private static readonly Guid HrAdministratorRoleId = new("00000000-0000-0000-0000-000000000004");
     private static readonly Guid ManagerRoleId = new("00000000-0000-0000-0000-000000000002");
     private static readonly Guid CompanyId = Guid.NewGuid();

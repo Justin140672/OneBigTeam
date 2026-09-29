@@ -4,13 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the Required Documents tab on the Position Profile edit page.
-///
-/// Uses the seeded "Software Engineer" profile
-/// (ID: 20000000-0000-0000-0000-000000000003) from Acme Corporation,
-/// which has no required documents in the seed data.
-/// </summary>
 public sealed class PositionProfileRequiredDocumentsTabTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId            = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -79,22 +72,18 @@ public sealed class PositionProfileRequiredDocumentsTabTests(HrAdminPersonaFixtu
         await ppEdit.GoToAsync(AcmeId, SoftwareEngineerId);
         await ppEdit.OpenRequiredDocumentsTabAsync();
 
-        // ── Add ──────────────────────────────────────────────────────────────
         await ppEdit.ClickAddRequiredDocumentAsync();
         await ppEdit.SelectDocumentTypeInDialogAsync("Passport");
         await ppEdit.SubmitAddDialogAsync();
 
-        // Verify it appears in the grid.
         await _page.WaitForSelectorAsync(".e-grid .e-row:has-text('Passport')", new() { Timeout = 10_000 });
         Assert.True(
             await ppEdit.HasRequiredDocumentInGridAsync("Passport"),
             "Expected 'Passport' to appear in the Required Documents grid after adding");
 
-        // ── Remove ───────────────────────────────────────────────────────────
         await ppEdit.ClickRemoveRequiredDocumentAsync("Passport");
         await ppEdit.ConfirmRemoveAsync();
 
-        // Wait for the row to disappear.
         await _page.WaitForFunctionAsync(
             "!document.querySelector('.e-grid .e-row') || " +
             "![...document.querySelectorAll('.e-grid .e-row')].some(r => r.textContent.includes('Passport'))",

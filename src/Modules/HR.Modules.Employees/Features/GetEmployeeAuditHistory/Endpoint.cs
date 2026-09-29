@@ -7,12 +7,6 @@ using IAuthorizationService = Microsoft.AspNetCore.Authorization.IAuthorizationS
 
 namespace HR.Modules.Employees.Features.GetEmployeeAuditHistory;
 
-/// <summary>
-/// AUD-06: employee and manager can view audit history at the appropriate detail level.
-/// HR Admins see everything. Managers see activity for their direct reports (security event
-/// before/after redacted). Employees see their own activity history (security events redacted).
-/// Callers with no relationship to the target employee receive an empty list (not a 403).
-/// </summary>
 internal sealed class Endpoint(
     GetEmployeeAuditHistoryHandler handler,
     IAuthorizationService authorizationService,
@@ -21,8 +15,6 @@ internal sealed class Endpoint(
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/employees/{employeeId:guid}/audit-history");
-        // Broadest applicable policy — any authenticated employee. Scope (self / manager / HR)
-        // is evaluated inside the handler, same pattern as GetEmployeeTimeline.
         Policies("role:employee");
     }
 
@@ -37,7 +29,6 @@ internal sealed class Endpoint(
             return;
         }
 
-        // Tenant isolation — same pattern as GetEmployeeTimeline.
         if (!Guid.TryParse(currentUser.TenantId, out var callerCompanyId) || callerCompanyId != companyId)
         {
             await Send.ResultAsync(TypedResults.Forbid());

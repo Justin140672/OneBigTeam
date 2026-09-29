@@ -2,11 +2,6 @@ using System.Text;
 
 namespace HR.Web.Components.Controls;
 
-/// <summary>
-/// Formats raw PascalCase enum names for UI display (e.g. "ReviewDue" -> "Review Due").
-/// Use this at call sites whose intent is "show an enum value to a user" instead of a raw
-/// <c>.ToString()</c> or an ad-hoc switch — keeps formatting consistent across the app.
-/// </summary>
 public static class EnumDisplay
 {
     public static string Humanize(string? value)

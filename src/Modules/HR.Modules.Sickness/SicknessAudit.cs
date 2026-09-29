@@ -2,13 +2,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Sickness;
 
-/// <summary>
-/// SICK-06: background/system-originated fit-note evidence requests are never attributed to the
-/// affected employee (they did nothing to trigger the request — a policy threshold did). Mirrors
-/// the SystemActorId convention used elsewhere for job-originated audit events (see
-/// HR.Modules.Leave.Jobs.LeaveYearRolloverService.SystemActorId,
-/// HR.Modules.Sickness.Services.FitNoteEvidenceRequestService.SystemActorId).
-/// </summary>
 internal sealed record SicknessEvidenceRequestedAuditEvent(
     Guid EvidenceRequestId,
     Guid SicknessRecordId,
@@ -27,17 +20,10 @@ internal sealed record SicknessEvidenceRequestedAuditEvent(
     Guid? IAuditEvent.CorrelationId => null;
     string? IAuditEvent.Summary => $"Fit note evidence requested, due {DueDate:d MMM yyyy}";
     object? IAuditEvent.Before => null;
-    // SICK-06: no free-text content here — only ids/dates.
     object? IAuditEvent.After => new { SicknessRecordId, DueDate };
     object? IAuditEvent.Metadata => null;
 }
 
-/// <summary>
-/// SICK-06: the actor here is whoever completed the "upload fit note" task (usually the employee
-/// themselves, but could be uploaded on their behalf) — resolved from
-/// <see cref="HR.Modules.Tasks.Contracts.TaskCompletionContext.CompletedBy"/>, never assumed to be
-/// the affected employee.
-/// </summary>
 internal sealed record SicknessEvidenceFulfilledAuditEvent(
     Guid EvidenceRequestId,
     Guid SicknessRecordId,
@@ -60,18 +46,10 @@ internal sealed record SicknessEvidenceFulfilledAuditEvent(
     Guid? IAuditEvent.CorrelationId => null;
     string? IAuditEvent.Summary => "Fit note evidence fulfilled";
     object? IAuditEvent.Before => null;
-    // SICK-06: no free-text content here — only ids/dates.
     object? IAuditEvent.After => new { SicknessRecordId, FulfilledAt };
     object? IAuditEvent.Metadata => null;
 }
 
-/// <summary>
-/// SICK-06: actor is resolved server-side from the caller who submitted the update (manager/HR
-/// via ICurrentUser, threaded through UpdateSicknessRecordRequest.ActorEmployeeId), never the
-/// affected employee unless that employee genuinely is the caller. Before/After carry only
-/// non-sensitive, structured fields (category, dates, total days) — never the free-text Notes
-/// field.
-/// </summary>
 internal sealed record SicknessUpdatedAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,
@@ -101,11 +79,6 @@ internal sealed record SicknessUpdatedAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
-/// <summary>
-/// SICK-06: actor is the manager/HR user who performed the close action (threaded through
-/// CloseSicknessRecordRequest.ActorEmployeeId), never the affected employee. Before/After carry
-/// only non-sensitive, structured fields.
-/// </summary>
 internal sealed record SicknessClosedAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,
@@ -135,11 +108,6 @@ internal sealed record SicknessClosedAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
-/// <summary>
-/// SICK-06: raised as an automatic, policy-driven consequence of CloseSicknessRecordHandler
-/// (total days reaching the return-to-work threshold) — the actor is the same person who closed
-/// the record (they caused this outcome directly), not the affected employee.
-/// </summary>
 internal sealed record ReturnToWorkReviewRequiredAuditEvent(
     Guid ReviewId,
     Guid SicknessRecordId,
@@ -193,21 +161,10 @@ internal sealed record ReturnToWorkReviewCompletedAuditEvent(
     Guid? IAuditEvent.CorrelationId => null;
     string? IAuditEvent.Summary => $"Return-to-work review completed with outcome {Outcome}";
     object? IAuditEvent.Before => null;
-    // SICK-06: AdjustmentDetails/Notes are free-text and may contain sensitive medical content —
-    // only safe, non-sensitive summary flags are recorded.
     object? IAuditEvent.After => new { SicknessRecordId, CompletedAt, Outcome, AdjustmentsRequired, HasAdjustmentDetails, HasNotes };
     object? IAuditEvent.Metadata => null;
 }
 
-/// <summary>
-/// SICK-03: raised when a "Not Fit" return-to-work review outcome reopens a previously closed
-/// sickness record (see SicknessRecord.ReopenFollowingUnfitReview). Kept distinct from
-/// ReturnToWorkReviewCompletedAuditEvent so audit consumers can filter on the record-level state
-/// change independently of the review-level completion.
-///
-/// SICK-06: the actor is the reviewer who completed the review that caused the reopen — never the
-/// affected employee.
-/// </summary>
 internal sealed record SicknessRecordReopenedAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,
@@ -229,13 +186,6 @@ internal sealed record SicknessRecordReopenedAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
-/// <summary>
-/// SICK-06: actor is resolved server-side (threaded via RecordSicknessRequest/
-/// RecordMySicknessRequest.ActorEmployeeId) — for manager/HR-initiated RecordSickness this is the
-/// authenticated caller (may differ from the affected employee); for self-service
-/// RecordMySickness this is explicitly the same person as the affected employee (subject and
-/// actor coincide by design, not by accident).
-/// </summary>
 internal sealed record SicknessRecordedAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,
@@ -261,11 +211,6 @@ internal sealed record SicknessRecordedAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
-/// <summary>
-/// SICK-06: sickness categories carry no health information (name/order/active flag only), so
-/// Before/After can safely include full structured field values. Actor is resolved server-side
-/// from the caller (threaded via *SicknessCategoryRequest.ActorEmployeeId).
-/// </summary>
 internal sealed record SicknessCategoryCreatedAuditEvent(
     Guid CompanyId,
     Guid CategoryId,

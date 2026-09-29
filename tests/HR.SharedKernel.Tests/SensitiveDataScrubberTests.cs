@@ -2,9 +2,6 @@ using HR.SharedKernel;
 
 namespace HR.SharedKernel.Tests;
 
-/// <summary>
-/// NFR-01: unit coverage for the single source of truth for sensitive-data classification.
-/// </summary>
 public class SensitiveDataScrubberTests
 {
     [Theory]
@@ -16,9 +13,9 @@ public class SensitiveDataScrubberTests
     [InlineData("token")]
     [InlineData("secret")]
     [InlineData("accessToken")]
-    [InlineData("BankAccountSortCode")]   // matched via the "bankaccount" fragment
-    [InlineData("SALARY")]                // case-insensitive exact match
-    [InlineData("employee_national_insurance")] // matched via the "national_insurance" fragment
+    [InlineData("BankAccountSortCode")]
+    [InlineData("SALARY")]
+    [InlineData("employee_national_insurance")]
     public void IsProhibitedFieldName_true_for_sensitive_names(string name)
     {
         Assert.True(SensitiveDataScrubber.IsProhibitedFieldName(name));
@@ -41,9 +38,9 @@ public class SensitiveDataScrubberTests
     [InlineData("religionOrBelief")]
     [InlineData("religionOrBeliefSelfDescribed")]
     [InlineData("religion")]
-    [InlineData("EthnicGroup")]            // casing variant
-    [InlineData("RELIGIONORBELIEF")]       // casing variant
-    [InlineData("DisabilityImpact")]       // casing variant
+    [InlineData("EthnicGroup")]
+    [InlineData("RELIGIONORBELIEF")]
+    [InlineData("DisabilityImpact")]
     public void IsProhibitedFieldName_true_for_equality_monitoring_fields(string name)
     {
         Assert.True(SensitiveDataScrubber.IsProhibitedFieldName(name));
@@ -67,7 +64,7 @@ public class SensitiveDataScrubberTests
     [Theory]
     [InlineData("employeeNumber")]
     [InlineData("firstName")]
-    [InlineData("displaySalaryOnProfile")]           // contains "salary" but is not an exact match / fragment
+    [InlineData("displaySalaryOnProfile")]
     [InlineData("DisplaySalaryOnEmployeeProfile")]   // boolean display-preference flag, deliberately allowed
     [InlineData("currency")]
     [InlineData("direction")]
@@ -82,12 +79,12 @@ public class SensitiveDataScrubberTests
     [Theory]
     [InlineData("AB123456C")]
     [InlineData("QQ 12 34 56 C")]
-    [InlineData("GB29NWBK60161331926819")]      // IBAN
-    [InlineData("12-34-56")]                     // sort code
-    [InlineData("4111111111111111")]            // 16-digit bank/card number
-    [InlineData("Bearer abc123.DEF-456")]       // authorization header value
-    [InlineData("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abc123sig")] // JWT
-    [InlineData("$2b$12$abcdefghijklmnopqrstuvABCDEFGHIJKLMNOPQRSTUVWXYZ012345678")] // bcrypt hash ($2b$12$ + 53 chars)
+    [InlineData("GB29NWBK60161331926819")]
+    [InlineData("12-34-56")]
+    [InlineData("4111111111111111")]
+    [InlineData("Bearer abc123.DEF-456")]
+    [InlineData("eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.abc123sig")]
+    [InlineData("$2b$12$abcdefghijklmnopqrstuvABCDEFGHIJKLMNOPQRSTUVWXYZ012345678")]
     public void ContainsSensitiveValue_true_for_sensitive_values(string value)
     {
         Assert.True(SensitiveDataScrubber.ContainsSensitiveValue(value));
@@ -95,14 +92,14 @@ public class SensitiveDataScrubberTests
     }
 
     [Theory]
-    [InlineData("3f2504e0-4f89-11d3-9a0c-0305e82c3301")] // GUID
+    [InlineData("3f2504e0-4f89-11d3-9a0c-0305e82c3301")]
     [InlineData("00000000-0000-0000-0000-000000000001")] // seeded GUID — 12-digit final segment must not trip BankOrCardNumber
-    [InlineData("12345678-1234-1234-1234-123456789012")] // GUID whose final segment is all digits
+    [InlineData("12345678-1234-1234-1234-123456789012")]
     [InlineData("Policy-cb0754f9d9ab40079b70a858434dac74")] // lowercase :N GUID embedded in a name — must not trip Iban
-    [InlineData("audit.tester.bf825b7f8baf4c0890f23225a2d8a0f9@example.com")] // lowercase :N GUID embedded in an email
+    [InlineData("audit.tester.bf825b7f8baf4c0890f23225a2d8a0f9@example.com")]
     [InlineData("Annual")]
     [InlineData("EMP-0001")]
-    [InlineData("123")]                                  // short number
+    [InlineData("123")]
     [InlineData("Increase")]
     [InlineData(null)]
     [InlineData("")]

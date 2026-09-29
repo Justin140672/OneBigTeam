@@ -15,14 +15,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// [P2] The Development-only local-storage delivery route
-/// (GET /api/dev/local-storage/{bucket}/{*key}) must make the same authorization and malware-scan
-/// decisions as production: a file is only served for a short-lived HMAC-signed URL minted by an
-/// authorised download handler, and only while the owning module re-confirms the record is live and
-/// Clean. Every refusal is a 404. The physical file is written for every case, so each denial proves
-/// the route refused a file that really exists on disk.
-/// </summary>
 [Collection("Integration")]
 public class DevLocalStorageDeliveryEndpointTests
 {
@@ -39,7 +31,6 @@ public class DevLocalStorageDeliveryEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    // ── helpers ──────────────────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> ClientAs(Guid userId, Guid companyId)
     {
@@ -100,7 +91,6 @@ public class DevLocalStorageDeliveryEndpointTests
         return document.Id;
     }
 
-    /// <summary>A recruiter obtains the dev signed URL through the normal authorised download handler.</summary>
     private async Task<Uri> GetSignedCvUrlAsync(HttpClient recruiter, Guid companyId, Guid candidateId, Guid documentId)
     {
         var response = await recruiter.GetAsync(DownloadUrl(companyId, candidateId, documentId));
@@ -116,7 +106,6 @@ public class DevLocalStorageDeliveryEndpointTests
         return (query["exp"]!, query["sig"]!);
     }
 
-    // ── happy path ───────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Clean_Cv_Is_Downloadable_By_Authorised_Recruiter_Through_The_Signed_Local_Url()
@@ -131,8 +120,6 @@ public class DevLocalStorageDeliveryEndpointTests
         Assert.False(string.IsNullOrEmpty(exp));
         Assert.False(string.IsNullOrEmpty(sig));
 
-        // The browser (or HR.Web's CV proxy) follows the redirect without an API bearer token, exactly
-        // as it would follow a Supabase signed URL.
         using var browser = AnonymousClient();
         var response = await browser.GetAsync(signedUrl.PathAndQuery);
 
@@ -142,7 +129,6 @@ public class DevLocalStorageDeliveryEndpointTests
         Assert.Contains("no-store", response.Headers.CacheControl?.ToString() ?? string.Empty);
     }
 
-    // ── anonymous / unsigned access ──────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Anonymous_Direct_Access_By_Bucket_And_Key_Is_Denied()
@@ -170,7 +156,6 @@ public class DevLocalStorageDeliveryEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    // ── cross-company ────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Cross_Company_Recruiter_Cannot_Reuse_Own_Signature_On_Another_Companys_Copied_Key()
@@ -183,11 +168,9 @@ public class DevLocalStorageDeliveryEndpointTests
         WriteFile(LocalStorageBuckets.CandidateDocuments, keyB);
         using var recruiterB = await ClientAs(RecruiterUser, companyB);
 
-        // B legitimately obtains a signed URL for its own CV...
         var ownUrl = await GetSignedCvUrlAsync(recruiterB, companyB, candidateB, documentB);
         var (exp, sig) = ReadSignature(ownUrl);
 
-        // ...then swaps in company A's copied storage key, and also tries A's key with no signature.
         var swapped = await recruiterB.GetAsync(
             $"{RawUrl(LocalStorageBuckets.CandidateDocuments, keyA)}?exp={exp}&sig={sig}");
         var unsigned = await recruiterB.GetAsync(RawUrl(LocalStorageBuckets.CandidateDocuments, keyA));
@@ -211,7 +194,6 @@ public class DevLocalStorageDeliveryEndpointTests
         Assert.Null(response.Headers.Location);
     }
 
-    // ── scan state ───────────────────────────────────────────────────────────────────────────
 
     [Theory]
     [InlineData("Pending")]
@@ -224,7 +206,6 @@ public class DevLocalStorageDeliveryEndpointTests
         var (_, _, key) = await SeedCvAsync(companyId, Enum.Parse<CandidateDocumentScanStatus>(status));
         WriteFile(LocalStorageBuckets.CandidateDocuments, key);
 
-        // A validly-signed URL (e.g. one copied before the scan state changed) must still be refused.
         var signed = Signer.CreateSignedUrl("http://localhost", LocalStorageBuckets.CandidateDocuments, key);
         using var anonymous = AnonymousClient();
 
@@ -233,7 +214,6 @@ public class DevLocalStorageDeliveryEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    // ── orphaned files ───────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Orphaned_File_With_No_Db_Record_Is_Denied_Even_With_A_Valid_Signature()
@@ -269,7 +249,6 @@ public class DevLocalStorageDeliveryEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    // ── traversal / malformed input ──────────────────────────────────────────────────────────
 
     [Theory]
     [InlineData("..%2F..%2Fsecret.txt")]
@@ -279,17 +258,14 @@ public class DevLocalStorageDeliveryEndpointTests
     [InlineData("a/%2e%2e%5csecret.txt")]
     [InlineData("C:%5CWindows%5Cwin.ini")]
     [InlineData("a//b.pdf")]
-    // (%00 itself is refused by the host's URL decoder before routing; NUL is covered by Key_Shape_Validation.)
     [InlineData("a/%01/b.pdf")]
     public async Task Encoded_Traversal_And_Malformed_Keys_Are_Rejected(string encodedKey)
     {
-        // A secret just outside the bucket root, so a traversal bug would have something to leak.
         var secretPath = Path.Combine(
             Path.GetDirectoryName(LocalStorageBuckets.GetRootPath(LocalStorageBuckets.CandidateDocuments))!,
             "secret.txt");
         File.WriteAllText(secretPath, "TOP-SECRET-OUTSIDE-BUCKET");
 
-        // Sign the decoded form too, so the refusal cannot be down to a bad signature alone.
         var decodedKey = Uri.UnescapeDataString(encodedKey);
         var (exp, sig) = ReadSignature(Signer.CreateSignedUrl("http://localhost", LocalStorageBuckets.CandidateDocuments, decodedKey));
         using var anonymous = AnonymousClient();
@@ -304,8 +280,6 @@ public class DevLocalStorageDeliveryEndpointTests
     [Fact]
     public async Task Traversal_Key_Is_Rejected_Even_When_A_Clean_Record_And_Valid_Signature_Exist()
     {
-        // Worst case: a (hypothetical) record owns a traversal-shaped key and a valid signature exists.
-        // The path defences must still refuse to leave the bucket root.
         var companyId = Guid.NewGuid();
         const string maliciousKey = "..%2Fsecret-record.txt";
         await SeedCvWithStorageKeyAsync(companyId, maliciousKey);
@@ -358,7 +332,6 @@ public class DevLocalStorageDeliveryEndpointTests
         Assert.Equal(expected, DevLocalStorageDeliveryEndpoint.IsWellFormedKey(key));
     }
 
-    // ── signature integrity ──────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Expired_Tampered_Missing_Or_Foreign_Signatures_Are_Rejected()
@@ -379,13 +352,13 @@ public class DevLocalStorageDeliveryEndpointTests
 
         var attempts = new[]
         {
-            $"{path}?exp={expValue - 3600}&sig={sig}",          // expired (and re-dated) expiry
-            $"{path}?exp={expValue + 60}&sig={sig}",            // extended expiry
-            $"{path}?exp={exp}&sig={tamperedSig}",              // tampered signature
-            $"{path}?exp={exp}",                                // missing signature
-            $"{path}?sig={sig}",                                // missing expiry
-            $"{path}?exp={exp}&sig={sig}&sig={sig}",            // duplicated parameters
-            $"{path}?exp={foreignExp}&sig={foreignSig}",        // signed with another key
+            $"{path}?exp={expValue - 3600}&sig={sig}",
+            $"{path}?exp={expValue + 60}&sig={sig}",
+            $"{path}?exp={exp}&sig={tamperedSig}",
+            $"{path}?exp={exp}",
+            $"{path}?sig={sig}",
+            $"{path}?exp={exp}&sig={sig}&sig={sig}",
+            $"{path}?exp={foreignExp}&sig={foreignSig}",
         };
 
         using var anonymous = AnonymousClient();
@@ -395,12 +368,10 @@ public class DevLocalStorageDeliveryEndpointTests
             Assert.True(response.StatusCode == HttpStatusCode.NotFound, $"Expected 404 for '{attempt}', got {(int)response.StatusCode}.");
         }
 
-        // Control: the untampered URL still works.
         var ok = await anonymous.GetAsync(signedUrl.PathAndQuery);
         Assert.Equal(HttpStatusCode.OK, ok.StatusCode);
     }
 
-    // ── other buckets ────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Profile_Photo_Is_Only_Served_Once_Its_Record_Is_Clean()

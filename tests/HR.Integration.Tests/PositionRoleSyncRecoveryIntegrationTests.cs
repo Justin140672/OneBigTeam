@@ -38,9 +38,6 @@ public class PositionRoleSyncRecoveryIntegrationTests
         _factory = factory;
     }
 
-    /// <summary>Creates a second, distinct PositionProfile in the same company/department/location as
-    /// an already-seeded <see cref="EmployeeReferenceDataSeeder.ReferenceData"/>, so a test can
-    /// transfer an employee between two real position profiles.</summary>
     private async Task<Guid> SeedAdditionalPositionProfileAsync(
         Guid companyId, EmployeeReferenceDataSeeder.ReferenceData referenceData, string title)
     {
@@ -58,11 +55,6 @@ public class PositionRoleSyncRecoveryIntegrationTests
         return positionProfile.Id;
     }
 
-    /// <summary>
-    /// Registers a role as a default for a position via the real identity.position_roles table
-    /// (bypassing PositionSync's lazy identity.positions projection — the position row is created
-    /// here directly since these tests never go through the SetPositionRoleDefaults endpoint).
-    /// </summary>
     private async Task<Guid> SeedPositionWithDefaultRoleAsync(Guid companyId, Guid positionProfileId, string positionName)
     {
         using var scope = _factory.Services.CreateScope();
@@ -138,9 +130,6 @@ public class PositionRoleSyncRecoveryIntegrationTests
         return await db.UserPositions.Where(up => up.UserId == userId).ToListAsync();
     }
 
-    /// <summary>Seeds a real Employee + a real matching ApplicationUser/UserProfile (system-access
-    /// user) so both the Employees-side reads and Identity-side role lookups line up on the same
-    /// id, as production requires (UserPosition.UserId == the employee's own id).</summary>
     private async Task<(Guid EmployeeId, EmployeeReferenceDataSeeder.ReferenceData ReferenceData)> SeedEmployeeWithUserAsync(
         Guid companyId, Guid initialPositionProfileId)
     {
@@ -178,12 +167,6 @@ public class PositionRoleSyncRecoveryIntegrationTests
     [Fact]
     public async Task CrashRecovery_ReconciliationConvergesEmployee_WithoutTheMissedEvent_WhenOutboxWasNeverDispatched()
     {
-        // Simulates "process interrupted after employee commit, before publication": the employee
-        // write + outbox row exist (TransferEmployeePositionAsync's own SaveChangesAsync), but
-        // dispatchOutbox:false means the event is never delivered to Identity — matching exactly
-        // what a crash right after commit leaves behind. PositionRoleReconciliationService must
-        // independently converge the employee's access to the new position without ever needing
-        // that missed event.
         var companyId = Guid.NewGuid();
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
         var newPositionProfileId = await SeedAdditionalPositionProfileAsync(companyId, referenceData, "Recovery Target Role");
@@ -193,7 +176,6 @@ public class PositionRoleSyncRecoveryIntegrationTests
 
         await TransferEmployeePositionAsync(companyId, employeeId, newPositionProfileId, dispatchOutbox: false);
 
-        // Sanity: no user_positions row for the new position yet — the event was never delivered.
         var beforeReconcile = await GetUserPositionsAsync(employeeId);
         Assert.DoesNotContain(beforeReconcile, up => up.PositionId == newPositionProfileId);
 
@@ -225,16 +207,12 @@ public class PositionRoleSyncRecoveryIntegrationTests
         var (employeeId, _) = await SeedEmployeeWithUserAsync(companyId, referenceData.PositionProfileId);
         var positionA = referenceData.PositionProfileId;
 
-        // Real, current transfer A -> C (this is what "actually happened": B was skipped/collapsed
-        // by the time events are processed, matching the ticket's own worked example).
         await TransferEmployeePositionAsync(companyId, employeeId, positionC, dispatchOutbox: true);
 
         var effectiveRolesAfterRealTransfer = await GetEffectiveRolesAsync(employeeId);
         Assert.Contains(roleC, effectiveRolesAfterRealTransfer);
         Assert.DoesNotContain(roleB, effectiveRolesAfterRealTransfer);
 
-        // Now a stale, delayed A -> B event arrives (out-of-order/duplicated delivery) — the
-        // employee's current position is already C, not B, so this must be skipped entirely.
         using (var scope = _factory.Services.CreateScope())
         {
             var handler = scope.ServiceProvider.GetRequiredService<IIntegrationEventHandler<EmployeePositionChangedIntegrationEvent>>();
@@ -244,11 +222,11 @@ public class PositionRoleSyncRecoveryIntegrationTests
         }
 
         var effectiveRolesAfterStaleEvent = await GetEffectiveRolesAsync(employeeId);
-        Assert.Contains(roleC, effectiveRolesAfterStaleEvent); // still C
-        Assert.DoesNotContain(roleB, effectiveRolesAfterStaleEvent); // B never reopened
+        Assert.Contains(roleC, effectiveRolesAfterStaleEvent);
+        Assert.DoesNotContain(roleB, effectiveRolesAfterStaleEvent);
 
         var positions = await GetUserPositionsAsync(employeeId);
-        Assert.DoesNotContain(positions, up => up.PositionId == positionB); // B was never created at all
+        Assert.DoesNotContain(positions, up => up.PositionId == positionB);
         var active = positions.Where(up => up.IsActive(DateTimeOffset.UtcNow)).ToList();
         Assert.Single(active);
         Assert.Equal(positionC, active[0].PositionId);
@@ -264,8 +242,6 @@ public class PositionRoleSyncRecoveryIntegrationTests
 
         var (employeeId, _) = await SeedEmployeeWithUserAsync(companyId, currentPositionId);
 
-        // Pre-seed an EXPIRED assignment for the employee's current position, simulating "held this
-        // position before, left, and has now returned to it" while the row was never cleaned up.
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
@@ -278,7 +254,7 @@ public class PositionRoleSyncRecoveryIntegrationTests
 
         var positions = await GetUserPositionsAsync(employeeId);
         var forCurrentPosition = positions.Where(up => up.PositionId == currentPositionId).ToList();
-        Assert.Single(forCurrentPosition); // reopened in place, not duplicated
+        Assert.Single(forCurrentPosition);
         Assert.True(forCurrentPosition[0].IsActive(DateTimeOffset.UtcNow));
 
         var effectiveRoles = await GetEffectiveRolesAsync(employeeId);
@@ -329,8 +305,6 @@ public class PositionRoleSyncRecoveryIntegrationTests
 
         var (employeeId, _) = await SeedEmployeeWithUserAsync(companyId, positionId);
 
-        // Grant the position's role via the handler path (simulating the original transfer INTO
-        // the position having already synced correctly).
         using (var scope = _factory.Services.CreateScope())
         {
             var handler = scope.ServiceProvider.GetRequiredService<IIntegrationEventHandler<EmployeePositionChangedIntegrationEvent>>();
@@ -341,14 +315,6 @@ public class PositionRoleSyncRecoveryIntegrationTests
 
         Assert.Contains(roleId, await GetEffectiveRolesAsync(employeeId));
 
-        // Employee's position is removed (set to none) directly on the aggregate — Employee.Assign
-        // requires a non-null positionProfileId in this codebase's current domain model, so we model
-        // "no position" the way IEmployeeAudienceReader actually reports it: reconciliation reads
-        // the employee's CURRENT authoritative position via GetEmployeeAudienceProfilesAsync, so we
-        // exercise the "no current position" branch directly against the reconciliation service
-        // using a null-position override, matching PositionRoleReconciliationServiceTests' unit
-        // coverage of the same branch, but here against the real end-to-end user_positions/roles
-        // state this test already built up.
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
@@ -367,10 +333,6 @@ public class PositionRoleSyncRecoveryIntegrationTests
         Assert.DoesNotContain(positions, up => up.IsActive(DateTimeOffset.UtcNow));
     }
 
-    /// <summary>Reports exactly one employee (the one under test) with no current position, and
-    /// nothing else — used by the "employee's position removed" scenario above to exercise
-    /// PositionRoleReconciliationService's real "no current position" branch end-to-end without
-    /// depending on unverified HTTP contract details for "remove an employee's position".</summary>
     private sealed class NoPositionAudienceReader(Guid companyId, Guid employeeId) : IEmployeeAudienceReader
     {
         public Task<EmployeeAudienceProfile?> GetEmployeeAudienceAsync(Guid cId, Guid eId, CancellationToken ct) =>
@@ -409,7 +371,6 @@ public class PositionRoleSyncRecoveryIntegrationTests
 
         var (employeeId, _) = await SeedEmployeeWithUserAsync(companyId, oldPositionId);
 
-        // Establish the initial position grant.
         using (var scope = _factory.Services.CreateScope())
         {
             var handler = scope.ServiceProvider.GetRequiredService<IIntegrationEventHandler<EmployeePositionChangedIntegrationEvent>>();
@@ -429,14 +390,13 @@ public class PositionRoleSyncRecoveryIntegrationTests
 
         Assert.Contains(overrideRoleId, await GetEffectiveRolesAsync(employeeId));
 
-        // Real end-to-end position transfer + reconciliation pass.
         await TransferEmployeePositionAsync(companyId, employeeId, newPositionId, dispatchOutbox: true);
         await RunReconciliationAsync();
 
         var effectiveRoles = await GetEffectiveRolesAsync(employeeId);
-        Assert.Contains(newRoleId, effectiveRoles); // position-derived access updated
-        Assert.DoesNotContain(oldRoleId, effectiveRoles); // old position's grant gone
-        Assert.Contains(overrideRoleId, effectiveRoles); // override untouched by either the transfer or reconciliation
+        Assert.Contains(newRoleId, effectiveRoles);
+        Assert.DoesNotContain(oldRoleId, effectiveRoles);
+        Assert.Contains(overrideRoleId, effectiveRoles);
     }
 
     [Fact]
@@ -449,8 +409,6 @@ public class PositionRoleSyncRecoveryIntegrationTests
 
         var (employeeId, _) = await SeedEmployeeWithUserAsync(companyId, referenceData.PositionProfileId);
 
-        // Stage (but do not yet dispatch) the transfer so the Handler and the reconciliation pass
-        // race against the same underlying rows for the same employee.
         var previousPositionId = await TransferEmployeePositionAsync(companyId, employeeId, newPositionId, dispatchOutbox: false);
 
         using var handlerScope = _factory.Services.CreateScope();
@@ -463,14 +421,9 @@ public class PositionRoleSyncRecoveryIntegrationTests
             CancellationToken.None);
         var reconcileTask = reconciliationService.ReconcileAllCompaniesAsync(CancellationToken.None);
 
-        // Neither path may throw an unhandled exception out of this Task.WhenAll — the
-        // reconciliation service explicitly catches DbUpdateException and defers to the next pass
-        // rather than letting a concurrent-write race escape as an unhandled failure.
         var exception = await Record.ExceptionAsync(() => Task.WhenAll(handlerTask, reconcileTask));
         Assert.Null(exception);
 
-        // A follow-up reconciliation pass (simulating the next scheduled run) must converge
-        // regardless of which of the two writers "won" the race.
         await RunReconciliationAsync();
 
         var positions = await GetUserPositionsAsync(employeeId);
@@ -483,13 +436,6 @@ public class PositionRoleSyncRecoveryIntegrationTests
     [Fact]
     public async Task OneEmployeesReconciliationFailure_DoesNotBlockAnotherEmployeeInTheSameCompany()
     {
-        // Isolation is per-employee INSIDE ReconcileEmployeeAsync (see PositionRoleReconciliationService),
-        // not at the batch-profile-read level — a reader that throws while resolving the whole
-        // company's employee profiles fails that whole company/pass, not just one employee. So this
-        // test simulates a failure the real code actually isolates: PositionSync.EnsureExistsAsync
-        // (via IPositionProfileReader.GetSummaryAsync) throwing while resolving ONE employee's
-        // current position, wrapping the real, DI-resolved IPositionProfileReader so every other
-        // position profile (including the healthy employee's) still resolves normally.
         var companyId = Guid.NewGuid();
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
         var healthyPositionId = await SeedAdditionalPositionProfileAsync(companyId, referenceData, "Healthy Role");
@@ -517,16 +463,10 @@ public class PositionRoleSyncRecoveryIntegrationTests
         var healthyEffectiveRoles = await GetEffectiveRolesAsync(healthyEmployeeId);
         Assert.Contains(healthyRoleId, healthyEffectiveRoles);
 
-        // The failing employee got no assignment created for the unresolvable position — isolated
-        // and logged, not silently treated as a success.
         var failingPositions = await GetUserPositionsAsync(failingEmployeeId);
         Assert.DoesNotContain(failingPositions, up => up.PositionId == failingPositionId);
     }
 
-    /// <summary>Wraps the real, DI-resolved <see cref="IPositionProfileReader"/> but throws when
-    /// resolving one specific position profile's summary — simulating a transient read failure for
-    /// exactly one employee's current position while every other position (including the healthy
-    /// employee's) still resolves via the real implementation.</summary>
     private sealed class ThrowingForOnePositionReader(
         IPositionProfileReader inner, Guid throwForPositionProfileId) : IPositionProfileReader
     {

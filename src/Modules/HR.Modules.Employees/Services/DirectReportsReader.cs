@@ -25,12 +25,6 @@ internal sealed class DirectReportsReader(EmployeesDbContext dbContext) : IDirec
         Guid managerId,
         CancellationToken cancellationToken)
     {
-        // Bulk-load a single (Id, ManagerId) projection for the whole company, then walk it
-        // in memory with a BFS closure. This mirrors GetOrganisationChartHandler's approach of
-        // pulling the flat employee set once and building relationships client-side, rather than
-        // issuing provider-specific raw SQL (e.g. a recursive CTE) — nothing else in this
-        // codebase uses FromSqlRaw/FromSqlInterpolated, and company employee counts in this
-        // domain make an in-memory walk cheap.
         var managerLookup = await dbContext.Employees
             .AsNoTracking()
             .Where(e => e.CompanyId == companyId)

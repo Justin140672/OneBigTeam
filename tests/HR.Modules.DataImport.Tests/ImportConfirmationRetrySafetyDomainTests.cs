@@ -2,11 +2,6 @@ using HR.Modules.DataImport.Domain;
 
 namespace HR.Modules.DataImport.Tests;
 
-/// <summary>
-/// OBT-REM-06: domain-level guarantees for the retry/concurrency-safe confirm flow —
-/// <see cref="ImportSession.ClaimForConfirmation"/> transitions + version bump, and the durable
-/// per-row <see cref="ImportStagingEmployee.MarkConfirmed"/> marker that lets a retry skip a row.
-/// </summary>
 public class ImportConfirmationRetrySafetyDomainTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 3, 11, 53, 53, TimeSpan.Zero);
@@ -38,9 +33,6 @@ public class ImportConfirmationRetrySafetyDomainTests
     [Fact]
     public void ClaimForConfirmation_refreshes_StartedAt_on_every_claim()
     {
-        // OBT-REM-08: StartedAt must be refreshed on every claim (not just the first), so an
-        // actively running confirmation is judged for staleness from when THIS attempt started,
-        // not from a much earlier Validate/first-claim timestamp.
         var s = NewSession();
         s.Start(Now);
 
@@ -89,16 +81,12 @@ public class ImportConfirmationRetrySafetyDomainTests
 
         Assert.Equal(employeeId, row.CreatedEmployeeId);
         Assert.Equal(Now.AddMinutes(1), row.EmployeeCreatedAt);
-        // Creating the employee alone does not yet make the row fully confirmed — downstream
-        // steps (events, leave balance, manager assignment) still need to complete.
         Assert.False(row.IsFullyConfirmed);
     }
 
     [Fact]
     public void MarkEmployeeCreated_is_the_signal_a_retry_uses_to_skip_re_creating_the_employee()
     {
-        // A row that already produced an employee must report a non-null CreatedEmployeeId so the
-        // handler's resume path reads back the snapshot instead of creating a second employee.
         var row = ImportStagingEmployee.Create(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 5, null, null, null,
             null, null, null, null, "{}", isValid: true, Now);

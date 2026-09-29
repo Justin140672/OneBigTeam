@@ -7,14 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Tests;
 
-/// <summary>
-/// LEGACY / dead-in-practice: <see cref="Vacancy.PositionProfileId"/> is now a non-nullable
-/// <see cref="Guid"/> (see the comment on that property), so there is no compiler-representable way
-/// to construct a vacancy that "needs" an auto-matched position profile any more — every vacancy
-/// always has one. ApplyPositionProfileMatchesHandler was rewritten to always short-circuit and
-/// return an empty result; these tests assert exactly that, regardless of what vacancy data exists in
-/// the database, and confirm it never touches existing rows.
-/// </summary>
 public class ApplyPositionProfileMatchesHandlerTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 7, 17, 10, 0, 0, DateTimeKind.Utc);

@@ -5,11 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Integration coverage for the RequestPersonalDetailsChange self-service slice
-/// (POST /api/companies/{companyId}/employees/{employeeId}/personal-details-change-requests).
-/// A caller may only raise a request against their OWN employee record.
-/// </summary>
 [Collection("Integration")]
 public class RequestPersonalDetailsChangeEndpointTests
 {
@@ -104,7 +99,6 @@ public class RequestPersonalDetailsChangeEndpointTests
         Assert.NotNull(payload);
         Assert.NotEqual(Guid.Empty, payload!.TaskId);
 
-        // Task is created unassigned and shows in the company's unassigned queue.
         var unassigned = await adminClient.GetFromJsonAsync<UnassignedTasksPayload>(
             $"/api/companies/{companyId}/tasks/unassigned");
         var task = Assert.Single(unassigned!.Items, t => t.Id == payload.TaskId);

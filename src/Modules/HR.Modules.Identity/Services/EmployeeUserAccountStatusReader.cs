@@ -53,7 +53,7 @@ internal sealed class EmployeeUserAccountStatusReader(IdentityDbContext db) : IE
         foreach (var profile in profiles)
         {
             if (result.ContainsKey(profile.Id))
-                continue; // an ApplicationUser already exists — that status takes precedence.
+                continue;
 
             result[profile.Id] = new EmployeeUserAccountSummary(
                 profile.Id,
@@ -64,7 +64,7 @@ internal sealed class EmployeeUserAccountStatusReader(IdentityDbContext db) : IE
         foreach (var invite in invites)
         {
             if (result.ContainsKey(invite.EmployeeId))
-                continue; // an ApplicationUser or UserProfile already exists — that status takes precedence.
+                continue;
 
             result[invite.EmployeeId] = new EmployeeUserAccountSummary(
                 invite.EmployeeId,

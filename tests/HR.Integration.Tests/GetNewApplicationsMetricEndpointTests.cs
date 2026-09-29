@@ -100,7 +100,6 @@ public class GetNewApplicationsMetricEndpointTests
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
-            // Custom, renamed pipeline with NO purpose flags and reordered stages.
             var screen = RecruitmentStage.Create(Guid.NewGuid(), companyId, "Screening", 2, false, RecruitmentStageTerminalOutcome.None, Now);
             var shortlist = RecruitmentStage.Create(Guid.NewGuid(), companyId, "Shortlisted", 1, false, RecruitmentStageTerminalOutcome.None, Now);
             var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Data Analyst", null, Guid.NewGuid(), Now);

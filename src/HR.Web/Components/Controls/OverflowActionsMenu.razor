@@ -6,9 +6,6 @@
 </SfDropDownButton>
 
 @code {
-    // Groups the lower-frequency toolbar actions (Print, Export, Columns) behind a single "More"
-    // overflow button so the toolbar gives visual priority to the actions used most often
-    // (search, filters, Add, Update selected) rather than treating every action equally.
     [Parameter] public EventCallback<string> OnItemSelected { get; set; }
 
     private static readonly List<DropDownMenuItem> _items =

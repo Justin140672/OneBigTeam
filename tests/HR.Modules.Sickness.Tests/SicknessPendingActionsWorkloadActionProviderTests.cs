@@ -10,11 +10,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Tests;
 
-/// <summary>
-/// OBT-721 workload action provider tests for pending sickness administration — HR-only category
-/// (see xmldoc on the provider). Mirrors GetProbationReportHandlerTests-style coverage, adapted for
-/// an HR-only (no Manager row-scoping) provider.
-/// </summary>
 public class SicknessPendingActionsWorkloadActionProviderTests
 {
     private static SicknessDbContext BuildContext()
@@ -61,7 +56,6 @@ public class SicknessPendingActionsWorkloadActionProviderTests
 
         Assert.Equal(2, result.Count);
         Assert.All(result, a => Assert.Equal("Complete Return to Work Review", a.ActionType));
-        // Reviews are always owned by the employee's manager — HR sees them for oversight only.
         Assert.All(result, a => Assert.False(a.IsOwnerActionable));
         Assert.All(result, a => Assert.Equal("Owned by the employee's manager", a.OwnerLabel));
     }
@@ -79,9 +73,6 @@ public class SicknessPendingActionsWorkloadActionProviderTests
             ReturnToWorkReview.Create(Guid.NewGuid(), companyId, record.Id, employeeId, new DateOnly(2026, 7, 10), DateTimeOffset.UtcNow));
         await context.SaveChangesAsync();
 
-        // Manager but not HR, and requesting the Hr scope explicitly — the authorization check for
-        // the Hr scope requires reporting:view-hr, which this caller lacks, so they get nothing back
-        // regardless of direct reports.
         var provider = new SicknessPendingActionsWorkloadActionProvider(
             context, new FakeEmployeeDepartmentReader(), new FakeAuthorizationService(),
             new FakeOpenTaskBySourceEntityReader(), new FakeDirectReportsReader([employeeId]), new FakeCurrentUser(Guid.NewGuid()));
@@ -113,8 +104,6 @@ public class SicknessPendingActionsWorkloadActionProviderTests
     [Fact]
     public async Task GetActionsAsync_HrCaller_Requesting_ManagerScope_With_No_Team_Returns_Empty()
     {
-        // Manager scope is now self-scoped to the caller's own reporting sub-tree regardless of
-        // any Hr role the caller also holds — a caller with an empty team sees nothing.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -176,7 +165,6 @@ public class SicknessPendingActionsWorkloadActionProviderTests
             Guid.NewGuid(), companyId, recordOut.Id, outsideEmployeeId, new DateOnly(2026, 7, 10), DateTimeOffset.UtcNow);
         context.ReturnToWorkReviews.AddRange(reviewIn, reviewOut);
 
-        // Evidence requests must never be surfaced to the Manager workspace at all.
         context.SicknessEvidenceRequests.Add(
             SicknessEvidenceRequest.Create(Guid.NewGuid(), companyId, recordIn.Id, Guid.NewGuid(),
                 new DateOnly(2026, 7, 20), null, DateTimeOffset.UtcNow));
@@ -220,9 +208,7 @@ public class SicknessPendingActionsWorkloadActionProviderTests
         Assert.Equal("Follow Up Sickness Evidence Request", action.ActionType);
         Assert.Equal("Pending Sickness Actions", action.ActionCategory);
         Assert.Equal(dueDate, action.DueDate);
-        // No employee-profile fallback: entirely task-backed category.
         Assert.Equal("", action.DeepLinkUrl);
-        // Evidence requests are actioned by the employee themselves — never owner-actionable from HR.
         Assert.False(action.IsOwnerActionable);
         Assert.Equal("Owned by the employee", action.OwnerLabel);
     }
@@ -267,9 +253,6 @@ public class SicknessPendingActionsWorkloadActionProviderTests
     [Fact]
     public async Task GetActionsAsync_Multiple_ReturnToWorkReviews_With_Identical_ActionType_Each_Resolve_Their_Own_Distinct_TaskId()
     {
-        // Two different employees' return-to-work reviews share the exact same ActionType/Category
-        // text — the linked task must be resolved by the review's own id, never by
-        // title/employee matching.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeA = Guid.NewGuid();

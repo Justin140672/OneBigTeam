@@ -98,7 +98,6 @@ public class ListVacanciesEndpointTests
         Assert.Equal(positionProfileId, item.PositionProfileId);
         Assert.Equal("Backend Engineer", item.PositionProfileTitle);
         Assert.Equal(departmentId, item.PositionProfileDepartmentId);
-        // No AdvertTitle override was supplied, so EffectiveTitle falls back to the Position Profile's.
         Assert.Equal("Backend Engineer", item.EffectiveTitle);
     }
 
@@ -165,8 +164,6 @@ public class ListVacanciesEndpointTests
         var item = Assert.Single(payload!.Items);
         Assert.Equal(vacancyId, item.Id);
         Assert.Equal("Legacy Support Engineer", item.PositionProfileTitle);
-        // List items don't carry an IsActive field of their own — Title/DepartmentId still
-        // resolve for a deactivated linked profile is the behaviour under test here.
     }
 
     [Fact]

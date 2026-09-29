@@ -19,10 +19,6 @@ public class AddSupportResponseHandlerTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
 
-    /// <summary>Security review finding #4 (P1): UploadedAttachmentCleanupScope now persists
-    /// cleanup bookkeeping through a genuinely separate DI scope/DbContext, not the ambient one.
-    /// None of these tests exercise cleanup failure paths, so an isolated in-memory database is
-    /// sufficient here.</summary>
     private static IServiceScopeFactory BuildScopeFactory() =>
         new ServiceCollection()
             .AddDbContext<SupportDbContext>(o => o.UseInMemoryDatabase(Guid.NewGuid().ToString("N")))
@@ -240,7 +236,6 @@ public class AddSupportResponseHandlerTests
         Assert.Equal("not_found", result.Error.Code);
     }
 
-    // ── P1 stored-XSS fix ────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Persists_Sanitised_Body_For_Malicious_Input()

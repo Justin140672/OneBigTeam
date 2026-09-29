@@ -8,10 +8,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Identity.Tests.Jobs;
 
-// P1 fix (departure access disablement): unit tests for AccountDisablementJob, the durable,
-// retryable worker that performs and confirms the actual ApplicationUser.IsActive disablement
-// requested by Features/OnEmployeeDepartureFinalised. Mirrors
-// HR.Modules.Companies.Tests.EmployeeRenumberSideEffectJobTests's retry/attempt-tracking pattern.
 [Collection("IdentityDatabase")]
 public class AccountDisablementJobTests(IdentityDatabaseFixture fixture)
 {
@@ -19,8 +15,6 @@ public class AccountDisablementJobTests(IdentityDatabaseFixture fixture)
     private static readonly DateTimeOffset Now = new(2026, 9, 11, 9, 0, 0, TimeSpan.Zero);
     private static readonly FakeClock Clock = new(Now.UtcDateTime);
 
-    // Only publishes audit events once the AccountDisablement row it's checking against is already
-    // Processed in a *freshly-loaded* context — proves the job never reports success optimistically.
     private sealed class OrderVerifyingAuditEventPublisher(IdentityDatabaseFixture fixture, Guid accountDisablementId)
         : IAuditEventPublisher
     {
@@ -133,7 +127,7 @@ public class AccountDisablementJobTests(IdentityDatabaseFixture fixture)
 
         Assert.Empty(auditPublisher.PublishedEvents);
         var reloaded = await db.AccountDisablements.SingleAsync(d => d.Id == request.Id);
-        Assert.Equal(RequestedAt.AddMinutes(2), reloaded.ProcessedAt); // untouched — no second run occurred
+        Assert.Equal(RequestedAt.AddMinutes(2), reloaded.ProcessedAt);
     }
 
     [Fact]
@@ -164,7 +158,6 @@ public class AccountDisablementJobTests(IdentityDatabaseFixture fixture)
 
         await using (var seedDb = fixture.BuildContext())
         {
-            // No ApplicationUser seeded — the linked account no longer exists.
             var request = AccountDisablement.CreatePending(
                 Guid.NewGuid(), companyId, Guid.NewGuid(), employeeId, RequestedAt);
             seedDb.AccountDisablements.Add(request);
@@ -182,12 +175,6 @@ public class AccountDisablementJobTests(IdentityDatabaseFixture fixture)
         }
     }
 
-    // Fault injection strategy: IClock is the only collaborator inside AccountDisablementJob's try
-    // block that can be made to fail without corrupting the DbContext directly — SelectiveThrowingClock
-    // throws on exactly its Nth access. The 1st access (before the try block, for MarkProcessing) is
-    // left to succeed so AttemptCount tracking behaves normally; the 2nd access (inside the try,
-    // fetching/deactivating the user) is made to throw, simulating a genuine mid-operation failure
-    // before the row would otherwise be marked Processed.
     [Fact]
     public async Task ProcessAsync_Transient_Failure_Increments_AttemptCount_Leaves_Processing_And_Rethrows()
     {
@@ -201,8 +188,6 @@ public class AccountDisablementJobTests(IdentityDatabaseFixture fixture)
         await Assert.ThrowsAsync<InvalidOperationException>(() => job.ProcessAsync(request.Id, companyId));
 
         var reloaded = await db.AccountDisablements.SingleAsync(d => d.Id == request.Id);
-        // AttemptCount is 1 (MarkProcessing ran once) but this isn't the final attempt
-        // (MaxAttempts=4), so the row is left Processing rather than Failed.
         Assert.Equal(1, reloaded.AttemptCount);
         Assert.Equal(AccountDisablement.StatusProcessing, reloaded.Status);
         Assert.Null(reloaded.FailureReason);
@@ -214,12 +199,6 @@ public class AccountDisablementJobTests(IdentityDatabaseFixture fixture)
     {
         var (companyId, _, request) = await SeedPendingRequestAsync();
 
-        // Simplification (per test-plan note): rather than driving AttemptCount up via repeated
-        // real invocations (which, given AccountDisablementJob's actual save-before-publish
-        // ordering, would already leave the row Processed after the first "failure" and short-
-        // circuit further attempts via the Status==Processed idempotency guard), seed AttemptCount
-        // directly to MaxAttempts-1 via the domain's own MarkProcessing/SaveChanges, then trigger
-        // exactly one more (final) failing attempt.
         await using (var seedDb = fixture.BuildContext())
         {
             var toBump = await seedDb.AccountDisablements.SingleAsync(d => d.Id == request.Id);

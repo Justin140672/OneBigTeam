@@ -42,10 +42,10 @@ public class ResolveOperationalAlertValidatorTests
     }
 
     [Theory]
-    [InlineData(4, false)]   // below the trimmed minimum of 5
-    [InlineData(5, true)]    // exact lower boundary
-    [InlineData(1000, true)] // exact upper boundary
-    [InlineData(1001, false)] // one past the upper boundary
+    [InlineData(4, false)]
+    [InlineData(5, true)]
+    [InlineData(1000, true)]
+    [InlineData(1001, false)]
     public void Trimmed_Length_Boundary(int length, bool expectValid)
     {
         var note = new string('x', length);
@@ -55,7 +55,6 @@ public class ResolveOperationalAlertValidatorTests
     [Fact]
     public void Note_Is_Measured_After_Trimming_Surrounding_Whitespace()
     {
-        // 3 real characters padded to well over 5 with whitespace — still too short once trimmed.
         var result = Validator.Validate(Request(note: "   abc   "));
         Assert.False(result.IsValid);
     }

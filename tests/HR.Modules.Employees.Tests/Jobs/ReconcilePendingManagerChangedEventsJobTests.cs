@@ -9,9 +9,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Employees.Tests.Jobs;
 
-// Daily sweep that publishes any PendingManagerChangedEvent still missing PublishedAt. See
-// PendingManagerChangedEvent's remarks and EmployeeDepartureFinalizer.CascadeManagerDepartureAsync
-// for the reliability gap this recovers from.
 public class ReconcilePendingManagerChangedEventsJobTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 9, 11, 8, 0, 0, DateTimeKind.Utc);
@@ -29,8 +26,6 @@ public class ReconcilePendingManagerChangedEventsJobTests
         return pendingEvent;
     }
 
-    // Selectively throws when publishing for a configured set of report employee ids, to simulate
-    // one record's publish failing without corrupting the others in the same sweep.
     private sealed class SelectivelyThrowingIntegrationEventPublisher(params Guid[] throwingReportEmployeeIds)
         : IIntegrationEventPublisher
     {
@@ -48,10 +43,6 @@ public class ReconcilePendingManagerChangedEventsJobTests
             return Task.CompletedTask;
         }
 
-        // The job under test now calls PublishAndConfirmAsync and gates MarkPublished on its
-        // return value rather than on the publish call simply not throwing (see Gap-1 reliability
-        // fix in ReconcilePendingManagerChangedEventsJob) — mirror that same throw/catch semantics
-        // here so these tests keep exercising "publish failed" via the confirmed-delivery path.
         public async Task<bool> PublishAndConfirmAsync<TEvent>(TEvent integrationEvent, CancellationToken cancellationToken)
             where TEvent : IIntegrationEvent
         {
@@ -108,7 +99,7 @@ public class ReconcilePendingManagerChangedEventsJobTests
 
         var reloadedAlreadyPublished =
             await context.PendingManagerChangedEvents.SingleAsync(e => e.Id == alreadyPublishedRecord.Id);
-        Assert.Equal(Now.AddMinutes(-5), reloadedAlreadyPublished.PublishedAt); // untouched
+        Assert.Equal(Now.AddMinutes(-5), reloadedAlreadyPublished.PublishedAt);
     }
 
     [Fact]
@@ -135,7 +126,7 @@ public class ReconcilePendingManagerChangedEventsJobTests
         Assert.Equal(healthyRecord.ReportEmployeeId, published.EmployeeId);
 
         var reloadedFailing = await context.PendingManagerChangedEvents.SingleAsync(e => e.Id == failingRecord.Id);
-        Assert.Null(reloadedFailing.PublishedAt); // left pending for the next run
+        Assert.Null(reloadedFailing.PublishedAt);
 
         var reloadedHealthy = await context.PendingManagerChangedEvents.SingleAsync(e => e.Id == healthyRecord.Id);
         Assert.NotNull(reloadedHealthy.PublishedAt);

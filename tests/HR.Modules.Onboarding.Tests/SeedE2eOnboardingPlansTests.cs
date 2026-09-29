@@ -46,7 +46,6 @@ public class SeedE2eOnboardingPlansTests
         Assert.Contains(tasksA, t => t.Title == "Schedule welcome and induction meeting — E2E SeedOnboardTabA");
         Assert.Contains(tasksA, t => t.DueDate == new DateOnly(2026, 3, 8));
 
-        // Matching unassigned Tasks-module tasks were also created (so they surface in the HR Inbox).
         var createdForA = _taskCreator.Created.Where(t => t.Title.EndsWith("E2E SeedOnboardTabA")).ToList();
         Assert.Equal(3, createdForA.Count);
         Assert.All(createdForA, t =>

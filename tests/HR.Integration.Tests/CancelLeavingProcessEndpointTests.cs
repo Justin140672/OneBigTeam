@@ -48,8 +48,6 @@ public class CancelLeavingProcessEndpointTests
         return (await response.Content.ReadFromJsonAsync<IdPayload>())!.Id;
     }
 
-    // Relative to "today" rather than hardcoded literals — see StartLeavingProcessEndpointTests'
-    // identical fields for why a fixed near-term literal eventually becomes "backdated".
     private static readonly DateOnly LeavingDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
     private static readonly DateOnly LastWorkingDay = LeavingDate.AddDays(-1);
 
@@ -106,10 +104,6 @@ public class CancelLeavingProcessEndpointTests
         Assert.Equal(companyId, payload!.CompanyId);
         Assert.Equal(employeeId, payload.EmployeeId);
         Assert.Equal("Cancelled", payload.Status);
-        // StartLeavingProcessHandler (slice 5) always auto-triggers offboarding via
-        // IOffboardingPlanCoordinator.StartAsync immediately after starting a leaving process, so
-        // by the time this test cancels it, an offboarding plan already exists and its outstanding
-        // tasks are expected to have been cancelled too.
         Assert.True(payload.OffboardingTasksCancelled);
 
         var getLeavingProcessResponse = await client.GetAsync(

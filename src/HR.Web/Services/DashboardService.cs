@@ -2,15 +2,6 @@ using HR.SharedKernel.Http;
 
 namespace HR.Web.Services;
 
-/// <summary>
-/// Typed client for the server-side bounded dashboard summary endpoints (ticket DSH-06). Each call
-/// replaces a fan-out of 5-7 independent widget fetches with one request that returns per-category
-/// authoritative counts plus a capped (25) pre-ordered item list. Non-swallowing ("OrThrow") so
-/// <see cref="WidgetSourceLoader"/> can record the failure — reads go through the shared
-/// <see cref="ApiResponseReader"/> so 401/403/404/5xx/network failures are classified consistently
-/// with every other migrated service, then re-thrown as an exception carrying that classification
-/// (rather than a bare "no body" message) for WidgetSourceLoader to log.
-/// </summary>
 public sealed class DashboardService(HrApiHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient();

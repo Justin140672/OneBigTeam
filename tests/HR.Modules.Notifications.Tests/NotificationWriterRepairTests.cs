@@ -71,13 +71,10 @@ public class NotificationWriterRepairTests
         Assert.Equal(notificationId, job.Args[0]);
         Assert.Equal(companyId, job.Args[1]);
 
-        // No new rows created — exactly the pre-existing ones remain.
         Assert.Single(await db.Notifications.ToListAsync());
         Assert.Single(await db.EmailDeliveries.ToListAsync());
     }
 
-    // Theory parameters must be a publicly accessible type (xUnit requires public test methods),
-    // but EmailDeliveryStatus is internal — pass the enum's underlying int value instead and cast.
     [Theory]
     [InlineData((int)EmailDeliveryStatus.Sent)]
     [InlineData((int)EmailDeliveryStatus.Skipped)]
@@ -119,7 +116,6 @@ public class NotificationWriterRepairTests
 
         await RepairAsync(writer, employeeId, sourceEntityId, NotificationType.LeaveApproved);
 
-        // Audit is still (unconditionally) republished — only the enqueue is gated on Pending.
         Assert.Single(auditPublisher.Published);
         Assert.Empty(backgroundJobClient.CreatedJobs);
     }
@@ -127,8 +123,6 @@ public class NotificationWriterRepairTests
     [Fact]
     public async Task Repair_Does_Not_Enqueue_Job_When_No_EmailDelivery_Row_Exists()
     {
-        // In-app-only notification type — the existing notification was never channel-eligible for
-        // email, so there is no EmailDelivery row to repair.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();

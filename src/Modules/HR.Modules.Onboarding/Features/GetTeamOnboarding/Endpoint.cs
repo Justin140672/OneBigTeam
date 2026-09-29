@@ -21,11 +21,6 @@ internal sealed class Endpoint(
         GetTeamOnboardingRequest request,
         CancellationToken cancellationToken)
     {
-        // DSH-02: "role:employee" only proves tenant membership. The {managerId} route value is
-        // browser-supplied — without this check any employee could read any manager's team
-        // onboarding by editing the URL. Caller identity comes from the authenticated principal;
-        // they may view this manager's team only if they are that manager, sit above them in the
-        // reporting hierarchy, or are an HR administrator.
         if (currentUser.UserId is not { } callerEmployeeId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());

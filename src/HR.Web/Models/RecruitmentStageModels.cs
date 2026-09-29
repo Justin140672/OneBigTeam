@@ -14,8 +14,6 @@ public enum RecruitmentStageTerminalOutcome
     Rejected,
 }
 
-// DSH-04: explicit, machine-readable stage purpose. Only valid on non-terminal stages
-// (server rejects a purpose on a terminal stage). Serializes as a string. null == no metric meaning.
 public enum RecruitmentStagePurpose
 {
     NewApplication,
@@ -106,8 +104,6 @@ public sealed class RecruitmentStageEditModel : IHasVersion
 
     public RecruitmentStageTerminalOutcome TerminalOutcome { get; set; } = RecruitmentStageTerminalOutcome.None;
 
-    // DSH-04: nullable — "None" in the picker maps to null. Server rejects a non-null purpose on a
-    // terminal stage, so the edit screen hides/disables the picker when IsTerminal is true.
     public RecruitmentStagePurpose? Purpose { get; set; }
 
     public bool IsTerminal => TerminalOutcome != RecruitmentStageTerminalOutcome.None;

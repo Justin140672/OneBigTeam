@@ -8,22 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.GetNewApplicationsMetric;
 
-/// <summary>
-/// DSH-04 — "New applications".
-///
-/// <para><b>Business definition.</b> The count of live applications (not withdrawn, not in a terminal
-/// stage) that are sitting in a stage the company has explicitly flagged with the
-/// <see cref="RecruitmentStagePurpose.NewApplication"/> purpose. This is a deliberate configuration
-/// choice, never inferred from stage ordering.</para>
-///
-/// <para><b>Fallback.</b> If the company has configured no stage with that purpose, the metric falls
-/// back to a purely time-based definition: live applications received in the last
-/// <c>NewWithinDays</c> days (default 14). <see cref="GetNewApplicationsMetricResponse.DefinedByStagePurpose"/>
-/// reports which definition was used so the UI can prompt the company to configure a stage.</para>
-///
-/// Company scope is enforced by the <c>{companyId}</c> route (validated against the caller's tenant by
-/// <c>TenantRouteAuthorizationMiddleware</c>) and a <c>company_id</c> filter on every query.
-/// </summary>
 internal sealed class GetNewApplicationsMetricHandler(
     RecruitmentDbContext db, IClock clock, IPositionProfileReader positionProfileReader)
 {

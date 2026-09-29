@@ -8,13 +8,6 @@ public sealed class AuditLogService(HrApiHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient();
 
-    /// <summary>
-    /// Returns null when the call fails or the caller isn't authorised (401/403) — same
-    /// null-means-"show sign-in/not-authorised state" contract as CustomerListService/
-    /// FailedPaymentsService. Real enforcement happens server-side (HR.Api's "platform:admin"
-    /// policy plus GetAuditLogHandler's PlatformAdmin:AllowedEmails allow-list); this is UI-side
-    /// only.
-    /// </summary>
     public async Task<AuditLogResponse?> GetAuditLogOrNullAsync(
         Guid? companyId = null,
         string? administratorEmail = null,

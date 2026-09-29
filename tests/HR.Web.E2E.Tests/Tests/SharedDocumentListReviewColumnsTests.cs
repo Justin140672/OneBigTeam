@@ -4,22 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the two new Shared Documents *list* grid columns ("Review Frequency" and "Review
-/// Owner") added to SharedDocuments.razor. Both fields were already visible on the detail page
-/// (see SharedDocumentReviewFrequencyTests / SharedDocumentReviewOwnerTests) — this file only
-/// covers their rendering on the list grid itself: correct values when set, blank cells when
-/// unset, and the "SixMonthly" -> "Six Monthly" friendly-label mapping
-/// (DocumentModels.ReviewFrequencyDisplay.Label) that the list grid's column template applies.
-///
-/// Column order in SharedDocuments.razor's GridColumns (0-based, matches DOM order of
-/// ".e-rowcell" per row): 0=Title, 1=Category, 2=Version, 3=Status, 4=Effective Date,
-/// 5=Next Review Date, 6=Review Frequency, 7=Review Owner, 8=Last Updated, 9=Updated By.
-///
-/// Uses Laura Bennett (laura.bennett@acme.example, HrAdministrator) against the seeded Acme
-/// company, and Marcus Diallo as a review owner candidate (a seeded Acme employee — see
-/// EmployeesModule), matching the other Shared Documents E2E tests.
-/// </summary>
 public sealed class SharedDocumentListReviewColumnsTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -47,8 +31,6 @@ public sealed class SharedDocumentListReviewColumnsTests(HrAdminPersonaFixture f
                 reviewFrequencyLabel: "Quarterly",
                 reviewOwnerNameFragment: MarcusDiallo);
 
-            // Reload the list page fresh so the assertion exercises a real page load of the grid,
-            // not just the in-memory state left over from the upload.
             await GoToListPageAsync();
 
             Assert.Equal("Quarterly", await GetListRowCellAsync(title, ReviewFrequencyColumnIndex));
@@ -72,8 +54,6 @@ public sealed class SharedDocumentListReviewColumnsTests(HrAdminPersonaFixture f
         var tempFile = Path.Combine(Path.GetTempPath(), $"shared-doc-{Guid.NewGuid():N}.pdf");
         try
         {
-            // Neither reviewFrequencyLabel nor reviewOwnerNameFragment supplied — both fields are
-            // left at their unset defaults ("None" / no owner selected).
             await UploadDocumentAsync(title, tempFile);
 
             await GoToListPageAsync();
@@ -118,25 +98,12 @@ public sealed class SharedDocumentListReviewColumnsTests(HrAdminPersonaFixture f
         await _page.WaitForSelectorAsync(".e-grid .e-row, .e-grid .e-emptyrow", new() { Timeout = 15_000 });
     }
 
-    // Reads the 0-based columnIndex cell of the list grid row whose text contains title — same
-    // ".e-row" filter + ".e-rowcell" Nth() pattern used by
-    // SharedDocumentDetailPage.GetVersionRowCellAsync for the Version History grid on the detail
-    // page.
     private async Task<string> GetListRowCellAsync(string title, int columnIndex)
     {
         var row = _page.Locator(".e-row").Filter(new() { HasText = title }).First;
         return (await row.Locator(".e-rowcell").Nth(columnIndex).InnerTextAsync()).Trim();
     }
 
-    // Uploads a shared document from the Shared Documents list page (same flow as
-    // SharedDocumentUploadTests / SharedDocumentReviewFrequencyTests / SharedDocumentReviewOwnerTests),
-    // optionally selecting a Review Frequency (+ its required Next Review Date once the frequency
-    // isn't "None") and/or a Review Owner before submitting. Category, Review Frequency, and
-    // Review Owner are each reached by scoping to their own ".col-md-6" field group (rather than by
-    // combobox index) since Review Frequency's combobox can render before Category's — Category's
-    // is gated behind an async data load while Review Frequency's isn't — and Review Owner sits
-    // after the conditional "Custom Frequency (months)" field, whose presence would otherwise
-    // shift a plain Nth() index.
     private async Task UploadDocumentAsync(
         string title, string filePath,
         string? reviewFrequencyLabel = null,
@@ -183,7 +150,6 @@ public sealed class SharedDocumentListReviewColumnsTests(HrAdminPersonaFixture f
         await _page.WaitForSelectorAsync($"text={title}", new() { Timeout = 15_000 });
     }
 
-    // %PDF- followed by padding, so magic-byte content validation passes.
     private static byte[] BuildTestPdf()
     {
         var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };

@@ -114,7 +114,6 @@ public class AssignVacancyPositionProfileEndpointTests
         var otherCompanyId = Guid.NewGuid();
         using var client = await AuthenticatedClient(companyId);
 
-        // Position profile exists, but for a different company than the one making the request.
         var otherCompanyReferenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, otherCompanyId);
         var vacancyId = await SeedVacancyAsync(companyId);
 

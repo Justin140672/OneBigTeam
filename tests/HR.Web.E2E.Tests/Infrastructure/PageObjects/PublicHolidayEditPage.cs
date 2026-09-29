@@ -2,17 +2,11 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the public holiday create/edit page.
-/// Routes: /companies/{id}/public-holidays/new  and  /companies/{id}/public-holidays/{id}
-/// </summary>
 public sealed class PublicHolidayEditPage(IPage page, string baseUrl)
 {
     public async Task GoToNewAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/public-holidays/new");
-        // PublicHolidayEdit has an SfDatePicker; .e-date-wrapper only appears after Blazor's
-        // interactive render, ensuring event handlers are wired up.
         await page.WaitForSelectorAsync(".e-date-wrapper", new() { Timeout = 20_000 });
     }
 
@@ -42,7 +36,6 @@ public sealed class PublicHolidayEditPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".e-date-wrapper", new() { Timeout = 20_000 });
     }
 
-    /// <summary>Extracts the holiday GUID from the current /public-holidays/{id} edit URL.</summary>
     public Guid CurrentHolidayId()
     {
         var match = System.Text.RegularExpressions.Regex.Match(
@@ -55,9 +48,7 @@ public sealed class PublicHolidayEditPage(IPage page, string baseUrl)
     public async Task SaveAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
-        // Navigates back to the public-holidays list on success.
         await page.WaitForURLAsync("**/public-holidays", new() { Timeout = 15_000 });
-        // With prerender:false the circuit connects after navigation, wait for the grid.
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
@@ -87,14 +78,11 @@ public sealed class PublicHolidayEditPage(IPage page, string baseUrl)
     public Task<bool> IsConcurrencyWarningVisibleAsync() =>
         ConcurrencyWarningBanner.IsVisibleAsync();
 
-    /// <summary>Clicks "Reload latest values" in the concurrency banner and waits for it to clear.</summary>
     public async Task ClickReloadLatestValuesAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }).ClickAsync();
         await ConcurrencyWarningBanner.WaitForAsync(
             new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
-        // The reload round-trips the service Get before repopulating the model; give the re-bound
-        // values a beat to land before callers read them.
         await page.WaitForTimeoutAsync(300);
     }
 

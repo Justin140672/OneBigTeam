@@ -6,9 +6,6 @@ using HR.Modules.Companies.Contracts;
 
 namespace HR.Modules.DataImport.Services;
 
-/// <summary>
-/// The outcome of validating a single staged employee import row.
-/// </summary>
 internal sealed record RowValidationResult(
     int RowNumber,
     IReadOnlyList<string> Errors,
@@ -22,14 +19,6 @@ internal sealed record RowValidationResult(
     public bool IsValid => Errors.Count == 0;
 }
 
-/// <summary>
-/// Validates parsed employee import rows for a single import session: required fields,
-/// duplicate employee numbers/work emails (within the file and against existing employees),
-/// date fields, manager references, and (only when the relevant columns are mapped)
-/// compensation and leave balance fields. Also resolves Department/EmploymentType/Location/
-/// PositionProfile references by name, auto-creating any that do not already exist for the
-/// company (recorded as Warning-severity row messages).
-/// </summary>
 internal sealed class EmployeeStagingRowValidator(
     IEmployeeImportLookupReader lookupReader,
     IImportLookupResolver lookupResolver,
@@ -38,29 +27,16 @@ internal sealed class EmployeeStagingRowValidator(
     private static readonly string[] RequiredFields =
         ["FirstName", "LastName", "WorkEmail", "StartDate", "DateOfBirth", "Nationality", "Gender", "SalaryAmount"];
 
-    // Lookup-by-name fields that resolve to a mandatory Employee foreign key (Department,
-    // Location, EmploymentType, PositionProfile). These are validated for presence here in
-    // addition to the ResolveLookupsAsync existence/auto-create logic below, since an employee
-    // row missing any of them can never produce a valid Employee (all four are NOT NULL columns).
     private static readonly string[] RequiredLookupFields =
         ["DepartmentName", "LocationName", "EmploymentTypeName", "PositionProfileTitle"];
     private static readonly string[] DateFields = ["StartDate", "DateOfBirth", "ContinuousServiceDate", "ProbationEndDate"];
-    // SalaryAmount itself is unconditionally mandatory (see RequiredFields) — an employee can never
-    // have an opening compensation record with no salary figure, regardless of which other
-    // compensation columns happen to be mapped for this import. It stays out of this array
-    // (which only gates the fields that remain optional-if-mapped) but its numeric-format check
-    // still lives in ValidateCompensationFields below, run unconditionally per row.
     private static readonly string[] CompensationFields = ["SalaryType", "Currency"];
     private static readonly string[] LeaveFields = ["LeaveBalanceDays"];
     private static readonly string[] WorkingPatternFields = ["WorkingDays", "HoursPerDay"];
 
-    // Comma-separated day names, e.g. "Monday,Tuesday,Wednesday,Thursday,Friday" — mirrors the
-    // flags on HR.Infrastructure.Abstractions.WorkingDays.
     private static readonly HashSet<string> ValidDayNames =
         new(StringComparer.OrdinalIgnoreCase) { "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday" };
 
-    // Mirrors the SalaryType values accepted by HR.Modules.Employees' Domain.SalaryType enum
-    // (Annual, Hourly, Daily) via CreateCompensationRecord's validator (IsInEnum()).
     private static readonly HashSet<string> ValidSalaryTypes =
         new(StringComparer.OrdinalIgnoreCase) { "Annual", "Hourly", "Daily" };
 
@@ -204,11 +180,6 @@ internal sealed class EmployeeStagingRowValidator(
 
             if (positionProfileId is null)
             {
-                // A brand-new position profile can only ever be created once Department and
-                // Location are both present and resolvable on this row (mirrors
-                // ImportLookupResolver.GetOrCreatePositionProfileAsync's own guard) — surfaced here
-                // as an error (not a "will be created" warning) so the same row can never pass
-                // validation only to fail unexpectedly at confirm time.
                 if (string.IsNullOrWhiteSpace(departmentName) || string.IsNullOrWhiteSpace(locationName))
                 {
                     rowErrors.Add(
@@ -258,13 +229,6 @@ internal sealed class EmployeeStagingRowValidator(
         }
     }
 
-    // EmployeeNumberPattern lives on HR.Modules.Employees' CreateEmployeeValidator, which is
-    // `internal` and therefore not visible from this module. Rather than reaching across a
-    // module boundary or duplicating the literal, the pattern text is duplicated here with an
-    // explicit comment pointing at the canonical definition, since no shared cross-module
-    // validation-constants location currently exists in this codebase and introducing one for a
-    // single regex is not justified.
-    // Canonical definition: HR.Modules.Employees.Features.CreateEmployee.CreateEmployeeValidator.EmployeeNumberPattern
     private const string EmployeeNumberPattern = @"^[A-Za-z0-9 \-_./]+$";
     private static readonly Regex EmployeeNumberFormatRegex = new(EmployeeNumberPattern, RegexOptions.Compiled);
 
@@ -284,9 +248,6 @@ internal sealed class EmployeeStagingRowValidator(
             return;
         }
 
-        // Manual mode: required. Enforced explicitly here (rather than via the static
-        // RequiredFields array) because requiredness depends on the company's EmployeeNumberMode,
-        // which is only known once this method has already read it.
         if (string.IsNullOrWhiteSpace(employeeNumber))
         {
             rowErrors.Add("'EmployeeNumber' is required.");
@@ -374,9 +335,6 @@ internal sealed class EmployeeStagingRowValidator(
             rowErrors.Add($"Manager reference '{managerReference}' does not match any employee in this file or company.");
     }
 
-    // SalaryAmount's presence is enforced by ValidateRequiredFields (it's unconditionally
-    // mandatory); this only checks the format of whatever value was supplied, and runs on every
-    // row regardless of which other compensation columns were mapped.
     private static void ValidateSalaryAmountFormat(ParsedImportRow row, List<string> rowErrors)
     {
         var salaryAmount = GetField(row, "SalaryAmount");
@@ -433,8 +391,6 @@ internal sealed class EmployeeStagingRowValidator(
                 rowErrors.Add($"'LeaveBalanceDays' value '{leaveBalanceDays}' must be a non-negative number.");
         }
 
-        // LeaveTypeCode is format-only checked (non-empty when present); the parser already
-        // normalizes empty/whitespace cell values to null, so a present value is guaranteed non-empty.
     }
 
     private static void AddDuplicateErrors(

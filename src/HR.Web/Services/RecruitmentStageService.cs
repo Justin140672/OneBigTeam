@@ -16,7 +16,6 @@ public sealed class RecruitmentStageService(HrApiHttpClientFactory httpClientFac
         return result.Success ? result.Value : null;
     }
 
-    // DSH-03: non-swallowing sibling of ListStagesAsync.
     public Task<ListRecruitmentStagesResponse?> ListStagesOrThrowAsync(Guid companyId) =>
         Http.GetFromJsonAsync<ListRecruitmentStagesResponse>(
             $"api/companies/{companyId}/recruitment-stages", HrApiJsonOptions.Default);
@@ -67,8 +66,6 @@ public sealed class RecruitmentStageService(HrApiHttpClientFactory httpClientFac
         return result.Success ? result.Value : null;
     }
 
-    // ── IEditService<RecruitmentStageEditModel, Guid> ────────────────────────
-    // No dedicated backend GetById endpoint — the list already returns full item detail.
 
     async Task<RecruitmentStageEditModel?> IEditService<RecruitmentStageEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
     {
@@ -99,7 +96,6 @@ public sealed class RecruitmentStageService(HrApiHttpClientFactory httpClientFac
         if (result.Success)
             return ApiSaveResult.Ok(result.Value?.Version);
 
-        // The recruitment API returns no "code" on its 409 body, so ANY 409 is treated as a save conflict.
         var isConflict = result.FailureKind is ApiFailureKind.Concurrency or ApiFailureKind.Conflict;
         return ApiSaveResult.Fail(
             result.DisplayMessage ?? (isConflict
@@ -111,8 +107,6 @@ public sealed class RecruitmentStageService(HrApiHttpClientFactory httpClientFac
     async Task<(RecruitmentStageEditModel? Result, string? Error)> IEditService<RecruitmentStageEditModel, Guid>.CreateAsync(
         Guid companyId, RecruitmentStageEditModel model)
     {
-        // DisplayOrder for a new stage: append to the end of the current list (server assigns the
-        // authoritative sequence anyway via reorder; this is just a sane initial slot).
         var existingCount = (await ListStagesAsync(companyId))?.Items.Count ?? 0;
 
         var request = new CreateRecruitmentStageRequest(

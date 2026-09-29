@@ -35,11 +35,6 @@ internal sealed class CreateEmployeeHandler
         ICompanyContactValidationReader contactValidationReader,
         ICompanyEmployeeNumberSettingsReader employeeNumberSettingsReader,
         IEmployeeNumberGenerator employeeNumberGenerator,
-        // Optional so the many existing handler-level unit tests that construct this handler
-        // directly (with no interest in delivering the outbox event inline) don't all need
-        // updating. Production DI always supplies real instances via the required interface
-        // registrations in Program.cs; when null (unit tests), the inline dispatch below is
-        // simply skipped and the event stays queued for the background IdempotencyMaintenanceJob.
         IAuditEventPublisher? auditPublisher = null,
         IIntegrationEventPublisher? integrationPublisher = null,
         ILogger<CreateEmployeeHandler>? logger = null,
@@ -90,10 +85,6 @@ internal sealed class CreateEmployeeHandler
             }
         }
 
-        // NFR-08: idempotency short-circuit. Automated provisioning flows (candidate hire) supply a
-        // stable SourceReference. If the upstream workflow is retried after a partial failure, an
-        // employee for this source may already exist — return it rather than creating a duplicate,
-        // and do NOT re-publish EmployeeCreated (downstream consumers already ran for the first one).
         if (!string.IsNullOrWhiteSpace(request.SourceReference))
         {
             var sourceReference = request.SourceReference.Trim();
@@ -137,9 +128,6 @@ internal sealed class CreateEmployeeHandler
 
         var employeeNumberMode = await _employeeNumberSettingsReader.GetModeAsync(request.CompanyId, cancellationToken);
 
-        // Normalized the same way Employee.Create/UpdateEmploymentDetails normalize it, so these
-        // existence checks compare like-for-like with what the unique index enforces at the DB
-        // level.
         string employeeNumber;
         string normalizedEmployeeNumber;
 
@@ -151,16 +139,6 @@ internal sealed class CreateEmployeeHandler
                     Error.Validation("Employee number is required."));
             }
 
-            // Automatic mode: caller didn't supply one, generate it via the atomic counter and
-            // retry on conflict. The counter itself is race-free (a single UPDATE ... RETURNING
-            // relying on Postgres's row lock — see EmployeeNumberGenerator's own remarks), so two
-            // concurrent callers can never claim the same number from each other. But the stored
-            // "next" value can still drift out of sync with actual data by means outside this
-            // handler's control entirely — e.g. an admin directly editing "Next Number" on HR
-            // Settings to a value at or behind one already claimed. Retry with a fresh claim
-            // instead of failing the whole request outright; bounded, since a conflict persisting
-            // past a handful of attempts indicates something more seriously wrong than ordinary
-            // drift.
             const int maxAttempts = 5;
             var attempt = 0;
             while (true)
@@ -355,8 +333,6 @@ internal sealed class CreateEmployeeHandler
                 now));
         }
 
-        // Built from in-memory values ahead of the save, so it can double as both the response and
-        // the payload persisted for an idempotency replay.
         var response = MapResponse(employee);
 
         // Ticket 3 (P1) follow-up item 3/5: stage the integration event in the SAME transaction as
@@ -380,9 +356,6 @@ internal sealed class CreateEmployeeHandler
                 var outcome = await _dbContext.SaveIdempotentAsync<IdempotencyRecord, CreateEmployeeResponse>(_dbContext.IdempotencyRecords, 
                     scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
 
-                // Lost a race against a concurrent duplicate under the same key - this attempt's
-                // employee row was rolled back along with it, so skip our own event publish and
-                // hand back the winner's result untouched.
                 if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
                     return Result.Success(outcome.Response!);
             }
@@ -417,10 +390,6 @@ internal sealed class CreateEmployeeHandler
                     return Result.Success(MapResponse(raced));
             }
 
-            // Backstop for the race between the AnyAsync pre-check above and this SaveChangesAsync:
-            // the (CompanyId, EmployeeNumber) unique index rejects the duplicate at the database
-            // level, and we surface that as the same Conflict error the pre-check would have
-            // returned, rather than propagating a raw DB exception.
             return Result.Failure<CreateEmployeeResponse>(
                 Error.Conflict($"An employee with employee number '{employeeNumber}' already exists in this company."));
         }

@@ -7,11 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Identity.Features.Login;
 
-// The real, environment-agnostic sign-in path — replaces HR.Web's earlier dev-persona-only login
-// stub, which only ever matched a hardcoded set of seeded personas against a literal "password"
-// and never called Supabase at all. Every dev persona already has a real Supabase account (see
-// IdentityModule.SeedDevSupabaseUsersAsync, seeded with SupabaseAuthGateway.DevSupabasePassword),
-// so this same real sign-in path also serves Development without a separate shortcut.
 internal sealed class LoginHandler(
     ISupabaseAuthGateway supabaseAuthGateway,
     IdentityDbContext dbContext,
@@ -52,30 +47,18 @@ internal sealed class LoginHandler(
 
         if (profile is null)
         {
-            // A confirmed Supabase account with no matching UserProfile row shouldn't happen for
-            // any real signup path in this app, but fail closed rather than let an orphaned
-            // Supabase identity through with no local profile for downstream code to resolve.
             logger.LogWarning(
                 "Login succeeded at Supabase but found no matching UserProfile (Supabase user id {SupabaseUserId})",
                 session.UserId);
             return Result.Failure<LoginResponse>(Error.Validation("Invalid email or password."));
         }
 
-        // Reuses the same IsActive gate + LastLoginAt recording as the dev persona switcher
-        // (IdentityModule.TryDevSignInAsync) — despite the "Dev" name, that method's own logic is
-        // environment-agnostic (a plain active-check + login timestamp), only its caller
-        // (HR.Api's /api/dev/persona/{userId} route) is Development-gated.
         var isAllowed = await serviceProvider.TryDevSignInAsync(profile.Id);
         if (!isAllowed)
         {
             return Result.Failure<LoginResponse>(Error.Validation("Your account has been disabled."));
         }
 
-        // A UserProfile row with zero effective roles isn't a usable company-app account — e.g. a
-        // Supabase Auth user that's actually a platform administrator (Admin Portal-only, no
-        // company/role assignment here — see PlatformAdministrator) rather than a real HR.Web user.
-        // Without this, such an account would "successfully" log in to a blank/broken session (no
-        // roles to land on any page with) instead of a clear rejection.
         var roles = await authorizationService.GetEffectiveRolesAsync(profile.Id, cancellationToken);
         if (roles.Count == 0)
         {

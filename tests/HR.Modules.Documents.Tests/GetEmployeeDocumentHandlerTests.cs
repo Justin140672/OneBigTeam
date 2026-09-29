@@ -88,8 +88,6 @@ public class GetEmployeeDocumentHandlerTests
         Assert.Null(r.ExpiryDate);
         Assert.Null(r.AcknowledgedAt);
 
-        // DOC-02: detail response is metadata-only; there must be no download-URL
-        // property on the response record (compile-time proof via reflection).
         var responseType = typeof(GetEmployeeDocumentResponse);
         Assert.DoesNotContain(
             responseType.GetProperties(),
@@ -185,8 +183,6 @@ public class GetEmployeeDocumentHandlerTests
     [Fact]
     public async Task HandleAsync_Does_Not_Require_A_DocumentStorageService_Dependency()
     {
-        // DOC-02: the handler must no longer depend on IDocumentStorageService to
-        // resolve a download URL - the constructor only accepts the DbContext.
         var ctor = typeof(GetEmployeeDocumentHandler)
             .GetConstructors(System.Reflection.BindingFlags.Instance
                 | System.Reflection.BindingFlags.Public
@@ -197,8 +193,6 @@ public class GetEmployeeDocumentHandlerTests
         Assert.Equal(typeof(DocumentsDbContext), ctor.GetParameters()[0].ParameterType);
     }
 
-    // DOC-04: archived (soft-deleted) employee documents must behave as not-found through the
-    // normal get-detail endpoint.
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Document_Is_Archived()
     {

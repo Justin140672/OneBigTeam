@@ -52,7 +52,6 @@ public class ProfilePhotoReaderTests
         var otherCompanyId  = Guid.NewGuid();
         var employeeId      = Guid.NewGuid();
 
-        // Same employeeId, but the live photo belongs to a different company.
         SeedLivePhoto(db, otherCompanyId, employeeId, "other-company/storage/key.png");
 
         var reader = BuildReader(db);

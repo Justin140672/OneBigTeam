@@ -76,13 +76,11 @@ internal sealed class EmployeeInternalAppointmentService(
         if (managerError is not null)
             return Result.Failure<InternalAppointmentResult>(managerError);
 
-        // Same rule as PromoteEmployee: a backdated change applies immediately, so it must be confirmed.
         if (request.EffectiveDate < today && !request.ConfirmBackdatedEffectiveDate)
             return Result.Failure<InternalAppointmentResult>(
                 Error.Conflict("EffectiveDate is in the past. Confirm to backdate and apply the appointment immediately."));
 
         SalaryType salaryType = default;
-        // Names only: Enum.TryParse alone would also accept numeric strings such as "7".
         if (request.Compensation is { } compensation &&
             (!Enum.GetNames<SalaryType>().Contains(compensation.SalaryType?.Trim(), StringComparer.OrdinalIgnoreCase) ||
              !Enum.TryParse(compensation.SalaryType!.Trim(), ignoreCase: true, out salaryType)))
@@ -92,7 +90,6 @@ internal sealed class EmployeeInternalAppointmentService(
         var now = clock.UtcNowOffset();
         EmployeePromotion promotion;
 
-        // EF InMemory (unit tests) has no transactions; relational providers always get one.
         var transaction = dbContext.Database.IsRelational()
             ? await dbContext.Database.BeginTransactionAsync(cancellationToken)
             : null;
@@ -224,9 +221,6 @@ internal sealed class EmployeeInternalAppointmentService(
         dbContext.EmployeePromotions
             .SingleOrDefaultAsync(p => p.CompanyId == companyId && p.SourceReference == sourceReference, cancellationToken);
 
-    // Completes whatever an earlier, interrupted attempt left undone: a due-but-unfinalised change is
-    // finalised now; a future-dated one is left for ProcessPromotionsJob (its scheduled timeline entry
-    // is re-written idempotently in case the interruption happened before it was written).
     private async Task<InternalAppointmentResult> ResumeAsync(
         EmployeePromotion promotion,
         DateOnly today,
@@ -253,11 +247,6 @@ internal sealed class EmployeeInternalAppointmentService(
         return Map(promotion, wasAlreadyRecorded: true);
     }
 
-    // completed_at is a concurrency token, so when two callers race to finalise the same promotion
-    // (a concurrent retry, or ProcessPromotionsJob) exactly one save wins. The loser — or a save that
-    // lost to a concurrent edit of the employee — re-reads the promotion: if it is now completed the
-    // change was applied exactly once and that is success; otherwise the failure is genuine and is
-    // rethrown (the promotion stays pending and is applied by a retry or ProcessPromotionsJob).
     private async Task<EmployeePromotion> FinalizeOnceAsync(
         Employee employee,
         EmployeePromotion promotion,
@@ -307,7 +296,6 @@ internal sealed class EmployeeInternalAppointmentService(
         if (!managerExists)
             return Error.NotFound($"Manager employee '{managerId}' was not found.");
 
-        // Same circular-hierarchy rule as AssignManager: walk up the proposed manager's chain.
         var managerByEmployee = await dbContext.Employees
             .AsNoTracking()
             .Where(e => e.CompanyId == companyId)

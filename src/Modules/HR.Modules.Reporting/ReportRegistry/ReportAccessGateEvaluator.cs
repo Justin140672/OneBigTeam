@@ -3,12 +3,6 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace HR.Modules.Reporting.ReportRegistry;
 
-/// <summary>
-/// Evaluates the same set of `reporting:view-*` policies GetReportCatalog's endpoint already
-/// evaluates, so SaveReportView/AddReportFavourite/GetReportViews/GetReportFavourites authorize
-/// saved views and favourites against the caller's current per-report access exactly as the
-/// catalogue and report endpoints do.
-/// </summary>
 internal static class ReportAccessGateEvaluator
 {
     public static async Task<ReportAccessGates> EvaluateAsync(

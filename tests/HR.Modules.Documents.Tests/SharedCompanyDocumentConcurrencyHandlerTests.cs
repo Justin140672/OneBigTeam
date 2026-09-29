@@ -41,7 +41,6 @@ public class SharedCompanyDocumentConcurrencyHandlerTests
         return (dbName, companyId, category.Id, doc.Id);
     }
 
-    // ── Metadata ────────────────────────────────────────────────────────────────
 
     private static UpdateSharedCompanyDocumentMetadataHandler MetadataHandler(
         DocumentsDbContext db, FakeAuditPublisher audit) =>
@@ -125,7 +124,6 @@ public class SharedCompanyDocumentConcurrencyHandlerTests
         Assert.Equal(2, saved.Version);
     }
 
-    // ── Audience ────────────────────────────────────────────────────────────────
 
     private static UpdateSharedCompanyDocumentAudienceHandler AudienceHandler(
         DocumentsDbContext db, FakeEmployeeAudienceReader reader, FakeAuditPublisher audit) =>
@@ -220,7 +218,6 @@ public class SharedCompanyDocumentConcurrencyHandlerTests
         Assert.Equal(2, (await verify.SharedCompanyDocuments.SingleAsync()).Version);
     }
 
-    // ── Acknowledgement settings ────────────────────────────────────────────────
 
     private static UpdateSharedCompanyDocumentAcknowledgementSettingsHandler AckHandler(
         DocumentsDbContext db, FakeAuditPublisher audit) =>

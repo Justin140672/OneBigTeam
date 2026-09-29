@@ -4,7 +4,6 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 public sealed class NotificationPanel(IPage page)
 {
-    /// <summary>Returns the unread count shown on the bell badge, or 0 if no badge is visible.</summary>
     public async Task<int> GetUnreadCountAsync()
     {
         var badge = page.Locator(".notif-badge");
@@ -18,13 +17,6 @@ public sealed class NotificationPanel(IPage page)
         await page.Locator(".notif-btn").ClickAsync();
         await page.WaitForSelectorAsync(".notif-dropdown", new() { Timeout = 10_000 });
 
-        // ToggleNotifications() opens the dropdown synchronously and only THEN awaits the list
-        // fetch, so the panel first paints a ".notif-loading" placeholder; MainLayout keeps that
-        // up until the fetch resolves, at which point it swaps in real ".notif-item" rows or the
-        // ".notif-empty" placeholder. Waiting for the loading marker to clear (rather than for
-        // "item or empty" directly) is what makes this deterministic under a loaded server —
-        // otherwise a caller calling GetNotificationTitlesAsync() next reads an empty list for a
-        // persona who genuinely has notifications.
         await page.Locator(".notif-loading").WaitForAsync(
             new() { State = WaitForSelectorState.Detached, Timeout = 15_000 });
         await page.WaitForSelectorAsync(".notif-item, .notif-empty", new() { Timeout = 10_000 });
@@ -37,20 +29,14 @@ public sealed class NotificationPanel(IPage page)
             new() { State = WaitForSelectorState.Hidden, Timeout = 5_000 });
     }
 
-    /// <summary>
-    /// Clicks "Mark all read" inside an already-open notification panel and waits
-    /// for the unread badge to be removed from the DOM.
-    /// </summary>
     public async Task MarkAllReadAsync()
     {
         await page.Locator(".notif-mark-all").ClickAsync();
-        // Badge is conditionally rendered (@if unreadCount > 0); wait for it to vanish.
         await page.WaitForFunctionAsync(
             "!document.querySelector('.notif-badge')",
             null, new PageWaitForFunctionOptions { Timeout = 10_000 });
     }
 
-    /// <summary>Returns all notification titles currently in the open dropdown.</summary>
     public async Task<IReadOnlyList<string>> GetNotificationTitlesAsync()
     {
         var items = await page.Locator(".notif-item-title").AllAsync();
@@ -60,11 +46,6 @@ public sealed class NotificationPanel(IPage page)
         return titles;
     }
 
-    /// <summary>
-    /// Clicks the first notification whose title contains <paramref name="titleFragment"/>.
-    /// This opens TaskViewDialog in place (no navigation) — use TaskViewPage.WaitForLoadedAsync
-    /// (or its own methods, which wait internally) to read the opened task's content.
-    /// </summary>
     public async Task ClickNotificationAsync(string titleFragment)
     {
         var item = page.Locator(".notif-item")

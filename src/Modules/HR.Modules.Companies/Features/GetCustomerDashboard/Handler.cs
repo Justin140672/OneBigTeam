@@ -84,9 +84,6 @@ internal sealed class GetCustomerDashboardHandler(
                     subscription.UpdatedAt))
             .ToListAsync(cancellationToken);
 
-        // Permanent Deletion Queue (Customer Lifecycle epic) — a company counts as "pending" while
-        // it has an active, uncancelled, unexecuted deletion countdown (see
-        // CustomerSubscription.HasPendingDeletion).
         var pendingPermanentDeletions = await _dbContext.CustomerSubscriptions
             .AsNoTracking()
             .CountAsync(

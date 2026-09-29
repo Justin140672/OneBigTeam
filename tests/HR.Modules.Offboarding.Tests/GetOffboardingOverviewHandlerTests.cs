@@ -175,7 +175,6 @@ public class GetOffboardingOverviewHandlerTests
         Assert.Null(skippedItem.CompletedAt);
     }
 
-    // ---- OFF-07 ----
 
     [Fact]
     public async Task HandleAsync_Returns_HasIncompleteOffboardingAtDeparture_Progress_Fields_When_No_Plan_Found()
@@ -233,8 +232,8 @@ public class GetOffboardingOverviewHandlerTests
 
         Assert.True(result.HasIncompleteOffboardingAtDeparture);
         Assert.Equal(3, result.TotalTasks);
-        Assert.Equal(2, result.ResolvedTasks); // Completed + Skipped
-        Assert.Equal(67, result.ProgressPercent); // 2/3 rounded
+        Assert.Equal(2, result.ResolvedTasks);
+        Assert.Equal(67, result.ProgressPercent);
 
         var skippedItem = Assert.Single(result.Tasks, t => t.Id == skippedTask.Id);
         Assert.False(skippedItem.IsMandatory);
@@ -336,7 +335,6 @@ public class GetOffboardingOverviewHandlerTests
         Assert.NotEqual(older.LastWorkingDay, result.LastWorkingDay);
     }
 
-    // ---- OFF-05 ----
 
     [Fact]
     public async Task HandleAsync_Returns_IsBackdated_And_RequiresHrReconciliation_False_When_No_Plan_Found()
@@ -384,7 +382,6 @@ public class GetOffboardingOverviewHandlerTests
         Assert.True(taskItem.RequiresHrConfirmation);
     }
 
-    // ---- Leaving/Offboarding unified workspace: OpenTaskId / AssetAssignmentId ----
 
     [Fact]
     public async Task HandleAsync_Populates_OpenTaskId_When_Reader_Returns_A_Task_Id_For_The_Obligation()
@@ -418,8 +415,6 @@ public class GetOffboardingOverviewHandlerTests
         SeedTask(db, companyId, plan.Id, Now, "Conduct exit interview");
         await db.SaveChangesAsync();
 
-        // No entries in the reader's dictionary at all — simulates "not yet synced" or "already
-        // terminal" per the doc comment on OpenTaskId.
         var handler = BuildHandler(db);
         var result = await handler.HandleAsync(
             new GetOffboardingOverviewRequest(companyId, employeeId),

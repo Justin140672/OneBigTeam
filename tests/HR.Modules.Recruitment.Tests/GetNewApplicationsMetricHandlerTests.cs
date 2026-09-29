@@ -64,7 +64,6 @@ public class GetNewApplicationsMetricHandlerTests
         var live = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidates[0].Id, stages.ApplicationReceived.Id, null, Now);
         var withdrawn = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidates[1].Id, stages.ApplicationReceived.Id, null, Now);
         withdrawn.Withdraw(Now);
-        // Terminal stage app: even though nominally "new", it has reached a terminal stage.
         var hired = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidates[2].Id, stages.Hired.Id, null, Now);
 
         db.Applications.AddRange(live, withdrawn, hired);

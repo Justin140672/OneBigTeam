@@ -131,7 +131,6 @@ public class SharedCompanyDocumentAcknowledgementReminderJobHardeningTests
 
         await Assert.ThrowsAsync<InvalidOperationException>(() => job.ExecuteAsync());
 
-        // Nothing recorded, no audit event — the task may already exist, which is fine (it is reused).
         Assert.Empty(fakeWriter.Written);
         Assert.Empty(audit.Published);
         var createdTask = tasks.Created.Single();
@@ -140,7 +139,7 @@ public class SharedCompanyDocumentAcknowledgementReminderJobHardeningTests
         await job.ExecuteAsync();
 
         Assert.Single(fakeWriter.Written);
-        Assert.Single(tasks.Created); // task reused, not duplicated
+        Assert.Single(tasks.Created);
         Assert.Single(audit.Published.OfType<SharedCompanyDocumentReminderSentAuditEvent>());
     }
 
@@ -159,15 +158,12 @@ public class SharedCompanyDocumentAcknowledgementReminderJobHardeningTests
         var openTasks = new FakeOpenTaskBySourceEntityReader();
         var job = BuildJob(db, audience, writer, tasks, openTasks, faultyAudit);
 
-        // First run: notification is written, then the audit publish throws.
         await Assert.ThrowsAsync<InvalidOperationException>(() => job.ExecuteAsync());
         Assert.Single(writer.Written);
 
         var createdTask = tasks.Created.Single();
         openTasks.AddOpenTaskForAssignee(doc.Id, employeeId, TaskActionType.Acknowledge, createdTask.Id);
 
-        // Second run: the interval has not elapsed, so no second email — even though the audit
-        // event for the first send was lost.
         await job.ExecuteAsync();
 
         Assert.Single(writer.Written);
@@ -180,21 +176,19 @@ public class SharedCompanyDocumentAcknowledgementReminderJobHardeningTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var ghostEmployeeId = Guid.NewGuid();
-        var doc = await SeedPublishedDocAsync(db, companyId, Today.AddDays(-1)); // overdue -> escalation path
+        var doc = await SeedPublishedDocAsync(db, companyId, Today.AddDays(-1));
 
         var audience = new FakeEmployeeAudienceReader { EligibleEmployeeIds = [ghostEmployeeId] };
         var writer = new FakeNotificationWriter();
         var tasks = new FakeTaskCreator();
         var audit = new FakeAuditPublisher();
 
-        // managerReader returns null (no manager record) and employeeNameReader knows no names.
         var ex = await Record.ExceptionAsync(() =>
             BuildJob(db, audience, writer, tasks, new FakeOpenTaskBySourceEntityReader(), audit,
                 managerReader: new FakeManagerReader(managerId: null),
                 employeeNameReader: new FakeEmployeeNameReader()).ExecuteAsync());
 
         Assert.Null(ex);
-        // The employee still gets their overdue reminder; there is simply no manager to escalate to.
         Assert.Single(writer.Written, n => n.Type == NotificationType.SharedCompanyDocumentAcknowledgementOverdue);
         Assert.DoesNotContain(writer.Written, n => n.Type == NotificationType.SharedCompanyDocumentManagerEscalation);
     }
@@ -263,7 +257,6 @@ public class SharedCompanyDocumentAcknowledgementReminderJobHardeningTests
         var docA = await SeedPublishedDocAsync(db, companyA, Today.AddDays(2));
         var docB = await SeedPublishedDocAsync(db, companyB, Today.AddDays(2));
 
-        // A single audience reader returns each document's own eligible employee only.
         var audience = new FakeEmployeeAudienceReader { EligibleEmployeeIds = [employeeA, employeeB] };
         var writer = new FakeNotificationWriter();
         var tasks = new FakeTaskCreator();
@@ -273,7 +266,6 @@ public class SharedCompanyDocumentAcknowledgementReminderJobHardeningTests
 
         Assert.All(writer.Written, n => Assert.Contains(n.CompanyId, new[] { companyA, companyB }));
         Assert.All(tasks.Created, t => Assert.Contains(t.CompanyId, new[] { companyA, companyB }));
-        // Every notification's company matches the document it was raised for.
         foreach (var n in writer.Written)
         {
             var expectedCompany = tasks.Created.Single(t => t.Id == n.SourceEntityId).CompanyId;

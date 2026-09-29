@@ -16,19 +16,12 @@ public interface IBackgroundJobStatusReader
 {
     BackgroundJobStatusSummary GetStatus();
 
-    /// <summary>Jobs currently scheduled to enqueue in the future (e.g. delayed jobs).</summary>
     IReadOnlyList<BackgroundJobDetail> GetScheduledJobs(int count = 50);
 
-    /// <summary>Jobs currently being processed by a Hangfire server.</summary>
     IReadOnlyList<BackgroundJobDetail> GetRunningJobs(int count = 50);
 
-    /// <summary>Jobs whose most recent execution ended in the Failed state.</summary>
     IReadOnlyList<BackgroundJobDetail> GetFailedJobs(int count = 50);
 
-    /// <summary>
-    /// Requeues a failed job for immediate re-execution using Hangfire's own Failed -&gt; Enqueued
-    /// state transition (the same mechanism the Hangfire dashboard's "Retry" button uses).
-    /// </summary>
     BackgroundJobRetryResult RetryJob(string jobId);
 }
 
@@ -42,9 +35,6 @@ public sealed record BackgroundJobStatusSummary(
     int Succeeded,
     int Recurring);
 
-/// <summary>
-/// Job-level detail for platform admin job monitoring (Background Jobs epic, Job Monitoring story).
-/// </summary>
 public sealed record BackgroundJobDetail(
     string JobId,
     string JobName,

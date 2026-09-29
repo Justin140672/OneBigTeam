@@ -15,29 +15,11 @@ namespace HR.Infrastructure.Abstractions;
 /// </summary>
 public interface ISensitiveDataProtector
 {
-    /// <summary>
-    /// Encrypts <paramref name="plaintext"/> with the active key using AES-256-GCM and returns a
-    /// self-describing token of the form <c>OBTENC1:{keyId}:{base64(nonce|ciphertext|tag)}</c>.
-    /// </summary>
     string Protect(string plaintext);
 
-    /// <summary>
-    /// Decrypts a token produced by <see cref="Protect"/>. The key is selected from the key id
-    /// embedded in the token. Throws <see cref="SensitiveDataProtectionException"/> when the token
-    /// is malformed, the referenced key is not configured, or the authentication tag fails
-    /// (tampered ciphertext or wrong key). The exception never contains plaintext or key material.
-    /// </summary>
     string Unprotect(string protectedValue);
 
-    /// <summary>
-    /// Returns true when <paramref name="value"/> looks like a token produced by <see cref="Protect"/>.
-    /// Used to make read paths tolerant of not-yet-migrated plaintext during a field roll-out.
-    /// </summary>
     bool IsProtected(string? value);
 
-    /// <summary>
-    /// Attempts to decrypt <paramref name="value"/>. Returns false (without throwing) when the value
-    /// is null, not a protected token, or cannot be decrypted.
-    /// </summary>
     bool TryUnprotect(string? value, out string? plaintext);
 }

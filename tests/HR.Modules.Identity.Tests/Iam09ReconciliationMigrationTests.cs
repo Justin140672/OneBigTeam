@@ -4,24 +4,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Tests;
 
-/// <summary>
-/// OBT-IAM-09 — dedicated correctness/idempotency coverage for the reconciliation migration
-/// itself (20260904185201_OBT_IAM09_RemoveCompanyAdministratorOnboardingSupport), simulating a
-/// database provisioned before the ticket: a Company Administrator row still holding
-/// onboarding:view, onboarding:manage and support:manage alongside its permanent allow-list
-/// (company:read, company:edit, subscription:manage).
-///
-/// <see cref="Iam08CompanyAdministratorPermissionsTests"/>'s ReconcileSql test already covers the
-/// idempotency of a WHERE-NOT-IN-shaped reconciliation using unrelated obsolete permissions
-/// (employee:read, leave:approve, etc.) left over from the IAM-08 migration. This file exercises
-/// the actual per-row DELETE shape used by the OBT-IAM-09 migration itself, against the exact
-/// three permission ids it targets.
-/// </summary>
 [Collection("IdentityDatabase")]
 public class Iam09ReconciliationMigrationTests(IdentityDatabaseFixture fixture)
 {
-    // Mirrors the three per-row DeleteData calls in
-    // src/Modules/HR.Modules.Identity/Migrations/20260904185201_OBT_IAM09_RemoveCompanyAdministratorOnboardingSupport.cs
     private const string ReconcileSql = """
         DELETE FROM identity.role_permissions
         WHERE role_id = '00000000-0000-0000-0000-000000000006'
@@ -49,8 +34,6 @@ public class Iam09ReconciliationMigrationTests(IdentityDatabaseFixture fixture)
     [Fact]
     public async Task Migration_Removes_Onboarding_And_Support_Grants_Keeps_Allowlist_And_Is_Idempotent()
     {
-        // Simulate a pre-OBT-IAM-09 database: Company Administrator still holds the three
-        // now-obsolete grants alongside its permanent allow-list.
         await using (var seed = fixture.BuildContext())
         {
             foreach (var permissionId in RemovedGrants.Concat(RetainedAllowList))

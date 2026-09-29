@@ -4,14 +4,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Web.Services;
 
-/// <summary>
-/// Calls HR.Api's POST /api/login (HR.Modules.Identity's Login feature) — a real Supabase
-/// password-grant sign-in for whatever email/password the user typed, replacing Login.razor's
-/// earlier dev-persona-only stub. Works for both real self-service-signed-up accounts and seeded
-/// Development personas (which have a real Supabase account too — see IdentityModule.
-/// SeedDevSupabaseUsersAsync — just with SupabaseAuthGateway.DevSupabasePassword rather than a
-/// literal "password").
-/// </summary>
 public sealed class AuthService(HrApiHttpClientFactory httpClientFactory, ILogger<AuthService> logger)
 {
     private HttpClient Http => httpClientFactory.CreateClient();

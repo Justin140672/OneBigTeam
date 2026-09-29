@@ -5,19 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Services;
 
-/// <summary>
-/// Shared stage-change side effects used by every path that moves an Application to a new
-/// RecruitmentStage (the generic MoveApplicationStage feature and the existing named-transition
-/// handlers: RejectCandidate, WithdrawApplication, OfferCandidate, HireCandidate). Guarantees the
-/// three effects required by tickets #65/#66/#67 happen exactly once per successful stage change:
-///  1. A persisted ApplicationStageHistoryEntry (ticket #66) — added to the DbContext but not saved,
-///     so callers can commit it in the same transaction as their own SaveChangesAsync.
-///  2. An ApplicationStageChangedIntegrationEvent (ticket #65) — published only after the stage change
-///     has actually been committed.
-///  3. An ApplicationStageChangedAuditEvent (ticket #67) — published alongside the integration event.
-/// Ticket #99: stages are now RecruitmentStage rows rather than ApplicationStatus enum values, so
-/// this recorder resolves stage names for the human-readable integration/audit event payloads.
-/// </summary>
 internal sealed class RecruitmentStageChangeRecorder(
     RecruitmentDbContext db,
     IIntegrationEventPublisher eventPublisher,

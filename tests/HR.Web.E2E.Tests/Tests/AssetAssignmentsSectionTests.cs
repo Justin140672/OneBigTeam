@@ -3,21 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the Assignments section on the asset detail page.
-///
-/// Uses seeded data:
-///   - ASSET-0001 (MacBook Pro 14") assigned to Tom Williams — ID c0000000-0000-0000-0000-000000000002
-///     with assignment c0000000-0000-0000-0000-000000000003
-///   - ASSET-0002 (Dell UltraSharp 27") assigned to Sarah Chen — ID c0000000-0000-0000-0000-000000000004
-///     with assignment c0000000-0000-0000-0000-000000000005
-///
-/// Both assets belong to company 00000000-0000-0000-0000-000000000001 (Acme Corp).
-/// Both assets are in Assigned status, so the "Assign to Employee" button is not shown.
-///
-/// Admin user: Laura Bennett (laura.bennett@acme.example) who holds the
-/// asset:view permission via the HrAdministrator role.
-/// </summary>
 public sealed class AssetAssignmentsSectionTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId      = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -87,7 +72,6 @@ public sealed class AssetAssignmentsSectionTests(HrAdminPersonaFixture fixture) 
         await detail.GoToAsync(AcmeId, TomAssetId);
         await detail.WaitForAssignmentsSectionAsync();
 
-        // ASSET-0001 is in "Assigned" status, so the button should not appear
         Assert.False(await detail.IsAssignToEmployeeButtonVisibleAsync(),
             "The 'Assign to Employee' button should not be visible when the asset is already assigned");
     }

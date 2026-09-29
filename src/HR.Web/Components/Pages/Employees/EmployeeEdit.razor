@@ -925,8 +925,6 @@
         }
     }
 
-    // "Edit details" (AC2) — drops the "/view" suffix and does a full reload so the edit form
-    // starts from freshly-fetched data rather than whatever was last rendered in view mode.
     private void EnterEditMode() =>
         Navigation.NavigateTo($"/companies/{CompanyId}/employees/{Id}", forceLoad: true);
 
@@ -945,32 +943,15 @@
 
     private EmployeeEmploymentTab? _employmentTab;
 
-    // Two-level navigation state. The screen is organised into 6 top-level groups
-    // (EmployeeProfileGroup) each with one or more sub-sections (EmployeeProfileSection).
-    // Selection is tracked purely by the section enum — the owning group is always derivable
-    // from it via EmployeeProfileNavigation.GroupOf — so there is no hand-computed positional
-    // index math any more. The outer/inner SfTab controls are bound to *derived* integer
-    // indices (see GroupTab / OverviewTab etc. below) computed from the list of currently
-    // visible sections, never from fixed constants.
     private EmployeeProfileSection _activeSection = EmployeeProfileSection.Details;
 
     private EmployeeProfileGroup ActiveGroup => EmployeeProfileNavigation.GroupOf(_activeSection);
 
-    // Remembers which section was last active for this employee (per browser, via localStorage —
-    // see app.js's setLastEmployeeTab/getLastEmployeeTab; the stored integer is now (int)section,
-    // a stable enum value rather than a positional tab index). An explicit "?tab=" query param
-    // (deep links from elsewhere, e.g. "?tab=leave") always takes priority and is never
-    // overridden by the stored value.
     private bool _hadTabQueryParam;
-    // See ParseTab handling above — true only when the raw "?tab=" value was literally
-    // "offboarding" (now an alias for the merged Leaving section), so EmployeeLeavingTab can
-    // scroll/focus its checklist instead of its leaving-details header.
     private bool _focusOffboardingChecklist;
     private bool _restoredTabFromStorage;
     private int _lastPersistedSectionValue = -1;
 
-    // Conditional-section visibility flags, populated from the employee profile response
-    // (GetEmployeeHandler is the single source of truth for these lifecycle rules).
     private bool _showProbationTab;
     private bool _showOnboardingTab;
     private bool _showOffboardingTab;
@@ -981,8 +962,6 @@
     {
         EmployeeProfileSection.Probation => _showProbationTab,
         EmployeeProfileSection.Onboarding => _showOnboardingTab,
-        // Merged into one tab entry (see EmployeeProfileNavigation) — visible whenever either the
-        // leaving process or its offboarding plan is relevant for this employee.
         EmployeeProfileSection.Offboarding => _showLeavingTab || _showOffboardingTab,
         EmployeeProfileSection.Leaving => _showLeavingTab || _showOffboardingTab,
         EmployeeProfileSection.Notes => Session.IsHrAdministrator,
@@ -995,9 +974,6 @@
             .Select(d => d.Section)
             .ToList();
 
-    // Outer strip index. GroupOrder matches the EmployeeProfileGroup enum order and every group
-    // always has at least one always-visible section, so this is just the group's ordinal, but
-    // resolved through the list so it stays correct if that ever changes.
     private int GroupTab
     {
         get => Math.Max(0, EmployeeProfileNavigation.GroupOrder.IndexOf(ActiveGroup));
@@ -1028,17 +1004,12 @@
         PersistSection();
     }
 
-    // One bound property per group's inner SfTab. Only the currently-selected group's inner
-    // SfTab is rendered (SfTab loads content on demand), so only that group's setter fires.
     private int OverviewTab { get => SectionIndex(EmployeeProfileGroup.Overview); set => SetSection(EmployeeProfileGroup.Overview, value); }
     private int CareerPayTab { get => SectionIndex(EmployeeProfileGroup.CareerPay); set => SetSection(EmployeeProfileGroup.CareerPay, value); }
     private int TimeOffTab { get => SectionIndex(EmployeeProfileGroup.TimeOff); set => SetSection(EmployeeProfileGroup.TimeOff, value); }
     private int TasksRecordsTab { get => SectionIndex(EmployeeProfileGroup.TasksRecords); set => SetSection(EmployeeProfileGroup.TasksRecords, value); }
     private int ActivityTab { get => SectionIndex(EmployeeProfileGroup.Activity); set => SetSection(EmployeeProfileGroup.Activity, value); }
 
-    // Used by the Timeline sub-navigation callbacks to jump straight to another section
-    // (possibly in another group). A no-op if the target section isn't currently visible,
-    // matching the previous behaviour of the guarded index assignments.
     private void GoToSection(EmployeeProfileSection s)
     {
         if (!SectionVisible(s)) return;
@@ -1061,7 +1032,6 @@
         }
         catch
         {
-            // ignore — a failed write should never break navigation.
         }
     }
 
@@ -1082,14 +1052,6 @@
         var locationResult = await LocationService.ListLocationsAsync(CompanyId);
         _locations = locationResult?.Items ?? [];
 
-        // Bounded — same fix as EmployeeEmploymentTab.razor's Position Profile field (see its own
-        // remarks): an unbounded fetch here was the other half of the same user-observed slow-
-        // combobox regression, since this "Add Employee" single-page form has its own separate
-        // Position Profile dropdown. Unlike the Employment tab's, this one has no server-side
-        // search-as-you-type wired up (a brand-new employee never has a pre-existing selection to
-        // preserve outside the first page), so AllowFiltering below only searches within these
-        // first 100 for now — a follow-up could add the same OnPositionProfileFilteringAsync-style
-        // handler here if that turns out to matter in practice.
         var profileResult = await PositionProfileService.ListPositionProfilesAsync(CompanyId, pageSize: 100);
         _positionProfiles = profileResult?.Items.ToList() ?? [];
 
@@ -1132,12 +1094,6 @@
             Model.ManagerId = Guid.Empty;
         }
 
-        // Parsed after the _show*Tab flags are known so a deep link to a currently-hidden section
-        // (e.g. "?tab=leaving" before a leaving process exists) can fall back to Details, matching
-        // the old positional switch's "=> 0" behaviour. EmployeeProfileNavigation.ParseTab keeps
-        // every legacy "?tab=" value working (probation/leave/sickness/documents/onboarding/
-        // offboarding/leaving/timeline) and additionally accepts the per-section key for any
-        // other section, so "?tab=documents" still lands on Tasks & Records > Documents.
         var query = QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query);
         if (query.TryGetValue("tab", out var tab))
         {
@@ -1147,9 +1103,6 @@
                 _hadTabQueryParam = true;
                 _activeSection = SectionVisible(section) ? section : EmployeeProfileSection.Details;
 
-                // Old "?tab=offboarding" bookmarks now land on the merged Leaving & Offboarding
-                // workspace (section == Leaving) — carry the original intent through so the
-                // workspace scrolls/focuses its checklist rather than the leaving-details header.
                 _focusOffboardingChecklist =
                     string.Equals(tab.ToString(), "offboarding", StringComparison.OrdinalIgnoreCase);
             }
@@ -1158,9 +1111,6 @@
         BuildMoreActionsItems();
     }
 
-    // Repopulates the Details-tab model + lifecycle tab-visibility flags from a freshly fetched
-    // employee. Shared by the initial load and the concurrency-conflict "Reload latest values"
-    // affordance below.
     private void PopulateFromEmployee(GetEmployeeResponse employee)
     {
         _employee = employee;
@@ -1183,18 +1133,12 @@
         Model.PostCode = employee.PostCode ?? string.Empty;
         Model.Country = string.IsNullOrWhiteSpace(employee.Country) ? "United Kingdom" : employee.Country;
         Model.HasSystemAccess = employee.HasSystemAccess;
-        // Not shown on this tab (owned by the Employment tab's own model/form), but
-        // EmployeeProfileEditModel is validated as a whole via the shared EditContext, so these
-        // must still be populated here or Save on the Details tab would fail DataAnnotations
-        // validation for an existing employee.
         Model.EmployeeNumber = employee.EmployeeNumber ?? string.Empty;
         Model.EmploymentTypeId = employee.EmploymentTypeId;
         Model.DepartmentId = employee.DepartmentId;
         Model.LocationId = employee.LocationId;
         Model.PositionProfileId = employee.PositionProfileId;
 
-        // The employee profile response is the single source of truth for lifecycle tab
-        // visibility — these rules live server-side (GetEmployeeHandler).
         _showProbationTab = employee.ShowProbationTab;
         _showOnboardingTab = employee.ShowOnboardingTab;
         _showOffboardingTab = employee.ShowOffboardingTab;
@@ -1202,11 +1146,6 @@
         _canStartLeavingProcess = employee.CanStartLeavingProcess;
     }
 
-    // Concurrency-conflict recovery hook (base ReloadLatestValuesAsync, wired to the shared
-    // <SaveConflictBanner>). Re-fetch the employee (same load path as init), repopulate the
-    // Details form + the Employment tab, and re-baseline unsaved-changes tracking. This is the
-    // explicit "show me what changed" action, so the user's unsaved edits are replaced with the
-    // latest server values (the banner itself leaves their input untouched until they click).
     protected override async Task ReloadServerStateAsync()
     {
         var refreshed = await EmployeeService.GetEmployeeAsync(CompanyId, Id!.Value);
@@ -1220,11 +1159,6 @@
         _employmentTab?.ResetBaseline();
     }
 
-    // Restores the last-active section from localStorage on first render (JS interop isn't
-    // available until after the first render), unless an explicit "?tab=" deep link already set
-    // it above. The stored integer is (int)EmployeeProfileSection; an unknown or now-hidden value
-    // is ignored. Once restored (or once there's nothing to restore), subsequent renders just
-    // persist whatever section the user is currently on.
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         await base.OnAfterRenderAsync(firstRender);
@@ -1251,7 +1185,6 @@
             }
             catch
             {
-                // ignore — storage unavailable, just keep the default/query-derived section.
             }
         }
 
@@ -1264,7 +1197,6 @@
             }
             catch
             {
-                // ignore — a failed write should never break navigation.
             }
         }
     }
@@ -1275,10 +1207,6 @@
 
     private void CloseStartLeavingProcessDialog() => _showStartLeavingProcessDialog = false;
 
-    // This doesn't deep-link into a tab first — the whole flow is
-    // captured by the wizard dialog itself. Once it succeeds, a forceLoad navigate to
-    // ?tab=leaving is the simplest way to re-trigger LoadAsync and re-derive every tab
-    // flag/index (including the now-true _showLeavingTab) from a freshly-fetched employee.
     private void OnLeavingProcessStarted()
     {
         _showStartLeavingProcessDialog = false;
@@ -1291,10 +1219,6 @@
 
     private void CloseAmendLeavingProcessDialog() => _showAmendLeavingProcessDialog = false;
 
-    // Same forceLoad-to-?tab=leaving pattern as OnLeavingProcessStarted, but also carries the
-    // OffboardingAlreadyStarted flag through as its own query-string flag — that's the simplest way
-    // for EmployeeLeavingTab to still know about it after this full-page reload, since the value only
-    // exists on the AmendLeavingProcessResponse from this one request and wouldn't otherwise survive.
     private void OnLeavingProcessAmended(bool offboardingAlreadyStarted)
     {
         _showAmendLeavingProcessDialog = false;
@@ -1308,23 +1232,14 @@
 
     private void CloseCancelLeavingProcessDialog() => _showCancelLeavingProcessDialog = false;
 
-    // Unlike Start/Amend, no ?tab= is needed here — cancelling flips the employee's status back to
-    // Active, so GetEmployeeHandler will derive ShowLeavingTab as false on the next fetch and the tab
-    // itself disappears; a plain forceLoad reload lands back on the default (Details) tab.
     private void OnLeavingProcessCancelled()
     {
         _showCancelLeavingProcessDialog = false;
         Navigation.NavigateTo($"/companies/{CompanyId}/employees/{Id}", forceLoad: true);
     }
 
-    // Same pattern as EmployeeEmploymentTab.OnManagerFilteringAsync — the manager list can't be
-    // preloaded in one bounded page, so search server-side as the user types.
     private int _managerFilterRequestId;
 
-    // Requests aren't guaranteed to resolve in the order they were fired — applying every response
-    // unconditionally means a late-arriving response for an earlier keystroke can land after the
-    // user already picked a manager from a later, faster response, visibly clearing their
-    // selection. Only the most recently issued request's response is applied.
     private async Task OnManagerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
     {
         args.PreventDefaultAction = true;
@@ -1435,11 +1350,6 @@
         }
         else
         {
-            // Item 5: profile + employment are one Employee aggregate row, so they are saved in a
-            // single transactional request guarded by one concurrency version. A conflict on
-            // either half rolls the whole save back — there is no "profile saved, employment
-            // failed" partial state and the banner/version stay accurate. One CorrelationId still
-            // produces one merged Employee Audit History entry.
             if (_employmentTab is not null && !_employmentTab.ValidateSection())
                 return "Please fix the highlighted errors on the Employment tab.";
 
@@ -1502,33 +1412,18 @@
                 return result.ErrorMessage;
             }
 
-            // One commit — adopt the new version on both the page and the Employment tab so a
-            // follow-up edit in the same session doesn't falsely trip the concurrency check.
             SaveConflict = false;
             if (result.NewVersion is { } v && _employee is not null)
                 _employee = _employee with { Version = v };
             _employmentTab?.AdoptSavedVersion(result.NewVersion);
 
-            // Existing employee — return to viewing the employee just updated, not the list.
             _redirectUrl = $"/companies/{CompanyId}/employees/{Id}/view";
             return null;
         }
     }
 
-    // Set when Save was invoked via the "Save" button in the Unsaved Changes dialog (i.e. the
-    // user was trying to Close/navigate away, not just Save-in-place) — see
-    // ConfirmSaveAndCloseFromDialogAsync. Changes OnSavedAsync's destination below from the
-    // just-saved employee's own view page to the employees list, which is what Close is
-    // supposed to land on.
     private bool _closing;
 
-    // Wraps the base class's ConfirmSaveAndCloseAsync (which the base UnsavedChangesDialog
-    // wiring assumes navigates via NavigateToList() when it wants to leave the page) so
-    // OnSavedAsync below knows this Save came from Close, not the page's own Save button —
-    // otherwise it always redirects to the employee's view page, and the base class's own
-    // followup NavigateToList() call (since _navigatedThisSave never got set by that direct
-    // Navigation.NavigateTo) races a second forceLoad navigation against the first, which can
-    // leave the browser stuck on the view page instead of the employees list.
     private async Task ConfirmSaveAndCloseFromDialogAsync()
     {
         _closing = true;
@@ -1542,8 +1437,6 @@
         }
     }
 
-    // Accessible success confirmation (AC6): a role="status" live region so screen readers
-    // announce the save, shown briefly before the existing forceLoad navigation takes over.
     protected override async Task OnSavedAsync()
     {
         _saveSuccessMessage = IsNew ? "Employee created successfully." : "Employee details saved successfully.";

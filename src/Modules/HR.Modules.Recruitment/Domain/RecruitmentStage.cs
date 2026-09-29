@@ -1,13 +1,5 @@
 namespace HR.Modules.Recruitment.Domain;
 
-/// <summary>
-/// A per-company configurable pipeline stage, replacing the previously fixed
-/// <c>ApplicationStatus</c> enum (ticket #97). Recruitment administrators can add, edit, reorder,
-/// activate and deactivate stages freely, including inserting new stages anywhere in the pipeline.
-/// A stage is never hard-deleted once referenced by an <see cref="Application"/> — deactivation via
-/// <see cref="SetActiveStatus"/> is the only supported removal path, so historical
-/// Application.CurrentStageId references always remain resolvable.
-/// </summary>
 internal sealed class RecruitmentStage : HR.SharedKernel.IVersionedAggregate
 {
     // Explicit, persisted optimistic-concurrency token (Ticket 2). See Employee.Version.
@@ -25,10 +17,6 @@ internal sealed class RecruitmentStage : HR.SharedKernel.IVersionedAggregate
     public bool IsTerminal { get; private set; }
     public RecruitmentStageTerminalOutcome TerminalOutcome { get; private set; }
 
-    /// <summary>
-    /// DSH-04: optional explicit metric role for this stage (see <see cref="RecruitmentStagePurpose"/>).
-    /// Always <c>null</c> for terminal stages.
-    /// </summary>
     public RecruitmentStagePurpose? Purpose { get; private set; }
 
     public DateTimeOffset CreatedAt { get; private set; }
@@ -77,8 +65,6 @@ internal sealed class RecruitmentStage : HR.SharedKernel.IVersionedAggregate
         UpdatedAt    = now;
     }
 
-    // Deactivating never deletes the row: historical Application.CurrentStageId references must
-    // remain resolvable, mirroring ExternalRecruiter.SetActiveStatus's rationale.
     public void SetActiveStatus(bool isActive, DateTimeOffset now)
     {
         IsActive  = isActive;

@@ -22,7 +22,6 @@ internal sealed class Endpoint(DownloadCandidateDocumentHandler handler)
         {
             var body = new { error = result.Error.Message, code = result.Error.Code };
 
-            // [P1] Not yet scanned → 409 (retry later); quarantined or unscannable → 403 (denied).
             IResult response = result.Error.Code switch
             {
                 DownloadCandidateDocumentHandler.ScanPendingCode => TypedResults.Conflict(body),

@@ -102,11 +102,6 @@ internal sealed class NoOpNotificationWriter : INotificationWriter
         => Task.FromResult(0);
 }
 
-/// <summary>
-/// NOT-03: minimal, test-local mirror of NotificationTemplateCatalogue's title/body wording for the
-/// six template-backed notification types, used only so fakes in this test project can assert on
-/// rendered wording without referencing the internal Notifications module.
-/// </summary>
 internal static class FakeNotificationTemplateRenderer
 {
     public static (string Title, string? Body) Render(NotificationType type, IReadOnlyDictionary<string, string> tokens)

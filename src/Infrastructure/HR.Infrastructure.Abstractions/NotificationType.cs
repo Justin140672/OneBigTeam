@@ -42,34 +42,13 @@ public enum NotificationType
     ProbationExtended                             = 38,
     ProbationReviewDue                            = 39,
     ProbationOutcomeRecorded                      = 40,
-    // OFF-02: raised when an outstanding task's due date is shifted as a side effect of an
-    // amendment to the underlying business date it was derived from (e.g. an employee's last
-    // working day) — distinct from TaskAssigned/TaskDueSoon/TaskOverdue, none of which fit a
-    // date-only change to a task the assignee already knows about.
     TaskDateChanged                               = 41,
-    // OFF-05: raised at offboarding-plan creation time for a backdated departure that generated at
-    // least one HR reconciliation task (outstanding assets/documents/access the departed employee
-    // can no longer action themselves). Sent to HR administrators, distinct from
-    // IncompleteOffboardingAtDeparture (which fires later, to the manager, at departure
-    // finalisation if offboarding is still incomplete) and from OffboardingStarted (the routine
-    // "plan created" notice).
     OffboardingRequiresHrReconciliation           = 42,
 
-    // NOT-03: added for the initial notification-template catalogue. No existing call site raises
-    // these yet — Employees/Recruitment do not currently trigger a notification on employee
-    // creation or candidate hire — but the template catalogue is defined for them now so a future
-    // call site can adopt WriteTemplatedAsync without also having to add template plumbing.
     EmployeeCreated                                = 43,
     CandidateHired                                 = 44,
 
-    // Story 2: raised when a company administrator's organisation data export ZIP has finished
-    // building and is available to download (see OrganisationDataExportCompletedIntegrationEvent /
-    // NotifyOnOrganisationDataExportCompletedHandler). In-app only.
     OrganisationDataExportReady                    = 45,
 
-    // Customer Release Notifications: a manual, platform-admin-authored product/release
-    // announcement sent to every active customer's Company Administrator users (see
-    // HR.Modules.Notifications.Features.SendProductUpdate). In-app only — never auto-generated on
-    // deploy, always a deliberate admin action.
     ProductUpdate                                  = 46,
 }

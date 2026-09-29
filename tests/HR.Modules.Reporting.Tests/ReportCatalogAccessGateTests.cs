@@ -3,12 +3,6 @@ using HR.Modules.Reporting.ReportRegistry;
 
 namespace HR.Modules.Reporting.Tests;
 
-/// <summary>
-/// REP-04: pins the catalogue's access gate for "workload-actions" to <see cref="ReportAccessGate.WorkloadActions"/>
-/// so the report catalogue (menu visibility, via ReportAccessGateEvaluator/"reporting:view-workload-actions") and
-/// the GetWorkloadActions/ExportWorkloadActions endpoints (Policies("reporting:view-workload-actions")) can never
-/// silently drift onto different authorization gates.
-/// </summary>
 public class ReportCatalogAccessGateTests
 {
     [Fact]

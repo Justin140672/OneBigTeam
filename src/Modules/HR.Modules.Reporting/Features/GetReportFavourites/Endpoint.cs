@@ -13,8 +13,6 @@ internal sealed class Endpoint(
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/reporting/favourites");
-        // Any reporting-entitled user can favourite/see their own favourites among the reports
-        // they can already see — same baseline gate as the catalog itself.
         Policies("reporting:view");
     }
 

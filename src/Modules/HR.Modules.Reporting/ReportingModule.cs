@@ -76,7 +76,6 @@ public static class ReportingModule
     {
         var jobManager = app.Services.GetRequiredService<IRecurringJobManager>();
 
-        // Story 2: daily purge of expired organisation data export archives.
         jobManager.AddOrUpdate<Jobs.PurgeExpiredOrganisationDataExportsJob>(
             "organisation-data-export-purge-expired",
             job => job.ExecuteAsync(CancellationToken.None),
@@ -88,7 +87,6 @@ public static class ReportingModule
             job => job.ExecuteAsync(CancellationToken.None),
             "*/5 * * * *");
 
-        // Follow-up I: retryable cleanup of attempt archives left by failed/abandoned exports.
         jobManager.AddOrUpdate<Jobs.CleanUpOrganisationDataExportArtefactsJob>(
             "organisation-data-export-cleanup-artefacts",
             job => job.ExecuteAsync(CancellationToken.None),
@@ -105,10 +103,8 @@ public static class ReportingModule
     private static void AddFeatureServices(IServiceCollection services)
     {
 
-        // REP-06: shared export auditing helper used by every Export*Report handler.
         services.AddScoped<ReportExportAuditor>();
 
-        // Story 2: organisation data export (account-closure export).
         services.AddScoped<IOrganisationDataExportJobStore, Services.OrganisationDataExportJobStore>();
         services.AddScoped<IOrganisationDataExportStatusReader, Services.OrganisationDataExportStatusReader>();
         services.AddSingleton<OrganisationDataExportPackageBuilder>();
@@ -118,7 +114,6 @@ public static class ReportingModule
             new OrganisationDataExportConcurrencyGate(sp.GetRequiredService<OrganisationDataExportResourceLimits>()));
         services.AddSingleton<IOrganisationDataExportWorkspaceFactory>(sp =>
             new OrganisationDataExportWorkspaceFactory(sp.GetRequiredService<OrganisationDataExportResourceLimits>()));
-        // Follow-up G: renews the build job's ownership lease from its own DI/DbContext scope.
         services.AddSingleton<Jobs.IOrganisationDataExportLeaseRenewer, Jobs.ScopedOrganisationDataExportLeaseRenewer>();
         services.AddScoped<Jobs.OrganisationDataExportBuildJob>();
         services.AddScoped<Jobs.PurgeExpiredOrganisationDataExportsJob>();
@@ -257,9 +252,6 @@ public static class ReportingModule
         services.AddScoped<ExportAssetAssignmentReportHandler>();
         services.AddScoped<IValidator<ExportAssetAssignmentReportRequest>, ExportAssetAssignmentReportValidator>();
 
-        // OBT-721 Workload & HR Actions Report — aggregates all registered IWorkloadActionProvider
-        // implementations from other modules (registered against the shared interface in
-        // HR.Infrastructure.Abstractions from each owning module's own ModuleRegistration).
         services.AddScoped<GetWorkloadActionsHandler>();
         services.AddScoped<IValidator<GetWorkloadActionsRequest>, GetWorkloadActionsValidator>();
 
@@ -267,8 +259,6 @@ public static class ReportingModule
         services.AddScoped<IValidator<ExportWorkloadActionsRequest>, ExportWorkloadActionsValidator>();
 
 
-        // DSH-06: bounded HR + Manager dashboard summary endpoints. Both fan out over every
-        // registered IWorkloadActionProvider via the shared DashboardSummaryComposer.
         services.AddScoped<DashboardSummaryComposer>();
         services.AddScoped<GetHrDashboardSummaryHandler>();
         services.AddScoped<IValidator<GetHrDashboardSummaryRequest>, GetHrDashboardSummaryValidator>();

@@ -28,7 +28,6 @@ public class ReportFavouritesEndpointTests
         return client;
     }
 
-    // ── Get favourites ────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_Favourites_Returns_Unauthorized_For_Anonymous_Request()
@@ -91,7 +90,6 @@ public class ReportFavouritesEndpointTests
         Assert.Empty(payload!.ReportIds);
     }
 
-    // ── Add favourite ─────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Add_Favourite_Returns_Unauthorized_For_Anonymous_Request()
@@ -179,9 +177,6 @@ public class ReportFavouritesEndpointTests
     {
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
-        // HrAdministrator only — no Recruiter role, so lacks reporting:view-recruitment, which
-        // "recruitment-pipeline-summary" requires. Still satisfies the endpoint-level
-        // "reporting:view" policy, so this exercises the handler's per-report access-gate check.
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
         using var client = await ClientFor(userId, companyId);
 
@@ -196,11 +191,6 @@ public class ReportFavouritesEndpointTests
     {
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
-        // Seed directly into the ReportingDbContext rather than through the Add endpoint: the Add
-        // endpoint itself now (by design) refuses to add a favourite for a report the caller isn't
-        // authorized for, so the only way to exercise GetReportFavourites' "no longer accessible"
-        // filtering path is to persist the row directly, as if it had been added under a permission
-        // the caller has since lost.
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
@@ -209,10 +199,6 @@ public class ReportFavouritesEndpointTests
             await db.SaveChangesAsync();
         }
 
-        // Employee role satisfies none of the reporting:view-* gates (and not even the baseline
-        // "reporting:view" policy — see Get_Favourites_Returns_Forbidden_For_Employee above), so
-        // this exercises the "not authorized" filtering by seeding data for a user/company that a
-        // Manager (who does pass the baseline policy but has no HR-gated access) then queries.
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Manager, companyId);
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
@@ -250,7 +236,6 @@ public class ReportFavouritesEndpointTests
         Assert.DoesNotContain("retired-report", payload!.ReportIds);
     }
 
-    // ── Remove favourite ──────────────────────────────────────────────────────
 
     [Fact]
     public async Task Remove_Favourite_Returns_Unauthorized_For_Anonymous_Request()
@@ -312,11 +297,6 @@ public class ReportFavouritesEndpointTests
         Assert.DoesNotContain("employee-directory", payload!.ReportIds);
     }
 
-    // AddReportFavourite's request is entirely route-bound (CompanyId, ReportId) with no JSON
-    // body fields, but FastEndpoints still requires a valid Content-Type on PUT requests — an
-    // HttpClient PUT with a null body sends no Content-Type header at all, which FastEndpoints
-    // rejects with 415. Sending an empty JSON object with the standard content type satisfies
-    // that without needing any body-less special-casing on the endpoint itself.
     private static StringContent EmptyJsonBody() => new("{}", Encoding.UTF8, "application/json");
 
     private sealed record FavouritesPayload(List<string> ReportIds);

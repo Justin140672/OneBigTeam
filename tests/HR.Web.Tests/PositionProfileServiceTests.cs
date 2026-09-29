@@ -185,7 +185,6 @@ public class PositionProfileServiceTests
         Assert.Equal("Annual", item.SalaryType);
     }
 
-    // ── Fake handlers ────────────────────────────────────────────────────────────
 
     private sealed class JsonResponseHandler(HttpStatusCode statusCode, object payload) : HttpMessageHandler
     {

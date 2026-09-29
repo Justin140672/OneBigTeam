@@ -7,13 +7,8 @@ namespace HR.Modules.Offboarding.Services;
 
 internal sealed class OffboardingReportReader(OffboardingDbContext dbContext) : IOffboardingReportReader
 {
-    // Literal title created by StartOffboarding/Handler.cs for every plan — the closest existing
-    // signal to "documents returned" (see OffboardingReportItem.DocumentsReturned doc comment).
     private const string DocumentReviewTaskTitle = "Review outstanding documents for employee exit";
 
-    // Row cap (OBT-720 perf pass) — see HR.Modules.Sickness.Services.SicknessReportReader.MaxRows
-    // for rationale. Applied to the raw plan rows (each employee typically has 1-3 plans across
-    // their tenure), well above the report's final one-row-per-employee output size.
     private const int MaxPlanRows = 50_000;
 
     public async Task<IReadOnlyList<OffboardingReportItem>> GetOffboardingReportAsync(
@@ -49,12 +44,6 @@ internal sealed class OffboardingReportReader(OffboardingDbContext dbContext) : 
         {
             var planTasks = tasksByPlan[plan.Id].ToList();
 
-            // OFF-07: uses the same OffboardingProgressCalculator as GetOffboardingOverviewHandler
-            // (and, by extension, the Blazor UI, which now displays the overview's server-computed
-            // numbers rather than recomputing them) — this used to only count Status == Completed as
-            // "done", silently excluding Skipped tasks and disagreeing with the UI's own
-            // Completed-or-Skipped definition of progress. CompletedTasks below is therefore
-            // "resolved" (Completed + Skipped), matching the UI exactly.
             var progress = OffboardingProgressCalculator.Calculate(planTasks);
             var resolvedTitles = planTasks
                 .Where(t => t.Status is OffboardingTaskStatus.Completed or OffboardingTaskStatus.Skipped

@@ -49,19 +49,11 @@ public sealed class CandidateCvDocumentsTests(RecruiterPersonaFixture fixture) :
         Assert.False(await cvs.IsEmptyStateVisibleAsync());
         await cvs.ExpectUploadButtonTextAsync(CandidateCvDocumentsSection.UploadReplacementButtonText);
 
-        // Fresh navigation → persisted server-side, not leftover component state.
         cvs = await OpenCandidateCvsAsync(candidateId);
         await cvs.ExpectRowCountAsync(1);
         Assert.True(await cvs.RowHasCurrentBadgeAsync(fileName));
     }
 
-    /// <summary>
-    /// [P1] Malware scanning: a new upload is not downloadable until its scan is Clean. In E2E the
-    /// no-op scanner clears it within seconds, so the first observation may already be Clean — the
-    /// test only asserts the "blocked" shape when it actually observes a non-Clean state (no race).
-    /// Infected/Failed states cannot be produced here and are covered by
-    /// HR.Integration.Tests.CandidateDocumentScanGatingEndpointTests.
-    /// </summary>
     [Fact]
     public async Task Upload_ShowsScanState_AndEnablesDownloadOnlyOnceClean()
     {
@@ -77,7 +69,6 @@ public sealed class CandidateCvDocumentsTests(RecruiterPersonaFixture fixture) :
         Assert.Contains(firstStatus, new[] { "Pending", "Scanning", "Clean" });
         if (firstStatus is "Pending" or "Scanning")
         {
-            // Re-read in case the scan completed between the two reads.
             var disabled = await cvs.IsRowDownloadDisabledAsync(fileName);
             var enabled = await cvs.IsRowDownloadLinkEnabledAsync(fileName);
             Assert.True(disabled ^ enabled, "A row must show exactly one of: disabled file name, download link");
@@ -113,7 +104,6 @@ public sealed class CandidateCvDocumentsTests(RecruiterPersonaFixture fixture) :
         Assert.False(await cvs.RowHasCurrentBadgeAsync(v1FileName), "The older CV must no longer be badged as current");
         Assert.Equal(1, await cvs.GetCurrentBadgeCountAsync());
 
-        // Fresh navigation → the older CV is retained server-side, still newest-first.
         cvs = await OpenCandidateCvsAsync(candidateId);
         await cvs.ExpectRowCountAsync(2);
         Assert.Equal(new[] { v2FileName, v1FileName }, await cvs.GetRowFileNamesAsync());
@@ -127,10 +117,8 @@ public sealed class CandidateCvDocumentsTests(RecruiterPersonaFixture fixture) :
         using var api = await CandidateCvApi.CreateRecruiterApiClientAsync(_fixture.ApiBaseUrl);
         var candidateId = await CreateFreshCandidateAsync(api);
 
-        // Fresh vacancy (own Position Profile) so no shared seeded vacancy gains an application.
         var vacancyId = await CreateFreshVacancyViaUiAsync();
 
-        // Seed: v1 uploaded and recorded as the application's submitted CV.
         var v1FileName = $"e2e-cv-v1-{Guid.NewGuid():N}.pdf";
         var v1DocId = await CandidateCvApi.UploadCandidateCvAsync(api, AcmeId, candidateId, v1FileName);
         var applicationId = await CandidateCvApi.CreateApplicationAsync(api, AcmeId, vacancyId, candidateId);
@@ -141,7 +129,6 @@ public sealed class CandidateCvDocumentsTests(RecruiterPersonaFixture fixture) :
         await cvs.ExpectRowReferencedTextAsync(v1FileName, "Submitted with 1 application(s)");
         Assert.True(await cvs.RowHasCurrentBadgeAsync(v1FileName), "v1 is still the candidate's only (current) CV");
 
-        // Upload v2 via the UI — it becomes current; v1 stays listed and referenced.
         var v2FileName = $"e2e-cv-v2-{Guid.NewGuid():N}.pdf";
         await cvs.UploadCvAsync(v2FileName, CandidateCvApi.BuildTestPdf());
 
@@ -152,13 +139,11 @@ public sealed class CandidateCvDocumentsTests(RecruiterPersonaFixture fixture) :
         Assert.True(await cvs.RowHasCurrentBadgeAsync(v2FileName));
         Assert.False(await cvs.RowHasReferencedTextAsync(v2FileName), "v2 was never submitted with an application");
 
-        // The application itself still points at v1.
         var app = await CandidateCvApi.GetApplicationAsync(api, AcmeId, vacancyId, applicationId);
         Assert.Equal(v1DocId, app.CvDocumentId);
         Assert.Equal(v2FileName, app.CurrentCandidateCvFileName);
     }
 
-    // ── Arrange helpers ─────────────────────────────────────────────────────────
 
     private static async Task<Guid> CreateFreshCandidateAsync(HttpClient api)
     {
@@ -181,11 +166,6 @@ public sealed class CandidateCvDocumentsTests(RecruiterPersonaFixture fixture) :
         return cvs;
     }
 
-    /// <summary>
-    /// Same Position Profile + Vacancy UI flow as CandidateCvReviewTests.ArrangeApplicationAsync
-    /// (a unique profile is required — only one live vacancy per profile). The vacancy is left in
-    /// Draft; CreateApplication doesn't require it to be published.
-    /// </summary>
     private async Task<Guid> CreateFreshVacancyViaUiAsync()
     {
         var unique       = Guid.NewGuid().ToString("N")[..8];

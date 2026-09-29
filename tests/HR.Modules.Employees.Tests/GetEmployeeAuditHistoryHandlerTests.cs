@@ -62,7 +62,6 @@ public class GetEmployeeAuditHistoryHandlerTests
         var reader = new FakeAuditHistoryReader([
             new AuditHistoryEntry(Now, "leave.approved", "LeaveRequest", null, actorId, "Leave request approved", null, null)
         ]);
-        // No names configured — actorId will not resolve.
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
         var result = await handler.HandleAsync(companyId, employeeId, callerId: null, callerIsHr: true, CancellationToken.None);
@@ -244,7 +243,6 @@ public class GetEmployeeAuditHistoryHandlerTests
         Assert.Empty(result.Value!.Items);
     }
 
-    // ── DepartmentId / PositionProfileId / LocationId resolution ────────────────
 
     [Fact]
     public async Task HandleAsync_Resolves_DepartmentId_To_Department_Name()
@@ -389,11 +387,6 @@ public class GetEmployeeAuditHistoryHandlerTests
         context.Departments.Add(department);
         await context.SaveChangesAsync();
 
-        // "SomeOtherFieldId" is not one of the four resolved field names (DepartmentId/
-        // PositionProfileId/LocationId/ManagerId), even though its value is a Department id and
-        // happens to be GUID-shaped — it must render as the raw guid string. (ManagerId itself
-        // used to be the example here, but it is now a resolved field name — see
-        // HandleAsync_Resolves_ManagerId_To_Manager_Full_Name below.)
         var reader = new FakeAuditHistoryReader([
             new AuditHistoryEntry(
                 Now, "employee.profile.updated", "Employee", null, null, "Employee profile updated",
@@ -454,7 +447,6 @@ public class GetEmployeeAuditHistoryHandlerTests
         Assert.Equal("—", change.After);
     }
 
-    // ── Reason field humanization ────────────────────────────────────────────────
 
     [Theory]
     [InlineData("AnnualReview", "Annual Review")]
@@ -508,7 +500,6 @@ public class GetEmployeeAuditHistoryHandlerTests
         Assert.Equal("—", change.After);
     }
 
-    // ── ManagerId resolution (Task C) ────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Resolves_ManagerId_To_Manager_Full_Name()
@@ -565,7 +556,6 @@ public class GetEmployeeAuditHistoryHandlerTests
         Assert.Equal("—", change.After);
     }
 
-    // ── CorrelationId merging (Task D) ───────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Merges_Entries_Sharing_A_CorrelationId_Into_One_Item_With_Combined_Changes()
@@ -593,7 +583,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         Assert.Equal(2, item.Changes.Count);
         Assert.Contains(item.Changes, c => c.Field == "First Name");
         Assert.Contains(item.Changes, c => c.Field == "Employee Number");
-        Assert.Equal(Now, item.OccurredAt); // earliest entry in the group
+        Assert.Equal(Now, item.OccurredAt);
     }
 
     [Fact]
@@ -642,7 +632,6 @@ public class GetEmployeeAuditHistoryHandlerTests
         Assert.Equal(2, result.Value!.Items.Count);
     }
 
-    // ── AUD-06: scoped visibility ─────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Returns_Empty_When_Caller_Has_No_Relationship_To_Employee()
@@ -669,7 +658,7 @@ public class GetEmployeeAuditHistoryHandlerTests
     {
         await using var context = BuildContext();
         var companyId  = Guid.NewGuid();
-        var employeeId = Guid.NewGuid(); // same as callerId → self
+        var employeeId = Guid.NewGuid();
 
         var reader = new FakeAuditHistoryReader([
             new AuditHistoryEntry(Now, "employee.profile.updated", "Employee", null, null, "updated", null,
@@ -697,13 +686,11 @@ public class GetEmployeeAuditHistoryHandlerTests
         ]);
         var handler = new GetEmployeeAuditHistoryHandler(reader, new FakeEmployeeNameReader(), context);
 
-        // Self view — security event before/after must be stripped.
         var result = await handler.HandleAsync(companyId, employeeId,
             callerId: employeeId, callerIsHr: false, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
-        // No change rows surfaced — payload was stripped.
         Assert.Empty(item.Changes);
     }
 
@@ -725,7 +712,6 @@ public class GetEmployeeAuditHistoryHandlerTests
 
         Assert.True(result.IsSuccess);
         var item = Assert.Single(result.Value!.Items);
-        // HR sees the change row.
         Assert.NotEmpty(item.Changes);
     }
 
@@ -740,7 +726,6 @@ public class GetEmployeeAuditHistoryHandlerTests
         var employee = Employee.Create(employeeId, companyId, "Bob", "Smith", "bob@example.com",
             new DateOnly(2023, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Male", "EMP-0001",
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Now);
-        // Set the manager relationship via the Assign method.
         employee.Assign(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), managerId, Now);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();

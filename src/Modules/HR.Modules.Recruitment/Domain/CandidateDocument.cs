@@ -16,15 +16,9 @@ internal sealed class CandidateDocument
     public Guid UploadedBy { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
 
-    // ── Malware scanning ([P1] candidate CV scan/quarantine) ──────────────────────────────────
-    // A document is only ever downloadable once ScanStatus == Clean. ScanAttemptCount doubles as the
-    // optimistic-concurrency token for scan claims (see CandidateDocumentConfiguration), so two
-    // workers can never both claim the same attempt.
 
-    /// <summary>Hard ceiling on scan attempts (job retries and reconciliation re-dispatch combined).</summary>
     public const int MaxScanAttempts = 5;
 
-    /// <summary>A Scanning claim older than this is treated as abandoned (lost job / crashed worker).</summary>
     public static readonly TimeSpan ScanLeaseDuration = TimeSpan.FromMinutes(15);
 
     public CandidateDocumentScanStatus ScanStatus { get; private set; } = CandidateDocumentScanStatus.Pending;
@@ -46,10 +40,6 @@ internal sealed class CandidateDocument
         ScanStatus == CandidateDocumentScanStatus.Scanning
         && (ScanLastAttemptAt is null || ScanLastAttemptAt.Value + ScanLeaseDuration <= now);
 
-    /// <summary>
-    /// True when a scan attempt may start now: a Pending document whose retry back-off (if any) has
-    /// elapsed, or a Scanning document whose claim was abandoned.
-    /// </summary>
     public bool CanBeginScanAttempt(DateTimeOffset now) => ScanStatus switch
     {
         CandidateDocumentScanStatus.Pending => ScanNextAttemptAt is null || ScanNextAttemptAt <= now,
@@ -57,8 +47,6 @@ internal sealed class CandidateDocument
         _ => false,
     };
 
-    /// <summary>Claims a scan attempt. Caller must check <see cref="CanBeginScanAttempt"/> and
-    /// <see cref="HasRemainingScanAttempts"/> first.</summary>
     public void BeginScanAttempt(DateTimeOffset now)
     {
         if (!CanBeginScanAttempt(now))
@@ -90,10 +78,6 @@ internal sealed class CandidateDocument
         ScanNextAttemptAt = null;
     }
 
-    /// <summary>
-    /// Records a failed attempt (scanner or storage outage). Returns the document to Pending with a
-    /// back-off when attempts remain; otherwise it becomes terminally Failed. Never marks Clean.
-    /// </summary>
     public void RecordFailedScanAttempt(string safeReason, DateTimeOffset now, DateTimeOffset nextAttemptAt)
     {
         EnsureScanning();
@@ -112,10 +96,6 @@ internal sealed class CandidateDocument
         }
     }
 
-    /// <summary>
-    /// Reconciliation: a claim whose lease expired (the worker was lost) is released back to Pending
-    /// for immediate re-dispatch, or terminally Failed once the attempt budget is spent.
-    /// </summary>
     public void ReleaseAbandonedScan(DateTimeOffset now)
     {
         if (!IsScanLeaseExpired(now))
@@ -124,8 +104,6 @@ internal sealed class CandidateDocument
         RecordFailedScanAttempt(CandidateDocumentScanFailureReasons.ScanAbandoned, now, now);
     }
 
-    /// <summary>A Pending document that has already used every attempt is closed off as Failed
-    /// rather than scanned again.</summary>
     public void MarkScanRetryLimitReached(DateTimeOffset now)
     {
         if (ScanStatus != CandidateDocumentScanStatus.Pending || HasRemainingScanAttempts)
@@ -167,7 +145,6 @@ internal sealed class CandidateDocument
         StorageKey  = storageKey.Trim(),
         UploadedBy  = uploadedBy,
         CreatedAt   = now,
-        // Every new upload is untrusted until scanned — see ScanCandidateDocumentJob.
         ScanStatus       = CandidateDocumentScanStatus.Pending,
         ScanAttemptCount = 0,
     };

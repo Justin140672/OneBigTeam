@@ -5,18 +5,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// DSH-07 (dashboard accessibility + responsive). Covers the WAI-ARIA tabs keyboard pattern on the
-/// Recruitment dashboard's Pipeline/Activity/Insights tablist, visible focus styling on interactive
-/// dashboard controls, the visually-hidden polite aria-live status region rendered by
-/// DashboardAnnouncer.razor on all three operational dashboards (/dashboard/hr, /dashboard/manager,
-/// /dashboard/recruitment), a keyboard/screen-reader accessible table alternative for the Syncfusion
-/// charts, and no horizontal overflow at narrow (375px) and tablet (768px) viewports.
-///
-/// A CrossUser-style class because it exercises three different role personas
-/// (Laura Bennett = HR, James Okafor = Manager, Marcus Diallo = Recruiter) across its tests — none of
-/// the four cached single-role fixtures covers all three dashboards.
-/// </summary>
 public sealed class DashboardAccessibilityTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     private const string HrEmail        = "laura.bennett@acme.example";
@@ -25,7 +13,6 @@ public sealed class DashboardAccessibilityTests(CrossUserFixture fixture) : Role
 
     private const double OverflowTolerancePx = 2;
 
-    // ── Recruitment dashboard tablist: keyboard navigation ───────────────────
 
     [Fact]
     public async Task RecruitmentTabs_ArrowKeys_MoveSelectionAndDomFocus_WithWrapAndHomeEnd()
@@ -41,7 +28,6 @@ public sealed class DashboardAccessibilityTests(CrossUserFixture fixture) : Role
         var activity = _page.Locator("[data-testid='recruitment-tab-activity']");
         var insights = _page.Locator("[data-testid='recruitment-tab-insights']");
 
-        // Roving tabindex: only the active tab is in the tab order.
         await Assertions.Expect(pipeline).ToHaveAttributeAsync("aria-selected", "true");
         await Assertions.Expect(pipeline).ToHaveAttributeAsync("tabindex", "0");
         await Assertions.Expect(activity).ToHaveAttributeAsync("tabindex", "-1");
@@ -56,12 +42,10 @@ public sealed class DashboardAccessibilityTests(CrossUserFixture fixture) : Role
         await Assertions.Expect(insights).ToHaveAttributeAsync("aria-selected", "true");
         await Assertions.Expect(insights).ToBeFocusedAsync();
 
-        // Wrap past the last tab back to the first.
         await _page.Keyboard.PressAsync("ArrowRight");
         await Assertions.Expect(pipeline).ToHaveAttributeAsync("aria-selected", "true");
         await Assertions.Expect(pipeline).ToBeFocusedAsync();
 
-        // Home / End jump to the ends.
         await _page.Keyboard.PressAsync("End");
         await Assertions.Expect(insights).ToHaveAttributeAsync("aria-selected", "true");
         await Assertions.Expect(insights).ToBeFocusedAsync();
@@ -70,7 +54,6 @@ public sealed class DashboardAccessibilityTests(CrossUserFixture fixture) : Role
         await Assertions.Expect(pipeline).ToHaveAttributeAsync("aria-selected", "true");
         await Assertions.Expect(pipeline).ToBeFocusedAsync();
 
-        // ArrowLeft from the first tab wraps to the last.
         await _page.Keyboard.PressAsync("ArrowLeft");
         await Assertions.Expect(insights).ToHaveAttributeAsync("aria-selected", "true");
         await Assertions.Expect(insights).ToBeFocusedAsync();
@@ -91,19 +74,16 @@ public sealed class DashboardAccessibilityTests(CrossUserFixture fixture) : Role
             await Assertions.Expect(tab).ToHaveAttributeAsync("aria-controls", $"recruitment-tabpanel-{name}");
         }
 
-        // The visible panel is a tabpanel labelled by its owning tab.
         var pipelinePanel = _page.Locator("#recruitment-tabpanel-pipeline");
         await Assertions.Expect(pipelinePanel).ToHaveAttributeAsync("role", "tabpanel");
         await Assertions.Expect(pipelinePanel).ToHaveAttributeAsync("aria-labelledby", "recruitment-tab-pipeline");
 
-        // Switching tab swaps which panel is rendered, still correctly wired.
         await _page.Locator("[data-testid='recruitment-tab-insights']").ClickAsync();
         var insightsPanel = _page.Locator("#recruitment-tabpanel-insights");
         await Assertions.Expect(insightsPanel).ToHaveAttributeAsync("role", "tabpanel");
         await Assertions.Expect(insightsPanel).ToHaveAttributeAsync("aria-labelledby", "recruitment-tab-insights");
     }
 
-    // ── Visible focus indicator ─────────────────────────────────────────────
 
     [Fact]
     public async Task RecruitmentDashboard_KeyboardFocusedTab_HasVisibleFocusOutline()
@@ -130,7 +110,6 @@ public sealed class DashboardAccessibilityTests(CrossUserFixture fixture) : Role
             "Expected the keyboard-focused dashboard tab to show a visible focus indicator (outline or box-shadow)");
     }
 
-    // ── Polite aria-live status region on all three operational dashboards ───
 
     [Theory]
     [InlineData(HrEmail, "/dashboard/hr")]
@@ -144,7 +123,6 @@ public sealed class DashboardAccessibilityTests(CrossUserFixture fixture) : Role
         var liveRegion = _page.Locator("[aria-live='polite']").First;
         await liveRegion.WaitForAsync(new() { Timeout = 20_000 });
 
-        // The dashboards populate the region once their data finishes loading — poll for non-empty text.
         var deadline = DateTime.UtcNow.AddSeconds(20);
         string text = "";
         while (DateTime.UtcNow < deadline)
@@ -159,7 +137,6 @@ public sealed class DashboardAccessibilityTests(CrossUserFixture fixture) : Role
         Assert.Contains("finished loading", text, StringComparison.OrdinalIgnoreCase);
     }
 
-    // ── Chart table alternative ─────────────────────────────────────────────
 
     [Fact]
     public async Task RecruitmentInsightsCharts_ProvideAccessibleTableAlternative()
@@ -184,7 +161,6 @@ public sealed class DashboardAccessibilityTests(CrossUserFixture fixture) : Role
     // needing a separate <details>/<table> alternative. The recruitment "Insights" tab still
     // uses a real SfChart — see RecruitmentInsightsCharts_ProvideAccessibleTableAlternative above.
 
-    // ── Responsive: no horizontal overflow ─────────────────────────────────
 
     [Theory]
     [InlineData(HrEmail, "/dashboard/hr")]

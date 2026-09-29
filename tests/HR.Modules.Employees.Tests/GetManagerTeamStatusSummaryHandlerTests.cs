@@ -7,10 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Tests;
 
-/// <summary>
-/// DSH-05 manager team-status summary handler. "Today" is a Monday (2026-06-15) so the default
-/// Mon–Fri working pattern counts as a working day unless a test overrides it.
-/// </summary>
 public class GetManagerTeamStatusSummaryHandlerTests
 {
     private static readonly DateTime MondayUtcNow = new(2026, 6, 15, 10, 0, 0, DateTimeKind.Utc);
@@ -87,7 +83,6 @@ public class GetManagerTeamStatusSummaryHandlerTests
         return employee;
     }
 
-    // ── counted population ───────────────────────────────────────────────────
 
     [Fact]
     public async Task TeamSize_Excludes_NonActive_NotYetStarted_And_Already_Left_But_Keeps_Inclusive_Boundaries()
@@ -156,7 +151,6 @@ public class GetManagerTeamStatusSummaryHandlerTests
         Assert.Empty(result.Members);
     }
 
-    // ── at-work vs not-scheduled ─────────────────────────────────────────────
 
     [Fact]
     public async Task AtWork_Excludes_A_Counted_Member_Not_Scheduled_To_Work_Today()
@@ -201,11 +195,10 @@ public class GetManagerTeamStatusSummaryHandlerTests
         var result = await handler.HandleAsync(companyId, Guid.NewGuid(), CancellationToken.None);
 
         var item = Assert.Single(result.Members);
-        Assert.False(item.ScheduledToday); // Monday is not in the profile's Tue/Wed pattern
+        Assert.False(item.ScheduledToday);
         Assert.Equal("NotScheduled", item.PrimaryStatus);
     }
 
-    // ── absence precedence ───────────────────────────────────────────────────
 
     [Fact]
     public async Task Member_On_Leave_Only_Has_PrimaryStatus_OnLeave()
@@ -241,7 +234,7 @@ public class GetManagerTeamStatusSummaryHandlerTests
 
         Assert.Equal(1, result.OnLeave);
         Assert.Equal(1, result.Sick);
-        Assert.Equal(1, result.AwayToday); // overlap counted once
+        Assert.Equal(1, result.AwayToday);
         Assert.Equal(0, result.AtWork);
 
         var item = Assert.Single(result.Members);
@@ -250,7 +243,6 @@ public class GetManagerTeamStatusSummaryHandlerTests
         Assert.Equal("Sick", item.PrimaryStatus);
     }
 
-    // ── probation / fit notes ────────────────────────────────────────────────
 
     [Fact]
     public async Task InProbation_And_MissingFitNotes_Come_From_Their_Readers_With_Drilldown_Parity()
@@ -273,11 +265,9 @@ public class GetManagerTeamStatusSummaryHandlerTests
         Assert.Equal(result.MissingFitNotes, result.Members.Count(m => m.MissingFitNote));
         Assert.True(result.Members.Single(m => m.EmployeeId == probationer.Id).InProbation);
         Assert.True(result.Members.Single(m => m.EmployeeId == noNote.Id).MissingFitNote);
-        // A member with only an "upcoming review" (not returned by the reader) is not counted.
         Assert.False(result.Members.Single(m => m.EmployeeId == plain.Id).InProbation);
     }
 
-    // ── drill-down parity across every metric ────────────────────────────────
 
     [Fact]
     public async Task Every_Count_Equals_Members_Filtered_By_The_Matching_Flag()
@@ -315,7 +305,7 @@ public class GetManagerTeamStatusSummaryHandlerTests
         Assert.Equal(result.AtWork, result.Members.Count(m => m.PrimaryStatus == "AtWork"));
         Assert.Equal(result.NotScheduledToday, result.Members.Count(m => m.PrimaryStatus == "NotScheduled"));
         Assert.Equal(result.AwayToday, result.Members.Count(m => m.OnLeaveToday || m.OffSickToday));
-        Assert.Equal(3, result.AwayToday); // onLeave + sick + both
+        Assert.Equal(3, result.AwayToday);
     }
 
     [Fact]
@@ -334,7 +324,6 @@ public class GetManagerTeamStatusSummaryHandlerTests
         Assert.Equal(new[] { adamsA.Id, adamsB.Id, young.Id }, result.Members.Select(m => m.EmployeeId));
     }
 
-    // ── readers only see the counted population ──────────────────────────────
 
     [Fact]
     public async Task Readers_Are_Passed_Only_The_Counted_Member_Ids_And_Todays_Date()
@@ -366,15 +355,13 @@ public class GetManagerTeamStatusSummaryHandlerTests
         Assert.Equal(Today, sick.LastOnDate);
     }
 
-    // ── company time zone drives "today" ────────────────────────────────────
 
     [Fact]
     public async Task Company_TimeZone_Ahead_Of_UTC_Rolls_Today_Forward_To_A_Working_Day()
     {
-        // 2026-06-14 23:30Z is still Sunday in UTC but already Monday 00:30 in Europe/London (BST).
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
-        var member = AddEmployee(context, companyId); // default Mon–Fri pattern
+        var member = AddEmployee(context, companyId);
         await context.SaveChangesAsync();
 
         var utcNow = new DateTime(2026, 6, 14, 23, 30, 0, DateTimeKind.Utc);
@@ -386,7 +373,7 @@ public class GetManagerTeamStatusSummaryHandlerTests
 
         var utc = BuildHandler(context, [member.Id], timeZoneId: "UTC", utcNow: utcNow);
         var utcResult = await utc.HandleAsync(companyId, Guid.NewGuid(), CancellationToken.None);
-        Assert.False(utcResult.Members.Single().ScheduledToday); // Sunday in UTC
+        Assert.False(utcResult.Members.Single().ScheduledToday);
         Assert.Equal("NotScheduled", utcResult.Members.Single().PrimaryStatus);
     }
 
@@ -400,8 +387,6 @@ public class GetManagerTeamStatusSummaryHandlerTests
         var b = AddEmployee(context, companyB, "B", "Two");
         await context.SaveChangesAsync();
 
-        // Even though the (fake) sub-tree reader hands back both ids, the handler's own query is
-        // company scoped.
         var handler = BuildHandler(context, [a.Id, b.Id]);
         var result = await handler.HandleAsync(companyA, Guid.NewGuid(), CancellationToken.None);
 

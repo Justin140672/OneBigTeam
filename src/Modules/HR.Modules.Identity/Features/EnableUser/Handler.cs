@@ -40,7 +40,6 @@ internal sealed class EnableUserHandler(
             }
         }
 
-        // IAM-01: confirm the target user belongs to the route company before touching account status.
         var isMember = await targetUserCompanyGuard.IsMemberAsync(request.CompanyId, request.UserId, cancellationToken);
         if (!isMember)
             return Result.Failure<EnableUserResponse>(Error.NotFound("User was not found."));

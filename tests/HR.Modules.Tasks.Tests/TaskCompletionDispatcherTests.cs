@@ -34,8 +34,6 @@ public class TaskCompletionDispatcherTests
     [Fact]
     public async Task DispatchAsync_Returns_Success_When_No_Matching_Action_Registered()
     {
-        // Ordinary tasks without decision requirements (e.g. plain Workflow/Complete tasks) have no
-        // registered ITaskCompletionAction and must remain completable.
         var dispatcher = new TaskCompletionDispatcher([]);
 
         var result = await dispatcher.DispatchAsync(

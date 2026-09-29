@@ -6,14 +6,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// See CreatePlatformAdministratorEndpointTests for notes on the "platform:admin" policy /
-/// handler-level PlatformOwner gate and the 401-for-both-anonymous-and-non-owner behavior. This
-/// handler now generates a single-use recovery link via ISupabaseAuthGateway.GenerateRecoveryLinkAsync
-/// (admin generate_link, not the client-facing /auth/v1/recover) and sends it via the branded
-/// password-reset email template; ApiWebApplicationFactory replaces the gateway with
-/// FakeSupabaseAuthGateway so no live Supabase call is made.
-/// </summary>
 [Collection("Integration")]
 public class ResetPlatformAdministratorPasswordEndpointTests
 {
@@ -45,8 +37,6 @@ public class ResetPlatformAdministratorPasswordEndpointTests
         var response = await client.PostAsync(
             $"/api/platform-administrators/{Guid.NewGuid()}/reset-password", EmptyJson());
 
-        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
-        // is Forbidden (403), not Unauthorized (401).
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 

@@ -29,7 +29,6 @@ public class CompanySettingsRecruitmentSettingsTests
     [Fact]
     public void UpdateRecruitmentSettings_Sets_Only_VacancyApprovalRequired_When_OfferApprovalRequired_Is_False()
     {
-        // Covers the negated branch of each independent bool flag.
         var settings = CompanySettings.CreateDefault(Guid.NewGuid(), DateTimeOffset.UtcNow);
 
         settings.UpdateRecruitmentSettings(true, false, 730, DateTimeOffset.UtcNow);

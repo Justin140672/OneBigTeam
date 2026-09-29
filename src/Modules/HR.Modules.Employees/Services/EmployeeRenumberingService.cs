@@ -17,8 +17,6 @@ internal sealed class EmployeeRenumberingService(
 {
     public async Task RenumberAllEmployeesAsync(Guid companyId, CancellationToken cancellationToken)
     {
-        // Deterministic order so a re-run (e.g. after a partial failure) renumbers employees in
-        // the same sequence — oldest employee gets the lowest new number.
         var employees = await dbContext.Employees
             .Where(e => e.CompanyId == companyId)
             .OrderBy(e => e.CreatedAt)
@@ -26,8 +24,6 @@ internal sealed class EmployeeRenumberingService(
 
         foreach (var employee in employees)
         {
-            // No exceptions: every employee is renumbered to the new format, including ones whose
-            // current number was manually entered and doesn't match any pattern.
             var newNumber = await employeeNumberGenerator.GenerateNextAsync(companyId, cancellationToken);
             employee.SetEmployeeNumber(newNumber);
         }

@@ -9,13 +9,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.DataImport.Features.ConfirmImportSession;
 
-/// <summary>
-/// Creates employees from a validated import session's staging rows. Per-row failures are
-/// caught and recorded as new ImportRowError rows so a partial success (some rows created,
-/// some failed) is possible — mirroring ValidateImportSession's tolerance model. Manager
-/// resolution happens in a second pass after all rows have been created, so a row can reference
-/// a manager created earlier in the same file.
-/// </summary>
 internal sealed class ConfirmImportSessionHandler(
     DataImportDbContext db,
     IEmployeeImportWriter employeeWriter,
@@ -45,10 +38,6 @@ internal sealed class ConfirmImportSessionHandler(
 
         var now = clock.UtcNowOffset();
 
-        // OBT-REM-06: a session is confirmable when validated, or when a previous confirm attempt
-        // finished with errors (a legitimate "fix the data / transient failure — retry" flow: the
-        // retry only reprocesses rows that were not already turned into employees), or when a prior
-        // run claimed it but appears to have crashed (Processing, but stale).
         const int staleClaimMinutes = 15;
         var claimIsStale = session.Status == ImportStatus.Processing
             && session.StartedAt is { } startedAt
@@ -109,17 +98,10 @@ internal sealed class ConfirmImportSessionHandler(
                 Error.Conflict($"Import session '{request.ImportSessionId}' has no valid rows to confirm."));
         }
 
-        // OBT-REM-08: rows that are not YET fully confirmed are (re)processed — this includes rows
-        // that never got an employee created at all, and rows whose employee exists but one or
-        // more downstream steps (integration events, opening leave balance, manager assignment)
-        // did not complete on a previous attempt. A row is never re-created once CreatedEmployeeId
-        // is set; only its remaining incomplete steps are resumed.
         var stagingRows = allValidRows.Where(s => !s.IsFullyConfirmed).ToList();
 
         var rowsByNumber = allValidRows.ToDictionary(r => r.RowNumber);
 
-        // Clear any confirm-phase error rows from a previous attempt for the rows we are about to
-        // retry, so cumulative counts and the error list do not double-count across retries.
         var rowNumbersToProcess = stagingRows.Select(s => s.RowNumber).ToHashSet();
         if (rowNumbersToProcess.Count > 0)
         {
@@ -129,20 +111,12 @@ internal sealed class ConfirmImportSessionHandler(
             db.ImportRowErrors.RemoveRange(staleErrors);
         }
 
-        // Rows that failed the earlier Validate step never enter the loop below (only IsValid
-        // staging rows do), so they'd otherwise vanish from this step's own failedCount entirely
-        // — session.Confirm below overwrites FailedRows rather than adding to it, so without this
-        // a file with some already-invalid rows would incorrectly report ImportStatus.Imported
-        // (0 failures) once every row that WAS valid is confirmed successfully.
         var alreadyInvalidRowCount = await db.ImportStagingEmployees
             .CountAsync(s => s.ImportSessionId == session.Id && s.CompanyId == request.CompanyId && !s.IsValid, cancellationToken);
 
         var createdByRow = new Dictionary<int, (Guid EmployeeId, string? ManagerReference)>();
         var createdRowResults = new List<ConfirmImportSessionRowResult>();
 
-        // Seed with every row that already has an employee (from this run or an earlier partial
-        // run) so this run's manager resolution can still point at them, and the response reflects
-        // the full picture.
         foreach (var confirmed in allValidRows.Where(r => r.CreatedEmployeeId is not null))
         {
             createdByRow[confirmed.RowNumber] = (confirmed.CreatedEmployeeId!.Value, confirmed.ManagerReference);
@@ -213,10 +187,6 @@ internal sealed class ConfirmImportSessionHandler(
                         fields.GetValueOrDefault("Address"),
                         ParseDate(fields.GetValueOrDefault("ProbationEndDate")));
 
-                    // Rows whose Work Email matched the company's seed admin employee (see
-                    // Employee.IsInitialCompanyAdmin) update that existing employee rather than
-                    // creating a duplicate — this is the ONLY case where import ever updates an
-                    // existing employee (see EmployeeStagingRowValidator's remarks).
                     createResult = row.ExistingEmployeeIdToUpdate is not null
                         ? await employeeWriter.UpdateEmployeeAsync(row.ExistingEmployeeIdToUpdate.Value, createRequest, cancellationToken)
                         : await employeeWriter.CreateEmployeeAsync(createRequest, cancellationToken);
@@ -248,12 +218,6 @@ internal sealed class ConfirmImportSessionHandler(
                             cancellationToken);
                     }
 
-                    // OBT-REM-08: record the durable per-row "employee created" step BEFORE
-                    // publishing integration events or laying the opening leave balance. A crash
-                    // between here and those later steps leaves the row's remaining steps
-                    // incomplete (not the whole row "confirmed"), so a retry resumes exactly the
-                    // steps that did not finish instead of creating the employee a second time OR
-                    // silently losing the events/balance.
                     row.MarkEmployeeCreated(createResult.EmployeeId, clock.UtcNowOffset());
                     await db.SaveChangesAsync(cancellationToken);
 
@@ -263,21 +227,14 @@ internal sealed class ConfirmImportSessionHandler(
                 }
                 else
                 {
-                    // Employee already created by an earlier (partial) attempt — resume without
-                    // creating it again. Read back the data needed to (re)publish events from the
-                    // Employees module rather than re-deriving it from the raw staging row.
                     createResult = await employeeWriter.GetImportSnapshotAsync(
                         request.CompanyId, row.CreatedEmployeeId.Value, cancellationToken)
                         ?? throw new InvalidOperationException(
                             $"Employee '{row.CreatedEmployeeId}' recorded against row {row.RowNumber} could not be found.");
                 }
 
-                // Each downstream step is independently resumable: only run (and only persist) a
-                // step that did not already complete for this row.
                 if (row.EmployeeCreatedEventPublishedAt is null)
                 {
-                    // Publishes synchronously in-process; InitialiseEmployeeLeave's handler will
-                    // have created the baseline leave balances by the time PublishAsync returns.
                     await integrationEventPublisher.PublishAsync(new EmployeeCreatedIntegrationEvent(
                         request.CompanyId,
                         createResult.EmployeeId,
@@ -303,12 +260,6 @@ internal sealed class ConfirmImportSessionHandler(
 
                 if (row.OpeningLeaveBalanceProcessedAt is null)
                 {
-                    // Leave Type Code was removed from the import template — Annual Leave is the
-                    // only leave type an import ever sets an opening balance for, so it's
-                    // hardcoded here rather than asking the user to specify a type.
-                    // TryLayOpeningBalanceAsync computes the adjustment as a delta from the
-                    // employee's current balance, so calling it again on retry (or when there is
-                    // nothing to apply) is a safe no-op.
                     var leaveBalanceDaysRaw = fields.GetValueOrDefault("LeaveBalanceDays");
                     if (!string.IsNullOrWhiteSpace(leaveBalanceDaysRaw))
                     {
@@ -327,9 +278,6 @@ internal sealed class ConfirmImportSessionHandler(
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // The DataImport DbContext only tracks the session + staging rows + error rows; a
-                // failure inside the (separately-scoped) employee writer does not dirty it, so the
-                // error row can be persisted immediately for durability.
                 db.ImportRowErrors.Add(ImportRowError.Create(
                     Guid.NewGuid(),
                     request.CompanyId,
@@ -343,11 +291,6 @@ internal sealed class ConfirmImportSessionHandler(
             }
         }
 
-        // Second pass: manager resolution, now that every row's employee (if created
-        // successfully) exists. A manager reference can point at another row in this same file
-        // or at a pre-existing employee. Only rows whose manager-assignment step has not already
-        // completed are (re)processed — this keeps a retry from repeatedly re-resolving managers
-        // for rows that finished this step on an earlier attempt.
         foreach (var (rowNumber, (employeeId, managerReference)) in createdByRow)
         {
             var stagingRow = rowsByNumber[rowNumber];
@@ -408,10 +351,6 @@ internal sealed class ConfirmImportSessionHandler(
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        // A row is fully confirmed only once every mandatory step has completed. This must be
-        // computed after both passes above, since manager assignment (pass two) can be the last
-        // outstanding step for a row that already had its employee/events/leave-balance steps
-        // done on an earlier attempt.
         var nowFinal = clock.UtcNowOffset();
         var rowsToFinalize = allValidRows.Where(r =>
             !r.IsFullyConfirmed
@@ -426,9 +365,6 @@ internal sealed class ConfirmImportSessionHandler(
 
         await db.SaveChangesAsync(cancellationToken);
 
-        // Recompute cumulative counts from fully-completed rows (not merely rows with an employee
-        // id), so a resumed/retried confirmation reports the whole session's true outcome and a
-        // row with dangling downstream work is never counted as a success.
         var confirmedTotal = await db.ImportStagingEmployees
             .CountAsync(s => s.ImportSessionId == session.Id && s.FullyConfirmedAt != null, cancellationToken);
         var validTotal = allValidRows.Count;

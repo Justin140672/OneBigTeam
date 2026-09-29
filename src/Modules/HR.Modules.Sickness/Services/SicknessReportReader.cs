@@ -6,9 +6,6 @@ namespace HR.Modules.Sickness.Services;
 
 internal sealed class SicknessReportReader(SicknessDbContext dbContext) : ISicknessReportReader
 {
-    // Row cap (OBT-720 perf pass) — mirrors ExportEmployeeDirectoryReport's 50,000-row bound so
-    // this reader (used by both the on-screen report and its export) can't return an unbounded
-    // result set for a company with an unusually long sickness history.
     private const int MaxRows = 50_000;
 
     public async Task<IReadOnlyList<SicknessReportRecordItem>> GetSicknessRecordsAsync(
@@ -21,9 +18,6 @@ internal sealed class SicknessReportReader(SicknessDbContext dbContext) : ISickn
             .AsNoTracking()
             .Where(r => r.CompanyId == companyId);
 
-        // Overlap filtering: a record overlaps the requested range when its start is on/before the
-        // range end (or there is no range end) and its effective end (EndDate, or "still open" which
-        // is treated as never-ending) is on/after the range start (or there is no range start).
         if (startDate is not null)
             query = query.Where(r => r.EndDate == null || r.EndDate >= startDate);
 

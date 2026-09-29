@@ -15,30 +15,10 @@ internal sealed class LeaveType : IVersionedAggregate
     public LeaveTypeBehaviour Behaviour { get; private set; }
     public bool IsActive { get; private set; }
 
-    /// <summary>
-    /// Leave-type-level configuration flag: whether this type of leave tracks a balance
-    /// (entitlement/used/adjustment/remaining) at all. Independent of <see cref="Behaviour"/> —
-    /// e.g. an Unpaid Leave type would typically have this set to false, but it is not derived
-    /// from Behaviour and can be set independently. When false, employees never get a
-    /// <c>LeaveBalance</c> row for this type and the balance UI renders "n/a" for it.
-    /// </summary>
     public bool HasBalance { get; private set; }
 
-    /// <summary>
-    /// True for the platform-provisioned "Annual Leave" record (dev seed data and
-    /// ILeaveTypeDefaultsProvisioner) — item 50's replacement for matching that record by its
-    /// Name string. A system leave type can never be renamed or deactivated (see
-    /// UpdateLeaveTypeHandler/DeactivateLeaveTypeHandler); other fields (code, default
-    /// entitlement, accrual method, behaviour, tracks-balance) remain editable. Never true for a
-    /// company-created leave type — there is no API surface to set this on Create.
-    /// </summary>
     public bool IsSystem { get; private set; }
 
-    /// <summary>
-    /// TOIL-only policy setting (LEAVE-06): number of days after an award's earn date at which its
-    /// remaining, unused balance expires. Null means TOIL earned under this leave type never
-    /// expires. Ignored for non-TOIL behaviours.
-    /// </summary>
     public int? ToilExpiryDays { get; private set; }
 
     /// <summary>

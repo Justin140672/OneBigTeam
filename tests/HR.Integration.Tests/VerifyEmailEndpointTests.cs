@@ -92,8 +92,6 @@ public class VerifyEmailEndpointTests
         var first = await client.PostAsync("/api/verify-email", content: null);
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
 
-        // Simulates a double-click / reopened tab: same still-valid caller, second call against a
-        // company that's already Active.
         var second = await client.PostAsync("/api/verify-email", content: null);
 
         Assert.Equal(HttpStatusCode.OK, second.StatusCode);
@@ -121,10 +119,6 @@ public class VerifyEmailEndpointTests
     [Fact]
     public async Task Post_VerifyEmail_Returns_Forbidden_For_Caller_With_No_Matching_UserProfile()
     {
-        // A caller id that was never seeded via SignUp (no UserProfile, no roles) — the closest
-        // integration-test equivalent to "a valid-looking token for someone who was never really
-        // signed up", which the middleware/role check rejects the same way it would a stale/
-        // invalid one, without needing a genuinely-expired real Supabase token.
         using var client = VerifiedCallerClient(Guid.NewGuid());
 
         var response = await client.PostAsync("/api/verify-email", content: null);

@@ -49,17 +49,14 @@ public sealed class EmployeeTimelineTabTests(HrAdminPersonaFixture fixture) : Ro
 
         await CreateEmployeeAsync(empList, empEdit, slot: 0);
 
-        // ── The employee's only entry so far is "Employee joined", dated by the seeded start date ──
         await timeline.OpenAsync();
 
         var textsBeforeNote = await timeline.GetEntryTextsAsync();
         Assert.Single(textsBeforeNote);
         Assert.Contains("Employee joined", textsBeforeNote[0]);
         Assert.Contains("1 Mar 2026", textsBeforeNote[0]);
-        // No performer is recorded for the "Employee joined" event — should fall back to "System".
         Assert.Contains("System", textsBeforeNote[0]);
 
-        // ── Add an HR note (dated today) — should render above "Employee joined" ──
         var noteText = $"Timeline ordering check {Guid.NewGuid():N}";
         await empEdit.OpenNotesTabAsync();
         await empEdit.ClickAddNoteAsync();
@@ -72,7 +69,6 @@ public sealed class EmployeeTimelineTabTests(HrAdminPersonaFixture fixture) : Ro
 
         Assert.Equal(2, textsAfterNote.Count);
         Assert.Contains("HR note added", textsAfterNote[0]);
-        // Laura performed the note-adding action — her name should resolve as the performer.
         Assert.Contains("Laura", textsAfterNote[0]);
         Assert.Contains("Employee joined", textsAfterNote[1]);
     }
@@ -90,15 +86,6 @@ public sealed class EmployeeTimelineTabTests(HrAdminPersonaFixture fixture) : Ro
 
         var (employeeId, _) = await CreateEmployeeAsync(empList, empEdit, slot: 1);
 
-        // Page size is 20 (see EmployeeTimelineTab.razor's PageSize const). 22 HR notes plus the
-        // one pre-existing "Employee joined" entry give 23 total — 20 on the first page, 3 more
-        // after "Load more". Only this test's OWN Timeline-pagination behaviour is under test here
-        // — the Notes tab's dialog/UI is already covered by EmployeeNotesTabTests — so these 22
-        // notes are seeded via a direct authenticated call to the same CreateEmployeeNote endpoint
-        // the Add Note dialog itself calls (still a real handler round trip, still writes a real
-        // "HR note added" timeline entry via the real domain event — not a DB-seeding shortcut,
-        // see this file's own header comment) rather than 22 slow, repeated Syncfusion dialog
-        // round-trips through the browser.
         await SeedNotesAsync(employeeId, count: 22);
 
         await empEdit.GoToAsync(AcmeId, employeeId);
@@ -118,8 +105,6 @@ public sealed class EmployeeTimelineTabTests(HrAdminPersonaFixture fixture) : Ro
         Assert.False(await timeline.HasLoadMoreButtonAsync(),
             "Expected 'Load more' to disappear once every entry has been loaded");
 
-        // No full page reload happened — the URL is unchanged and the first page's entries are
-        // still present in the DOM (appended to, not replaced).
         Assert.Equal(urlBeforeLoadMore, _page.Url);
         var allTexts = await timeline.GetEntryTextsAsync();
         foreach (var text in firstPageTexts)
@@ -148,9 +133,6 @@ public sealed class EmployeeTimelineTabTests(HrAdminPersonaFixture fixture) : Ro
         // changes nothing for the Recruitment E2E tests. "Senior Software Engineer" must stay free
         // for those tests, so it is deliberately not used here.
         await wizard.SelectNewPositionProfileAsync("Software Engineer");
-        // A few days ahead of "today" — future enough to be after the run date, near enough not
-        // to require guessing far into the future. See EmployeePromotionTabTests for the same
-        // one-week-ahead convention used elsewhere in this suite.
         var futureEffectiveDate = DateTime.Today.AddDays(7).ToString("dd/MM/yyyy");
         await wizard.FillEffectiveDateAsync(futureEffectiveDate);
         await wizard.FillReasonAsync("Timeline upcoming-badge check");
@@ -172,12 +154,6 @@ public sealed class EmployeeTimelineTabTests(HrAdminPersonaFixture fixture) : Ro
     [Fact]
     public async Task ViewDetails_NavigatesToDestinationTab_ForHr_ButNotRendered_ForSelfService()
     {
-        // Tom Williams already has a real login and self-service profile access, so this test
-        // reuses him rather than creating a fresh employee (self-service dev-auth login is only
-        // established for seeded personas). A distinctive target position ("HR Manager", not used
-        // elsewhere for Tom in this suite) keeps the new promotion's timeline summary
-        // ("Promoted from ... to HR Manager.") unambiguous even if other tests have also promoted
-        // Tom to a different position.
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
         var wizard = new PromoteEmployeeDialog(_page);
@@ -198,7 +174,6 @@ public sealed class EmployeeTimelineTabTests(HrAdminPersonaFixture fixture) : Ro
         await wizard.SubmitAsync();
         Assert.False(await wizard.IsVisibleAsync());
 
-        // ── HR view (EmployeeEdit): "View details" is present and navigates to Promotion History ──
         await timeline.OpenAsync();
         Assert.True(await timeline.EntryHasViewDetailsLinkAsync("HR Manager"),
             "Expected 'View details' on the promotion entry for the HR admin viewer");
@@ -208,7 +183,6 @@ public sealed class EmployeeTimelineTabTests(HrAdminPersonaFixture fixture) : Ro
         Assert.True(await EmployeeEditPage.SectionTab(_page, "Promotion History")
             .GetAttributeAsync("aria-selected") == "true");
 
-        // ── Self-service view (MyProfile): the same event type has no wired navigation callback ──
         var login2 = new LoginPage(_page, _fixture.WebBaseUrl);
         await login2.GoToAsync();
         await login2.LoginAsync("tom.williams@acme.example");
@@ -222,21 +196,7 @@ public sealed class EmployeeTimelineTabTests(HrAdminPersonaFixture fixture) : Ro
             "since MyProfile.razor only wires OnNavigateToDocuments/OnNavigateToAcknowledgements");
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Creates a brand-new employee via the UI (HR admin must already be logged in) and leaves the
-    /// browser on that employee's edit page. Returns the new employee's id (parsed from the
-    /// resulting URL) and last name. A fresh employee guarantees the only pre-existing timeline
-    /// entry is "Employee joined" (dated <paramref name="startDateDdMmYyyy"/>), regardless of what
-    /// other E2E tests have done to shared seeded employees elsewhere in the suite.
-    /// </summary>
-    // Each of the three timeline scenarios below gets its own dedicated pre-seeded pool employee
-    // (SeededE2eEmployees.Timeline[slot]) rather than paying the full New Employee form. A pool
-    // member's only pre-existing timeline entry is "Employee joined" dated 2026-03-01 (its seeded
-    // StartDate) — a NotStarted onboarding plan writes no timeline entry — so the "exactly one
-    // entry to start" guarantee the old fresh-employee flow gave still holds. Each test mutates its
-    // own employee (adds notes / a promotion), hence one distinct row (slot) per test.
     private async Task<(Guid Id, string LastName)> CreateEmployeeAsync(
         EmployeeListPage empList, EmployeeEditPage empEdit, int slot)
     {

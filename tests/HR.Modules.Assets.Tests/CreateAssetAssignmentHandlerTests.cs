@@ -132,7 +132,6 @@ public class CreateAssetAssignmentHandlerTests
         var taskCreator = new FakeTaskCreator();
         var handler = new CreateAssetAssignmentHandler(db, clock, taskCreator, new FakeNotificationWriter(), new FakeAuditPublisher());
 
-        // First assignment — should succeed
         var firstResult = await handler.HandleAsync(new CreateAssetAssignmentRequest
         {
             CompanyId = companyId,
@@ -143,7 +142,6 @@ public class CreateAssetAssignmentHandlerTests
 
         Assert.True(firstResult.IsSuccess);
 
-        // Second assignment — asset is now Assigned, not Available
         var secondResult = await handler.HandleAsync(new CreateAssetAssignmentRequest
         {
             CompanyId = companyId,
@@ -154,7 +152,7 @@ public class CreateAssetAssignmentHandlerTests
 
         Assert.True(secondResult.IsFailure);
         Assert.Equal("conflict", secondResult.Error.Code);
-        Assert.Single(taskCreator.Created); // only one task was created (for the first assignment)
+        Assert.Single(taskCreator.Created);
     }
 
     [Fact]

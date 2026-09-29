@@ -3,23 +3,12 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers a batch of Recruitment UI changes not already exercised by
-/// VacancyDetailsAndListScreensUpdateTests / VacancyManagementTests / ExternalRecruiterManagementTests:
-/// - Vacancy List: "Show active" toggle hides Closed vacancies until switched off, and an
-///   "Applications" count column is present.
-/// - Vacancy Detail: a Draft-status vacancy (freshly created, before any status transition) hides
-///   the Applications/Interviews tabs entirely.
-/// - Vacancy Detail's Applications tab: row actions live in the grid's own toolbar, not a per-row
-///   Actions column.
-/// - External Recruiter edit: "Contact Name" renders on its own full-width row.
-/// </summary>
 public sealed class RecruitmentUiUpdatesTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    private const string MarcusEmail = "marcus.diallo@acme.example"; // Recruiter
-    private const string LauraEmail = "laura.bennett@acme.example"; // HR Administrator
+    private const string MarcusEmail = "marcus.diallo@acme.example";
+    private const string LauraEmail = "laura.bennett@acme.example";
 
     [Fact]
     public async Task VacancyList_ShowActiveToggle_HidesClosedVacancies_UntilSwitchedOff()
@@ -35,8 +24,6 @@ public sealed class RecruitmentUiUpdatesTests(RecruiterPersonaFixture fixture) :
         Assert.True(await vacancyList.IsShowingActiveOnlyAsync(),
             "Expected the list to default to showing active vacancies only");
 
-        // "Senior Software Engineer" is a seeded Open vacancy — always visible regardless of the
-        // toggle (see VacancyDetailsAndListScreensUpdateTests' own header comment on this seed).
         Assert.True(await vacancyList.HasVacancyAsync("Senior Software Engineer"),
             "Expected an active (non-Closed) vacancy to remain visible under 'Show active'");
 

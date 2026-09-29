@@ -5,10 +5,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Identity.Features.GetUserAuditHistory;
 
-// Identity-specific view of the same audit trail that also feeds the Employee Audit History tab
-// (see HR.Modules.Employees.Features.GetEmployeeAuditHistory, which uses the same
-// IAuditHistoryReader.GetEmployeeAuditHistoryAsync port and maps ApplicationUser/UserInvite entity
-// types to the "Identity" module). This view is filtered to just the user-administration events.
 internal sealed class GetUserAuditHistoryHandler(
     IAuditHistoryReader auditHistoryReader,
     IEmployeeNameReader employeeNameReader,
@@ -20,8 +16,6 @@ internal sealed class GetUserAuditHistoryHandler(
         GetUserAuditHistoryRequest request,
         CancellationToken cancellationToken)
     {
-        // IAM-01: prove the target employee belongs to the route company before returning any
-        // audit history for them.
         var isMember = await targetUserCompanyGuard.IsMemberAsync(request.CompanyId, request.EmployeeId, cancellationToken);
         if (!isMember)
             return Result.Failure<GetUserAuditHistoryResponse>(Error.NotFound("No user or invitation found for this employee."));

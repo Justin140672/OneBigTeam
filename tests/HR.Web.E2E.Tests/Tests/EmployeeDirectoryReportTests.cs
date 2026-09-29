@@ -4,20 +4,13 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the Employee Directory report page
-/// (/companies/{companyId}/reporting/employee-directory — EmployeeDirectoryReportPage.razor):
-/// filter panel, server-side paging, export, and access control for the
-/// "reporting:view-hr"-gated data/export endpoints. Catalog-page coverage (search, favourites,
-/// navigation into this page) lives in <see cref="ReportCatalogTests"/>.
-/// </summary>
 public sealed class EmployeeDirectoryReportTests(ParallelBlankPersonaFixture fixture)
     : RoleE2ETestBase<ParallelBlankPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    private const string LauraEmail = "laura.bennett@acme.example"; // HR Administrator
-    private const string MarcusEmail = "marcus.diallo@acme.example"; // Recruiter — no HrAdministrator role
+    private const string LauraEmail = "laura.bennett@acme.example";
+    private const string MarcusEmail = "marcus.diallo@acme.example";
 
     [Fact]
     public async Task FilterPanel_ByStatus_ReloadsGridWithoutErroring()
@@ -35,8 +28,6 @@ public sealed class EmployeeDirectoryReportTests(ParallelBlankPersonaFixture fix
         await report.SelectFilterAsync("Status", "Active");
         await report.ApplyFiltersAsync();
 
-        // With seeded dev data we can't assume a specific row-count delta, but the grid must
-        // reload cleanly (no crash/error banner) and continue rendering rows/headers.
         Assert.False(await report.HasLoadErrorAsync(), "Expected the grid to reload without an error banner after applying a Status filter");
         var filteredRowCount = await report.GetRowCountAsync();
         Assert.True(filteredRowCount <= unfilteredRowCount,
@@ -79,9 +70,6 @@ public sealed class EmployeeDirectoryReportTests(ParallelBlankPersonaFixture fix
 
         await catalog.GoToAsync(AcmeId);
 
-        // Marcus (Recruiter, no HrAdministrator role) passes "reporting:view-recruitment" but not
-        // "reporting:view-hr" — the catalog endpoint itself filters out "Hr"-category entries
-        // (including employee-directory) server-side, so there is no card to hide client-side.
         Assert.False(await catalog.HasCardAsync("Employee Directory"),
             "Expected a non-HR-admin persona to not see the Employee Directory catalog card at all");
     }
@@ -95,10 +83,6 @@ public sealed class EmployeeDirectoryReportTests(ParallelBlankPersonaFixture fix
         await login.GoToAsync();
         await login.LoginAsync(MarcusEmail);
 
-        // ADM-05 (commit e67ba6ff): EmployeeDirectoryReportPage guards on Session.CanViewHrReports
-        // via AppSession.GuardAccess, redirecting a persona that lacks it to /access-denied
-        // (replace) rather than rendering and letting the data call 403. Marcus is a Recruiter,
-        // not an HR Administrator.
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/reporting/employee-directory");
 
         await accessDenied.WaitForLoadedAsync();

@@ -271,7 +271,6 @@ public class GetApplicationHandlerTests
         db.CandidateDocuments.Add(submittedCv);
         await db.SaveChangesAsync();
 
-        // A newer CV is uploaded against the candidate after the application was submitted.
         var newerCv = CandidateDocument.Create(Guid.NewGuid(), companyId, candidate.Id, "CV v2", "cv-v2.pdf", 222, "application/pdf", "k2", Guid.NewGuid(), Now.AddDays(3), CandidateDocumentKind.Cv);
         db.CandidateDocuments.Add(newerCv);
         await db.SaveChangesAsync();
@@ -354,7 +353,6 @@ public class GetApplicationHandlerTests
         Assert.Equal(cvB.Id, resultB.Value!.CvDocumentId);
         Assert.Equal("cv-design.pdf", resultB.Value.CvFileName);
 
-        // Both share the same "current" CV — the candidate's newest.
         Assert.Equal(cvB.Id, resultA.Value.CurrentCandidateCvDocumentId);
         Assert.Equal(cvB.Id, resultB.Value.CurrentCandidateCvDocumentId);
     }
@@ -544,8 +542,6 @@ public class GetApplicationHandlerTests
     [InlineData("Direct")]
     public async Task HandleAsync_Hired_External_Candidate_Linked_To_Employee_Is_Not_Internal_And_EmployeeId_Is_Null(string? source)
     {
-        // Candidate.EmployeeId is set by HireCandidate on external candidates — it must never make the
-        // application look internal. Only Application.Source == Internal does.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);

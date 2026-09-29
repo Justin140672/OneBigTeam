@@ -107,12 +107,6 @@ else
         }
         catch (Exception)
         {
-            // Leave _response null — the markup's "else if (_response is null)" branch already
-            // renders the "not authorised, or they couldn't be loaded" banner for exactly this
-            // case. Without this catch, any exception here (a transient network blip, an
-            // unauthorised/failed call) left the page stuck showing "Loading…" forever: _loading
-            // never reached its "= false" below, so that already-built fallback banner was
-            // unreachable regardless of the real failure reason.
             _response = null;
         }
 

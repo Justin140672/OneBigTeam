@@ -5,11 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Tests;
 
-/// <summary>
-/// DSH-05: <see cref="EmployeesMissingFitNoteReader"/> — an employee "is missing a fit note" when
-/// they have a sickness evidence request in Pending or Overdue status (joined to the sickness
-/// record for the employee id). Fulfilled / Cancelled requests do not count.
-/// </summary>
 public class EmployeesMissingFitNoteReaderTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 1, 9, 0, 0, TimeSpan.Zero);

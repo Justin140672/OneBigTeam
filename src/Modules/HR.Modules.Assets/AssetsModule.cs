@@ -112,11 +112,10 @@ public static class AssetsModule
 
         var now       = DateTimeOffset.UtcNow;
         var companyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-        var sarahId   = Guid.Parse("30000000-0000-0000-0000-000000000001"); // Sarah Chen
-        var tomId     = Guid.Parse("30000000-0000-0000-0000-000000000004"); // Tom Williams
-        var lauraId   = Guid.Parse("30000000-0000-0000-0000-000000000005"); // Laura Bennett
+        var sarahId   = Guid.Parse("30000000-0000-0000-0000-000000000001");
+        var tomId     = Guid.Parse("30000000-0000-0000-0000-000000000004");
+        var lauraId   = Guid.Parse("30000000-0000-0000-0000-000000000005");
 
-        // Fixed IDs so E2E tests can reference them directly.
         var categoryId        = Guid.Parse("c0000000-0000-0000-0000-000000000001");
         var tomAssetId        = Guid.Parse("c0000000-0000-0000-0000-000000000002");
         var tomAssignmentId   = Guid.Parse("c0000000-0000-0000-0000-000000000003");
@@ -130,7 +129,6 @@ public static class AssetsModule
             "Laptops, monitors and peripherals", now);
         db.AssetCategories.Add(category);
 
-        // Tom's asset — MacBook Pro
         var tomAsset = Asset.Create(tomAssetId, companyId, "ASSET-0001", categoryId,
             "MacBook Pro 14\"", "Apple", "MacBook Pro 14-inch M3",
             "C02X12345678", purchaseDate: new DateOnly(2024, 3, 1),
@@ -140,7 +138,6 @@ public static class AssetsModule
         db.AssetAssignments.Add(AssetAssignment.Create(tomAssignmentId, companyId,
             tomAssetId, tomId, sarahId, notes: "Issued for remote work", now));
 
-        // Sarah's asset — Dell monitor so she can see the acknowledgement UI when logged in as dev user
         var sarahAsset = Asset.Create(sarahAssetId, companyId, "ASSET-0002", categoryId,
             "Dell UltraSharp 27\"", "Dell", "U2723DE",
             "CN-0ABC123", purchaseDate: new DateOnly(2024, 1, 15),
@@ -150,16 +147,12 @@ public static class AssetsModule
         db.AssetAssignments.Add(AssetAssignment.Create(sarahAssignmentId, companyId,
             sarahAssetId, sarahId, sarahId, notes: "Home office monitor", now));
 
-        // Available asset — not assigned, so it appears in the "Assign Asset" dialog dropdown.
         var availableAsset = Asset.Create(availableAssetId, companyId, "ASSET-0003", categoryId,
             "Logitech MX Keys", "Logitech", "MX Keys Advanced",
             "LGT-0003", purchaseDate: new DateOnly(2024, 6, 1),
             purchasePrice: 129.00m, now);
         db.Assets.Add(availableAsset);
 
-        // Laura's asset — Dell laptop, unacknowledged, so E2E dashboard-widget scenarios that
-        // previously relied on Sarah Chen (who is now CompanyAdministrator-only and redirected
-        // away from "/") can exercise the same "Pending" acknowledgement flow via Laura instead.
         var lauraAsset = Asset.Create(lauraAssetId, companyId, "ASSET-0007", categoryId,
             "Dell Latitude 5440", "Dell", "Latitude 5440",
             "CN-0DEF456", purchaseDate: new DateOnly(2024, 2, 10),

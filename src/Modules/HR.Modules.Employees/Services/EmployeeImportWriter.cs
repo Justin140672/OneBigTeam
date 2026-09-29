@@ -9,13 +9,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Services;
 
-/// <summary>
-/// Implements <see cref="IEmployeeImportWriter"/> for the DataImport module's confirm step.
-/// Mirrors CreateEmployeeHandler/SetEmployeeWorkingPatternHandler/CreateCompensationRecordHandler/
-/// AssignManagerHandler, but is invoked once per staged import row and does not itself publish
-/// EmployeeCreatedIntegrationEvent — that happens once per row from the DataImport handler after
-/// all per-row writer calls for that row have succeeded.
-/// </summary>
 internal sealed class EmployeeImportWriter(
     EmployeesDbContext dbContext,
     IClock clock,
@@ -29,12 +22,6 @@ internal sealed class EmployeeImportWriter(
     {
         var now = clock.UtcNowOffset();
 
-        // Automatic-mode rows are staged with no EmployeeNumber (enforced by
-        // EmployeeStagingRowValidator) — generate the real number here, at write time, via the
-        // same atomic counter CreateEmployeeHandler uses. Each row is written independently and
-        // GenerateNextAsync's own UPDATE...RETURNING is atomic per call, so sequential per-row
-        // calls are sufficient to guarantee no two rows in the same (or a concurrent) import ever
-        // receive the same number — no bulk-reservation step is needed.
         var employeeNumber = string.IsNullOrWhiteSpace(request.EmployeeNumber)
             ? await employeeNumberGenerator.GenerateNextAsync(request.CompanyId, cancellationToken)
             : request.EmployeeNumber.Trim();
@@ -74,8 +61,6 @@ internal sealed class EmployeeImportWriter(
                 p => p.Id == request.PositionProfileId && p.CompanyId == request.CompanyId,
                 cancellationToken);
 
-        // Use the imported Probation End Date when the file specified one; otherwise fall back to
-        // the company's default calculation, exactly as before this field was captured.
         var probationEndDate = request.ProbationEndDate ?? await probationDateResolver.ResolveEndDateAsync(
             request.CompanyId, positionProfile?.ProbationMonthsOverride, employee.StartDate, cancellationToken);
         employee.SetProbationEndDate(probationEndDate, now);
@@ -228,8 +213,6 @@ internal sealed class EmployeeImportWriter(
         if (manager is null)
             return false;
 
-        // Circular hierarchy check, replicated from AssignManagerHandler: walk up the proposed
-        // manager's chain and bail out if we would reach the employee being updated.
         var allEmployees = await dbContext.Employees
             .AsNoTracking()
             .Where(e => e.CompanyId == companyId)

@@ -5,11 +5,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Notifications.Features.PreviewProductUpdateRecipients;
 
-/// <summary>
-/// Customer Release Notifications: computes the "{N} Company Admin users across {M} active
-/// customer companies" count the Admin Portal's confirmation dialog shows before SendProductUpdate
-/// is allowed to run. Read-only — never writes a notification.
-/// </summary>
 internal sealed class PreviewProductUpdateRecipientsHandler(
     IActiveCompanyDirectory activeCompanyDirectory,
     ISubscriptionStatusReader subscriptionStatusReader,

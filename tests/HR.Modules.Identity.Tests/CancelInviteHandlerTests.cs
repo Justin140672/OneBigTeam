@@ -159,13 +159,10 @@ public class CancelInviteHandlerTests(IdentityDatabaseFixture fixture)
             await db.SaveChangesAsync();
         }
 
-        // Context A loads and tracks the row while Version == 1 (mirrors the handler's own read).
         await using var ctxA = fixture.BuildContext();
         var trackedA = await ctxA.UserInvites.FirstAsync(i => i.Id == invite.Id);
         var expectedVersionA = trackedA.Version;
 
-        // Context B wins the race: a concurrent AcceptInvite claims the invite first, bumping
-        // Version to 2.
         await using (var ctxB = fixture.BuildContext())
         {
             var trackedB = await ctxB.UserInvites.FirstAsync(i => i.Id == invite.Id);
@@ -175,7 +172,6 @@ public class CancelInviteHandlerTests(IdentityDatabaseFixture fixture)
             Assert.True(saveResult.IsSuccess);
         }
 
-        // CancelInvite's handler now saves against context A with the now-stale Version == 1.
         trackedA.Cancel(Now);
         var result = await ctxA.SaveChangesWithConcurrencyAsync(
             trackedA, expectedVersionA, "This invitation was already accepted and can no longer be cancelled.", CancellationToken.None);
@@ -212,13 +208,10 @@ public class CancelInviteHandlerTests(IdentityDatabaseFixture fixture)
 
         var idempotencyKey = $"cancel-race-{Guid.NewGuid():N}";
 
-        // Context A loads and tracks the row while Version == 1 (mirrors the keyed handler's own
-        // read, held stale exactly like the unkeyed race test above).
         await using var ctxA = fixture.BuildContext();
         var trackedA = await ctxA.UserInvites.FirstAsync(i => i.Id == invite.Id);
         var expectedVersionA = trackedA.Version;
 
-        // A concurrent AcceptInvite wins the race first, claiming the invite and bumping Version.
         await using (var ctxB = fixture.BuildContext())
         {
             var trackedB = await ctxB.UserInvites.FirstAsync(i => i.Id == invite.Id);
@@ -228,9 +221,6 @@ public class CancelInviteHandlerTests(IdentityDatabaseFixture fixture)
             Assert.True(saveResult.IsSuccess);
         }
 
-        // Context A now applies the cancel and saves via the exact same
-        // SaveIdempotentWithConcurrencyAsync call CancelInviteHandler's keyed branch uses (see
-        // Handler.cs), against the now-stale Version == 1 it read before context B's claim.
         trackedA.Cancel(Now);
         var request = new CancelInviteRequest { CompanyId = companyId, InviteId = invite.Id };
         var scope = new IdempotencyScope(nameof(CancelInviteHandler), companyId, Guid.Empty);
@@ -266,7 +256,6 @@ public class CancelInviteHandlerTests(IdentityDatabaseFixture fixture)
         var companyId = Guid.NewGuid();
         var idempotencyKey = $"cancel-reuse-{Guid.NewGuid():N}";
 
-        // First invite: loses the race to a concurrent claim, as above.
         var employeeId1 = Guid.NewGuid();
         var invite1 = UserInvite.Create(employeeId1, companyId, "reuse-first@test.com", Now);
         await using (var db = fixture.BuildContext())
@@ -288,8 +277,6 @@ public class CancelInviteHandlerTests(IdentityDatabaseFixture fixture)
             Assert.True(saveResult.IsSuccess);
         }
 
-        // The first (losing) attempt saves via the same SaveIdempotentWithConcurrencyAsync call
-        // CancelInviteHandler's keyed branch uses, against the now-stale version.
         trackedA1.Cancel(Now);
         var firstRequest = new CancelInviteRequest { CompanyId = companyId, InviteId = invite1.Id };
         var firstScope = new IdempotencyScope(nameof(CancelInviteHandler), companyId, Guid.Empty);
@@ -307,8 +294,6 @@ public class CancelInviteHandlerTests(IdentityDatabaseFixture fixture)
             Assert.False(await verify.IdempotencyRecords.AnyAsync(r => r.Key == idempotencyKey));
         }
 
-        // Second invite: a genuinely still-pending, cancellable invite - the "reload and retry" the
-        // caller performs after the first attempt's conflict.
         var employeeId2 = Guid.NewGuid();
         var invite2 = UserInvite.Create(employeeId2, companyId, "reuse-second@test.com", Now);
         await using (var db = fixture.BuildContext())

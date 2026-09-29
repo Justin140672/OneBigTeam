@@ -4,11 +4,6 @@ using HR.Modules.Sickness.Services;
 
 namespace HR.Modules.Sickness.Tests.Services;
 
-/// <summary>
-/// SICK-04: unit tests for the pure, deterministic AttendanceAlertEvaluationService. All tests use
-/// a fixed EvaluationDate of 2026-06-15 and settings mirroring CompanySicknessSettings.Default
-/// unless a specific threshold is being pinned to its boundary.
-/// </summary>
 public class AttendanceAlertEvaluationServiceTests
 {
     private static readonly DateOnly EvaluationDate = new(2026, 6, 15);
@@ -61,9 +56,6 @@ public class AttendanceAlertEvaluationServiceTests
         return review;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // FrequentAbsences
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public void Evaluate_FrequentAbsences_Fires_At_ExactThreshold()
@@ -106,7 +98,7 @@ public class AttendanceAlertEvaluationServiceTests
         // One spell falls just outside the window and must not count toward the threshold.
         var records = new[]
         {
-            CreateRecord(new DateOnly(2025, 6, 14)), // outside window (one day too early)
+            CreateRecord(new DateOnly(2025, 6, 14)),
             CreateRecord(new DateOnly(2026, 2, 5)),
             CreateRecord(new DateOnly(2026, 3, 5)),
             CreateRecord(new DateOnly(2026, 4, 5)),
@@ -123,7 +115,7 @@ public class AttendanceAlertEvaluationServiceTests
         var windowStart = EvaluationDate.AddDays(-365);
         var records = new[]
         {
-            CreateRecord(windowStart), // exactly at window boundary — inclusive
+            CreateRecord(windowStart),
             CreateRecord(new DateOnly(2026, 2, 5)),
             CreateRecord(new DateOnly(2026, 3, 5)),
             CreateRecord(new DateOnly(2026, 4, 5)),
@@ -135,14 +127,10 @@ public class AttendanceAlertEvaluationServiceTests
         Assert.Equal(4, candidate.OccurrenceCount);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // WeekdayPattern
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public void Evaluate_WeekdayPattern_Fires_At_ExactThreshold()
     {
-        // 2026-01-05, 2026-01-12, 2026-01-19 are all Mondays.
         var records = new[]
         {
             CreateRecord(new DateOnly(2026, 1, 5)),
@@ -177,9 +165,9 @@ public class AttendanceAlertEvaluationServiceTests
         // Three absences on three *different* weekdays must not trip a same-weekday pattern.
         var records = new[]
         {
-            CreateRecord(new DateOnly(2026, 1, 5)),  // Monday
-            CreateRecord(new DateOnly(2026, 1, 13)), // Tuesday
-            CreateRecord(new DateOnly(2026, 1, 21)), // Wednesday
+            CreateRecord(new DateOnly(2026, 1, 5)),
+            CreateRecord(new DateOnly(2026, 1, 13)),
+            CreateRecord(new DateOnly(2026, 1, 21)),
         };
 
         var candidates = BuildService().Evaluate(records, [], DefaultSettings, EvaluationDate);
@@ -193,7 +181,7 @@ public class AttendanceAlertEvaluationServiceTests
         var windowStart = EvaluationDate.AddDays(-365);
         var records = new[]
         {
-            CreateRecord(windowStart.AddDays(-7)), // one week before window start, same weekday, excluded
+            CreateRecord(windowStart.AddDays(-7)),
             CreateRecord(new DateOnly(2026, 1, 12)),
             CreateRecord(new DateOnly(2026, 1, 19)),
         };
@@ -203,15 +191,12 @@ public class AttendanceAlertEvaluationServiceTests
         Assert.DoesNotContain(candidates, c => c.Rule == AttendanceAlertRule.WeekdayPattern);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // LongAbsence
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public void Evaluate_LongAbsence_Fires_At_ExactThreshold_ClosedRecord()
     {
         var start = new DateOnly(2026, 1, 1);
-        var end = start.AddDays(27); // inclusive of both ends => 28 calendar days
+        var end = start.AddDays(27);
         var records = new[] { CreateRecord(start, end) };
 
         var candidates = BuildService().Evaluate(records, [], DefaultSettings, EvaluationDate);
@@ -226,7 +211,7 @@ public class AttendanceAlertEvaluationServiceTests
     public void Evaluate_LongAbsence_DoesNotFire_OneDayBelowThreshold()
     {
         var start = new DateOnly(2026, 1, 1);
-        var end = start.AddDays(26); // 27 calendar days — one below the 28-day threshold
+        var end = start.AddDays(26);
         var records = new[] { CreateRecord(start, end) };
 
         var candidates = BuildService().Evaluate(records, [], DefaultSettings, EvaluationDate);
@@ -237,7 +222,6 @@ public class AttendanceAlertEvaluationServiceTests
     [Fact]
     public void Evaluate_LongAbsence_OpenRecord_MeasuredAgainstEvaluationDate()
     {
-        // Open record (EndDate == null) started exactly 28 calendar days before EvaluationDate.
         var start = EvaluationDate.AddDays(-27);
         var records = new[] { CreateRecord(start, endDate: null) };
 
@@ -251,7 +235,7 @@ public class AttendanceAlertEvaluationServiceTests
     [Fact]
     public void Evaluate_LongAbsence_OpenRecord_OneDayBelowThreshold_DoesNotFire()
     {
-        var start = EvaluationDate.AddDays(-26); // only 27 calendar days elapsed as of EvaluationDate
+        var start = EvaluationDate.AddDays(-26);
         var records = new[] { CreateRecord(start, endDate: null) };
 
         var candidates = BuildService().Evaluate(records, [], DefaultSettings, EvaluationDate);
@@ -273,9 +257,6 @@ public class AttendanceAlertEvaluationServiceTests
         Assert.Equal(2, candidates.Count(c => c.Rule == AttendanceAlertRule.LongAbsence));
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // MissingReturnToWorkReview
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public void Evaluate_MissingReturnToWorkReview_Fires_ForOverdueStatusReview()
@@ -294,7 +275,6 @@ public class AttendanceAlertEvaluationServiceTests
     {
         var record = CreateRecord(new DateOnly(2026, 5, 1), new DateOnly(2026, 5, 3));
         var now = new DateTimeOffset(2026, 5, 4, 0, 0, 0, TimeSpan.Zero);
-        // DueDate before EvaluationDate (2026-06-15) but review never got transitioned to Overdue.
         var review = CreatePendingReview(record.Id, Guid.NewGuid(), new DateOnly(2026, 5, 4), now);
 
         var candidates = BuildService().Evaluate([record], [review], DefaultSettings, EvaluationDate);
@@ -317,7 +297,6 @@ public class AttendanceAlertEvaluationServiceTests
     [Fact]
     public void Evaluate_MissingReturnToWorkReview_DoesNotFire_ForPendingReviewDueExactlyOnEvaluationDate()
     {
-        // DueDate < evaluationDate is the overdue condition — due *on* the evaluation date is not yet overdue.
         var record = CreateRecord(new DateOnly(2026, 6, 10), new DateOnly(2026, 6, 12));
         var now = new DateTimeOffset(2026, 6, 12, 0, 0, 0, TimeSpan.Zero);
         var review = CreatePendingReview(record.Id, Guid.NewGuid(), EvaluationDate, now);
@@ -343,7 +322,7 @@ public class AttendanceAlertEvaluationServiceTests
     [Fact]
     public void Evaluate_MissingReturnToWorkReview_Fires_ForClosedRecordWithNoReviewAtAll()
     {
-        var record = CreateRecord(new DateOnly(2026, 5, 1), new DateOnly(2026, 5, 3)); // 3 days, >= ReturnToWorkRequiredAfterDays(1)
+        var record = CreateRecord(new DateOnly(2026, 5, 1), new DateOnly(2026, 5, 3));
 
         var candidates = BuildService().Evaluate([record], [], DefaultSettings, EvaluationDate);
 
@@ -375,9 +354,6 @@ public class AttendanceAlertEvaluationServiceTests
         Assert.DoesNotContain(candidates, c => c.Rule == AttendanceAlertRule.MissingReturnToWorkReview);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Sensitive-data exclusion (all rules)
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public void Evaluate_Descriptions_NeverContain_SicknessRecordNotesOrReviewNotes()
@@ -407,9 +383,6 @@ public class AttendanceAlertEvaluationServiceTests
         Assert.All(candidates, c => Assert.DoesNotContain(ConfidentialMarker, c.Description));
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Determinism / repeat-call
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public void Evaluate_IsDeterministic_AcrossRepeatedCalls()

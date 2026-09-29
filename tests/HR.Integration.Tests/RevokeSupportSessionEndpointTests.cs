@@ -11,10 +11,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// See ExtendCustomerTrialEndpointTests/GenerateSupportSessionEndpointTests for the shared
-/// platform:admin allow-list auth pattern used by these tests.
-/// </summary>
 [Collection("Integration")]
 public class RevokeSupportSessionEndpointTests
 {
@@ -70,8 +66,6 @@ public class RevokeSupportSessionEndpointTests
 
         var response = await client.PostAsJsonAsync(Url(Guid.NewGuid()), new { });
 
-        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
-        // is Forbidden (403), not Unauthorized (401).
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 

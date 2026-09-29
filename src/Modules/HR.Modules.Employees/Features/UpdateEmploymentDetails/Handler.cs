@@ -50,9 +50,6 @@ internal sealed class UpdateEmploymentDetailsHandler
             return Result.Failure<UpdateEmploymentDetailsResponse>(
                 Error.NotFound($"Employee with id '{request.Id}' was not found."));
 
-        // Employee number can only be corrected here by HR when the company's numbering mode is
-        // Manual. In Automatic mode the number is system-generated and must remain read-only on
-        // edit — mirrors the read-only handling already enforced elsewhere for Automatic mode.
         var employeeNumberMode = await _employeeNumberSettingsReader.GetModeAsync(request.CompanyId, cancellationToken);
 
         var normalizedEmployeeNumber = employeeNumberMode == EmployeeNumberMode.Automatic
@@ -152,25 +149,14 @@ internal sealed class UpdateEmploymentDetailsHandler
             }
         }
 
-        // Draft isn't a selectable option on the Employment tab's status dropdown — it's only
-        // ever a brand-new employee's starting state — so the one transition worth rejecting here
-        // is someone actively reverting an already-progressed employee back to it. A Draft
-        // employee whose edit doesn't touch status at all (e.g. just assigning a manager) still
-        // round-trips Status == Draft unchanged, which must be allowed through.
         if (request.Status == EmploymentStatus.Draft && employee.Status != EmploymentStatus.Draft)
             return Result.Failure<UpdateEmploymentDetailsResponse>(
                 Error.Validation("Cannot set employment status to Draft."));
 
-        // FormerEmployee is never settable through this generic edit form — it is only ever
-        // entered via the scheduled job that follows the Employee Leaving Process. Same shape as
-        // the Draft guard above: only rejects an actual attempted transition.
         if (request.Status == EmploymentStatus.FormerEmployee && employee.Status != request.Status)
             return Result.Failure<UpdateEmploymentDetailsResponse>(
                 Error.Validation("Cannot set employment status to Former Employee directly."));
 
-        // Leaving is only selectable through this generic edit form once the employee already has
-        // a LeavingDate set (i.e. the Start Leaving Process action has already been used) — it is
-        // not a free-choice status for an employee who has not yet started leaving.
         if (request.Status == EmploymentStatus.Leaving &&
             employee.Status != EmploymentStatus.Leaving &&
             employee.LeavingDate is null)
@@ -262,10 +248,6 @@ internal sealed class UpdateEmploymentDetailsHandler
         if (saveResult.IsFailure)
             return Result.Failure<UpdateEmploymentDetailsResponse>(saveResult.Error);
 
-        // Deliver the just-committed position-change outbox entry immediately rather than waiting
-        // for the next IdempotencyMaintenanceJob cron tick — the outbox row remains the source of
-        // truth if this inline attempt throws or the process dies right here (purely a best-effort
-        // latency optimisation on top of the durability guarantee already provided by the outbox row).
         if (positionProfileChanged && _logger is not null)
         {
             try

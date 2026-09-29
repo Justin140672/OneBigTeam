@@ -141,9 +141,6 @@ public class GetVacancyEndpointTests
     [Fact]
     public async Task Get_Vacancy_EffectiveLocation_Is_Resolved_Purely_From_PositionProfile_Location()
     {
-        // Location is no longer a vacancy-level concept at all — there is no vacancy-level override
-        // field, and EffectiveLocation is resolved exclusively from the linked Position Profile's
-        // PositionProfileSummary.LocationName.
         var companyId = Guid.NewGuid();
         using var client = await AuthenticatedClient(companyId);
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);

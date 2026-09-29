@@ -58,8 +58,6 @@ public class GetEmployeeTeamViewHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_Forbidden_For_Self()
     {
-        // GetEmployeeTeamView is manager-hierarchy only — the employee themself must go through
-        // GetEmployee for their own record, never this reduced view.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
@@ -83,8 +81,6 @@ public class GetEmployeeTeamViewHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_Forbidden_For_Manager_Viewing_A_Former_Employee_Report()
     {
-        // Agreed status scope: managers can view Draft/Active/Suspended/Leaving reports, never
-        // FormerEmployee ones — narrowed in resource authorization itself, not just the UI list.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
@@ -141,9 +137,6 @@ public class GetEmployeeTeamViewHandlerTests
     [Fact]
     public void Response_Has_No_Property_For_Any_Sensitive_Field()
     {
-        // Type-level guarantee, not a field-by-field null check: GetEmployeeTeamViewResponse's
-        // constructor has no parameter for any sensitive field at all, so this assertion fails to
-        // compile (not just fails at runtime) the moment a sensitive field is ever added to it.
         var responseFieldNames = typeof(GetEmployeeTeamViewResponse)
             .GetProperties()
             .Select(p => p.Name)

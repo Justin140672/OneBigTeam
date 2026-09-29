@@ -9,11 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Story 4 — configurable subscription pricing. GET/PUT are behind the "platform:admin" policy
-/// (same DB-backed check as GetPlatformSettingsEndpointTests); the anonymous public feed is
-/// covered by <see cref="GetPublicSubscriptionPricingEndpointTests"/>.
-/// </summary>
 [Collection("Integration")]
 public class SubscriptionPricingConfigEndpointTests
 {
@@ -105,7 +100,6 @@ public class SubscriptionPricingConfigEndpointTests
         await ResetSingletonRowAsync();
         using var client = await AuthenticatedClientAsync();
 
-        // Gap between band 1 (ends 50) and band 2 (starts 60).
         var request = new
         {
             bands = new object[]

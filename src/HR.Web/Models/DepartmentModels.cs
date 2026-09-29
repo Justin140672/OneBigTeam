@@ -3,7 +3,6 @@ using HR.Web.Services;
 
 namespace HR.Web.Models;
 
-// ── LIST ──────────────────────────────────────────────────────────────────────
 
 public record ListDepartmentsResponse(List<DepartmentListItemModel> Items);
 
@@ -15,7 +14,6 @@ public record DepartmentListItemModel(
     bool IsActive,
     int Version = 0);
 
-// ── GET ───────────────────────────────────────────────────────────────────────
 
 public record GetDepartmentResponse(
     Guid Id,
@@ -27,7 +25,6 @@ public record GetDepartmentResponse(
     bool IsActive,
     int Version = 0);
 
-// ── CREATE ────────────────────────────────────────────────────────────────────
 
 public record CreateDepartmentRequest(
     Guid CompanyId,
@@ -44,7 +41,6 @@ public record CreateDepartmentResponse(
     bool IsActive,
     DateTimeOffset CreatedAt);
 
-// ── UPDATE ────────────────────────────────────────────────────────────────────
 
 public record UpdateDepartmentRequest(
     Guid CompanyId,
@@ -67,7 +63,6 @@ public record UpdateDepartmentResponse(
     DateTimeOffset UpdatedAt,
     int Version = 0);
 
-// ── EDIT MODEL ────────────────────────────────────────────────────────────────
 
 public sealed class DepartmentEditModel : IHasVersion
 {

@@ -13,8 +13,6 @@ public class ScanStatusAccessGuardTests
         Assert.Null(error);
     }
 
-    // Theory parameters must be a publicly accessible type (xUnit requires public test methods),
-    // but FileScanStatus is internal — pass the enum's underlying int value instead and cast.
     [Theory]
     [InlineData((int)FileScanStatus.Pending)]
     [InlineData((int)FileScanStatus.Scanning)]

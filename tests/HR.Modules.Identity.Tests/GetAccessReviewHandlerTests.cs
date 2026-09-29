@@ -35,7 +35,6 @@ public class GetAccessReviewHandlerTests(IdentityDatabaseFixture fixture)
             await db.SaveChangesAsync();
         }
 
-        // Only inScopeUser is returned by the audience reader for this company.
         var handler = BuildHandler([inScopeUser]);
 
         var result = await handler.HandleAsync(
@@ -206,7 +205,6 @@ public class GetAccessReviewHandlerTests(IdentityDatabaseFixture fixture)
     [Fact]
     public async Task HandleAsync_Excludes_A_User_Whose_Only_Override_Is_A_Deny_Override()
     {
-        // Deny overrides don't confer privilege — only active Grant overrides do.
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var roleId = Guid.NewGuid();

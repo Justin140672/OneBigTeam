@@ -8,17 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Tasks.Services;
 
-/// <summary>
-/// OBT-721 Workload &amp; HR Actions Report — self-scoped provider: every authenticated caller sees
-/// their own overdue tasks (TaskItem.AssignedEmployeeId == caller), regardless of role. This is the
-/// "Employee Tasks Overdue" category from the ticket.
-///
-/// Interpretation note (documented per OBT-721 ticket guidance, since TaskItem does not cleanly
-/// separate "employee-owned" vs "manager-owned" tasks by any domain flag): this provider and
-/// <see cref="ManagerTasksOverdueWorkloadActionProvider"/> below both query the same TaskItem table,
-/// differing only in whose tasks they surface — self vs. direct-reports/company-wide. There is no
-/// TaskItem.Category concept to split "employee kind" vs "manager kind" tasks by content.
-/// </summary>
 internal sealed class EmployeeTasksOverdueWorkloadActionProvider(
     TasksDbContext dbContext,
     IEmployeeDepartmentReader employeeDepartmentReader,
@@ -32,13 +21,6 @@ internal sealed class EmployeeTasksOverdueWorkloadActionProvider(
         WorkloadScope requestedScope,
         CancellationToken cancellationToken)
     {
-        // Self-scoped regardless of requested workspace: every caller's own overdue tasks
-        // legitimately belong on both their Manager and HR dashboards (this is the "personal task"
-        // case, not an HR-vs-Manager distinction), matching requirement that a task may validly
-        // appear in multiple workspaces when it independently qualifies for each.
-        // NOT caller.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's
-        // resolved Employee/UserId. ICurrentUser.UserId reads off the ambient HttpContext, safe
-        // even from this provider's own DI scope.
         if (currentUser.UserId is not { } callerEmployeeId)
             return [];
 
@@ -73,12 +55,6 @@ internal sealed class EmployeeTasksOverdueWorkloadActionProvider(
     }
 }
 
-/// <summary>
-/// OBT-721 "Manager Tasks Overdue" category: a Manager sees overdue tasks assigned to anyone in
-/// their reporting sub-tree (direct or indirect reports, per DSH-02); HR sees every overdue task
-/// company-wide. See the interpretation note on
-/// <see cref="EmployeeTasksOverdueWorkloadActionProvider"/> above.
-/// </summary>
 internal sealed class ManagerTasksOverdueWorkloadActionProvider(
     TasksDbContext dbContext,
     IDirectReportsReader directReportsReader,
@@ -94,31 +70,18 @@ internal sealed class ManagerTasksOverdueWorkloadActionProvider(
         WorkloadScope requestedScope,
         CancellationToken cancellationToken)
     {
-        // Scope is driven by the EXPLICITLY requested workspace, never re-inferred from the
-        // caller's full role set. This is the fix for the reported bug: a caller holding BOTH HR
-        // and Manager roles must still only see their own reporting sub-tree's overdue tasks when
-        // the Manager workspace is requested — HR access must never widen the Manager view to
-        // company-wide, even though the same caller legitimately sees company-wide data when the
-        // HR workspace is explicitly requested instead.
         IReadOnlyCollection<Guid>? employeeIds = null;
         if (requestedScope == WorkloadScope.Hr)
         {
-            // A requested workspace is a display-routing signal only: re-verify the caller actually
-            // holds HR access before honouring it, never trust it as authorization.
             var callerIsHr = (await authorizationService.AuthorizeAsync(caller, "reporting:view-hr")).Succeeded;
             if (!callerIsHr)
                 return [];
         }
         else
         {
-            // NOT caller.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's
-            // resolved Employee/UserId. ICurrentUser.UserId reads off the ambient HttpContext, safe
-            // even from this provider's own DI scope.
             if (currentUser.UserId is not { } callerEmployeeId)
                 return [];
 
-            // DSH-02: a manager's dashboard scope is their entire reporting sub-tree (direct and
-            // indirect reports). See specifications/architecture/11-manager-hierarchy-scope.md.
             var teamIds = await directReportsReader.GetAllDescendantIdsAsync(
                 companyId, callerEmployeeId, cancellationToken);
 

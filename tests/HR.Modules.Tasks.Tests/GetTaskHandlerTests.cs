@@ -16,10 +16,6 @@ public class GetTaskHandlerTests
     private static readonly DateTimeOffset Now = new(2026, 6, 15, 9, 0, 0, TimeSpan.Zero);
     private static readonly Guid HrAdministratorRoleId = new("00000000-0000-0000-0000-000000000004");
 
-    // Defaults to an HR-Administrator caller so tests unrelated to IAM-07 authorization
-    // (pre-existing not-found/status-mapping behavior) don't need to wire up assignee/manager
-    // relationships just to get past the authorization check — mirrors
-    // CompleteTaskHandlerTests.BuildHandler's identical default.
     private static GetTaskHandler BuildHandler(TasksDbContext context) =>
         new(context, new TasksResourceAuthorizer(
             new FakeRoleAuthorizationService(HrAdministratorRoleId),
@@ -127,7 +123,6 @@ public class GetTaskHandlerTests
         Assert.Equal(completedAt, result.Value.CompletedAt);
     }
 
-    // ---- IAM-07: authorization matrix ----
 
     [Fact]
     public async Task HandleAsync_Allows_Assignee()
@@ -183,8 +178,8 @@ public class GetTaskHandlerTests
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
-        var assignedEmployee = Guid.NewGuid(); // A
-        var skipLevelManager = Guid.NewGuid(); // C, A's manager's manager
+        var assignedEmployee = Guid.NewGuid();
+        var skipLevelManager = Guid.NewGuid();
 
         var task = TaskItem.Create(
             Guid.NewGuid(), companyId, Guid.NewGuid(),
@@ -193,8 +188,6 @@ public class GetTaskHandlerTests
         context.TaskItems.Add(task);
         await context.SaveChangesAsync();
 
-        // C's full descendant tree (via GetAllDescendantIdsAsync) includes A even though C is not
-        // A's direct manager.
         var handler = new GetTaskHandler(context, new TasksResourceAuthorizer(
             new FakeRoleAuthorizationService(), new FakeDirectReportsReader(assignedEmployee)));
 

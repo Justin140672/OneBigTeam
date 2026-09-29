@@ -9,12 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Proves a Vacancy (and its linked Position Profile) in one company can never leak to, or be acted
-/// on by, another company's caller — including through the new ListVacancies PositionProfileId /
-/// DepartmentId filters, and through the Hire/Offer actions that now derive Department/Location from
-/// the Vacancy's linked Position Profile.
-/// </summary>
 [Collection("Integration")]
 public class RecruitmentPositionProfileTenantIsolationTests
 {
@@ -95,8 +89,6 @@ public class RecruitmentPositionProfileTenantIsolationTests
             applicationAId = applicationA.Id;
         }
 
-        // Company B's caller supplies Company A's real Vacancy/Application IDs, but authenticates as
-        // Company B — the request must be scoped away (404), never operate on Company A's data.
         using var clientB = await AuthenticatedClient(companyB);
 
         var offerResponse = await clientB.PostAsJsonAsync(

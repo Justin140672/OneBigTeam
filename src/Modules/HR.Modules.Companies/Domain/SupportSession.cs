@@ -61,11 +61,6 @@ internal sealed class SupportSession : IVersionedAggregate
         };
     }
 
-    /// <summary>
-    /// Point-in-time evaluation of persisted state (RedeemedAt/RevokedAt/ExpiresAt) — a computed
-    /// property, not new state that itself needs persisting, matching the convention set by
-    /// CustomerSubscription.MarkExpiredIfNeeded's remarks on persisted vs. derived state.
-    /// </summary>
     public bool IsActive(DateTimeOffset now) => RedeemedAt is null && RevokedAt is null && now < ExpiresAt;
 
     public Result Redeem(DateTimeOffset now)

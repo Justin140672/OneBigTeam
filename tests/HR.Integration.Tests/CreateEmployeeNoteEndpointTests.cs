@@ -10,9 +10,6 @@ public class CreateEmployeeNoteEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 
-    // Guid.NewGuid() rather than hardcoded literals — the shared-database test collection means
-    // a hardcoded id here can collide with the same literal used (for a different role) in
-    // another test file, silently granting this user extra roles/permissions.
     private static readonly Guid AdminUserId = Guid.NewGuid();
     private static readonly Guid ManagerUserId = Guid.NewGuid();
     private static readonly Guid EmployeeUserId = Guid.NewGuid();

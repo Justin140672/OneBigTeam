@@ -79,8 +79,6 @@
     private bool _isLoading = true;
     private string? _error;
 
-    // Defaults the Start Date filter to the 1st of the current month so the report opens already
-    // scoped to "this month's starters" rather than every starter ever recorded.
     private readonly DateOnly _defaultStartDate = new(DateTime.Today.Year, DateTime.Today.Month, 1);
     private ReportFilterCriteriaModel _currentFilter = null!;
 
@@ -118,9 +116,6 @@
             return;
         }
 
-        // See EmployeeDirectoryReportPage's OnGridActionBeginAsync — externally/server-paged grid,
-        // must cancel the grid's own built-in paging/sorting so it doesn't also process the small
-        // returned page locally and clobber header/pager UI state after the reload.
         args.Cancel = true;
 
         await LoadAsync();

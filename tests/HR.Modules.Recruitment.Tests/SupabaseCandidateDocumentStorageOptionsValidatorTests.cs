@@ -5,11 +5,6 @@ using Xunit;
 
 namespace HR.Modules.Recruitment.Tests;
 
-/// <summary>
-/// Reliability review issue 3 (P1): startup validation for candidate document storage must catch
-/// every missing/malformed required field (not just a blank SupabaseUrl), and error messages must
-/// name the configuration key without ever printing the secret value itself.
-/// </summary>
 public class SupabaseCandidateDocumentStorageOptionsValidatorTests
 {
     private static SupabaseCandidateDocumentStorageOptions ValidOptions() => new()
@@ -155,10 +150,6 @@ public class SupabaseCandidateDocumentStorageOptionsValidatorTests
     }
 }
 
-/// <summary>
-/// Minimal IHostEnvironment test double used to exercise the Development/Test-only HTTP allowance
-/// added for security review finding 6, without pulling in a full WebApplicationFactory host.
-/// </summary>
 internal sealed class FakeHostEnvironment(string environmentName) : IHostEnvironment
 {
     public string EnvironmentName { get; set; } = environmentName;

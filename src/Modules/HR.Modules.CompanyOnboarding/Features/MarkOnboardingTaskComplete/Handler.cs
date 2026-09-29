@@ -6,15 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.CompanyOnboarding.Features.MarkOnboardingTaskComplete;
 
-/// <summary>
-/// Marks a single onboarding checklist task as manually completed, independent of the task's own
-/// live IsCompletedAsync computation. Used for tasks like "Download the Employee import template"
-/// (see DownloadEmployeeImportTemplateTask) where the meaningful user action (clicking Download)
-/// has no other durable signal to key off — unlike ImportEmployeesTask, which is satisfied purely
-/// by data already present (an actual employee import). Once set, GetOnboardingChecklistHandler
-/// treats the persisted completion as sticky (OR'd with the live computed value) so a manual
-/// completion is never silently reverted on a later checklist load.
-/// </summary>
 internal sealed class MarkOnboardingTaskCompleteHandler(
     CompanyOnboardingDbContext dbContext,
     OnboardingTaskRegistry registry,

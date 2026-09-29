@@ -67,13 +67,6 @@ public class GetImportSessionEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    // These two tests preserve coverage that used to live in the E2E suite's (now-removed, see
-    // item 47 — Import History screen deleted) ImportHistoryTests: that a completed import
-    // session's Status/TotalRows/SuccessfulRows/FailedRows are correctly reflected via
-    // GetImportSession once the full upload -> validate -> confirm flow has actually run, not
-    // just right after upload (Pending, all counts zero — the only state the tests above cover).
-    // The Import History UI screen is gone, but ListImportSessions/GetImportSession themselves
-    // remain in place and still need to report accurate post-confirm state for any other caller.
     [Fact]
     public async Task Returns_Imported_Status_And_Correct_Row_Counts_After_A_Fully_Successful_Confirm()
     {
@@ -107,8 +100,6 @@ public class GetImportSessionEndpointTests
         Assert.Equal(2, payload.SuccessfulRows);
         Assert.Equal(0, payload.FailedRows);
 
-        // Also preserved from the removed E2E test: the session must appear correctly in the list
-        // view too, not only its own detail endpoint.
         var listResponse = await client.GetAsync($"/api/companies/{companyId}/data-import/sessions");
         listResponse.EnsureSuccessStatusCode();
         var sessions = await listResponse.Content.ReadFromJsonAsync<List<SessionSummaryPayload>>();
@@ -135,8 +126,6 @@ public class GetImportSessionEndpointTests
         await EnsureDefaultLeavePolicyAsync(client, companyId);
         await SetEmployeeNumberModeAsync(client, companyId, "Manual");
 
-        // Second row is missing the required Last Name — one valid row, one row that fails
-        // EmployeeStagingRowValidator's RequiredFields check.
         const string csv =
             "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount\n" +
             "Valid,Employee,valid.employee@example.com,2026-01-01,EMP-VALID,1990-01-01,British,Male,Sales,London,Permanent,Software Developer,50000\n" +
@@ -186,20 +175,12 @@ public class GetImportSessionEndpointTests
         return client;
     }
 
-    // POST /api/companies (CreateCompany) was removed in 78a43344; this now provisions the
-    // company directly via CompaniesDbContext — same as ConfirmImportSessionEndpointTests'
-    // identical helper.
     private async Task<Guid> CreateCompanyAsync(HttpClient client)
     {
         _ = client;
         return await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Import GetSession Test Co {Guid.NewGuid():N}");
     }
 
-    /// <summary>
-    /// DefaultLeavePolicyId is mandatory on PositionProfile, so ImportLookupResolver's
-    /// auto-create-position-profile path can only succeed once the company already has a default
-    /// leave policy (the first policy created for a company is automatically its default).
-    /// </summary>
     private static async Task EnsureDefaultLeavePolicyAsync(HttpClient client, Guid companyId)
     {
         var response = await client.PostAsJsonAsync(
@@ -237,10 +218,6 @@ public class GetImportSessionEndpointTests
         "John,Doe,john.doe@example.com,2026-01-01,EMP001\n" +
         "Jane,Doe,jane.doe@example.com,2026-01-02,EMP002\n";
 
-    // Unlike ValidCsv() above (upload/detail-only tests, never validated/confirmed), this includes
-    // every field EmployeeStagingRowValidator.RequiredFields/RequiredLookupFields needs so rows
-    // actually pass staging validation and can be confirmed — same shape as
-    // ConfirmImportSessionEndpointTests' own ValidCsv().
     private static string FullyValidCsv() =>
         "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount\n" +
         "John,Doe,john.doe@example.com,2026-01-01,EMP001,1990-01-01,British,Male,Sales,London,Permanent,Software Developer,50000\n" +
@@ -271,9 +248,6 @@ public class GetImportSessionEndpointTests
         return content;
     }
 
-    // Builds a minimal XLSX workbook (via ClosedXML) from comma-delimited "csv-shaped" header/data
-    // lines, so existing test fixtures (written as csv-style strings for readability) can still be
-    // uploaded against the now xlsx-only import endpoint.
     private static byte[] BuildXlsxBytes(string csvShapedContent)
     {
         var lines = csvShapedContent

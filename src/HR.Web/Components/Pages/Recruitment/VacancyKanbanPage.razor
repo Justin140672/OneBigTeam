@@ -18,8 +18,6 @@
 
     private string _searchText = string.Empty;
 
-    // Recruiter-only, matching the backend's GetRecruitmentKanban policy (recruitment:manage) —
-    // the Kanban board is an operational recruiting tool, not general vacancy visibility.
     protected override void OnInitialized()
     {
         if (!Session.CanManageRecruitment)

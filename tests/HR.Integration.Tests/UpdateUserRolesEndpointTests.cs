@@ -107,8 +107,6 @@ public class UpdateUserRolesEndpointTests
     [Fact]
     public async Task Put_UpdateUserRoles_Returns_NotFound_When_User_Belongs_To_Another_Company()
     {
-        // IAM-01 regression: caller's own companyId is in the route (passes tenant middleware),
-        // but the target userId belongs to a different company's employee — must 404, not update roles.
         var ownCompanyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
         using var client = AuthenticatedClient(ownCompanyId);
@@ -132,9 +130,6 @@ public class UpdateUserRolesEndpointTests
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
         var userId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, employeeId, "test3@test.com");
 
-        // IAM-02: the Employee role is mandatory and can never be removed via this endpoint, and
-        // HR Administrator (the seeded actor) may only administer Employee/Manager/Recruiter/
-        // HrAdministrator — a freestanding custom role is outside its administrable set.
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/users/{userId}/roles",
             new { companyId, userId, roleIds = new[] { SystemRoles.Employee, SystemRoles.Manager } });
@@ -151,7 +146,6 @@ public class UpdateUserRolesEndpointTests
     [Fact]
     public async Task Put_UpdateUserRoles_Returns_Forbidden_When_Granting_A_Role_Outside_Actors_Administrable_Set()
     {
-        // HR Administrator (the seeded actor) is not authorised to administer Company Administrator.
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);

@@ -30,7 +30,7 @@ public class InviteEmployeeUserHandlerTests(IdentityDatabaseFixture fixture)
     {
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        var nameReader = new FakeEmployeeNameReader(); // no names => employee not found
+        var nameReader = new FakeEmployeeNameReader();
         var handler = BuildHandler(nameReader, new FakeAuditEventPublisher());
 
         var request = new InviteEmployeeUserRequest
@@ -136,7 +136,7 @@ public class InviteEmployeeUserHandlerTests(IdentityDatabaseFixture fixture)
 
         await using var db2 = fixture.BuildContext();
         var invites = await db2.UserInvites.Where(i => i.EmployeeId == employeeId).ToListAsync();
-        Assert.Single(invites); // original left untouched
+        Assert.Single(invites);
         Assert.Equal("pending@test.com", invites[0].Email);
     }
 
@@ -334,7 +334,6 @@ public class InviteEmployeeUserHandlerTests(IdentityDatabaseFixture fixture)
 
         var result = await handler.HandleAsync(request, actorUserId: null, CancellationToken.None);
 
-        // Invite must be persisted even when email fails.
         Assert.True(result.IsSuccess);
         Assert.False(result.Value.EmailSent);
 
@@ -440,7 +439,6 @@ public class InviteEmployeeUserHandlerTests(IdentityDatabaseFixture fixture)
     [Fact]
     public async Task HandleAsync_Public_Email_Rejection_Does_Not_Replace_An_Existing_Expired_Invite()
     {
-        // The policy check runs before any existing (non-actionable) invite is removed/superseded.
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         Guid existingInviteId;
@@ -470,8 +468,6 @@ public class InviteEmployeeUserHandlerTests(IdentityDatabaseFixture fixture)
     [Fact]
     public async Task HandleAsync_Unknown_Employee_Still_Returns_NotFound_For_A_Public_Email()
     {
-        // The company-membership 404 check precedes the policy check (no audit for a request that
-        // doesn't even target a real employee).
         var auditPublisher = new FakeAuditEventPublisher();
         var handler = BuildHandler(new FakeEmployeeNameReader(), auditPublisher);
 

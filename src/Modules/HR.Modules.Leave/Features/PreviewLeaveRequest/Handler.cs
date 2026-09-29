@@ -95,8 +95,6 @@ internal sealed class PreviewLeaveRequestHandler(
                       && b.PolicyYear == policyYear,
                     cancellationToken);
 
-            // Same LeaveAccrualCalculator call as SubmitLeaveRequestHandler's validation - see its
-            // comment (LEAVE-04) for why this must stay identical.
             if (balance is not null)
             {
                 var (_, balancePolicyYearEnd) = LeaveYearCalculator.GetPolicyYearBounds(policyYear, leaveSettings.LeaveYearStartMonth);

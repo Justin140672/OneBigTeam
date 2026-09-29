@@ -47,17 +47,9 @@ internal sealed class DeactivateLeaveTypeHandler(
         if (!entity.IsActive)
             return Result.Failure(Error.Conflict("Leave type is already inactive."));
 
-        // System leave types (e.g. Annual Leave, provisioned for every company — see
-        // LeaveType.IsSystem) can never be deactivated, matching the "not deletable" product
-        // decision for item 50.
         if (entity.IsSystem)
             return Result.Failure(Error.Conflict($"'{entity.Name}' is a system leave type and cannot be deactivated."));
 
-        // Every employee auto-gets a LeaveBalance row on policy assignment (see
-        // AssignLeavePolicyToEmployeeHandler), so an unfiltered count of LeaveBalances would make
-        // every leave type permanently undeactivatable. Filter to current (non-terminated)
-        // employees only, matching the "in use" definition used for the other 8 deactivatable
-        // lookups.
         var currentEmployeeIds = await currentEmployeeReader
             .GetCurrentEmployeeIdsAsync(request.CompanyId, cancellationToken);
 

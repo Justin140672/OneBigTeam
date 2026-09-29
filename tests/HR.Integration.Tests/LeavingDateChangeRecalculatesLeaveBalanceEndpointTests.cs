@@ -54,18 +54,12 @@ public class LeavingDateChangeRecalculatesLeaveBalanceEndpointTests
 
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
 
-        // A real company gets its default leave types (incl. "ANNUAL") provisioned during
-        // self-service signup (CompanyDefaultDataSeeder); this test bootstraps the company
-        // directly, so do the same one step explicitly.
         using (var seedScope = _factory.Services.CreateScope())
         {
             await seedScope.ServiceProvider.GetRequiredService<ILeaveTypeDefaultsProvisioner>()
                 .EnsureDefaultLeaveTypesAsync(companyId, default);
         }
 
-        // Start date well before the current calendar year so the entitlement window's lower bound
-        // is always the policy year start, not the employee's start date — isolating the leaving
-        // date as the only variable under test.
         var employeeStartDate = new DateOnly(2020, 1, 1);
         var employeeResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees",
@@ -87,9 +81,8 @@ public class LeavingDateChangeRecalculatesLeaveBalanceEndpointTests
         assignResponse.EnsureSuccessStatusCode();
 
         var entitlementBeforeLeaving = await GetAnnualLeaveEntitlementAsync(companyId, employeeId);
-        Assert.Equal(25m, entitlementBeforeLeaving); // full default entitlement, no leaving process yet
+        Assert.Equal(25m, entitlementBeforeLeaving);
 
-        // ── Start the leaving process with a near-term leaving date ───────────────────────────
         var nearLeavingDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(10);
         var startResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leaving-process",
@@ -108,7 +101,6 @@ public class LeavingDateChangeRecalculatesLeaveBalanceEndpointTests
         Assert.True(entitlementAfterStart < entitlementBeforeLeaving,
             $"Expected entitlement to reduce below {entitlementBeforeLeaving} for a near-term leaving date, but was {entitlementAfterStart}.");
 
-        // ── Amend the leaving date further out — entitlement should grow, not stack a reduction ─
         var laterLeavingDate = nearLeavingDate.AddDays(30);
         var amendResp = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leaving-process",
@@ -127,7 +119,6 @@ public class LeavingDateChangeRecalculatesLeaveBalanceEndpointTests
         Assert.True(entitlementAfterAmend > entitlementAfterStart,
             $"Expected entitlement to grow above {entitlementAfterStart} after amending to a later leaving date, but was {entitlementAfterAmend}.");
 
-        // ── Cancel the leaving process — entitlement should be restored to the pre-leaving figure ─
         var cancelResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leaving-process/cancel",
             new { companyId, employeeId, cancellationReason = "Employee retracted resignation." });

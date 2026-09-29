@@ -8,7 +8,6 @@ namespace HR.Modules.Documents.Tests;
 
 public class GetExpiringDocumentsHandlerTests
 {
-    // Today is 2026-06-18; threshold is 2026-07-18
     private static readonly DateTime FixedUtcNow = new(2026, 6, 18, 0, 0, 0, DateTimeKind.Utc);
     private static readonly DateOnly  Today      = DateOnly.FromDateTime(FixedUtcNow);
 
@@ -285,10 +284,6 @@ public class GetExpiringDocumentsHandlerTests
     [Fact]
     public async Task HandleAsync_Uses_Company_Local_Day_Not_UTC_Day_For_Expired_Vs_ExpiringSoon()
     {
-        // At 2026-06-17T23:30:00Z the UTC day is still Jun 17, so an expiry of Jun 17 would still
-        // read as "today" (ExpiringSoon) under UTC. But in a fixed UTC+12 zone (no DST) the local
-        // day is already Jun 18 — the same document should read as Expired once the company's
-        // timezone is applied.
         var fixedUtcNow = new DateTime(2026, 6, 17, 23, 30, 0, DateTimeKind.Utc);
 
         await using var db = BuildContext();

@@ -22,17 +22,11 @@ public class NotificationsEndpointTests
         _factory = factory;
         Task.Run(async () =>
         {
-            // Every real user carries the Employee role as a floor (see IdentityModule.AddRolePolicies /
-            // "role:employee"), so a persona that also happens to be an HR Administrator must be seeded
-            // with both roles here — otherwise the "role:employee" policy on endpoints like
-            // MarkNotificationRead rejects the request with 403 before the handler's own ownership check
-            // (which is what NOT-01's anti-enumeration NotFound behaviour actually exercises) is reached.
             await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, AdminUser, SystemRoles.HrAdministrator);
         }).GetAwaiter().GetResult();
     }
 
-    // ── GetMyNotifications ────────────────────────────────────────────────────────
 
     [Fact]
     public async Task GetMyNotifications_Returns_Unauthorized_Without_Auth()
@@ -61,7 +55,6 @@ public class NotificationsEndpointTests
     [Fact]
     public async Task GetMyNotifications_Returns_Notification_When_Task_Assigned_To_Me()
     {
-        // userId == employeeId — sub claim is used as employeeId
         var userId       = Guid.NewGuid();
         using var client = await AuthenticatedClient(userId);
 
@@ -114,7 +107,6 @@ public class NotificationsEndpointTests
         Assert.Empty(payload!.Items);
     }
 
-    // ── MarkNotificationRead ─────────────────────────────────────────────────────
 
     [Fact]
     public async Task MarkNotificationRead_Returns_Unauthorized_Without_Auth()
@@ -158,7 +150,6 @@ public class NotificationsEndpointTests
         Assert.True(afterPayload.Items[0].IsRead);
     }
 
-    // ── NOT-05: notification audit history ─────────────────────────────────────────
 
     [Fact]
     public async Task MarkNotificationRead_Persists_NotificationReadAuditEvent()
@@ -188,7 +179,6 @@ public class NotificationsEndpointTests
         Assert.NotNull(auditRecord);
         Assert.Equal("Notification", auditRecord!.EntityType);
         Assert.Equal(userId, auditRecord.EmployeeId);
-        // The recipient marks their own notification read — actor and recipient are the same employee.
         Assert.Equal(userId, auditRecord.ActorEmployeeId);
     }
 
@@ -245,15 +235,10 @@ public class NotificationsEndpointTests
         Assert.All(auditRecords, r => Assert.Equal(userId, r.ActorEmployeeId));
     }
 
-    // ── NOT-01: notification ownership enforcement ─────────────────────────────────
 
     [Fact]
     public async Task MarkNotificationRead_Returns_NotFound_For_Other_Employees_Notification()
     {
-        // NOT-01: the single-read handler used to check only company+notificationId, not the
-        // caller's identity — any authenticated employee could mark any other employee's
-        // notification as read. Must now be indistinguishable from "doesn't exist" (NotFound,
-        // not Forbidden) per this session's anti-enumeration convention.
         var owner  = Guid.NewGuid();
         var caller = Guid.NewGuid();
 
@@ -271,7 +256,6 @@ public class NotificationsEndpointTests
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 
-        // The notification must remain unread for its true owner.
         using var verifyClient = await AuthenticatedClient(owner);
         var listResp    = await verifyClient.GetAsync($"/api/companies/{SeededCompanyId}/notifications/my");
         var listPayload = await listResp.Content.ReadFromJsonAsync<NotifListPayload>();
@@ -281,10 +265,6 @@ public class NotificationsEndpointTests
     [Fact]
     public async Task MarkNotificationRead_HrAdministrator_Cannot_Bypass_Ownership()
     {
-        // NOT-01: unlike every other resource authorizer built this session (Leave/Sickness/
-        // Probation/Documents all grant HR company-wide access), notifications are pure personal
-        // data — there is no role-based bypass. An HR Administrator has no more access to another
-        // employee's private notification than any other employee.
         var owner = Guid.NewGuid();
 
         using (var ownerClient = await AuthenticatedClient(owner))
@@ -334,9 +314,6 @@ public class NotificationsEndpointTests
     [Fact]
     public async Task MarkAllNotificationsRead_Ignores_Route_EmployeeId_And_Only_Affects_Caller()
     {
-        // NOT-01: the bulk-read endpoint used to trust a route-supplied employeeId with no
-        // authenticated-identity check. The route segment is retained for URL-shape
-        // compatibility, but it must now be fully ignored server-side.
         var caller = Guid.NewGuid();
         var other  = Guid.NewGuid();
 
@@ -348,29 +325,22 @@ public class NotificationsEndpointTests
         using var callerClient = await AuthenticatedClient(caller);
         await TaskSeeder.SeedAsync(_factory, SeededCompanyId, "Caller's task", assignedEmployeeId: caller);
 
-        // Caller hits the bulk-read route with someone else's employeeId in the URL.
         var markAllResp = await callerClient.PutAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/employees/{other}/notifications/read-all",
             new { companyId = SeededCompanyId, employeeId = other });
         Assert.Equal(HttpStatusCode.NoContent, markAllResp.StatusCode);
 
-        // The caller's own notification is unaffected (route employeeId was ignored, so nothing
-        // matched the real WHERE clause targeting the caller — this proves the parameter isn't
-        // silently used to affect the caller's own records either, only the authenticated id).
         var callerListResp    = await callerClient.GetAsync($"/api/companies/{SeededCompanyId}/notifications/my");
         var callerListPayload = await callerListResp.Content.ReadFromJsonAsync<NotifListPayload>();
         Assert.Equal(0, callerListPayload!.UnreadCount);
         Assert.All(callerListPayload.Items, n => Assert.True(n.IsRead));
 
-        // The other employee's notification must remain untouched — the route id must never
-        // override the authenticated identity.
         using var otherVerifyClient = await AuthenticatedClient(other);
         var otherListResp    = await otherVerifyClient.GetAsync($"/api/companies/{SeededCompanyId}/notifications/my");
         var otherListPayload = await otherListResp.Content.ReadFromJsonAsync<NotifListPayload>();
         Assert.Equal(1, otherListPayload!.UnreadCount);
     }
 
-    // ── MarkAllNotificationsRead ─────────────────────────────────────────────────
 
     [Fact]
     public async Task MarkAllNotificationsRead_Returns_Unauthorized_Without_Auth()
@@ -402,7 +372,6 @@ public class NotificationsEndpointTests
         Assert.All(payload.Items, n => Assert.True(n.IsRead));
     }
 
-    // ── NOT-06: pagination, filters, and independent unread count ───────────────────
 
     [Fact]
     public async Task GetMyNotifications_Returns_Validation_Error_For_PageNumber_Zero()
@@ -609,7 +578,6 @@ public class NotificationsEndpointTests
         Assert.Equal(0, payload.UnreadCount);
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId)
     {

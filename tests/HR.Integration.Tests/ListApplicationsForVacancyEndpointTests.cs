@@ -6,12 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Postgres integration coverage for GET /vacancies/{v}/applications. See
-/// ListApplicationsForVacancyHandlerTests in HR.Modules.Recruitment.Tests for the unit-level
-/// equivalent. Covers: anonymous 401, wrong-role 403, happy 200 with candidate join fields,
-/// stage filter, and company isolation (a different company's applications never leak in).
-/// </summary>
 [Collection("Integration")]
 public class ListApplicationsForVacancyEndpointTests
 {
@@ -108,7 +102,6 @@ public class ListApplicationsForVacancyEndpointTests
         var seededA = await RecruitmentTestSeeder.SeedApplicationAsync(_factory, companyA, Now);
         using var clientB = await ClientAs(RecruiterUser, companyB);
 
-        // Same vacancy id, but requested under company B's tenant/route — no rows belong to B.
         var payload = await clientB.GetFromJsonAsync<ListPayload>(
             $"/api/companies/{companyB}/vacancies/{seededA.VacancyId}/applications");
 

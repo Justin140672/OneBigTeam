@@ -10,26 +10,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Documents.Jobs;
 
-/// <summary>
-/// Hangfire enqueue-style (one-off, on-upload) job that virus-scans a single uploaded file and
-/// updates its ScanStatus. This is the first enqueue-style job in the Documents module — every
-/// other job here (SharedCompanyDocumentAcknowledgementReminderJob, DetectDocumentsDueForReviewJob)
-/// is a daily recurring job registered via IRecurringJobManager; this one is queued directly from
-/// each upload handler via IBackgroundJobClient.Enqueue, once per upload, immediately after the
-/// row is persisted as Pending.
-///
-/// A single job class (rather than five) covers all five scannable entity kinds via
-/// <see cref="FileScanTargetType"/> and the shared <see cref="IScannableFile"/> shape — the
-/// scanner itself (<see cref="IVirusScanService"/>) has no knowledge of which kind of row it's
-/// scanning, only a stream and a file name, so there is no scanner-specific coupling here either.
-///
-/// Retry behaviour: [AutomaticRetry] lets Hangfire retry a scanner-unreachable/errored failure
-/// automatically. On the final exhausted attempt the entity is marked Failed, a structured
-/// critical log is written, and the exception is still rethrown so the existing
-/// BackgroundJobAuditFilter (HR.Infrastructure.BackgroundJobs) writes its own
-/// BackgroundJobFailedAuditEvent — the operational alert path this app already has, rather than a
-/// new one invented for this feature.
-/// </summary>
 [AutomaticRetry(Attempts = MaxAttempts, DelaysInSeconds = new[] { 30, 120, 600 })]
 internal sealed class ScanUploadedFileJob(
     DocumentsDbContext db,
@@ -64,11 +44,6 @@ internal sealed class ScanUploadedFileJob(
 
         try
         {
-            // The no-op scanner (E2E / local without ClamAV — see DocumentsModule) never inspects
-            // the bytes, so downloading them first is pure cost and, worse, a hard failure point:
-            // the E2E document storage's download URL isn't a reachable HTTP endpoint, so
-            // GetStreamAsync throws "connection refused" and every upload's scan job burns all 5
-            // retries and marks the file Failed. Skip straight to a clean result in that case.
             VirusScanResult scanResult;
             if (virusScanner is NoOpVirusScanService)
             {
@@ -76,10 +51,6 @@ internal sealed class ScanUploadedFileJob(
             }
             else if (GetStorage(targetType) is ILocalStorageFileReader localReader)
             {
-                // Development/test local storage only: the dev delivery route refuses anything that
-                // is not yet Clean (which a file being scanned never is), so read it from disk
-                // directly. Production (Supabase) storage never implements ILocalStorageFileReader,
-                // so it keeps the signed-URL download below unchanged.
                 await using var content = await localReader.OpenLocalReadStreamAsync(target.StorageKey, CancellationToken.None)
                     ?? throw new FileNotFoundException("The uploaded file to scan was not found in local storage.");
                 scanResult = await virusScanner.ScanAsync(content, target.FileName, CancellationToken.None);
@@ -113,9 +84,6 @@ internal sealed class ScanUploadedFileJob(
                 target.MarkScanInfected(threatName, now);
                 await db.SaveChangesAsync();
 
-                // Infected files are removed from storage immediately — the entity row is kept
-                // (marked Infected) purely as a record; ScanStatusAccessGuard makes sure nobody
-                // can download it, and the underlying blob is gone so there is nothing to leak.
                 try
                 {
                     await DeleteFromStorageAsync(targetType, target.StorageKey, CancellationToken.None);
@@ -138,8 +106,6 @@ internal sealed class ScanUploadedFileJob(
         }
         catch (Exception ex)
         {
-            // Scanner unreachable/errored. Let Hangfire's automatic retry handle it — only mark
-            // the entity Failed once this was the final attempt.
             var retryCount = context?.GetJobParameter<int?>("RetryCount") ?? 0;
             var isFinalAttempt = retryCount >= MaxAttempts - 1;
 
@@ -148,10 +114,6 @@ internal sealed class ScanUploadedFileJob(
                 var previousStatus = target.ScanStatus.ToString();
                 var failedNow = clock.UtcNowOffset();
 
-                // Only a safe, closed-set category is ever persisted/audited — the raw exception
-                // (which can carry internal paths, hosts, storage addresses, signed URLs, tokens or
-                // personal data) is logged in full below via ILogger for restricted operational
-                // diagnosis only. See VirusScanFailureReasonMapper for the mapping rules.
                 var safeFailureReason = VirusScanFailureReasonMapper.ToSafeCategory(ex);
 
                 target.MarkScanFailed(safeFailureReason, failedNow);
@@ -166,9 +128,6 @@ internal sealed class ScanUploadedFileJob(
                     previousStatus, FileScanStatus.Failed.ToString(), safeFailureReason, failedNow), CancellationToken.None);
             }
 
-            // Rethrow in all cases: while retries remain, this is what triggers Hangfire's retry;
-            // on the final attempt it's what lets BackgroundJobAuditFilter record the standard
-            // operational-failure audit trail this app already relies on for every other job.
             throw;
         }
     }

@@ -17,9 +17,6 @@ internal sealed class GetUpcomingProbationReviewsHandler(
         IReadOnlySet<Guid>? authorizedEmployeeIds,
         CancellationToken cancellationToken)
     {
-        // authorizedEmployeeIds is null for HR Administrators (company-wide, unrestricted). For
-        // managers it is their full reporting hierarchy — resolved server-side by the endpoint
-        // via ProbationResourceAuthorizer, never trusted from the client (PROB-02).
         if (authorizedEmployeeIds is not null && authorizedEmployeeIds.Count == 0)
             return Result.Success(new GetUpcomingProbationReviewsResponse([]));
 
@@ -45,9 +42,6 @@ internal sealed class GetUpcomingProbationReviewsHandler(
             }
         ).ToListAsync(cancellationToken);
 
-        // GenerateDueProbationReviewsJob creates one Review-action task per review with
-        // sourceEntityId = review.Id, so the same review.Id used to build this projection
-        // resolves the open task directly — mirrors GetRecentLeaveRequestsHandler's TaskId lookup.
         var reviewIds = rows.Select(r => r.Id).ToList();
         var openTaskIds = await openTaskReader.GetOpenTaskIdsAsync(
             request.CompanyId, reviewIds, cancellationToken, TaskActionType.Review);

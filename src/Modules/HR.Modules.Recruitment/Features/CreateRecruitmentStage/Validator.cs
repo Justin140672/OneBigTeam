@@ -22,8 +22,6 @@ internal sealed class CreateRecruitmentStageValidator : AbstractValidator<Create
             .IsInEnum()
             .When(r => r.Purpose.HasValue);
 
-        // DSH-04: a purpose expresses a non-terminal metric role; terminal stages carry their
-        // meaning through TerminalOutcome instead.
         RuleFor(r => r.Purpose)
             .Null()
             .When(r => r.IsTerminal)

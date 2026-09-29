@@ -158,8 +158,6 @@ public class UpdateLeaveRequestDraftEndpointTests
         var companyId = SeededCompanyId;
         var draftId = await CreateDraftAsync(client, companyId, employeeId);
 
-        // Assign a policy that allows negative balance so submission succeeds without a
-        // separately-seeded LeaveBalance row.
         var policyResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/leave-policies",
             new

@@ -115,8 +115,6 @@
         return Task.CompletedTask;
     }
 
-    // Conflict recovery: re-fetch the record's latest server state, adopt its values and version,
-    // and clear the banner. Mirrors EmployeeEmploymentTab.ReloadLatestValuesAsync(rebaseline: true).
     private async Task ReloadLatestClickedAsync()
     {
         if (Record is null)

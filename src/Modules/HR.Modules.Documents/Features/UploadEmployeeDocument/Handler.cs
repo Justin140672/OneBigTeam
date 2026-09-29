@@ -17,7 +17,6 @@ internal sealed class UploadEmployeeDocumentHandler(
     IIntegrationEventPublisher integrationEventPublisher,
     IBackgroundJobClient backgroundJobClient)
 {
-    // Backward-compatible overload used by existing tests — treats the caller as a manager.
     public Task<Result<UploadEmployeeDocumentResponse>> HandleAsync(
         UploadEmployeeDocumentRequest request,
         Guid uploadedBy,
@@ -38,10 +37,6 @@ internal sealed class UploadEmployeeDocumentHandler(
 
         await using var fileStream = file.OpenReadStream();
 
-        // Verify file content matches the declared content type (prevents extension/MIME spoofing).
-        // Virus scanning no longer happens inline here — the file is stored as-is with
-        // ScanStatus = Pending and asynchronously scanned by ScanUploadedFileJob below, so upload
-        // requests are never blocked on the scanner.
         var contentResult = fileValidator.ValidateContent(fileStream, file.ContentType);
         if (contentResult.IsFailure)
             return Result.Failure<UploadEmployeeDocumentResponse>(contentResult.Error);
@@ -109,7 +104,6 @@ internal sealed class UploadEmployeeDocumentHandler(
         }
         catch
         {
-            // Best-effort: remove the already-uploaded file so it doesn't become an orphan.
             try { await storage.DeleteAsync(storageKey, cancellationToken); } catch { }
             throw;
         }

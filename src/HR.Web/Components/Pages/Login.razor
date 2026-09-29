@@ -120,10 +120,6 @@
             return;
         }
 
-        // The session never touches the URL: it is stashed server-side and handed to the
-        // cookie-setting hop via an opaque, single-use code (see AuthHandoffStore). Genuine hard
-        // browser navigation via app.js's hardNavigate guarantees a fresh circuit that will read
-        // the session cookie /login-complete sets.
         var code = HandoffStore.Issue(new AuthHandoffStore.Session(
             session.AccessToken, session.RefreshToken, session.ExpiresIn));
         await JS.InvokeVoidAsync("hardNavigate", $"/login-complete?code={Uri.EscapeDataString(code)}");

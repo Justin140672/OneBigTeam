@@ -156,9 +156,6 @@ public class SicknessEvidenceReminderJobTests
     [Fact]
     public async Task ExecuteAsync_Reconciles_Missing_Overdue_Notification_For_Already_Overdue_Request_Exactly_Once()
     {
-        // OBT-REM-04: a request already persisted as Overdue but whose overdue notification never
-        // got sent (e.g. a prior run crashed after the status commit) must have that notification
-        // reconciled on a later run — and only once, however many times the job re-runs.
         await using var db = BuildContext();
         var (recordId, _, companyId) = await SeedRecordAsync(db);
         await SeedRequestAsync(db, recordId, companyId, Today.AddDays(-5), SicknessEvidenceRequestStatus.Overdue);
@@ -179,8 +176,6 @@ public class SicknessEvidenceReminderJobTests
     {
         await using var db = BuildContext();
         var (recordId, _, companyId) = await SeedRecordAsync(db);
-        // Due date within reminder window AND a separate one already past due —
-        // neither should generate any notification once fulfilled.
         await SeedRequestAsync(db, recordId, companyId, Today.AddDays(1), SicknessEvidenceRequestStatus.Fulfilled);
         await SeedRequestAsync(db, recordId, companyId, Today.AddDays(-3), SicknessEvidenceRequestStatus.Fulfilled);
 
@@ -200,8 +195,6 @@ public class SicknessEvidenceReminderJobTests
     {
         await using var db = BuildContext();
         var (recordId, _, companyId) = await SeedRecordAsync(db);
-        // Due date within reminder window AND a separate one already past due —
-        // neither should generate any notification once cancelled.
         await SeedRequestAsync(db, recordId, companyId, Today.AddDays(1), SicknessEvidenceRequestStatus.Cancelled);
         await SeedRequestAsync(db, recordId, companyId, Today.AddDays(-3), SicknessEvidenceRequestStatus.Cancelled);
 

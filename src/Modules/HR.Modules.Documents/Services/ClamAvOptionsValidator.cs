@@ -2,12 +2,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Documents.Services;
 
-/// <summary>
-/// Reliability review issue 3 (P1): startup previously only checked that ClamAv:Host was
-/// non-empty — the port range and timeout were never validated, so a malformed port (e.g. 0,
-/// negative, or > 65535) or a zero/negative timeout could pass registration and only fail on the
-/// first real scan attempt.
-/// </summary>
 internal sealed class ClamAvOptionsValidator : IValidateOptions<ClamAvOptions>
 {
     public ValidateOptionsResult Validate(string? name, ClamAvOptions options)

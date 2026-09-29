@@ -14,8 +14,4 @@ internal sealed record PublishedSharedCompanyDocumentItem(
     DateOnly? AcknowledgementDueDate,
     DateTimeOffset? MyAcknowledgedAt,
     DateTimeOffset? PublishedAt,
-    // One of SharedCompanyDocumentAcknowledgementStatusCalculator's four canonical values
-    // ("Pending", "Completed", "Overdue", "Not Required") — the single source of truth for this
-    // document's acknowledgement status from the calling employee's perspective, so callers (the
-    // My Documents tab) don't need to re-derive it themselves from the raw fields above.
     string AcknowledgementStatus);

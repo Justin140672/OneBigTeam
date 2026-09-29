@@ -230,7 +230,6 @@ public class PositionProfileReaderTests
         Assert.Equal("Inactive Role", inactiveSummary.Title);
         Assert.False(inactiveSummary.IsActive);
 
-        // Omitted: the other company's profile (tenant isolation) and the unknown ID.
         Assert.DoesNotContain(summaries, s => s.Id == otherCompanyProfile.Id);
     }
 

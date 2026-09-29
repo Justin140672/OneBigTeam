@@ -78,8 +78,6 @@ public class CompanyOnboardingTaskCompletionTests
     [Fact]
     public void SetStatus_True_After_Being_Uncompleted_Sets_A_New_CompletedAt()
     {
-        // Once a completion is toggled back off, CompletedAt is cleared, so the next
-        // "true" transition must produce a fresh CompletedAt rather than reusing the old one.
         var completion = CompanyOnboardingTaskCompletion.Create(Guid.NewGuid(), Guid.NewGuid(), "task-key", Now);
         var firstCompletedAt = Now.AddDays(1);
         var uncompletedAt = Now.AddDays(2);

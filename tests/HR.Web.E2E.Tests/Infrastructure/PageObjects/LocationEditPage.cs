@@ -3,10 +3,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the location create/edit page.
-/// Routes: /companies/{id}/locations/new  and  /companies/{id}/locations/{id}
-/// </summary>
 public sealed class LocationEditPage(IPage page, string baseUrl)
 {
     public async Task GoToNewAsync(Guid companyId)
@@ -33,13 +29,6 @@ public sealed class LocationEditPage(IPage page, string baseUrl)
         await page.Keyboard.PressAsync("Tab");
     }
 
-    /// <summary>
-    /// Selects a location type from the Syncfusion dropdown by filtering on a fragment of its
-    /// name. Follows the popup-hidden-wait + committed-value-assertion pattern used elsewhere
-    /// for Syncfusion dropdowns (see VacancyDetailPage.SelectPositionProfileAsync) — popup-hidden
-    /// alone can be a purely client-side JS close animation and isn't proof that Blazor's
-    /// ValueChanged round-trip to the server actually committed the selected id yet.
-    /// </summary>
     public async Task SelectLocationTypeAsync(string nameFragment)
     {
         var group = page.Locator(".mb-3").Filter(new() { HasText = "Location Type" }).First;
@@ -74,8 +63,6 @@ public sealed class LocationEditPage(IPage page, string baseUrl)
 
     public Guid GetIdFromUrl() => UrlIdParser.LastGuid(page.Url);
 
-    // ── Description field (optional HrTextBox) — robust type-for-real technique, see
-    // DocumentTypeEditPage.SetDescriptionAsync for the full rationale. ─────────────
     public async Task SetDescriptionAsync(string value)
     {
         var input = page.GetByPlaceholder("Optional description");

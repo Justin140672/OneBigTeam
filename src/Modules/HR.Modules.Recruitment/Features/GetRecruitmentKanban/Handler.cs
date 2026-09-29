@@ -6,15 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.GetRecruitmentKanban;
 
-/// <summary>
-/// Ticket #63: Kanban read model for a single vacancy's candidate pipeline, grouped by stage in
-/// pipeline order. Ticket #99: columns are now the company's own active RecruitmentStage rows (in
-/// DisplayOrder) instead of the fixed eight ApplicationStatus values — the board layout is stable
-/// across vacancies within the same company, but differs between companies with different stage
-/// configurations. Withdrawn applications are not given a separate column (no "Withdrawn" stage
-/// exists — see Application.WithdrawnAt's remarks) — they remain visible under whatever stage they
-/// were on when withdrawn, flagged via KanbanCandidateSummary.IsWithdrawn so the UI can grey them out.
-/// </summary>
 internal sealed class GetRecruitmentKanbanHandler(RecruitmentDbContext db, IPositionProfileReader positionProfileReader)
 {
     public async Task<Result<GetRecruitmentKanbanResponse>> HandleAsync(
@@ -36,9 +27,6 @@ internal sealed class GetRecruitmentKanbanHandler(RecruitmentDbContext db, IPosi
 
         var vacancyTitle = vacancy.AdvertTitle ?? positionProfile?.Title ?? "(untitled)";
 
-        // Ticket #81: AssignedRecruiterId now references ExternalRecruiter (an external agency), not
-        // an Employee — resolved here (same module/schema, direct EF Core access) rather than by the
-        // UI looking it up against the employee list, which is what happened before this change.
         string? assignedRecruiterAgencyName = null;
         if (vacancy.AssignedRecruiterId is { } assignedRecruiterId)
         {

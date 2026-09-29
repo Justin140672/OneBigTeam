@@ -18,8 +18,6 @@ internal sealed class SubscriptionStatusReader(CompaniesDbContext dbContext, ICl
 
         if (subscription is null)
         {
-            // No subscription row (e.g. a seeded dev company predating this epic) — treat as
-            // trial-expired/read-only rather than throwing, so callers always get a usable snapshot.
             return new SubscriptionStatusSnapshot(SubscriptionStatus.TrialExpired, IsReadOnly: true, TrialDaysRemaining: 0);
         }
 

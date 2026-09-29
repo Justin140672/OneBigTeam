@@ -2,9 +2,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Employees.Tests.Infrastructure;
 
-// Simple in-memory stand-in for the Documents-module-backed IProfilePhotoReader, following the
-// same "not found = absent" convention as the real implementation. Tests seed PhotoUrls directly
-// rather than going through any storage/upload machinery.
 internal sealed class FakeProfilePhotoReader : IProfilePhotoReader
 {
     public Dictionary<Guid, string> PhotoUrls { get; } = new();

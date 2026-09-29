@@ -7,9 +7,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Offboarding.Tests;
 
-// OFF-03: this is the core cross-module-failure-injection seam — OffboardingTaskSynchronizer is
-// the only place a Tasks-module TaskItem is actually created for an already-durable OffboardingTask
-// row, and the only place a failure of that cross-module call is handled.
 public class OffboardingTaskSynchronizerTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 25, 10, 0, 0, DateTimeKind.Utc);
@@ -85,8 +82,8 @@ public class OffboardingTaskSynchronizerTests
     }
 
     [Theory]
-    [InlineData(4)] // Skipped
-    [InlineData(3)] // Completed
+    [InlineData(4)]
+    [InlineData(3)]
     public async Task SyncPlanAsync_Never_Syncs_Skipped_Or_Completed_Tasks_Even_When_TaskItemCreatedAt_Is_Null(
         int statusValue)
     {

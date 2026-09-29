@@ -10,15 +10,6 @@ using Xunit;
 
 namespace HR.Modules.DataImport.Tests;
 
-/// <summary>
-/// Reliability review issue 2 (P1): import file storage must never fall back to the ephemeral
-/// local temp-directory implementation outside Development/an explicit automated-test environment,
-/// and Staging/Production must fail fast at registration time rather than silently using it when
-/// Supabase storage is not configured. Durability matters more here than for most storage
-/// categories: import validation/confirmation happen in requests after the initial upload, so a
-/// process restart on local temp storage between stages would orphan an otherwise-valid import.
-/// Mirrors HR.Modules.Documents.Tests.DocumentsModuleVirusScanRegistrationTests.
-/// </summary>
 public class DataImportModuleImportFileStorageRegistrationTests
 {
     private const string ConnectionString =
@@ -93,8 +84,6 @@ public class DataImportModuleImportFileStorageRegistrationTests
 
         services.AddDataImportModule(ConnectionString, ConfigurationWithSupabase(), environment);
 
-        // AddHttpClient<TInterface, TImpl> registers TInterface via a typed-client factory, not a
-        // plain ImplementationType — resolve an instance to prove the concrete type actually wired.
         var provider = services.BuildServiceProvider();
         var resolved = provider.GetRequiredService<IImportFileStorageService>();
         Assert.IsType<SupabaseImportFileStorageService>(resolved);

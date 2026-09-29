@@ -2,10 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the asset category create/edit page.
-/// Routes: /companies/{id}/asset-categories/new  and  /companies/{id}/asset-categories/{id}
-/// </summary>
 public sealed class AssetCategoryEditPage(IPage page, string baseUrl)
 {
     public async Task GoToNewAsync(Guid companyId)

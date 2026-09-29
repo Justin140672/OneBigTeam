@@ -18,10 +18,5 @@ namespace HR.Marketing.Services;
 /// </summary>
 public static class BrowserStorageConsent
 {
-    /// <summary>
-    /// Whether non-essential browser storage (analytics / advertising / tracking / recording /
-    /// third-party) is currently permitted. Always <c>false</c> until a real consent mechanism
-    /// exists. Do not add non-essential storage that is not gated on this.
-    /// </summary>
     public static bool NonEssentialStorageAllowed => false;
 }

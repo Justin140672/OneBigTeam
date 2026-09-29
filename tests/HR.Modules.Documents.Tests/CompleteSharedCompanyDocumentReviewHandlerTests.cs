@@ -13,7 +13,6 @@ namespace HR.Modules.Documents.Tests;
 
 public class CompleteSharedCompanyDocumentReviewHandlerTests
 {
-    // Today is 2026-07-16.
     private static readonly DateTime FixedUtcNow = new(2026, 7, 16, 12, 0, 0, DateTimeKind.Utc);
     private static readonly DateOnly Today        = DateOnly.FromDateTime(FixedUtcNow);
     private static readonly DateTimeOffset Now    = new(2026, 7, 13, 10, 0, 0, TimeSpan.Zero);
@@ -142,9 +141,6 @@ public class CompleteSharedCompanyDocumentReviewHandlerTests
     [Fact]
     public async Task HandleAsync_Completing_Review_Removes_Document_From_DueForReview_List()
     {
-        // End-to-end proof that completing a review clears the document's overdue status:
-        // seed an overdue document, confirm it appears in the due-for-review list beforehand,
-        // complete its review, then confirm it no longer appears afterwards.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var category  = await SeedCategory(db, companyId);
@@ -243,9 +239,6 @@ public class CompleteSharedCompanyDocumentReviewHandlerTests
             Guid.NewGuid(), CancellationToken.None);
         Assert.True(secondResult.IsSuccess);
 
-        // Both reviews run against the same FakeClock instant, so CreatedAt/ReviewDate are
-        // identical between the two rows — distinguish them by ReviewNotes instead of relying
-        // on any ordering.
         var history = await db.SharedCompanyDocumentReviewHistories.AsNoTracking()
             .Where(h => h.SharedCompanyDocumentId == doc.Id)
             .ToListAsync();
@@ -340,10 +333,6 @@ public class CompleteSharedCompanyDocumentReviewHandlerTests
 
         var evt = Assert.Single(audit.Published);
 
-        // Before carries the review date this review fulfilled; After carries the new review
-        // date/notes/next review date — serialize both and confirm each value only shows up
-        // where expected, mirroring UpdateSharedCompanyDocumentMetadataHandlerTests' Before/After
-        // JSON assertion style.
         var beforeJson = JsonSerializer.Serialize(evt.Before);
         var afterJson  = JsonSerializer.Serialize(evt.After);
 

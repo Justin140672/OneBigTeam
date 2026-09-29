@@ -2,9 +2,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Reporting.Tests.Infrastructure;
 
-// Mirrors HR.Modules.Offboarding.Tests.Infrastructure.FakeAssignedAssetReader. Returns a
-// pre-configured set of assigned assets per employee, or empty (i.e. "assets returned") by
-// default.
 internal sealed class FakeAssignedAssetReader : IAssignedAssetReader
 {
     private readonly Dictionary<Guid, IReadOnlyList<AssignedAssetItem>> _assetsByEmployee;

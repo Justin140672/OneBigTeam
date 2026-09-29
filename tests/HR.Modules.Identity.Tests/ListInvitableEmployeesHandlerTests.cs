@@ -115,7 +115,6 @@ public class ListInvitableEmployeesHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            // ExpiresAt = LongAgo + 7 days, still in the past => IsExpired.
             db.UserInvites.Add(UserInvite.Create(expired.EmployeeId, companyId, "expired@test.com", LongAgo));
             await db.SaveChangesAsync();
         }

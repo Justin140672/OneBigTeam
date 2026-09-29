@@ -8,22 +8,11 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Proves the leave:request / leave:approve / leave:manage FastEndpoints policy
-/// declarations actually enforce access end-to-end over real HTTP. Company Administrator
-/// is scoped to company profile/settings management only and no longer holds any of these
-/// permissions — see the narrowing in HR.Modules.Identity.IdentityModule.AddRolePolicies.
-/// </summary>
 [Collection("Integration")]
 public class LeaveAuthorizationTests
 {
     private readonly ApiWebApplicationFactory _factory;
 
-    // Was hardcoded ("dd000001-...") — collided with GetMeEndpointTests/
-    // RecruitmentDashboardSummaryEndpointTests, each assigning the same literal GUID a different,
-    // conflicting role, now that all test classes share one database (see IntegrationTestCollection).
-    // Guid.NewGuid() is evaluated once per static initialization (stable across this class's own
-    // tests), guaranteed unique across every other file.
     private static readonly Guid HrAdminUserId = Guid.NewGuid();
     private static readonly Guid CompanyAdministratorUserId = Guid.NewGuid();
 
@@ -31,9 +20,6 @@ public class LeaveAuthorizationTests
     {
         _factory = factory;
 
-        // HrAdministrator performs all setup (company/employee/leave-policy creation —
-        // leave:manage / employee:manage). CompanyAdministrator is the persona under test
-        // and must be forbidden from leave:request / leave:approve / leave:manage endpoints.
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUserId, SystemRoles.HrAdministrator);
@@ -58,14 +44,11 @@ public class LeaveAuthorizationTests
         bootstrapClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, HrAdminUserId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, HrAdminUserId, SystemRoles.HrAdministrator, HrAdminUserId);
 
-        // POST /api/companies (CreateCompany) was removed in 78a43344; seed the company directly
-        // via CompaniesDbContext instead, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
         var companyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Leave Auth Test {Guid.NewGuid():N}");
 
         var hrAdminClient = await ClientForCompany(companyId, HrAdminUserId);
         var companyAdminClient = await ClientForCompany(companyId, CompanyAdministratorUserId);
 
-        // Seed a leave type directly — no API endpoint exists for this.
         var leaveTypeId = Guid.NewGuid();
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
@@ -158,7 +141,6 @@ public class LeaveAuthorizationTests
         return (employee.Id, policy.Id);
     }
 
-    // ── leave:request ──────────────────────────────────────────────────────────
 
     [Fact]
     public async Task CompanyAdministrator_Gets_Forbidden_Submitting_Leave_Request()
@@ -182,7 +164,6 @@ public class LeaveAuthorizationTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── leave:approve ───────────────────────────────────────────────────────────
 
     [Fact]
     public async Task CompanyAdministrator_Gets_Forbidden_Approving_Leave_Request()
@@ -218,7 +199,6 @@ public class LeaveAuthorizationTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── leave:manage ────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task CompanyAdministrator_Gets_Forbidden_Creating_Leave_Policy()

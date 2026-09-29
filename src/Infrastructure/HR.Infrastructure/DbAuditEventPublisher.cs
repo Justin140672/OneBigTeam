@@ -48,7 +48,7 @@ internal sealed class DbAuditEventPublisher(
             // IAuditEventPublisher.PublishAsync path intentionally does NOT also default this field,
             // to avoid corrupting the pre-existing merge semantics. See CorrelationIdGuid for the
             // string -> Guid mapping still used by the outbox/operation paths.
-            _ = executionContextAccessor; // retained for future scoped use (see remarks above)
+            _ = executionContextAccessor;
 
             // AUD-03 / AUD-04 / NFR-01: payload and actor validation happen here so a rejected
             // event is logged and dropped without ever surfacing to (or failing) the business
@@ -56,10 +56,6 @@ internal sealed class DbAuditEventPublisher(
             var pending = AuditPendingItem.From(evt);
             context.AuditPendingItems.Add(pending);
 
-            // Also write the committed audit row in the same (non-business) transaction so audit
-            // history is immediately consistent for read-your-writes. The pending staging row is
-            // retained as an idempotent crash-recovery safety net: AuditPendingItemPromotionJob
-            // will observe the row already committed (unique EventId) and simply mark it done.
             var alreadyCommitted = await context.AuditEvents
                 .AnyAsync(e => e.EventId == evt.EventId, cancellationToken);
             if (!alreadyCommitted)
@@ -69,10 +65,6 @@ internal sealed class DbAuditEventPublisher(
         }
         catch (ProhibitedAuditFieldException pex)
         {
-            // AUD-03 / NFR-01: prohibited sensitive field or value in the before/after payload.
-            // This is a programming error at the call site (the audit event must project only
-            // non-sensitive fields). The event is DROPPED — it never reaches the audit trail — so
-            // this is logged at Error to guarantee the regression is visible and not silent.
             logger.LogError(pex,
                 "AUD-03: audit event DROPPED — payload contains a prohibited sensitive field/value. " +
                 "Narrow the audit event's Before/After projection. " +
@@ -81,7 +73,6 @@ internal sealed class DbAuditEventPublisher(
         }
         catch (MissingAuditActorException aex)
         {
-            // AUD-04: human event with no actor — programming error; fix the audit event.
             logger.LogError(aex,
                 "AUD-04: audit event rejected — human-triggered event has no actor identity. " +
                 "EventType={EventType} EntityType={EntityType} EntityId={EntityId}",
@@ -89,7 +80,6 @@ internal sealed class DbAuditEventPublisher(
         }
         catch (Exception ex)
         {
-            // AUD-01: delivery failure — log without sensitive payload so operators can investigate.
             logger.LogError(ex,
                 "AUD-01: failed to enqueue audit pending item. " +
                 "EventType={EventType} EntityType={EntityType} EntityId={EntityId} CompanyId={CompanyId}",

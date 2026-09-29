@@ -46,10 +46,8 @@ internal sealed class UpdateCompanyHandler
 
         var now = _clock.UtcNowOffset();
 
-        // --- Profile ---
         company.Update(request.Name.Trim(), now);
 
-        // --- Addresses ---
         var registeredOfficeRequest = request.Addresses
             .SingleOrDefault(address => address.Type == CompanyAddressType.RegisteredOffice);
         var tradingAddressRequest = request.Addresses

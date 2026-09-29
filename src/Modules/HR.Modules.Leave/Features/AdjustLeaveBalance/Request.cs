@@ -11,8 +11,6 @@ internal sealed record AdjustLeaveBalanceRequest(
     string? Comments,
     bool AllowNegativeOverride)
 {
-    // Populated by the endpoint from the authenticated user's "sub" claim — never bound from the
-    // client body (internal properties are not touched by FastEndpoints' JSON model binding).
     internal Guid AdjustedByEmployeeId { get; init; }
 
     // Populated by the endpoint from the optional "Idempotency-Key" request header (ticket 3, P1

@@ -14,8 +14,6 @@ internal sealed record CreateLeaveTypeRequest
     public int? ToilExpiryDays { get; init; }
     public bool AllowNegativeToilBalance { get; init; }
 
-    // Populated by the endpoint from the authenticated user's "sub" claim — never bound from the
-    // client body (internal properties are not touched by FastEndpoints' JSON model binding).
     internal Guid? ActorEmployeeId { get; init; }
 
     // Populated by the endpoint from the optional "Idempotency-Key" request header (ticket 3, P1

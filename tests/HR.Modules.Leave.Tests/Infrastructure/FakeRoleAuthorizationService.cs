@@ -2,13 +2,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Leave.Tests.Infrastructure;
 
-/// <summary>
-/// Hand-rolled fake for <see cref="HR.SharedKernel.IAuthorizationService"/> used to exercise
-/// LEAVE-01's role-based authorization override (HR Administrator) in
-/// <c>LeaveResourceAuthorizer</c> without booting real Identity infrastructure. Construct with the
-/// set of effective role ids that should be returned for every caller under test. Mirrors
-/// HR.Modules.Tasks.Tests.Infrastructure.FakeRoleAuthorizationService (SEC-003's equivalent fake).
-/// </summary>
 internal sealed class FakeRoleAuthorizationService(params Guid[] effectiveRoles) : IAuthorizationService
 {
     private readonly IReadOnlySet<Guid> _effectiveRoles = effectiveRoles.ToHashSet();

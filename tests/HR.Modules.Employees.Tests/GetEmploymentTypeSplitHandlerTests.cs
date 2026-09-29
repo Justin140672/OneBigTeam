@@ -66,9 +66,6 @@ public class GetEmploymentTypeSplitHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        // EmploymentTypeId is a mandatory Employee field, but a fresh randomly generated
-        // employment type id that was never seeded as a real EmploymentType row still exercises
-        // the handler's "Not Specified" fallback (no matching EmploymentTypes row).
         var unresolved = NewEmployee(companyId, "Alice", "Smith", Guid.NewGuid());
         unresolved.Activate(Now);
         context.Employees.Add(unresolved);

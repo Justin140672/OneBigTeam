@@ -3,18 +3,8 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Reporting.ReportRegistry;
 
-/// <summary>
-/// Validates saved filter-criteria JSON (used by SaveReportView) against the field names/allowed
-/// values a given report definition actually supports, and rejects malformed or oversized payloads
-/// cleanly instead of throwing.
-/// </summary>
 internal static class ReportFilterValidator
 {
-    /// <summary>
-    /// Reasonable upper bound for a saved filter payload. Saved views only ever hold a handful of
-    /// scalar filter/grouping/sorting fields, so this comfortably covers legitimate use while
-    /// rejecting pathological/oversized payloads before they reach JSON parsing.
-    /// </summary>
     public const int MaxFilterCriteriaJsonLength = 8_000;
 
     public static Result Validate(ReportDefinition definition, string filterCriteriaJson)

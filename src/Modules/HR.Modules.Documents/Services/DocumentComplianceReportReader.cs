@@ -27,13 +27,6 @@ internal sealed class DocumentComplianceReportReader(
         if (employeeIds.Count == 0)
             return [];
 
-        // Resolve each employee's own PositionProfileId — the report needs each employee's
-        // required-document set, which depends on their assigned position profile. Employees with
-        // no position profile at all have no required-document set and are omitted from the
-        // result entirely (simplest way to keep the comparison well-defined).
-        // Bulk call (OBT-720 perf pass) — replaces a former per-employee loop over
-        // IEmployeeAudienceReader.GetEmployeeAudienceAsync(companyId, employeeId, ...), which issued
-        // one query per employee in this report.
         var audienceProfiles = await employeeAudienceReader.GetEmployeeAudienceProfilesAsync(
             companyId, employeeIds, cancellationToken);
 
@@ -47,8 +40,6 @@ internal sealed class DocumentComplianceReportReader(
         if (employeePositionProfiles.Count == 0)
             return [];
 
-        // Cache/dedupe required-document lookups within one report run — many employees will
-        // share a position profile.
         var requiredDocsByProfile = new Dictionary<Guid, IReadOnlyList<PositionProfileRequiredDocumentItem>>();
         foreach (var ppId in employeePositionProfiles.Values.Distinct())
         {
@@ -129,8 +120,6 @@ internal sealed class DocumentComplianceReportReader(
                 missingTypeNames));
         }
 
-        // Deterministic ordering with an explicit tiebreaker (REP-05) — a Dictionary's enumeration
-        // order is an implementation detail, not a guarantee.
         return results
             .OrderBy(r => r.EmployeeId)
             .ToList();

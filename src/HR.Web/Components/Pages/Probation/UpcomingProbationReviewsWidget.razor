@@ -112,7 +112,6 @@
             return;
         }
 
-        // Use company-local date for business-calendar probation review due-date tracking (overdue, due-soon).
         _today = CompanyTimeProvider.Today;
 
         var employeesTask = Session.GetEmployeeNamesAsync();
@@ -139,9 +138,6 @@
         _retrying = false;
     }
 
-    // Opens the review task dialog when one exists (the normal case — GenerateDueProbationReviewsJob
-    // always creates one per review), falling back to the employee's Probation tab for the rare
-    // review that predates task creation and has no open task to show.
     private async Task OnReviewClicked(UpcomingProbationReviewItem item)
     {
         if (item.TaskId is { } taskId && OnOpenTask.HasDelegate)

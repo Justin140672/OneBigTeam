@@ -3,14 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the standalone HR Settings page (/companies/{id}/hr-settings), gated on
-/// Session.IsHrAdministrator. Holds all the HR-policy fields that used to live on the Company
-/// Settings tab (see HrSettingsPage.razor) — Working Week, Sickness, Document Acknowledgement,
-/// Leaving Process, and Employee Numbering. Locator logic here is ported directly from
-/// CompanyEditPage's now-removed equivalents since the underlying DOM markup is unchanged, just
-/// relocated to a different page/route.
-/// </summary>
 public sealed class HrSettingsPage(IPage page, string baseUrl)
 {
     private Guid _companyId;
@@ -20,30 +12,12 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
         _companyId = companyId;
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/hr-settings");
         await page.WaitForSelectorAsync(".card", new() { Timeout = 20_000 });
-        // Wait for Syncfusion to initialise — span[role='combobox'] (the Leave Year Start
-        // Month SfDropDownList) only appears after Blazor's interactive render completes.
         await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
     }
 
-    // ── Working Week ─────────────────────────────────────────────────────────
 
-    // Ported from CompanyEditPage's equivalent — SfCheckBox renders the checkbox <input> and its
-    // <label> as siblings inside a shared ".e-checkbox-wrapper" (the label does NOT wrap the
-    // input), same structural convention as every other SfCheckBox helper in this file (see
-    // IsExcludePublicHolidaysFromSicknessCheckedAsync etc. below).
     public async Task<bool> IsWorkingDayCheckedAsync(string dayName)
     {
-        // Working Week lives on the first ("Working & Leave") tab — every field accessor for a
-        // later tab (Sickness/Document Acknowledgement/Leaving Process/Employee Numbering/Asset
-        // Numbering) explicitly switches to its own tab first, but this one and its siblings below
-        // (Hours Per Day, Default Holiday Allowance, Probation Months, Leave Year Start Month, the
-        // two Working & Leave checkboxes) never did, silently relying on "Working & Leave" already
-        // being the active tab — true only immediately after GoToAsync, and false the moment any
-        // other tab-switching accessor has run first (e.g. reading/writing Employee Numbering
-        // fields then coming back to toggle "Saturday"). SfTab only renders the active tab's
-        // ContentTemplate, so the checkbox/input genuinely isn't in the DOM in that case — the
-        // exact "Timeout ... waiting for .e-checkbox-wrapper Filter('Saturday')" failure. Switch
-        // explicitly, same as every other tab's accessors.
         await SwitchToTabAsync("Working & Leave");
         var wrapper = page.Locator(".e-checkbox-wrapper").Filter(new() { HasText = dayName }).First;
         return await wrapper.Locator("input[type='checkbox']").IsCheckedAsync();
@@ -59,7 +33,6 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
         }
     }
 
-    // ── Numeric helpers (ported from CompanyEditPage) ───────────────────────────
 
     private ILocator NumericBoxByLabel(string columnClass, string labelText) =>
         page.Locator(columnClass).Filter(new() { HasText = labelText }).First.Locator("input").First;
@@ -113,7 +86,6 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
         await page.Keyboard.PressAsync("Tab");
     }
 
-    // ── Regional/core numeric + dropdown fields ─────────────────────────────────
 
     public async Task SetHoursPerDayAsync(decimal hours)
     {
@@ -257,7 +229,6 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
         return int.TryParse(value, out var parsed) ? parsed : null;
     }
 
-    // ── Document Acknowledgement ─────────────────────────────────────────────────
 
     private ILocator DefaultAcknowledgementStatementTextArea =>
         page.GetByPlaceholder("I confirm that I have read and understood this document.");
@@ -289,7 +260,6 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
         return int.Parse(value);
     }
 
-    // ── Leaving Process / Notice Period ──────────────────────────────────────────
 
     public async Task SelectNoticePeriodPresetAsync(string presetLabel)
     {
@@ -363,26 +333,11 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
         }
     }
 
-    // ── Employee Numbering ────────────────────────────────────────────────────
 
-    // HrSettingsPage.razor groups its fields into an SfTab (Working & Leave, Sickness,
-    // Document Acknowledgement, Leaving Process, Employee Numbering, Asset Numbering) instead of
-    // one flat card — GoToAsync always lands on the first tab, and SfTab only renders the active
-    // tab's content, so every accessor for a field on a non-first tab must activate that tab first
-    // (the same way MyProfilePage.OpenTasksTabAsync does for its tabs).
     private async Task SwitchToTabAsync(string tabName)
     {
-        // Not Exact: SfTab headers can carry an error-icon span that perturbs the accessible name.
         var tab = page.GetByRole(AriaRole.Tab, new() { Name = tabName }).First;
 
-        // SfTab (OverflowMode.Scrollable) renders every header up front, but under real page load
-        // (this is frequently the very first interactive action after GoToAsync's own render-ready
-        // wait) the tab header row can still be mid-hydration when a bare ClickAsync's default 30s
-        // actionability wait starts polling — and a header sitting past the initially-visible
-        // scroll width needs to actually be scrolled into view before Playwright will consider it
-        // clickable. Wait for it to attach explicitly (separately from the click's own actionability
-        // wait, so a slow-to-attach header doesn't eat into the same 30s budget the click below
-        // needs for its own visible/stable/enabled checks) and scroll it into view first.
         await tab.WaitForAsync(new() { State = WaitForSelectorState.Attached, Timeout = 30_000 });
         await tab.ScrollIntoViewIfNeededAsync();
         await tab.ClickAsync();
@@ -460,16 +415,10 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
         if (!await paragraph.IsVisibleAsync())
             return null;
 
-        // The preview text is recomputed by Blazor after the numeric fields' OnChange/blur
-        // handlers fire; give it a moment to re-render before reading the DOM.
         await page.WaitForTimeoutAsync(200);
         return (await paragraph.TextContentAsync())?.Trim();
     }
 
-    // ── Renumber-existing-employees confirmation ─────────────────────────────────
-    // Changing the employee-number prefix or minimum length WHILE the company is in Automatic mode
-    // pops this confirmation before the save proceeds (HrSettingsPage.razor's _showRenumberWarning
-    // SfDialog); confirming it queues the background renumber of every existing employee.
 
     private ILocator RenumberDialog =>
         page.Locator("[role='dialog']").Filter(new() { HasText = "Renumber existing employees?" });
@@ -502,7 +451,6 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
             new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
     }
 
-    // ── Save / Cancel ────────────────────────────────────────────────────────
 
     public Task ClickSaveAsync() =>
         page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
@@ -511,15 +459,6 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
     {
         await ClickSaveAsync();
 
-        // Wait for the save's actual outcome rather than fixed sleeps. Previously this slept 600ms
-        // and then took one snapshot for the renumber confirmation — a prefix / minimum-length
-        // change in Automatic mode interposes that dialog one Blazor Server round-trip after the
-        // click, and if it rendered later than 600ms under load the dialog was never confirmed:
-        // nothing was saved, yet the caller carried on as if it had been. Outcomes:
-        //  - the renumber confirmation appears -> confirm it and keep waiting for the save;
-        //  - a SUCCESSFUL save navigates away to the HR dashboard (HrSettingsPage.razor's
-        //    ListUrl => "/dashboard/hr", via EditPageBase.OnSavedAsync);
-        //  - a FAILED save stays put and shows ".alert-danger" / ".validation-message".
         var deadline = DateTime.UtcNow.AddSeconds(30);
         while (DateTime.UtcNow < deadline)
         {
@@ -535,10 +474,6 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
             await page.WaitForTimeoutAsync(100);
         }
 
-        // Re-open the settings page after a successful save so post-save accessors/assertions
-        // (e.g. GetEmployeeNumberModeAsync, reload-persistence checks) keep working against the
-        // settings form rather than the dashboard. Wait for the post-save navigation to actually
-        // commit first so this GoToAsync can't race (and abort) it.
         if (!page.Url.Contains("/hr-settings", StringComparison.OrdinalIgnoreCase))
         {
             await page.WaitForLoadStateAsync(LoadState.DOMContentLoaded);
@@ -549,7 +484,6 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
     public Task CancelAsync() =>
         page.GetByRole(AriaRole.Button, new() { Name = "Cancel", Exact = true }).ClickAsync();
 
-    /// <summary>Text of the first visible error/validation message on the page, or null — for assertion messages.</summary>
     public async Task<string?> GetErrorTextAsync()
     {
         var error = page.Locator(".alert-danger, .validation-message").First;
@@ -569,7 +503,6 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
         }
     }
 
-    // ── Section headings (presence-only rendering checks) ───────────────────────
 
     public Task<bool> IsWorkingWeekSectionVisibleAsync() =>
         page.GetByText("Working Week", new() { Exact = true }).IsVisibleAsync();

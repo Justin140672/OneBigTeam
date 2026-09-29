@@ -9,10 +9,6 @@ namespace HR.Modules.Identity.Tests;
 
 using AppAuthorizationService = HR.SharedKernel.IAuthorizationService;
 
-/// <summary>
-/// IAM-06: unit tests for <see cref="PermissionAuthorizationHandler"/>, the mechanism every named
-/// capability policy now runs through instead of a hard-coded inline role list.
-/// </summary>
 public class PermissionAuthorizationHandlerTests
 {
     private static readonly Guid PermissionId = Guid.NewGuid();
@@ -22,7 +18,6 @@ public class PermissionAuthorizationHandlerTests
     private static PermissionDenialAuditThrottle NewThrottle() =>
         new(new FakeClock(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)));
 
-    /// <summary>Minimal fake for HR.SharedKernel.IAuthorizationService, configurable per test.</summary>
     private sealed class FakeAppAuthorizationService(bool hasPermission) : AppAuthorizationService
     {
         public Task<bool> HasPermissionAsync(Guid userId, Guid permissionId, CancellationToken ct = default) =>
@@ -123,7 +118,6 @@ public class PermissionAuthorizationHandlerTests
     public async Task Does_Not_Publish_A_Denial_Audit_Event_When_Tenant_Cannot_Be_Resolved()
     {
         var publisher = new FakeAuditEventPublisher();
-        // No tenantId supplied — same as an authenticated caller whose tenant could not be resolved.
         var handler = new PermissionAuthorizationHandler(
             FakeCurrentUser.Authenticated(UserId),
             new FakeAppAuthorizationService(hasPermission: false),
@@ -141,10 +135,6 @@ public class PermissionAuthorizationHandlerTests
     [Fact]
     public async Task Publishes_A_Single_Escalated_Denial_Audit_Event_On_The_Fifth_Denial_In_A_Window()
     {
-        // End-to-end through the handler with a real (not faked) PermissionDenialAuditThrottle —
-        // denials 1-4 in the same window each hit HandleRequirementAsync but only the first and
-        // fifth ever reach the audit publisher (see PermissionDenialAuditThrottleTests for the
-        // throttle's own unit coverage of this dedup/escalation logic in isolation).
         var publisher = new FakeAuditEventPublisher();
         var throttle = NewThrottle();
         var handler = new PermissionAuthorizationHandler(
@@ -170,7 +160,6 @@ public class PermissionAuthorizationHandlerTests
         Assert.Equal(5, escalation.DenialCountInWindow);
     }
 
-    // ADM-03: repeated-denial escalation surfaces a Security administrative alert -----------------
 
     private static PermissionAuthorizationHandler BuildHandler(
         PermissionDenialAuditThrottle throttle,
@@ -223,11 +212,6 @@ public class PermissionAuthorizationHandlerTests
         Assert.Empty(alertWriter.Commands);
     }
 
-    // P1 "Login as Customer" support-session branch -----------------------------------------------
-    // A support session is never resolved through the real permission-assignment lookup — it can
-    // only ever satisfy the fixed EmployeeRead allow-list entry. These assert both the one positive
-    // case and several negative cases, and that the "would otherwise have it" service is never
-    // consulted (hasPermission: true below, yet denied) since support sessions have no user_profile.
 
     [Fact]
     public async Task SupportSession_Succeeds_For_EmployeeRead()

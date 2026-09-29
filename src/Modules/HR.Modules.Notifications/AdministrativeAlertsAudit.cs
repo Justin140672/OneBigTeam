@@ -3,11 +3,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Notifications;
 
-/// <summary>
-/// ADM-03: raised whenever an administrative alert is raised or an existing live alert recurs.
-/// Actor is the system (NotificationsSystemActor.Id) — alerts originate from background/compliance
-/// infrastructure with no human at the call site.
-/// </summary>
 internal sealed record AdministrativeAlertRaisedAuditEvent(
     Guid CompanyId,
     Guid AlertId,
@@ -30,9 +25,6 @@ internal sealed record AdministrativeAlertRaisedAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
-/// <summary>
-/// ADM-03: raised when an admin acknowledges an open alert. Actor is the acknowledging user.
-/// </summary>
 internal sealed record AdministrativeAlertAcknowledgedAuditEvent(
     Guid CompanyId,
     Guid AlertId,
@@ -52,10 +44,6 @@ internal sealed record AdministrativeAlertAcknowledgedAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
-/// <summary>
-/// ADM-03: raised when an admin resolves an alert. The free-text resolution note is never placed
-/// in the audit payload (redaction guard) — only a HasNote flag.
-/// </summary>
 internal sealed record AdministrativeAlertResolvedAuditEvent(
     Guid CompanyId,
     Guid AlertId,

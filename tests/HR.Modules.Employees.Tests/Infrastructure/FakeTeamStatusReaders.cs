@@ -2,9 +2,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Employees.Tests.Infrastructure;
 
-// DSH-05: small id-set fakes for the cross-module contract readers the manager team-status
-// summary handler composes. Each records the ids/date it was asked about so tests can assert the
-// handler only ever passes the counted-member id list (not the raw sub-tree).
 
 internal sealed class FakeEmployeeLeaveStatusReader(params Guid[] onLeaveIds) : IEmployeeLeaveStatusReader
 {

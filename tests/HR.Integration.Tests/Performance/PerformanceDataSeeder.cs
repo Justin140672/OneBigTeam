@@ -10,20 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests.Performance;
 
-/// <summary>
-/// NFR-02 representative dataset builder. Seeds a company at one of the target scales
-/// (50 / 500 / 2000 employees — the product's stated upper bound is "50–2000 employees per company",
-/// specifications/product-specifications/31-non-functional-requirements.md) plus proportional
-/// related data (leave requests, overdue tasks) so page/dashboard/search/report queries exercise
-/// realistic joins and row counts.
-///
-/// Multi-tenancy: a second, smaller "noise" company is always seeded alongside the company under
-/// test so every query must actually filter by <c>company_id</c> rather than passing by accident on
-/// a single-tenant database.
-///
-/// Rows are inserted with a single bulk <c>AddRange</c> + <c>SaveChangesAsync</c> per context to
-/// keep seeding time bounded even at 2000 employees.
-/// </summary>
 internal static class PerformanceDataSeeder
 {
     private const int DepartmentCount = 6;
@@ -41,7 +27,6 @@ internal static class PerformanceDataSeeder
 
     public static async Task<SeededCompany> SeedAsync(PerfApiWebApplicationFactory factory, int employeeCount)
     {
-        // Noise tenant: ~10% the size, so cross-tenant filtering is genuinely exercised.
         await SeedCompanyCoreAsync(factory, Guid.NewGuid(), Math.Max(5, employeeCount / 10));
         return await SeedCompanyCoreAsync(factory, Guid.NewGuid(), employeeCount);
     }
@@ -64,7 +49,6 @@ internal static class PerformanceDataSeeder
         employeesDb.Departments.AddRange(extraDepartments);
         departmentIds.AddRange(extraDepartments.Select(d => d.Id));
 
-        // First ~10% of employees are managers (no manager themselves); the rest report to one.
         var managerCount = Math.Max(1, employeeCount / 10);
         var employees = new List<Employee>(employeeCount);
         var employeeIds = new List<Guid>(employeeCount);
@@ -102,7 +86,6 @@ internal static class PerformanceDataSeeder
         employeesDb.Employees.AddRange(employees);
         await employeesDb.SaveChangesAsync();
 
-        // ~20% of employees have a pending leave request; ~10% have an overdue task.
         var leaveDb = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
         var leaveRequests = employeeIds.Take(Math.Max(1, employeeCount / 5))
             .Select((employeeId, i) => LeaveRequest.Create(
@@ -123,9 +106,6 @@ internal static class PerformanceDataSeeder
         tasksDb.TaskItems.AddRange(tasks);
         await tasksDb.SaveChangesAsync();
 
-        // Let async domain-event handlers triggered by the bulk seed (e.g. document-request
-        // generation on employee create) drain before the harness starts measuring, so their DB
-        // writes don't inflate the first few command-count samples.
         await Task.Delay(TimeSpan.FromMilliseconds(750));
 
         return new SeededCompany(companyId, employeeIds, managerIds, departmentIds, refData, employeeIds[0]);

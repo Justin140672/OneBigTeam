@@ -62,7 +62,6 @@ public class SaveMyEqualityDataHandlerTests
         var row = Assert.Single(await db.EmployeeEqualityData.ToListAsync());
         Assert.Equal(new DateTimeOffset(Now), row.CreatedAt);
         Assert.Equal(new DateTimeOffset(Later), row.UpdatedAt);
-        // Answers persist as the enum member *name* (decrypted back by the context converter).
         Assert.Equal(nameof(EthnicGroup.Mixed), row.EthnicGroup);
 
         var updated = Assert.IsType<EqualityDataUpdatedAuditEvent>(Assert.Single(publisher.Published));

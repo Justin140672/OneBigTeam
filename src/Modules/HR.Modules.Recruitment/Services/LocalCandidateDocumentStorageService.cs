@@ -3,10 +3,6 @@ using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Recruitment.Services;
 
-/// <summary>
-/// Development implementation that stores files on the local file system.
-/// Replace with a cloud implementation (Azure Blob, S3, etc.) for production.
-/// </summary>
 internal sealed class LocalCandidateDocumentStorageService(
     IHttpContextAccessor httpContextAccessor,
     ILocalStorageUrlSigner urlSigner)
@@ -14,8 +10,6 @@ internal sealed class LocalCandidateDocumentStorageService(
 {
     private readonly string _basePath = LocalStorageBuckets.GetRootPath(LocalStorageBuckets.CandidateDocuments);
 
-    // The original file name is untrusted; the physical storage key never incorporates it, so
-    // it cannot be used to escape the storage root via ".." or rooted path segments.
     public string GenerateStorageKey(string storageFolder, string fileName)
     {
         var extension  = Path.GetExtension(fileName);
@@ -49,15 +43,10 @@ internal sealed class LocalCandidateDocumentStorageService(
         string storageKey,
         CancellationToken cancellationToken)
     {
-        // Throws FileNotFoundException for a missing blob — the scan job records that as a failed
-        // (never clean) attempt.
         Stream stream = File.OpenRead(ToFullPath(storageKey));
         return Task.FromResult(stream);
     }
 
-    // A raw file:// path isn't followable by a browser redirect once served from an http(s)://
-    // page — route through the dev-only streaming endpoint in Program.cs instead, which serves
-    // the same local file over HTTP.
     public Task<Uri> GetDownloadUrlAsync(
         string storageKey,
         CancellationToken cancellationToken)
@@ -67,9 +56,6 @@ internal sealed class LocalCandidateDocumentStorageService(
             ? $"{request.Scheme}://{request.Host}"
             : "http://localhost";
 
-        // Only DownloadCandidateDocumentHandler reaches this (after its tenant + Clean checks). The URL
-        // is short-lived and HMAC-signed, and the route re-checks the CandidateDocument row is still
-        // present and Clean via CandidateDocumentLocalStorageObjectResolver.
         return Task.FromResult(urlSigner.CreateSignedUrl(baseUrl, LocalStorageBuckets.CandidateDocuments, storageKey));
     }
 

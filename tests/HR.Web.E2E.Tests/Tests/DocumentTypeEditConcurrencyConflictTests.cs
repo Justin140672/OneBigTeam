@@ -86,11 +86,9 @@ public sealed class DocumentTypeEditConcurrencyConflictTests(HrAdminPersonaFixtu
         var otherTabDesc = $"E2E Other {Guid.NewGuid():N}"[..20];
         var finalDesc    = $"E2E Final {Guid.NewGuid():N}"[..20];
 
-        // ── Tab 1: open the editor and start editing the Description (loads Version v1) ──
         await typeEdit.GoToEditAsync(AcmeId, id);
         await typeEdit.SetDescriptionAsync(firstTabDesc);
 
-        // ── Tab 2 (same context / persona): load the same document type and save first ──
         var otherPage = await _context.NewPageAsync();
         try
         {
@@ -104,7 +102,6 @@ public sealed class DocumentTypeEditConcurrencyConflictTests(HrAdminPersonaFixtu
             await otherPage.CloseAsync();
         }
 
-        // ── Tab 1: saving now is stale → conflict banner, page stays, input preserved ──
         await typeEdit.SaveExpectingConflictAsync();
 
         Assert.True(await typeEdit.IsConcurrencyWarningVisibleAsync(),
@@ -112,14 +109,12 @@ public sealed class DocumentTypeEditConcurrencyConflictTests(HrAdminPersonaFixtu
         Assert.Contains($"/document-types/{id}", _page.Url);
         Assert.Equal(firstTabDesc, await typeEdit.GetDescriptionAsync());
 
-        // ── Tab 1: "Reload latest values" clears the banner and adopts the other tab's value ──
         await typeEdit.ClickReloadLatestValuesAsync();
 
         Assert.False(await typeEdit.IsConcurrencyWarningVisibleAsync(),
             "Expected the conflict banner to clear after reloading latest values");
         Assert.Equal(otherTabDesc, await typeEdit.WaitForDescriptionAsync(otherTabDesc));
 
-        // ── Tab 1: re-edit against the fresh version and save successfully ──
         await typeEdit.SetDescriptionAsync(finalDesc);
         await typeEdit.SaveAsync();
 
@@ -127,7 +122,6 @@ public sealed class DocumentTypeEditConcurrencyConflictTests(HrAdminPersonaFixtu
         Assert.Equal(finalDesc, await typeEdit.WaitForDescriptionAsync(finalDesc));
     }
 
-    /// <summary>Creates a uniquely-named document type via the list + new-page flow and returns its name.</summary>
     private async Task<string> CreateDocumentTypeAsync(DocumentTypeListPage typeList, DocumentTypeEditPage typeEdit)
     {
         var name = $"E2E DTConflict {Guid.NewGuid().ToString("N")[..8]}";

@@ -6,16 +6,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Tests;
 
-/// <summary>
-/// Covers the ManagerId, LocationId and extended-search (job title / dept name) filters
-/// added in SEA-01.
-/// </summary>
 public class ListEmployeesFilterTests
 {
     private static readonly DateTimeOffset Now = new(2026, 6, 8, 10, 0, 0, TimeSpan.Zero);
     private static readonly DateOnly StartDate = new(2026, 7, 1);
 
-    // ── ManagerId filter ──────────────────────────────────────────────────
 
     [Fact]
     public async Task Filter_By_ManagerId_Returns_Only_That_Managers_Reports()
@@ -64,7 +59,6 @@ public class ListEmployeesFilterTests
         Assert.Equal(0, result.Value!.TotalCount);
     }
 
-    // ── LocationId filter ─────────────────────────────────────────────────
 
     [Fact]
     public async Task Filter_By_LocationId_Returns_Only_Employees_At_That_Location()
@@ -92,7 +86,6 @@ public class ListEmployeesFilterTests
         Assert.All(result.Value.Items, i => Assert.Equal(locA, i.LocationId));
     }
 
-    // ── Search extended to job title ──────────────────────────────────────
 
     [Fact]
     public async Task Search_By_JobTitle_Returns_Matching_Employees()
@@ -124,7 +117,6 @@ public class ListEmployeesFilterTests
         Assert.Equal(2, result.Value!.TotalCount);
     }
 
-    // ── Search extended to department name ────────────────────────────────
 
     [Fact]
     public async Task Search_By_DepartmentName_Returns_Matching_Employees()
@@ -158,7 +150,6 @@ public class ListEmployeesFilterTests
         Assert.Equal(2, result.Value!.TotalCount);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────
 
     private static ListEmployeesHandler Handler(EmployeesDbContext ctx) =>
         new(ctx, new FakeProfilePhotoReader(), new FakeEmployeeUserAccountStatusReader());

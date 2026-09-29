@@ -69,7 +69,6 @@ public class GetEmployeeStarterReportEndpointTests
     [Fact]
     public async Task Get_EmployeeStarters_Returns_Ok_For_Recruiter()
     {
-        // reporting:view-employee-starter is Recruiter OR HrAdministrator per OBT-704.
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Recruiter);

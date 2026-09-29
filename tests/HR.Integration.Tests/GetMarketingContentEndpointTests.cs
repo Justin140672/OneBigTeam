@@ -75,7 +75,6 @@ public class GetMarketingContentEndpointTests
     {
         using var admin = await MarketingTestHelpers.PlatformAdminClientAsync(_factory);
 
-        // High display orders keep these after the seeded features (indexes 0-6).
         var low = MarketingTestHelpers.UniqueSlug();
         var mid = MarketingTestHelpers.UniqueSlug();
         var high = MarketingTestHelpers.UniqueSlug();

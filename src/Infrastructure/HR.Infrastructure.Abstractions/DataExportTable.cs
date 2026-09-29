@@ -18,17 +18,8 @@ public sealed record DataExportTable(
     IReadOnlyList<string> Columns,
     IReadOnlyList<IReadOnlyList<string?>> Rows)
 {
-    /// <summary>
-    /// Optional streamed row source. When non-null the package builder enumerates this instead of
-    /// <see cref="Rows"/>, writing each row directly to the CSV stream and discarding it. The factory
-    /// receives the build cancellation token and must honour it while fetching and while enumerating.
-    /// </summary>
     public Func<CancellationToken, IAsyncEnumerable<IReadOnlyList<string?>>>? RowStream { get; init; }
 
-    /// <summary>
-    /// Creates a table whose rows are produced by a bounded async stream (e.g. keyset-paged database
-    /// reads) rather than materialised up front.
-    /// </summary>
     public static DataExportTable Streamed(
         string name,
         IReadOnlyList<string> columns,

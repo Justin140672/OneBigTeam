@@ -7,8 +7,6 @@ public sealed class ProbationService(HrApiHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient();
 
-    // A missing probation record is a legitimate, expected outcome for an employee with no
-    // probation period — 404 is treated as "no record" here, not as a failure.
     public async Task<ProbationRecordModel?> GetProbationRecordByEmployeeAsync(
         Guid companyId,
         Guid employeeId,
@@ -81,7 +79,6 @@ public sealed class ProbationService(HrApiHttpClientFactory httpClientFactory)
         return result.Success ? (result.Value?.Items ?? []) : [];
     }
 
-    // DSH-03: non-swallowing sibling of GetUpcomingReviewsAsync.
     public async Task<IReadOnlyList<UpcomingProbationReviewItem>> GetUpcomingReviewsOrThrowAsync(
         Guid companyId, CancellationToken cancellationToken = default)
     {

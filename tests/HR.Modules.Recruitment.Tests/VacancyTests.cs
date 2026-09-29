@@ -34,10 +34,6 @@ public class VacancyTests
     [Fact]
     public void Create_PositionProfileId_Has_No_Nullable_Representation()
     {
-        // PositionProfileId is a non-nullable Guid on both the Create() parameter and the domain
-        // property, per product direction: "the only way to create a vacancy is from a position
-        // profile, so it should be mandatory everywhere." There is no compiler-representable way
-        // to construct a Vacancy with a missing/null PositionProfileId.
         var positionProfileId = Guid.NewGuid();
 
         var vacancy = Vacancy.Create(
@@ -123,8 +119,6 @@ public class VacancyTests
     [Fact]
     public void Open_From_OnHold_Sets_Status_To_Open()
     {
-        // Open() accepts Draft *or* OnHold — this covers the OnHold branch of that condition,
-        // which was previously only exercised via the Draft branch.
         var vacancy = CreateVacancy();
         var date = DateOnly.FromDateTime(Now.UtcDateTime);
         vacancy.Open(Now, date);
@@ -178,8 +172,6 @@ public class VacancyTests
     [Fact]
     public void Cancel_When_Closed_Throws()
     {
-        // Cancel() rejects Closed *or* Cancelled — this covers the Closed branch of that
-        // condition, which was previously only exercised via the Cancelled branch.
         var vacancy = CreateVacancy();
         var date = DateOnly.FromDateTime(Now.UtcDateTime);
         vacancy.Close(Now, date);
@@ -210,8 +202,6 @@ public class VacancyTests
     [Fact]
     public void Close_When_Cancelled_Throws()
     {
-        // Close() rejects Closed *or* Cancelled — this covers the Cancelled branch of that
-        // condition, which was previously only exercised via the Closed branch.
         var vacancy = CreateVacancy();
         vacancy.Cancel(Now);
 
@@ -350,7 +340,6 @@ public class VacancyTests
         Assert.Null(vacancy.AssignedRecruiterId);
     }
 
-    // SET-05: vacancy approval.
 
     [Fact]
     public void Approve_Sets_ApprovedAt_And_ApprovedByUserId()
@@ -377,8 +366,6 @@ public class VacancyTests
     [Fact]
     public void Approve_Can_Be_Called_Again_And_Overwrites_Previous_Approval()
     {
-        // Approve() is not guarded against re-approval (unlike Purge/LinkToEmployee) — re-approving
-        // simply overwrites ApprovedAt/ApprovedByUserId with the latest actor/time.
         var vacancy = CreateVacancy();
         var firstApprover = Guid.NewGuid();
         vacancy.Approve(firstApprover, Now.AddDays(1));
@@ -390,7 +377,6 @@ public class VacancyTests
         Assert.Equal(Now.AddDays(2), vacancy.ApprovedAt);
     }
 
-    // Internal vacancies: IsAdvertisedInternally flag.
 
     [Fact]
     public void Create_Defaults_IsAdvertisedInternally_To_False()

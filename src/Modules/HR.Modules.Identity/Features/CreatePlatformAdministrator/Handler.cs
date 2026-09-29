@@ -12,9 +12,6 @@ using Npgsql;
 
 namespace HR.Modules.Identity.Features.CreatePlatformAdministrator;
 
-// P1: creation is a durable provisioning workflow, not a single local insert — see
-// PlatformAdministrator's remarks. Only an enabled PlatformOwner may create new platform
-// administrator accounts (defense-in-depth handler-level gate — see remarks below).
 internal sealed class CreatePlatformAdministratorHandler(
     IdentityDbContext db,
     ISupabaseAuthGateway supabaseAuthGateway,
@@ -62,8 +59,6 @@ internal sealed class CreatePlatformAdministratorHandler(
         if (emailPolicy.IsFailure)
             return Result.Failure<CreatePlatformAdministratorResponse>(emailPolicy.Error);
 
-        // 1. Validate and normalize email (FluentValidation already checked format at the endpoint;
-        // normalization here is what the DB unique index and every later lookup key off).
         var normalizedEmail = request.Email.Trim().ToLowerInvariant();
 
         var alreadyExists = await db.PlatformAdministrators
@@ -75,9 +70,6 @@ internal sealed class CreatePlatformAdministratorHandler(
         var now = clock.UtcNow;
         var nowOffset = new DateTimeOffset(now, TimeSpan.Zero);
 
-        // 2. Determine whether a provider (Supabase Auth) account already exists for this email.
-        // A failure here leaves NOTHING persisted yet, so the caller can simply retry the whole
-        // request — there is no partial/orphaned local state to reconcile from a lookup failure.
         var correlationId = Guid.NewGuid();
         Guid? existingProviderUserId;
         try
@@ -100,10 +92,6 @@ internal sealed class CreatePlatformAdministratorHandler(
 
         var isNewProviderAccount = existingProviderUserId is null;
 
-        // 3. Persist the local record FIRST, already in a well-defined Pending* provisioning state
-        // (never left silently "created but not really usable"). This is the durable checkpoint a
-        // retry (RetryPlatformAdministratorProvisioning) can safely resume from without ever
-        // creating a second local row or a second provider account for the same email.
         var administrator = PlatformAdministrator.Create(
             normalizedEmail, request.Role, nowOffset, createdByUserId: currentUser.UserId);
         administrator.BeginProvisioning(isNewProviderAccount, correlationId, nowOffset);
@@ -116,10 +104,6 @@ internal sealed class CreatePlatformAdministratorHandler(
         }
         catch (DbUpdateException ex) when (IsUniqueViolation(ex))
         {
-            // Two concurrent creation requests for the same normalized email: the AnyAsync
-            // pre-check above cannot prevent this race by itself (classic TOCTOU), but the DB's own
-            // unique index on Email is the actual guard — exactly one INSERT can ever win. The
-            // loser gets a clean conflict instead of a duplicate row or an unhandled 500.
             return Result.Failure<CreatePlatformAdministratorResponse>(
                 Error.Conflict("A platform administrator with this email already exists."));
         }
@@ -129,9 +113,6 @@ internal sealed class CreatePlatformAdministratorHandler(
                 administrator.Id, administrator.Email, administrator.Role, currentUser.UserId, nowOffset),
             cancellationToken);
 
-        // 4. Now that durable local state is committed (a genuine recoverable checkpoint), attempt
-        // the identity-provider side. A failure here does NOT roll back the local row — it moves to
-        // Failed, remains fully visible/retryable, and is never duplicated by a subsequent retry.
         var webBaseUrl =
             configuration["WebApp:BaseUrl"]?.TrimEnd('/') ??
             configuration["services:web:https:0"] ??
@@ -158,15 +139,6 @@ internal sealed class CreatePlatformAdministratorHandler(
         return Result.Success(response);
     }
 
-    /// <summary>
-    /// Shared by CreatePlatformAdministratorHandler and RetryPlatformAdministratorProvisioningHandler:
-    /// attempts the identity-provider side of provisioning for an already-persisted Pending*/Failed
-    /// row and saves the resulting outcome (Failed, or left Pending* — never advances to Active here;
-    /// only ActivatePlatformAdministratorHandler does that, once the recipient has actually proven
-    /// control of the account). Sends the onboarding/link-verification email ONLY after the durable
-    /// checkpoint (the provider account existing, or — for an already-existing provider account — no
-    /// creation being needed at all) has been reached.
-    /// </summary>
     internal async Task AttemptProvisioningDeliveryAsync(
         PlatformAdministrator administrator,
         bool isNewProviderAccount,
@@ -188,15 +160,9 @@ internal sealed class CreatePlatformAdministratorHandler(
             }
             else
             {
-                // An identity-provider account already exists for this email. Never link to it
-                // silently — the recipient must authenticate with their EXISTING credentials
-                // (ActivatePlatformAdministratorHandler) before this local row is linked. The email
-                // sent here simply asks them to sign in and confirm.
                 await supabaseAuthGateway.RequestPasswordResetAsync(administrator.Email, redirectTo, cancellationToken);
             }
 
-            // Moves the row back to the correct Pending* status — a no-op on a first-time attempt
-            // (already Pending*), but essential for a retry resuming from Failed.
             administrator.MarkProvisioningDelivered(now);
             await db.SaveChangesAsync(cancellationToken);
         }
@@ -204,9 +170,6 @@ internal sealed class CreatePlatformAdministratorHandler(
         {
             var failureStage = isNewProviderAccount ? "provider_account_creation_failed" : "link_verification_email_failed";
 
-            // CodeQL #61: both provider calls above are keyed by the administrator's email, so the
-            // raw exception (whose message may echo the address) is not logged — only its type
-            // plus the durable administrator record id and provisioning correlation id.
             logger.LogError(
                 "Platform administrator provisioning failed at stage {FailureStage} ({ExceptionType}). AdministratorId={AdministratorId} CorrelationId={CorrelationId}",
                 failureStage, ex.GetType().FullName, administrator.Id, correlationId);

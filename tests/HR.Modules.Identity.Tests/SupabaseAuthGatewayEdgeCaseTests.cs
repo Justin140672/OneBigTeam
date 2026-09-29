@@ -4,12 +4,6 @@ using HR.Modules.Identity.Tests.Infrastructure;
 
 namespace HR.Modules.Identity.Tests;
 
-/// <summary>
-/// TEST-004 — hardening for the raw-HTTP Supabase auth gateway: authentication rejection,
-/// timeout/cancellation, malformed JSON and transport failures must all surface as a controlled
-/// <see cref="InvalidOperationException"/> (or the honoured <see cref="OperationCanceledException"/>)
-/// rather than an unhandled crash, and must never echo tokens/secrets.
-/// </summary>
 public class SupabaseAuthGatewayEdgeCaseTests
 {
     private static SupabaseAuthOptions Options() => new()
@@ -23,7 +17,6 @@ public class SupabaseAuthGatewayEdgeCaseTests
     private static SupabaseAuthGateway BuildGateway(FakeHttpMessageHandler handler) =>
         new(new FakeHttpClientFactory(handler), Microsoft.Extensions.Options.Options.Create(Options()));
 
-    // ---- successful response mapping -------------------------------------------------------
 
     [Fact]
     public async Task SignInWithPasswordAsync_Maps_All_Session_Fields_On_Success()
@@ -67,7 +60,6 @@ public class SupabaseAuthGatewayEdgeCaseTests
         Assert.InRange(session.ExpiresAt, before.AddSeconds(3500), DateTimeOffset.UtcNow.AddSeconds(3600));
     }
 
-    // ---- authentication rejection (401 / 403) --------------------------------------------
 
     [Theory]
     [InlineData(HttpStatusCode.Unauthorized)]
@@ -117,7 +109,6 @@ public class SupabaseAuthGatewayEdgeCaseTests
             () => BuildGateway(handler).RemoveAllMfaFactorsAsync(Guid.NewGuid(), CancellationToken.None));
     }
 
-    // ---- timeout / cancellation ---------------------------------------------------------
 
     [Fact]
     public async Task SignInWithPasswordAsync_Honours_Cancellation_Token()
@@ -152,7 +143,6 @@ public class SupabaseAuthGatewayEdgeCaseTests
             () => BuildGateway(handler).SignInWithPasswordAsync("ada@example.com", "pw", CancellationToken.None));
     }
 
-    // ---- malformed / incomplete JSON --------------------------------------------------
 
     [Fact]
     public async Task SignInWithPasswordAsync_Malformed_Json_Body_Fails_Gracefully()
@@ -165,7 +155,6 @@ public class SupabaseAuthGatewayEdgeCaseTests
 
         await Assert.ThrowsAnyAsync<Exception>(
             () => BuildGateway(handler).SignInWithPasswordAsync("ada@example.com", "pw", CancellationToken.None));
-        // Key assertion: the call completes (throws) rather than hanging or corrupting state.
     }
 
     [Fact]
@@ -174,7 +163,7 @@ public class SupabaseAuthGatewayEdgeCaseTests
         var handler = new FakeHttpMessageHandler
         {
             StatusCodeToReturn = HttpStatusCode.OK,
-            ResponseBodyToReturn = """{"access_token":"a"}""", // no refresh_token, no user
+            ResponseBodyToReturn = """{"access_token":"a"}""",
         };
 
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -213,7 +202,6 @@ public class SupabaseAuthGatewayEdgeCaseTests
             () => BuildGateway(handler).CreateUserAsync("ada@example.com", "pw", "https://app/verify", CancellationToken.None));
     }
 
-    // ---- sensitive value scrubbing on failure ----------------------------------------
 
     [Fact]
     public async Task ExchangeCodeForSessionAsync_Failure_Message_Does_Not_Leak_Tokens()

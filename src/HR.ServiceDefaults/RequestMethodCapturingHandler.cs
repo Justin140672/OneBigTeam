@@ -37,8 +37,6 @@ internal sealed class RequestMethodCapturingHandler : DelegatingHandler
         }
         finally
         {
-            // Only return a context this handler itself rented from the pool - one already attached
-            // by an earlier caller belongs to that caller, not to us.
             if (ownsContext)
                 ResilienceContextPool.Shared.Return(context);
         }

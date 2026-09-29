@@ -46,8 +46,6 @@ public class OrganisationHierarchyBuilderTests
     [Fact]
     public void Build_Employee_With_Manager_Not_In_The_Set_Becomes_A_Root_Node()
     {
-        // ManagerId points at someone who isn't part of this chart (e.g. inactive/left) — treated
-        // the same as having no manager at all, rather than being dropped.
         var alice = Employee(Guid.NewGuid(), "Alice", managerId: Guid.NewGuid());
 
         var result = _builder.Build([alice]);
@@ -104,8 +102,6 @@ public class OrganisationHierarchyBuilderTests
         var allNodeIds = Flatten(result).Select(n => n.EmployeeId).ToList();
         Assert.Contains(aliceId, allNodeIds);
         Assert.Contains(bobId, allNodeIds);
-        // Exactly one root is promoted to break the cycle — the other hangs beneath it rather
-        // than also appearing as a second, disconnected root.
         Assert.Single(result);
     }
 

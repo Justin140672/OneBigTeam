@@ -12,7 +12,6 @@ using Npgsql;
 
 namespace HR.Modules.Recruitment.Features.ApplyForInternalVacancy;
 
-/// <summary>Success, a coded refusal (<see cref="ApplyForInternalVacancyRejection"/>), or any other error.</summary>
 internal sealed record ApplyForInternalVacancyResult(
     Result<ApplyForInternalVacancyResponse> Result,
     ApplyForInternalVacancyRejection? Rejection)
@@ -118,8 +117,6 @@ internal sealed class ApplyForInternalVacancyHandler(
         if (applicant is null || applicant.EmploymentState != EmployeeApplicantEmploymentState.Active)
             return ApplyForInternalVacancyResult.NotEligible();
 
-        // Draft / closed / on-hold / cancelled / not-advertised / another company's vacancy are all
-        // simply "not found" to an employee — no information disclosure (same rule as GetInternalVacancy).
         var vacancyIsOpenInternally = await db.Vacancies
             .AsNoTracking()
             .AnyAsync(
@@ -146,7 +143,6 @@ internal sealed class ApplyForInternalVacancyHandler(
         if (fileValidation.IsFailure)
             return ApplyForInternalVacancyResult.Failed(fileValidation.Error);
 
-        // Defensive, as in CreateApplication: normally already seeded when the vacancy was created.
         await stageSeeder.EnsureDefaultStagesSeededAsync(companyId, clock.UtcNowOffset(), cancellationToken);
 
         var initialStageId = await db.RecruitmentStages
@@ -175,8 +171,6 @@ internal sealed class ApplyForInternalVacancyHandler(
         }
     }
 
-    /// <summary>One attempt. Returns null when the attempt was abandoned (and compensated) because the
-    /// employee's linked candidate changed concurrently and should be retried.</summary>
     private async Task<ApplyForInternalVacancyResult?> TryApplyAsync(
         Guid vacancyId,
         EmployeeApplicantProfile applicant,
@@ -188,8 +182,6 @@ internal sealed class ApplyForInternalVacancyHandler(
         var employeeId = applicant.EmployeeId;
         var normalisedEmail = CandidateEmail.Normalise(applicant.WorkEmail);
 
-        // Cheap pre-checks outside the transaction so the common refusals never upload a file. All are
-        // re-checked under the locks below — these alone are not race-safe.
         var linked = await db.Candidates
             .AsNoTracking()
             .Where(c => c.CompanyId == companyId && c.EmployeeId == employeeId)
@@ -210,14 +202,10 @@ internal sealed class ApplyForInternalVacancyHandler(
 
         try
         {
-            // Disposed (and therefore rolled back unless committed) when this try block exits, before
-            // any catch below or the compensation after it runs.
             await using var transaction = db.Database.IsRelational()
                 ? await db.Database.BeginTransactionAsync(cancellationToken)
                 : null;
 
-            // Lock order is always employee, then email; every other candidate-creation path takes only
-            // the email lock, so this cannot deadlock.
             await AcquireEmployeeLockAsync(companyId, employeeId, cancellationToken);
             await CandidateEmailUniqueness.AcquireCreationLockAsync(db, companyId, normalisedEmail, cancellationToken);
 
@@ -226,8 +214,6 @@ internal sealed class ApplyForInternalVacancyHandler(
 
             if (candidate?.Id != linked?.Id)
             {
-                // A linked candidate was created (e.g. by a concurrent apply) after the pre-check, so the
-                // CV was staged under the wrong candidate id. Abandon and retry against it.
                 retry = true;
             }
             else
@@ -252,7 +238,6 @@ internal sealed class ApplyForInternalVacancyHandler(
         }
         catch (DbUpdateConcurrencyException)
         {
-            // A recruiter edited the reused candidate between our read and our save.
             created = null;
             refusal = ApplyForInternalVacancyResult.Failed(Error.Concurrency(ConcurrentChangeMessage));
         }
@@ -268,13 +253,11 @@ internal sealed class ApplyForInternalVacancyHandler(
         }
         catch (DbUpdateException ex) when (IsUniqueViolationOn(ex, CandidateEmployeeUniqueIndexName))
         {
-            // A writer that does not take the employee lock linked a candidate to this employee first.
             created = null;
             retry = true;
         }
         catch
         {
-            // Clear the tracker so compensation's own save cannot re-attempt the failed inserts.
             db.ChangeTracker.Clear();
             await staging.CompensateAsync(staged);
             throw;
@@ -315,8 +298,6 @@ internal sealed class ApplyForInternalVacancyHandler(
     {
         if (linked is not null)
         {
-            // Duplicate prevention: any existing application by this employee's candidate for this
-            // vacancy — including a withdrawn or already-decided one — counts as "already applied".
             var alreadyApplied = await db.Applications
                 .AsNoTracking()
                 .AnyAsync(a => a.CompanyId == companyId && a.VacancyId == vacancyId && a.CandidateId == linked.Id, cancellationToken);
@@ -324,8 +305,6 @@ internal sealed class ApplyForInternalVacancyHandler(
             if (alreadyApplied)
                 return ApplyForInternalVacancyResult.AlreadyApplied();
 
-            // Linked candidates are excluded from the retention purge, so this is defensive only: a
-            // purged record's personal data must never be silently restored.
             if (linked.PurgedAt is not null)
                 return ApplyForInternalVacancyResult.Failed(Error.Conflict(PurgedCandidateMessage));
         }
@@ -375,15 +354,12 @@ internal sealed class ApplyForInternalVacancyHandler(
                 applicant.PhoneNumber,
                 now);
 
-            // A current employee applying internally is always a live candidate again, even if a
-            // recruiter previously deactivated their (e.g. post-hire) candidate record.
             if (!candidate.IsActive)
             {
                 candidate.Reactivate(applicant.EmployeeId, now);
                 reactivated = true;
             }
 
-            // Stale recruiter edits of this candidate must now fail their optimistic-concurrency check.
             if (refreshed || reactivated)
                 candidate.IncrementVersion();
         }
@@ -402,8 +378,6 @@ internal sealed class ApplyForInternalVacancyHandler(
             CandidateDocumentKind.Cv);
         db.CandidateDocuments.Add(cvDocument);
 
-        // The intent is still tracked from the staging save; confirming it in this same save is what
-        // marks the blob as owned.
         staged.Intent.MarkConfirmed(now);
 
         var application = Application.Create(
@@ -476,8 +450,6 @@ internal sealed class ApplyForInternalVacancyHandler(
     private static CandidateAuditSnapshot Snapshot(Candidate candidate) =>
         new(candidate.FirstName, candidate.LastName, candidate.Email, candidate.Phone, candidate.ResumeUrl);
 
-    /// <summary>Serialises this employee's concurrent applications until commit/rollback. A no-op for
-    /// non-relational providers (unit tests on EF InMemory).</summary>
     private async Task AcquireEmployeeLockAsync(Guid companyId, Guid employeeId, CancellationToken cancellationToken)
     {
         if (!db.Database.IsRelational())

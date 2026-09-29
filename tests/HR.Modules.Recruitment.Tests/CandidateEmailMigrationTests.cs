@@ -7,16 +7,6 @@ using Npgsql;
 
 namespace HR.Modules.Recruitment.Tests;
 
-/// <summary>
-/// [P1] Case-insensitive candidate email uniqueness — migration
-/// <c>EnforceCandidateNormalisedEmailUniqueness</c> against real PostgreSQL.
-///
-/// Each test creates its OWN throwaway database on the <see cref="RecruitmentDatabaseFixture"/>
-/// container (the fixture's shared, fully-migrated database is never touched), migrates it to the
-/// migration immediately before the one under test (computed from the assembly's migration list, so
-/// unrelated migrations added before it don't break this test), seeds pre-migration rows with raw SQL,
-/// then applies the migration under test.
-/// </summary>
 public class CandidateEmailMigrationTests(RecruitmentDatabaseFixture fixture)
     : IClassFixture<RecruitmentDatabaseFixture>
 {
@@ -46,12 +36,10 @@ public class CandidateEmailMigrationTests(RecruitmentDatabaseFixture fixture)
         Assert.Contains("(1 group(s))", postgres.Detail);
         Assert.DoesNotContain(companyB.ToString(), postgres.Detail);
 
-        // No email addresses in the operator-facing error.
         Assert.DoesNotContain("dup@example.com", postgres.MessageText, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("dup@example.com", postgres.Detail, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("dup@example.com", postgres.Hint ?? string.Empty, StringComparison.OrdinalIgnoreCase);
 
-        // The whole migration rolled back.
         Assert.False(await scratch.ColumnExistsAsync("normalised_email"));
         Assert.True(await scratch.IndexExistsAsync(OldIndexName));
         Assert.False(await scratch.IndexExistsAsync(NewIndexName));
@@ -68,7 +56,6 @@ public class CandidateEmailMigrationTests(RecruitmentDatabaseFixture fixture)
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
 
-        // Company A: two groups (one of three rows); company B: one group.
         await scratch.InsertCandidateAsync(companyA, "one@example.com");
         await scratch.InsertCandidateAsync(companyA, "ONE@example.com");
         await scratch.InsertCandidateAsync(companyA, "One@Example.com ");
@@ -99,7 +86,6 @@ public class CandidateEmailMigrationTests(RecruitmentDatabaseFixture fixture)
 
         await scratch.MigrateToUnderTestExpectingFailureAsync();
 
-        // Operator resolves the group (e.g. corrects the second record's email), then re-runs.
         await scratch.ExecuteAsync(
             "UPDATE recruitment.candidates SET email = 'dup.second@example.com' WHERE id = @id",
             ("id", secondId));
@@ -110,7 +96,6 @@ public class CandidateEmailMigrationTests(RecruitmentDatabaseFixture fixture)
         Assert.True(await scratch.ColumnExistsAsync("normalised_email"));
         Assert.Equal("NO", await scratch.ColumnIsNullableAsync("normalised_email"));
 
-        // Backfilled as lower(btrim(email)) for every row.
         Assert.Equal(0, await scratch.ScalarAsync<long>(
             "SELECT count(*) FROM recruitment.candidates WHERE normalised_email IS DISTINCT FROM lower(btrim(email))"));
         Assert.Equal(1, await scratch.ScalarAsync<long>(
@@ -122,7 +107,6 @@ public class CandidateEmailMigrationTests(RecruitmentDatabaseFixture fixture)
         Assert.Contains("UNIQUE", indexDef);
         Assert.Contains("(company_id, normalised_email)", indexDef);
 
-        // The index is enforced from now on.
         var ex = await Assert.ThrowsAsync<PostgresException>(() => scratch.InsertCandidateWithNormalisedAsync(companyA, "MIXED.case@example.com"));
         Assert.Equal(PostgresErrorCodes.UniqueViolation, ex.SqlState);
         Assert.Equal(NewIndexName, ex.ConstraintName);
@@ -162,7 +146,6 @@ public class CandidateEmailMigrationTests(RecruitmentDatabaseFixture fixture)
         Assert.True(await scratch.IndexExistsAsync(OldIndexName));
     }
 
-    /// <summary>A uniquely-named database on the fixture's container, dropped (best effort) on dispose.</summary>
     private sealed class ScratchDatabase : IAsyncDisposable
     {
         private readonly string _adminConnectionString;
@@ -192,8 +175,6 @@ public class CandidateEmailMigrationTests(RecruitmentDatabaseFixture fixture)
             {
                 Database = databaseName,
                 Pooling  = false,
-                // Npgsql redacts PostgresException.Detail by default; the migration's DETAIL (affected
-                // company ids) is part of what is under test.
                 IncludeErrorDetail = true,
             }.ConnectionString;
 
@@ -254,7 +235,6 @@ public class CandidateEmailMigrationTests(RecruitmentDatabaseFixture fixture)
             return id;
         }
 
-        /// <summary>Post-migration insert (normalised_email is NOT NULL once the migration has run).</summary>
         public async Task InsertCandidateWithNormalisedAsync(Guid companyId, string email) =>
             await ExecuteAsync(
                 """
@@ -336,7 +316,6 @@ public class CandidateEmailMigrationTests(RecruitmentDatabaseFixture fixture)
             }
             catch
             {
-                // Best effort — the container is discarded at the end of the run anyway.
             }
         }
     }

@@ -2,11 +2,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Companies.Features.LiftCompanyLegalHold;
 
-/// <summary>
-/// NFR-07: records a platform administrator lifting a company-wide legal hold, after which normal
-/// retention deletion resumes for the company. See PlaceCompanyLegalHold's Audit.cs for the shared
-/// convention.
-/// </summary>
 internal sealed record CompanyLegalHoldLiftedAuditEvent(
     Guid CompanyId,
     Guid? ActorUserId,

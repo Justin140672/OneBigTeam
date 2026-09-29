@@ -128,7 +128,5 @@
         _dialogOpen = true;
     }
 
-    // "Status" here holds the stage's display name (GetPipelineSummary's PipelineSummaryItem.Status
-    // field name is retained as-is from the backend, but functionally it is the stage's Name).
     private sealed record FunnelStage(Guid StageId, string Label, int Value, string Fill);
 }

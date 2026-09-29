@@ -99,7 +99,6 @@ public class GetVacancyHandlerTests
         db.Vacancies.Add(vacancy);
         await db.SaveChangesAsync();
 
-        // No summaries dictionary supplied — simulates the linked profile no longer being resolvable.
         var result = await new GetVacancyHandler(db, new FakePositionProfileReader()).HandleAsync(
             new GetVacancyRequest { CompanyId = companyId, VacancyId = vacancy.Id },
             CancellationToken.None);
@@ -133,12 +132,10 @@ public class GetVacancyHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        // The now-inactive linked profile's fields are still surfaced...
         Assert.Equal("Deactivated Profile Title", result.Value!.PositionProfileTitle);
         Assert.Equal(profileDepartmentId, result.Value.PositionProfileDepartmentId);
         Assert.Equal("Deactivated profile description", result.Value.PositionProfileDescription);
         Assert.False(result.Value.PositionProfileIsActive);
-        // ...while the vacancy's own AdvertTitle/AdvertDescription remain untouched by this story.
         Assert.Equal("Backend Engineer", result.Value.AdvertTitle);
         Assert.Equal("Vacancy's own description", result.Value.AdvertDescription);
     }
@@ -146,9 +143,6 @@ public class GetVacancyHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_Null_PositionProfile_Fields_When_Linked_PositionProfile_Cannot_Be_Found()
     {
-        // PositionProfileId is always populated on a Vacancy (non-nullable Guid) — the only way the
-        // PositionProfile* fields can be null is when IPositionProfileReader can no longer resolve a
-        // summary for that ID (e.g. the linked profile was deleted out from under the vacancy).
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var positionProfileId = Guid.NewGuid();
@@ -238,9 +232,6 @@ public class GetVacancyHandlerTests
     [Fact]
     public async Task HandleAsync_EffectiveLocation_Is_Resolved_Purely_From_PositionProfile()
     {
-        // Location is no longer a vacancy-level concept at all — EffectiveLocation is resolved
-        // exclusively from the linked Position Profile's PositionProfileSummary.LocationName, with
-        // no vacancy-level override or fallback logic.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var positionProfileId = Guid.NewGuid();
@@ -296,7 +287,6 @@ public class GetVacancyHandlerTests
         db.Vacancies.Add(vacancy);
         db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, vacancy.Id, Guid.NewGuid(), Guid.NewGuid(), null, Now));
         db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, vacancy.Id, Guid.NewGuid(), Guid.NewGuid(), null, Now));
-        // An application linked to a different vacancy should not be counted.
         var otherVacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Other Role", null, Guid.NewGuid(), Now);
         db.Vacancies.Add(otherVacancy);
         db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, otherVacancy.Id, Guid.NewGuid(), Guid.NewGuid(), null, Now));

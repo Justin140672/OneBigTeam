@@ -83,7 +83,7 @@ public class DeactivateAssetCategoryHandlerTests
 
         var result = await handler.HandleAsync(new DeactivateAssetCategoryRequest
         {
-            CompanyId = Guid.NewGuid(), // different company
+            CompanyId = Guid.NewGuid(),
             Id = categoryId
         }, CancellationToken.None);
 

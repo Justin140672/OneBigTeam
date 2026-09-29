@@ -7,23 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Recruitment.Jobs;
 
-/// <summary>
-/// [P1] Recurring backstop that guarantees no candidate document is left permanently unscanned —
-/// the recruitment counterpart of the module's other reconciliation sweeps
-/// (PurgeCandidateDocumentStorageReconciliationJob, OffboardingPlanCreationReconciliationJob):
-/// <list type="bullet">
-/// <item><description><b>Due Pending rows</b> — a lost/never-sent enqueue, a lost retry schedule, or a
-/// row backfilled to Pending by the CandidateDocumentMalwareScan migration — are re-dispatched to
-/// <see cref="ScanCandidateDocumentJob"/>. A freshly uploaded row gets a short grace period first
-/// so the normal on-save dispatch is not duplicated.</description></item>
-/// <item><description><b>Abandoned Scanning claims</b> (lease expired: the worker crashed or was
-/// recycled mid-scan) are released — back to Pending for immediate re-dispatch while attempts remain,
-/// otherwise terminally Failed — and audited.</description></item>
-/// </list>
-/// Every re-dispatch still goes through the job's own claim, so attempts stay bounded by
-/// <see cref="CandidateDocument.MaxScanAttempts"/> however often this runs. Batched, so a large
-/// backfill drains over several sweeps rather than flooding the scanner.
-/// </summary>
 internal sealed class ReconcileCandidateDocumentScansJob(
     RecruitmentDbContext db,
     IBackgroundJobClient backgroundJobClient,
@@ -33,7 +16,6 @@ internal sealed class ReconcileCandidateDocumentScansJob(
 {
     internal const int BatchSize = 500;
 
-    /// <summary>A new upload is normally dispatched on save; only sweep it after this grace period.</summary>
     internal static readonly TimeSpan NewUploadGracePeriod = TimeSpan.FromMinutes(2);
 
     [DisableConcurrentExecution(timeoutInSeconds: 300)]
@@ -74,7 +56,6 @@ internal sealed class ReconcileCandidateDocumentScansJob(
             }
             catch (DbUpdateConcurrencyException)
             {
-                // A worker claimed or finished it in the meantime — nothing to repair.
                 db.Entry(document).State = EntityState.Detached;
                 continue;
             }

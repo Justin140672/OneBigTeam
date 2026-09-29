@@ -5,13 +5,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the Documents tab on the self-service My Profile page.
-///
-/// Tom Williams (30000000-...-004) has:
-///   - Seeded uploaded docs: Employment Contract, Offer Letter
-///   - Seeded document request: Passport (b0000000-...-001, task a0000000-...-010)
-/// </summary>
 public sealed class SelfServiceDocumentTests(EmployeePersonaFixture fixture) : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -50,21 +43,6 @@ public sealed class SelfServiceDocumentTests(EmployeePersonaFixture fixture) : R
     [Fact]
     public async Task SelfServiceDocumentsTab_HasGeneralUploadButton_PlusOnePerRequestUploadButton()
     {
-        // MyProfileDocumentsTab.razor (the merged Documents tab — see item 34) always renders its
-        // own bulk "Upload" button (self-service employees can now upload a document of their own
-        // from My Profile, not only in response to an HR request) — this replaced the older
-        // EmployeeDocumentsTab.razor-based tab, whose bulk Upload button was admin-only and never
-        // rendered for EmployeeSelfUpload. Each "Requested" row in the Document Requests table
-        // still gets its own contextual "Upload" button too.
-        //
-        // Tom's seeded Passport request is NOT the only outstanding request he can end up with —
-        // Tom Williams is a widely-reused persona, and other test classes (EmployeeDocumentsTabTests
-        // requests "Driving Licence", DocumentUploadTaskTests requests "Certificate") add their own
-        // permanent, never-cleared document requests for him on the shared E2E database. Asserting a
-        // hard-coded total of 2 assumed Passport would forever be Tom's only open request, which
-        // stopped holding once those other classes' requests accumulated. Assert the actual
-        // relationship instead — exactly 1 bulk button plus 1 per currently-"Requested" row — so
-        // this test keeps passing regardless of how many other requests Tom has picked up.
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
 
@@ -96,8 +74,6 @@ public sealed class SelfServiceDocumentTests(EmployeePersonaFixture fixture) : R
     [Fact]
     public async Task SelfServiceDocumentsTab_HasNoDeleteButtonsAnywhere()
     {
-        // Deleting a document is HR/manager-only (server-enforced by the "employee:manage"
-        // policy) — the button shouldn't even appear on the self-service view.
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
 
@@ -131,10 +107,6 @@ public sealed class SelfServiceDocumentTests(EmployeePersonaFixture fixture) : R
             "!document.querySelector('.spinner-border') || !document.querySelector('.spinner-border').offsetParent",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
 
-        // "Requested Documents" (the self-service-only duplicate section) was removed — the
-        // "Document Requests" section on MyProfileDocumentsTab.razor (data-testid=
-        // "my-profile-document-requests-section" — distinct from EmployeeDocumentsTab.razor's
-        // admin equivalent, "admin-document-requests-section") is now the only place this shows.
         var requestedSection = _page.Locator("[data-testid='my-profile-document-requests-section']");
         Assert.True(await requestedSection.IsVisibleAsync(),
             "Expected the 'Document Requests' section to be visible for Tom, who has a Passport request");
@@ -143,33 +115,16 @@ public sealed class SelfServiceDocumentTests(EmployeePersonaFixture fixture) : R
         Assert.Contains("Passport", content, StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>
-    /// Returns the dedicated pre-seeded pool employee for this class
-    /// (SeededE2eEmployees.SelfServiceDocument). Its Employee row exists but has no Supabase login
-    /// until <see cref="EnsureEmployeeLoginAsync"/> provisions one at runtime.
-    /// </summary>
     private static (Guid EmployeeId, string Email, string LastName) CreateEmployeeAsync()
     {
         var seeded = SeededE2eEmployees.SelfServiceDocument;
         return (seeded.EmployeeId, seeded.Email, seeded.LastName);
     }
 
-    /// <summary>
-    /// Gives a freshly-created employee a real, working Supabase login via the dev-only
-    /// POST /api/dev/ensure-employee-login endpoint — see AssetAcknowledgementTaskTests'
-    /// EnsureEmployeeLoginAsync for the full rationale (a brand-new Employee row has no linked
-    /// UserProfile by construction). 404s outside Development.
-    /// </summary>
     private async Task EnsureEmployeeLoginAsync(Guid employeeId, string email, string lastName)
     {
         using var http = new HttpClient { BaseAddress = new Uri(_fixture.ApiBaseUrl) };
 
-        // This endpoint's EnsureDevSupabaseUserAsync makes a real, network-dependent call to
-        // Supabase's Admin API (unlike most other E2E auth paths, which are faked under
-        // E2E_TESTING=true — see FakeSupabaseAuthGateway's own remarks) — a genuine transient
-        // failure/rate-limit response under this suite's concurrency can surface as a 500 here.
-        // Retry a couple of times before failing outright, and capture the response body on
-        // failure so a real, non-transient error is immediately diagnosable.
         HttpResponseMessage? response = null;
         string? body = null;
         for (var attempt = 1; attempt <= 3; attempt++)
@@ -196,14 +151,6 @@ public sealed class SelfServiceDocumentTests(EmployeePersonaFixture fixture) : R
     [Fact]
     public async Task SelfServiceDocumentsTab_UploadRequestedDocument_CompletesTheRequest()
     {
-        // This used to upload against Tom Williams' seeded Passport request directly. That's
-        // irreversible (no "un-upload" action) and permanently flips the seeded request from
-        // "Requested" to "Uploaded" on the shared, long-lived E2E dev database — colliding with
-        // every other read-only test in this file and in EmployeeDocumentsTabTests that expects
-        // Tom's Passport request to still show "Requested"
-        // (Admin_Documents_Tab_Shows_Requested_Status_Badge_For_Outstanding_Request in particular).
-        // Same fix pattern as AssetAcknowledgementTaskTests/AssetReturnTaskTests: use a fresh
-        // employee (with a fresh "Certificate" document request) instead of Tom.
         var login    = new LoginPage(_page, _fixture.WebBaseUrl);
         var empAdmin = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
         var profile  = new MyProfilePage(_page, _fixture.WebBaseUrl);
@@ -236,8 +183,6 @@ public sealed class SelfServiceDocumentTests(EmployeePersonaFixture fixture) : R
             await File.WriteAllBytesAsync(tempFile, BuildTestPdf());
             await profile.UploadRequestedDocumentAsync("Certificate", tempFile);
 
-            // The grid reloads after a successful upload — the request should no longer show an
-            // "Upload" action (its status has moved on from "Requested").
             Assert.False(await profile.HasUploadButtonForDocumentRequestAsync("Certificate"),
                 "Expected the Certificate request's 'Upload' button to disappear once the document has been uploaded");
         }
@@ -270,10 +215,6 @@ public sealed class SelfServiceDocumentTests(EmployeePersonaFixture fixture) : R
         Assert.True(await downloadBtn.IsVisibleAsync(),
             "Expected a Download button to be visible for Tom's seeded documents");
 
-        // DownloadAsync calls JS window.open via Blazor Server interop — there is no browser-side
-        // HTTP request to intercept. Spy on window.open before clicking so we can verify it fires.
-        // Spy on window.open without calling the original — opening a file:// URI from an
-        // HTTP origin is cross-origin blocked in Chromium and can destabilise the browser.
         await _page.EvaluateAsync(
             "window.__lastOpenedUrl = null; " +
             "window.open = (url, target) => { window.__lastOpenedUrl = url; return null; };");

@@ -2,7 +2,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace HR.Web.Models;
 
-// --- List / detail response shapes (mirror HR.Modules.Support.Features.* Response.cs) ---
 
 public sealed record SupportRequestListItem(
     Guid Id,
@@ -70,8 +69,6 @@ public sealed record SupportDashboardModel(
     List<SupportDashboardTitleCount> TopReportedProblems,
     List<SupportDashboardTypeCount> RequestsByType);
 
-// --- UI-side option lists (mirror the backend enums; kept as plain strings on the wire since the
-// API accepts/returns enum values as strings). ---
 
 public static class SupportRequestOptions
 {
@@ -89,7 +86,6 @@ public static class SupportRequestOptions
     };
 }
 
-// --- Submission form model (customer-facing) ---
 
 public sealed class SubmitSupportRequestFormModel
 {
@@ -110,7 +106,6 @@ public sealed class SubmitSupportRequestFormModel
     public bool IncludeDiagnostics { get; set; } = true;
 }
 
-// --- Reply form model (submission detail / conversation thread) ---
 
 public sealed class AddSupportResponseFormModel
 {

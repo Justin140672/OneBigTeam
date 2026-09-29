@@ -141,7 +141,6 @@ public class GetCustomerDashboardHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(1, result.Value!.TrialCustomers);
-        // ReadOnlyCustomers includes both TrialExpired (1) and Paused (1) subscriptions.
         Assert.Equal(2, result.Value.ReadOnlyCustomers);
         Assert.Equal(1, result.Value.PausedCustomers);
         Assert.Equal(1, result.Value.CancelledSubscriptions);

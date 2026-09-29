@@ -25,7 +25,6 @@ public class AccountCreationEmailGuardTests
 
     private static string Serialise(object? value) => JsonSerializer.Serialize(value);
 
-    // ── Contract constants ──────────────────────────────────────────────────────
 
     [Fact]
     public void Constants_Match_The_Published_Contract()
@@ -37,7 +36,6 @@ public class AccountCreationEmailGuardTests
         Assert.Equal("PublicEmailDomain", AccountCreationEmailGuard.BulkExclusionReason);
     }
 
-    // ── Blocked ─────────────────────────────────────────────────────────────────
 
     [Theory]
     [InlineData("janet.unique-localpart@gmail.com", "gmail.com")]
@@ -109,18 +107,15 @@ public class AccountCreationEmailGuardTests
         Assert.Single(logger.Messages);
         var logText = logger.Text;
 
-        // Retains useful diagnostic info: path and count
         Assert.Contains("PublicSignup", logText);
         Assert.Contains("1", logText);
         Assert.Contains("address", logText);
 
-        // Never contains personal data: no domain, email, or local part
         Assert.DoesNotContain("gmail.com", logText);
         Assert.DoesNotContain("@", logText);
         Assert.DoesNotContain(LocalPart, logText, StringComparison.OrdinalIgnoreCase);
     }
 
-    // ── Actor attribution ───────────────────────────────────────────────────────
 
     [Fact]
     public async Task Audit_ActorType_Is_Anonymous_When_No_Actor()
@@ -167,7 +162,6 @@ public class AccountCreationEmailGuardTests
         Assert.Equal(AuditActorType.ScheduledJob, evt.ActorType);
     }
 
-    // ── Allowed ─────────────────────────────────────────────────────────────────
 
     [Theory]
     [InlineData("person@acme.example")]
@@ -185,7 +179,6 @@ public class AccountCreationEmailGuardTests
         Assert.Empty(logger.Messages);
     }
 
-    // ── Malformed ───────────────────────────────────────────────────────────────
 
     [Theory]
     [InlineData(null)]
@@ -217,7 +210,6 @@ public class AccountCreationEmailGuardTests
         Assert.Equal("work_email_required", AccountCreationEmailGuard.ErrorFor(guard.Evaluate("person@gmail.com")).Code);
     }
 
-    // ── RecordRejectionsAsync ───────────────────────────────────────────────────
 
     [Fact]
     public async Task RecordRejectionsAsync_With_No_Rejections_Publishes_Nothing_And_Logs_Nothing()
@@ -262,7 +254,6 @@ public class AccountCreationEmailGuardTests
         Assert.Equal("bulk-employee-invitation", evt.Path);
 
         IAuditEvent auditEvent = evt;
-        // Multiple subjects: no single employee to attribute, and the summary reports the count.
         Assert.Null(auditEvent.EmployeeId);
         Assert.Contains("5 recipients", auditEvent.Summary);
         Assert.DoesNotContain("@", Serialise(auditEvent.Metadata));

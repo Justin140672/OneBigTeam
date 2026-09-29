@@ -6,11 +6,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Support.Tests;
 
-/// <summary>
-/// P1 stored-XSS fix: the idempotent backfill that re-sanitises support response bodies stored
-/// before write-time sanitisation existed. Legacy rows are simulated by overwriting BodyHtml with
-/// raw markup (bypassing SupportResponse.Create's sanitisation) before saving.
-/// </summary>
 public class SupportResponseBodySanitisationJobTests
 {
     private static readonly DateTimeOffset SeedNow = new(2026, 6, 1, 9, 0, 0, TimeSpan.Zero);
@@ -41,7 +36,6 @@ public class SupportResponseBodySanitisationJobTests
 
     private static async Task<int> RunJobAsync(string databaseName)
     {
-        // Fresh context per run, as a hosted job would get from its own DI scope.
         await using var db = BuildContext(databaseName);
         var job = new SupportResponseBodySanitisationJob(db, NullLogger<SupportResponseBodySanitisationJob>.Instance);
         return await job.ExecuteAsync(CancellationToken.None);
@@ -82,7 +76,6 @@ public class SupportResponseBodySanitisationJobTests
                 originalCompany[r.Id] = r.CompanyId;
         }
 
-        // Precondition: the dirty rows really were persisted raw.
         await using (var check = BuildContext(databaseName))
         {
             var stored = await check.SupportResponses.AsNoTracking().SingleAsync(r => r.Id == dirtyIds[0]);
@@ -144,8 +137,6 @@ public class SupportResponseBodySanitisationJobTests
     [Fact]
     public async Task ExecuteAsync_Processes_Every_Chunk_When_Rows_Exceed_The_Batch_Size()
     {
-        // 2 full batches + a partial third, so an off-by-one in chunking (e.g. only the first
-        // batch, or dropping the trailing partial batch) leaves raw rows behind.
         var dirtyCount = SupportResponseBodySanitisationJob.BatchSize * 2 + 50;
         var databaseName = Guid.NewGuid().ToString("N");
 
@@ -177,7 +168,6 @@ public class SupportResponseBodySanitisationJobTests
     [Fact]
     public async Task ExecuteAsync_Handles_Exactly_One_Full_Batch()
     {
-        // Boundary: exactly BatchSize rows is a single full chunk with no remainder.
         var databaseName = Guid.NewGuid().ToString("N");
         await using (var seed = BuildContext(databaseName))
         {

@@ -21,9 +21,6 @@ public class GetOffboardingProgressReportHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_All_Company_Employees_Regardless_Of_Caller_Role()
     {
-        // GetOffboardingProgressReport has no row-level manager scoping — the endpoint policy is
-        // reporting:view-hr only (HR Administrator), so unlike GetProbationReport/GetOnboarding-
-        // ProgressReport the handler takes no callerIsHr/callerEmployeeId parameters at all.
         var employeeA = Guid.NewGuid();
         var employeeB = Guid.NewGuid();
         var reader = new FakeOffboardingReportReader([BuildItem(employeeA), BuildItem(employeeB)]);

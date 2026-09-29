@@ -5,12 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Verifies the shared-document:* policies (see IdentityModule.AddRolePolicies) as applied to
-/// the CompanyDocumentCategory endpoints — in particular the "Expected access" rules from the
-/// permissions spec: HR can manage, Managers do not automatically get manage rights, and a
-/// Company Administrator only gets access if they ALSO hold the HrAdministrator role.
-/// </summary>
 [Collection("Integration")]
 public class CompanyDocumentCategoryEndpointTests
 {
@@ -159,7 +153,6 @@ public class CompanyDocumentCategoryEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── UpdateCompanyDocumentCategory ─────────────────────────────────────────
 
     [Fact]
     public async Task Update_Returns_Unauthorized_Without_Auth()
@@ -275,7 +268,6 @@ public class CompanyDocumentCategoryEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    // ── DeactivateCompanyDocumentCategory ─────────────────────────────────────
 
     [Fact]
     public async Task Deactivate_Returns_Unauthorized_Without_Auth()
@@ -369,12 +361,6 @@ public class CompanyDocumentCategoryEndpointTests
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
-        // Role-agnostic sync only — every caller of this helper already granted the specific
-        // role(s) it wants to test beforehand via AssignRoleAsync. Hardcoding a role here (this
-        // used to always grant SystemRoles.Manager) additionally granted it to every caller
-        // regardless of intent, which used to be harmless only because tenant resolution didn't
-        // actually key off UserProfile.CompanyId yet — now that it does, an unconditional extra
-        // role grant here changes real authorization outcomes.
         await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }

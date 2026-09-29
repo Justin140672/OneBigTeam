@@ -3,24 +3,6 @@ using HR.SharedKernel;
 
 namespace HR.Infrastructure.Persistence;
 
-/// <summary>
-/// AUD-03 / NFR-01: centralised sensitive-data classification and rejection.
-///
-/// Scans serialised audit Before/After/Metadata JSON before the pending item is written and
-/// rejects the payload if it contains either:
-/// <list type="bullet">
-/// <item><description>a prohibited field <b>name</b> (salary, NI number, bank details, password,
-/// token, secret, ...) — see <see cref="SensitiveDataScrubber.ProhibitedFieldNames"/>; or</description></item>
-/// <item><description>a string <b>value</b> that matches a sensitive pattern (NI number, IBAN,
-/// sort code, bank/card number, bearer token, JWT, bcrypt/argon hash) regardless of the field
-/// name it sits under.</description></item>
-/// </list>
-///
-/// Throws <see cref="ProhibitedAuditFieldException"/> so the publisher can log a clear
-/// operational error; the offending payload is never persisted. Publishers must fix the audit
-/// event to omit the value. Where a change must still be recorded (e.g. "salary was changed"),
-/// use a summary-only approach (direction / band, never the amount).
-/// </summary>
 internal static class AuditPayloadRedactionGuard
 {
     public static void AssertPayloadIsSafe(string? json, string fieldName)
@@ -91,8 +73,4 @@ internal static class AuditPayloadRedactionGuard
     }
 }
 
-/// <summary>
-/// Thrown by <see cref="AuditPayloadRedactionGuard"/> when a prohibited field or value is detected.
-/// The publisher logs this and the pending item is not persisted.
-/// </summary>
 public sealed class ProhibitedAuditFieldException(string message) : InvalidOperationException(message);

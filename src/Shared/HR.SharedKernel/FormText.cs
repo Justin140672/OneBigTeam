@@ -16,22 +16,10 @@ namespace HR.SharedKernel;
 /// </summary>
 public static class FormText
 {
-    /// <summary>
-    /// Required ordinary text (names, titles, references, codes, email addresses, usernames).
-    /// Trims leading/trailing whitespace only; internal whitespace and case are preserved.
-    /// </summary>
     public static string Required(string value) => value.Trim();
 
-    /// <summary>
-    /// Optional ordinary text (notes, descriptions, reasons). Null, empty and whitespace-only
-    /// input becomes null; otherwise the value is trimmed.
-    /// </summary>
     public static string? Optional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    /// <summary>
-    /// Search terms and filter parameters. Whitespace-only input is treated as absent (null) so
-    /// callers building query strings never send a meaningless blank filter.
-    /// </summary>
     public static string? OptionalSearch(string? value) => Optional(value);
 }

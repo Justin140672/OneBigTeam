@@ -2,12 +2,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Companies.Tests.Infrastructure;
 
-/// <summary>
-/// Test double for <see cref="IAuditHistoryReader"/> — lets GetAuditLogHandler tests supply a fixed
-/// set of platform-wide audit entries and apply the same filter/paging semantics as the real
-/// AuditHistoryReader.GetPlatformAuditLogAsync, without a real AuditDbContext/database. The other
-/// three overloads on the interface aren't exercised by GetAuditLog and simply return an empty list.
-/// </summary>
 internal sealed class FakeAuditHistoryReader : IAuditHistoryReader
 {
     public IReadOnlyList<AuditHistoryEntry> PlatformEntries { get; set; } = [];

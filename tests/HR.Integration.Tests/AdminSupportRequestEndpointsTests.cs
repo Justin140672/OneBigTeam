@@ -65,9 +65,6 @@ public class AdminSupportRequestEndpointsTests
         return (companyId, payload.Id, detailPayload!.Version);
     }
 
-    // ---------------------------------------------------------------------
-    // 1-2: Allow-listed platform administrator can list/get across tenants.
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task PlatformAdministrator_Can_List_SupportRequests_For_Any_Company()
@@ -103,9 +100,6 @@ public class AdminSupportRequestEndpointsTests
         Assert.Equal(id, detail!.Id);
     }
 
-    // ---------------------------------------------------------------------
-    // 3: Disabled/unknown platform administrators are forbidden on all three routes.
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task Disabled_PlatformAdministrator_Is_Forbidden_On_All_Admin_Routes()
@@ -130,9 +124,6 @@ public class AdminSupportRequestEndpointsTests
         await AssertAllThreeForbiddenAsync(unknownClient, companyId, id, version);
     }
 
-    // ---------------------------------------------------------------------
-    // 4: An ordinary authenticated tenant user (no platform-admin row) is forbidden.
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task Ordinary_TenantUser_Is_Forbidden_On_All_Admin_Routes()
@@ -163,9 +154,6 @@ public class AdminSupportRequestEndpointsTests
         Assert.Equal(HttpStatusCode.Forbidden, put.StatusCode);
     }
 
-    // ---------------------------------------------------------------------
-    // 5: Cross-company isolation via the admin Get route.
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task PlatformAdministrator_Get_Returns_NotFound_When_Id_Belongs_To_Different_Company()
@@ -182,9 +170,6 @@ public class AdminSupportRequestEndpointsTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    // ---------------------------------------------------------------------
-    // 6-7: Update status via the admin route — success + notification fan-out, and 409 conflict.
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task PlatformAdministrator_Update_Status_With_Correct_Version_Succeeds_And_Fires_Notifications()

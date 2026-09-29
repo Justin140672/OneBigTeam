@@ -5,14 +5,6 @@ using Stripe;
 
 namespace HR.Modules.Companies.Services;
 
-/// <summary>
-/// Registered as the "stripe" named health check (System Health Dashboard, Platform Monitoring
-/// epic). A cheap, real reachability probe — retrieves the Stripe account balance, which is a
-/// lightweight read-only call that doesn't touch invoice/customer data — rather than a fake ping.
-/// Reports Degraded (not Unhealthy) when no secret key is configured, matching the existing
-/// "StripeConfigured" convention used elsewhere in this module (Stripe absence is an expected,
-/// non-fatal state in dev/test environments, not a platform outage).
-/// </summary>
 internal sealed class StripeHealthCheck(IOptions<StripeOptions> options) : IHealthCheck
 {
     public async Task<HealthCheckResult> CheckHealthAsync(

@@ -3,11 +3,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Recruitment.Tests.Infrastructure;
 
-/// <summary>
-/// Hand-rolled fake for <see cref="IEmployeeDepartmentReader"/> — returns a pre-configured
-/// dictionary of department info, or an empty dictionary by default so providers/handlers under
-/// test fall back to the employee-id-as-name behaviour.
-/// </summary>
 internal sealed class FakeEmployeeDepartmentReader : IEmployeeDepartmentReader
 {
     private readonly IReadOnlyDictionary<Guid, EmployeeDepartmentInfo> _departments;

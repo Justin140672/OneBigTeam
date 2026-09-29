@@ -4,10 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies that the Overview tab on the self-service My Profile page
-/// renders the employee's employment details and action buttons.
-/// </summary>
 public sealed class ProfileOverviewTabTests(HrSettingsSerialFixture fixture) : HrSettingsSerialTestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -22,25 +18,19 @@ public sealed class ProfileOverviewTabTests(HrSettingsSerialFixture fixture) : H
         var profile  = new MyProfilePage(_page, _fixture.WebBaseUrl);
         var overview = new OverviewTab(_page);
 
-        // ── Step 1: Login as Tom ──────────────────────────────────────────────
         await login.GoToAsync();
         await login.LoginAsync(TomEmail);
 
-        // ── Step 2: Navigate to Tom's self-service profile ────────────────────
         await profile.GoToAsync(AcmeId, TomId);
 
-        // ── Step 3: The Overview tab should be the default tab ────────────────
-        // If it is not default, open it explicitly.
         if (!await overview.IsVisibleAsync())
             await profile.OpenOverviewTabAsync();
 
         await overview.WaitForLoadAsync();
 
-        // ── Step 4: Overview grid is rendered ────────────────────────────────
         Assert.True(await overview.IsVisibleAsync(),
             "Expected the overview-grid to be visible on the Overview tab");
 
-        // ── Step 5: Key employment details are displayed ──────────────────────
         var jobTitle = await overview.GetDetailAsync("Job Title");
         Assert.False(string.IsNullOrWhiteSpace(jobTitle),
             "Expected a Job Title to be displayed in the overview");
@@ -51,7 +41,6 @@ public sealed class ProfileOverviewTabTests(HrSettingsSerialFixture fixture) : H
             "Expected a Department to be displayed in the overview");
         Assert.Contains("Engineering", department, StringComparison.OrdinalIgnoreCase);
 
-        // ── Step 6: Action buttons are present ───────────────────────────────
         var content = await _page.ContentAsync();
         Assert.Contains("Request Leave", content, StringComparison.OrdinalIgnoreCase);
     }
@@ -73,7 +62,6 @@ public sealed class ProfileOverviewTabTests(HrSettingsSerialFixture fixture) : H
 
         await overview.WaitForLoadAsync();
 
-        // ── Every mandatory field renders with a non-empty value ──────────────
         var employeeNumber = await overview.GetDetailAsync("Employee Number");
         Assert.False(string.IsNullOrWhiteSpace(employeeNumber),
             "Expected an Employee Number to be displayed in the overview");
@@ -100,12 +88,10 @@ public sealed class ProfileOverviewTabTests(HrSettingsSerialFixture fixture) : H
             "Expected a Working Pattern to be displayed in the overview");
         Assert.Contains("hrs/day", workingPattern, StringComparison.OrdinalIgnoreCase);
 
-        // ── Continuous Service Date is optional — only assert on shape when present ──
         var continuousServiceDate = await overview.GetDetailAsync("Continuous Service Date");
         if (continuousServiceDate is not null)
             Assert.False(string.IsNullOrWhiteSpace(continuousServiceDate));
 
-        // ── Relative field order matches the required Employment card layout ──
         var labels = await overview.GetEmploymentCardLabelsAsync();
         var expectedOrder = new[]
         {
@@ -127,13 +113,8 @@ public sealed class ProfileOverviewTabTests(HrSettingsSerialFixture fixture) : H
         var overview   = new OverviewTab(_page);
         var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
 
-        // "Display salary to employees on their profile" lives on the standalone HR Settings page
-        // (HrSettingsPage.razor), gated on Session.IsHrAdministrator — it used to live on the
-        // Company Settings tab (CompanyAdministrator-only) before the HR-policy fields were split
-        // out, so this needs an HrAdministrator persona.
         const string hrAdminEmail = "laura.bennett@acme.example";
 
-        // ── Baseline: Salary row is not rendered while the company setting is off ──
         await login.GoToAsync();
         await login.LoginAsync(TomEmail);
         await profile.GoToAsync(AcmeId, TomId);
@@ -146,7 +127,6 @@ public sealed class ProfileOverviewTabTests(HrSettingsSerialFixture fixture) : H
 
         try
         {
-            // ── Enable the setting as an HR administrator ───────────────────────
             await login.GoToAsync();
             await login.LoginAsync(hrAdminEmail);
             await hrSettings.GoToAsync(AcmeId);
@@ -161,12 +141,9 @@ public sealed class ProfileOverviewTabTests(HrSettingsSerialFixture fixture) : H
             }
             else
             {
-                // Setting was already enabled — the "hidden by default" baseline captured
-                // above won't be meaningful, but we can still verify it's shown once enabled.
                 Assert.False(string.IsNullOrWhiteSpace(salaryBeforeEnabling));
             }
 
-            // ── Re-login as Tom so a fresh AppSession picks up the new setting ─
             await login.GoToAsync();
             await login.LoginAsync(TomEmail);
             await profile.GoToAsync(AcmeId, TomId);
@@ -183,7 +160,6 @@ public sealed class ProfileOverviewTabTests(HrSettingsSerialFixture fixture) : H
         }
         finally
         {
-            // ── Restore the original setting so this test doesn't leak state ───
             if (!wasEnabled)
             {
                 await login.GoToAsync();
@@ -212,7 +188,6 @@ public sealed class ProfileOverviewTabTests(HrSettingsSerialFixture fixture) : H
 
         await overview.WaitForLoadAsync();
 
-        // ── Clicking "Request Leave" from the overview opens the leave dialog ─
         await overview.ClickRequestLeaveAsync();
         await _page.WaitForSelectorAsync(".e-dialog", new() { Timeout = 10_000 });
 
@@ -223,10 +198,6 @@ public sealed class ProfileOverviewTabTests(HrSettingsSerialFixture fixture) : H
     [Fact]
     public async Task OverviewTab_ShowsOpenTasksStatCard()
     {
-        // Tom has no onboarding plan (see EmployeeOnboardingTabTests remarks — only employees
-        // created via the CreateEmployee handler get one, and no seeded employee has one), so
-        // the "Onboarding Progress" card should also be absent for him; the Open Tasks stat
-        // card, however, always renders regardless of onboarding state.
         var login    = new LoginPage(_page, _fixture.WebBaseUrl);
         var profile  = new MyProfilePage(_page, _fixture.WebBaseUrl);
         var overview = new OverviewTab(_page);
@@ -294,8 +265,6 @@ public sealed class ProfileOverviewTabTests(HrSettingsSerialFixture fixture) : H
 
         await overview.WaitForLoadAsync();
 
-        // ── Clicking "Notify Sickness" from the overview opens the self-service
-        // sickness dialog (RecordSicknessDialog in SelfService mode) ────────────
         await overview.ClickNotifySicknessAsync();
 
         Assert.True(await _page.Locator("[role='dialog'].record-sickness-dialog").IsVisibleAsync(),

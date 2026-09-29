@@ -66,7 +66,6 @@ public class CompensationConcurrencyHandlerTests
         return (dbName, companyId, employee, record);
     }
 
-    // ── Compensation.IncrementVersion ─────────────────────────────────────────
 
     [Fact]
     public void IncrementVersion_Increments_Version_By_One()
@@ -81,7 +80,6 @@ public class CompensationConcurrencyHandlerTests
         Assert.Equal(3, record.Version);
     }
 
-    // ── Matching ExpectedVersion ─────────────────────────────────────────────
 
     [Fact]
     public async Task Matching_ExpectedVersion_Succeeds_And_Bumps_Version()
@@ -105,7 +103,6 @@ public class CompensationConcurrencyHandlerTests
         Assert.Equal(55000m, saved.Salary);
     }
 
-    // ── Null ExpectedVersion — last-writer-wins ───────────────────────────────
 
     [Fact]
     public async Task Null_ExpectedVersion_Is_Rejected_As_Concurrency_And_Writes_Nothing()
@@ -128,18 +125,15 @@ public class CompensationConcurrencyHandlerTests
         Assert.Equal(1, saved.Version);
     }
 
-    // ── Stale ExpectedVersion — concurrency failure ───────────────────────────
 
     [Fact]
     public async Task Stale_ExpectedVersion_Returns_Concurrency_Failure_And_Leaves_Row_Unchanged()
     {
         var (dbName, companyId, employee, record) = await SeedAsync();
 
-        // Context A loads and tracks the row while Version == 1.
         await using var ctxA = new EmployeesDbContext(Options(dbName));
         await ctxA.Compensations.SingleAsync();
 
-        // Context B wins the race: saves first, bumping the store's Version to 2.
         await using (var ctxB = new EmployeesDbContext(Options(dbName)))
         {
             var winner = await BuildHandler(ctxB, new FakeAuditPublisher()).HandleAsync(
@@ -148,7 +142,6 @@ public class CompensationConcurrencyHandlerTests
             Assert.True(winner.IsSuccess);
         }
 
-        // Context A now saves with the stale ExpectedVersion == 1.
         var publisher = new FakeAuditPublisher();
         var result = await BuildHandler(ctxA, publisher).HandleAsync(
             Request(companyId, employee.Id, record.Id, expectedVersion: 1, salary: 99000m),

@@ -119,10 +119,6 @@ public class InviteAdditionalUsersTaskTests
     [Fact]
     public async Task IsCompletedAsync_Returns_True_When_A_Bulk_Created_Invites_EmailSentAt_Is_Set()
     {
-        // A bulk-created UserInvite is just a regular UserInvite row (ProcessInvitationBatchJob
-        // creates it the same way InviteEmployeeUserHandler does) — nothing about this task's query
-        // is aware of InvitationBatch/InvitationBatchRecipient at all, so this pins that the
-        // completion rule genuinely doesn't care which flow created the invite.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -150,8 +146,6 @@ public class InviteAdditionalUsersTaskTests
         var skippedEmployeeId = Guid.NewGuid();
         var failedEmployeeId = Guid.NewGuid();
 
-        // Failed recipient's invite WAS created (RecordInviteCreated happened) but the send failed,
-        // so EmailSentAt was never set.
         context.UserInvites.Add(UserInvite.Create(failedEmployeeId, companyId, "failed-recipient@test.com", Now));
         await context.SaveChangesAsync();
 

@@ -43,7 +43,6 @@ internal sealed class EmployeePromotion
         SourceReference is not null &&
         SourceReference.StartsWith(InternalAppointmentSourcePrefix, StringComparison.Ordinal);
 
-    /// <summary>The manager the employee reports to once this promotion is applied.</summary>
     public Guid? ResolveManagerId(Guid? currentManagerId) =>
         ClearsManager ? null : NewManagerId ?? currentManagerId;
 
@@ -89,10 +88,6 @@ internal sealed class EmployeePromotion
         };
     }
 
-    // Called by EmployeePromotionFinalizer once the promotion's effective date is due (or
-    // immediately, when the effective date is today/backdated). The idempotency guard mirrors
-    // EmployeeLeavingProcess.Complete exactly — the finalizer is responsible for not calling this
-    // twice, not the entity swallowing a repeated call.
     public void Complete(DateTimeOffset now)
     {
         if (CompletedAt.HasValue)

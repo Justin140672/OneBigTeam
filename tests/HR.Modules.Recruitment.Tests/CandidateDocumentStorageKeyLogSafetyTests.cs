@@ -9,17 +9,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Recruitment.Tests;
 
-/// <summary>
-/// CodeQL #66 (log forging via candidate document storage keys):
-/// <see cref="CandidateDocumentUploadStaging.CompensateAsync"/> logs a failed compensating delete
-/// with <see cref="CandidateDocumentUploadStaging.RedactStorageKey"/>. Real keys are
-/// "{companyId}/{candidateId}/{server GUID}{allow-listed extension}" (ValidateFile runs before
-/// GenerateStorageKey), so these tests pin (a) the redaction output shape for every real key,
-/// (b) that even a hostile key can never emit a control character, (c) that the extension
-/// allow-list rejects names carrying control/encoded characters, (d) that both storage
-/// implementations generate keys from a server GUID + extension only, and (e) the actual
-/// CompensateAsync warning's StorageKeySuffix property.
-/// </summary>
 public class CandidateDocumentStorageKeyLogSafetyTests
 {
     private const char LineSeparator = (char)0x2028;
@@ -46,7 +35,6 @@ public class CandidateDocumentStorageKeyLogSafetyTests
         "evil\r\n",
     };
 
-    // ── (a) redaction of real keys ────────────────────────────────────────────────
 
     [Theory]
     [MemberData(nameof(AllowedExtensions))]
@@ -65,7 +53,6 @@ public class CandidateDocumentStorageKeyLogSafetyTests
         Assert.DoesNotContain(candidateId.ToString(), redacted);
     }
 
-    // ── (b) redaction of hostile keys ─────────────────────────────────────────────
 
     [Theory]
     [MemberData(nameof(HostileKeys))]
@@ -78,7 +65,6 @@ public class CandidateDocumentStorageKeyLogSafetyTests
         Assert.Matches(HostileKeyRedaction, redacted);
     }
 
-    // ── (c) extension allow-list ──────────────────────────────────────────────────
 
     [Theory]
     [InlineData("evil.pdf\r\nX")]
@@ -105,7 +91,6 @@ public class CandidateDocumentStorageKeyLogSafetyTests
         Assert.True(result.IsSuccess);
     }
 
-    // ── (d) generated key shape ───────────────────────────────────────────────────
 
     [Fact]
     public void LocalStorage_GenerateStorageKey_Uses_Server_Guid_And_Extension_Only()
@@ -145,7 +130,6 @@ public class CandidateDocumentStorageKeyLogSafetyTests
     private static Regex ExpectedKeyShape(Guid companyId, Guid candidateId) =>
         new($@"^{Regex.Escape(companyId.ToString())}/{Regex.Escape(candidateId.ToString())}/[0-9a-f]{{32}}\.pdf\z");
 
-    // ── (e) the actual CompensateAsync warning ────────────────────────────────────
 
     public static TheoryData<string> CompensationKeyTails => new()
     {
@@ -185,13 +169,8 @@ public class CandidateDocumentStorageKeyLogSafetyTests
         Assert.DoesNotContain(suffix, char.IsControl);
         Assert.DoesNotContain(LineSeparator, suffix);
 
-        // The structured message/state (exception text excluded — it is the storage client's own
-        // exception, not this log statement's interpolation) must never carry the full key or any
-        // control character.
         Assert.DoesNotContain(warning.MessageAndStateText, char.IsControl);
         Assert.DoesNotContain(LineSeparator, warning.MessageAndStateText);
-        // Printable letters from a hostile tail may survive in the <=12-char suffix; what matters is
-        // that the CR/LF separating them is neutralised, so no second log line can be forged.
         Assert.DoesNotContain("\r\nFORGED", warning.MessageAndStateText);
         Assert.DoesNotContain("\nFORGED", warning.MessageAndStateText);
         Assert.DoesNotContain($"{companyId}/{candidateId}/", warning.MessageAndStateText);

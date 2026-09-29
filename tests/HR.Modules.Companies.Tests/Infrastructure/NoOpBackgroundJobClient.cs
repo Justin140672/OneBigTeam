@@ -4,8 +4,6 @@ using Hangfire.States;
 
 namespace HR.Modules.Companies.Tests.Infrastructure;
 
-/// <summary>No-op Hangfire IBackgroundJobClient for handler unit tests (mirrors
-/// HR.Modules.Documents.Tests/Infrastructure/NoOpBackgroundJobClient.cs).</summary>
 internal sealed class NoOpBackgroundJobClient : IBackgroundJobClient
 {
     public readonly List<string> EnqueuedJobTypes = [];

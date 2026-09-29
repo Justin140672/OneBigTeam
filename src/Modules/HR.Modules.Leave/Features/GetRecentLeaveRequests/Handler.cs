@@ -30,16 +30,8 @@ internal sealed class GetRecentLeaveRequestsHandler(
             .AsNoTracking()
             .Where(r => r.CompanyId == request.CompanyId);
 
-        // HR administrators keep the original company-wide, all-statuses view. Everyone else
-        // (managers) is scoped to their whole reporting sub-tree and pending requests only —
-        // the consistent DSH-02 dashboard rule, matching GetTeamTasksHandler/
-        // GetTeamSicknessTodayHandler. The HR/non-HR split itself is resolved server-side by
-        // the endpoint (User claims + IAuthorizationService), never trusted from the client.
         if (!isHrAdministrator)
         {
-            // DSH-02: a manager's dashboard scope is their entire reporting sub-tree (direct and
-            // indirect reports), resolved server-side. See
-            // specifications/architecture/11-manager-hierarchy-scope.md.
             var teamIds = await directReportsReader.GetAllDescendantIdsAsync(
                 request.CompanyId, viewerEmployeeId, cancellationToken);
 
@@ -50,11 +42,6 @@ internal sealed class GetRecentLeaveRequestsHandler(
         }
         else
         {
-            // An approved request stops being something an admin needs to act on once its leave
-            // has actually started — hide it from this point on. Requests still awaiting a
-            // decision, already declined/cancelled, and approved-but-not-yet-started requests
-            // (e.g. approved ahead of time for next month) are unaffected; they're still governed
-            // purely by recency/take below.
             query = query.Where(r => r.Status != LeaveRequestStatus.Approved || r.StartDate > today);
         }
 

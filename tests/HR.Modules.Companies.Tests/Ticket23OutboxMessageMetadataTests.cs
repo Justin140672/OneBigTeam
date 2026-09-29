@@ -36,7 +36,6 @@ public class Ticket23OutboxMessageMetadataTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
 
-    // ── CreatePending: stamping from a supplied IExecutionContext ───────────────────────────────
 
     [Fact]
     public void CreatePending_With_Supplied_Context_Stamps_CorrelationId_From_Context_CorrelationId_And_CausationId_From_Context_MessageId()
@@ -46,8 +45,6 @@ public class Ticket23OutboxMessageMetadataTests
         var message = OutboxMessage.CreatePending(
             Guid.NewGuid(), Guid.NewGuid(), RenumberEventType, "{}", Now, context);
 
-        // context.CorrelationId is a GUID-shaped string here (NewRoot), so CorrelationIdGuid.Derive
-        // maps it back to the exact same Guid as context.MessageId.
         Assert.Equal(context.MessageId, message.CorrelationId);
         Assert.Equal(context.MessageId, message.CausationId);
         Assert.NotNull(message.MessageId);
@@ -67,10 +64,6 @@ public class Ticket23OutboxMessageMetadataTests
         Assert.NotEqual(Guid.Empty, message.MessageId!.Value);
     }
 
-    // ── UpdateCompanySettingsHandler: reference wiring picks up the ambient context ─────────────
-    //
-    // Covers the CreatePending call site actually driven by production wiring — see class remarks
-    // for why no dispatcher-level test exists for this particular event type.
 
     [Fact]
     public async Task HandleAsync_With_Ambient_Context_Stamps_The_Created_OutboxMessages_Correlation_And_Causation_From_It()
@@ -137,10 +130,7 @@ public class Ticket23OutboxMessageMetadataTests
         Assert.NotNull(outboxMessage.MessageId);
     }
 
-    // ── EmployeeRenumberSideEffectJob: restores persisted metadata as the ambient context ───────
 
-    // Captures whatever execution context is ambient (via the supplied accessor) at the moment the
-    // renumbering service is actually invoked.
     private sealed class ContextCapturingEmployeeRenumberingService(IExecutionContextAccessor accessor)
         : HR.Modules.Employees.Contracts.IEmployeeRenumberingService
     {
@@ -183,7 +173,6 @@ public class Ticket23OutboxMessageMetadataTests
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
-        // No supplied context — simulates a row written before this migration.
         var message = OutboxMessage.CreatePending(Guid.NewGuid(), companyId, RenumberEventType, "{}", Now);
         context.OutboxMessages.Add(message);
         await context.SaveChangesAsync();

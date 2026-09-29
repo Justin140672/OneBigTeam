@@ -7,13 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Notifications.Tests;
 
-/// <summary>
-/// OBT-REM-12: <see cref="ReconcileMissingNotificationAuditsJob"/> — periodic recovery for
-/// NotificationCreatedAuditEvents that may have been lost when a caller committed a Notification but
-/// crashed before publishing. See NotificationsAuditTests for why republishing a deterministic
-/// EventId is always safe, and NotificationWriterRepairTests for the crashed-writer repair path this
-/// job's grace/lookback window backstops.
-/// </summary>
 public class ReconcileMissingNotificationAuditsJobTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 4, 12, 0, 0, TimeSpan.Zero);
@@ -140,8 +133,6 @@ public class ReconcileMissingNotificationAuditsJobTests
     [Fact]
     public async Task ExecuteAsync_Boundary_Exactly_At_LookbackHours_Is_Still_Eligible()
     {
-        // Job uses CreatedAt >= lookback (inclusive) — a notification created exactly LookbackHours
-        // ago must still be scanned.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var boundaryId = await SeedNotificationAsync(
@@ -215,7 +206,6 @@ public class ReconcileMissingNotificationAuditsJobTests
         Assert.Empty(auditPublisher.Published);
     }
 
-    // Cancellation ---------------------------------------------------------------------------------
 
     [Fact]
     public async Task ExecuteAsync_Already_Cancelled_Token_Throws_Before_Publishing()
@@ -235,16 +225,10 @@ public class ReconcileMissingNotificationAuditsJobTests
         Assert.Empty(auditPublisher.Published);
     }
 
-    // OBT-REM-14: keyset-cursor forward progress ----------------------------------------------------
 
     [Fact]
     public async Task ExecuteAsync_Multiple_Runs_Advance_Cursor_Past_Already_Audited_Batch_To_Reach_Missing_Audit()
     {
-        // Regression for the bug OBT-REM-14 fixes: a fixed Take(BatchSizePerCompany) every run would
-        // re-select the same already-audited oldest notifications forever and never reach a
-        // genuinely-missing audit further back in the window. With the keyset cursor, run 1 only
-        // advances through the already-audited batch; the missing one is only reached (and repaired)
-        // on run 2.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var inWindow = InWindow();
@@ -256,9 +240,6 @@ public class ReconcileMissingNotificationAuditsJobTests
             alreadyAuditedIds.Add(id);
         }
 
-        // The genuinely missing one is newer than all the already-audited ones, so it sorts after
-        // them in the (CreatedAt, Id) keyset order and only becomes reachable once the cursor has
-        // advanced past the full first batch.
         var missingId = await SeedNotificationAsync(db, companyId, inWindow);
 
         var auditPublisher = new FakeAuditPublisher();
@@ -280,20 +261,16 @@ public class ReconcileMissingNotificationAuditsJobTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
 
-        // Window is [lookback, cutoff) = [Now - LookbackHours, Now - GraceMinutes) — every seeded
-        // CreatedAt must fall strictly inside this ~23h45m span for the row to be eligible at all.
         var lookback = Now.AddHours(-ReconcileMissingNotificationAuditsJob.LookbackHours);
         var cutoff = Now.AddMinutes(-ReconcileMissingNotificationAuditsJob.GraceMinutes);
         var windowSeconds = (cutoff - lookback).TotalSeconds;
 
         var batchSize = ReconcileMissingNotificationAuditsJob.BatchSizePerCompany;
-        var total = (batchSize * 3) - 10; // spans 3 batches
-        var spacingSeconds = (windowSeconds - 60) / total; // leave a margin below cutoff
+        var total = (batchSize * 3) - 10;
+        var spacingSeconds = (windowSeconds - 60) / total;
         var alreadyAuditedIds = new List<Guid>();
         var missingIds = new List<Guid>();
 
-        // Oldest first so ordering by CreatedAt ascending places index 0 in batch 1, etc.
-        // Place a genuinely-missing notification near the start of each of the 3 batches.
         var missingOffsets = new HashSet<int> { 5, batchSize + 5, (batchSize * 2) + 5 };
 
         for (var i = 0; i < total; i++)
@@ -314,7 +291,6 @@ public class ReconcileMissingNotificationAuditsJobTests
         var existenceReader = new FakeAuditEventExistenceReader(alreadyAuditedIds);
         var job = BuildJob(db, auditPublisher, existenceReader);
 
-        // One execution per batch.
         await job.ExecuteAsync();
         await job.ExecuteAsync();
         await job.ExecuteAsync();
@@ -332,8 +308,6 @@ public class ReconcileMissingNotificationAuditsJobTests
     [Fact]
     public async Task ExecuteAsync_Small_Company_Backlog_Is_Not_Starved_By_Large_Company_Backlog_In_Same_Run()
     {
-        // Each company gets its own up-to-BatchSizePerCompany allowance per run — company B's small
-        // backlog must be fully resolved in the very first execution regardless of company A's size.
         await using var db = BuildContext();
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
@@ -387,8 +361,6 @@ public class ReconcileMissingNotificationAuditsJobTests
         var firstRunQueried = existenceReader.Queried.ToList();
         Assert.Equal(ids.Count, firstRunQueried.Count);
 
-        // Second run: cursor has caught up to the end of the window (no candidates ahead of it), so
-        // the candidate query returns zero rows and the cursor is reset rather than re-scanned.
         await job.ExecuteAsync();
 
         var secondRunQueried = existenceReader.Queried.Skip(firstRunQueried.Count).ToList();
@@ -434,7 +406,6 @@ public class ReconcileMissingNotificationAuditsJobTests
             .Cast<NotificationCreatedAuditEvent>()
             .ToList();
 
-        // At least one of the two racing runs must have found and repaired the missing audit.
         Assert.NotEmpty(allPublished);
         Assert.All(allPublished, e => Assert.Equal(id, e.NotificationId));
         Assert.All(allPublished, e => Assert.Equal(companyId, e.CompanyId));
@@ -444,15 +415,6 @@ public class ReconcileMissingNotificationAuditsJobTests
     [Fact]
     public async Task ExecuteAsync_Retry_After_Simulated_Crash_Skips_Republish_But_Still_Advances_Cursor()
     {
-        // Simulates the crash/retry safety net described in the job's XML doc: a prior run is
-        // presumed to have successfully published the creation audit for this notification (the
-        // durable audit store already reflects it — modelled here by seeding the existence reader
-        // with the id up front) but then crashed before its own cursor SaveChangesAsync could
-        // commit (modelled by not persisting any cursor row before this run starts). This run
-        // ("the retry") must: (a) not republish (existence check finds it already audited), and
-        // (b) still make durable cursor progress past it despite never having repaired anything
-        // itself — proving the cursor advances on scan, not on repair, so a subsequent run doesn't
-        // re-scan the same row forever.
         var dbName = Guid.NewGuid().ToString("N");
         await using var db1 = new NotificationsDbContext(
             new DbContextOptionsBuilder<NotificationsDbContext>().UseInMemoryDatabase(dbName).Options);
@@ -468,12 +430,9 @@ public class ReconcileMissingNotificationAuditsJobTests
         var job1 = BuildJob(db1, publisher1, existenceReader1);
         await job1.ExecuteAsync();
 
-        Assert.Empty(publisher1.Published); // no duplicate publish — already durably audited
+        Assert.Empty(publisher1.Published);
         Assert.Contains(id, existenceReader1.Queried);
 
-        // A subsequent run finds nothing new to scan (batch returns 0 rows) since the window's only
-        // notification has already been scanned/advanced past by the "retry" run above — proving the
-        // cursor persisted even though that run repaired nothing itself.
         var publisher3 = new FakeAuditPublisher();
         var existenceReader3 = new FakeAuditEventExistenceReader([id]);
         await using var db3 = new NotificationsDbContext(
@@ -481,7 +440,7 @@ public class ReconcileMissingNotificationAuditsJobTests
         var job3 = BuildJob(db3, publisher3, existenceReader3);
         await job3.ExecuteAsync();
 
-        Assert.Empty(existenceReader3.Queried); // nothing left ahead of the cursor to re-check
+        Assert.Empty(existenceReader3.Queried);
     }
 
     [Fact]
@@ -492,8 +451,6 @@ public class ReconcileMissingNotificationAuditsJobTests
         var inWindow = InWindow();
         var id = await SeedNotificationAsync(db, companyId, inWindow);
 
-        // Seed a cursor row directly with a resume point far before the current lookback window —
-        // simulating a cursor left over from a previous run whose window has since slid forward.
         db.NotificationAuditReconciliationCursors.Add(
             NotificationAuditReconciliationCursor.Create(
                 companyId, Now.AddDays(-30), Guid.NewGuid(), Now.AddDays(-30)));
@@ -505,7 +462,6 @@ public class ReconcileMissingNotificationAuditsJobTests
 
         await job.ExecuteAsync();
 
-        // Treated as resume-from-start rather than being permanently stuck past the current window.
         Assert.Contains(id, existenceReader.Queried);
         var evt = Assert.Single(auditPublisher.Published);
         Assert.Equal(id, ((NotificationCreatedAuditEvent)evt).NotificationId);

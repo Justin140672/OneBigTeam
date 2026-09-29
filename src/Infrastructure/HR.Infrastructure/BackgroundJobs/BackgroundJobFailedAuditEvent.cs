@@ -105,11 +105,6 @@ internal sealed class BackgroundJobFailedAuditEvent : IAuditEvent
         Scope = IsTenantScoped ? "tenant" : "system-wide",
     };
 
-    /// <summary>
-    /// Maps an exception to a fixed, closed-set category using only its .NET type — never its
-    /// message — so the result can never carry free-text PII regardless of what a given failure
-    /// happened to say.
-    /// </summary>
     private static BackgroundJobFailureCategory Classify(Exception exception) => exception switch
     {
         OperationCanceledException => BackgroundJobFailureCategory.Cancelled,

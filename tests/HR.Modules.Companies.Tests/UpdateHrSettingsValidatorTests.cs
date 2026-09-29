@@ -99,7 +99,6 @@ public class UpdateHrSettingsValidatorTests
 	[Fact]
 	public void Validate_Fails_When_ProbationMonths_Is_Zero()
 	{
-		// SET-01: ProbationMonths must now be strictly greater than zero.
 		var validator = new UpdateHrSettingsValidator();
 		var result = validator.Validate(ValidRequest() with { ProbationMonths = 0 });
 		Assert.False(result.IsValid);
@@ -165,8 +164,6 @@ public class UpdateHrSettingsValidatorTests
 	[Fact]
 	public void Validate_Passes_When_DefaultAcknowledgementStatement_Is_Blank()
 	{
-		// The domain-level fallback to the hardcoded default happens in CompanySettings.UpdateHrPolicy,
-		// not here — a blank string must pass the validator.
 		var validator = new UpdateHrSettingsValidator();
 		var result = validator.Validate(ValidRequest() with { DefaultAcknowledgementStatement = string.Empty });
 		Assert.True(result.IsValid);
@@ -302,7 +299,6 @@ public class UpdateHrSettingsValidatorTests
 		Assert.Contains(result.Errors, error => error.PropertyName == nameof(UpdateHrSettingsRequest.EmployeeNumberPrefix));
 	}
 
-	// SET-04: probation checkpoints.
 
 	[Fact]
 	public void Validate_Passes_When_ProbationCheckpoints_Are_Valid_And_Strictly_Increasing()
@@ -334,7 +330,6 @@ public class UpdateHrSettingsValidatorTests
 	[Fact]
 	public void Validate_Passes_When_Only_A_Later_ProbationCheckpoint_Is_Configured()
 	{
-		// Day1 = null, Day2 = 10, Day3 = 20 — nulls are simply skipped, not required to be trailing.
 		var validator = new UpdateHrSettingsValidator();
 		var result = validator.Validate(ValidRequest() with
 		{
@@ -397,7 +392,6 @@ public class UpdateHrSettingsValidatorTests
 	[Fact]
 	public void Validate_Fails_When_A_ProbationCheckpoint_Equals_The_Probation_End_Day()
 	{
-		// ProbationMonths = 6 -> end day = 180. Exactly 180 must fail (strictly less-than required).
 		var validator = new UpdateHrSettingsValidator();
 		var result = validator.Validate(ValidRequest() with
 		{
@@ -439,7 +433,6 @@ public class UpdateHrSettingsValidatorTests
 		Assert.Contains(result.Errors, error => error.PropertyName == "ProbationCheckpoints");
 	}
 
-	// SET-04: attendance-alert thresholds.
 
 	[Theory]
 	[InlineData(1)]
@@ -584,7 +577,6 @@ public class UpdateHrSettingsValidatorTests
 	[Fact]
 	public void Validate_Passes_When_NextEmployeeNumber_Is_Omitted()
 	{
-		// Omitted = "unchanged by the administrator" — the handler keeps the live counter.
 		var validator = new UpdateHrSettingsValidator();
 		var result = validator.Validate(ValidRequest() with { NextEmployeeNumber = null });
 		Assert.True(result.IsValid);

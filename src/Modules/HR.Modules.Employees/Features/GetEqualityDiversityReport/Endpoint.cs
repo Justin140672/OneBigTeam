@@ -3,11 +3,6 @@ using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Employees.Features.GetEqualityDiversityReport;
 
-/// <summary>
-/// Anonymous aggregate equality &amp; diversity statistics for HR analytics. Gated on the
-/// dedicated <c>reporting:view-equality</c> permission (HR Administrator) — never
-/// <c>role:employee</c>. Returns counts/percentages only; no individual answers.
-/// </summary>
 internal sealed class Endpoint(GetEqualityDiversityReportHandler handler)
     : Endpoint<GetEqualityDiversityReportRequest, GetEqualityDiversityReportResponse>
 {

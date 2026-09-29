@@ -14,7 +14,6 @@ public class GetTaskEndpointTests(ApiWebApplicationFactory factory)
     private static readonly Guid SeededCompanyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid UserId = Guid.NewGuid();
 
-    // ── Auth ───────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_Task_Returns_Unauthorized_When_No_Auth_Header()
@@ -27,7 +26,6 @@ public class GetTaskEndpointTests(ApiWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ── Not found ──────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_Task_Returns_NotFound_When_Task_Does_Not_Exist()
@@ -45,21 +43,16 @@ public class GetTaskEndpointTests(ApiWebApplicationFactory factory)
     {
         var taskId = await TaskSeeder.SeedAsync(factory, SeededCompanyId, "Private task", priority: TaskPriority.Low);
 
-        // Authenticated as SeededCompanyId but route targets a different company — middleware blocks it.
         using var client = await AuthenticatedClient();
         var response = await client.GetAsync($"/api/companies/{Guid.NewGuid()}/tasks/{taskId}");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── Happy path ─────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_Task_Returns_200_With_Full_Payload()
     {
-        // IAM-07: only the assignee, their manager, or an HR Administrator may view a task —
-        // assign it to the caller (UserId) so this remains an authorized happy-path request; a
-        // separate assignee is exercised by the authorization-matrix tests below.
         var assignedEmployee = UserId;
         var taskId = await TaskSeeder.SeedAsync(
             factory, SeededCompanyId,
@@ -91,11 +84,6 @@ public class GetTaskEndpointTests(ApiWebApplicationFactory factory)
         Assert.Null(payload.CompletedAt);
     }
 
-    // ── IAM-07: resource-ownership authorization matrix ───────────────────────
-    // GetTask requires more than the baseline "role:employee" policy — the caller must also be
-    // the task's assignee, a manager anywhere in the assignee's reporting hierarchy, or an HR
-    // Administrator. Mirrors CompleteTaskAuthorizationTests's matrix for the same underlying
-    // TasksResourceAuthorizer.
 
     [Fact]
     public async Task Get_Task_Returns_Ok_For_The_Assignee()
@@ -131,9 +119,9 @@ public class GetTaskEndpointTests(ApiWebApplicationFactory factory)
     [Fact]
     public async Task Get_Task_Returns_Ok_For_Skip_Level_Manager_In_Three_Level_Hierarchy()
     {
-        var seniorManager = await CreateEmployeeAsync(); // C
-        var manager = await CreateEmployeeAsync();       // B
-        var report = await CreateEmployeeAsync();        // A
+        var seniorManager = await CreateEmployeeAsync();
+        var manager = await CreateEmployeeAsync();
+        var report = await CreateEmployeeAsync();
 
         using (var setupClient = await AuthenticatedAsAsync(Guid.NewGuid(), hrAdministrator: true))
         {
@@ -195,7 +183,6 @@ public class GetTaskEndpointTests(ApiWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient()
     {
@@ -221,11 +208,6 @@ public class GetTaskEndpointTests(ApiWebApplicationFactory factory)
         return client;
     }
 
-    /// <summary>
-    /// Creates a real employee record via the employees API and returns its id, which doubles as
-    /// the identity user id for TestAuthHandler.UserHeader — mirrors
-    /// CompleteTaskAuthorizationTests.CreateEmployeeAsync.
-    /// </summary>
     private async Task<Guid> CreateEmployeeAsync()
     {
         using var setupClient = await AuthenticatedAsAsync(Guid.NewGuid(), hrAdministrator: true);

@@ -9,8 +9,6 @@ internal sealed class Endpoint(GetUpcomingInterviewsHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/interviews/upcoming");
-        // Matches GetInterviewsTodayCount's policy — Recruiter + HrAdministrator can see
-        // candidate/interview scheduling detail; a plain Employee/Manager cannot.
         Policies("recruitment:manage");
     }
 

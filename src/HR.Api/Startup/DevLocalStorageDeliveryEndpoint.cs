@@ -3,30 +3,6 @@ using Microsoft.AspNetCore.StaticFiles;
 
 namespace HR.Api.Startup;
 
-/// <summary>
-/// Development-only delivery route for the <c>Local*StorageService</c> temp-directory fallbacks
-/// (<c>GET /api/dev/local-storage/{bucket}/{*key}?exp=…&amp;sig=…</c>).
-///
-/// Previously this streamed any file from bucket + key alone, anonymously, bypassing the normal
-/// document / candidate-CV / profile-photo download handlers (no entitlement, tenant, record or
-/// malware-scan checks). It now makes the same decisions as production:
-/// <list type="number">
-/// <item>The URL must carry a valid, unexpired HMAC signature over bucket + exact key + expiry
-///   (<see cref="ILocalStorageUrlSigner"/>). Signatures are only minted by a storage service's
-///   <c>GetDownloadUrlAsync</c>, which is only reached after the authenticated handler has authorised
-///   the caller (tenant + permission) and checked the file is Clean, the local equivalent of a
-///   Supabase signed URL. A raw or copied storage key without that signature is never served, and a
-///   signature cannot be moved onto another key, bucket or expiry.</item>
-/// <item>The owning module's <see cref="ILocalStorageObjectResolver"/> re-confirms against the
-///   database, at fetch time, that the key still belongs to a live record that is Clean. Orphaned
-///   files and Pending/Scanning/Infected/Failed files are refused even when the file exists on disk.
-///   A bucket with no resolver is always refused (fail closed).</item>
-/// <item>Path-traversal defences are kept: strict segment validation (including double-encoded
-///   forms) plus a canonical, ordinal containment check against the bucket root.</item>
-/// </list>
-/// Every refusal is an indistinguishable 404, so the route never confirms whether a key exists.
-/// Mapped only in Development; production Supabase storage never produces these URLs.
-/// </summary>
 internal static class DevLocalStorageDeliveryEndpoint
 {
     private const int MaxKeyLength = 1024;
@@ -123,8 +99,6 @@ internal static class DevLocalStorageDeliveryEndpoint
             ? rootPath
             : rootPath + Path.DirectorySeparatorChar;
 
-        // Ordinal (not OrdinalIgnoreCase): on a case-sensitive filesystem (Linux) a case-insensitive
-        // prefix check would let a differently-cased sibling directory pass as "contained".
         return fullPath.StartsWith(rootWithSeparator, StringComparison.Ordinal) ? fullPath : null;
     }
 }

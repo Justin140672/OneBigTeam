@@ -5,11 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// SET-02: company-settings history is reached via GET .../settings/history, gated by the same
-/// "company:manage" (CompanyAdministrator-only) policy as UpdateCompanySettings — see
-/// UpdateCompanySettingsEndpointTests and IdentityModule.AddRolePolicies for the policy definition.
-/// </summary>
 [Collection("Integration")]
 public class GetCompanySettingsHistoryEndpointTests
 {
@@ -89,8 +84,6 @@ public class GetCompanySettingsHistoryEndpointTests
     [Fact]
     public async Task Get_History_Returns_Forbidden_For_Foreign_Company_Id()
     {
-        // The route companyId must match the caller's resolved tenant — a Company Administrator
-        // cannot view another company's settings history by simply changing the route id.
         var tenantId = Guid.NewGuid();
         var foreignCompanyId = Guid.NewGuid();
         using var client = await ClientFor(CompanyAdminUserId, tenantId);

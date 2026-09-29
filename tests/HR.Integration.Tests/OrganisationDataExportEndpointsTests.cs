@@ -11,10 +11,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Story 2: organisation data export endpoints, all gated by "role:company-administrator" plus a
-/// caller-tenant check (mirrors PurgeEligibleArchivedEmployeeDocumentsEndpointTests).
-/// </summary>
 [Collection("Integration")]
 public class OrganisationDataExportEndpointsTests
 {
@@ -146,7 +142,6 @@ public class OrganisationDataExportEndpointsTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, AcmeCompanyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, CompanyAdmin, SystemRoles.Employee, AcmeCompanyId);
         await TestRoleSeeder.AssignRoleAsync(_factory, CompanyAdmin, SystemRoles.CompanyAdministrator, AcmeCompanyId);
-        // 5e985cea: organisation-data exports require BOTH Company Administrator and HR Administrator roles.
         await TestRoleSeeder.AssignRoleAsync(_factory, CompanyAdmin, SystemRoles.HrAdministrator, AcmeCompanyId);
         return client;
     }

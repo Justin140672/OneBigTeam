@@ -119,8 +119,6 @@ public class CompleteProbationReviewFromTaskActionTests
         var savedReview = await context.ProbationReviews.SingleAsync(r => r.Id == review.Id);
         Assert.Equal(ProbationReviewStatus.Completed, savedReview.Status);
 
-        // Extending also schedules the PROB-01 follow-up cycle: an ExtensionConfirmation review
-        // and a fresh Pending FinalDecision review for the new expected end date.
         var extensionConfirmation = await context.ProbationReviews
             .SingleAsync(r => r.ReviewType == ProbationReviewType.ExtensionConfirmation);
         Assert.Equal(ProbationReviewStatus.Pending, extensionConfirmation.Status);
@@ -252,8 +250,6 @@ public class CompleteProbationReviewFromTaskActionTests
         await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), integrationPublisher, TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
             .ExecuteAsync(taskContext, CancellationToken.None);
 
-        // PROB-07: a Fail outcome now publishes ProbationFailedIntegrationEvent (to drive the
-        // ProbationFailed employee timeline entry) — it must never publish ProbationPassedIntegrationEvent.
         Assert.DoesNotContain(integrationPublisher.Published, e => e is ProbationPassedIntegrationEvent);
         var evt = Assert.IsType<ProbationFailedIntegrationEvent>(Assert.Single(integrationPublisher.Published));
         Assert.Equal(companyId, evt.CompanyId);
@@ -333,8 +329,6 @@ public class CompleteProbationReviewFromTaskActionTests
         await action.ExecuteAsync(taskContext, CancellationToken.None);
         var reviewCountAfterFirst = await context.ProbationReviews.CountAsync();
 
-        // Retry the same completion request — the review is now Pending's terminal state
-        // (Completed), so the guard `review.Status != Pending` no-ops the second call.
         var actionForRetry = new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter());
         await actionForRetry.ExecuteAsync(taskContext, CancellationToken.None);
 
@@ -360,8 +354,6 @@ public class CompleteProbationReviewFromTaskActionTests
         var result = await new CompleteProbationReviewFromTaskAction(context, new FakeClock(FixedUtcNow), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher(), TestProbationExtensionServiceFactory.Build(context), new FakeNotificationWriter())
             .ExecuteAsync(taskContext, CancellationToken.None);
 
-        // Cancelled is a non-Pending status — same idempotent-no-op guard as the
-        // already-completed case, so this is a Success no-op, not a failure.
         Assert.True(result.IsSuccess);
 
         var saved = await context.ProbationReviews.SingleAsync(r => r.Id == review.Id);
@@ -583,15 +575,12 @@ public class CompleteProbationReviewFromTaskActionTests
     [Fact]
     public async Task ExecuteAsync_Leaves_Review_Pending_When_Extend_Date_Equal_To_Current_ExpectedEndDate()
     {
-        // Boundary: extend date == current ExpectedEndDate must fail (not strictly after).
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var completedBy = Guid.NewGuid();
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
 
-        // Record's ExpectedEndDate is 2026-07-01 (see SeedRecordAndReview) — extend date equal to
-        // it does not move the date strictly forward.
         var taskContext = BuildContext(companyId, completedBy, review.Id,
             outcomeDecision: $"Extend|{record.ExpectedEndDate:yyyy-MM-dd}",
             notes: "No actual extension.");
@@ -613,8 +602,6 @@ public class CompleteProbationReviewFromTaskActionTests
     [Fact]
     public async Task ExecuteAsync_Succeeds_When_Extend_Date_Is_One_Day_After_Current_ExpectedEndDate()
     {
-        // Boundary counterpart to the test above: ExpectedEndDate + 1 day is strictly after, so it
-        // must succeed — pins the exact inclusive/exclusive edge of the ">" comparison.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var completedBy = Guid.NewGuid();
@@ -639,16 +626,12 @@ public class CompleteProbationReviewFromTaskActionTests
     [Fact]
     public async Task ExecuteAsync_Leaves_Review_Pending_When_Extend_Date_Not_After_DecisionDate_Today()
     {
-        // Boundary: extend date == today (the decision date) must fail (not strictly after).
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var completedBy = Guid.NewGuid();
 
         var (record, review) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
 
-        // The action derives decisionDate from clock.UtcNowOffset(), i.e. Today (2026-06-25) here.
-        // An extend date of "today" is also <= the record's current ExpectedEndDate (2026-07-01),
-        // so this trips the guard regardless of which comparison is evaluated first.
         var taskContext = BuildContext(companyId, completedBy, review.Id,
             outcomeDecision: $"Extend|{Today:yyyy-MM-dd}",
             notes: "Backdated to today.");

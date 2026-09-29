@@ -49,10 +49,6 @@ internal sealed class UpdateCompanySettingsHandler
 
 		var now = _clock.UtcNowOffset();
 
-		// SET-03: explicit optimistic-concurrency pre-check. The EF concurrency token on
-		// CompanySettings.Version still guards the genuine write race, but when the version the
-		// client submitted is already stale on read we can return a clean 409 here rather than
-		// relying on the shape of the exception a batched 0-row UPDATE throws.
 		if (company.Settings is not null && company.Settings.Version != request.Version)
 		{
 			return Result.Failure<UpdateCompanySettingsResponse>(
@@ -65,8 +61,6 @@ internal sealed class UpdateCompanySettingsHandler
 				company.Settings.TimeZone,
 				company.Settings.Locale);
 
-		// Validator already confirmed these resolve; normalise to the canonical time-zone id
-		// before persistence so downstream TimeZoneInfo lookups are always consistent.
 		CompanySettingsValidation.TryResolveTimeZone(request.TimeZone, out var canonicalTimeZone);
 
 		var settings = company.Settings ?? CompanySettings.CreateDefault(company.Id, now);
@@ -77,9 +71,6 @@ internal sealed class UpdateCompanySettingsHandler
 
 		company.SetSettings(settings, now);
 
-		// SET-03: force the concurrency check against the version the client actually read,
-		// rather than whatever this handler's own SingleOrDefaultAsync just loaded a moment ago
-		// (which would always match and never detect a conflict).
 		_dbContext.Entry(settings).Property(s => s.Version).OriginalValue = request.Version;
 
 		var payload = JsonSerializer.Serialize(new CompanySettingsUpdatedIntegrationEvent(
@@ -104,8 +95,6 @@ internal sealed class UpdateCompanySettingsHandler
 		}
 		catch (DbUpdateConcurrencyException)
 		{
-			// No partial change and no audit/integration event: SaveChangesAsync throws before
-			// anything commits, so the outbox message added above is rolled back with it.
 			return Result.Failure<UpdateCompanySettingsResponse>(
 				Error.Conflict("Company settings were changed by someone else. Reload the latest settings and try again."));
 		}

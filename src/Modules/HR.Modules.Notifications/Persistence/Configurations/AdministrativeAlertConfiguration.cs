@@ -106,8 +106,6 @@ internal sealed class AdministrativeAlertConfiguration : IEntityTypeConfiguratio
         builder.HasIndex(a => new { a.CompanyId, a.Status, a.Severity, a.LastOccurredAt });
         builder.HasIndex(a => new { a.CompanyId, a.IsRead });
 
-        // ADM-03: one live alert per dedup key per company; resolved (status = 3) alerts drop out
-        // so an identical failure after resolution starts a fresh alert.
         builder.HasIndex(a => new { a.CompanyId, a.DedupKey })
             .IsUnique()
             .HasFilter("status <> 3");

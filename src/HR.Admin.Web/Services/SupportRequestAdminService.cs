@@ -17,11 +17,6 @@ public sealed class SupportRequestAdminService(HrApiHttpClientFactory httpClient
 {
     private HttpClient Http => httpClientFactory.CreateClient();
 
-    /// <summary>
-    /// Distinguishes unauthenticated (401), not-an-enabled-platform-administrator (403), the
-    /// company not found (404), and a transient failure (network error / 5xx / anything else) —
-    /// see SupportRequestFetchOutcome remarks. The page must show a different message for each.
-    /// </summary>
     public async Task<SupportRequestListFetchResult> ListSupportRequestsAsync(
         Guid companyId, string? status = null, CancellationToken cancellationToken = default)
     {
@@ -46,11 +41,6 @@ public sealed class SupportRequestAdminService(HrApiHttpClientFactory httpClient
         }
     }
 
-    /// <summary>
-    /// Distinguishes unauthenticated (401), not-an-enabled-platform-administrator (403), the
-    /// request not found or belonging to a different company (404), and a transient failure — see
-    /// SupportRequestFetchOutcome remarks.
-    /// </summary>
     public async Task<SupportRequestDetailFetchResult> GetSupportRequestAsync(
         Guid companyId, Guid id, CancellationToken cancellationToken = default)
     {

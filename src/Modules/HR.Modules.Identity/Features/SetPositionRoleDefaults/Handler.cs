@@ -10,12 +10,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Features.SetPositionRoleDefaults;
 
-// IAM-03: configures the set of roles automatically inherited by every employee holding a given
-// position (HR.Modules.Employees PositionProfile). Reuses IAM-02's RoleAdministrationPolicy so an
-// administrator can never configure a position default that grants a role they are not themselves
-// authorised to administer (e.g. an HR Administrator cannot make Company Administrator a position
-// default) — same privilege-escalation guard as Features/UpdateUserRoles, applied here because a
-// position default is just as capable of granting a role as a direct per-user assignment.
 internal sealed class SetPositionRoleDefaultsHandler(
     IdentityDbContext db,
     IClock clock,
@@ -78,8 +72,6 @@ internal sealed class SetPositionRoleDefaultsHandler(
 
         var now = clock.UtcNowOffset();
 
-        // Ensures identity.positions has a row for this PositionProfile before the FK-constrained
-        // position_roles insert below — see PositionSync's remarks.
         await positionSync.EnsureExistsAsync(request.CompanyId, request.PositionProfileId, now, cancellationToken);
 
         var currentRoles = await db.PositionRoles

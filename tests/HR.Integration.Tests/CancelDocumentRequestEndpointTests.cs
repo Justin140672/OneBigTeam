@@ -92,7 +92,6 @@ public class CancelDocumentRequestEndpointTests
     {
         var (companyId, employeeId, requestId) = await SetupAsync();
 
-        // Upload the document first
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DocumentsDbContext>();
         var req = await db.DocumentRequests.SingleAsync(r => r.Id == requestId);
@@ -144,7 +143,6 @@ public class CancelDocumentRequestEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private async Task<(Guid CompanyId, Guid EmployeeId, Guid RequestId)> SetupAsync()
     {

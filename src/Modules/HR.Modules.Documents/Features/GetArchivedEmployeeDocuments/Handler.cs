@@ -4,8 +4,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Features.GetArchivedEmployeeDocuments;
 
-// DOC-04: HR-only view of archived (soft-deleted) employee documents — the mirror of
-// ListEmployeeDocuments but scoped to IsArchived == true instead of excluding it.
 internal sealed class GetArchivedEmployeeDocumentsHandler(DocumentsDbContext db)
 {
     public async Task<Result<GetArchivedEmployeeDocumentsResponse>> HandleAsync(

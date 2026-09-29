@@ -3,19 +3,10 @@ using HR.Admin.Web.Models;
 
 namespace HR.Admin.Web.Services;
 
-/// <summary>
-/// Wraps the Permanent Deletion Queue endpoints (Customer Lifecycle epic). Modeled exactly on
-/// CustomerDetailsService: HttpClientFactory "hrapi" client, GetXxxOrNullAsync returning null on
-/// any failure (401/403/404 or a transport error), PostActionAsync returning bool.
-/// </summary>
 public sealed class DeletionQueueService(HrApiHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient();
 
-    /// <summary>
-    /// Returns null when the call fails or the caller isn't authorised (401/403) — same
-    /// null-means-"show error state" contract as CustomerDetailsService.
-    /// </summary>
     public async Task<DeletionQueueResponse?> GetDeletionQueueOrNullAsync(
         CancellationToken cancellationToken = default)
     {
@@ -33,11 +24,6 @@ public sealed class DeletionQueueService(HrApiHttpClientFactory httpClientFactor
         }
     }
 
-    /// <summary>
-    /// Shared execution for the schedule/cancel/execute deletion actions below. Returns true on a
-    /// successful (2xx) response; false on any failure (401/403/404/400 or a transport error), same
-    /// contract as CustomerDetailsService.PostActionAsync.
-    /// </summary>
     private async Task<bool> PostActionAsync<TRequest>(
         string path, TRequest request, CancellationToken cancellationToken)
     {

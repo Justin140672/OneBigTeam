@@ -6,10 +6,6 @@ using HR.Modules.Identity.Tests.Infrastructure;
 
 namespace HR.Modules.Identity.Tests;
 
-/// <summary>
-/// IAM-08: unit tests for <see cref="ExportAccessReviewHandler"/> — maps GetAccessReviewHandler's
-/// output to export rows, and audits both success and (via a throwing exporter) failure.
-/// </summary>
 [Collection("IdentityDatabase")]
 public class ExportAccessReviewHandlerTests(IdentityDatabaseFixture fixture)
 {
@@ -87,7 +83,6 @@ public class ExportAccessReviewHandlerTests(IdentityDatabaseFixture fixture)
         Assert.Equal("Pdf", exportedEvent.Format);
     }
 
-    /// <summary>Hand-rolled fake for IReportExporter — mirrors HR.Modules.Reporting.Tests' FakeReportExporter.</summary>
     private sealed class FakeReportExporter : IReportExporter
     {
         public ReportExportFormat? LastFormat { get; private set; }

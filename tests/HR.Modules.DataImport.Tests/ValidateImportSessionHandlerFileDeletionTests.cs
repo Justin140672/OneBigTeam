@@ -9,11 +9,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.DataImport.Tests;
 
-/// <summary>
-/// Security review finding #2: ValidateImportSessionHandler deletes the raw uploaded file
-/// (best-effort, idempotent) once validation completes, since ConfirmImportSession never reads
-/// it again. See ValidateImportSessionHandler.TryDeleteSessionFileAsync.
-/// </summary>
 public class ValidateImportSessionHandlerFileDeletionTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 20, 9, 0, 0, DateTimeKind.Utc);
@@ -22,9 +17,6 @@ public class ValidateImportSessionHandlerFileDeletionTests
     private const string StandardHeader =
         "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount";
 
-    // Appended to a data row (after Employee Number) to satisfy the mandatory
-    // DateOfBirth/Nationality/Gender/Department/Location/EmploymentType/PositionProfile/
-    // SalaryAmount fields.
     private const string MandatoryFieldSuffix = "1990-01-01,British,Female,Engineering,London,Permanent,Developer,50000";
 
     private const string XlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -129,8 +121,6 @@ public class ValidateImportSessionHandlerFileDeletionTests
         db.ImportSessions.Add(session);
         await db.SaveChangesAsync();
 
-        // Not a valid xlsx workbook — EmployeeImportFileParser.Parse will throw when it tries to
-        // read this, exercising the file-read-failure (Fail) branch of the handler.
         storage.SeedContent(storageKey, "this is not a valid xlsx file"u8.ToArray());
 
         return session;
@@ -172,8 +162,6 @@ public class ValidateImportSessionHandlerFileDeletionTests
         var storage = new FakeImportFileStorageService();
         var companyId = Guid.NewGuid();
 
-        // Missing LastName on the only row means every row fails validation, landing on
-        // CompletedWithErrors rather than Validated.
         var csv =
             StandardHeader + "\n" +
             $"John,,john.doe@example.com,2026-01-01,EMP001,{MandatoryFieldSuffix}\n";
@@ -277,9 +265,6 @@ public class ValidateImportSessionHandlerFileDeletionTests
     [Fact]
     public async Task HandleAsync_Does_Not_Attempt_Deletion_Again_If_FileDeletedAt_Already_Set()
     {
-        // Defensive regression guard for the idempotency contract documented on
-        // ImportSession.MarkFileDeleted / TryDeleteSessionFileAsync: a session that already
-        // recorded a successful deletion (e.g. from a prior partial run) is never re-deleted.
         await using var db = BuildContext();
         var storage = new FakeImportFileStorageService();
         var companyId = Guid.NewGuid();

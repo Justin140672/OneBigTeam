@@ -2,17 +2,11 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the asset create/edit page.
-/// Routes: /companies/{id}/assets/new  and  /companies/{id}/assets/{id}
-/// </summary>
 public sealed class AssetEditPage(IPage page, string baseUrl)
 {
     public async Task GoToNewAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/assets/new");
-        // AssetEdit has an SfDropDownList for Category; span[role='combobox'] only appears
-        // after Blazor's interactive render, ensuring event handlers are wired up.
         await page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
     }
 
@@ -28,12 +22,6 @@ public sealed class AssetEditPage(IPage page, string baseUrl)
         await page.Keyboard.PressAsync("Tab");
     }
 
-    /// <summary>
-    /// Selects a category from the Category dropdown (no filtering support on this field). Scoped
-    /// to the field's own ".col-md-6" group — an unscoped "body" locator would match the *first*
-    /// span[role='combobox'] anywhere on the page in DOM order, which is the top navbar's user
-    /// account dropdown, not this field.
-    /// </summary>
     public Task SelectCategoryAsync(string categoryName) =>
         DropDownSelector.SelectAsync(page, page.Locator(".col-md-6").Filter(new() { HasText = "Category" }).First, categoryName);
 

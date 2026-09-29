@@ -139,7 +139,6 @@ public class GetHrHeadcountSummaryReportEndpointTests
         Assert.NotNull(payload);
         Assert.Equal(3, payload!.TotalHeadcount);
         Assert.Equal(1.5m, payload.TotalFte);
-        // Not equal to headcount — proving it's a genuine sum, not a proxy for TotalHeadcount.
         Assert.NotEqual(payload.TotalHeadcount, payload.TotalFte);
     }
 
@@ -151,7 +150,6 @@ public class GetHrHeadcountSummaryReportEndpointTests
         using var client = await ClientFor(userId, companyId);
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
 
-        // Future starter.
         var futureResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees",
             EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
@@ -159,7 +157,6 @@ public class GetHrHeadcountSummaryReportEndpointTests
                 startDate: DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(1))));
         futureResponse.EnsureSuccessStatusCode();
 
-        // A leaver: seed directly via EF, since setting LeavingDate isn't exposed on CreateEmployee.
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();

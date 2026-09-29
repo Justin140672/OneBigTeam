@@ -2,10 +2,6 @@ using FluentValidation;
 
 namespace HR.Modules.Companies.Features.UpdateDocumentReminderSettings;
 
-/// <summary>
-/// SET-07: values must be positive, unique and ordered (furthest-out first); at least one reminder
-/// must remain configured while reminders are enabled.
-/// </summary>
 internal sealed class UpdateDocumentReminderSettingsValidator : AbstractValidator<UpdateDocumentReminderSettingsRequest>
 {
     public UpdateDocumentReminderSettingsValidator()

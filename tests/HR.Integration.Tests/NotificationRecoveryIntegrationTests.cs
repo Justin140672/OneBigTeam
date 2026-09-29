@@ -9,17 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// OBT-REM-12: end-to-end recovery coverage that specifically needs a real PostgreSQL backend —
-/// unlike EF Core's InMemory provider, only a real Postgres testcontainer enforces the
-/// (employee_id, source_entity_id, type) unique index and surfaces Npgsql's PostgresException shape,
-/// which is what actually drives NotificationWriter.TrySaveIdempotentlyAsync's duplicate-detection
-/// catch clause and therefore RepairExistingNotificationAsync. See
-/// HR.Modules.Notifications.Tests/NotificationWriterRepairTests for isolated unit-level coverage of
-/// the repair method's own effects, and ReconcilePendingEmailDeliveriesJobTests /
-/// ReconcileMissingNotificationAuditsJobTests for exhaustive branch coverage of the two reconciliation
-/// jobs — this class only proves the real-database wiring these unit tests cannot exercise.
-/// </summary>
 [Collection("Integration")]
 public class NotificationRecoveryIntegrationTests
 {
@@ -30,7 +19,6 @@ public class NotificationRecoveryIntegrationTests
         _factory = factory;
     }
 
-    // Concurrent writers racing the same idempotency key ------------------------------------------
 
     [Fact]
     public async Task Concurrent_WriteAsync_Calls_For_Same_Key_Produce_Exactly_One_Notification_And_Delivery()
@@ -40,9 +28,6 @@ public class NotificationRecoveryIntegrationTests
         var sourceEntityId = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
 
-        // Two independent scopes (independent DbContext instances, as two concurrent requests would
-        // have) racing to write the same (employee, source entity, type) idempotency key with two
-        // different notification ids — exactly one of the two inserts must win.
         var idA = Guid.NewGuid();
         var idB = Guid.NewGuid();
 
@@ -70,24 +55,17 @@ public class NotificationRecoveryIntegrationTests
         var deliveries = await db.EmailDeliveries.Where(d => d.NotificationId == winningId).ToListAsync();
         Assert.Single(deliveries);
 
-        // Exactly one committed audit event for the winning notification, regardless of which of the
-        // two concurrent calls actually published it (winner directly, or the loser's repair path) —
-        // NotificationCreatedAuditEvent's deterministic EventId guarantees this.
         var auditDb = verifyScope.ServiceProvider.GetRequiredService<AuditDbContext>();
         var auditEvents = await auditDb.AuditEvents
             .Where(e => e.EventId == winningId && e.EventType == "notifications.created")
             .ToListAsync();
         Assert.Single(auditEvents);
 
-        // At least one Hangfire enqueue happened for the winning notification (the winner's own
-        // enqueue, and/or the loser's repair-path enqueue — both are safe: EmailDeliveryJob itself
-        // is idempotent per notification).
         var backgroundJobClient = Assert.IsType<FakeBackgroundJobClient>(
             verifyScope.ServiceProvider.GetRequiredService<Hangfire.IBackgroundJobClient>());
         Assert.Contains(backgroundJobClient.CreatedJobs, j => j.Args.ElementAtOrDefault(0) is Guid g && g == winningId);
     }
 
-    // Reconciliation jobs run twice without error or duplication ------------------------------------
 
     [Fact]
     public async Task Running_ReconcileMissingNotificationAuditsJob_Twice_Produces_No_Duplicate_Audit_Rows()
@@ -114,7 +92,7 @@ public class NotificationRecoveryIntegrationTests
         }
 
         await RunJobAsync();
-        await RunJobAsync(); // second run must be a no-op (existence check short-circuits), not an error
+        await RunJobAsync();
 
         using var verifyScope = _factory.Services.CreateScope();
         var auditDb = verifyScope.ServiceProvider.GetRequiredService<AuditDbContext>();
@@ -158,7 +136,6 @@ public class NotificationRecoveryIntegrationTests
         Assert.Contains(backgroundJobClient.CreatedJobs, j => j.Args.ElementAtOrDefault(0) is Guid g && g == notificationId);
     }
 
-    // Orphaned pending delivery row -------------------------------------------------------------
 
     [Fact]
     public async Task ReconcilePendingEmailDeliveriesJob_Enqueues_A_Job_For_An_Orphaned_Pending_Delivery()
@@ -193,7 +170,6 @@ public class NotificationRecoveryIntegrationTests
             && (Guid?)j.Args.ElementAtOrDefault(1) == companyId);
     }
 
-    // Permanently failed deliveries are never re-enqueued ------------------------------------------
 
     [Fact]
     public async Task ReconcilePendingEmailDeliveriesJob_Never_ReEnqueues_A_Permanently_Failed_Delivery()
@@ -228,7 +204,6 @@ public class NotificationRecoveryIntegrationTests
         Assert.DoesNotContain(backgroundJobClient.CreatedJobs, j => j.Args.ElementAtOrDefault(0) is Guid g && g == notificationId);
     }
 
-    // Cancellation --------------------------------------------------------------------------------
 
     [Fact]
     public async Task ReconcilePendingEmailDeliveriesJob_Already_Cancelled_Token_Throws()

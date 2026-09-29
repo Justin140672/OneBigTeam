@@ -54,8 +54,6 @@ internal sealed class TaskCompletionEffectsJob(
                 $"TaskCompletionOperation {operationId} does not belong to company {companyId}.");
         }
 
-        // Already fully applied (a prior attempt that succeeded but crashed before marking
-        // Processed, or a duplicate enqueue) — no-op.
         if (operation.Status == TaskCompletionOperation.StatusProcessed)
             return;
 

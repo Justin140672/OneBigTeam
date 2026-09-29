@@ -4,50 +4,12 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers "Sort Documents by Next Review Date" on the Shared Documents list
-/// (SharedDocuments.razor): the "Next Review Date" column has no
-/// <c>AllowSorting="false"</c> override, so Syncfusion's native 3-state header-click sort
-/// (ascending -&gt; descending -&gt; none/original) already works client-side against the
-/// full in-memory <c>_documents</c> list rendered by
-/// <c>&lt;HrGrid TValue="SharedCompanyDocumentListItem" ... AllowSorting="true"&gt;</c>. No grid,
-/// Handler, or DTO changes were needed for this story — these tests exist purely to prove the
-/// existing behaviour end-to-end.
-///
-/// Column order in SharedDocuments.razor's GridColumns (0-based, matches DOM order of
-/// ".e-rowcell" per row): 0=Title, 1=Category, 2=Version, 3=Status, 4=Effective Date,
-/// 5=Next Review Date, 6=Review Frequency, 7=Review Owner, 8=Last Updated, 9=Updated By.
-///
-/// The list endpoint's default (unsorted) order is <c>OrderByDescending(d =&gt; d.CreatedAt)</c>
-/// (see ListSharedCompanyDocumentsHandler) — i.e. most-recently-created first. The list filter bar
-/// (Search/Status/Review Status/Category/Next Review Date range) has been removed, so these tests
-/// no longer scope the visible dataset with a review-date range filter. Because the backend database
-/// is shared across the whole "E2E" collection (DisableParallelization = true, so tests run
-/// strictly sequentially — see E2ECollection) and the date window alone can't
-/// guarantee only this test's rows are visible, row-order assertions never assume the grid
-/// contains *only* the documents this test created: they read the full list of visible ".e-row"
-/// titles and extract just the relative order of this test's own distinctively-titled
-/// (<c>$"Sort Test {Guid.NewGuid():N}"</c>) documents among them.
-///
-/// Header click target: Syncfusion's EJ2 Grid (which HrGrid/SfGrid renders under the hood) marks
-/// each header cell as ".e-headercell" containing a ".e-headercelldiv" — clicking that div is the
-/// standard way to trigger a single-column sort/cycle. No prior E2E test in this suite already
-/// exercises grid header sorting, so there's no existing helper/prior-art class name to reuse for
-/// waiting on the sort-indicator; ".e-headercell.e-ascending" / ".e-headercell.e-descending" are
-/// EJ2's documented convention for the sorted-header CSS classes, used here as a best-effort wait
-/// with a short fallback settle delay if that assumption doesn't hold — the row-order assertions
-/// that follow are the actual source of truth for each test, independent of whether the indicator
-/// wait succeeds.
-/// </summary>
 public sealed class SharedDocumentSortByReviewDateTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private const string HrEmail = "laura.bennett@acme.example";
 
-    // A review-date window not used by any other AddDays/AddYears offset elsewhere in this test
-    // suite (max seen elsewhere is AddDays(60) / AddYears(1)), to keep unrelated seeded/persisted
-    // documents out of the filtered view as much as possible.
     private static readonly DateOnly EarlyReviewDate = DateOnly.FromDateTime(DateTime.Today.AddDays(150));
     private static readonly DateOnly MiddleReviewDate = DateOnly.FromDateTime(DateTime.Today.AddDays(165));
     private static readonly DateOnly LateReviewDate = DateOnly.FromDateTime(DateTime.Today.AddDays(180));
@@ -103,8 +65,6 @@ public sealed class SharedDocumentSortByReviewDateTests(HrAdminPersonaFixture fi
 
             await GoToListPageAsync();
 
-            // First click -> ascending, second click -> descending (Syncfusion's native 3-click
-            // single-column sort cycle: ascending -> descending -> none/original).
             await ClickReviewDateHeaderAsync(expectedDirectionClass: "e-ascending");
             await ClickReviewDateHeaderAsync(expectedDirectionClass: "e-descending");
 
@@ -154,8 +114,6 @@ public sealed class SharedDocumentSortByReviewDateTests(HrAdminPersonaFixture fi
             var descendingOrder = await GetRelativeOrderOfTitlesAsync(ourTitles);
             Assert.Equal([lateTitle, middleTitle, earlyTitle], descendingOrder);
 
-            // Third click on a single (non-multi) sort column removes sorting entirely and
-            // restores the grid's original, pre-sort row order.
             await ClickReviewDateHeaderAndWaitForUnsortedAsync();
             var restoredOrder = await GetRelativeOrderOfTitlesAsync(ourTitles);
             Assert.Equal(defaultOrder, restoredOrder);
@@ -197,9 +155,6 @@ public sealed class SharedDocumentSortByReviewDateTests(HrAdminPersonaFixture fi
         }
     }
 
-    // Third click of the cycle removes sorting rather than adding a new direction class, so there
-    // is no "e-ascending"/"e-descending" class to positively wait for here — best-effort wait for
-    // both to be gone, falling back to a short settle delay.
     private async Task ClickReviewDateHeaderAndWaitForUnsortedAsync()
     {
         await ReviewDateHeaderCell.Locator(".e-headercelldiv").First.ClickAsync();
@@ -239,18 +194,6 @@ public sealed class SharedDocumentSortByReviewDateTests(HrAdminPersonaFixture fi
         var order = new List<string>();
         var remaining = new HashSet<string>(titles);
 
-        // Bounded by wall-clock time rather than a fixed page count — the shared, long-lived E2E
-        // dev database's document count keeps growing as more of the suite runs over time (a fixed
-        // 50-page/1000-row cap here was itself observed going stale as that happened, the exact
-        // same class of "assumed-generous constant becomes insufficient later" issue this whole
-        // page-walk replaced a fixed page-1-only read for in the first place). 60s comfortably
-        // covers many hundreds of pages at ~200ms/page even if the dataset keeps growing further.
-        //
-        // Always starts from page 1 (a previous read may have left the grid on a later page, and a
-        // re-sort doesn't necessarily rewind it), confirms each page swap actually landed before
-        // reading (previously a fixed 200ms sleep, which could re-read the stale page or skip one),
-        // and reads each page as one atomic snapshot of first-cell texts (previously per-index
-        // reads with a 30s auto-wait, which hung if the page swapped mid-loop).
         await _page.VisitAllGridPagesAsync(async () =>
         {
             var firstCells = await _page.Locator(".e-grid .e-row > .e-rowcell:first-child").AllInnerTextsAsync();
@@ -280,10 +223,6 @@ public sealed class SharedDocumentSortByReviewDateTests(HrAdminPersonaFixture fi
         }
     }
 
-    // Uploads a shared document from the Shared Documents list page with a Next Review Date —
-    // same upload-dialog interaction pattern as
-    // HrDashboardTests.UploadDocumentWithReviewDateAsync / SharedDocumentListReviewColumnsTests.
-    // UploadDocumentAsync.
     private async Task UploadDocumentWithReviewDateAsync(string title, string filePath, DateOnly reviewDate)
     {
         await _page.GotoAsync(_fixture.WebBaseUrl + $"/companies/{AcmeId}/shared-documents");
@@ -315,7 +254,6 @@ public sealed class SharedDocumentSortByReviewDateTests(HrAdminPersonaFixture fi
         await _page.WaitForSelectorAsync($"text={title}", new() { Timeout = 15_000 });
     }
 
-    // %PDF- followed by padding, so magic-byte content validation passes.
     private static byte[] BuildTestPdf()
     {
         var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };

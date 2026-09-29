@@ -21,7 +21,6 @@ public class LeaveResourceAuthorizerTests
             authorizationService ?? new FakeRoleAuthorizationService(),
             directReportsReader ?? new FakeDirectReportsReader());
 
-    // ── CanActOnOwnLeaveAsync (self-service: Submit/Preview/Cancel) ─────────────
 
     [Fact]
     public async Task CanActOnOwnLeaveAsync_Allows_Self()
@@ -62,9 +61,6 @@ public class LeaveResourceAuthorizerTests
     [Fact]
     public async Task CanActOnOwnLeaveAsync_Denies_Direct_Manager_Acting_On_Behalf_Of_Report()
     {
-        // LEAVE-01: managers never get self-service (submit/preview/cancel) rights over a
-        // report's leave, even though they are in the report's management hierarchy — only
-        // CanViewAsync/CanApproveOrRejectAsync honor the hierarchy relationship.
         var manager = Guid.NewGuid();
         var report = Guid.NewGuid();
         var authorizer = BuildAuthorizer(
@@ -76,7 +72,6 @@ public class LeaveResourceAuthorizerTests
         Assert.False(result);
     }
 
-    // ── CanViewAsync (Get/List/GetEmployeeLeaveBalance/GetLeaveBalanceHistory) ──
 
     [Fact]
     public async Task CanViewAsync_Allows_Self()
@@ -117,12 +112,8 @@ public class LeaveResourceAuthorizerTests
     [Fact]
     public async Task CanViewAsync_Allows_Skip_Level_Manager_In_Three_Level_Hierarchy()
     {
-        // C's full descendant tree (via GetAllDescendantIdsAsync) includes A even though C is not
-        // A's direct manager — descendant resolution is transitive, verified here by including A
-        // directly in the fake's returned set, which is what a real GetAllDescendantIdsAsync
-        // implementation would resolve for a skip-level manager.
-        var skipLevelManager = Guid.NewGuid(); // C
-        var employee = Guid.NewGuid();         // A
+        var skipLevelManager = Guid.NewGuid();
+        var employee = Guid.NewGuid();
         var authorizer = BuildAuthorizer(directReportsReader: new FakeDirectReportsReader(employee));
 
         var result = await authorizer.CanViewAsync(CompanyId, skipLevelManager, employee, CancellationToken.None);
@@ -158,8 +149,6 @@ public class LeaveResourceAuthorizerTests
     [Fact]
     public async Task CanViewAsync_Denies_Own_Manager_Viewed_Bottom_Up()
     {
-        // Denial case: being someone's report does not grant view rights over the manager's own
-        // resources — the hierarchy check is one-directional (manager sees reports, not vice versa).
         var manager = Guid.NewGuid();
         var report = Guid.NewGuid();
         var authorizer = BuildAuthorizer(directReportsReader: new FakeDirectReportsReader(report));
@@ -212,8 +201,8 @@ public class LeaveResourceAuthorizerTests
     [Fact]
     public async Task CanApproveOrRejectAsync_Allows_Skip_Level_Manager_In_Three_Level_Hierarchy()
     {
-        var seniorManager = Guid.NewGuid(); // C
-        var employee = Guid.NewGuid();      // A, in C's full descendant tree via B
+        var seniorManager = Guid.NewGuid();
+        var employee = Guid.NewGuid();
         var authorizer = BuildAuthorizer(directReportsReader: new FakeDirectReportsReader(employee));
 
         var result = await authorizer.CanApproveOrRejectAsync(CompanyId, seniorManager, employee, CancellationToken.None);
@@ -258,7 +247,6 @@ public class LeaveResourceAuthorizerTests
         Assert.False(result);
     }
 
-    // ── IsHrAdministratorAsync (direct coverage of the shared role check) ──────
 
     [Fact]
     public async Task IsHrAdministratorAsync_True_When_Role_Present()

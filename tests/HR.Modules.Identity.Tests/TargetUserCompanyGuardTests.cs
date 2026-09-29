@@ -3,11 +3,6 @@ using HR.Modules.Identity.Tests.Infrastructure;
 
 namespace HR.Modules.Identity.Tests;
 
-/// <summary>
-/// IAM-01: <see cref="TargetUserCompanyGuard"/> is a thin delegate onto
-/// <see cref="HR.Modules.Employees.Contracts.IEmployeeAudienceReader.EmployeeExistsAsync"/> — these
-/// tests pin that delegation (both the parameters passed through and the return value propagated).
-/// </summary>
 public class TargetUserCompanyGuardTests
 {
     [Fact]

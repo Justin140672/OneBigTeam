@@ -11,21 +11,10 @@ internal sealed class ReturnToWorkReview
     public DateOnly DueDate { get; private set; }
     public Guid? ReviewedBy { get; private set; }
 
-    /// <summary>
-    /// Manager/HR free-text notes on the review. May contain sensitive return-to-work detail —
-    /// trimmed from non-HR callers by <see cref="Services.SicknessResourceAuthorizer"/> consumers
-    /// (see GetReturnToWorkReview, SICK-02).
-    /// </summary>
     public string? Notes { get; private set; }
 
-    /// <summary>
-    /// SICK-03: the structured fit-to-return decision. Null until the review is completed —
-    /// completion is not permitted without a value (enforced by
-    /// Features/CompleteReturnToWorkReview/Validator.cs).
-    /// </summary>
     public FitToReturnOutcome? Outcome { get; private set; }
 
-    /// <summary>Whether workplace adjustments are required for the employee to return.</summary>
     public bool AdjustmentsRequired { get; private set; }
 
     /// <summary>
@@ -63,14 +52,6 @@ internal sealed class ReturnToWorkReview
         };
     }
 
-    /// <summary>
-    /// Records the structured review outcome and marks the review Completed. Idempotent: a
-    /// review that is already Completed is left entirely unchanged (SICK-03 — "repeated task
-    /// completion does not overwrite or duplicate the review"), so callers may invoke this
-    /// safely from more than one code path (e.g. both the dedicated CompleteReturnToWorkReview
-    /// endpoint and a defensive re-dispatch from the Tasks module) without risk of overwriting
-    /// an already-recorded outcome or re-firing audit events.
-    /// </summary>
     public void Complete(
         Guid reviewedBy,
         FitToReturnOutcome outcome,

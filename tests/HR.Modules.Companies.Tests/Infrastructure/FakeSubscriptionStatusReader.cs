@@ -2,10 +2,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Companies.Tests.Infrastructure;
 
-/// <summary>
-/// Test double for <see cref="ISubscriptionStatusReader"/> — lets ReadOnlyModeMiddleware unit
-/// tests control the snapshot returned without hitting a real DbContext/database.
-/// </summary>
 internal sealed class FakeSubscriptionStatusReader : ISubscriptionStatusReader
 {
     public SubscriptionStatusSnapshot SnapshotToReturn { get; set; } =

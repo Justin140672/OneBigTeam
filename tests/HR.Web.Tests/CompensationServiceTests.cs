@@ -330,7 +330,6 @@ public class CompensationServiceTests
         Assert.Null(rowErrors);
     }
 
-    // ── Fake handlers ────────────────────────────────────────────────────────────
 
     private sealed class JsonResponseHandler(HttpStatusCode statusCode, object payload) : HttpMessageHandler
     {

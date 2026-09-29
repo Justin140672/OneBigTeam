@@ -6,18 +6,6 @@ using Xunit.Abstractions;
 
 namespace HR.Integration.Tests.Performance;
 
-/// <summary>
-/// NFR-02 measurement harness. Warms up, then runs N measured iterations of an operation, capturing
-/// wall-clock latency and EF command count per iteration. Reports p95 latency (the agreed metric for
-/// API/page operations — see specifications/engineering/performance-testing.md), plus median / p99 / max and cold-vs-warm,
-/// and records the run to <see cref="PerformanceResults"/> for artefact output.
-///
-/// The pass/fail budget is <c>target * PERF_CI_MULTIPLIER</c>. The product targets
-/// (specifications/product-specifications/31-non-functional-requirements.md) assume production
-/// hardware; shared CI runners are slower and noisier, so the multiplier (default 3.0) keeps the
-/// gate meaningful without flaky-failing. Set <c>PERF_CI_MULTIPLIER=1</c> to assert the raw product
-/// target on a representative runner.
-/// </summary>
 internal sealed class PerformanceMeasurement
 {
     private readonly ITestOutputHelper _output;
@@ -153,12 +141,6 @@ internal sealed class PerfResult
         $"| commands/req={MinCommandCount}..{MaxCommandCount} slow={SlowCommandCount}";
 }
 
-/// <summary>
-/// Process-wide sink for <see cref="PerfResult"/>s. Test parallelization is disabled for this
-/// assembly, so a simple locked list + rewrite-on-each-record is safe and guarantees a complete
-/// artefact even if the run is interrupted. Output path: <c>PERF_RESULTS_PATH</c> env var, else
-/// <c>./perf-results/perf-results.json</c> under the test working directory.
-/// </summary>
 internal static class PerformanceResults
 {
     private static readonly object Gate = new();

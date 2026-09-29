@@ -3,21 +3,11 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the Vacancy Performance report page
-/// (/companies/{companyId}/reporting/vacancy-performance — VacancyPerformanceReportPage.razor):
-/// loading, the date-range-only filter panel (no group-by control on this page), and export.
-/// Catalog-page navigation coverage lives in <see cref="ReportCatalogTests"/>.
-/// </summary>
 public sealed class VacancyPerformanceReportTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    // The endpoint behind this page is gated by the "reporting:view-recruitment" policy, which is
-    // Recruiter-only (see IdentityModule.AddPolicy("reporting:view-recruitment", ...)) — Laura
-    // Bennett (HR Administrator, no Recruiter role) would get 403 Forbidden here. Use the Recruiter
-    // persona, matching every other Recruitment-domain E2E test and RecruitmentPipelineReportTests.
-    private const string MarcusEmail = "marcus.diallo@acme.example"; // Recruiter
+    private const string MarcusEmail = "marcus.diallo@acme.example";
 
     [Fact]
     public async Task Page_Loads_WithExpectedColumns()

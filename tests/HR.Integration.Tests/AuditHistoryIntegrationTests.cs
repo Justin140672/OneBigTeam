@@ -9,18 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Closes a real coverage gap: every write handler that publishes an audit event is covered by a
-/// unit test asserting the publish CALL happened against a fake/capturing IAuditEventPublisher,
-/// but nothing previously verified the write actually landed in the audit table and comes back
-/// out through GetEmployeeAuditHistory. These tests exercise the real HTTP endpoint, the real
-/// DbAuditEventPublisher, and the real AuditDbContext/AuditHistoryReader end-to-end.
-///
-/// UpdateCompanySettings is the exception: its audit event is company-scoped (EmployeeId is never
-/// set — see CompanySettingsUpdatedAuditEvent), so it can never appear in GetEmployeeAuditHistory
-/// (which filters by EmployeeId) and there is no company-level audit-history endpoint. That test
-/// instead reads AuditDbContext directly via the test host's DI container.
-/// </summary>
 [Collection("Integration")]
 public class AuditHistoryIntegrationTests
 {
@@ -119,7 +107,6 @@ public class AuditHistoryIntegrationTests
 
         var entry = Assert.Single(history!.Items, i => i.Action == "Compensation record created");
         Assert.Equal("Employees", entry.Module);
-        // NFR-01: the salary amount must never appear in the audit trail.
         Assert.DoesNotContain(entry.Changes, c => c.After == "55000");
         Assert.Contains(entry.Changes, c => c.Field == "Currency" && c.After == "GBP");
     }
@@ -152,8 +139,6 @@ public class AuditHistoryIntegrationTests
             });
         updateResp.EnsureSuccessStatusCode();
 
-        // employee:manage is required to read audit-history, so the self-service employee client
-        // (a plain employee with no elevated role) can't fetch it — use the HR admin client instead.
         var historyResp = await hrAdminClient.GetAsync($"/api/companies/{companyId}/employees/{employeeId}/audit-history");
         historyResp.EnsureSuccessStatusCode();
 
@@ -200,10 +185,6 @@ public class AuditHistoryIntegrationTests
         Assert.Contains(entry.Changes, c => c.Field == "First Name" && c.After == "Audrey");
         Assert.Contains(entry.Changes, c => c.Field == "Gender" && c.After == "Female");
 
-        // GetEmployeeAuditHistoryHandler.ResolveUser renders "System" only when ActorEmployeeId is
-        // null. The HR admin has no seeded Employee record in this test, so the name itself can't
-        // resolve ("Unknown" is expected) — but proving it isn't "System" confirms the acting
-        // employee id (from the "sub" claim) is actually reaching the audit event, not being lost.
         Assert.NotEqual("System", entry.User);
     }
 
@@ -254,14 +235,10 @@ public class AuditHistoryIntegrationTests
     [Fact]
     public async Task UpdateEmployeeProfile_And_UpdateEmploymentDetails_With_Same_CorrelationId_Merge_Into_One_AuditHistory_Entry()
     {
-        // Ticket: EmployeeEdit.razor's combined Save action generates one CorrelationId and passes
-        // it into both UpdateEmployeeProfile and UpdateEmploymentDetails so their two audit rows
-        // read back as a single merged entry rather than two separate ones.
         var companyId = Guid.NewGuid();
         using var hrAdminClient = await AuthenticatedClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(hrAdminClient, companyId);
-        // The employment PUT below sets an explicit employee number, only allowed in Manual mode.
         await EmployeeReferenceDataSeeder.SetEmployeeNumberModeManualAsync(hrAdminClient, companyId);
         var correlationId = Guid.NewGuid();
 
@@ -310,21 +287,11 @@ public class AuditHistoryIntegrationTests
     [Fact]
     public async Task UpdateCompanySettings_Persists_Audit_Record()
     {
-        // No API surface exposes company-level audit events (GetEmployeeAuditHistory is scoped to
-        // a single employee, and CompanySettingsUpdatedAuditEvent never sets EmployeeId) — so this
-        // reads the audit table directly via the test host's own DI container instead.
-        //
-        // Must be CompanyAdministrator, not HrAdministrator — the company:manage policy that
-        // guards UpdateCompanySettings is CompanyAdministrator-only.
         using var companyAdminClient = _factory.CreateClient();
         companyAdminClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, CompanyAdminUser.ToString());
-        // Placeholder tenant header for the creation call itself (RequireTenantMiddleware
-        // requires one on every authenticated request) — swapped for the real company id below.
         companyAdminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, CompanyAdminUser.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, CompanyAdminUser, SystemRoles.CompanyAdministrator, CompanyAdminUser);
 
-        // POST /api/companies (CreateCompany) was removed in 78a43344; seed the company directly
-        // via CompaniesDbContext instead, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
         var companyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Audit Test {Guid.NewGuid():N}");
 
         companyAdminClient.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
@@ -359,10 +326,6 @@ public class AuditHistoryIntegrationTests
     [Fact]
     public async Task CreatePositionProfile_Persists_Audit_Record()
     {
-        // PositionProfileCreatedAuditEvent is scoped by ActorEmployeeId, not EmployeeId (it records
-        // who managed the position profile, not an employee the profile belongs to), so like
-        // CompanySettings it can never appear via GetEmployeeAuditHistory. Read the audit table
-        // directly via the test host's own DI container instead.
         var companyId = Guid.NewGuid();
         using var hrAdminClient = await AuthenticatedClient(companyId);
 
@@ -446,9 +409,6 @@ public class AuditHistoryIntegrationTests
         Assert.Contains(newTitle, auditRecord.AfterJson);
     }
 
-    // SICK-06: actor attribution and sensitive-data exclusion, verified end-to-end through the
-    // real DbAuditEventPublisher/AuditDbContext (not just the fake publisher used by the unit
-    // tests in HR.Modules.Sickness.Tests).
     [Fact]
     public async Task RecordSickness_Persists_Audit_Record_With_Actor_And_Without_Notes_Content()
     {
@@ -483,8 +443,6 @@ public class AuditHistoryIntegrationTests
         Assert.NotNull(auditRecord);
         Assert.Equal("SicknessRecord", auditRecord!.EntityType);
         Assert.Equal(employeeId, auditRecord.EmployeeId);
-        // HrAdminUser is the authenticated caller — the actor recorded on the audit event, not
-        // implicitly assumed to be the affected employee.
         Assert.Equal(HrAdminUser, auditRecord.ActorEmployeeId);
         Assert.NotEqual(employeeId, auditRecord.ActorEmployeeId);
         Assert.DoesNotContain(sensitiveNotes, auditRecord.AfterJson ?? string.Empty);
@@ -589,16 +547,12 @@ public class AuditHistoryIntegrationTests
         Assert.NotNull(auditRecord);
         Assert.Equal("ReturnToWorkReview", auditRecord!.EntityType);
         Assert.Equal(employeeId, auditRecord.EmployeeId);
-        // Reviewer (HrAdminUser) is the actor, correctly distinct from the reviewed employee.
         Assert.Equal(HrAdminUser, auditRecord.ActorEmployeeId);
         Assert.NotEqual(employeeId, auditRecord.ActorEmployeeId);
         Assert.DoesNotContain(sensitiveAdjustmentDetails, auditRecord.AfterJson ?? string.Empty);
         Assert.DoesNotContain(sensitiveManagerNotes, auditRecord.AfterJson ?? string.Empty);
     }
 
-    // PROB-07: actor attribution, structured before/after and sensitive-notes exclusion, verified
-    // end-to-end through the real DbAuditEventPublisher/AuditDbContext (not just the fake publisher
-    // used by the unit tests in HR.Modules.Probation.Tests).
     [Fact]
     public async Task CreateProbationRecord_Persists_Audit_Record_With_Actor_And_Without_Notes_Content()
     {
@@ -770,21 +724,18 @@ public class AuditHistoryIntegrationTests
         const string sensitiveFailNotes = "AuditIntegration-Sensitive-FailNotes-Detail";
         const string sensitiveCheckpointNotes = "AuditIntegration-Sensitive-CheckpointNotes-Detail";
 
-        // Pass
         var (passRecordId, passReviewId) = await CreateProbationRecordAndReviewAsync(hrAdminClient, companyId, "FinalDecision");
         var passResp = await hrAdminClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/probation-records/{passRecordId}/reviews/{passReviewId}/complete",
             new { companyId, probationRecordId = passRecordId, reviewId = passReviewId, notes = sensitivePassNotes, outcome = "Pass", decisionDate = "2026-09-01" });
         passResp.EnsureSuccessStatusCode();
 
-        // Fail
         var (failRecordId, failReviewId) = await CreateProbationRecordAndReviewAsync(hrAdminClient, companyId, "FinalDecision");
         var failResp = await hrAdminClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/probation-records/{failRecordId}/reviews/{failReviewId}/complete",
             new { companyId, probationRecordId = failRecordId, reviewId = failReviewId, notes = sensitiveFailNotes, outcome = "Fail", decisionDate = "2026-09-01" });
         failResp.EnsureSuccessStatusCode();
 
-        // Checkpoint (no outcome)
         var (checkpointRecordId, checkpointReviewId) = await CreateProbationRecordAndReviewAsync(hrAdminClient, companyId, "ManagerCheckIn");
         var checkpointResp = await hrAdminClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/probation-records/{checkpointRecordId}/reviews/{checkpointReviewId}/complete",
@@ -838,18 +789,12 @@ public class AuditHistoryIntegrationTests
             .OrderByDescending(e => e.OccurredAt)
             .ToListAsync();
 
-        // The first review (ManagerCheckIn) created via CreateProbationRecordAndReviewAsync produces
-        // its own audit record too — assert on the most recent (HrReview) one.
         var auditRecord = auditRecords.First();
         Assert.Equal("ProbationReview", auditRecord.EntityType);
         Assert.Equal(HrAdminUser, auditRecord.ActorEmployeeId);
         Assert.Contains("HrReview", auditRecord.AfterJson);
     }
 
-    // PROB-07: end-to-end coverage for the Extend outcome — actor attribution, structured
-    // before/after expected-end dates and free-text extension-reason exclusion, verified through
-    // the real DbAuditEventPublisher/AuditDbContext (unit-level coverage lives in
-    // ProbationExtensionServiceTests / CompleteProbationReviewHandlerTests).
     [Fact]
     public async Task CompleteProbationReview_Extend_Persists_Audit_Record_With_Actor_And_Without_ExtensionReason_Content()
     {
@@ -924,16 +869,11 @@ public class AuditHistoryIntegrationTests
         Assert.NotNull(auditRecord);
         Assert.Equal("ProbationRecord", auditRecord!.EntityType);
         Assert.Equal(employeeId, auditRecord.EmployeeId);
-        // jsonb round-trips through Postgres's canonical text output, which inserts a space after
-        // ':' — assert loosely on the property name/value rather than an exact compact-JSON substring.
         Assert.Contains("\"HasReason\"", auditRecord.AfterJson ?? string.Empty);
         Assert.Contains("true", auditRecord.AfterJson ?? string.Empty);
         Assert.DoesNotContain(sensitiveReason, auditRecord.AfterJson ?? string.Empty);
     }
 
-    // OFF-08: StartOffboarding (the manual "Start Offboarding" HR action) must attribute its audit
-    // event to the authenticated HR actor — never leave ActorEmployeeId unset/null the way every
-    // Offboarding audit event previously did.
     [Fact]
     public async Task StartOffboarding_Persists_Audit_Record_Attributed_To_Authenticated_Actor()
     {
@@ -958,16 +898,9 @@ public class AuditHistoryIntegrationTests
         Assert.NotNull(auditRecord);
         Assert.Equal("OffboardingPlan", auditRecord!.EntityType);
         Assert.Equal(employeeId, auditRecord.EmployeeId);
-        // The critical assertion for OFF-08: the plan-started event must be attributed to the real
-        // authenticated HR actor, not left null/unattributed as every Offboarding audit event did
-        // before this ticket.
         Assert.Equal(HrAdminUser, auditRecord.ActorEmployeeId);
     }
 
-    // OFF-08: completing the sole/final offboarding task must both (a) publish a task-level
-    // OffboardingTaskCompletedAuditEvent distinct from the plan-level roll-up, and (b) attribute
-    // the resulting OffboardingPlanCompletedAuditEvent to the person who actually completed the
-    // task (via TaskCompletionContext.CompletedBy) — not leave it unattributed.
     [Fact]
     public async Task CompleteOffboardingTask_Persists_TaskLevel_And_PlanCompleted_Audit_Records_With_Actor()
     {
@@ -981,9 +914,6 @@ public class AuditHistoryIntegrationTests
             new { companyId, employeeId, lastWorkingDay = "2026-12-01", notes = "Resigned." });
         startResp.EnsureSuccessStatusCode();
 
-        // Locate the Tasks-module TaskItem(s) generated for this offboarding plan and complete
-        // every one of them, driving the plan to Completed and exercising both the task-level and
-        // plan-level audit events end-to-end.
         var tasksResp = await hrAdminClient.GetAsync($"/api/companies/{companyId}/employees/{employeeId}/tasks");
         tasksResp.EnsureSuccessStatusCode();
         var tasksPayload = await tasksResp.Content.ReadFromJsonAsync<EmployeeTaskListPayload>();
@@ -992,9 +922,6 @@ public class AuditHistoryIntegrationTests
 
         if (offboardingTasks.Count == 0)
         {
-            // No employee-assigned Offboarding tasks (e.g. all checklist items were manager/HR-
-            // assigned) — the plan-started attribution assertion above already covers OFF-08's core
-            // requirement; nothing further to exercise here without a more elaborate fixture.
             return;
         }
 

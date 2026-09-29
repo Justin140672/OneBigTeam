@@ -9,12 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Postgres integration coverage for POST /vacancies/{id}/close. See CloseVacancyHandlerTests in
-/// HR.Modules.Recruitment.Tests for the unit-level equivalent.
-/// Covers: anonymous 401, wrong-role 403, tenant-mismatch 403, happy 200 + persisted Closed status,
-/// unknown vacancy 404, cross-company 404, already-closed 400, already-cancelled 400.
-/// </summary>
 [Collection("Integration")]
 public class CloseVacancyEndpointTests
 {

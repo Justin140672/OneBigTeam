@@ -120,7 +120,6 @@ public class CreateAssetAssignmentEndpointTests
         using var client = await AdminClient(companyId);
         var assetId = await CreateAssetAsync(client, companyId);
 
-        // First assignment
         var first = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/assets/{assetId}/assignments",
             new
@@ -132,7 +131,6 @@ public class CreateAssetAssignmentEndpointTests
             });
         Assert.Equal(HttpStatusCode.Created, first.StatusCode);
 
-        // Second assignment — asset is now Assigned
         var second = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/assets/{assetId}/assignments",
             new

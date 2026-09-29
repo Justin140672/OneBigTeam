@@ -123,7 +123,6 @@ public class DetectDocumentsDueForReviewJobTests
     [Fact]
     public async Task ExecuteAsync_Does_Not_Count_Document_With_ReviewDate_In_The_Future()
     {
-        // Represents a review that has already been completed by moving ReviewDate forward.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var category  = await SeedCategoryAsync(db, companyId);
@@ -194,8 +193,6 @@ public class DetectDocumentsDueForReviewJobTests
     [Fact]
     public async Task ExecuteAsync_Counts_Documents_Across_Multiple_Companies_In_A_Single_Run()
     {
-        // This job queries across ALL companies (no CompanyId filter), unlike the per-company
-        // ListSharedCompanyDocumentsDueForReviewHandler — confirm no accidental company-scoping crept in.
         await using var db = BuildContext();
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
@@ -241,9 +238,6 @@ public class DetectDocumentsDueForReviewJobTests
         Assert.Equal(TaskActionType.Review, task.ActionType);
         Assert.Equal(doc.ReviewDate, task.DueDate);
 
-        // notifyAssignee must be false — the dedicated notification (asserted below) replaces the
-        // generic "New task assigned" notification, which would have carried the task's own id as
-        // SourceEntityId rather than the document's.
         Assert.False(task.NotifyAssignee);
 
         var notification = Assert.Single(notificationWriter.Written);
@@ -259,8 +253,6 @@ public class DetectDocumentsDueForReviewJobTests
     [Fact]
     public async Task ExecuteAsync_Does_Not_Create_A_Task_For_A_Due_Document_With_No_Review_Owner()
     {
-        // Deliberate "skip, don't fall back to another assignee" rule — a due document without a
-        // configured review owner produces no task at all.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var category  = await SeedCategoryAsync(db, companyId);
@@ -300,18 +292,12 @@ public class DetectDocumentsDueForReviewJobTests
         Assert.Empty(taskCreator.Created);
         Assert.Equal(0, LoggedCreatedCount(logger));
 
-        // The task-creation skip and the notification-write skip are gated by the same
-        // `continue` inside the job, so an already-open Review task must suppress both.
         Assert.Empty(notificationWriter.Written);
     }
 
     [Fact]
     public async Task ExecuteAsync_Still_Creates_A_Review_Task_When_The_Only_Open_Task_Is_A_Different_ActionType()
     {
-        // KEY REGRESSION TEST: mirrors SharedCompanyDocumentAcknowledgementReminderJob creating an
-        // open Acknowledge task with sourceEntityId = document.Id. Before the actionType-filtered
-        // lookup was introduced, ANY open task for this source entity id (regardless of action
-        // type) would have wrongly suppressed the new Review task. Prove that no longer happens.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var reviewOwnerId = Guid.NewGuid();
@@ -372,9 +358,6 @@ public class DetectDocumentsDueForReviewJobTests
     [Fact]
     public async Task ExecuteAsync_Resolves_ReviewDate_Due_Boundary_Per_Company_Timezone()
     {
-        // At 2026-07-16T23:30:00Z the UTC day is still Jul 16. A company in a fixed UTC+12 zone
-        // (no DST) has a local day of Jul 17 at that instant, so a ReviewDate of Jul 17 is already
-        // due for it, while a UTC company's ReviewDate of Jul 17 is still one day away.
         var fixedUtcNow = new DateTime(2026, 7, 16, 23, 30, 0, DateTimeKind.Utc);
 
         await using var db = BuildContext();

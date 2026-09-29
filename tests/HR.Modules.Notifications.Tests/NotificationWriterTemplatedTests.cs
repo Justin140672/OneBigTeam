@@ -53,7 +53,6 @@ public class NotificationWriterTemplatedTests
         Assert.Equal(id, job.Args[0]);
     }
 
-    // NOT-05: audit -------------------------------------------------------------------------------
 
     [Fact]
     public async Task WriteTemplatedAsync_Publishes_NotificationCreatedAuditEvent_On_Success()
@@ -119,7 +118,7 @@ public class NotificationWriterTemplatedTests
         var backgroundJobClient = new RecordingBackgroundJobClient();
         var auditPublisher = new FakeAuditPublisher();
         var writer = new NotificationWriter(ctx, backgroundJobClient, auditPublisher, new FakeCompanyNotificationSettingsReader());
-        var tokens = new Dictionary<string, string> { ["StartDate"] = "3 Aug 2026" }; // EndDate missing
+        var tokens = new Dictionary<string, string> { ["StartDate"] = "3 Aug 2026" };
 
         var result = await writer.WriteTemplatedAsync(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), NotificationType.LeaveApproved, tokens,
@@ -144,7 +143,6 @@ public class NotificationWriterTemplatedTests
             new Dictionary<string, string>(), Guid.NewGuid(), NotificationPriority.Normal, Now));
     }
 
-    // NOT-04: ActionUrl computed at write time -------------------------------------------------
 
     [Fact]
     public async Task WriteTemplatedAsync_LeaveApproved_Persists_ActionUrl_Matching_NotificationActionRouteBuilder()
@@ -202,7 +200,6 @@ public class NotificationWriterTemplatedTests
         Assert.Equal(expected, notification.ActionUrl);
     }
 
-    // SET-06: notification-channel settings ----------------------------------------------------
 
     [Fact]
     public async Task WriteTemplatedAsync_Scheduled_Reminder_Type_With_ScheduledRemindersEnabled_False_Is_A_NoOp()
@@ -254,7 +251,6 @@ public class NotificationWriterTemplatedTests
 
         Assert.True(result.IsSuccess);
         Assert.Single(await ctx.Notifications.ToListAsync());
-        // DocumentExpiring is not an email-eligible type — no EmailDelivery regardless of setting.
         Assert.Empty(ctx.EmailDeliveries);
         Assert.Empty(backgroundJobClient.CreatedJobs);
     }

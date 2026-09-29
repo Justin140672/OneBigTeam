@@ -5,11 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Services;
 
-/// <summary>
-/// Story 2: contributes the Sickness module's principal data (sickness records, return-to-work
-/// reviews, evidence-request metadata) to the organisation data export. Evidence file bytes are
-/// never included — only metadata. company_id enforced on every query.
-/// </summary>
 internal sealed class SicknessDataExportSource(SicknessDbContext db) : ISicknessDataExportSource
 {
     public async Task<IReadOnlyList<DataExportTable>> GetTablesAsync(Guid companyId, CancellationToken cancellationToken)

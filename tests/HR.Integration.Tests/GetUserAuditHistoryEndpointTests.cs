@@ -58,8 +58,6 @@ public class GetUserAuditHistoryEndpointTests
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
 
-        // IAM-01: the employee must actually belong to the route company or the handler now
-        // (correctly) returns NotFound rather than an empty history for an arbitrary/nonexistent id.
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId, "No", "Events");
 
         var response = await client.GetAsync($"/api/companies/{companyId}/users/{employeeId}/audit-history");
@@ -95,8 +93,6 @@ public class GetUserAuditHistoryEndpointTests
     [Fact]
     public async Task Get_UserAuditHistory_Returns_NotFound_When_Employee_Belongs_To_Another_Company()
     {
-        // IAM-01 regression: caller's own companyId is in the route (passes tenant middleware),
-        // but the target employeeId belongs to a different company — must 404, not leak history.
         var ownCompanyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
         var otherCompanyEmployeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, otherCompanyId, "Other", "Company");

@@ -2,10 +2,6 @@ using HR.SharedKernel.Http;
 
 namespace HR.SharedKernel.Tests;
 
-/// <summary>
-/// [P2] CSP: the shared builder/parser used by HR.Web and HR.Admin.Web. It carries no policy of its
-/// own — these pin the mechanics each app's explicit policy relies on.
-/// </summary>
 public class ContentSecurityPolicyBuilderTests
 {
     [Fact]
@@ -30,7 +26,6 @@ public class ContentSecurityPolicyBuilderTests
     {
         var builder = new ContentSecurityPolicyBuilder().Add("script-src", "'self'");
 
-        // Directive names are case-insensitive in CSP; the builder rejects duplicates regardless of case.
         Assert.Throws<InvalidOperationException>(() => builder.Add("script-src", "'none'"));
         Assert.Throws<InvalidOperationException>(() => builder.Add("Script-Src", "'none'"));
     }

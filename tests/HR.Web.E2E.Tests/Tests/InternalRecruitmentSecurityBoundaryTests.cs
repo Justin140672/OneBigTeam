@@ -38,7 +38,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
     private const string InitialStage = "Application Received";
     private const string HiredStage = "Hired";
 
-    /// <summary>A fresh Active employee with a login, plus an HttpClient signed in AS that employee.</summary>
     private sealed record SignedInEmployee(InternalVacancyApplyApi.FreshEmployee Employee, HttpClient Api) : IDisposable
     {
         public void Dispose() => Api.Dispose();
@@ -51,7 +50,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
         return new SignedInEmployee(employee, api);
     }
 
-    // ── 1. Impersonation ──────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Apply_WithAnotherEmployeesIdentityInTheForm_IsFiledForTheSignedInEmployeeOnly()
@@ -63,7 +61,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
         using var victim = await CreateSignedInEmployeeAsync(hrAdminApi);
         using var attacker = await CreateSignedInEmployeeAsync(hrAdminApi);
 
-        // The attacker submits the apply form carrying every identity field a client might try.
         var spoofedIdentity = new Dictionary<string, string>
         {
             ["EmployeeId"] = victim.Employee.Id.ToString(),
@@ -82,7 +79,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
                 "The attacker's own application should be accepted (the spoofed fields are simply ignored)");
         }
 
-        // Exactly one application, and it belongs to the ATTACKER — not the employee they named.
         var afterSpoof = await CandidateCvApi.ListApplicationsForVacancyAsync(recruiterApi, AcmeId, vacancy.Id);
         var attackerApplication = Assert.Single(afterSpoof);
         Assert.Equal(attacker.Employee.WorkEmail, attackerApplication.CandidateEmail, ignoreCase: true);
@@ -94,7 +90,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
         var attackerDetail = await InternalRecruitmentJourneyApi.GetApplicationAsync(recruiterApi, vacancy.Id, attackerApplication.Id);
         Assert.True(attackerDetail.IsInternal);
 
-        // Repeating the spoof is "already applied" for the attacker — it never becomes the victim's.
         using (var repeat = await InternalRecruitmentJourneyApi.PostInternalApplicationAsync(
                    attacker.Api, AcmeId, vacancy.Id, $"cv2-{attacker.Employee.LastName}.pdf", spoofedIdentity))
         {
@@ -103,8 +98,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
             Assert.Equal("already_applied", await InternalRecruitmentJourneyApi.ReadRejectionCodeAsync(repeat));
         }
 
-        // The victim was never applied on their behalf: their own application is accepted (not a
-        // duplicate) and is linked to their own employee record.
         using (var victimApply = await InternalRecruitmentJourneyApi.PostInternalApplicationAsync(
                    victim.Api, AcmeId, vacancy.Id, $"cv-{victim.Employee.LastName}.pdf"))
         {
@@ -121,7 +114,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
         Assert.Equal(victim.Employee.Id, victimCandidate.EmployeeId);
     }
 
-    // ── 2. Only Open + internally advertised vacancies accept internal applications ──────────
 
     [Fact]
     public async Task Apply_ToDraftClosedOrNotAdvertisedVacancy_IsNotFound_AndCreatesNoApplication()
@@ -149,7 +141,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
         }
     }
 
-    // ── 3. Cross-company vacancy / company route on the employee apply endpoint ──────────────
 
     [Fact]
     public async Task Apply_WithAnotherCompanysVacancyOrCompanyRoute_IsRejected_AndCreatesNoApplication()
@@ -160,7 +151,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
 
         using var applicant = await CreateSignedInEmployeeAsync(hrAdminApi);
 
-        // Another company's vacancy id through the employee's own company route → simply not found.
         using (var foreignVacancy = await InternalRecruitmentJourneyApi.PostInternalApplicationAsync(
                    applicant.Api, AcmeId, InternalRecruitmentJourneyApi.BetaBackendVacancyId, $"cv-{applicant.Employee.LastName}.pdf"))
         {
@@ -168,7 +158,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
                 "Another company's vacancy id must not be reachable through the employee's own company");
         }
 
-        // Another company in the route (with the employee's own, valid vacancy id) → refused outright.
         using (var foreignRoute = await InternalRecruitmentJourneyApi.PostInternalApplicationAsync(
                    applicant.Api, BetaCorpId, vacancy.Id, $"cv-{applicant.Employee.LastName}.pdf"))
         {
@@ -178,7 +167,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
 
         Assert.Empty(await CandidateCvApi.ListApplicationsForVacancyAsync(recruiterApi, AcmeId, vacancy.Id));
 
-        // The legitimate request still works — the rejections left nothing half-created.
         using (var legitimate = await InternalRecruitmentJourneyApi.PostInternalApplicationAsync(
                    applicant.Api, AcmeId, vacancy.Id, $"cv-{applicant.Employee.LastName}.pdf"))
         {
@@ -188,7 +176,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
         Assert.Single(await CandidateCvApi.ListApplicationsForVacancyAsync(recruiterApi, AcmeId, vacancy.Id));
     }
 
-    // ── 4. Cross-company candidate / vacancy / application ids on the recruiter endpoints ─────
 
     [Fact]
     public async Task RecruiterEndpoints_WithAnotherCompanysVacancyCandidateOrApplication_AreRejected()
@@ -198,7 +185,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
         var vacancy = await InternalVacancyApplyApi.CreateOpenInternalVacancyAsync(hrAdminApi, recruiterApi);
         var unique = Guid.NewGuid().ToString("N")[..8];
 
-        // new-candidate: another company's vacancy via our route → 404; another company's route → 403.
         using (var foreignVacancy = await InternalRecruitmentJourneyApi.PostNewCandidateApplicationAsync(
                    recruiterApi, AcmeId, InternalRecruitmentJourneyApi.BetaBackendVacancyId, $"XVac{unique}"))
         {
@@ -212,7 +198,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
                 "A recruiter must not be able to address another company's vacancies");
         }
 
-        // Add existing candidate: another company's candidate onto our own vacancy → 404.
         using (var foreignCandidate = await InternalRecruitmentJourneyApi.PostExistingCandidateApplicationAsync(
                    recruiterApi, AcmeId, vacancy.Id, InternalRecruitmentJourneyApi.BetaSophieCandidateId))
         {
@@ -220,7 +205,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
                 "Another company's candidate must not be addable to this company's vacancy");
         }
 
-        // Set application CV: another company's application (under its own or our vacancy) → 404.
         var anyCvDocumentId = Guid.NewGuid();
         using (var foreignApplication = await InternalRecruitmentJourneyApi.PutApplicationCvAsync(
                    recruiterApi, AcmeId, InternalRecruitmentJourneyApi.BetaBackendVacancyId,
@@ -237,11 +221,9 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
                 "Another company's application id must not resolve under this company's vacancy");
         }
 
-        // Nothing was created on our vacancy by any of the above.
         Assert.Empty(await CandidateCvApi.ListApplicationsForVacancyAsync(recruiterApi, AcmeId, vacancy.Id));
     }
 
-    // ── 5. An internal application's CV can't be swapped for another candidate's document ────
 
     [Fact]
     public async Task SetCv_OnInternalApplication_WithAnotherCandidatesCvDocument_IsRejected_AndSubmittedCvIsKept()
@@ -259,7 +241,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
         var submittedCvId = before.CvDocumentId
             ?? throw new InvalidOperationException("The internal application has no submitted CV document.");
 
-        // Someone else's CV (a different, external candidate in the same company).
         var unique = Guid.NewGuid().ToString("N")[..8];
         var otherCandidateId = await CandidateCvApi.CreateCandidateAsync(
             recruiterApi, AcmeId, "E2E", $"OtherCv{unique}", $"e2e.othercv.{unique}@example.com");
@@ -278,7 +259,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
         Assert.Equal(submittedCvFileName, after.CvFileName);
     }
 
-    // ── 6. Cross-company ids on the appoint endpoint ─────────────────────────────────────────
 
     [Fact]
     public async Task Appoint_WithAnotherCompanysManagerApplicationVacancyOrRoute_IsRejected_EmployeeUnchanged_ThenValidAppointSucceeds()
@@ -292,15 +272,12 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
         var application = await InternalVacancyApplyApi.ApplyAsEmployeeAsync(
             applicant.Api, vacancy.Id, $"cv-{applicant.Employee.LastName}.pdf");
 
-        // Appointing needs recruitment:manage only, so the seeded Recruiter (Marcus — no
-        // employee:manage) is the appointer; the employee record is read back as the HR Administrator.
         var appointerApi = recruiterApi;
 
         var before = await InternalRecruitmentJourneyApi.GetEmployeeRecordAsync(hrAdminApi, applicant.Employee.Id);
         Assert.NotEqual(vacancyInfo.PositionProfileId, before.PositionProfileId);
         Assert.NotNull(before.ManagerId);
 
-        // Another company's employee as the new manager → not found; nothing changes.
         using (var foreignManager = await InternalRecruitmentJourneyApi.PostAppointAsync(
                    appointerApi, AcmeId, vacancy.Id, application.ApplicationId, InternalRecruitmentJourneyApi.BetaAliceEmployeeId))
         {
@@ -308,7 +285,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
                 "Another company's employee must not be accepted as the new manager");
         }
 
-        // Another company's application (under its own vacancy, or ours) → not found.
         using (var foreignApplication = await InternalRecruitmentJourneyApi.PostAppointAsync(
                    appointerApi, AcmeId, InternalRecruitmentJourneyApi.BetaBackendVacancyId,
                    InternalRecruitmentJourneyApi.BetaSophieApplicationId, managerId: null))
@@ -323,7 +299,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
                 "Another company's application id must not resolve under this company's vacancy");
         }
 
-        // Another company in the route (with our own valid ids) → refused outright.
         using (var foreignRoute = await InternalRecruitmentJourneyApi.PostAppointAsync(
                    appointerApi, BetaCorpId, vacancy.Id, application.ApplicationId, managerId: null))
         {
@@ -331,7 +306,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
                 "An appointer must not be able to address another company's applications");
         }
 
-        // Nothing changed: same role and manager, application still on its initial stage.
         var unchanged = await InternalRecruitmentJourneyApi.GetEmployeeRecordAsync(hrAdminApi, applicant.Employee.Id);
         Assert.Equal(before.PositionProfileId, unchanged.PositionProfileId);
         Assert.Equal(before.DepartmentId, unchanged.DepartmentId);
@@ -359,7 +333,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
         Assert.Equal(HiredStage, hired.CurrentStageName);
     }
 
-    // ── 7. Appointing needs recruitment:manage — employee:manage alone is not enough ─────────
 
     [Fact]
     public async Task Appoint_ByHrAdministratorWithoutRecruitmentManage_IsForbidden_ThenRecruiterAppointSucceeds()
@@ -375,7 +348,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
 
         var before = await InternalRecruitmentJourneyApi.GetEmployeeRecordAsync(hrAdminApi, applicant.Employee.Id);
 
-        // Laura (HR Administrator: employee:manage, no recruitment:manage) → 403, nothing changes.
         using (var forbidden = await InternalRecruitmentJourneyApi.PostAppointAsync(
                    hrAdminApi, AcmeId, vacancy.Id, application.ApplicationId, managerId: null))
         {
@@ -389,7 +361,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
         var stillOpen = await InternalRecruitmentJourneyApi.GetApplicationAsync(recruiterApi, vacancy.Id, application.ApplicationId);
         Assert.Equal(InitialStage, stillOpen.CurrentStageName);
 
-        // Marcus (Recruiter: recruitment:manage, no employee:manage) → appoints successfully.
         using (var appointed = await InternalRecruitmentJourneyApi.PostAppointAsync(
                    recruiterApi, AcmeId, vacancy.Id, application.ApplicationId, managerId: null))
         {

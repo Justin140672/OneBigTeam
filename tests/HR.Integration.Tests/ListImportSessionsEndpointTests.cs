@@ -105,9 +105,6 @@ public class ListImportSessionsEndpointTests
         return content;
     }
 
-    // Builds a minimal XLSX workbook (via ClosedXML) from comma-delimited "csv-shaped" header/data
-    // lines, so existing test fixtures (written as csv-style strings for readability) can still be
-    // uploaded against the now xlsx-only import endpoint.
     private static byte[] BuildXlsxBytes(string csvShapedContent)
     {
         var lines = csvShapedContent

@@ -47,9 +47,6 @@
     [Parameter] public bool IsOpen { get; set; }
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
-    // Passed straight from EmployeeEdit's _employee.ShowOffboardingTab — when true, an offboarding
-    // plan is already in progress for this employee, so cancelling here needs stronger copy about
-    // its outstanding tasks also being cancelled (see AmendLeavingProcess/CancelLeavingProcess ticket).
     [Parameter] public bool ShowOffboardingTab { get; set; }
     [Parameter] public EventCallback OnCancelled { get; set; }
     [Parameter] public EventCallback OnCompleted { get; set; }

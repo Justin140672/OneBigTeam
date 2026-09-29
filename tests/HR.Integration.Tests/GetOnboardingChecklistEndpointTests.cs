@@ -10,12 +10,6 @@ public class GetOnboardingChecklistEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 
-    // Guid.NewGuid() rather than hardcoded literals — under the shared-database "Integration"
-    // collection, a fixed literal here previously collided with the same literal used (and
-    // assigned a different role) in CompanyAuthorizationTests.cs, silently granting this
-    // "Employee" user CompanyAdministrator too since roles are additive and never reset between
-    // test classes sharing the same Testcontainer database. See that file's NoRoleUser comment
-    // for the same precedent.
     private static readonly Guid HrAdminUserId = Guid.NewGuid();
     private static readonly Guid CompanyAdminUserId = Guid.NewGuid();
     private static readonly Guid EmployeeUserId = Guid.NewGuid();
@@ -77,11 +71,6 @@ public class GetOnboardingChecklistEndpointTests
         Assert.InRange(payload.CompletionPercentage, 0, 100);
     }
 
-    // OBT-IAM-09: onboarding:view was removed from Company Administrator — a
-    // Company-Administrator-only account is limited to company settings and subscription
-    // administration and must be denied here, same as a plain Employee. The initial company
-    // creator retains access because signup also assigns HR Administrator (see
-    // Get_Checklist_Returns_Ok_For_HrAdministrator above).
     [Fact]
     public async Task Get_Checklist_Returns_Forbidden_For_CompanyAdministrator_Only()
     {

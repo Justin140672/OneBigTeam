@@ -15,9 +15,6 @@ internal sealed class Endpoint(WaiveOffboardingTaskHandler handler, ICurrentUser
 
     public override async Task HandleAsync(WaiveOffboardingTaskRequest request, CancellationToken cancellationToken)
     {
-        // Spec SPEC-OFF-01: mandatory reason, actor resolved server-side from the authenticated
-        // caller's own resolved Employee/UserId — never client-supplied — mirroring
-        // StartLeavingProcess/Endpoint.cs's identical resolution.
         if (currentUser.UserId is not { } actorEmployeeId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());

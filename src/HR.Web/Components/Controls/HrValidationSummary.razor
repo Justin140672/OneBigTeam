@@ -19,11 +19,6 @@
 @code {
     [CascadingParameter] private EditContext? CurrentEditContext { get; set; }
 
-    /// <summary>
-    /// Extra error messages to display alongside (or instead of) the cascaded
-    /// <see cref="EditContext"/> messages — for forms that do manual validation
-    /// without an <c>EditForm</c>.
-    /// </summary>
     [Parameter] public IEnumerable<string>? AdditionalErrors { get; set; }
 
     [Parameter] public string Heading { get; set; } = "Please fix the following:";

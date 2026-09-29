@@ -2,11 +2,6 @@ using HR.Web.Components.Pages.Dashboards;
 
 namespace HR.Web.Tests;
 
-/// <summary>
-/// DSH-03 — <see cref="WidgetResult{T}"/> is the DI-free per-source load outcome a dashboard widget
-/// consumes. These pin the factory/status mapping and the guard on <see cref="WidgetResult{T}.ValueOrThrow"/>
-/// (a Failed or Loading source must never be mistaken for an empty-but-loaded one).
-/// </summary>
 public class WidgetResultTests
 {
     private const string Source = "Leave requests";

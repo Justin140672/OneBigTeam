@@ -54,7 +54,6 @@
     private int? _attentionCount;
     private int? _awayTodayCount;
 
-    // DSH-07: polite live-region text — refreshed whenever a headline count changes.
     private string? _announcement;
 
     private void Announce()
@@ -99,8 +98,6 @@
         return string.Join(" · ", parts);
     }
 
-    // Guarded like CompanyEdit.razor: URL-typing into this dashboard without the
-    // Manager role bounces to MyProfileUrl. The switcher/redirect only pick a default.
     private bool _ready;
 
     protected override async Task OnInitializedAsync()

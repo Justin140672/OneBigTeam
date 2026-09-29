@@ -7,10 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Tests;
 
-/// <summary>
-/// OBT-721 workload action provider tests for upcoming employee start dates. HR-only — there is no
-/// manager-scoped tier for this category, per the provider's xmldoc.
-/// </summary>
 public class UpcomingEmployeeStartDatesWorkloadActionProviderTests
 {
     private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
@@ -70,8 +66,8 @@ public class UpcomingEmployeeStartDatesWorkloadActionProviderTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         context.Employees.AddRange(
-            CreateEmployee(companyId, Today.AddDays(-1)), // already started
-            CreateEmployee(companyId, Today.AddDays(31))); // too far out
+            CreateEmployee(companyId, Today.AddDays(-1)),
+            CreateEmployee(companyId, Today.AddDays(31)));
         await context.SaveChangesAsync();
 
         var provider = new UpcomingEmployeeStartDatesWorkloadActionProvider(

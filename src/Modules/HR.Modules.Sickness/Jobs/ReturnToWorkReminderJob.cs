@@ -9,25 +9,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Sickness.Jobs;
 
-/// <summary>
-/// Sends the employee's manager a reminder as a return-to-work review approaches its due
-/// date, and marks it overdue (with a further notification) once the due date has passed.
-/// Mirrors SicknessEvidenceReminderJob's shape. Unlike that job, the notification recipient
-/// is the employee's manager (via IManagerReader) — the review's own EmployeeId is the
-/// employee being reviewed, not the manager conducting the review.
-///
-/// <para>
-/// OBT-REM-04: retry-safe. The <c>Pending → Overdue</c> transition is committed per review before
-/// any notification is written, and the overdue notification is then reconciled against every
-/// recently-overdue review using a durable idempotency key
-/// (<c>ExistsAsync(manager, reviewId, ReturnToWorkReviewOverdue)</c>). A Hangfire retry completes
-/// only the missing work; one failing employee is logged and skipped.
-/// </para>
-/// <para>
-/// OBT-REM-10: a save failure for one review only detaches that review from the change tracker
-/// (not the whole batch), so later reviews in the same run still transition and persist correctly.
-/// </para>
-/// </summary>
 internal sealed class ReturnToWorkReminderJob(
     SicknessDbContext db,
     INotificationWriter notificationWriter,
@@ -96,7 +77,6 @@ internal sealed class ReturnToWorkReminderJob(
 
     private async Task MarkOverdueAndNotifyAsync(DateOnly today, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        // Step 1: durably transition each newly-overdue review, committing per review.
         var newlyOverdue = await db.ReturnToWorkReviews
             .Where(r => r.Status == ReturnToWorkReviewStatus.Pending && r.DueDate < today)
             .ToListAsync(cancellationToken);
@@ -112,9 +92,6 @@ internal sealed class ReturnToWorkReminderJob(
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                // OBT-REM-10: detach only the failed entity — clearing the whole change tracker
-                // would also detach every other still-pending review already loaded into
-                // `newlyOverdue`, silently preventing their MarkOverdue() calls from persisting.
                 var entry = db.Entry(review);
                 if (entry.State != EntityState.Detached)
                     entry.State = EntityState.Detached;
@@ -126,7 +103,6 @@ internal sealed class ReturnToWorkReminderJob(
             }
         }
 
-        // Step 2: reconcile the overdue notification for every recently-overdue review.
         var reconcileFrom = today.AddDays(-OverdueReconciliationDays);
 
         var overdue = await db.ReturnToWorkReviews

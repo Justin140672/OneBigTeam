@@ -4,29 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the standalone HR Settings page (/companies/{id}/hr-settings), which now holds all
-/// the HR-policy fields previously on the Company Settings tab (Working Week, HoursPerDay,
-/// LeaveYearStartMonth, DefaultHolidayAllowance, ProbationMonths, ExcludePublicHolidaysFrom*,
-/// DisplaySalaryOnEmployeeProfile, Sickness, Document Acknowledgement, Leaving Process, and
-/// Employee Numbering).
-///
-/// Access is gated on Session.IsHrAdministrator. The read-only/permission-boundary tests below
-/// use Laura Bennett (laura.bennett@acme.example, HrAdministrator) and Priya Shah
-/// (priya.shah@acme.example, CompanyAdministrator-only, to confirm the permission gap fix: she
-/// can no longer reach this page or see its nav link) — the same personas used throughout the
-/// suite for HR-administrator-only pages.
-///
-/// The tests that actually mutate Employee Numbering mode (which flips the shared
-/// company_settings row to Automatic mid-test, hiding the Employee Number field on the New
-/// Employee form for anyone else on that tenant — see FillEmployeeNumberAsync's own remarks) use
-/// Grace Kim on Beta Corp (grace.kim@betacorp.example, HrAdministrator) instead of Laura on
-/// Acme, even though this class already serializes against itself (HrSettingsSerial): that only
-/// prevents these tests from racing each other, not from racing the ~139 other, ordinary
-/// role-fixed classes that create Acme employees via the same New Employee form and expect
-/// Manual mode. Using a dedicated tenant removes the race at its source instead of requiring
-/// every employee-creation test to join a shared serialization group.
-/// </summary>
 public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSettingsSerialTestBase(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -116,8 +93,6 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
             Assert.False(await hrSettings.HasErrorAsync(),
                 $"Expected no error after saving representative HR settings fields, got: {await hrSettings.GetErrorTextAsync()}");
 
-            // Reload the page for real (re-navigate) to exercise the settings-hydration path
-            // server-side, not just in-memory Blazor state.
             await hrSettings.GoToAsync(BetaCorpId);
 
             Assert.Equal(desiredSaturday, await hrSettings.IsWorkingDayCheckedAsync("Saturday"));
@@ -147,8 +122,6 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
         }
         finally
         {
-            // Restore original values so this test doesn't leak state into other tests/fixtures
-            // that rely on the seeded defaults for this company.
             await hrSettings.SetWorkingDayAsync("Saturday", initialSaturday);
             await hrSettings.SetHoursPerDayAsync(initialHours);
             await hrSettings.SetDefaultHolidayAllowanceAsync(initialAllowance);
@@ -223,14 +196,6 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
         }
         finally
         {
-            // This test never saves — the preview is purely client-side — so there is nothing to
-            // restore: just discard the unsaved edits by reloading. It previously re-selected the
-            // initial mode and SAVED here, which persisted the preview's "EMP-"/42/4 edits along
-            // with it; in Automatic mode that prefix/minimum-length change silently triggered (and
-            // auto-confirmed) a background renumber of every Beta Corp employee that nothing
-            // waited for, so the next renumber-triggering save in this serialized class could hit
-            // "A previous employee number reformat is still processing" (409) — e.g.
-            // UpdateRepresentativeFieldsAcrossAllSections / PrefixChange_ShowsRenumberDialog.
             await hrSettings.GoToAsync(BetaCorpId);
         }
     }
@@ -245,15 +210,6 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/hr-settings");
 
-        // Blazor Server's own authorization redirect (NavigateTo, fired from OnInitializedAsync
-        // after the circuit determines the user lacks access) happens entirely over the page's
-        // already-open SignalR connection — no additional HTTP request is made for it. Playwright's
-        // NetworkIdle waits for HTTP network activity to settle, but the long-lived SignalR
-        // websocket never goes away for the life of the page, so NetworkIdle here either times out
-        // outright or (when it does resolve, e.g. against buffered/pooled connections) can resolve
-        // before the redirect's own render has actually landed — either way it's the wrong signal to
-        // wait on for a client-side navigation with no page load. Poll the URL directly instead,
-        // the same way every other post-navigation assertion in this suite avoids NetworkIdle.
         var deadline = DateTime.UtcNow.AddSeconds(15);
         var finalUrl = _page.Url;
         while (DateTime.UtcNow < deadline)
@@ -295,33 +251,9 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
             "Expected Laura (HrAdministrator) to see the 'HR Settings' nav link under 'HR configuration'");
     }
 
-    // ── Employee-number renumbering ────────────────────────────────────────────
-    // There is no "Backfill Employee Numbers" button any more. Instead: changing the prefix or
-    // minimum length WHILE the company is in Automatic mode pops a "Renumber existing employees?"
-    // confirmation, and confirming it queues a background job that rewrites EVERY existing
-    // employee's number to the new format. A Manual <-> Automatic mode switch does NOT renumber
-    // (existing numbers are left as-is). These exercise that flow through the UI; the handler /
-    // job / outbox mechanics are covered by UpdateHrSettingsHandlerTests,
-    // EmployeeRenumberSideEffectJobTests and EmployeeRenumberSideEffectEndpointTests.
 
     private static readonly Guid GraceKimEmployeeId = Guid.Parse("30000000-0000-0000-0000-000000000015");
 
-    /// <summary>
-    /// Clicks Save and, if that submission actually triggered the "Renumber existing employees?"
-    /// confirmation (a prefix/minimum-length change while staying in Automatic mode), confirms it
-    /// AND waits for the background job to fully apply before returning — mirroring the polling
-    /// PrefixChange_ShowsRenumberDialog_AndConfirming_RenumbersExistingEmployees already does.
-    /// Without this wait, a caller that immediately performs a second save on the same
-    /// CompanySettings row (whether later in the same test, e.g.
-    /// UpdateRepresentativeFieldsAcrossAllSections_PersistAfterReload's own NextEmployeeNumber-only
-    /// save, or in a completely different test in this serialized class that happens to run right
-    /// after) can submit a stale optimistic-concurrency Version — the job's own update to
-    /// NextEmployeeNumber bumps Version as it completes — and get a spurious "HR settings were
-    /// changed by someone else" conflict that has nothing to do with the field(s) that test is
-    /// actually exercising. This is the real, recurring root cause behind this class's flakiness:
-    /// tests were leaving a still-processing renumber job behind them for the next test (or their
-    /// own next save) to race against, not any defect in the renumber-gating logic itself.
-    /// </summary>
     private async Task SaveAndWaitForRenumberToSettleAsync(HrSettingsPage hrSettings, string expectedPrefixIfRenumbered)
     {
         var renumbered = false;
@@ -359,8 +291,6 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
             }
         }
 
-        // Mirror HrSettingsPage.SaveAsync's own post-save behaviour — we bypassed it above (and
-        // may have navigated away to the employee edit page while waiting for the job).
         if (!_page.Url.Contains("/hr-settings", StringComparison.OrdinalIgnoreCase))
             await hrSettings.GoToAsync(BetaCorpId);
     }
@@ -394,10 +324,6 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
         {
             await hrSettings.SelectEmployeeNumberModeAsync("Automatic");
 
-            // Changing the prefix in Automatic mode interposes the "Renumber existing employees?"
-            // confirmation. A prior renumber from another test in this serial class may still be
-            // processing (SET-08 allows only one in flight per company, 409ing the rest) — retry a
-            // few times, waiting it out, so this test isn't order-dependent.
             var accepted = false;
             for (var attempt = 1; attempt <= 4 && !accepted; attempt++)
             {
@@ -412,15 +338,13 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
                 await _page.WaitForSpinnerToClearAsync();
 
                 if (await hrSettings.HasErrorAsync())
-                    await _page.WaitForTimeoutAsync(15_000); // another company renumber still running — wait then retry
+                    await _page.WaitForTimeoutAsync(15_000);
                 else
                     accepted = true;
             }
 
             Assert.True(accepted, "The renumber-triggering save kept 409ing on a still-processing prior renumber");
 
-            // The renumber runs as a background job — poll an existing Beta employee until her
-            // number is rewritten to the new format.
             await empEdit.GoToViewAsync(BetaCorpId, GraceKimEmployeeId);
 
             var deadline = DateTime.UtcNow.AddSeconds(90);
@@ -465,7 +389,6 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
             Assert.True(await hrSettings.IsRenumberDialogVisibleAsync());
             await hrSettings.CancelRenumberAsync();
 
-            // Cancel abandons the save entirely — reload and the prefix is unchanged.
             await hrSettings.GoToAsync(BetaCorpId);
             Assert.Equal(prefixBefore, await hrSettings.GetEmployeeNumberPrefixAsync());
         }

@@ -24,10 +24,6 @@ public sealed class PromotionService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    // RequiresBackdateConfirmation is true only for the specific 409 raised when EffectiveDate is
-    // in the past and the caller didn't already set ConfirmBackdatedEffectiveDate — the dialog uses
-    // this to prompt the user and let them explicitly resubmit with that flag set, rather than
-    // silently retrying on their behalf.
     public async Task<(PromoteEmployeeResponse? Result, string? Error, bool RequiresBackdateConfirmation)> PromoteEmployeeAsync(
         Guid companyId, Guid employeeId, PromoteEmployeeRequest request)
     {

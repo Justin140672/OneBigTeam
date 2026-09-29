@@ -7,8 +7,6 @@ namespace HR.Web.Services;
 
 public sealed class DataImportService(HrApiHttpClientFactory httpClientFactory)
 {
-    /// <summary>Sentinel returned as the error string from <see cref="GetSessionAsync"/> when the
-    /// session doesn't exist, so callers can show a "not found" message instead of a generic error.</summary>
     public const string NotFoundSentinel = "NotFound";
 
     private HttpClient Http => httpClientFactory.CreateClient();
@@ -51,9 +49,6 @@ public sealed class DataImportService(HrApiHttpClientFactory httpClientFactory)
     {
         try
         {
-            // FastEndpoints rejects a truly bodyless POST (no Content-Type header at all) with
-            // 415 Unsupported Media Type, even though ValidateImportSessionRequest's properties
-            // are all route-bound — so post an empty JSON object rather than a null body.
             var response = await Http.PostAsJsonAsync(
                 $"api/companies/{companyId}/data-import/sessions/{importSessionId}/validate",
                 new { columnMapping }, HrApiJsonOptions.Default, cancellationToken);
@@ -101,8 +96,6 @@ public sealed class DataImportService(HrApiHttpClientFactory httpClientFactory)
     {
         try
         {
-            // Same bodyless-POST 415 issue as ValidateSessionAsync above — post an empty JSON
-            // object so FastEndpoints sees a valid Content-Type instead of none at all.
             var response = await Http.PostAsJsonAsync(
                 $"api/companies/{companyId}/data-import/sessions/{importSessionId}/confirm",
                 new { }, HrApiJsonOptions.Default, cancellationToken);
@@ -183,9 +176,6 @@ public sealed class DataImportService(HrApiHttpClientFactory httpClientFactory)
                 return (result, null);
             }
 
-            // Callers distinguish "not found" from other failures by checking for this exact
-            // sentinel value, so a missing session can be shown as a friendly message rather
-            // than a generic error banner.
             if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
                 return (null, NotFoundSentinel);
 

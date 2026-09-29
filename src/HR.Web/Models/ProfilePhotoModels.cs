@@ -1,6 +1,5 @@
 namespace HR.Web.Models;
 
-// ── Self-service ("my profile photo") ──────────────────────────────────────
 
 public sealed record GetMyProfilePhotoResponse(
     CurrentProfilePhotoDto? CurrentPhoto,
@@ -33,7 +32,6 @@ public sealed record UploadMyProfilePhotoResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
-// ── HR-facing (direct upload, pending review) ───────────────────────────────
 
 public sealed record UploadEmployeeProfilePhotoResponse(
     Guid Id,

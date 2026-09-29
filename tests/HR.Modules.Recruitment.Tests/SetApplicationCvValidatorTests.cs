@@ -62,7 +62,6 @@ public class SetApplicationCvValidatorTests
     [InlineData(42)]
     public void Validate_Passes_For_Any_Supplied_ExpectedVersion(int expectedVersion)
     {
-        // RequireLoadedVersion only requires presence; staleness is the handler's job (409).
         Assert.True(_validator.Validate(Valid() with { ExpectedVersion = expectedVersion }).IsValid);
     }
 

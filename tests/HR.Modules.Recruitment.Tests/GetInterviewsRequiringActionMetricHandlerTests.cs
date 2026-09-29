@@ -65,10 +65,8 @@ public class GetInterviewsRequiringActionMetricHandlerTests
         var (vacancy, candidates) = GetNewApplicationsMetricHandlerTests.SeedVacancyAndCandidates(db, companyId, 2);
         var apps = AddApplications(db, companyId, vacancy.Id, candidates);
 
-        // Originally future, moved earlier to yesterday — now requires action.
         var movedEarlier = Interview.Create(Guid.NewGuid(), companyId, apps[0].Id, Guid.NewGuid(), Now.AddDays(5), 30, null, Now);
         movedEarlier.UpdateDetails(Guid.NewGuid(), Now.AddDays(-1), 30, null, Now);
-        // Originally past, pushed out to next week — no action due yet.
         var movedLater = Interview.Create(Guid.NewGuid(), companyId, apps[1].Id, Guid.NewGuid(), Now.AddDays(-2), 30, null, Now);
         movedLater.UpdateDetails(Guid.NewGuid(), Now.AddDays(7), 30, null, Now);
 

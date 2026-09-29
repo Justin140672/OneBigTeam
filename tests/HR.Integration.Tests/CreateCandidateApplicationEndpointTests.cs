@@ -86,7 +86,7 @@ public class CreateCandidateApplicationEndpointTests
     private static (string, string, byte[]) PdfCv(string fileName = "emma-cv.pdf")
     {
         var bytes = new byte[2048];
-        bytes[0] = 0x25; bytes[1] = 0x50; bytes[2] = 0x44; bytes[3] = 0x46; // %PDF
+        bytes[0] = 0x25; bytes[1] = 0x50; bytes[2] = 0x44; bytes[3] = 0x46;
         return (fileName, "application/pdf", bytes);
     }
 
@@ -126,7 +126,6 @@ public class CreateCandidateApplicationEndpointTests
             .FirstAsync();
     }
 
-    // ---- Happy paths -----------------------------------------------------------------------------
 
     [Fact]
     public async Task Post_Without_Cv_Returns_Created_And_Persists_Candidate_And_Application_On_Initial_Stage()
@@ -177,7 +176,6 @@ public class CreateCandidateApplicationEndpointTests
     public async Task Post_Places_Application_On_First_Active_NonTerminal_Stage_Skipping_Inactive_Ones()
     {
         var companyId = Guid.NewGuid();
-        // Seeds the default stage set (plus an unrelated vacancy/application) for the company.
         var seeded = await RecruitmentTestSeeder.SeedApplicationAsync(_factory, companyId, Now);
         Guid firstStageId;
         using (var scope = _factory.Services.CreateScope())
@@ -271,7 +269,6 @@ public class CreateCandidateApplicationEndpointTests
         Assert.Equal(recruiterId, application.SourceExternalRecruiterId);
     }
 
-    // ---- Auth ------------------------------------------------------------------------------------
 
     [Fact]
     public async Task Post_Returns_Unauthorized_For_Anonymous()
@@ -298,7 +295,6 @@ public class CreateCandidateApplicationEndpointTests
         Assert.Equal(0, await CountApplicationsForVacancyAsync(vacancyId));
     }
 
-    // ---- Duplicate email -------------------------------------------------------------------------
 
     [Fact]
     public async Task Post_Returns_Conflict_With_Existing_Candidate_When_Email_Exists_Case_Insensitively()
@@ -348,7 +344,6 @@ public class CreateCandidateApplicationEndpointTests
         Assert.Equal(1, await CountCandidatesWithEmailAsync(otherCompanyId, email));
     }
 
-    // ---- Not found -------------------------------------------------------------------------------
 
     [Fact]
     public async Task Post_Returns_NotFound_For_Unknown_Vacancy_And_Creates_Nothing()
@@ -395,7 +390,6 @@ public class CreateCandidateApplicationEndpointTests
         Assert.Equal(0, await CountCandidatesWithEmailAsync(companyId, email));
     }
 
-    // ---- Validation ------------------------------------------------------------------------------
 
     [Fact]
     public async Task Post_Returns_UnprocessableEntity_When_FirstName_Missing()

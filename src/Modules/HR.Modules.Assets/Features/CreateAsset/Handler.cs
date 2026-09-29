@@ -16,11 +16,6 @@ internal sealed class CreateAssetHandler(
     IClock clock,
     ICompanyAssetNumberSettingsReader assetNumberSettingsReader,
     IAssetNumberGenerator assetNumberGenerator,
-    // Optional (like postCommitFaultInjector below) so the many existing handler-level unit tests
-    // that construct this handler directly don't all need updating. Production DI always supplies
-    // real instances via the required IAuditEventPublisher/ILogger registrations in Program.cs;
-    // when null (unit tests), the inline post-commit outbox dispatch below is simply skipped and
-    // the event stays queued for the background IdempotencyMaintenanceJob.
     IAuditEventPublisher? auditPublisher = null,
     ILogger<CreateAssetHandler>? logger = null,
     IPostCommitFaultInjector? postCommitFaultInjector = null,
@@ -84,8 +79,6 @@ internal sealed class CreateAssetHandler(
                     Error.Validation("Asset number is required."));
             }
 
-            // Automatic mode: caller didn't supply one, generate it via the atomic counter and
-            // retry on conflict — mirrors CreateEmployeeHandler's own EmployeeNumber generation.
             const int maxAttempts = 5;
             var attempt = 0;
             while (true)
@@ -134,8 +127,6 @@ internal sealed class CreateAssetHandler(
 
         db.Assets.Add(entity);
 
-        // Built from in-memory values ahead of the save, so it can double as both the response and
-        // the payload persisted for an idempotency replay.
         var response = new CreateAssetResponse(
             entity.Id, entity.CompanyId, entity.AssetNumber, entity.CategoryId,
             entity.Name, entity.Manufacturer, entity.Model,
@@ -166,10 +157,6 @@ internal sealed class CreateAssetHandler(
             var outcome = await db.SaveIdempotentAsync(db.IdempotencyRecords,
                 scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
 
-            // Lost a race against a concurrent duplicate under the same key - this attempt's asset
-            // row and staged outbox entry were rolled back along with it, so skip returning our own
-            // result and hand back the winner's result untouched. Its own outbox row continues
-            // delivery independently.
             if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
                 return Result.Success(outcome.Response!);
         }
@@ -186,9 +173,6 @@ internal sealed class CreateAssetHandler(
         await _postCommitFaultInjector.MaybeFailAfterCommitAsync(
             nameof(CreateAssetHandler), request.IdempotencyKey, cancellationToken);
 
-        // Deliver the just-committed audit outbox entry immediately rather than waiting for the
-        // next IdempotencyMaintenanceJob cron tick (every 5 minutes). The outbox row remains the
-        // source of truth: if this inline attempt throws, the background job still retries it.
         if (auditPublisher is not null && logger is not null)
         {
             try

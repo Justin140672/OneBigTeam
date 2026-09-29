@@ -8,18 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Services;
 
-/// <summary>
-/// HR dashboard "Needs your attention" queue provider for Shared Company Documents whose
-/// ReviewDate has arrived or is within the next 7 days (mirrors
-/// ListSharedCompanyDocumentsDueForReviewHandler's own overdue/due-this-week window, which powers
-/// the standalone Document Reviews report). HR-only.
-///
-/// Unlike DetectDocumentsDueForReviewJob (a daily background job that only creates a Review task
-/// for documents that already have a ReviewOwnerEmployeeId), this provider surfaces every document
-/// due for review — including ones with no owner assigned yet — directly from
-/// SharedCompanyDocuments so the widget reflects a document's review-due state immediately, without
-/// waiting for the next job run or requiring an owner.
-/// </summary>
 internal sealed class SharedCompanyDocumentReviewsDueWorkloadActionProvider(
     DocumentsDbContext db,
     IClock clock,
@@ -55,9 +43,6 @@ internal sealed class SharedCompanyDocumentReviewsDueWorkloadActionProvider(
         if (documents.Count == 0)
             return [];
 
-        // ActionType carries the document's own title — this becomes the row's subject/title
-        // (AttentionQueueWidget.AttentionItem.ActionTitle), matching the standalone Document
-        // Reviews report where each row is identified by document title, not by an employee.
         return documents.Select(d => new WorkloadAction(
             EmployeeId: d.ReviewOwnerEmployeeId ?? Guid.Empty,
             EmployeeName: "",

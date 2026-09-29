@@ -2,10 +2,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Modules.Identity.Tests;
 
-/// <summary>
-/// Domain-only (no DB) tests for PlatformAdministrator's P1 provisioning-workflow methods:
-/// BeginProvisioning, MarkProvisioningFailed, CompleteProvisioning.
-/// </summary>
 public class PlatformAdministratorTests
 {
     private static readonly DateTimeOffset Now = new(2026, 6, 6, 12, 0, 0, TimeSpan.Zero);
@@ -104,7 +100,6 @@ public class PlatformAdministratorTests
     [Fact]
     public void CompleteProvisioning_Fails_With_Conflict_When_Already_Active()
     {
-        // Create() defaults to Active with no BeginProvisioning call — the legacy/bootstrap-seeded path.
         var admin = PlatformAdministrator.Create("someone@test.com", PlatformAdministratorRole.SupportStaff, Now);
 
         var result = admin.CompleteProvisioning(Guid.NewGuid(), Now);

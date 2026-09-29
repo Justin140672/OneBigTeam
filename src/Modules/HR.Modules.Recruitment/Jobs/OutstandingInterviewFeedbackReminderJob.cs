@@ -6,17 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Jobs;
 
-/// <summary>
-/// Notifies hiring managers when interview feedback is overdue. An interview's feedback is
-/// considered overdue once its scheduled time plus one day has passed and no outcome has been
-/// recorded — mirroring the feedback task due date set by ScheduleInterviewHandler
-/// (interviewDate.AddDays(1)). This is a self-contained signal derived entirely from Interview's
-/// own ScheduledAt/Outcome, the same way AssetReminderJob computes overdue windows from its own
-/// AssetAssignment timestamps rather than asking the Tasks module whether a task is overdue.
-///
-/// The hiring manager is resolved via Interview -> Application -> Vacancy -> HiringManagerId,
-/// entirely within RecruitmentDbContext, since Vacancy is owned by this same module.
-/// </summary>
 internal sealed class OutstandingInterviewFeedbackReminderJob(
     RecruitmentDbContext db,
     INotificationWriter notificationWriter,

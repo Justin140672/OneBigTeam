@@ -28,7 +28,6 @@ public class OrganisationDataExportPackageBuilderTests
         }
     }
 
-    /// <summary>Runs the streaming builder into an in-memory stream and returns the resulting archive bytes.</summary>
     private async Task<(byte[] Bytes, IReadOnlyList<string> Missing)> Build(
         IEnumerable<DataExportTable> tables,
         params (string ZipPath, byte[]? Content)[] files)
@@ -165,7 +164,7 @@ public class OrganisationDataExportPackageBuilderTests
             lengths.Add,
             CancellationToken.None);
 
-        Assert.Equal(2, lengths.Count); // one table + one document
+        Assert.Equal(2, lengths.Count);
         Assert.True(lengths[1] >= lengths[0]);
     }
 
@@ -289,15 +288,11 @@ public class OrganisationDataExportPackageBuilderTests
 
         Assert.Equal(rowCount, yielded);
 
-        // Behavioural: the builder pulls the generator one row at a time — it never asks for all
-        // rows up front. This is NOT a retained-memory guarantee on its own (a consumer could still
-        // buffer every row it is handed); the retained-bytes proof lives in the parked-generator
-        // tests below, which measure what actually reaches the output stream mid-enumeration.
         Assert.True(maxLive <= 2, $"builder requested rows ahead of writing them: max concurrently-live was {maxLive}");
 
         using var archive = Open(output.ToArray());
         var lines = ReadEntry(archive, "big.csv").Split("\r\n", StringSplitOptions.RemoveEmptyEntries);
-        Assert.Equal(rowCount + 1, lines.Length); // header + every row
+        Assert.Equal(rowCount + 1, lines.Length);
     }
 
     [Fact]
@@ -353,7 +348,7 @@ public class OrganisationDataExportPackageBuilderTests
                 ct.ThrowIfCancellationRequested();
                 yield return new string?[] { i.ToString() };
                 emitted++;
-                cts.Cancel(); // cancel right after the first row
+                cts.Cancel();
                 await Task.Yield();
             }
         }
@@ -376,12 +371,8 @@ public class OrganisationDataExportPackageBuilderTests
     [Fact]
     public async Task Cancellation_Mid_Enumeration_Of_An_Eager_Rows_Table_Propagates_And_Stops_The_Build()
     {
-        // Mirror of Cancellation_Mid_Enumeration_Of_A_Streamed_Table for the eager Rows path: the
-        // builder must check the token inside the eager loop, not only the streamed loop.
         using var cts = new CancellationTokenSource();
 
-        // A lazy eager-Rows collection that cancels the token the moment the builder asks for the
-        // second row — so the per-row token check inside the eager loop is what must stop the build.
         var enumerated = 0;
         IEnumerable<IReadOnlyList<string?>> RowSource()
         {
@@ -401,7 +392,6 @@ public class OrganisationDataExportPackageBuilderTests
             _builder.BuildToStreamAsync(
                 AsAsync(table), [], (_, _) => Task.FromResult<Stream?>(null), output, null, cts.Token));
 
-        // The builder stopped almost immediately instead of draining all 5,000 rows.
         Assert.True(enumerated < 100, $"builder enumerated {enumerated} rows after cancellation");
     }
 
@@ -430,10 +420,8 @@ public class OrganisationDataExportPackageBuilderTests
             {
                 ct.ThrowIfCancellationRequested();
                 if (i == 0)
-                    baselineAtFirstRow = output!.BytesWritten; // whatever is written so far == ZIP header only
+                    baselineAtFirstRow = output!.BytesWritten;
 
-                // Poorly-compressible prefix: three "N"-format Guids per row (~96 chars), well past
-                // any StreamWriter / deflate buffer once accumulated over thousands of rows.
                 yield return new string?[]
                 {
                     i.ToString(),
@@ -506,9 +494,6 @@ public class OrganisationDataExportPackageBuilderTests
         await _builder.BuildToStreamAsync(
             AsAsync(table), [], (_, _) => Task.FromResult<Stream?>(null), output, null, CancellationToken.None);
 
-        // Several checkpoints captured mid-enumeration must show real, substantial growth over time —
-        // not merely "non-zero" and not merely "non-decreasing". A whole-stream buffering consumer
-        // would leave every checkpoint pinned near 0.
         Assert.True(checkpoints.Count >= 4, $"expected several mid-enumeration checkpoints, got {checkpoints.Count}");
         for (var i = 1; i < checkpoints.Count; i++)
         {
@@ -522,11 +507,6 @@ public class OrganisationDataExportPackageBuilderTests
         Assert.True(output.BytesWritten >= checkpoints[^1]);
     }
 
-    /// <summary>
-    /// Lazy <see cref="IReadOnlyList{T}"/> facade over an <see cref="IEnumerable{T}"/> — lets a test
-    /// drive side effects (e.g. cancelling a token) from inside the builder's eager <c>Rows</c> loop.
-    /// Only <see cref="GetEnumerator"/> is exercised by the builder.
-    /// </summary>
     private sealed class RowList(IEnumerable<IReadOnlyList<string?>> source) : IReadOnlyList<IReadOnlyList<string?>>
     {
         public IEnumerator<IReadOnlyList<string?>> GetEnumerator() => source.GetEnumerator();
@@ -535,7 +515,6 @@ public class OrganisationDataExportPackageBuilderTests
         public IReadOnlyList<string?> this[int index] => throw new NotSupportedException();
     }
 
-    /// <summary>Write-only stream that counts bytes and fires a callback on every write.</summary>
     private sealed class CallbackStream(Action onWrite) : Stream
     {
         private long _bytes;

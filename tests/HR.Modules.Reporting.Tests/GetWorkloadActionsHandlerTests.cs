@@ -27,10 +27,6 @@ public class GetWorkloadActionsHandlerTests
 
     private static ClaimsPrincipal AnyCaller() => new(new ClaimsIdentity());
 
-    // Manager/Location/RecruitmentUser filters are not exercised by these existing tests (see
-    // GetWorkloadActionsHandlerTests additions for that coverage) — these fakes return empty/no-op
-    // results so the handler's default (no manager/location/recruiter filter applied) behaviour is
-    // unaffected.
     private static GetWorkloadActionsHandler MakeHandler(
         IEnumerable<IWorkloadActionProvider> providers, HR.SharedKernel.IClock clock,
         Microsoft.AspNetCore.Authorization.IAuthorizationService? authorizationService = null) =>
@@ -152,8 +148,8 @@ public class GetWorkloadActionsHandlerTests
     public async Task HandleAsync_Filters_By_Urgency()
     {
         var provider = new FakeWorkloadActionProvider("Cat",
-            Action(dueDate: Today.AddDays(-1)), // Overdue
-            Action(dueDate: Today.AddDays(20))); // Upcoming
+            Action(dueDate: Today.AddDays(-1)),
+            Action(dueDate: Today.AddDays(20)));
         var handler = MakeHandler([provider], new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(
@@ -198,11 +194,11 @@ public class GetWorkloadActionsHandlerTests
     public async Task HandleAsync_Computes_Summary_Card_Counts()
     {
         var provider = new FakeWorkloadActionProvider("Cat",
-            Action(dueDate: Today.AddDays(-1)),  // Overdue
-            Action(dueDate: Today.AddDays(-2)),  // Overdue
-            Action(dueDate: Today),              // DueToday
-            Action(dueDate: Today.AddDays(3)),   // DueThisWeek
-            Action(dueDate: Today.AddDays(30))); // Upcoming
+            Action(dueDate: Today.AddDays(-1)),
+            Action(dueDate: Today.AddDays(-2)),
+            Action(dueDate: Today),
+            Action(dueDate: Today.AddDays(3)),
+            Action(dueDate: Today.AddDays(30)));
         var handler = MakeHandler([provider], new FakeClock(FixedUtcNow));
 
         var result = await handler.HandleAsync(new GetWorkloadActionsRequest(Guid.NewGuid()), AnyCaller(), CancellationToken.None);
@@ -214,7 +210,6 @@ public class GetWorkloadActionsHandlerTests
         Assert.Equal(1, summary.DueThisWeek);
     }
 
-    // ── Manager/Location/RecruitmentUser filters (OBT-721 extension) ───────────
 
     private static EmployeeDirectoryReportItem DirectoryItem(Guid employeeId) =>
         new(employeeId, "EMP-001", "Employee", "Engineering", "Engineer", "Manager",
@@ -294,9 +289,9 @@ public class GetWorkloadActionsHandlerTests
     [Fact]
     public async Task HandleAsync_Combines_ManagerId_And_RecruitmentUser_Filters()
     {
-        var employeeA = Guid.NewGuid(); // matches manager + recruiter
-        var employeeB = Guid.NewGuid(); // matches manager only
-        var employeeC = Guid.NewGuid(); // matches neither
+        var employeeA = Guid.NewGuid();
+        var employeeB = Guid.NewGuid();
+        var employeeC = Guid.NewGuid();
         var provider = new FakeWorkloadActionProvider("Cat",
             Action(employeeId: employeeA), Action(employeeId: employeeB), Action(employeeId: employeeC));
 
@@ -335,7 +330,6 @@ public class GetWorkloadActionsHandlerTests
         Assert.Equal("Overdue Item", items[0].EmployeeName);
     }
 
-    // ── REP-05: bounded results ─────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Below_DisplayRowLimit_Is_Not_Truncated()
@@ -372,13 +366,10 @@ public class GetWorkloadActionsHandlerTests
     [Fact]
     public async Task HandleAsync_Summary_Counts_Reflect_Full_Filtered_Set_Not_Capped_Rows()
     {
-        // Seed limit+500 overdue actions — if the summary were computed AFTER the display cap was
-        // applied (a regression), Overdue/TotalOutstanding would read DisplayRowLimit instead of
-        // the true total.
         const int overLimitBy = 500;
         var totalActions = ReportLimits.DisplayRowLimit + overLimitBy;
         var actions = Enumerable.Range(0, totalActions)
-            .Select(_ => Action(dueDate: Today.AddDays(-1))) // Overdue
+            .Select(_ => Action(dueDate: Today.AddDays(-1)))
             .ToArray();
         var provider = new FakeWorkloadActionProvider("Cat", actions);
         var handler = MakeHandler([provider], new FakeClock(FixedUtcNow));
@@ -392,9 +383,6 @@ public class GetWorkloadActionsHandlerTests
         Assert.Equal(ReportLimits.DisplayRowLimit, result.Value.Items.Count);
     }
 
-    // ── Requested scope derivation (this endpoint is single/non-tabbed, so scope is derived once
-    // from the caller's own HR access rather than being caller-chosen, unlike the Manager/HR
-    // dashboard summary endpoints) ──────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_HrCaller_Passes_HrScope_To_Providers()

@@ -2,10 +2,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace HR.Web.Models;
 
-// Employee Number is required except when the company's numbering mode is Automatic and this is
-// a brand-new employee (in which case the field isn't shown at all and the value is left empty
-// for the server to auto-generate) — the flag is read from a sibling bool property on the same
-// model instance at validation time, same pattern as DynamicRegexAttribute above.
 public sealed class RequiredUnlessAttribute(string flagPropertyName) : ValidationAttribute
 {
     protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)

@@ -69,7 +69,6 @@ public class ReadOnlyModeMiddlewareTests
             Request = { Method = "POST", Path = "/api/companies/some-mutation" }
         };
         context.Response.Body = new MemoryStream();
-        // No authenticated user set — IsAuthenticated defaults to false.
 
         var nextCalled = false;
         var middleware = new ReadOnlyModeMiddleware(_ => { nextCalled = true; return Task.CompletedTask; });
@@ -170,7 +169,7 @@ public class ReadOnlyModeMiddlewareTests
 
     private static DefaultHttpContext BuildAuthenticatedContext(string method, string path, Guid? companyId = null)
     {
-        _ = companyId; // tenant is supplied separately via FakeCurrentTenant at the call site.
+        _ = companyId;
 
         var context = new DefaultHttpContext
         {

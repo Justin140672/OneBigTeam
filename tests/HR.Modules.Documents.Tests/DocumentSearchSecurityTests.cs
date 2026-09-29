@@ -1,5 +1,3 @@
-// SEA-08: Search security matrix — document search cross-company isolation,
-// consistent out-of-range page behaviour and search term validation.
 using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Features.ListSharedCompanyDocuments;
 using HR.Modules.Documents.Features.SearchEmployeeDocuments;
@@ -13,7 +11,6 @@ public class DocumentSearchSecurityTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 28, 9, 0, 0, TimeSpan.Zero);
 
-    // ── SearchEmployeeDocuments: cross-company isolation ──────────────────
 
     [Fact]
     public async Task SearchEmployeeDocuments_TotalCount_Excludes_Other_Company_Records()
@@ -24,7 +21,6 @@ public class DocumentSearchSecurityTests
         var typeA = await SeedType(db, companyA);
         var typeB = await SeedType(db, companyB);
 
-        // 2 docs for company A, 3 for company B
         await SeedDoc(db, companyA, typeA.Id, "A Doc 1", "a1.pdf", Guid.NewGuid(), Now);
         await SeedDoc(db, companyA, typeA.Id, "A Doc 2", "a2.pdf", Guid.NewGuid(), Now);
         await SeedDoc(db, companyB, typeB.Id, "B Doc 1", "b1.pdf", Guid.NewGuid(), Now);
@@ -57,13 +53,11 @@ public class DocumentSearchSecurityTests
             new SearchEmployeeDocumentsRequest { CompanyId = companyId },
             allowedEmployeeIds: [allowed], callerIsHrAdministrator: false, CancellationToken.None);
 
-        // TotalCount must reflect only the accessible records, not all company records.
         Assert.Equal(2, result.Value!.TotalCount);
         Assert.Equal(2, result.Value.Items.Count);
         Assert.All(result.Value.Items, i => Assert.NotEqual("Not Allowed", i.Title));
     }
 
-    // ── SearchEmployeeDocuments: out-of-range page ────────────────────────
 
     [Fact]
     public async Task SearchEmployeeDocuments_Out_Of_Range_Page_Returns_Empty_Items_With_Correct_TotalCount()
@@ -82,7 +76,6 @@ public class DocumentSearchSecurityTests
         Assert.Empty(result.Value.Items);
     }
 
-    // ── SearchEmployeeDocuments: validator ────────────────────────────────
 
     [Fact]
     public void SearchEmployeeDocuments_Validator_Rejects_Oversized_SearchText()
@@ -97,7 +90,6 @@ public class DocumentSearchSecurityTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(SearchEmployeeDocumentsRequest.SearchText));
     }
 
-    // ── ListSharedCompanyDocuments: cross-company isolation ───────────────
 
     [Fact]
     public async Task ListSharedCompanyDocuments_TotalCount_Excludes_Other_Company_Records()
@@ -140,7 +132,6 @@ public class DocumentSearchSecurityTests
         Assert.Empty(result.Value.Items);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────
 
     private static SearchEmployeeDocumentsHandler SearchHandler(DocumentsDbContext db, Dictionary<Guid, string>? names = null) =>
         new(db, new FakeEmployeeNameReader(names));

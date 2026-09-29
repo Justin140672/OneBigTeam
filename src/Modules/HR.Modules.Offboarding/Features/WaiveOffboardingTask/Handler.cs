@@ -36,10 +36,6 @@ internal sealed class WaiveOffboardingTaskHandler(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        // Spec SPEC-OFF-01: EmployeeId is the leaving employee the plan belongs to — falls back to
-        // the task's own AssignedEmployeeId in the unexpected case the owning plan cannot be found,
-        // mirroring CompleteOffboardingTaskFromTaskAction's identical fallback for its own audit
-        // events.
         var plan = await dbContext.OffboardingPlans
             .FirstOrDefaultAsync(p => p.Id == offboardingTask.OffboardingPlanId, cancellationToken);
 

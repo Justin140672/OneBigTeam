@@ -56,9 +56,6 @@ internal sealed class GetSystemHealthHandler(
                         category.DisplayName, entry.Status.ToString(), entry.Description);
                 }
 
-                // A check that hasn't been registered (e.g. missing configuration wiring) is
-                // surfaced as Unhealthy rather than silently omitted, so a wiring regression is
-                // visible on the dashboard rather than hidden.
                 return new SystemHealthCategory(
                     category.DisplayName, HealthStatus.Unhealthy.ToString(), "No health check registered.");
             })

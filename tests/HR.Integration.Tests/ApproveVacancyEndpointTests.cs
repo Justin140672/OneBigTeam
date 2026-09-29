@@ -9,10 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// See ApproveVacancyHandlerTests/VacancyTests in HR.Modules.Recruitment.Tests for the equivalent
-/// unit-level coverage of the same behaviour.
-/// </summary>
 [Collection("Integration")]
 public class ApproveVacancyEndpointTests
 {

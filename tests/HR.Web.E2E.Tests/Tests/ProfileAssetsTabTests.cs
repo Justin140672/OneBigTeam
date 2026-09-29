@@ -4,15 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the Assets tab on the self-service My Profile page.
-///
-/// Uses seeded data:
-///   - Sarah Chen (30000000-0000-0000-0000-000000000001) has a Dell UltraSharp 27"
-///     monitor assigned (ASSET-0002, assignment c0000000-0000-0000-0000-000000000005).
-///   - Tom Williams (30000000-0000-0000-0000-000000000004) has a MacBook Pro 14"
-///     assigned (ASSET-0001, assignment c0000000-0000-0000-0000-000000000003).
-/// </summary>
 public sealed class ProfileAssetsTabTests(EmployeePersonaFixture fixture) : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId   = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -107,13 +98,8 @@ public sealed class ProfileAssetsTabTests(EmployeePersonaFixture fixture) : Role
 
         var profileUrlBeforeClick = _page.Url;
 
-        // The "View" action is a button directly on the row — no row selection needed.
         await _page.Locator(".e-grid .e-row").First.Locator("button[title='View']").ClickAsync();
 
-        // Should open the asset in a dialog (AssetDetailDialog), not navigate to /assets/{id}/view.
-        // Scoped to [role='dialog'] because Syncfusion's SfDialog CssClass propagates onto
-        // multiple elements (the outer container, the dialog itself, and the close button),
-        // which makes a bare ".asset-detail-dialog" locator ambiguous under Playwright's strict mode.
         await _page.WaitForSelectorAsync("[role='dialog'].asset-detail-dialog", new() { Timeout = 15_000 });
         Assert.True(await _page.Locator("[role='dialog'].asset-detail-dialog").IsVisibleAsync(),
             "Expected clicking View on My Profile's Assets tab to open the asset in a dialog");

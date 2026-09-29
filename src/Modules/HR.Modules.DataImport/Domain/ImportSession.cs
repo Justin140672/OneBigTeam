@@ -22,17 +22,8 @@ internal sealed class ImportSession
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    // OBT-REM-06: optimistic-concurrency token for the atomic confirm-session claim. Follows the
-    // persisted-column pattern used by CompanySettings.Version.
     public int Version { get; private set; } = 1;
 
-    // Security review finding #2: raw-file deletion status is tracked separately from the
-    // session's business Status so a retry of a failed deletion (or a concurrent sweep run) is
-    // safe and idempotent, and so an operator can tell "file purged" apart from "import failed"
-    // at a glance. FileDeletedAt is the durable idempotency marker: once set, no code path
-    // attempts deletion again. FileDeletionAttemptCount/FileDeletionLastAttemptedAt exist purely
-    // to detect and log exhausted cleanup attempts (see PurgeImportSessionFilesJob); they never
-    // gate business behaviour.
     public DateTimeOffset? FileDeletedAt { get; private set; }
     public DateTimeOffset? FileDeletionLastAttemptedAt { get; private set; }
     public int FileDeletionAttemptCount { get; private set; }
@@ -83,11 +74,6 @@ internal sealed class ImportSession
     public void ClaimForConfirmation(DateTimeOffset now)
     {
         Status = ImportStatus.Processing;
-        // OBT-REM-08: always refresh StartedAt on claim (not just the first time) so an active
-        // confirmation is judged for staleness from when THIS attempt started, not from when the
-        // original validation step ran. Without this, a session validated more than 15 minutes ago
-        // would be treated as an abandoned claim the instant it is claimed, even though the claim
-        // itself is brand new and actively running.
         StartedAt = now;
         CompletedAt = null;
         UpdatedAt = now;
@@ -104,11 +90,6 @@ internal sealed class ImportSession
         UpdatedAt = now;
     }
 
-    /// <summary>
-    /// Records the outcome of the validate step. Lands on Validated when at least one row is
-    /// valid (so a confirm can proceed against that valid subset); lands on CompletedWithErrors
-    /// when every row failed validation, since there is nothing left to confirm.
-    /// </summary>
     public void Validate(int successfulRows, int failedRows, DateTimeOffset now)
     {
         SuccessfulRows = successfulRows;
@@ -119,11 +100,6 @@ internal sealed class ImportSession
         UpdatedAt = now;
     }
 
-    /// <summary>
-    /// Records the outcome of the confirm/create step. Lands on Imported when every valid row
-    /// was successfully created; lands on CompletedWithErrors when some rows failed at
-    /// creation time (their row-level errors are recorded separately as ImportRowError rows).
-    /// </summary>
     public void Confirm(int createdCount, int failedCount, DateTimeOffset now)
     {
         SuccessfulRows = createdCount;
@@ -150,22 +126,12 @@ internal sealed class ImportSession
         UpdatedAt = now;
     }
 
-    /// <summary>
-    /// Records that the raw uploaded file was successfully (and idempotently) deleted from
-    /// storage. Safe to call more than once; callers should skip deletion entirely once
-    /// <see cref="FileDeletedAt"/> is already set.
-    /// </summary>
     public void MarkFileDeleted(DateTimeOffset now)
     {
         FileDeletedAt = now;
         FileDeletionLastAttemptedAt = now;
     }
 
-    /// <summary>
-    /// Records a failed (or not-yet-attempted-to-completion) deletion attempt so the sweep job
-    /// can back off and so exhausted-attempt logging has a count to compare against a threshold.
-    /// Does not touch the session's business Status.
-    /// </summary>
     public void RecordFileDeletionAttemptFailed(DateTimeOffset now)
     {
         FileDeletionLastAttemptedAt = now;

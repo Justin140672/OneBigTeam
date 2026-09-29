@@ -10,14 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// DOC-01: resource-level (self / manager-hierarchy / HR-admin) authorization for the four
-/// employee-document endpoints guarded by
-/// <c>HR.Modules.Documents.Services.DocumentResourceAuthorizer</c>. Endpoint-level Policies(...)
-/// only proves tenant/role membership; it never proves the caller has a relationship to the
-/// specific employeeId in the route, so these tests exercise that resource-ownership check
-/// end-to-end over real HTTP, mirroring LeaveResourceAuthorizationTests's pattern for LEAVE-01.
-/// </summary>
 [Collection("Integration")]
 public class DocumentsResourceAuthorizationTests(ApiWebApplicationFactory factory)
 {
@@ -32,9 +24,6 @@ public class DocumentsResourceAuthorizationTests(ApiWebApplicationFactory factor
 
     private static readonly Guid OtherCompanyId = Guid.NewGuid();
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // List
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task List_Returns_Unauthorized_For_Anonymous_Request()
@@ -94,9 +83,9 @@ public class DocumentsResourceAuthorizationTests(ApiWebApplicationFactory factor
     [Fact]
     public async Task List_Allows_Skip_Level_Manager_In_Three_Level_Hierarchy()
     {
-        var seniorManager = await CreateEmployeeAsync(); // C
-        var manager = await CreateEmployeeAsync();       // B
-        var employee = await CreateEmployeeAsync();      // A
+        var seniorManager = await CreateEmployeeAsync();
+        var manager = await CreateEmployeeAsync();
+        var employee = await CreateEmployeeAsync();
 
         using (var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true))
         {
@@ -121,9 +110,6 @@ public class DocumentsResourceAuthorizationTests(ApiWebApplicationFactory factor
 
         using (var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true))
         {
-            // Give the manager a report — but not the target employee under test — so this
-            // exercises the "manager, but target not in hierarchy" denial branch specifically,
-            // not just "no reports at all".
             await AssignManagerAsync(setupClient, someoneElsesReport, manager);
         }
 
@@ -164,9 +150,6 @@ public class DocumentsResourceAuthorizationTests(ApiWebApplicationFactory factor
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Get (detail)
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_Returns_Unauthorized_For_Anonymous_Request()
@@ -285,9 +268,6 @@ public class DocumentsResourceAuthorizationTests(ApiWebApplicationFactory factor
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Download
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Download_Returns_Unauthorized_For_Anonymous_Request()
@@ -408,12 +388,6 @@ public class DocumentsResourceAuthorizationTests(ApiWebApplicationFactory factor
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Delete (HR-administrator only via the pre-existing "employee:manage" policy — not
-    // self-service, so only the positive HR-administrator case plus the new cross-company
-    // tenant-check regression are covered here; role-gating denial cases already live in
-    // DeleteEmployeeDocumentEndpointTests)
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Delete_Allows_HrAdministrator()
@@ -431,10 +405,6 @@ public class DocumentsResourceAuthorizationTests(ApiWebApplicationFactory factor
     [Fact]
     public async Task Delete_Returns_Forbidden_For_Cross_Company_HrAdministrator()
     {
-        // DOC-01: before this fix, an HR administrator's token could delete documents in a
-        // different company by editing the companyId route segment — the tenant check added to
-        // DeleteEmployeeDocument/Endpoint.cs closes that gap even though "employee:manage"
-        // already restricted the endpoint to HR administrators.
         var employee = await CreateEmployeeAsync();
         using var hrClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true);
         var documentId = await UploadDocumentAsync(employee);
@@ -452,9 +422,6 @@ public class DocumentsResourceAuthorizationTests(ApiWebApplicationFactory factor
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(
         Guid userId, bool hrAdministrator = false, bool manager = false, bool allowAutoRedirect = true)
@@ -475,13 +442,6 @@ public class DocumentsResourceAuthorizationTests(ApiWebApplicationFactory factor
         return client;
     }
 
-    /// <summary>
-    /// Creates a real employee via the employees API and returns its id. An employee's id doubles
-    /// as the identity user id for the linked account (see GetMyEmployeeHandler's `e.Id == userId`
-    /// lookup), so this id is used both as the document resource's EmployeeId and as the
-    /// TestAuthHandler.UserHeader value when acting "as" that employee. Mirrors
-    /// LeaveResourceAuthorizationTests.CreateEmployeeAsync.
-    /// </summary>
     private async Task<Guid> CreateEmployeeAsync()
     {
         using var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true);
@@ -519,12 +479,6 @@ public class DocumentsResourceAuthorizationTests(ApiWebApplicationFactory factor
         response.EnsureSuccessStatusCode();
     }
 
-    /// <summary>
-    /// UploadEmployeeDocument is gated by the "employee:manage" policy (HrAdministrator role
-    /// only — see UploadEmployeeDocument/Endpoint.cs's isManagerUpload check), so a plain
-    /// employee's own client cannot upload even their own document via this endpoint; every
-    /// caller here must be an HR administrator regardless of whose document is being seeded.
-    /// </summary>
     private async Task<Guid> UploadDocumentAsync(Guid employeeId)
     {
         using var uploaderClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true);
@@ -535,11 +489,6 @@ public class DocumentsResourceAuthorizationTests(ApiWebApplicationFactory factor
         response.EnsureSuccessStatusCode();
         var payload = await response.Content.ReadFromJsonAsync<UploadPayload>();
 
-        // FakeBackgroundJobClient (see its remarks) makes ScanUploadedFileJob enqueue a no-op in
-        // this test host, so a freshly-uploaded Document would otherwise sit at ScanStatus.Pending
-        // forever and every download attempt would be blocked by ScanStatusAccessGuard regardless
-        // of authorization — mirrors DocumentScanStatusGatingEndpointTests's direct-DbContext
-        // MarkScanClean pattern to make these authorization-focused tests deterministic.
         using (var scope = factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<DocumentsDbContext>();
@@ -554,7 +503,7 @@ public class DocumentsResourceAuthorizationTests(ApiWebApplicationFactory factor
     private static MultipartFormDataContent BuildPdfUpload(string title = "Auth Test Doc")
     {
         var pdfBytes = new byte[1024];
-        pdfBytes[0] = 0x25; pdfBytes[1] = 0x50; pdfBytes[2] = 0x44; pdfBytes[3] = 0x46; // %PDF
+        pdfBytes[0] = 0x25; pdfBytes[1] = 0x50; pdfBytes[2] = 0x44; pdfBytes[3] = 0x46;
 
         var content = new MultipartFormDataContent();
         content.Add(new StringContent(title), "Title");

@@ -1,26 +1,11 @@
 namespace HR.SharedKernel.Pricing;
 
-/// <summary>
-/// One band of the progressive per-employee subscription pricing model. <see cref="StartEmployee"/>
-/// and <see cref="EndEmployee"/> are 1-based and inclusive. A band with a null
-/// <see cref="EndEmployee"/> is the final, unlimited band and must be the last band in the config.
-/// </summary>
 public sealed record SubscriptionPricingBand(int StartEmployee, int? EndEmployee, decimal PricePerEmployee);
 
-/// <summary>
-/// The single authoritative, configurable progressive per-employee pricing model: an ordered,
-/// contiguous list of <see cref="SubscriptionPricingBand"/> starting at employee 1, plus a minimum
-/// monthly charge floor. Managed centrally (Companies module / Platform Settings) and consumed
-/// identically by the marketing pricing calculator, customer billing and the Admin app. Rates are
-/// never hard-coded in the calculation — see <see cref="SubscriptionPricingCalculator"/>.
-/// </summary>
 public sealed record SubscriptionPricingConfig(
     IReadOnlyList<SubscriptionPricingBand> Bands,
     decimal MinimumMonthlyChargeGbp)
 {
-    /// <summary>
-    /// The out-of-the-box default: 1–50 £2.00/employee/mo, 51–150 £1.75, 151+ £1.50, minimum £20.00.
-    /// </summary>
     public static SubscriptionPricingConfig Default { get; } = new(
         new[]
         {
@@ -30,13 +15,6 @@ public sealed record SubscriptionPricingConfig(
         },
         20.00m);
 
-    /// <summary>
-    /// Enforces the structural rules: at least one band; bands ordered and contiguous starting at 1
-    /// (no gaps, no overlaps); exactly one final unlimited band (null EndEmployee) and it must be
-    /// last; every non-final band has EndEmployee ≥ StartEmployee; StartEmployee ≥ 1 and
-    /// EndEmployee ≥ 1; no negative prices; minimum monthly charge ≥ 0; the final band's
-    /// StartEmployee == previous band's EndEmployee + 1.
-    /// </summary>
     public Result Validate()
     {
         if (Bands is null || Bands.Count == 0)
@@ -114,7 +92,6 @@ public sealed record SubscriptionPricingConfig(
     }
 }
 
-/// <summary>The charge contributed by a single band for a given employee count.</summary>
 public sealed record SubscriptionPricingBandCharge(
     string BandRangeLabel,
     int StartEmployee,
@@ -123,7 +100,6 @@ public sealed record SubscriptionPricingBandCharge(
     decimal PricePerEmployee,
     decimal Subtotal);
 
-/// <summary>The full progressive breakdown of a monthly subscription charge.</summary>
 public sealed record SubscriptionPricingBreakdown(
     int ActiveEmployeeCount,
     IReadOnlyList<SubscriptionPricingBandCharge> BandBreakdown,
@@ -131,12 +107,6 @@ public sealed record SubscriptionPricingBreakdown(
     decimal MinimumMonthlyChargeGbp,
     decimal FinalMonthlyCharge);
 
-/// <summary>
-/// The one authoritative progressive per-employee pricing calculation. Each employee is charged at
-/// their band's rate; the summed employee charge is floored at the configured minimum monthly
-/// charge (the floor applies even at zero employees, matching the marketing site's long-standing
-/// behaviour).
-/// </summary>
 public static class SubscriptionPricingCalculator
 {
     public static SubscriptionPricingBreakdown Calculate(int activeEmployeeCount, SubscriptionPricingConfig config)

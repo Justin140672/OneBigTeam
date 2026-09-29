@@ -3,15 +3,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Companies.Features.GetCompanySettingsHistory;
 
-/// <summary>
-/// SET-02: company-settings configuration history for Company Administrators. Reuses the existing
-/// cross-cutting IAuditHistoryReader.GetPlatformAuditLogAsync port (already paginated and
-/// company-scoped via its optional companyId filter) rather than adding a new read path — the only
-/// difference from the platform-admin audit log is that this endpoint is gated to a single tenant's
-/// Company Administrators and restricted to the "company-settings.updated" event type, so an HR
-/// Administrator viewing HR-settings history (see GetHrSettingsHistory) never sees company-profile
-/// changes and vice versa.
-/// </summary>
 internal sealed class GetCompanySettingsHistoryHandler(
     IAuditHistoryReader auditHistoryReader,
     IUserEmailDirectoryReader userEmailDirectoryReader)

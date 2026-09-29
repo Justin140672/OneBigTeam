@@ -30,13 +30,6 @@ internal sealed class FakeSupabaseAuthGateway(IHttpClientFactory httpClientFacto
 {
     private readonly SupabaseAuthGateway _real = new(httpClientFactory, options);
 
-    // Must derive the SAME deterministic id SignInWithPasswordAsync will later compute for this
-    // email (see DeriveFakeUserId below) — self-service SignUp persists this returned id as
-    // UserProfile.SupabaseAuthUserId, and LoginHandler looks up the UserProfile by the id
-    // SignInWithPasswordAsync returns after a real form login. Previously returned Guid.NewGuid(),
-    // an unrelated random id that could never match the deterministic one sign-in computes, so
-    // every self-service-signed-up E2E account failed login with "Invalid email or password" even
-    // though Supabase-side auth itself "succeeded" (see LoginHandler's UserProfile-not-found path).
     public Task<Guid> CreateUserAsync(string email, string password, string redirectTo, CancellationToken cancellationToken) =>
         Task.FromResult(DeriveFakeUserId(email));
 
@@ -56,13 +49,9 @@ internal sealed class FakeSupabaseAuthGateway(IHttpClientFactory httpClientFacto
     public Task SignOutAsync(string userAccessToken, CancellationToken cancellationToken) =>
         Task.CompletedTask;
 
-    // No real Supabase project is exercised in E2E — report "no factors were enrolled" (success).
     public Task<int> RemoveAllMfaFactorsAsync(Guid supabaseUserId, CancellationToken cancellationToken) =>
         Task.FromResult(0);
 
-    // Every E2E identity maps deterministically from its email (see DeriveFakeUserId) — a platform
-    // administrator created through the Admin Portal has no locally-linked id, so MFA reset resolves
-    // it by email through here.
     public Task<Guid?> GetUserIdByEmailAsync(string email, CancellationToken cancellationToken) =>
         Task.FromResult<Guid?>(DeriveFakeUserId(email));
 
@@ -95,8 +84,6 @@ internal sealed class FakeSupabaseAuthGateway(IHttpClientFactory httpClientFacto
         return Task.FromResult<(Guid, IReadOnlyDictionary<string, string>)?>((DeriveFakeUserId(email), metadata));
     }
 
-    // P1 platform-administrator provisioning: same deterministic-id / metadata-recording behaviour
-    // as CreateConfirmedUserAsync above.
     public Task<Guid> CreatePendingUserWithMetadataAsync(
         string email, string redirectTo, IReadOnlyDictionary<string, string> metadata, CancellationToken cancellationToken)
     {
@@ -117,18 +104,6 @@ internal sealed class FakeSupabaseAuthGateway(IHttpClientFactory httpClientFacto
         }
 
         var userId = DeriveFakeUserId(email);
-        // 12h, not the usual real-Supabase-mirroring 1h: PersonaLoginCache performs each persona's
-        // real login exactly ONCE for the whole E2E run and never proactively refreshes it — every
-        // later test's browser context reuses that same cached storageState/JWT for however long the
-        // run takes. A 1h expiry meant every context built after the run's 1-hour mark carried an
-        // already-expired token, causing a mass "session looks fine but every API call 401s" failure
-        // for every still-running test (worst for laura.bennett, used by ~110 of ~170 classes) — an
-        // entirely separate stampede from the run-start one, indistinguishable from it in symptoms
-        // (bounces to /login, PersonaLoginCache.InvalidateAndRefreshAsync fires, real relogin queues
-        // behind _realLoginGate) but caused by wall-clock elapsed time rather than concurrency. This
-        // token is E2E-only and not a real secret (see E2eFakeSupabaseJwt's remarks), so there's no
-        // reason to mirror production's real 1h Supabase access-token lifetime here — 12h comfortably
-        // outlasts any realistic full-suite run.
         var expiresAt = DateTimeOffset.UtcNow.AddHours(12);
         var accessToken = E2eFakeSupabaseJwt.CreateAccessToken(
             options.Value.ProjectUrl, userId, email, expiresAt - DateTimeOffset.UtcNow);
@@ -136,10 +111,6 @@ internal sealed class FakeSupabaseAuthGateway(IHttpClientFactory httpClientFacto
         return Task.FromResult(new SupabaseSession(accessToken, "e2e-fake-refresh-token", userId, expiresAt));
     }
 
-    // Deterministic per-email GUID so repeated calls (EnsureDevUserAsync then SignInWithPasswordAsync,
-    // or multiple SignInWithPasswordAsync calls across a run) always resolve to the same fake
-    // Supabase user id for a given email — mirrors real Supabase's idempotent "already exists"
-    // behaviour (SupabaseAuthGateway.EnsureDevUserAsync) without needing any storage.
     private static Guid DeriveFakeUserId(string email)
     {
         var hash = MD5.HashData(Encoding.UTF8.GetBytes(email.Trim().ToLowerInvariant()));

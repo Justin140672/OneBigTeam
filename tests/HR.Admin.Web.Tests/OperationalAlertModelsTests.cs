@@ -4,13 +4,6 @@ using HR.Admin.Web.Models;
 
 namespace HR.Admin.Web.Tests;
 
-/// <summary>
-/// The Admin app's operational-alert DTOs must accept everything the API contract
-/// (HR.Modules.Notifications ListOperationalAlerts / GetOperationalAlert) can return. The API's
-/// AffectedItemCount is nullable; the app-local DTO previously declared it as a non-nullable int, so
-/// any alert without an item count made ReadFromJsonAsync throw a JsonException and the whole
-/// Operational Alerts page fell back to its "not authorised, or couldn't be loaded" banner.
-/// </summary>
 public class OperationalAlertModelsTests
 {
     private const string ListJson = """

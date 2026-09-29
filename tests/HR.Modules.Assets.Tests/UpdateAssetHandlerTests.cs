@@ -158,7 +158,7 @@ public class UpdateAssetHandlerTests
 
         var result = await handler.HandleAsync(new UpdateAssetRequest
         {
-            CompanyId = Guid.NewGuid(), // different company
+            CompanyId = Guid.NewGuid(),
             Id = assetId,
             AssetNumber = "ASSET-001",
             CategoryId = categoryId,
@@ -175,7 +175,6 @@ public class UpdateAssetHandlerTests
         await using var db = BuildContext();
         var (categoryId, companyId, assetId) = await SeedAssetAsync(db, "ASSET-001");
 
-        // Create a second asset with a different number
         var assetHandler = new CreateAssetHandler(db, new FakeClock(FixedUtcNow), new FakeCompanyAssetNumberSettingsReader(), new FakeAssetNumberGenerator());
         await assetHandler.HandleAsync(new CreateAssetRequest
         {
@@ -187,7 +186,6 @@ public class UpdateAssetHandlerTests
 
         var handler = new UpdateAssetHandler(db, new FakeClock(FixedUtcNow));
 
-        // Try to rename ASSET-001 to ASSET-002 (conflict)
         var result = await handler.HandleAsync(new UpdateAssetRequest
         {
             CompanyId = companyId,
@@ -212,7 +210,7 @@ public class UpdateAssetHandlerTests
         {
             CompanyId = companyId,
             Id = assetId,
-            AssetNumber = "ASSET-001", // same number, same asset — no conflict
+            AssetNumber = "ASSET-001",
             CategoryId = categoryId,
             Name = "Updated Name",
             ExpectedVersion = 1
@@ -233,7 +231,7 @@ public class UpdateAssetHandlerTests
             CompanyId = companyId,
             Id = assetId,
             AssetNumber = "ASSET-001",
-            CategoryId = Guid.NewGuid(), // non-existent category
+            CategoryId = Guid.NewGuid(),
             Name = "Laptop"
         }, CancellationToken.None);
 
@@ -247,7 +245,6 @@ public class UpdateAssetHandlerTests
         await using var db = BuildContext();
         var (_, companyId, assetId) = await SeedAssetAsync(db);
 
-        // Seed a category for a different company
         var otherCompanyId = Guid.NewGuid();
         var otherCategoryHandler = new CreateAssetCategoryHandler(db, new FakeClock(FixedUtcNow));
         var otherCategoryResult = await otherCategoryHandler.HandleAsync(new CreateAssetCategoryRequest

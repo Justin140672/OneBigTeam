@@ -5,11 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Tests;
 
-/// <summary>
-/// DSH-05: <see cref="EmployeesOffSickReader"/> — an active (open) sickness record covers
-/// <c>onDate</c> when its start date is on or before that date. A record captured ahead of the
-/// absence actually starting, or one that has been closed, does not count.
-/// </summary>
 public class EmployeesOffSickReaderTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 1, 9, 0, 0, TimeSpan.Zero);

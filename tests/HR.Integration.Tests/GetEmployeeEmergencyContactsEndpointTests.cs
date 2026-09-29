@@ -5,12 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// ADM-05: tests the authorization change for GET /api/companies/{companyId}/employees/{employeeId}/emergency-contacts
-/// which now requires "employee:manage" policy (HrAdministrator only), not "employee:read".
-/// Viewing another employee's emergency contacts is an administration action; self-service uses
-/// the /me/emergency-contacts endpoints instead.
-/// </summary>
 [Collection("Integration")]
 public class GetEmployeeEmergencyContactsEndpointTests
 {
@@ -111,7 +105,6 @@ public class GetEmployeeEmergencyContactsEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
 
     private async Task<Guid> CreateEmployeeAsync(Guid companyId)
     {

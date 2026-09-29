@@ -13,7 +13,6 @@ public sealed record EmployeePromotionHistoryItemModel(
 
 public sealed record GetEmployeePromotionHistoryResponse(IReadOnlyList<EmployeePromotionHistoryItemModel> Items);
 
-// ── PROMOTE ──────────────────────────────────────────────────────────────────
 
 public sealed record PromoteEmployeeRequest(
     Guid CompanyId,

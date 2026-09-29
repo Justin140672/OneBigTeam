@@ -71,7 +71,7 @@ public class StripeGatewayFailureTests
         await Assert.ThrowsAsync<HttpRequestException>(() => handler.HandleAsync(CancellationToken.None));
 
         var persisted = await BuildContext().CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
-        Assert.True(persisted.CancelAtPeriodEnd); // resume never took effect
+        Assert.True(persisted.CancelAtPeriodEnd);
     }
 
     [Fact]
@@ -157,7 +157,6 @@ public class StripeGatewayFailureTests
         context.CustomerSubscriptions.Add(sub);
         await context.SaveChangesAsync();
 
-        // Gateway would throw if touched — asserts the "no secret key" branch short-circuits first.
         var gateway = new FakeStripeGateway
         {
             ExceptionToThrowOnListInvoices = new InvalidOperationException("gateway must not be called"),

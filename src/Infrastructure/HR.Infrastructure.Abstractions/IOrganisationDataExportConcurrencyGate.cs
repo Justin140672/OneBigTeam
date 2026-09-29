@@ -12,10 +12,6 @@ public interface IOrganisationDataExportConcurrencyGate
 {
     int MaxConcurrentExports { get; }
 
-    /// <summary>
-    /// Waits for a free slot. Returns a handle whose disposal releases the slot, or <c>null</c> if no
-    /// slot became available within the configured timeout.
-    /// </summary>
     Task<IAsyncDisposable?> AcquireAsync(CancellationToken cancellationToken);
 }
 
@@ -26,7 +22,6 @@ public sealed class OrganisationDataExportSlotUnavailableException(Guid exportId
     public Guid ExportId { get; } = exportId;
 }
 
-/// <summary>Default process-wide implementation backed by a <see cref="SemaphoreSlim"/>. Register as a singleton.</summary>
 public sealed class OrganisationDataExportConcurrencyGate : IOrganisationDataExportConcurrencyGate
 {
     private readonly SemaphoreSlim _slots;

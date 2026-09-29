@@ -46,8 +46,6 @@ public class RetryPolicyTests
     [Fact]
     public async Task Get_Timing_Out_Before_Any_Response_Is_Retried()
     {
-        // First attempt "times out" (throws, producing no HttpResponseMessage - Outcome.Result is
-        // null); this is exactly the case the RequestMethodCapturingHandler fallback exists for.
         var inner = FakeHandler.ThrowThenRespond(() => new Polly.Timeout.TimeoutRejectedException(), HttpStatusCode.OK);
         var client = BuildClient(inner);
 
@@ -72,8 +70,6 @@ public class RetryPolicyTests
     [Fact]
     public async Task Post_Timing_Out_After_Simulated_Commit_Is_Sent_Once()
     {
-        // Simulates the exact ticket-3 scenario: the handler committed its write, but the response
-        // never made it back (connection dropped / attempt timed out) - Outcome.Result is null.
         var inner = FakeHandler.ThrowThenRespond(() => new Polly.Timeout.TimeoutRejectedException(), HttpStatusCode.OK);
         var client = BuildClient(inner);
 
@@ -140,8 +136,6 @@ public class RetryPolicyTests
     [Fact]
     public async Task Caller_Cancellation_Does_Not_Trigger_Retry()
     {
-        // Distinguishes an attempt timeout (retried, tested above) from the CALLER cancelling the
-        // request outright - the latter must never be treated as a transient failure worth retrying.
         var inner = FakeHandler.RespondWith(HttpStatusCode.InternalServerError, HttpStatusCode.OK);
         var client = BuildClient(inner);
         using var cts = new CancellationTokenSource();
@@ -156,9 +150,6 @@ public class RetryPolicyTests
     [Fact]
     public async Task Get_Retries_Are_Bounded_Not_Indefinite()
     {
-        // Persistent 5xx on a safe method must still stop retrying eventually (MaxRetryAttempts = 4
-        // in HR.ServiceDefaults, so 1 initial attempt + 4 retries = 5 total) rather than retrying
-        // forever.
         var inner = FakeHandler.AlwaysRespondWith(HttpStatusCode.InternalServerError);
         var client = BuildClient(inner);
 
@@ -199,8 +190,6 @@ public class RetryPolicyTests
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            // Respect caller cancellation like a real HttpMessageHandler would - a pre-cancelled
-            // token must never even count as an attempt.
             cancellationToken.ThrowIfCancellationRequested();
 
             CallCount++;

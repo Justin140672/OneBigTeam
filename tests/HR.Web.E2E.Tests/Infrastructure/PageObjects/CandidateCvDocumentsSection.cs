@@ -31,11 +31,6 @@ public sealed class CandidateCvDocumentsSection(IPage page)
     private ILocator SuccessAlert => Card.Locator("[data-testid='candidate-cv-success']");
     private ILocator ErrorAlert   => Card.Locator("[data-testid='candidate-cv-error']");
 
-    /// <summary>
-    /// Waits for the card to render. The card is gated on the candidate having loaded
-    /// (OnLoadedAsync also loads the CV list before the page leaves its loading state), so once
-    /// the card is visible its rows / empty state are already populated.
-    /// </summary>
     public Task WaitForLoadedAsync() =>
         Card.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
 
@@ -43,13 +38,11 @@ public sealed class CandidateCvDocumentsSection(IPage page)
 
     public Task<bool> IsLegacyLinkVisibleAsync() => LegacyLink.IsVisibleAsync();
 
-    /// <summary>Auto-retrying assertion on the number of CV rows.</summary>
     public Task ExpectRowCountAsync(int expected) =>
         Assertions.Expect(Rows).ToHaveCountAsync(expected, new() { Timeout = 15_000 });
 
     public Task<int> GetCurrentBadgeCountAsync() => CurrentBadges.CountAsync();
 
-    /// <summary>File names of the CV rows in display order (newest first).</summary>
     public async Task<IReadOnlyList<string>> GetRowFileNamesAsync()
     {
         var names = await Rows.Locator("a").AllTextContentsAsync();
@@ -58,11 +51,6 @@ public sealed class CandidateCvDocumentsSection(IPage page)
 
     private ILocator RowFor(string fileName) => Rows.Filter(new() { HasText = fileName });
 
-    // ── Malware-scan state ([P1] candidate CV scanning) ──────────────────────────────────────
-    // Each row carries a scan badge (data-scan-status = raw status). The file name is a real link
-    // (<a href>) only once the scan is Clean; before that it is an <a> without href marked
-    // data-testid='candidate-document-download-disabled'. In E2E the no-op scanner makes every
-    // upload Clean shortly after the Hangfire job runs; the page auto-polls, and Refresh reloads.
 
     private ILocator RefreshButton => Card.Locator("[data-testid='candidate-documents-refresh']");
 
@@ -80,11 +68,6 @@ public sealed class CandidateCvDocumentsSection(IPage page)
 
     public Task ClickRefreshAsync() => RefreshButton.ClickAsync();
 
-    /// <summary>
-    /// Bounded wait for a row's scan badge to reach <paramref name="expectedStatus"/>. Relies on the
-    /// page's own auto-poll first, then presses Refresh between waits (the auto-poll stops after
-    /// ~30s), so it is deterministic whether the scan finished before or after the first check.
-    /// </summary>
     public async Task WaitForRowScanStatusAsync(string fileName, string expectedStatus, int timeoutMs = 90_000)
     {
         var badge = RowFor(fileName).Locator(
@@ -111,12 +94,10 @@ public sealed class CandidateCvDocumentsSection(IPage page)
     public Task<bool> RowHasReferencedTextAsync(string fileName) =>
         RowFor(fileName).Locator("[data-testid='candidate-cv-referenced']").IsVisibleAsync();
 
-    /// <summary>Auto-retrying (whitespace-normalised) assertion on a row's "Submitted with N application(s)" text.</summary>
     public Task ExpectRowReferencedTextAsync(string fileName, string expected) =>
         Assertions.Expect(RowFor(fileName).Locator("[data-testid='candidate-cv-referenced']"))
             .ToHaveTextAsync(expected, new() { Timeout = 15_000 });
 
-    /// <summary>"Upload CV" when there are no CVs yet, "Upload replacement CV" otherwise.</summary>
     public async Task<string?> GetUploadButtonTextAsync() => (await UploadButton.TextContentAsync())?.Trim();
 
     public Task ExpectUploadButtonTextAsync(string expected) =>
@@ -125,14 +106,6 @@ public sealed class CandidateCvDocumentsSection(IPage page)
     public async Task<string?> GetErrorAsync() =>
         await ErrorAlert.IsVisibleAsync() ? (await ErrorAlert.TextContentAsync())?.Trim() : null;
 
-    /// <summary>
-    /// Selects an in-memory PDF named <paramref name="fileName"/> and clicks the upload button. The
-    /// button is disabled until InputFile's OnChange has round-tripped to the circuit
-    /// (_selectedCvFile set), so wait for it to become enabled rather than sleeping. UploadCvAsync in
-    /// CandidateDetail.razor sets the success message and reloads the CV list inside one event
-    /// handler, which only re-renders on completion — so the success alert appearing means the list
-    /// already reflects the new upload.
-    /// </summary>
     public async Task UploadCvAsync(string fileName, byte[] content)
     {
         await FileInput.SetInputFilesAsync(new FilePayload

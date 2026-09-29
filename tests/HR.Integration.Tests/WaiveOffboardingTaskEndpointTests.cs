@@ -6,7 +6,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-// Spec SPEC-OFF-01: PUT /api/companies/{companyId}/offboarding/tasks/{offboardingTaskId}/waive.
 [Collection("Integration")]
 public class WaiveOffboardingTaskEndpointTests
 {
@@ -98,7 +97,6 @@ public class WaiveOffboardingTaskEndpointTests
 
     private async Task<Guid> StartOffboardingAndGetFirstTaskIdAsync(HttpClient client, Guid companyId, Guid employeeId)
     {
-        // Future last-working-day so tasks aren't auto-waived by backdated-departure reconciliation.
         var lastWorkingDay = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30).ToString("yyyy-MM-dd");
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/offboarding/start",

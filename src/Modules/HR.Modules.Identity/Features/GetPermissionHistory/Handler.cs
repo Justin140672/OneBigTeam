@@ -3,23 +3,10 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Identity.Features.GetPermissionHistory;
 
-/// <summary>
-/// IAM-08: company-wide permission-change history — direct role changes, position/inherited-role
-/// changes and employee-level override changes surface together, reusing the same
-/// IAuditHistoryReader-backed audit store every other module already writes to (see IdentityAudit.cs
-/// and AddEmployeeRoleOverride/UpdateUserRoles/SetPositionRoleDefaults handlers), rather than a
-/// second parallel history mechanism.
-/// </summary>
 internal sealed class GetPermissionHistoryHandler(
     IAuditHistoryReader auditHistoryReader,
     IEmployeeNameReader employeeNameReader)
 {
-    /// <summary>
-    /// Event types this view surfaces — every audit event IdentityAudit.cs publishes for a role,
-    /// position-role-default or override change (direct role changes appear alongside
-    /// position/override changes, per acceptance criteria), plus the account lifecycle events that
-    /// change effective access indirectly.
-    /// </summary>
     private static readonly HashSet<string> PermissionEventTypes =
     [
         "user.roles-changed",
@@ -35,9 +22,6 @@ internal sealed class GetPermissionHistoryHandler(
         "user.permission-denied",
     ];
 
-    // Bounded fetch — company permission history is not expected to run into the tens of thousands
-    // of rows; if it ever does, this should move to a DB-level entity-type filter on
-    // IAuditHistoryReader rather than widening this cap.
     private const int FetchLimit = 5_000;
 
     public async Task<GetPermissionHistoryResponse> HandleAsync(GetPermissionHistoryRequest request, CancellationToken cancellationToken)

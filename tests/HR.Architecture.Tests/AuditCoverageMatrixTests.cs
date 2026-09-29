@@ -3,22 +3,6 @@ using System.Reflection;
 
 namespace HR.Architecture.Tests;
 
-/// <summary>
-/// AUD-08: Enforces the audit coverage matrix across all business modules.
-///
-/// Two invariants:
-/// 1. Naming convention — every IAuditEvent implementation must be a record whose name ends in
-///    "AuditEvent".  This keeps audit types discoverable and distinguishable from domain events,
-///    integration events and other record types.
-///
-/// 2. Coverage completeness — every module assembly that contains mutation handlers (types whose
-///    names end in "Handler" and are NOT read-only by naming convention: not starting with "Get",
-///    "List", "Search", or "Query") must also declare at least one IAuditEvent implementation.
-///    This does not prove that every individual handler publishes an event, but it does guarantee
-///    that the module author has at minimum thought about auditing and created an audit file.
-///    Per-handler coverage is enforced by code-review process; a full handler-level test would
-///    require reflection into DI registrations which are too brittle for an architecture test.
-/// </summary>
 public class AuditCoverageMatrixTests
 {
     private static readonly Assembly[] ModuleAssemblies =
@@ -39,10 +23,6 @@ public class AuditCoverageMatrixTests
         typeof(HR.Modules.Reporting.ReportingModule).Assembly,
     ];
 
-    /// <summary>
-    /// AUD-08 — naming convention: every IAuditEvent implementation must have a name that ends
-    /// in "AuditEvent" so that audit records are trivially discoverable via tooling and grep.
-    /// </summary>
     [Fact]
     public void All_IAuditEvent_Implementations_Have_Names_Ending_In_AuditEvent()
     {
@@ -60,11 +40,6 @@ public class AuditCoverageMatrixTests
             string.Join("\n", violations));
     }
 
-    /// <summary>
-    /// AUD-08 — coverage completeness: every module assembly that has mutation handlers must also
-    /// declare at least one IAuditEvent.  A mutation handler is any type whose name ends in
-    /// "Handler" and whose name does NOT start with a read-only verb (Get, List, Search, Query).
-    /// </summary>
     [Fact]
     public void Every_Module_With_Mutation_Handlers_Declares_At_Least_One_AuditEvent()
     {

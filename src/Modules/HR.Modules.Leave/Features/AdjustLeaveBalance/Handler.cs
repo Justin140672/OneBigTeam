@@ -18,11 +18,6 @@ internal sealed class AdjustLeaveBalanceHandler(
     IWorkingPatternProvider workingPatternProvider,
     ICompanyLeaveSettingsReader leaveSettingsReader,
     IEmployeeNameReader employeeNameReader,
-    // Optional (like postCommitFaultInjector below) so the many existing handler-level unit tests
-    // that construct this handler directly don't all need updating. Production DI always supplies
-    // real instances via the required IAuditEventPublisher/ILogger registrations in Program.cs;
-    // when null (unit tests), the inline post-commit outbox dispatch below is simply skipped and
-    // the event stays queued for the background IdempotencyMaintenanceJob.
     IAuditEventPublisher? auditPublisher = null,
     ILogger<AdjustLeaveBalanceHandler>? logger = null,
     IPostCommitFaultInjector? postCommitFaultInjector = null,
@@ -76,10 +71,6 @@ internal sealed class AdjustLeaveBalanceHandler(
             return Result.Failure<AdjustLeaveBalanceResponse>(
                 Error.NotFound($"Leave type '{request.LeaveTypeId}' was not found."));
 
-        // Cross-module employee-existence check via the existing reader abstraction
-        // (IEmployeeNameReader is implemented in HR.Modules.Employees and DI-registered
-        // against HR.Infrastructure.Abstractions; other modules — e.g. Sickness — already
-        // consume it the same way). IDs not found are simply absent from the returned map.
         var names = await employeeNameReader.GetNamesAsync(request.CompanyId, [request.EmployeeId], cancellationToken);
         if (!names.ContainsKey(request.EmployeeId))
             return Result.Failure<AdjustLeaveBalanceResponse>(
@@ -116,9 +107,6 @@ internal sealed class AdjustLeaveBalanceHandler(
 
             if (!allowNegative)
             {
-                // Uses accrued (not raw) entitlement so a manual adjustment can't push a
-                // Monthly/Fortnightly balance below zero relative to what has actually accrued -
-                // consistent with SubmitLeaveRequestHandler's balance-sufficiency check (LEAVE-04).
                 var (_, adjustPolicyYearEnd) = LeaveYearCalculator.GetPolicyYearBounds(policyYear, leaveSettings.LeaveYearStartMonth);
                 var accruedDays = leaveType.Behaviour == LeaveTypeBehaviour.Toil
                     ? balance.EntitlementDays
@@ -156,8 +144,6 @@ internal sealed class AdjustLeaveBalanceHandler(
 
         var newRemainingHours = balance.RemainingDays * workingPattern.HoursPerDay;
 
-        // Built from in-memory values ahead of the save (balance.Adjust already ran above), so it
-        // can double as both the response and the payload persisted for an idempotency replay.
         var response = new AdjustLeaveBalanceResponse(
             adjustment.Id,
             adjustment.CompanyId,
@@ -192,7 +178,6 @@ internal sealed class AdjustLeaveBalanceHandler(
             AdjustmentHours: adjustmentHoursForRecord,
             Reason: request.Reason.ToString()), request.CompanyId, now, executionContextAccessor);
 
-        // Explicit transaction per ticket requirement, even though both writes share one DbContext/SaveChangesAsync.
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         // Ticket 3 (P1) final gap item 6: no-op in production. Lets an integration test simulate a
@@ -217,10 +202,6 @@ internal sealed class AdjustLeaveBalanceHandler(
 
                 if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
                 {
-                    // Lost a race against a concurrent duplicate under the same key. SaveIdempotentAsync
-                    // already rolled back this attempt's transaction (including the staged outbox entry
-                    // above) - nothing here was committed, so skip our own commit and hand back the
-                    // winner's result untouched. Its own outbox row continues delivery independently.
                     return Result.Success(outcome.Response!);
                 }
             }
@@ -245,10 +226,6 @@ internal sealed class AdjustLeaveBalanceHandler(
         await _postCommitFaultInjector.MaybeFailAfterCommitAsync(
             nameof(AdjustLeaveBalanceHandler), request.IdempotencyKey, cancellationToken);
 
-        // Deliver the just-committed audit outbox entry immediately rather than waiting for the
-        // next IdempotencyMaintenanceJob cron tick (every 5 minutes) - audit history readers expect
-        // this to be visible right after the request completes. The outbox row remains the source
-        // of truth: if this inline attempt throws, the background job still retries it on schedule.
         if (auditPublisher is not null && logger is not null)
         {
             try

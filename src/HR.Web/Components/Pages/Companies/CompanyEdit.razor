@@ -80,8 +80,6 @@
 
     protected override async Task LoadAsync()
     {
-        // Editing (not just viewing) company profile/addresses is admin-only, matching the
-        // "company:manage" policy that guards the underlying save endpoints.
         await Session.InitialiseAsync();
         if (!IsViewMode && !Session.CanManageCompany)
         {
@@ -111,10 +109,6 @@
                 City = a.City,
                 Region = a.Region,
                 PostalCode = a.PostalCode,
-                // Country Code is no longer user-editable (UK-only customers for now — see
-                // CompanyProfileTab.razor's remarks) — always "GB" regardless of whatever the
-                // stored value actually is, so existing addresses from before this change (or a
-                // freshly provisioned company's default address) still save correctly.
                 CountryCode = "GB",
                 PostcodeRegexPattern = Session.PostcodeRegex
             }).ToList();
@@ -139,13 +133,11 @@
         return null;
     }
 
-    // No list page to navigate to on save — this page shows an inline success banner instead.
     protected override Task OnSavedAsync()
     {
         SuccessMsg = "Company saved successfully.";
         return Task.CompletedTask;
     }
 
-    // Close navigates to the dashboard — there's no dedicated "company list" page.
     protected override string? ListUrl => "/";
 }

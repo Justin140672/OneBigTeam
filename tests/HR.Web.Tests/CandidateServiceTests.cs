@@ -14,7 +14,6 @@ public class CandidateServiceTests
         Email = "jane@example.com",
     };
 
-    // ── UpdateAsync(ApiSaveResult) — ANY 409 is a save conflict (no "code" needed) ──
 
     [Fact]
     public async Task UpdateAsync_Returns_Ok_When_Api_Returns_Success()
@@ -32,8 +31,6 @@ public class CandidateServiceTests
     [Fact]
     public async Task UpdateAsync_Flags_ConcurrencyConflict_For_Any_409_With_No_Code()
     {
-        // The recruitment API returns no "code" on its 409 body — ANY 409 must still be treated
-        // as a save conflict, unlike the code-gated services.
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.Conflict, new { error = "Someone else changed this candidate." }));
         var service = new CandidateService(factory);
 
@@ -92,7 +89,6 @@ public class CandidateServiceTests
         Assert.NotNull(result.ErrorMessage);
     }
 
-    // ── CreateCandidateAsync ──────────────────────────────────────────────────────
 
     [Fact]
     public async Task CreateCandidateAsync_Returns_Result_When_Api_Returns_Created()
@@ -119,7 +115,6 @@ public class CandidateServiceTests
         Assert.Equal("'not-an-email' is not a valid email address.", error);
     }
 
-    // ── DeactivateCandidateAsync ──────────────────────────────────────────────────
 
     [Fact]
     public async Task DeactivateCandidateAsync_Returns_Failure_When_Api_Returns_Unauthorized()
@@ -145,7 +140,6 @@ public class CandidateServiceTests
         Assert.Equal("You do not have permission to perform this action.", error);
     }
 
-    // ── GetCandidateAsync (representative read) ──────────────────────────────────
 
     [Fact]
     public async Task GetCandidateAsync_Returns_Value_When_Api_Returns_Ok()

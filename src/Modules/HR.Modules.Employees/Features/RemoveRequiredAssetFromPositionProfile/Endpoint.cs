@@ -16,8 +16,6 @@ internal sealed class Endpoint(RemoveRequiredAssetHandler handler, ICurrentUser 
         RemoveRequiredAssetRequest request,
         CancellationToken cancellationToken)
     {
-        // NOT User.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's resolved
-        // Employee/UserId (see GetMyEmployee/Endpoint.cs for the rationale).
         if (currentUser.UserId is not { } actorEmployeeId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());

@@ -27,9 +27,6 @@ public sealed class OffboardingService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    // SPEC-OFF-01 §Templates/obligations: HR-only, mandatory-reason waiver of a mandatory obligation.
-    // Endpoint is offboarding-task scoped (not nested under the employee), matching
-    // WaiveOffboardingTask/Endpoint.cs's actual route.
     public async Task<(WaiveOffboardingTaskResponse? Result, string? Error)> WaiveTaskAsync(
         Guid companyId, Guid offboardingTaskId, string reason, CancellationToken cancellationToken = default)
     {

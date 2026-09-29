@@ -83,11 +83,9 @@ public sealed class OnboardingTemplateEditConcurrencyConflictTests(HrAdminPerson
         var otherTabDesc = $"E2E Other {Guid.NewGuid():N}"[..20];
         var finalDesc    = $"E2E Final {Guid.NewGuid():N}"[..20];
 
-        // ── Tab 1: open the editor and start editing the Description (loads Version v1) ──
         await edit.GoToEditAsync(AcmeId, id);
         await edit.SetDescriptionAsync(firstTabDesc);
 
-        // ── Tab 2 (same context / persona): load the same template and save first ──
         var otherPage = await _context.NewPageAsync();
         try
         {
@@ -101,7 +99,6 @@ public sealed class OnboardingTemplateEditConcurrencyConflictTests(HrAdminPerson
             await otherPage.CloseAsync();
         }
 
-        // ── Tab 1: saving now is stale → conflict banner, page stays, input preserved ──
         await edit.SaveExpectingConflictAsync();
 
         Assert.True(await edit.IsConcurrencyWarningVisibleAsync(),
@@ -109,14 +106,12 @@ public sealed class OnboardingTemplateEditConcurrencyConflictTests(HrAdminPerson
         Assert.Contains($"/onboarding-templates/{id}", _page.Url);
         Assert.Equal(firstTabDesc, await edit.GetDescriptionAsync());
 
-        // ── Tab 1: "Reload latest values" clears the banner and adopts the other tab's value ──
         await edit.ClickReloadLatestValuesAsync();
 
         Assert.False(await edit.IsConcurrencyWarningVisibleAsync(),
             "Expected the conflict banner to clear after reloading latest values");
         Assert.Equal(otherTabDesc, await edit.WaitForDescriptionAsync(otherTabDesc));
 
-        // ── Tab 1: re-edit against the fresh version and save successfully ──
         await edit.SetDescriptionAsync(finalDesc);
         await edit.SaveAsync();
 
@@ -124,24 +119,12 @@ public sealed class OnboardingTemplateEditConcurrencyConflictTests(HrAdminPerson
         Assert.Equal(finalDesc, await edit.WaitForDescriptionAsync(finalDesc));
     }
 
-    /// <summary>
-    /// Regression for the two-part fix: <c>ReloadServerStateAsync</c> now also reloads
-    /// <c>Model.Tasks</c> (the checklist) on a concurrency-conflict reload — previously the reload
-    /// adopted the server's name/description/version but left the editor's stale task list in place,
-    /// so the next save silently overwrote the other editor's checklist changes.
-    ///
-    /// Editor A and Editor B both open the same template (one checklist task). A edits the task
-    /// title and saves. B edits the task title and saves → conflict banner. B clicks "Reload latest
-    /// values" → B's checklist must now show A's task title (server state), not B's stale edit. B
-    /// saves successfully and A's change survives. A further server-side change then makes B's next
-    /// save conflict again (banner reappears).
-    /// </summary>
     [Fact]
     public async Task OnboardingTemplateEdit_ReloadLatestValues_AdoptsServerChecklist_NotStaleTaskList()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var list  = new OnboardingTemplateListPage(_page, _fixture.WebBaseUrl);
-        var edit  = new OnboardingTemplateEditPage(_page, _fixture.WebBaseUrl);   // Editor B
+        var edit  = new OnboardingTemplateEditPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
@@ -154,16 +137,13 @@ public sealed class OnboardingTemplateEditConcurrencyConflictTests(HrAdminPerson
         var editorBFinal = $"Task BF {Guid.NewGuid():N}"[..18];
         var serverDesc   = $"Srv Desc {Guid.NewGuid():N}"[..18];
 
-        // Seed one checklist task on the template.
         await edit.GoToEditAsync(AcmeId, id);
         await edit.AddTaskWithTitleAsync(originalTask);
         await edit.SaveAsync();
 
-        // ── Editor B: open the editor and start renaming the task (loads Version v1) ──
         await edit.GoToEditAsync(AcmeId, id);
         await edit.FillTaskTitleAsync(editorBTask);
 
-        // ── Editor A (same context / persona, second tab): rename the task and save first ──
         var editorAPage = await _context.NewPageAsync();
         try
         {
@@ -177,24 +157,20 @@ public sealed class OnboardingTemplateEditConcurrencyConflictTests(HrAdminPerson
             await editorAPage.CloseAsync();
         }
 
-        // ── Editor B: saving now is stale → conflict banner, page stays put ──
         await edit.SaveExpectingConflictAsync();
         Assert.True(await edit.IsConcurrencyWarningVisibleAsync(),
             "Expected the concurrency conflict banner after Editor A changed the checklist");
         Assert.Contains($"/onboarding-templates/{id}", _page.Url);
 
-        // ── Editor B: "Reload latest values" must adopt Editor A's checklist, not B's stale edit ──
         await edit.ClickReloadLatestValuesAsync();
         Assert.False(await edit.IsConcurrencyWarningVisibleAsync(),
             "Expected the conflict banner to clear after reloading latest values");
         Assert.Equal(editorATask, await edit.WaitForFirstTaskTitleAsync(editorATask));
 
-        // ── Editor B: re-save against the fresh version succeeds; A's change survives ──
         await edit.SaveAsync();
         await edit.GoToEditAsync(AcmeId, id);
         Assert.Equal(editorATask, await edit.WaitForFirstTaskTitleAsync(editorATask));
 
-        // ── A further server-side change makes Editor B's next save conflict again ──
         var serverPage = await _context.NewPageAsync();
         try
         {

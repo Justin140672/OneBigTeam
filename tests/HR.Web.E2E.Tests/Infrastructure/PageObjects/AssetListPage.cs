@@ -2,9 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the asset list page (/companies/{companyId}/assets).
-/// </summary>
 public sealed class AssetListPage(IPage page, string baseUrl)
 {
     public async Task GoToAsync(Guid companyId)

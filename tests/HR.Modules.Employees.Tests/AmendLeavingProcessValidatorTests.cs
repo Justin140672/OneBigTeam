@@ -113,7 +113,6 @@ public class AmendLeavingProcessValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(AmendLeavingProcessRequest.LeavingReason));
     }
 
-    // ---- Spec SPEC-OFF-01: Notes required when LeavingReason == Other ----
 
     [Fact]
     public void Validate_Fails_When_LeavingReason_Is_Other_And_Notes_Is_Null()

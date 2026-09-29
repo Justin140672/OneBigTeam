@@ -86,8 +86,6 @@ public class NotifyHrOfOverdueFitNoteHandlerTests
 
         await handler.HandleAsync(MakeEvent(), CancellationToken.None);
 
-        // Not TaskActionType.Review — reserved for return-to-work review tasks (see
-        // NotifyHrOfFitNoteThresholdHandlerTests for the same note).
         Assert.Equal(TaskActionType.Complete, creator.Created[0].ActionType);
     }
 
@@ -149,7 +147,6 @@ public class NotifyHrOfOverdueFitNoteHandlerTests
         Assert.Contains("overdue", creator.Created[0].Description, StringComparison.OrdinalIgnoreCase);
     }
 
-    // OBT-REM-13: idempotency-key wiring ------------------------------------------------------------
 
     [Fact]
     public async Task HandleAsync_Passes_A_Deterministic_IdempotencyKey_Derived_From_EvidenceRequestId()
@@ -166,10 +163,6 @@ public class NotifyHrOfOverdueFitNoteHandlerTests
     [Fact]
     public async Task HandleAsync_Called_Twice_For_Same_Event_Passes_The_Same_IdempotencyKey_Both_Times()
     {
-        // Sequential replay of the same underlying occurrence (e.g. a retried Hangfire delivery) must
-        // produce two CreateAsync calls with an identical idempotency key — correctness against the
-        // resulting duplicate is then TaskCreator's/the database's responsibility (see
-        // TaskCreatorIdempotencyTests and TaskCreatorIdempotencyIntegrationTests), not this handler's.
         var creator           = new FakeTaskCreator();
         var handler           = BuildHandler(creator);
         var evidenceRequestId = Guid.NewGuid();

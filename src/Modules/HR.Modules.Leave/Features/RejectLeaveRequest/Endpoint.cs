@@ -26,9 +26,6 @@ internal sealed class Endpoint(
             return;
         }
 
-        // SEC: the acting reviewer must always be the authenticated caller, never trusted from
-        // request data — any client-supplied ReviewedByEmployeeId is discarded here and replaced
-        // with the server-resolved identity before authorization or persistence.
         var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
         request = request with
         {
@@ -48,8 +45,6 @@ internal sealed class Endpoint(
 
         if (result.IsFailure)
         {
-            // P1 #4: routes "concurrency" (as well as "conflict") to 409, matching every other
-            // versioned-aggregate endpoint (see ProblemResults.FromError).
             await Send.ResultAsync(ProblemResults.FromError(result.Error));
             return;
         }

@@ -27,10 +27,6 @@ internal sealed class GetEmployeeNotesHandler(
             .OrderByDescending(n => n.CreatedDate)
             .ToListAsync(cancellationToken);
 
-        // CreatedByUserId is the acting employee's own id (see CreateEmployeeNoteHandler, which
-        // passes actorEmployeeId — despite the "UserId" name, matching the same convention already
-        // used by GetEmployeeTimeline's PerformedBy resolution), so it resolves via the same
-        // employee-id-keyed name reader rather than a separate identity/user lookup.
         var names = await employeeNameReader.GetNamesAsync(
             companyId, notes.Select(n => n.CreatedByUserId).Distinct(), cancellationToken);
 

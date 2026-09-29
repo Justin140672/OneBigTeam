@@ -461,19 +461,24 @@ public class MigrationSeparationTests
                     Assert.True(platformCountBefore == platformCountAfter,
                         "Platform schema table count should not change on re-run (idempotency check)");
 
-                    // Verify seed data counts also didn't duplicate
+                    // Verify seed data counts also didn't duplicate. Unlike companiesSeededQuery
+                    // above (filtered to Acme/Beta Corp by id), these are unfiltered COUNT(*)s over
+                    // the whole table — CompaniesModule.SeedCompaniesAsync seeds 3 companies (Acme,
+                    // Beta Corp, and Gamma Industries — a company dedicated to a single E2E
+                    // subscription test, see that seed method's remarks), each with its own
+                    // subscription row.
                     const string companiesCountQuery = "SELECT COUNT(*) FROM companies.companies";
                     using (var cmd = new NpgsqlCommand(companiesCountQuery, connection))
                     {
                         var count = (long)(await cmd.ExecuteScalarAsync() ?? 0);
-                        Assert.Equal(2, count);
+                        Assert.Equal(3, count);
                     }
 
                     const string subscriptionsCountQuery = "SELECT COUNT(*) FROM companies.customer_subscriptions";
                     using (var cmd = new NpgsqlCommand(subscriptionsCountQuery, connection))
                     {
                         var count = (long)(await cmd.ExecuteScalarAsync() ?? 0);
-                        Assert.Equal(2, count);
+                        Assert.Equal(3, count);
                     }
                 }
                 finally

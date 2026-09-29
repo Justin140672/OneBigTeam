@@ -58,8 +58,6 @@ public class TasksResourceAuthorizerTests
         var skipLevelManager = Guid.NewGuid();
         var indirectReport = Guid.NewGuid();
 
-        // GetAllDescendantIdsAsync returns the complete tree, so the fake models a skip-level
-        // relationship the same way CompleteTaskHandlerTests does.
         var authorizer = new TasksResourceAuthorizer(
             new FakeRoleAuthorizationService(), new FakeDirectReportsReader(indirectReport));
 

@@ -68,7 +68,6 @@ public class ListUsersHandlerTests(IdentityDatabaseFixture fixture)
             await db.SaveChangesAsync();
         }
 
-        // audience reader knows the employee id but returns no audience profile for them.
         var audienceReader = new FakeEmployeeAudienceReader([employeeId]);
 
         var result = await BuildHandler(audienceReader).HandleAsync(Request(companyId), CancellationToken.None);
@@ -98,7 +97,6 @@ public class ListUsersHandlerTests(IdentityDatabaseFixture fixture)
             {
                 [employeeId] = new EmployeeAudienceProfile(null, null, positionProfileId),
             });
-        // no summaries => GetSummariesAsync returns empty.
         var result = await BuildHandler(audienceReader).HandleAsync(Request(companyId), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -127,7 +125,7 @@ public class ListUsersHandlerTests(IdentityDatabaseFixture fixture)
 
         Assert.True(result.IsSuccess);
         Assert.Equal(3, result.Value.TotalCount);
-        Assert.Equal(2, result.Value.Items.Count); // page respects PageSize
+        Assert.Equal(2, result.Value.Items.Count);
         Assert.Equal(1, result.Value.Page);
         Assert.Equal(2, result.Value.PageSize);
     }

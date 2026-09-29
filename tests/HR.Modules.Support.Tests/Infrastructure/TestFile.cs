@@ -37,8 +37,6 @@ internal static class TestFile
         return collection;
     }
 
-    /// <summary>Reliability review issue 4 (P1): a form file whose stream throws partway through
-    /// <c>CopyToAsync</c>, simulating a client disconnect / truncated upload mid-copy.</summary>
     public static IFormFile CreateWithThrowingStream(
         string fileName = "broken.png", string contentType = "image/png") =>
         new ThrowingStreamFormFile(fileName, contentType);

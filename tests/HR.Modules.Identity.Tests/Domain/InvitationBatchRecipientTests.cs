@@ -118,10 +118,6 @@ public class InvitationBatchRecipientTests
     [Fact]
     public void ResetForRetry_From_Sent_Also_Resets_State_Domain_Level_But_Callers_Never_Call_It_On_Sent()
     {
-        // The domain method itself has no built-in "only from Failed" guard — that invariant is
-        // enforced by RetryInvitationBatchHandler only querying Failed recipients. This test simply
-        // documents the domain-level behaviour so a future caller change doesn't silently corrupt a
-        // Sent/Skipped recipient without a test catching it.
         var recipient = InvitationBatchRecipient.Create(Guid.NewGuid(), Guid.NewGuid(), "a@test.com", Now);
         recipient.MarkProcessing();
         recipient.MarkSent(Now.AddMinutes(1));

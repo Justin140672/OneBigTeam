@@ -85,7 +85,7 @@ public class AuditDataExportSourceTests
     {
         await using var context = NewContext();
         var company = Guid.NewGuid();
-        const int total = 2_500; // > 2 * PageSize
+        const int total = 2_500;
         var seeded = Enumerable.Range(0, total)
             .Select(i => new TestAuditEvent
             {
@@ -111,7 +111,6 @@ public class AuditDataExportSourceTests
         var company = Guid.NewGuid();
         const int total = 1_010;
 
-        // Rows 990..1009 all share a single timestamp that straddles the first page boundary (index 1000).
         var sharedInstant = Base.AddDays(-5);
         var seeded = Enumerable.Range(0, total)
             .Select(i => new TestAuditEvent
@@ -197,7 +196,7 @@ public class AuditDataExportSourceTests
             }
         });
 
-        Assert.Equal(PageSize, seen); // stopped before fetching / emitting page 2
+        Assert.Equal(PageSize, seen);
     }
 
     [Fact]
@@ -221,7 +220,7 @@ public class AuditDataExportSourceTests
         var rows = await DrainAsync(new AuditDataExportSource(context), company);
 
         var row = Assert.Single(rows);
-        Assert.Null(row[3]); // EntityId == Guid.Empty -> null cell
+        Assert.Null(row[3]);
         Assert.Equal(employeeId.ToString(), row[4]);
         Assert.Equal(Base.ToString("o", CultureInfo.InvariantCulture), row[0]);
     }

@@ -85,27 +85,12 @@
         return Task.CompletedTask;
     }
 
-    // Both search and the active/inactive ("exclude Closed") filter are now server-side (see
-    // ListVacanciesRequest.Search/ExcludeClosed) — matching every other SearchPageBase list page
-    // (e.g. EmployeeList, UserAdministrationList), which bind DataSource straight to the base
-    // class's own Items and never filter client-side. Vacancy used to be the one exception,
-    // reinventing filtering via a locally computed property bound to DataSource — a real bug, not
-    // just a style inconsistency: Syncfusion's SfGrid rebinds and silently drops its own internal
-    // row-selection state whenever DataSource's object reference changes, which a freshly
-    // recomputed "Items.Where(...).ToList()" does on every single access — including the very
-    // re-render OnRowSelected triggers right after a row is selected. The toolbar's Edit button
-    // still looked enabled (driven by the base class's separate _hasSelection field, never reset
-    // by this), but Grid.GetSelectedRecordsAsync() came back empty by click time, so
-    // OnToolbarClick's "hr-edit" case silently no-opped.
     protected override async Task<IReadOnlyList<VacancyListItemModel>?> FetchItemsAsync(string? search)
     {
         var result = await VacancyService.ListVacanciesAsync(CompanyId, excludeClosed: !ShowInactive, search: search);
         return result?.Items;
     }
 
-    // Vacancy doesn't have a plain IsActive bool like most SupportsActiveFilter entities (it has a
-    // 5-value Status), so "inactive" here specifically means Closed — passed to the server as
-    // ExcludeClosed above, same as ListDepartmentsRequest's ShowInactive.
     protected override bool SupportsActiveFilter => true;
 
     protected override string LoadErrorMessage => "Failed to load vacancies.";

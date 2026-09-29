@@ -33,16 +33,8 @@
     [Parameter] public EventCallback OnDiscard { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }
 
-    // Local-only busy flag covering the async Save/Discard round-trip (validation, the HTTP
-    // call, and any resulting navigation) so a slow response can't be raced by a duplicate
-    // click — mirrors HrConfirmDialog's Busy handling, but tracked internally here since none of
-    // the ~39 call sites pass their own Saving/Busy state in as a parameter.
     private bool _busy;
 
-    // The footer Cancel button and the close-icon/Escape/backdrop path both need to end in
-    // OnCancel — but the footer button already invokes it directly, and SfDialog's Closed event
-    // then fires anyway once Visible flips to false in response, which would invoke OnCancel a
-    // second time. Mirrors HrConfirmDialog's/EditDialogBase's _suppressNextClosedEvent guard.
     private bool _suppressNextClosed;
 
     private Task HandleClosed()

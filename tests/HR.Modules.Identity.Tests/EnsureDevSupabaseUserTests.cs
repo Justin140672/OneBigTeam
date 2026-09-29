@@ -8,13 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Modules.Identity.Tests;
 
-/// <summary>
-/// The Development-only "make this employee login-ready" provisioning path
-/// (IdentityModule.EnsureDevSupabaseUserAsync, behind POST /api/dev/ensure-employee-login) must
-/// leave the user in the same shape as a seeded dev persona — including the ApplicationUser row.
-/// Without it, user-administration endpoints that load db.Users (e.g. UpdateUserRoles) answered
-/// "User was not found." for the provisioned user.
-/// </summary>
 public class EnsureDevSupabaseUserTests
 {
     private static ServiceProvider BuildServices()

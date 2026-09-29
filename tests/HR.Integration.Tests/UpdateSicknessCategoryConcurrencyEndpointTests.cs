@@ -50,7 +50,6 @@ public class UpdateSicknessCategoryConcurrencyEndpointTests
         Assert.Equal(HttpStatusCode.Conflict, editorB.StatusCode);
         Assert.Equal("concurrency", (await editorB.Content.ReadFromJsonAsync<ErrorPayload>())!.Code);
 
-        // A follow-up edit with the current version shows editor A's DisplayOrder, not editor B's.
         var reload = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/sickness-categories/{id}", Body(companyId, id, order: 5, expectedVersion: editorAPayload.Version));
         Assert.Equal(HttpStatusCode.OK, reload.StatusCode);
@@ -79,7 +78,6 @@ public class UpdateSicknessCategoryConcurrencyEndpointTests
             $"/api/companies/{companyId}/sickness-categories/{id}", Body(companyId, id, order: 2, expectedVersion: null));
         Assert.Equal(HttpStatusCode.UnprocessableEntity, r1.StatusCode);
 
-        // A follow-up edit with the known-good version 1 still succeeds -> the 422 wrote nothing.
         var reload = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/sickness-categories/{id}", Body(companyId, id, order: 4, expectedVersion: 1));
         Assert.Equal(HttpStatusCode.OK, reload.StatusCode);

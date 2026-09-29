@@ -4,15 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// NFR-05: applies the shared <see cref="AccessibilityScan"/> axe-core WCAG 2.0 A/AA gate across the
-/// representative HR-administrator journeys — the post-login shell, employee administration (list
-/// grid + edit page), leave configuration forms, a confirmation dialog, a data grid carrying status
-/// badges, and the reporting catalogue plus two report pages. Dashboard journeys stay in
-/// <see cref="AxeCoreDashboardScanTests"/>; employee self-service is in
-/// <see cref="EmployeeSelfServiceAccessibilityScanTests"/>; unauthenticated auth is in
-/// <see cref="LoginAccessibilityScanTests"/>.
-/// </summary>
 public sealed class AccessibilityScanJourneyTests(HrAdminPersonaFixture fixture)
     : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
@@ -66,8 +57,6 @@ public sealed class AccessibilityScanJourneyTests(HrAdminPersonaFixture fixture)
         await LoginAsync();
         var leaveTypes = new LeaveTypeListPage(_page, _fixture.WebBaseUrl);
         await leaveTypes.GoToAsync(AcmeId);
-        // The leave types grid renders .status-badge / .status-badge--success severity indicators —
-        // scanning it here keeps axe's colour-contrast rule covering that component (NFR-05 §6).
 
         await AccessibilityScan.AssertNoSeriousViolationsAsync(_page, "leave types grid (with status badges)");
     }
@@ -156,7 +145,7 @@ public sealed class RecruitmentAccessibilityScanJourneyTests(RecruiterPersonaFix
     : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-    private const string MarcusEmail = "marcus.diallo@acme.example"; // Recruiter
+    private const string MarcusEmail = "marcus.diallo@acme.example";
 
     [Fact]
     public async Task RecruitmentPipelineReport_HasNoSeriousViolations()
@@ -172,20 +161,11 @@ public sealed class RecruitmentAccessibilityScanJourneyTests(RecruiterPersonaFix
     }
 }
 
-/// <summary>
-/// NFR-05: the Company edit page's Profile tab (registered office + trading address fields) is
-/// gated by the "company:manage" policy, which CompanyAdministrator holds but HrAdministrator no
-/// longer does (see <see cref="Tests.CompanyEditCloseBehaviorTests"/>) — so this journey runs
-/// under the CompanyAdministrator-only persona rather than the HR-administrator fixture the rest
-/// of <see cref="AccessibilityScanJourneyTests"/> uses. Added alongside the persistent visible
-/// address field labels (Address Line 1/2, Town/City, County/Region, Postcode) that replaced
-/// placeholder-only labelling.
-/// </summary>
 public sealed class CompanyProfileAccessibilityScanJourneyTests(PriyaShahPersonaFixture fixture)
     : RoleE2ETestBase<PriyaShahPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-    private const string CompanyAdminEmail = "priya.shah@acme.example"; // CompanyAdministrator
+    private const string CompanyAdminEmail = "priya.shah@acme.example";
 
     [Fact]
     public async Task CompanyProfileTab_AddressFields_HasNoSeriousViolations()
@@ -198,8 +178,6 @@ public sealed class CompanyProfileAccessibilityScanJourneyTests(PriyaShahPersona
         await companyEdit.GoToAsync(AcmeId);
         await companyEdit.OpenProfileTabAsync();
 
-        // Acme has both a Registered Office and a Trading Address seeded, so both address
-        // sections (and their persistent field labels) are visible on the tab in one scan.
         await AccessibilityScan.AssertNoSeriousViolationsAsync(_page, "company profile — address fields");
     }
 }

@@ -33,7 +33,6 @@ public sealed class ContactDetailsTabSavingControlTests(EmployeePersonaFixture f
     private const string KeyboardDismissEmail = "e2e.seed53@acme.example";
     private const string BoundedFailureEmail  = "e2e.seed54@acme.example";
 
-    // ── Test 1: saving announcement + duplicate-submit guard ─────────────────
 
     [Fact]
     public async Task ContactDetailsTab_Saving_AnnouncesToAssistiveTechAndPreventsDuplicateSubmit()
@@ -45,18 +44,14 @@ public sealed class ContactDetailsTabSavingControlTests(EmployeePersonaFixture f
 
         await contact.ClickSaveAsync();
         await ctrl.WaitUntilRequestArrivedAsync();
-        // The request arriving server-side doesn't mean the "saving" render has reached the DOM yet.
         await contact.WaitForSavingStateRenderedAsync();
 
-        // The live region announces the in-flight save and is exposed to assistive tech.
         Assert.Contains("Saving contact details", await contact.SavingStatusTextAsync());
         Assert.Equal("status", await contact.SavingStatusRegion.GetAttributeAsync("role"));
         Assert.Equal("polite", await contact.SavingStatusRegion.GetAttributeAsync("aria-live"));
         Assert.True(await contact.IsSaveDisabledAsync(),
             "Save button should be disabled while a save is in flight.");
 
-        // Attempt keyboard re-activation WITHOUT any Playwright call that auto-waits for the button
-        // to be enabled — focus the form via JS then press keys straight at the keyboard.
         await _page.EvaluateAsync("() => { const b = document.getElementById('cd-save-button'); if (b) b.focus(); }");
         await _page.Keyboard.PressAsync("Enter");
         await _page.Keyboard.PressAsync("Space");
@@ -75,7 +70,6 @@ public sealed class ContactDetailsTabSavingControlTests(EmployeePersonaFixture f
             "Save button should be re-enabled after a successful save.");
     }
 
-    // ── Test 2: server failure → accessible error + retry ───────────────────
 
     [Fact]
     public async Task ContactDetailsTab_ServerFailure_ShowsAccessibleErrorAndAllowsRetry()
@@ -99,7 +93,6 @@ public sealed class ContactDetailsTabSavingControlTests(EmployeePersonaFixture f
                 new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
             Assert.False(string.IsNullOrWhiteSpace(await contact.ErrorAlertTextAsync()));
 
-            // Entered values preserved, saving status cleared, Save re-enabled.
             Assert.Equal(email, await contact.GetPersonalEmailAsync());
             Assert.Equal(line1, (await _page.GetByPlaceholder("Street address").InputValueAsync()).Trim());
             Assert.Equal(string.Empty, await contact.SavingStatusTextAsync());
@@ -110,7 +103,6 @@ public sealed class ContactDetailsTabSavingControlTests(EmployeePersonaFixture f
         }
         finally
         {
-            // Clear the control so the retry hits the real API.
             await ctrl.DisposeAsync();
         }
 
@@ -118,7 +110,6 @@ public sealed class ContactDetailsTabSavingControlTests(EmployeePersonaFixture f
         Assert.True(await contact.IsSuccessBannerVisibleAsync());
     }
 
-    // ── Test 3: keyboard-dismiss the error banner returns focus to Save ─────
 
     [Fact]
     public async Task ContactDetailsTab_ErrorBanner_DismissByKeyboard_ReturnsFocusToSave()
@@ -154,7 +145,6 @@ public sealed class ContactDetailsTabSavingControlTests(EmployeePersonaFixture f
         await contact.ClickSaveAsync();
         await ctrl.WaitUntilRequestArrivedAsync();
 
-        // A wrong expectation still fails promptly (bounded), not by hanging.
         var sw = Stopwatch.StartNew();
         await Assert.ThrowsAnyAsync<Exception>(async () =>
         {
@@ -164,14 +154,12 @@ public sealed class ContactDetailsTabSavingControlTests(EmployeePersonaFixture f
         Assert.True(sw.Elapsed < TimeSpan.FromSeconds(30),
             $"A wrong expectation should fail in a bounded time; took {sw.Elapsed.TotalSeconds:0.0}s.");
 
-        // Cleanup releases the held request and removes the shared control.
         await ctrl.DisposeAsync();
 
         using var http = new HttpClient { BaseAddress = new Uri(_fixture.WebBaseUrl) };
         var afterDispose = await http.GetAsync($"/_e2e/contact-save-control/{BoundedFailureEmail}");
         Assert.Equal(HttpStatusCode.NotFound, afterDispose.StatusCode);
 
-        // A fresh armed control on the same email starts clean — no leakage.
         await using var fresh = await ContactDetailsTab.SaveControl.ArmAsync(_fixture.WebBaseUrl, BoundedFailureEmail);
         Assert.Equal(0, await fresh.RequestCountAsync());
         var freshStatus = await http.GetFromJsonAsync<FreshStatus>(
@@ -182,7 +170,6 @@ public sealed class ContactDetailsTabSavingControlTests(EmployeePersonaFixture f
 
     private sealed record FreshStatus(bool arrived, int requestCount, bool resolved);
 
-    // ── Helpers ─────────────────────────────────────────────────────────────
 
     private async Task<ContactDetailsTab> OpenContactDetailsAsync(SeededE2eEmployees.Pooled employee, string email)
     {
@@ -201,8 +188,6 @@ public sealed class ContactDetailsTabSavingControlTests(EmployeePersonaFixture f
         return contact;
     }
 
-    /// <summary>Fills the mandatory fields plus a unique personal email so every saving test writes
-    /// isolated data and can run at maxParallelThreads=15.</summary>
     private static async Task FillValidUniqueAsync(ContactDetailsTab contact)
     {
         await contact.FillAddressLine1Async($"{Guid.NewGuid():N} Test Street");
@@ -211,10 +196,6 @@ public sealed class ContactDetailsTabSavingControlTests(EmployeePersonaFixture f
         await contact.FillPersonalEmailAsync($"e2e.{Guid.NewGuid():N}@personal.example.com");
     }
 
-    /// <summary>
-    /// Gives the pre-seeded (login-less) pool employee a real, working Supabase login via the
-    /// dev-only POST /api/dev/ensure-employee-login endpoint. 404s outside Development.
-    /// </summary>
     private async Task EnsureEmployeeLoginAsync(Guid employeeId, string email, string lastName)
     {
         using var http = new HttpClient { BaseAddress = new Uri(_fixture.ApiBaseUrl) };

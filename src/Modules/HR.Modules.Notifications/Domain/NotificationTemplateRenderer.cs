@@ -4,7 +4,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Notifications.Domain;
 
-/// <summary>Deterministic rendering output for a single template + token dictionary pair.</summary>
 internal sealed record RenderedNotification(
     string InAppTitle,
     string? InAppBody,
@@ -61,11 +60,6 @@ internal static class NotificationTemplateRenderer
         return Result.Success(new RenderedNotification(inAppTitle, inAppBody, emailSubject, emailBody));
     }
 
-    /// <summary>
-    /// Returns every "{Token}" placeholder found across the template's four strings that is not
-    /// present in the union of RequiredTokens/OptionalTokens — used only by architecture-style
-    /// catalogue tests, not at render time.
-    /// </summary>
     public static IReadOnlyList<string> FindUndeclaredTokenPlaceholders(NotificationTemplate template)
     {
         var declared = template.RequiredTokens.Union(template.OptionalTokens).ToHashSet(StringComparer.Ordinal);

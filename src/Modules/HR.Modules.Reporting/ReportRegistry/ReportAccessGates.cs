@@ -1,10 +1,5 @@
 namespace HR.Modules.Reporting.ReportRegistry;
 
-/// <summary>
-/// The caller's currently-evaluated authorization outcome for every per-report access gate.
-/// Constructed once per request from the same `reporting:view-*` policy checks GetReportCatalog
-/// already performs, then reused to authorize saved views / favourites against the same rules.
-/// </summary>
 internal readonly record struct ReportAccessGates(
     bool CanViewRecruitment,
     bool CanViewHr,

@@ -4,12 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies HR Administrator CRUD workflows for locations:
-/// - A new location can be created and appears in the list.
-/// - A location can be edited and the change persists across a reload.
-/// Uses the seeded "Office" location type on the Acme company (see EmployeesModule dev seed).
-/// </summary>
 public sealed class LocationManagementTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -76,7 +70,6 @@ public sealed class LocationManagementTests(HrAdminPersonaFixture fixture) : Rol
         await _page.GotoAsync($"{_fixture.WebBaseUrl}{updatedHref}");
         await _page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
 
-        // Reload the page directly to confirm the change persisted server-side, not just in local state.
         await _page.ReloadAsync();
         await _page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
 
@@ -95,14 +88,12 @@ public sealed class LocationManagementTests(HrAdminPersonaFixture fixture) : Rol
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Create first
         await locationList.GoToAsync(AcmeId);
         await locationList.ClickNewLocationAsync();
         await locationEdit.FillNameAsync(locationName);
         await locationEdit.SelectLocationTypeAsync(SeededLocationTypeName);
         await locationEdit.SaveAsync();
 
-        // Now deactivate
         await locationList.GoToAsync(AcmeId);
         Assert.True(await locationList.IsActiveAsync(locationName), "Expected newly created location to be Active");
         await locationList.DeactivateAsync(locationName);
@@ -110,7 +101,6 @@ public sealed class LocationManagementTests(HrAdminPersonaFixture fixture) : Rol
         Assert.False(await locationList.HasLocationAsync(locationName),
             "Expected deactivated location to be hidden from the default active-only list");
 
-        // Show inactive and verify
         await locationList.ShowInactiveAsync();
 
         Assert.True(await locationList.HasLocationAsync(locationName),

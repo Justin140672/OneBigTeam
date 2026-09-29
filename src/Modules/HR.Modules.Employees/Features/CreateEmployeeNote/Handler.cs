@@ -99,9 +99,6 @@ internal sealed class CreateEmployeeNoteHandler(
                 now),
             cancellationToken);
 
-        // EmployeeTimelineVisibility's Wave 2/3 rules: HR notes must always be written as HrOnly
-        // and with a generic Title/Summary — the actual note text/category must never appear on
-        // the timeline, only in the Notes feature itself.
         await timelineWriter.TryAddAsync(
             EmployeeTimelineEntry.Create(
                 Guid.NewGuid(),

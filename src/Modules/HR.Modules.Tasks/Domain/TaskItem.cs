@@ -21,12 +21,6 @@ internal sealed class TaskItem
     public Guid? AssignedUserId { get; private set; }
     public Guid? SourceEntityId { get; private set; }
 
-    // OBT-REM-13: a deterministic, workflow-owned key (e.g. "SicknessEvidenceOverdue:{requestId}")
-    // that makes creating a workflow-triggered task idempotent under retries and concurrent event
-    // delivery. Null for tasks created outside a workflow that needs this (most tasks — manual,
-    // interactive-endpoint-created tasks have no meaningful replay to guard against). Uniqueness is
-    // enforced per company by a partial unique index (see TaskItemConfiguration) rather than by the
-    // pre-existing read-before-create check alone, which is a check-then-act race under concurrency.
     public string? IdempotencyKey { get; private set; }
 
     public Guid CreatedBy { get; private set; }
@@ -123,12 +117,6 @@ internal sealed class TaskItem
         UpdatedAt = now;
     }
 
-    // OFF-02: shifts the due date only, for bulk source-driven rescheduling (e.g. every open
-    // OffboardingTask's TaskItem when the employee's last working day is amended). Returns false
-    // (and leaves everything untouched) when newDueDate already matches the current DueDate, so
-    // callers can cheaply detect a no-op and skip downstream side effects (notifications, audit)
-    // — the same check-current-value-before-update shape ITaskCanceller's terminal-state guard
-    // uses for idempotency.
     public bool Reschedule(DateOnly newDueDate, DateTimeOffset now)
     {
         if (DueDate == newDueDate)

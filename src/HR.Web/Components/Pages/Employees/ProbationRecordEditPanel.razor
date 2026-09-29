@@ -184,9 +184,6 @@ else
             {
                 if (IsTerminalStatus(latest.Status))
                 {
-                    // The record reached a terminal status (Passed/Failed/NotApplicable) while this
-                    // editor was open. It can never be saved again, so hand the authoritative record
-                    // to the parent and exit — do not clear SaveConflict / keep editing.
                     await OnBecameTerminal.InvokeAsync((latest,
                         $"This probation record has reached the terminal status '{latest.Status}' and can no longer be edited."));
                     return;

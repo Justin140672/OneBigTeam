@@ -3,10 +3,6 @@ using HR.Modules.Recruitment.Domain;
 
 namespace HR.Modules.Recruitment.Tests;
 
-/// <summary>
-/// [P1] Malware-scan lifecycle of <see cref="CandidateDocument"/>: Pending -> Scanning -> Clean |
-/// Infected | (failed attempt -> Pending with back-off) | Failed. Only Clean is ever downloadable.
-/// </summary>
 public class CandidateDocumentScanStateTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 26, 9, 0, 0, TimeSpan.Zero);
@@ -16,8 +12,6 @@ public class CandidateDocumentScanStateTests
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "CV", "cv.pdf", 1024, "application/pdf",
             "company/candidate/cv.pdf", Guid.NewGuid(), createdAt ?? Now, CandidateDocumentKind.Cv);
 
-    /// <summary>Drives a document through <paramref name="failedAttempts"/> failed attempts, each
-    /// immediately eligible for the next (nextAttemptAt = attempt time).</summary>
     private static DateTimeOffset FailAttempts(CandidateDocument document, int failedAttempts, DateTimeOffset start)
     {
         var at = start;
@@ -30,7 +24,6 @@ public class CandidateDocumentScanStateTests
         return at;
     }
 
-    // ── Initial state ──────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public void Create_Starts_Pending_With_No_Attempts_And_Is_Not_Downloadable()
@@ -49,7 +42,6 @@ public class CandidateDocumentScanStateTests
         Assert.True(document.CanBeginScanAttempt(Now));
     }
 
-    // ── Claim ─────────────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public void BeginScanAttempt_Moves_To_Scanning_Increments_Attempts_And_Is_Not_Downloadable()
@@ -95,7 +87,6 @@ public class CandidateDocumentScanStateTests
         Assert.Equal(attempts, document.ScanAttemptCount);
     }
 
-    // ── Clean ─────────────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public void MarkScanClean_Makes_Document_Downloadable_And_Terminal()
@@ -128,7 +119,6 @@ public class CandidateDocumentScanStateTests
         Assert.True(document.IsDownloadable);
     }
 
-    // ── Infected ──────────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public void MarkScanInfected_Stores_Sanitised_Threat_Name_And_Is_Not_Downloadable()
@@ -190,7 +180,6 @@ public class CandidateDocumentScanStateTests
         Assert.Equal(name, CandidateDocumentScanFailureReasons.SanitiseThreatName(name));
     }
 
-    // ── Failed attempt / retry ────────────────────────────────────────────────────────────────
 
     [Fact]
     public void RecordFailedScanAttempt_Returns_To_Pending_With_Next_Attempt_And_Is_Not_Downloadable()
@@ -242,7 +231,6 @@ public class CandidateDocumentScanStateTests
         Assert.False(document.HasRemainingScanAttempts);
     }
 
-    // ── Results require an active claim ───────────────────────────────────────────────────────
 
     [Fact]
     public void Results_Cannot_Be_Recorded_While_Pending()
@@ -286,7 +274,6 @@ public class CandidateDocumentScanStateTests
         Assert.False(document.IsDownloadable);
     }
 
-    // ── Back-off ──────────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public void CanBeginScanAttempt_Is_False_Before_Next_Attempt_And_True_At_Exactly_Next_Attempt()
@@ -298,11 +285,10 @@ public class CandidateDocumentScanStateTests
 
         Assert.False(document.CanBeginScanAttempt(next.AddTicks(-1)));
         Assert.Throws<InvalidOperationException>(() => document.BeginScanAttempt(next.AddTicks(-1)));
-        Assert.True(document.CanBeginScanAttempt(next)); // inclusive boundary
+        Assert.True(document.CanBeginScanAttempt(next));
         Assert.True(document.CanBeginScanAttempt(next.AddMinutes(1)));
     }
 
-    // ── Lease / abandoned claim ───────────────────────────────────────────────────────────────
 
     [Fact]
     public void IsScanLeaseExpired_Is_False_Just_Before_Lease_And_True_At_Exactly_Lease_Duration()
@@ -375,7 +361,6 @@ public class CandidateDocumentScanStateTests
         Assert.False(document.IsDownloadable);
     }
 
-    // ── Retry-limit close-off ─────────────────────────────────────────────────────────────────
 
     [Fact]
     public void MarkScanRetryLimitReached_Throws_While_Attempts_Remain()
@@ -435,7 +420,6 @@ public class CandidateDocumentScanStateTests
         Assert.Equal(CandidateDocumentScanStatus.Clean, document.ScanStatus);
     }
 
-    // ── Failure reason mapping (closed set; raw exception text never persisted) ──────────────
 
     public static TheoryData<Exception, string> ExceptionMappings() => new()
     {
@@ -460,7 +444,6 @@ public class CandidateDocumentScanStateTests
         Assert.DoesNotContain(exception.Message, reason);
     }
 
-    // ── helpers ───────────────────────────────────────────────────────────────────────────────
 
     private static void DriveTo(CandidateDocument document, CandidateDocumentScanStatus status)
     {
@@ -484,9 +467,6 @@ public class CandidateDocumentScanStateTests
         Assert.Equal(status, document.ScanStatus);
     }
 
-    /// <summary>A Pending document with an exhausted budget cannot be reached through the public
-    /// domain API (the fifth failure goes straight to Failed); it can exist in the database if a
-    /// status was reset out-of-band, which is exactly what MarkScanRetryLimitReached guards.</summary>
     private static void SetAttemptCount(CandidateDocument document, int count) =>
         typeof(CandidateDocument).GetProperty(nameof(CandidateDocument.ScanAttemptCount))!.SetValue(document, count);
 }

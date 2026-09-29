@@ -5,11 +5,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Infrastructure.Email;
 
-/// <summary>
-/// Sends transactional email via the Postmark HTTP API.
-/// Used whenever Infrastructure:Postmark:ServerToken is configured; otherwise
-/// <see cref="LoggingEmailSender"/> is registered instead — see InfrastructureModule.
-/// </summary>
 internal sealed class PostmarkEmailSender : IEmailSender
 {
     private readonly HttpClient _httpClient;
@@ -31,9 +26,6 @@ internal sealed class PostmarkEmailSender : IEmailSender
     {
         if (PostmarkRecipientGuard.IsUndeliverable(toEmail))
         {
-            // Reserved / never-deliverable domain (RFC 2606, or this app's *.example seed personas).
-            // Drop it silently — returning normally (not throwing) so EmailDeliveryJob does not retry
-            // or mark a spurious hard failure. See PostmarkRecipientGuard.
             _logger.LogWarning(
                 "Postmark send skipped: recipient domain is a reserved / undeliverable address. " +
                 "A live Postmark token is likely configured in a non-production environment.");
@@ -63,10 +55,6 @@ internal sealed class PostmarkEmailSender : IEmailSender
                 "Postmark email send failed. StatusCode={StatusCode} PostmarkErrorCode={PostmarkErrorCode} FailureCategory={FailureCategory}",
                 failure.StatusCode, failure.ErrorCode, failure.Category);
 
-            // A fixed-shape exception instead of EnsureSuccessStatusCode, so the exception text that
-            // EmailDeliveryJob / SendOperationalAlertEmailJob log is fully under our control (no
-            // provider-supplied reason phrase). StatusCode is preserved so callers can still tell a
-            // terminal 4xx from a retryable 5xx.
             throw new HttpRequestException(
                 failure.ToExceptionMessage("Postmark email send"), inner: null, response.StatusCode);
         }

@@ -68,7 +68,6 @@ public sealed class ApplicationService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    // DSH-03: non-swallowing sibling of GetApplicationsByStatusAsync.
     public Task<GetApplicationsByStatusResponse?> GetApplicationsByStatusOrThrowAsync(
         Guid companyId, Guid stageId, CancellationToken cancellationToken = default) =>
         Http.GetFromJsonAsync<GetApplicationsByStatusResponse>(
@@ -101,7 +100,6 @@ public sealed class ApplicationService(HrApiHttpClientFactory httpClientFactory)
         Guid companyId, Guid vacancyId, CreateCandidateApplicationRequest request, IBrowserFile? cvFile,
         CancellationToken cancellationToken = default)
     {
-        // OpenReadStream throws for anything over maxAllowedSize — report it instead of faulting the circuit.
         if (cvFile is not null && cvFile.Size > CandidateService.MaxCandidateDocumentBytes)
             return CreateCandidateApplicationResult.Failure("The CV file is larger than the 20 MB limit.");
 
@@ -250,8 +248,6 @@ public sealed class ApplicationService(HrApiHttpClientFactory httpClientFactory)
         return (null, await ReadErrorAsync(response, "Failed to make offer."));
     }
 
-    // Ticket #2: record the candidate's response to a standing offer.
-    // 422 validation / 400 business / 404 not found / 409 already resolved.
     public async Task<(RespondToOfferResponse? Result, string? Error)> RespondToOfferAsync(
         Guid companyId, Guid vacancyId, Guid applicationId, string status)
     {
@@ -296,8 +292,6 @@ public sealed class ApplicationService(HrApiHttpClientFactory httpClientFactory)
     public async Task<(AppointInternalCandidateResponse? Result, string? Error)> AppointInternalCandidateAsync(
         Guid companyId, Guid vacancyId, Guid applicationId, AppointInternalCandidateRequest request)
     {
-        // ApiResponseReader surfaces both the {error, code} business-error envelope and FastEndpoints'
-        // validation {errors} envelope, so validator messages (e.g. "manager required") reach the dialog.
         var result = await ApiResponseReader.ExecuteAsync<AppointInternalCandidateResponse>(
             ct => Http.PostAsJsonAsync(
                 $"api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/appoint",
@@ -309,7 +303,6 @@ public sealed class ApplicationService(HrApiHttpClientFactory httpClientFactory)
             : (null, result.DisplayMessage ?? "Failed to complete the internal appointment.");
     }
 
-    // Ticket #1: save the CV review notes only — no stage change. 400 if the application is withdrawn.
     public async Task<(SaveCvReviewNotesResponse? Result, string? Error)> SaveCvReviewNotesAsync(
         Guid companyId, Guid vacancyId, Guid applicationId, string? cvReviewNotes)
     {
@@ -323,9 +316,6 @@ public sealed class ApplicationService(HrApiHttpClientFactory httpClientFactory)
         return (null, await ReadErrorAsync(response, "Failed to save CV review notes."));
     }
 
-    // Ticket #1: persist the notes (if provided) and advance to the next active non-terminal stage.
-    // The server resolves the next stage from the company's stage config — never hard-coded here.
-    // 400 with an {error} body if there is no next stage / the stage is terminal / withdrawn.
     public async Task<(MoveApplicationForwardResponse? Result, string? Error)> MoveApplicationForwardAsync(
         Guid companyId, Guid vacancyId, Guid applicationId, string? cvReviewNotes)
     {

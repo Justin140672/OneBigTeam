@@ -95,13 +95,6 @@ internal sealed class OnboardingTemplate : IVersionedAggregate
         UpdatedAt = now;
     }
 
-    /// <summary>
-    /// Reconciles the active task checklist against a desired set of tasks in a single operation.
-    /// Tasks with a matching existing <paramref name="desiredTasks"/> id are updated in place,
-    /// tasks with no id are added as new, and any currently active task not present in
-    /// <paramref name="desiredTasks"/> is deactivated. Used by the template edit screen, which
-    /// replaces the whole checklist rather than exposing separate add/remove/reorder endpoints.
-    /// </summary>
     public void ReplaceTasks(
         IReadOnlyList<(Guid? Id, string Title, string? Description, TaskPriority Priority, OnboardingTemplateTaskAssignTo AssignTo, int DueDaysAfterStart, int DisplayOrder)> desiredTasks,
         DateTimeOffset now)

@@ -30,12 +30,6 @@ public class ToilExpiryJobScopeIsolationTests
     private static readonly DateTimeOffset Now = new(FixedUtcNow, TimeSpan.Zero);
     private static readonly DateOnly AsOf = new(2026, 7, 1);
 
-    /// <summary>
-    /// Throws for one designated "faulty" company's audit publish (which happens after
-    /// ExpireCompanyAsync's transaction has already committed - see ToilExpiryService), so the
-    /// exception surfaces from inside ToilExpiryJob's per-company try/catch exactly like a real
-    /// downstream failure would, without needing to corrupt the DbContext itself to provoke it.
-    /// </summary>
     private sealed class FaultingForCompanyAuditPublisher(Guid faultyCompanyId) : IAuditEventPublisher
     {
         public List<object> Published { get; } = [];
@@ -112,17 +106,8 @@ public class ToilExpiryJobScopeIsolationTests
         }
 
         var job = provider.GetRequiredService<ToilExpiryJob>();
-        // ToilExpiryJob resolves its own scopes internally via IServiceScopeFactory - not via the
-        // job's own DI-injected dependencies here - so this exercises the exact same
-        // scope-per-company code path as production.
         await job.ExecuteAsync();
 
-        // Both companies' balances end up correctly expired, even though the faulty company's
-        // iteration threw partway through (after its own transaction had already committed, but
-        // before the job's per-company try/catch swallowed the exception). Nothing about the
-        // faulty company's failed scope leaked into or blocked the healthy company's independent
-        // scope - proven by asserting the healthy company's result regardless of which company the
-        // job happened to process first (order is not asserted or relied upon).
         await using var verifyScope = provider.CreateAsyncScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<LeaveDbContext>();
 
@@ -133,10 +118,10 @@ public class ToilExpiryJobScopeIsolationTests
             .Where(t => t.CompanyId == healthyCompanyId && t.Type == ToilTransactionType.Expired)
             .ToListAsync();
 
-        Assert.Single(faultyExpired); // committed before the simulated downstream fault fired
+        Assert.Single(faultyExpired);
         Assert.Equal(4m, faultyExpired[0].Days);
 
-        Assert.Single(healthyExpired); // entirely unaffected by the faulty company's exception
+        Assert.Single(healthyExpired);
         Assert.Equal(5m, healthyExpired[0].Days);
 
         var faultyFinalBalance = await verifyDb.LeaveBalances.SingleAsync(b => b.CompanyId == faultyCompanyId);
@@ -148,9 +133,6 @@ public class ToilExpiryJobScopeIsolationTests
     [Fact]
     public async Task Repeat_Run_After_A_Faulted_Iteration_Is_Still_Idempotent_For_Both_Companies()
     {
-        // Guards against a regression where a faulted company's leftover tracked state on a
-        // *shared* DbContext could cause a second run to double-expire - the very bug this ticket
-        // fixes by giving every iteration (and every job run) a fresh scope.
         var storeName = "toil-job-isolation-repeat-" + Guid.NewGuid().ToString("N");
         var faultyCompanyId = Guid.NewGuid();
         var healthyCompanyId = Guid.NewGuid();
@@ -171,7 +153,7 @@ public class ToilExpiryJobScopeIsolationTests
 
         var job = provider.GetRequiredService<ToilExpiryJob>();
         await job.ExecuteAsync();
-        await job.ExecuteAsync(); // Hangfire-style retry/re-run
+        await job.ExecuteAsync();
 
         await using var verifyScope = provider.CreateAsyncScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<LeaveDbContext>();

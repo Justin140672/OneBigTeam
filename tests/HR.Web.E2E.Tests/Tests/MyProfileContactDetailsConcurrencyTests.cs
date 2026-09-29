@@ -44,7 +44,6 @@ public sealed class MyProfileContactDetailsConcurrencyTests(EmployeePersonaFixtu
         await login.GoToAsync();
         await login.LoginAsync(EmployeeEmail);
 
-        // ── Tab 1: open Contact Details and start editing (loads the current version) ──
         await profile.GoToAsync(AcmeId, EmployeeId);
         await profile.OpenContactDetailsTabAsync();
         await contact.WaitForLoadAsync();
@@ -53,7 +52,6 @@ public sealed class MyProfileContactDetailsConcurrencyTests(EmployeePersonaFixtu
         await contact.FillPostCodeAsync("EC1A 1BB");
         await contact.FillMobilePhoneAsync(firstTabMobile);
 
-        // ── Tab 2 (same context): load the same tab and save a change first ──
         var otherPage = await _context.NewPageAsync();
         try
         {
@@ -73,7 +71,6 @@ public sealed class MyProfileContactDetailsConcurrencyTests(EmployeePersonaFixtu
             await otherPage.CloseAsync();
         }
 
-        // ── Tab 1: saving now is stale → warning banner, input preserved, no success ──
         await contact.ClickSaveExpectingConflictAsync();
 
         Assert.True(await contact.IsConcurrencyWarningVisibleAsync(),
@@ -82,14 +79,12 @@ public sealed class MyProfileContactDetailsConcurrencyTests(EmployeePersonaFixtu
             "Save should not have succeeded after a concurrency conflict");
         Assert.Equal(firstTabMobile, await contact.GetMobilePhoneValueAsync());
 
-        // ── Tab 1: "Reload latest values" clears the banner and shows the other tab's value ──
         await contact.ClickReloadLatestValuesAsync();
 
         Assert.False(await contact.IsConcurrencyWarningVisibleAsync(),
             "Expected the warning banner to clear after reloading latest values");
         Assert.Equal(otherTabMobile, await contact.GetMobilePhoneValueAsync());
 
-        // ── Tab 1: re-edit against the fresh version and save successfully ──
         await contact.FillMobilePhoneAsync(finalMobile);
         await contact.SaveChangesAsync();
 
@@ -97,14 +92,6 @@ public sealed class MyProfileContactDetailsConcurrencyTests(EmployeePersonaFixtu
             "Expected a success banner after saving against the reloaded version");
     }
 
-    /// <summary>
-    /// Bug (b): once the concurrency banner is showing on the Contact Details tab, editing a field
-    /// to an invalid value (here: clearing the required "Address Line 1") must clear the stale
-    /// banner so it doesn't sit alongside the new validation errors. Driven by
-    /// EditSectionBase.OnValidationStateChanged.
-    /// Shares the pool employee with the test above — the base runs employee tests serially and
-    /// each test starts from a fresh login + page load, so there is no shared mutable state.
-    /// </summary>
     [Fact]
     public async Task ContactDetails_MakingFieldInvalidAfterConflict_ClearsWarningBanner()
     {
@@ -156,11 +143,6 @@ public sealed class MyProfileContactDetailsConcurrencyTests(EmployeePersonaFixtu
             "Expected the concurrency banner to clear once the form became invalid after a conflict");
     }
 
-    /// <summary>
-    /// Gives the pre-seeded (login-less) pool employee a real, working Supabase login via the
-    /// dev-only POST /api/dev/ensure-employee-login endpoint — same helper pattern as
-    /// SelfServiceDocumentTests. 404s outside Development.
-    /// </summary>
     private async Task EnsureEmployeeLoginAsync(Guid employeeId, string email, string lastName)
     {
         using var http = new HttpClient { BaseAddress = new Uri(_fixture.ApiBaseUrl) };

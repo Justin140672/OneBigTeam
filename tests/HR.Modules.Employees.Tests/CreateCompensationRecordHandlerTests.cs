@@ -87,8 +87,6 @@ public class CreateCompensationRecordHandlerTests
         Assert.Equal(ActorEmployeeId, createdEvent.ActorEmployeeId);
         Assert.Equal("NewHire", createdEvent.Reason);
 
-        // The IAuditEvent.EmployeeId interface member must round-trip to the subject employee's ID —
-        // this is what lets the audit history reader find "all events belonging to employee X".
         Assert.Equal(employee.Id, ((HR.SharedKernel.IAuditEvent)createdEvent).EmployeeId);
         Assert.Equal(ActorEmployeeId, ((HR.SharedKernel.IAuditEvent)createdEvent).ActorEmployeeId);
     }
@@ -262,7 +260,6 @@ public class CreateCompensationRecordHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_Conflict_When_EffectiveFrom_Exactly_Matches_Existing_Open_Record_EffectiveFrom()
     {
-        // Exact-duplicate-date case: new EffectiveFrom equal to an existing open record's EffectiveFrom.
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
         var companyId = Guid.NewGuid();
@@ -341,7 +338,6 @@ public class CreateCompensationRecordHandlerTests
         var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2020, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         context.Employees.Add(employee);
 
-        // A closed record entirely in the future relative to the requested EffectiveFrom.
         var futureHistorical = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2027, 1, 1), SalaryType.Annual, 50000m, "GBP", null, null, null, CompensationChangeReason.NewHire, Guid.NewGuid(), now);
         futureHistorical.Close(new DateOnly(2027, 12, 31), now);
         context.Compensations.Add(futureHistorical);
@@ -402,7 +398,6 @@ public class CreateCompensationRecordHandlerTests
 
         Assert.True(result.IsSuccess);
 
-        // Only the CompensationRecordCreatedAuditEvent should fire — nothing was open to close.
         var singleEvent = Assert.Single(publisher.Published);
         Assert.IsType<CompensationRecordCreatedAuditEvent>(singleEvent);
 
@@ -443,8 +438,6 @@ public class CreateCompensationRecordHandlerTests
         Assert.Equal(employee.Id, evt.EmployeeId);
         Assert.Equal(result.Value!.Id, evt.CompensationId);
 
-        // CompensationChangedIntegrationEvent has no field capable of carrying a salary figure —
-        // verify the serialized form never contains the actual salary as a defence-in-depth check.
         var json = System.Text.Json.JsonSerializer.Serialize(evt);
         Assert.DoesNotContain("99000", json);
     }

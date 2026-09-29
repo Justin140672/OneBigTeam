@@ -4,11 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the Tasks tab on the self-service My Profile page:
-/// - Seeded tasks are listed for the employee.
-/// - Clicking a task navigates to the Task View page.
-/// </summary>
 public sealed class ProfileTasksTabTests(EmployeePersonaFixture fixture) : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -16,7 +11,6 @@ public sealed class ProfileTasksTabTests(EmployeePersonaFixture fixture) : RoleE
 
     private const string TomEmail = "tom.williams@acme.example";
 
-    // Tom has a seeded "Schedule probation review" task assigned to him.
     private const string TomTaskFragment = "probation review";
 
     [Fact]
@@ -25,19 +19,15 @@ public sealed class ProfileTasksTabTests(EmployeePersonaFixture fixture) : RoleE
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
 
-        // ── Step 1: Login as Tom ──────────────────────────────────────────────
         await login.GoToAsync();
         await login.LoginAsync(TomEmail);
 
-        // ── Step 2: Navigate to Tom's profile and open the Tasks tab ──────────
         await profile.GoToAsync(AcmeId, TomId);
         await profile.OpenTasksTabAsync();
 
-        // Wait for the task grid or empty state.
         await _page.WaitForSelectorAsync(".e-grid, .task-cell, p",
             new() { Timeout = 15_000 });
 
-        // ── Step 3: Tom's probation task should be listed ─────────────────────
         var content = await _page.ContentAsync();
         Assert.Contains(TomTaskFragment, content, StringComparison.OrdinalIgnoreCase);
     }
@@ -58,13 +48,8 @@ public sealed class ProfileTasksTabTests(EmployeePersonaFixture fixture) : RoleE
 
         var profileUrlBeforeClick = _page.Url;
 
-        // The "View" action is a button directly on the row — no row selection needed.
         await _page.Locator(".e-row").First.Locator("button[title='View']").ClickAsync();
 
-        // Should open the task in a dialog (TaskViewDialog), not navigate to /tasks/{id}.
-        // Scoped to [role='dialog'] because Syncfusion's SfDialog CssClass propagates onto
-        // multiple elements (the outer container, the dialog itself, and the close button),
-        // which makes a bare ".task-view-dialog" locator ambiguous under Playwright's strict mode.
         await _page.WaitForSelectorAsync("[role='dialog'].task-view-dialog", new() { Timeout = 15_000 });
         Assert.True(await _page.Locator("[role='dialog'].task-view-dialog").IsVisibleAsync(),
             "Expected clicking View on My Profile's Tasks tab to open the task in a dialog");

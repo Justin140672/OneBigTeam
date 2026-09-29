@@ -28,7 +28,6 @@ public class Ticket23CandidateDocumentDeletionOperationMetadataTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
 
-    // ── CreatePending: stamping from a supplied IExecutionContext ───────────────────────────────
 
     [Fact]
     public void CreatePending_With_Supplied_Context_Stamps_CorrelationId_From_Context_CorrelationId_And_CausationId_From_Context_MessageId()
@@ -57,7 +56,6 @@ public class Ticket23CandidateDocumentDeletionOperationMetadataTests
         Assert.NotEqual(Guid.Empty, operation.MessageId!.Value);
     }
 
-    // ── PurgeEligibleCandidatesHandler: reference wiring picks up the ambient context ───────────
 
     private static Candidate CreateCandidateUpdatedAt(Guid companyId, DateTimeOffset updatedAt) =>
         Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, updatedAt);
@@ -125,10 +123,7 @@ public class Ticket23CandidateDocumentDeletionOperationMetadataTests
         Assert.NotNull(operation.MessageId);
     }
 
-    // ── PurgeCandidateDocumentStorageJob: restores persisted metadata as the ambient context ───
 
-    // Captures whatever execution context is ambient (via the supplied accessor) at the moment the
-    // destructive storage delete is about to happen.
     private sealed class ContextCapturingCandidateDocumentStorageService(IExecutionContextAccessor accessor)
         : ICandidateDocumentStorageService
     {
@@ -185,7 +180,6 @@ public class Ticket23CandidateDocumentDeletionOperationMetadataTests
     public async Task ProcessAsync_Legacy_Row_With_Null_Metadata_Still_Restores_A_Fresh_Root_Context_Rather_Than_Throwing()
     {
         await using var db = BuildContext();
-        // No supplied context — simulates a row written before this migration.
         var operation = CandidateDocumentDeletionOperation.CreatePending(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "company/candidate/doc/cv.pdf", Now);
         db.CandidateDocumentDeletionOperations.Add(operation);

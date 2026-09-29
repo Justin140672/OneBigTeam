@@ -17,25 +17,14 @@ ThreadPool.SetMinThreads(Environment.ProcessorCount * 12, Environment.ProcessorC
 var builder = WebApplication.CreateBuilder(args);
 builder.AddServiceDefaults();
 
-// TEST-ONLY: when running under the E2E harness (E2E_TESTING=true — HR.AppHost forbids this outside
-// Development/test environments), enable the contact-save control mechanism (see HR.Web.Testing).
 var isE2E = string.Equals(Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
 
-// Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(options => options.DetailedErrors = builder.Environment.IsDevelopment());
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.TryAddSingleton(TimeProvider.System);
-// Process-wide, in-memory, single-use exchange store used to hand a freshly established Supabase
-// session from the interactive circuit to the real HTTP hop that sets the session cookie, WITHOUT
-// ever putting a token in a URL (security ticket: remove auth tokens from browser-visible URLs).
 builder.Services.AddSingleton<AuthHandoffStore>();
-// CircuitSessionState is the real, per-circuit source of truth for the current Supabase access
-// token (see its remarks). SupabaseSessionAccessor keeps it in sync with the session cookie;
-// HrApiHttpClientFactory reads it directly (in the caller's own scope) to attach the bearer token —
-// no pooled DelegatingHandler is involved in carrying user identity anymore, which removes the
-// captive-dependency root cause of the original P1 cross-user token leak.
 builder.Services.AddScoped<CircuitSessionState>();
 builder.Services.AddScoped<SupabaseSessionAccessor>();
 builder.Services.AddScoped<HrApiHttpClientFactory>();
@@ -50,35 +39,15 @@ var hrApiClientBuilder = builder.Services.AddHttpClient("hrapi", c =>
         throw new InvalidOperationException("API base URL is missing. Expected services:api:https:0 or services:api:http:0.");
 
     c.BaseAddress = new Uri(apiBaseUrl);
-    // HttpClient.Timeout is the hard wall around the WHOLE resilience pipeline (all retries). The
-    // standard handler's total budget is widened to 120s in ServiceDefaults for slow CI hosts;
-    // keep this above that so the client timeout never truncates a legitimate retry sequence.
     c.Timeout = TimeSpan.FromSeconds(130);
 });
-// The bearer token is no longer attached by a pooled DelegatingHandler — see HrApiHttpClientFactory,
-// which attaches it directly on the HttpClient it returns, resolved from the caller's own real DI
-// scope. Consumers should inject HrApiHttpClientFactory and call CreateClient() instead of injecting
-// IHttpClientFactory directly for the "hrapi" client.
 
-// TEST-ONLY: lets an E2E test hold/release/fail the outbound contact-details PUT.
 if (isE2E)
 {
     hrApiClientBuilder.AddHttpMessageHandler<E2eContactSaveControlHandler>();
 }
 
 hrApiClientBuilder
-// SocketsHttpHandler's default PooledConnectionLifetime is infinite, so a connection idle long
-// enough can be silently closed server-side by Kestrel's own keep-alive timeout while the pool
-// still considers it valid — the next request reused from the pool then fails mid-flight with an
-// OperationCanceledException while the server is reading the request body. Bounding the lifetime
-// well under Kestrel's default 130s keep-alive timeout forces proactive recycling instead.
-//
-// CertificateRevocationCheckMode = NoCheck: every new connection (including the periodic
-// recycling above) re-runs the TLS handshake, which by default performs an online CRL/OCSP
-// revocation check against Aspire's local HTTPS dev certificate. That check can't complete
-// against a dev cert and stalls for ~15s before SocketsHttpHandler gives up and proceeds anyway
-// — this is purely internal service-to-service traffic on localhost, so skipping the check is
-// safe and removes that stall entirely.
 .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
 {
     PooledConnectionLifetime = TimeSpan.FromSeconds(60),
@@ -171,10 +140,6 @@ builder.Services.AddSyncfusionBlazor();
 
 var app = builder.Build();
 
-// [P2] Content Security Policy — see HrWebContentSecurityPolicy for the source inventory. Resolved
-// once at startup: the development allowances are derived from the host environment only, and
-// invalid/non-https/localhost image origins outside Development fail startup rather than silently
-// widening the policy.
 var cspSettings = HrWebCspSettings.Create(app.Environment, app.Configuration);
 if (!app.Environment.IsDevelopment() && cspSettings.ImageOrigins.Count == 0)
 {
@@ -183,17 +148,12 @@ if (!app.Environment.IsDevelopment() && cspSettings.ImageOrigins.Count == 0)
         "Supabase Storage signed URLs will be blocked by img-src. Set it to the Supabase project origin.");
 }
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-// After the exception-handler/status-code-page middleware (re-executed error and 404 pages pass
-// through it again and get their own header + nonce) and before anything that can short-circuit
-// (HTTPS redirect, static assets, endpoints).
 app.UseHrWebContentSecurityPolicy(cspSettings);
 app.UseHttpsRedirection();
 
@@ -212,10 +172,6 @@ app.UseAuthorization();
 
 app.UseAntiforgery();
 
-// Blazor's form-handling middleware throws when a POST arrives without __blazor_form_name.
-// This can happen when a previous circuit fails mid-request and the browser retries with a
-// stale enhanced-navigation POST. Catch it here and redirect to a clean page rather than
-// crashing the request pipeline (which would make the error-UI bleed into the next circuit).
 app.Use(async (context, next) =>
 {
     try { await next(context); }
@@ -226,19 +182,10 @@ app.Use(async (context, next) =>
     }
 });
 
-// Forces SupabaseSessionAccessor to capture the obt_supabase_at cookie now, while HttpContext is
-// guaranteed available (this middleware runs for every real HTTP request). Without this, the
-// scoped accessor's first read could otherwise happen only once Blazor Server's interactive
-// circuit has taken over (a live SignalR connection, not an HTTP request), at which point
-// HttpContext is null and no token would ever be attached to hrapi calls on that circuit.
 app.Use(async (context, next) =>
 {
     _ = context.RequestServices.GetRequiredService<SupabaseSessionAccessor>().AccessToken;
 
-    // P1 "Login as Customer": same forcing pattern as SupabaseSessionAccessor above — reads the
-    // support-session display-metadata cookie now, while a real HttpContext is guaranteed, and
-    // activates SupportSessionState for this circuit so SupportSessionBanner (injected directly,
-    // no separate API round-trip) renders correctly from the very first page render.
     context.RequestServices.GetRequiredService<SupportSessionCookieAccessor>().Synchronize();
 
     await next(context);
@@ -327,14 +274,6 @@ app.MapPost("/verify-email-complete", async (
     return Results.Redirect("/login?verified=true");
 }).AllowAnonymous();
 
-// P1 platform-administrator provisioning: lands here after EITHER Supabase provisioning path
-// (see HR.Modules.Identity's CreatePlatformAdministratorHandler):
-//   - PendingProvisioning (brand-new account): Supabase's own signup-confirmation redirect.
-//   - PendingLinkVerification (pre-existing account): Supabase's recovery redirect (reused here
-//     specifically because it also doubles as a strong, existing "prove you control this account"
-//     mechanism — see CreatePlatformAdministratorHandler's remarks on why silent email-match
-//     linking is never acceptable).
-// Same implicit/fragment hand-off pattern as /verify-email above — see that endpoint's remarks.
 app.MapGet("/platform-admin/activate", (HttpContext context) => Results.Content($$"""
     <!DOCTYPE html>
     <html>
@@ -392,19 +331,6 @@ app.MapPost("/platform-admin/activate-complete", async (
     return Results.Redirect("/login?activated=true");
 }).AllowAnonymous();
 
-// Handles Supabase's password-recovery redirect — same implicit/fragment flow as /verify-email
-// above (Supabase uses the identical redirect mechanism for both — see that endpoint's remarks).
-// Unlike /verify-email-complete, the next hop here (/reset-password-complete) needs to render an
-// actual form (the new password), not just set a cookie and redirect — so it's a normal Blazor
-// page reached via plain navigation, rather than another raw minimal-API hop. A missing token is
-// still forwarded there (as an empty query value) rather than redirected elsewhere, so that page
-// can show its own "this link is invalid or has expired" message with reset-password-specific
-// copy and a link back to /forgot-password, instead of reusing /verify-email-error's mismatched
-// wording.
-// Supabase's password-recovery redirect — same implicit/fragment flow as /verify-email. The
-// recovery access token arrives in the URL fragment; this page POSTs it to the server (never a
-// query string), where /reset-password-begin swaps it for an opaque single-use handoff code and
-// redirects to the reset form carrying only that code.
 app.MapGet("/reset-password", (HttpContext context) => Results.Content($$"""
     <!DOCTYPE html>
     <html>
@@ -448,9 +374,6 @@ app.MapGet("/login-complete", (HttpContext context, AuthHandoffStore handoffStor
 
     SupabaseSessionAccessor.SetSessionCookie(context, session.AccessToken, session.ExpiresInSeconds, environment, sessionState);
 
-    // Redirect to a clean URL — no token, no code, nothing to bookmark, share or leak. The fresh
-    // circuit created by this hard navigation reads the session from the cookie (see
-    // SupabaseSessionAccessor and the early middleware in this file).
     return Results.Redirect("/");
 }).AllowAnonymous();
 
@@ -487,12 +410,6 @@ app.MapGet("/logout", async (
             .LogWarning(ex, "Server-side sign-out call failed; clearing the cookie anyway.");
     }
 
-    // Clears both the browser cookie AND this request's CircuitSessionState. The latter closes the
-    // gap the ticket flagged: without it, a call racing on this same scope that finds no live
-    // HttpContext could otherwise still resolve the old token from CircuitSessionState after the
-    // cookie was already deleted. The subsequent hard-navigation redirect to /login also tears down
-    // this circuit/scope entirely, so there is no further code that could observe a stale value even
-    // in principle.
     SupabaseSessionAccessor.ClearSessionCookie(context, environment, sessionState);
     return Results.Redirect("/login");
 }).AllowAnonymous();
@@ -558,24 +475,6 @@ if (app.Environment.IsDevelopment())
     }).AllowAnonymous();
 }
 
-// "Login As Customer" support-session redemption (Support epic). A platform administrator
-// generates a support session from the Admin Portal (HR.Modules.Companies's
-// GenerateSupportSession feature — POST /api/companies/admin/customers/{companyId}/support-session,
-// platform:admin policy, requires a typed reason, 20-minute single-use token) and is given a link
-// to this endpoint.
-//
-// Redeems the token (atomically, single-use — HR.Modules.Companies's RedeemSupportSession) and, on
-// success, establishes a real authenticated support session: the API mints a distinctly-signed,
-// distinctly-issued support-session token (never a real Supabase token — see
-// HR.Infrastructure.Security.SupportSessionTokenIssuer / HR.Api's SupportSessionJwtBearerConfiguration)
-// scoped to exactly the redeemed session's target company and expiry. That token is set as this
-// browser's normal bearer-token cookie (obt_supabase_at) — HR.Api's authentication pipeline
-// recognises it via a second JwtBearer scheme and HR.Modules.Identity's
-// SupabaseCurrentUserResolutionMiddleware builds a support-scoped ResolvedCurrentUser from it,
-// restricted to a narrow read-only permission grant (PermissionAuthorizationHandler) and never
-// resolvable to a real employee identity. A second, small cookie carries only display metadata
-// (company id, admin email, expiry) for the visible SupportSessionBanner (see
-// SupportSessionCookieAccessor).
 app.MapGet("/support-session/redeem", async (
     HttpContext context,
     string? token,
@@ -637,15 +536,10 @@ app.MapGet("/support-session/redeem", async (
             """, "text/html");
     }
 
-    // Token was valid and is now consumed (single-use — RedeemSupportSession marks it redeemed
-    // server-side with a race-safe conditional update, so this call cannot succeed a second time).
     var expiresInSeconds = Math.Max(1, (int)(redeemed.ExpiresAt - DateTimeOffset.UtcNow).TotalSeconds);
     SupabaseSessionAccessor.SetSessionCookie(context, redeemed.Token, expiresInSeconds, environment, sessionState);
     SupportSessionCookieAccessor.SetCookie(context, redeemed.CompanyId, redeemed.IssuedByAdminEmail, redeemed.ExpiresAt, environment);
 
-    // Lands on the employee list, not the company-settings edit page: a support session is
-    // restricted to the read-only "employee:read" grant (PermissionAuthorizationHandler) and does
-    // NOT hold "company:manage", so /companies/{id}/edit would immediately 403 for it.
     return Results.Redirect($"/companies/{redeemed.CompanyId}/employees");
 }).AllowAnonymous();
 
@@ -661,17 +555,6 @@ app.MapPost("/support-session/end", (HttpContext context, IHostEnvironment envir
     return Results.Redirect("/login");
 }).AllowAnonymous();
 
-// Authenticated proxy for downloading the employee import template (used by the Getting Started
-// "Download the Employee import template" task — see DownloadEmployeeImportTemplateTask). A plain
-// HTML <a href> can't attach a Supabase Bearer token to a call to hrapi directly, but it DOES
-// automatically send this app's own session cookie on a same-origin request — this bridges that
-// cookie auth to the real Bearer-authenticated hrapi call (via the "hrapi" HttpClient, which
-// already attaches the token via SupabaseAuthDelegatingHandler/SupabaseSessionAccessor) and
-// streams the file straight back with the same Content-Disposition the api endpoint itself sets,
-// so the browser downloads it exactly as if the link pointed at a static file. Requires
-// authentication via the default ("NoOp") scheme — same cookie-presence check every other
-// [Authorize]'d Razor page in this app already relies on; the real permission check still happens
-// server-side against hrapi's own "employee:manage" policy.
 app.MapGet("/companies/{companyId:guid}/data-import/employees/template/download", async (
     Guid companyId,
     HrApiHttpClientFactory httpClientFactory) =>
@@ -691,26 +574,17 @@ app.MapGet("/companies/{companyId:guid}/data-import/employees/template/download"
         ?? response.Content.Headers.ContentDisposition?.FileName
         ?? "employee-import-template.xlsx";
 
-    // Best-effort: mark the "Download the Employee import template" onboarding task complete now
-    // that the file has actually been streamed back successfully. Failure here must never block
-    // or fail the download itself — the checklist item is a non-mandatory helper step.
     try
     {
         await http.PostAsync("api/company-onboarding/checklist/tasks/download-employee-import-template/mark-complete", null);
     }
     catch
     {
-        // Swallow — the download already succeeded and is the primary outcome of this request.
     }
 
     return Results.File(bytes, contentType, fileName);
 }).RequireAuthorization();
 
-// Ticket #1: authenticated proxy that streams a candidate CV/document inline, so it can render in an
-// <iframe>/<object> and also work as an "Open / Download" link. Same cookie-auth-to-Bearer bridge as
-// the employee import template download above — the browser sends this app's session cookie on the
-// same-origin request, and the "hrapi" client attaches the real Supabase Bearer for the API call.
-// The API's own candidate-document policy still performs the real permission check server-side.
 app.MapGet("/companies/{companyId:guid}/candidates/{candidateId:guid}/cv/{documentId:guid}", async (
     Guid companyId,
     Guid candidateId,
@@ -727,18 +601,12 @@ app.MapGet("/companies/{companyId:guid}/candidates/{candidateId:guid}/cv/{docume
     var bytes = await response.Content.ReadAsByteArrayAsync();
     var contentType = response.Content.Headers.ContentType?.ToString() ?? "application/octet-stream";
 
-    // No download file name → the browser renders it inline (Content-Disposition: inline).
     return Results.File(bytes, contentType);
 }).RequireAuthorization()
-    // ReviewCv embeds this response in <object>; its CSP says frame-ancestors 'self' instead of 'none'.
     .AllowSameOriginFraming();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
-    // Blazor Server otherwise appends its own second "Content-Security-Policy: frame-ancestors 'self'"
-    // header to component responses. HrWebContentSecurityPolicy already sends the stricter
-    // frame-ancestors 'none' on every response, so keep a single policy — except in report-only mode,
-    // where Blazor's enforced frame-ancestors is kept so clickjacking protection never lapses.
     .AddInteractiveServerRenderMode(options =>
         options.ContentSecurityFrameAncestorsPolicy = cspSettings.ReportOnly ? "'self'" : null);
 app.MapDefaultEndpoints();

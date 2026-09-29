@@ -5,12 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Proves the probation:manage / probation:review FastEndpoints policy declarations
-/// actually enforce access end-to-end over real HTTP. Company Administrator is scoped to
-/// company profile/settings management only and no longer holds either permission — see
-/// the narrowing in HR.Modules.Identity.IdentityModule.AddRolePolicies.
-/// </summary>
 [Collection("Integration")]
 public class ProbationAuthorizationTests
 {
@@ -41,7 +35,6 @@ public class ProbationAuthorizationTests
         return client;
     }
 
-    // --- probation:manage — CreateProbationRecord ---
 
     [Fact]
     public async Task CompanyAdministrator_Gets_Forbidden_Creating_Probation_Record()
@@ -61,7 +54,6 @@ public class ProbationAuthorizationTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // --- probation:review — GetProbationReview ---
 
     [Fact]
     public async Task CompanyAdministrator_Gets_Forbidden_Getting_Probation_Review()
@@ -74,8 +66,6 @@ public class ProbationAuthorizationTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // --- probation:review — GetUpcomingProbationReviews now includes Manager (dashboard
-    // widening; was previously "probation:manage", HrAdministrator only) ---
 
     [Fact]
     public async Task Manager_Gets_Ok_Getting_Upcoming_Probation_Reviews()

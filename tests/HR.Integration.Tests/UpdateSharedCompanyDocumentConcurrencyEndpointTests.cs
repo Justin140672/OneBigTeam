@@ -27,7 +27,6 @@ public class UpdateSharedCompanyDocumentConcurrencyEndpointTests
         _factory = factory;
     }
 
-    // ── Metadata ────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task PutMetadata_Returns_Unauthorized_For_Anonymous_Request()
@@ -100,7 +99,6 @@ public class UpdateSharedCompanyDocumentConcurrencyEndpointTests
         Assert.Equal(version + 1, (await GetAsync(client, companyId, docId)).Version);
     }
 
-    // ── Audience ────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task PutAudience_Returns_Unauthorized_For_Anonymous_Request()
@@ -159,7 +157,6 @@ public class UpdateSharedCompanyDocumentConcurrencyEndpointTests
         Assert.Equal(version + 1, (await GetAsync(client, companyId, docId)).Version);
     }
 
-    // ── Acknowledgement settings ────────────────────────────────────────────────
 
     [Fact]
     public async Task PutAcknowledgementSettings_Returns_Unauthorized_For_Anonymous_Request()
@@ -216,7 +213,6 @@ public class UpdateSharedCompanyDocumentConcurrencyEndpointTests
         Assert.Equal(version + 1, (await GetAsync(client, companyId, docId)).Version);
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────────────
 
     private async Task<(HttpClient Client, Guid CompanyId, Guid CategoryId, Guid DocumentId)> SeedAsync()
     {
@@ -247,8 +243,6 @@ public class UpdateSharedCompanyDocumentConcurrencyEndpointTests
         uploadResponse.EnsureSuccessStatusCode();
         var docId = (await uploadResponse.Content.ReadFromJsonAsync<DocumentPayload>())!.Id;
 
-        // Uploads are scanned asynchronously via a Hangfire job that never runs in-test; simulate a
-        // completed Clean scan so downstream reads work, matching SharedCompanyDocumentEndpointTests.
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Documents.Persistence.DocumentsDbContext>();
         var doc = await db.SharedCompanyDocuments.SingleAsync(d => d.Id == docId);

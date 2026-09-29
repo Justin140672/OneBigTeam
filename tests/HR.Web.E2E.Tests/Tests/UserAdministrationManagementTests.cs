@@ -4,26 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the "User Administration" area added in UserAdministrationList.razor / UserDetail.razor:
-/// - The list page renders for an HR Administrator with expected grid data.
-/// - A plain Employee has no nav link and is redirected away from the page (same access-control
-///   convention as EmploymentTypeManagementTests / SicknessCategoryManagementTests).
-/// - Inviting an eligible employee end-to-end via the Employee List's row-level "Invite User"
-///   Quick Invite action (User Administration no longer has its own invite entry point — see
-///   InviteUserDialog.razor), and the new row shows up with "Pending" invitation status.
-/// - Navigating into a user's detail page and reading its audit history.
-/// - Editing an active user's roles via "Manage Roles".
-/// - Disabling then re-enabling an active user's account (the deactivate/reactivate coverage this
-///   project's convention expects for every list+edit page pair).
-///
-/// Uses Laura Bennett (HR Administrator) and Tom Williams (plain Employee) against the seeded
-/// Acme company, matching the personas described for this feature. The happy-path invite target is
-/// the dedicated E2E pool employee SeededE2eEmployees.QuickInvite (no linked user account; see
-/// UninvitedEmployeeName's remarks). The Resend/Cancel toolbar tests create their own fresh
-/// employee per run instead of reusing another shared seeded "no account" employee (see
-/// CreateFreshUninvitedEmployeeAsync's doc comment for why).
-/// </summary>
 public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -31,29 +11,8 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
     private const string HrAdminEmail = "laura.bennett@acme.example";
     private const string PlainEmployeeEmail = "tom.williams@acme.example";
 
-    // Dedicated seeded pool employee (no linked user account) used as the row-level Quick Invite
-    // target. NOT the seeded "Emma Jones": InviteUserFromAdminTests also sends her an invitation,
-    // and a sent invitation permanently removes its target from the invitable set, so whichever
-    // of the two ran second in a run found no "Invite" action for her. See
-    // SeededE2eEmployees.QuickInvite.
     private static readonly string UninvitedEmployeeName = SeededE2eEmployees.QuickInvite.FullName;
 
-    /// <summary>
-    /// Creates a fresh, uniquely-named Acme employee with no linked user account, to use as an
-    /// invite target for the Resend/Cancel toolbar tests below.
-    ///
-    /// Previously these tests used the shared seeded "Sophie Laurent" employee as their invite
-    /// target. That collided with EmployeeUserAccountColumnTests.
-    /// QuickInvite_ForNoUserEmployee_OpensPreselectedDialog_AndCompletesToPendingInvitation, which
-    /// also invites Sophie Laurent (to prove the row-level Quick Invite flow) — under real
-    /// parallel execution the two tests race to invite/resend/cancel the same seeded employee,
-    /// leaving her in an unpredictable Pending/Cancelled state depending on run order, and
-    /// EmployeeUserAccountColumnTests.UserAccountColumn_ShowsNoUserIconLabelAndInviteLink_ForEmployeeWithoutAccount
-    /// (a read-only test that still expects her to be "No User") would then fail too. A freshly
-    /// created employee has no linked user account (employee creation does not provision one), so
-    /// it satisfies the same "eligible NoUser invite target" precondition without touching shared
-    /// seed data.
-    /// </summary>
     private async Task<string> CreateFreshUninvitedEmployeeAsync()
     {
         var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
@@ -95,7 +54,6 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
 
         await list.GoToAsync(AcmeId);
 
-        // Laura Bennett herself has an account and should appear in the grid.
         Assert.True(await list.HasRowAsync("Laura Bennett"),
             "Expected the User Administration grid to include Laura Bennett's own account row");
         Assert.True(await list.HasRowAsync("laura.bennett@acme.example"),
@@ -115,9 +73,6 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
             "A plain Employee should not see the 'User Administration' nav link");
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/user-administration");
-        // See E2ETestBase.WaitForUrlToStopContainingAsync's doc comment: the redirect is a
-        // client-side Blazor NavigateTo, not a full page navigation, so NetworkIdle after the
-        // initial GET is not a reliable signal that the redirect has completed.
         await WaitForUrlToStopContainingAsync("/user-administration");
 
         var finalUrl = _page.Url;
@@ -135,12 +90,9 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
         await login.GoToAsync();
         await login.LoginAsync(HrAdminEmail);
 
-        // Inviting is only reachable from the Employee List's row-level "Invite User" action.
         await employees.GoToAsync(AcmeId);
         await employees.ClickInviteUserLinkAsync(UninvitedEmployeeName);
 
-        // "Employee" is always applied automatically (fixed badge, not a selectable role) — no
-        // additional roles are needed for this happy-path invite.
         await employees.CompleteQuickInviteAsync([]);
 
         await list.GoToAsync(AcmeId);
@@ -152,13 +104,6 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
         Assert.Equal("Pending", invitationStatus);
     }
 
-    // ── Resend/Cancel Invitation toolbar actions ──────────────────────────────
-    // UserAdministrationList.razor — the two toolbar buttons added alongside the standard
-    // Add/Edit/View trio, selection-dependent like every other custom toolbar action
-    // (SearchPageBase.AddToolbarAction), but the handlers themselves additionally guard on the
-    // selected row actually having a pending/expired invite (HasActionableInvite) — an active
-    // user has no InviteId left to act on, so clicking either button on one is a no-op with an
-    // inline error rather than silently succeeding.
 
     [Fact]
     public async Task ResendThenCancelInvitation_FromToolbar_UpdatesInvitationStatus()
@@ -193,8 +138,8 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
     }
 
     [Theory]
-    [InlineData(true)]  // Resend
-    [InlineData(false)] // Cancel
+    [InlineData(true)]
+    [InlineData(false)]
     public async Task InvitationToolbarAction_OnActiveUser_ShowsInlineError(bool resend)
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
@@ -204,9 +149,6 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
         await login.LoginAsync(HrAdminEmail);
 
         await list.GoToAsync(AcmeId);
-        // David Park is a seeded active account with no invite left to act on (see
-        // UserDetail_ShowsAccountDetailsAndAuditHistory's own reasoning for using him as an
-        // untouched-by-other-tests active persona).
         await list.SelectRowAsync("David Park");
 
         if (resend)
@@ -229,22 +171,12 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
         await login.LoginAsync(HrAdminEmail);
 
         await list.GoToAsync(AcmeId);
-        // David Park is a seeded active account not otherwise edited by this test class — Marcus
-        // Diallo is mutated by ManageRoles_UpdatesUsersRoles below, and reusing him here would make
-        // the "starts with no audit history" assertion order-dependent on that other test.
         await list.OpenUserDetailAsync("David Park");
 
         var detail = new UserDetailPage(_page, _fixture.WebBaseUrl);
 
         Assert.Equal("Active", await detail.GetAccountStatusAsync());
 
-        // The end-of-test revert below only prevents THIS test from leaving stale state for a
-        // FUTURE run — it can't undo contamination already sitting in a persistent/shared dev
-        // database from a run that happened before that revert step existed (or from a run that
-        // died between the "add Manager" and "remove Manager" steps). Actively clear the Manager
-        // role here, before the real assertions, so the test is self-healing against whatever
-        // state the database happens to already be in, rather than just trusting a previous run's
-        // cleanup to have worked.
         var neededPreCleanup = (await detail.GetRoleNamesAsync()).Contains("Manager");
         if (neededPreCleanup)
         {
@@ -255,12 +187,6 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
         var rolesBefore = await detail.GetRoleNamesAsync();
         Assert.DoesNotContain("Manager", rolesBefore);
 
-        // Seeded dev personas carry no audit trail of their own (seeding bypasses the normal
-        // audit-event flow), so the empty-history state is expected here — an actual edit is
-        // what should produce the first entry. Skip this specific assertion if the pre-cleanup
-        // step above just had to remove a stale Manager role itself — that toggle legitimately
-        // produced its own audit entry, so the account is no longer in the pristine "never
-        // touched" state this assertion is checking for.
         await detail.OpenAuditHistoryDialogAsync();
         if (!neededPreCleanup)
         {
@@ -282,9 +208,6 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
             "Expected the roles edit to produce a visible audit history entry");
         await detail.CloseAuditHistoryDialogAsync();
 
-        // Revert the Manager role toggle so this test remains idempotent across repeated runs
-        // against a persistent/shared dev database (David Park must start each run without
-        // Manager, per the "rolesBefore" assertion above).
         await detail.OpenManageRolesDialogAsync();
         await detail.ToggleRolesAndSaveAsync(["Manager"]);
         Assert.DoesNotContain("Manager", await detail.GetRoleNamesAsync());
@@ -300,16 +223,12 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
         await login.LoginAsync(HrAdminEmail);
 
         await list.GoToAsync(AcmeId);
-        // Marcus Diallo is a seeded active Recruiter account — a safer target for a roles edit
-        // than the HR Administrator persona actually driving the test.
         await list.OpenUserDetailAsync("Marcus Diallo");
 
         var detail = new UserDetailPage(_page, _fixture.WebBaseUrl);
         var rolesBefore = await detail.GetRoleNamesAsync();
 
         await detail.OpenManageRolesDialogAsync();
-        // Toggle "Manager" on in addition to whatever roles Marcus already has, so the dialog's
-        // "at least one role" guard is never at risk of being violated.
         await detail.ToggleRolesAndSaveAsync(["Manager"]);
 
         Assert.Equal("Roles updated.", await detail.GetSuccessMessageAsync());
@@ -329,8 +248,6 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
         await login.LoginAsync(HrAdminEmail);
 
         await list.GoToAsync(AcmeId);
-        // Use a seeded active account other than the HR Administrator persona driving the test,
-        // so disabling it can't lock the test itself out mid-run.
         await list.OpenUserDetailAsync("Carlos Rivera");
 
         var detail = new UserDetailPage(_page, _fixture.WebBaseUrl);

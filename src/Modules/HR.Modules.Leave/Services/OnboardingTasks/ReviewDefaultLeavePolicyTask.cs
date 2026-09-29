@@ -12,11 +12,6 @@ internal sealed class ReviewDefaultLeavePolicyTask(LeaveDbContext dbContext) : I
     public bool IsMandatory => true;
     public int Order => 3;
 
-    // Links straight to the default policy's own edit page
-    // ("/companies/{CompanyId:guid}/leave-policies/{Id:guid}") rather than the leave policies
-    // search/list screen — "review your default leave policy" means look at that one specific
-    // policy, not go find it yourself. Falls back to the plain list route (still company-scoped,
-    // "{companyId}" substituted by HR.Web) in the unexpected case no default policy exists yet.
     public async Task<string> GetLinkUrlAsync(Guid companyId, CancellationToken cancellationToken)
     {
         var defaultPolicyId = await dbContext.LeavePolicies

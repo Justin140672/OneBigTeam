@@ -107,9 +107,6 @@ public class ListEmployeesEndpointTests
         var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
         Assert.NotNull(payload);
         var item = payload!.Items.Single(i => i.FirstName == "Alice");
-        // Employee.NormalizeEmployeeNumber upper-cases the value on create (see Employee.cs), so
-        // the value round-tripped through the list endpoint is the normalized form, not the raw
-        // input casing.
         Assert.Equal(employeeNumber.ToUpperInvariant(), item.EmployeeNumber);
     }
 
@@ -174,7 +171,6 @@ public class ListEmployeesEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, ListEmpUser5, SystemRoles.HrAdministrator, companyA);
         await CreateEmployeeAsync(client, companyA, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com");
 
-        // Authenticated as companyA but route targets companyB — middleware blocks it.
         var response = await client.GetAsync($"/api/companies/{companyB}/employees");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);

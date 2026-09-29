@@ -106,13 +106,11 @@ public class UpdateSupportRequestStatusConcurrencyEndpointTests
     {
         var (client, companyId, id, version) = await CreateRequestAsync();
 
-        // Someone else legitimately advances the version first.
         var legitimate = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/support/requests/{id}/status",
             new { companyId, id, status = "UnderReview", expectedVersion = version });
         legitimate.EnsureSuccessStatusCode();
 
-        // A second caller still believes the old version is current.
         var stale = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/support/requests/{id}/status",
             new { companyId, id, status = "Planned", expectedVersion = version });
@@ -146,7 +144,6 @@ public class UpdateSupportRequestStatusConcurrencyEndpointTests
     {
         var (client, companyId, id, version) = await CreateRequestAsync();
 
-        // Legitimate change (version -> version+1) triggers one notification per HR admin.
         var legitimate = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/support/requests/{id}/status",
             new { companyId, id, status = "UnderReview", expectedVersion = version });

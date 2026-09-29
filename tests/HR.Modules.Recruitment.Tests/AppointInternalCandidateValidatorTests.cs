@@ -46,7 +46,6 @@ public class AppointInternalCandidateValidatorTests
     [Fact]
     public void Validate_Passes_When_EffectiveDate_Omitted()
     {
-        // Falls back to the offer's proposed start date in the handler.
         Assert.True(_validator.Validate(ValidRequest() with { EffectiveDate = null }).IsValid);
     }
 
@@ -83,12 +82,10 @@ public class AppointInternalCandidateValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(AppointInternalCandidateRequest.ApplicationId));
     }
 
-    // ---- Manager: exactly one of ManagerId / NoManager ----
 
     [Fact]
     public void Validate_Fails_When_Neither_Manager_Nor_NoManager_Chosen()
     {
-        // Omitting the manager must never silently clear it.
         var result = _validator.Validate(ValidRequest() with { ManagerId = null, NoManager = false });
 
         Assert.False(result.IsValid);
@@ -119,7 +116,6 @@ public class AppointInternalCandidateValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(AppointInternalCandidateRequest.ManagerId));
     }
 
-    // ---- Compensation ignored unless CreateCompensationChange ----
 
     [Fact]
     public void Validate_Ignores_Invalid_Compensation_Fields_When_No_Compensation_Change()
@@ -138,7 +134,6 @@ public class AppointInternalCandidateValidatorTests
         Assert.True(result.IsValid);
     }
 
-    // ---- Salary type ----
 
     [Theory]
     [InlineData("Annual")]
@@ -165,7 +160,6 @@ public class AppointInternalCandidateValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(AppointInternalCandidateRequest.CompensationSalaryType));
     }
 
-    // ---- Salary (> 0, exclusive) ----
 
     [Fact]
     public void Validate_Fails_When_Salary_Missing()
@@ -192,7 +186,6 @@ public class AppointInternalCandidateValidatorTests
         Assert.True(_validator.Validate(ValidWithCompensation() with { CompensationSalary = 0.01m }).IsValid);
     }
 
-    // ---- Currency (exactly 3 characters) ----
 
     [Fact]
     public void Validate_Passes_For_Three_Letter_Currency()
@@ -214,7 +207,6 @@ public class AppointInternalCandidateValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(AppointInternalCandidateRequest.CompensationCurrency));
     }
 
-    // ---- Hours per week (optional, > 0 exclusive) ----
 
     [Fact]
     public void Validate_Passes_When_HoursPerWeek_Omitted()
@@ -238,7 +230,6 @@ public class AppointInternalCandidateValidatorTests
         Assert.True(_validator.Validate(ValidWithCompensation() with { CompensationHoursPerWeek = 0.01m }).IsValid);
     }
 
-    // ---- FTE (optional, 0..1 inclusive) ----
 
     [Theory]
     [InlineData("0")]
@@ -265,7 +256,6 @@ public class AppointInternalCandidateValidatorTests
         Assert.True(_validator.Validate(ValidWithCompensation() with { CompensationFte = null }).IsValid);
     }
 
-    // ---- Notes (max 4000) ----
 
     [Fact]
     public void Validate_Passes_When_Notes_At_Max_Length()

@@ -48,7 +48,6 @@ internal sealed class SetExternalRecruiterActiveStatusHandler(
         var previousIsActive = recruiter.IsActive;
         var now = clock.UtcNowOffset();
 
-        // Never deletes the row — just flips the flag, per SetActiveStatus's remarks.
         recruiter.SetActiveStatus(request.IsActive, now);
 
         var response = new SetExternalRecruiterActiveStatusResponse(

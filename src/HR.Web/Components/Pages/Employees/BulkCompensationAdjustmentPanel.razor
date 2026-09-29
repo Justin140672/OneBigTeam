@@ -209,7 +209,6 @@
         var currentIds = Employees.Select(e => e.Id).ToHashSet();
         if (_lastEmployeeIds is not null && !_lastEmployeeIds.SetEquals(currentIds))
         {
-            // Selection changed since last render — the previously-built preview no longer applies.
             _previewRows = [];
             _excludedEmployees = [];
             _globalError = null;

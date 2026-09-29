@@ -111,7 +111,6 @@ public class GetEmployeeDocumentVersionHistoryHandlerTests
 
         var handler = BuildHandler(db);
 
-        // Anchor on the OLDEST version's id — must still return the whole chain, newest-first.
         var result = await handler.HandleAsync(
             new GetEmployeeDocumentVersionHistoryRequest
             {
@@ -128,7 +127,6 @@ public class GetEmployeeDocumentVersionHistoryHandlerTests
         Assert.False(result.Value.Versions[1].IsLatestVersion);
         Assert.False(result.Value.Versions[2].IsLatestVersion);
 
-        // Anchor on the MIDDLE version's id — same result.
         var resultFromMiddle = await handler.HandleAsync(
             new GetEmployeeDocumentVersionHistoryRequest
             {
@@ -141,7 +139,6 @@ public class GetEmployeeDocumentVersionHistoryHandlerTests
         Assert.True(resultFromMiddle.IsSuccess);
         Assert.Equal([v3.Id, v2.Id, v1.Id], resultFromMiddle.Value!.Versions.Select(v => v.EmployeeDocumentId));
 
-        // Anchor on the NEWEST (latest) version's id — same result.
         var resultFromLatest = await handler.HandleAsync(
             new GetEmployeeDocumentVersionHistoryRequest
             {

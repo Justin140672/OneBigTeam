@@ -1,10 +1,8 @@
 namespace HR.Web.Models;
 
-// ── TODAY COUNT ───────────────────────────────────────────────────────────────
 
 public record GetInterviewsTodayCountResponse(int Count);
 
-// ── DASHBOARD: UPCOMING INTERVIEWS ──────────────────────────────────────────────
 
 public record GetUpcomingInterviewsResponse(IReadOnlyList<UpcomingInterviewItem> Items);
 
@@ -18,7 +16,6 @@ public record UpcomingInterviewItem(
     DateTimeOffset ScheduledAt,
     string? Location);
 
-// ── LIST ──────────────────────────────────────────────────────────────────────
 
 public record ListInterviewsForVacancyResponse(List<InterviewListItemModel> Items);
 
@@ -38,7 +35,6 @@ public record InterviewListItemModel(
     // (only Schedule and Record-Outcome, both POSTs), so this is carried for contract parity only.
     int Version = 0);
 
-// ── SCHEDULE ──────────────────────────────────────────────────────────────────
 
 public record ScheduleInterviewRequest(
     Guid CompanyId,
@@ -62,7 +58,6 @@ public record ScheduleInterviewResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
-// ── RECORD OUTCOME ────────────────────────────────────────────────────────────
 
 public record RecordInterviewOutcomeRequest(
     Guid CompanyId,

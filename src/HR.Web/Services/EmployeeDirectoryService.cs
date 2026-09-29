@@ -3,10 +3,6 @@ using System.Web;
 
 namespace HR.Web.Services;
 
-/// <summary>
-/// Employee-facing directory. Backed by the "employees/directory" endpoints which only require an
-/// authenticated employee (policy role:employee); company is resolved server-side from AppSession.
-/// </summary>
 public class EmployeeDirectoryService(HrApiHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient();

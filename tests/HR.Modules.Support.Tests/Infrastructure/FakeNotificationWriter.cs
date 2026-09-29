@@ -16,8 +16,6 @@ internal sealed class FakeNotificationWriter : INotificationWriter
         return Task.CompletedTask;
     }
 
-    /// <summary>NOT-03: no Support handler currently raises a template-backed NotificationType, so
-    /// this fake records a generic entry rather than reproducing the real catalogue's wording.</summary>
     public Task<Result> WriteTemplatedAsync(
         Guid id, Guid companyId, Guid employeeId, NotificationType type,
         IReadOnlyDictionary<string, string> tokens, Guid sourceEntityId,

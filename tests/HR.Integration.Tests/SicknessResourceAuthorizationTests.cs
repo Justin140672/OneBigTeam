@@ -8,16 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// SICK-02: reporting-hierarchy / HR-administrator resource-level authorization for the
-/// Sickness endpoints guarded by <c>HR.Modules.Sickness.Services.SicknessResourceAuthorizer</c> —
-/// GetMissingFitNotes and GetReturnToWorkReview. The
-/// "sickness:review" policy those endpoints carry only proves Manager/HrAdministrator role
-/// membership; it never proves the caller has a reporting relationship to the specific
-/// employee(s) whose data is being requested, so these tests exercise that resource-ownership
-/// check end-to-end over real HTTP. Mirrors LeaveResourceAuthorizationTests' pattern for
-/// LEAVE-01/02's equivalent authorizer.
-/// </summary>
 [Collection("Integration")]
 public class SicknessResourceAuthorizationTests
 {
@@ -28,9 +18,6 @@ public class SicknessResourceAuthorizationTests
         _factory = factory;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // GetMissingFitNotes
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task GetMissingFitNotes_Visible_To_Direct_Manager()
@@ -175,9 +162,6 @@ public class SicknessResourceAuthorizationTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // GetReturnToWorkReview (single-resource read; unauthorized -> 404, never 403)
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task GetReturnToWorkReview_Visible_To_Direct_Manager_Without_Notes()
@@ -200,8 +184,6 @@ public class SicknessResourceAuthorizationTests
         var payload = await response.Content.ReadFromJsonAsync<ReviewPayload>();
         Assert.NotNull(payload);
         Assert.Equal(report, payload!.EmployeeId);
-        // SICK-02: managers get a trimmed view that omits Notes, even though they're authorized
-        // to view the review itself.
         Assert.Null(payload.Notes);
     }
 
@@ -250,8 +232,6 @@ public class SicknessResourceAuthorizationTests
         using var peerClient = await ClientFor(companyId, peerManager);
         var response = await peerClient.GetAsync($"/api/companies/{companyId}/return-to-work-reviews/{reviewId}");
 
-        // SICK-02: a manager unrelated to the review's employee must receive the same 404 as a
-        // genuinely nonexistent review id — never 403 — so review ids cannot be enumerated.
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -317,8 +297,6 @@ public class SicknessResourceAuthorizationTests
         using var otherHrClient = await HrAdminClientAsync(otherCompanyId);
         var response = await otherHrClient.GetAsync($"/api/companies/{otherCompanyId}/return-to-work-reviews/{reviewId}");
 
-        // Even an HR Administrator of a different company cannot fetch Company A's review by
-        // guessing/knowing its id — the review lookup itself is scoped by CompanyId.
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
@@ -337,9 +315,6 @@ public class SicknessResourceAuthorizationTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> HrAdminClientAsync(Guid companyId)
     {
@@ -352,14 +327,6 @@ public class SicknessResourceAuthorizationTests
         return client;
     }
 
-    /// <summary>
-    /// An employee's id doubles as the identity user id for the linked account (see
-    /// GetMyEmployeeHandler's `e.Id == userId` lookup), so this id is used both as the sickness
-    /// resource's EmployeeId and as the TestAuthHandler.UserHeader value when acting "as" that
-    /// employee/manager. Employee role is always assigned by CreateEmployee's own downstream
-    /// side effects are NOT relied upon here — callers must assign Manager/HrAdministrator via
-    /// AssignRoleAsync explicitly as needed.
-    /// </summary>
     private async Task<Guid> CreateEmployeeAsync(
         HttpClient hrClient, Guid companyId, EmployeeReferenceDataSeeder.ReferenceData reference)
     {
@@ -412,11 +379,6 @@ public class SicknessResourceAuthorizationTests
         return payload!.Id;
     }
 
-    /// <summary>
-    /// Creates an open (unclosed) sickness record starting well over the default
-    /// FitNoteRequiredAfterDays threshold (7 calendar days) in the past, so
-    /// FitNoteRequestJob will create a Pending SicknessEvidenceRequest for it on its next run.
-    /// </summary>
     private async Task<Guid> CreateStaleOpenSicknessRecordAsync(HttpClient hrClient, Guid companyId, Guid employeeId)
     {
         var categoryId = await CreateCategoryAsync(hrClient, companyId);

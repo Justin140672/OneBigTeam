@@ -35,7 +35,6 @@ public class NotificationWriterTests
         Assert.False(saved.IsRead);
     }
 
-    // NOT-05: audit -------------------------------------------------------------------------------
 
     [Fact]
     public async Task WriteAsync_Publishes_NotificationCreatedAuditEvent()
@@ -220,17 +219,14 @@ public class NotificationWriterTests
             Guid.NewGuid(), companyId, Guid.NewGuid(),
             "Match 2", null, sourceEntityId,
             NotificationType.TaskDueSoon, NotificationPriority.Normal, Now);
-        // Different type - should not be removed
         await writer.WriteAsync(
             Guid.NewGuid(), companyId, Guid.NewGuid(),
             "Different type", null, sourceEntityId,
             NotificationType.TaskAssigned, NotificationPriority.Normal, Now);
-        // Different company - should not be removed
         await writer.WriteAsync(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
             "Different company", null, sourceEntityId,
             NotificationType.TaskDueSoon, NotificationPriority.Normal, Now);
-        // Different source entity - should not be removed
         await writer.WriteAsync(
             Guid.NewGuid(), companyId, Guid.NewGuid(),
             "Different source", null, Guid.NewGuid(),
@@ -245,7 +241,6 @@ public class NotificationWriterTests
             remainingTitles);
     }
 
-    // NOT-02: channel-aware delivery ------------------------------------------------------------
 
     [Fact]
     public async Task WriteAsync_Persists_EmailDelivery_And_Enqueues_Job_For_Email_Eligible_Type()
@@ -293,7 +288,6 @@ public class NotificationWriterTests
         Assert.Empty(backgroundJobClient.CreatedJobs);
     }
 
-    // NOT-04: ActionUrl computed at write time -------------------------------------------------
 
     [Fact]
     public async Task WriteAsync_Persists_ActionUrl_Matching_NotificationActionRouteBuilder_For_Mapped_Type()
@@ -335,7 +329,6 @@ public class NotificationWriterTests
         Assert.Null(saved.ActionUrl);
     }
 
-    // SET-06: notification-channel settings ----------------------------------------------------
 
     [Fact]
     public async Task WriteAsync_Scheduled_Reminder_Type_With_ScheduledRemindersEnabled_False_Creates_No_Notification_Or_EmailDelivery()
@@ -374,7 +367,6 @@ public class NotificationWriterTests
 
         var saved = await ctx.Notifications.SingleAsync();
         Assert.Equal("Task due soon", saved.Title);
-        // TaskDueSoon is InApp-only regardless of email setting.
         Assert.Empty(ctx.EmailDeliveries);
         Assert.Empty(backgroundJobClient.CreatedJobs);
     }

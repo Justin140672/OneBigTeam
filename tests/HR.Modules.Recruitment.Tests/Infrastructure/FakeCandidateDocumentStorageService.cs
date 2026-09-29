@@ -8,13 +8,10 @@ internal sealed class FakeCandidateDocumentStorageService : ICandidateDocumentSt
     public List<string> Deletions { get; } = [];
     public HashSet<string> ExistingKeys { get; } = [];
 
-    /// <summary>Stored bytes per key (populated by UploadAsync, or directly by a test), served by OpenReadAsync.</summary>
     public Dictionary<string, byte[]> Contents { get; } = [];
 
-    /// <summary>Test helper: when greater than zero, the next N OpenReadAsync calls throw (simulated storage outage).</summary>
     public int ThrowOnNextOpenReadAttempts { get; set; }
 
-    /// <summary>Every key a signed download URL was requested for — lets tests prove none was minted.</summary>
     public List<string> DownloadUrlRequests { get; } = [];
 
     public Task<Stream> OpenReadAsync(string storageKey, CancellationToken cancellationToken)
@@ -59,16 +56,8 @@ internal sealed class FakeCandidateDocumentStorageService : ICandidateDocumentSt
         return Task.FromResult(new Uri($"https://storage.example.com/{storageKey}"));
     }
 
-    /// <summary>
-    /// Test helper: when greater than zero, the next N calls to <see cref="DeleteAsync"/> throw
-    /// (simulating a transient storage failure) instead of succeeding, decrementing by one per
-    /// call. Mirrors FakeImportFileStorageService's helper of the same name/shape.
-    /// </summary>
     public int ThrowOnNextDeleteAttempts { get; set; }
 
-    /// <summary>Test helper: records the CancellationToken passed to each DeleteAsync call, so
-    /// tests can assert compensation used an independent cleanup token rather than a cancelled
-    /// request token.</summary>
     public List<CancellationToken> DeleteCancellationTokens { get; } = [];
 
     public Task DeleteAsync(string storageKey, CancellationToken cancellationToken)

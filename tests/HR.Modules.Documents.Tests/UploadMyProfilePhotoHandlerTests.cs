@@ -46,8 +46,6 @@ public class UploadMyProfilePhotoHandlerTests
             employeeNameReader ?? new FakeEmployeeNameReader(),
             backgroundJobClient ?? new NoOpBackgroundJobClient());
 
-    // Produces a valid PNG file with real IHDR dimensions so magic-byte and dimension
-    // validation both pass by default.
     private static IFormFile FakePngFile(
         string fileName = "avatar.png",
         int width = 400,
@@ -126,14 +124,12 @@ public class UploadMyProfilePhotoHandlerTests
             CancellationToken.None);
         Assert.True(secondResult.IsSuccess);
 
-        // Same logical pending row, replaced in place.
         Assert.Equal(firstResult.Value!.Id, secondResult.Value!.Id);
 
         var rows = await db.PendingProfilePhotos.Where(p => p.EmployeeId == employeeId).ToListAsync();
         Assert.Single(rows);
         Assert.Equal("second.png", rows[0].FileName);
 
-        // Old blob is best-effort deleted once the replacement is safely persisted.
         Assert.Equal(2, storage.Uploads.Count);
         Assert.Single(storage.Deletions);
         Assert.Equal(storage.Uploads[0].StorageKey, storage.Deletions[0]);
@@ -183,8 +179,6 @@ public class UploadMyProfilePhotoHandlerTests
     [Fact]
     public async Task HandleAsync_Stores_Pending_Photo_With_Pending_ScanStatus()
     {
-        // Virus scanning now happens asynchronously (ScanUploadedFileJob, enqueued after
-        // persistence) rather than inline during upload.
         await using var db = BuildContext();
         var storage        = new FakeProfilePhotoStorageService();
         var companyId      = Guid.NewGuid();
@@ -228,7 +222,6 @@ public class UploadMyProfilePhotoHandlerTests
         var employeeId     = Guid.NewGuid();
         var handler        = BuildHandler(db, storage);
 
-        // Extension/content type say PNG, but bytes are zeros (renamed/spoofed file).
         var spoofedFile = FakeFile("legit.png", "image/png", new byte[] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 });
 
         var result = await handler.HandleAsync(
@@ -430,13 +423,11 @@ public class UploadMyProfilePhotoHandlerTests
                 employeeId,
                 CancellationToken.None));
 
-        // The file that was uploaded must have been cleaned up.
         Assert.Single(storage.Uploads);
         Assert.Single(storage.Deletions);
         Assert.Equal(storage.Uploads[0].StorageKey, storage.Deletions[0]);
     }
 
-    // Subclass used only in the orphan-cleanup test to simulate a DB save failure.
     private sealed class ThrowingDocumentsDbContext(DbContextOptions<DocumentsDbContext> options)
         : DocumentsDbContext(options)
     {

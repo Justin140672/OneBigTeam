@@ -98,7 +98,6 @@ public class OpenTaskBySourceEntityReaderTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var sourceEntityId = Guid.NewGuid();
-        // No tasks seeded at all.
 
         var reader = new OpenTaskBySourceEntityReader(context);
         var result = await reader.GetOpenTaskIdsAsync(companyId, [sourceEntityId], CancellationToken.None);
@@ -139,9 +138,6 @@ public class OpenTaskBySourceEntityReaderTests
     [Fact]
     public async Task GetOpenTaskIdsAsync_Without_ActionType_Filter_Matches_Any_ActionType()
     {
-        // Default (null) behaviour is unchanged — an open task of ANY action type still matches
-        // when no actionType filter is supplied. This preserves the original contract relied on by
-        // the one existing caller, GetRecentLeaveRequestsHandler.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var sourceEntityId = Guid.NewGuid();
@@ -175,8 +171,6 @@ public class OpenTaskBySourceEntityReaderTests
     [Fact]
     public async Task GetOpenTaskIdsAsync_With_ActionType_Filter_Omits_SourceEntityId_When_Only_A_Different_ActionType_Is_Open()
     {
-        // Core new behaviour: the source entity id must be OMITTED entirely (not mapped to null,
-        // not matched to the wrong task) when its only open task is of a different action type.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var sourceEntityId = Guid.NewGuid();
@@ -195,9 +189,6 @@ public class OpenTaskBySourceEntityReaderTests
     [Fact]
     public async Task GetOpenTaskIdsAsync_With_ActionType_Filter_Distinguishes_Between_Two_Open_Tasks_Of_Different_ActionTypes_For_The_Same_SourceEntity()
     {
-        // A single source entity (e.g. a Shared Company Document) can have multiple concurrent open
-        // tasks of different action types. Prove each actionType-scoped call returns only its own
-        // matching task id, never the other one.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var sourceEntityId = Guid.NewGuid();

@@ -55,9 +55,6 @@ public sealed class AdminUsersManagementTests(ParallelBlankPersonaFixture fixtur
         Assert.False(await adminUsers.IsErrorBannerVisibleAsync(),
             "Expected the allow-listed admin to see the administrators list, not the error banner");
 
-        // The list should never truly be empty (the logged-in admin itself is seeded/created as a
-        // row), but tolerate either the empty-state message or the table as a "list rendered"
-        // outcome, matching DeletionQueueTests' convention.
         var isEmpty = await adminUsers.IsEmptyStateVisibleAsync();
         var hasTable = await adminUsers.IsTableVisibleAsync();
         Assert.True(isEmpty || hasTable,
@@ -226,10 +223,6 @@ public sealed class AdminUsersManagementTests(ParallelBlankPersonaFixture fixtur
         await adminUsers.FillDialogReasonAsync(adminUsers.ResetPasswordDialog, "E2E: resetting password for administrator");
         await adminUsers.ClickDialogConfirmAsync(adminUsers.ResetPasswordDialog, "Reset password");
 
-        // Matches the 20s timeout other admin-action-success waits use elsewhere in the suite
-        // (e.g. AdminSupportRequestDetailPage.SaveAsync, OperationalAlertDetailsPage) — reset-
-        // password chains a full admin-list reload before the success message renders, and 15s
-        // was tight for that under load.
         await _page.WaitForSelectorAsync(".admin-action-success", new() { Timeout = 20_000 });
         Assert.True(await adminUsers.IsActionSuccessVisibleAsync(),
             "Expected a success message after resetting the administrator's password");
@@ -238,9 +231,6 @@ public sealed class AdminUsersManagementTests(ParallelBlankPersonaFixture fixtur
     [Fact]
     public async Task AnonymousAccess_ToAdminUsers_RedirectsToLogin()
     {
-        // Same pattern as DeletionQueueTests.AnonymousAccess_ToDeletionQueue_RedirectsToLogin:
-        // navigate directly rather than via AdminUsersPage.GoToAsync, which waits for that page's
-        // own settled-state selectors and would time out on /login.
         await _page.GotoAsync($"{_fixture.AdminWebBaseUrl}/admin-users");
 
         await _page.WaitForURLAsync(url => url.ToString().Contains("/login"), new() { Timeout = 20_000 });

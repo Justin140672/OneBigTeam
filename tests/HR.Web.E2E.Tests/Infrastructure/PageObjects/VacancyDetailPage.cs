@@ -3,21 +3,11 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the vacancy create/edit/view page, including its Applications and
-/// Interviews tabs (VacancyApplicationsTab.razor / VacancyInterviewsTab.razor), which render
-/// inline on this same page rather than as separate routes.
-/// Routes: /companies/{id}/vacancies/new, /vacancies/{id}, /vacancies/{id}/view
-/// </summary>
 public sealed class VacancyDetailPage(IPage page, string baseUrl)
 {
     public async Task GoToNewAsync(Guid companyId)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/vacancies/new");
-        // With prerender disabled the page is blank until the interactive circuit connects. Gate
-        // on the shell, then on the form's own title field (a page-specific signal) rather than
-        // "span[role='combobox']", which also matches chrome outside this form and can be
-        // satisfied before the form has actually rendered.
         await page.WaitForSelectorAsync(".app-shell", new() { Timeout = 30_000 });
         await page.GetByPlaceholder("e.g. Senior Software Engineer")
             .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
@@ -29,16 +19,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".e-tab, span[role='combobox']", new() { Timeout = 20_000 });
     }
 
-    // ── Overview (new/edit form) ─────────────────────────────────────────────────
 
-    /// <summary>
-    /// Fills the "Advert Title (optional)" field (bound to Model.AdvertTitle — see
-    /// VacancyDetail.razor's RenderDetailsCard). Despite the label rename ("Title" →
-    /// "Advert Title (optional)") as part of the "Refactor Duplicate Vacancy Fields" story, the
-    /// underlying HrTextBox and its placeholder are unchanged, so this locator still applies. The
-    /// field is now genuinely optional — leaving it blank no longer produces a validation error;
-    /// see CreateVacancy_WithoutAdvertTitle_UsesPositionProfileTitleAsEffectiveTitle.
-    /// </summary>
     public async Task FillTitleAsync(string value)
     {
         await page.GetByPlaceholder("e.g. Senior Software Engineer").FillAsync(value);
@@ -60,54 +41,26 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await page.Keyboard.PressAsync("Tab");
     }
 
-    /// <summary>
-    /// Selects a value from the Hiring Manager dropdown (AllowFiltering enabled). Scoped to
-    /// ".col-md-4" — the Recruitment Advert Details card's Location/Hiring Manager fields share
-    /// that column width (see VacancyDetail.razor's RenderDetailsCard). The vacancy-level
-    /// Department dropdown that used to share this column width was removed as part of the
-    /// "Refactor Duplicate Vacancy Fields" story — department is now shown only via the
-    /// read-only "Linked Position Profile" card.
-    /// </summary>
     public Task SelectHiringManagerAsync(string nameFragment) =>
         DropDownSelector.SelectAsync(page, page.Locator(".col-md-4").Filter(new() { HasText = "Hiring Manager" }).First, nameFragment);
 
-    /// <summary>
-    /// Selects a value from the Position Profile dropdown (AllowFiltering enabled). Only usable
-    /// on the create form / a new vacancy — this field is Enabled="@IsNew" in VacancyDetail.razor,
-    /// disabled once a vacancy exists (PositionProfileId cannot be changed via UpdateVacancy).
-    /// Scoped to ".col-md-8" — Position Profile now renders in its own card ahead of the Vacancy
-    /// Details card (see RenderDetailsCard), in an 8-wide column rather than the 4-wide columns
-    /// used by Department/Hiring Manager below it.
-    /// </summary>
     public async Task SelectPositionProfileAsync(string titleFragment)
     {
         var group = page.Locator(".col-md-8").Filter(new() { HasText = "Position Profile" }).First;
         await DropDownSelector.SelectAsync(page, group, titleFragment);
 
-        // Confirms Blazor's ValueChanged round-trip to the server actually committed
-        // Model.PositionProfileId, not just that the popup closed client-side — without this, a
-        // caller that immediately clicks Save can race the round-trip.
         await Assertions.Expect(group.Locator(".e-input-group input").First)
             .ToHaveValueAsync(new Regex(Regex.Escape(titleFragment)), new() { Timeout = 10_000 });
     }
 
-    /// <summary>
-    /// Opens the Position Profile dropdown's popup without selecting anything, so its visible
-    /// option list can be inspected — e.g. to assert inactive profiles are excluded (the dropdown's
-    /// DataSource is active-profiles-only; see VacancyDetail.razor's OnLoadedAsync, which calls
-    /// PositionProfileService.ListPositionProfilesAsync with its default includeInactive: false).
-    /// </summary>
     public async Task OpenPositionProfileDropdownAsync()
     {
         var group = page.Locator(".col-md-8").Filter(new() { HasText = "Position Profile" }).First;
         await group.Locator("span[role='combobox']").First.ClickAsync();
         await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        // Same populated-before-reading guard as DropDownSelector.SelectAsync — the popup container
-        // can become visible a tick before its item list actually renders.
         await page.Locator(".e-popup.e-ddl:visible .e-list-item:not(.e-hide)").First.WaitForAsync(new() { Timeout = 10_000 });
     }
 
-    /// <summary>Reads the visible option titles from the (currently open) Position Profile dropdown popup.</summary>
     public async Task<IReadOnlyList<string>> GetPositionProfileDropdownOptionsAsync()
     {
         var items = await page.Locator(".e-popup.e-ddl:visible .e-list-item:not(.e-hide)").AllAsync();
@@ -117,18 +70,12 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         return titles;
     }
 
-    /// <summary>Reads the current value of the Position Profile dropdown's visible text.</summary>
     public async Task<string?> GetSelectedPositionProfileTextAsync()
     {
         var group = page.Locator(".col-md-8").Filter(new() { HasText = "Position Profile" }).First;
         return await group.Locator(".e-input-group input").First.InputValueAsync();
     }
 
-    /// <summary>
-    /// Returns true if the Position Profile dropdown is disabled — expected once a vacancy has
-    /// been created (Enabled="@IsNew" in VacancyDetail.razor; PositionProfileId cannot be changed
-    /// after creation).
-    /// </summary>
     public async Task<bool> IsPositionProfileDisabledAsync()
     {
         var group = page.Locator(".col-md-8").Filter(new() { HasText = "Position Profile" }).First;
@@ -155,28 +102,17 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             "Position Profile cannot be changed after the vacancy has applications or has moved past Draft status",
             new() { Exact = false }).IsVisibleAsync();
 
-    /// <summary>
-    /// The "From Position Profile" summary card (data-testid="position-profile-defaults-summary")
-    /// that appears once a Position Profile has been selected and its defaults fetched (see
-    /// OnPositionProfileChanged in VacancyDetail.razor).
-    /// </summary>
     private ILocator PositionProfileDefaultsSummary => page.Locator("[data-testid='position-profile-defaults-summary']");
 
     public Task<bool> IsPositionProfileDefaultsSummaryVisibleAsync() =>
         PositionProfileDefaultsSummary.IsVisibleAsync();
 
-    /// <summary>Reads the Department value shown in the "From Position Profile" summary card.</summary>
     public async Task<string?> GetSummaryDepartmentNameAsync()
     {
         var dd = PositionProfileDefaultsSummary.Locator("dt:has-text('Department') + dd");
         return (await dd.TextContentAsync())?.Trim();
     }
 
-    /// <summary>
-    /// Reads the Salary Range value shown in the "From Position Profile" summary card, or null if
-    /// the selected profile has no salary range set (that row is only rendered when present — see
-    /// RenderDetailsCard in VacancyDetail.razor).
-    /// </summary>
     public async Task<string?> GetSummarySalaryRangeAsync()
     {
         var dd = PositionProfileDefaultsSummary.Locator("dt:has-text('Salary Range') + dd");
@@ -231,7 +167,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             }
             catch (TimeoutException)
             {
-                // Fall through to the caller's own assertion for a clearer failure message.
             }
         }
     }
@@ -252,23 +187,11 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await page.Keyboard.PressAsync("Tab");
     }
 
-    // ── Linked Position Profile card (existing vacancy only) ─────────────────────
-    // "Derive Vacancy Role Information from Position Profile" story: read-only card
-    // (data-testid="linked-position-profile-card") rendered whenever an existing vacancy is
-    // loaded (edit/view mode, gated on "_vacancy is not null" — never on the "Add Vacancy" create
-    // form). Shows the linked Position Profile's own canonical Title/Department/Description, plus
-    // an "Inactive" indicator if that profile has since been deactivated. See
-    // VacancyDetail.razor's RenderDetailsCard.
 
     private ILocator LinkedPositionProfileCard => page.Locator("[data-testid='linked-position-profile-card']");
 
     public async Task<bool> IsLinkedPositionProfileCardVisibleAsync()
     {
-        // IsVisibleAsync() reads the DOM synchronously with no auto-wait/retry — the same race as
-        // GetLinkedPositionProfileTitleAsync/IsViewPositionProfileLinkVisibleAsync below. A caller
-        // right after navigating to a freshly (re)loaded vacancy detail page can otherwise sample
-        // the DOM before this card has finished rendering at all, reading "not visible yet" as
-        // "genuinely absent".
         try
         {
             await LinkedPositionProfileCard.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
@@ -281,75 +204,40 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         return await LinkedPositionProfileCard.IsVisibleAsync();
     }
 
-    /// <summary>
-    /// Reads the linked profile's Title, rendered as a plain "span.fw-semibold" (not an input —
-    /// this card is entirely read-only). Scoped within the card since the vacancy's own Title
-    /// textbox elsewhere on the page is a completely separate element.
-    /// </summary>
     public async Task<string?> GetLinkedPositionProfileTitleAsync()
     {
         var span = LinkedPositionProfileCard.Locator("span.fw-semibold");
 
-        // VacancyListPage.ClickVacancyAsync's own post-navigation wait (".e-tab, span[role=
-        // 'combobox']") is satisfied by the Position Profile dropdown itself, not specifically by
-        // this card — so on a freshly (re)loaded detail page this card can still be mid-render
-        // when callers reach this method. IsVisibleAsync() below doesn't auto-wait/retry the way
-        // Playwright's action methods do, so without waiting for the card first, a call made right
-        // after navigating can read "not visible yet" as "genuinely absent".
         await span.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
 
         return await span.IsVisibleAsync() ? (await span.TextContentAsync())?.Trim() : null;
     }
 
-    /// <summary>Reads the Department value shown in the "Linked Position Profile" card.</summary>
     public async Task<string?> GetLinkedPositionProfileDepartmentAsync()
     {
         var dd = LinkedPositionProfileCard.Locator("dt:has-text('Department') + dd");
         return (await dd.TextContentAsync())?.Trim();
     }
 
-    /// <summary>
-    /// Reads the Description value shown in the "Linked Position Profile" card ("—" if the
-    /// profile has no description set — see RenderDetailsCard's ternary fallback).
-    /// </summary>
     public async Task<string?> GetLinkedPositionProfileDescriptionAsync()
     {
         var dd = LinkedPositionProfileCard.Locator("dt:has-text('Description') + dd");
         return (await dd.TextContentAsync())?.Trim();
     }
 
-    /// <summary>
-    /// Returns true if the card shows the "Inactive" indicator (ActiveStatusBadge with
-    /// IsActive="false", rendered only when PositionProfileIsActive == false) next to the linked
-    /// profile's title. Scoped to the card so it can't collide with any other "Inactive" badge
-    /// elsewhere on the page (e.g. the vacancy's own StatusBadge never renders that text).
-    /// </summary>
     public Task<bool> IsLinkedPositionProfileInactiveBadgeVisibleAsync() =>
         LinkedPositionProfileCard.GetByText("Inactive", new() { Exact = true }).IsVisibleAsync();
 
-    /// <summary>
-    /// The fallback message shown instead of profile details when a (legacy) vacancy has no
-    /// linked Position Profile at all (_vacancy.PositionProfileTitle is null).
-    /// </summary>
     public async Task<string?> GetLinkedPositionProfileEmptyMessageAsync()
     {
         var p = LinkedPositionProfileCard.Locator("p.text-muted");
         return await p.IsVisibleAsync() ? (await p.TextContentAsync())?.Trim() : null;
     }
 
-    /// <summary>
-    /// The "View Position Profile" link in the "Linked Position Profile" card header — rendered
-    /// only when the vacancy has a linked Position Profile (_vacancy.PositionProfileId is not
-    /// null). Navigates to /companies/{CompanyId}/position-profiles/{PositionProfileId}/view.
-    /// </summary>
     public async Task<bool> IsViewPositionProfileLinkVisibleAsync()
     {
         var link = LinkedPositionProfileCard.GetByRole(AriaRole.Link, new() { Name = "View Position Profile" });
 
-        // IsVisibleAsync() reads the DOM synchronously with no auto-wait/retry — the same class of
-        // race as GetLinkedPositionProfileTitleAsync above. A caller right after navigating to a
-        // freshly (re)loaded vacancy detail page can otherwise sample the DOM before this card has
-        // finished rendering at all, reading "not visible yet" as "genuinely absent".
         try
         {
             await link.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
@@ -365,44 +253,15 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public Task ClickViewPositionProfileLinkAsync() =>
         LinkedPositionProfileCard.GetByRole(AriaRole.Link, new() { Name = "View Position Profile" }).ClickAsync();
 
-    /// <summary>
-    /// True if the (renamed) "Recruitment Advert Details" card header is present — this card was
-    /// previously headed "Vacancy Details" before the "Derive Vacancy Role Information from
-    /// Position Profile" story; the fields underneath were later further reduced (the vacancy-level
-    /// Department dropdown was removed entirely, and Title/Description were renamed to "Advert
-    /// Title (optional)"/"Advert Description (optional)") by the "Refactor Duplicate Vacancy
-    /// Fields" story.
-    /// </summary>
     public Task<bool> HasRecruitmentAdvertDetailsHeaderAsync() =>
         page.Locator(".card-header h5").Filter(new() { HasText = "Recruitment Advert Details" }).IsVisibleAsync();
 
-    /// <summary>
-    /// The "Recruitment Advert Details" card container itself (not just its header) — used to
-    /// scope assertions about which fields render inside it, e.g. confirming the vacancy-level
-    /// Department dropdown removed by the "Refactor Duplicate Vacancy Fields" story is genuinely
-    /// gone from this specific card, without accidentally matching the separate, unrelated
-    /// "Linked Position Profile" card's read-only Department &lt;dt&gt;/&lt;dd&gt; pair.
-    /// </summary>
     private ILocator RecruitmentAdvertDetailsCard =>
         page.Locator(".card").Filter(new() { Has = page.Locator(".card-header h5:has-text('Recruitment Advert Details')") });
 
-    /// <summary>
-    /// Counts any "Department" field label within the Recruitment Advert Details card. Expected to
-    /// be zero — the vacancy-level Department dropdown was removed entirely as part of the
-    /// "Refactor Duplicate Vacancy Fields" story; department is now shown only via the separate,
-    /// read-only "Linked Position Profile" card.
-    /// </summary>
     public Task<int> CountDepartmentFieldsInAdvertDetailsCardAsync() =>
         RecruitmentAdvertDetailsCard.Locator("label.form-label", new() { HasText = "Department" }).CountAsync();
 
-    /// <summary>
-    /// Reads the "Advert Title" field label's exact text, if present. No longer suffixed with
-    /// "(optional)" — the field itself is still genuinely optional, but that qualifier was
-    /// dropped from every field label across this card (see <see cref="HasOptionalSuffixAsync"/>).
-    /// A bounded wait, not a bare instant check — the Recruitment Advert Details card also holds
-    /// the async-populated Hiring Manager dropdown, so on the new-vacancy form it can still be
-    /// mid-render when GoToNewAsync's own wait (which only waits for *some* combobox) returns.
-    /// </summary>
     public async Task<bool> HasAdvertTitleLabelAsync()
     {
         try
@@ -417,7 +276,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>Reads the "Advert Description" field label's exact text, if present (no "(optional)" suffix — see <see cref="HasAdvertTitleLabelAsync"/>).</summary>
     public async Task<bool> HasAdvertDescriptionLabelAsync()
     {
         try
@@ -432,43 +290,22 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>
-    /// True if any field label within the Recruitment Advert Details card still contains the
-    /// literal text "(optional)" — expected false; that qualifier was removed from every label on
-    /// this card.
-    /// </summary>
     public async Task<bool> HasOptionalSuffixAsync() =>
         await RecruitmentAdvertDetailsCard.GetByText("(optional)", new() { Exact = false }).CountAsync() > 0;
 
-    /// <summary>
-    /// Reads the page's main heading text — for an existing vacancy this is
-    /// "_vacancy.EffectiveTitle" (the vacancy's own AdvertTitle if set, otherwise the linked
-    /// Position Profile's title), not the raw AdvertTitle field, as of the "Refactor Duplicate
-    /// Vacancy Fields" story (see VacancyDetail.razor's non-IsNew branch).
-    /// </summary>
     public async Task<string?> GetHeaderTextAsync()
     {
-        // A bare "h1" locator is ambiguous on this page: VacancyList.razor (the page this test
-        // just navigated FROM, via client-side routing) has its own "<h1 class='mb-1'>Vacancies
-        // </h1>" — on a client-side route transition, that markup can still be present in the DOM
-        // a tick after the URL/tab-strip wait callers already do (ClickVacancyAsync's own wait)
-        // is satisfied, so ".First" here can resolve to the OLD list page's heading instead of
-        // this page's own "h1.mb-0.fs-4" title (see VacancyDetail.razor's non-IsNew branch).
-        // Scope to that specific class, and wait rather than snapshot, since it renders from
-        // _vacancy?.EffectiveTitle after this page's own async load completes.
         var h1 = page.Locator("h1.fs-4");
         await h1.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
         return (await h1.TextContentAsync())?.Trim();
     }
 
-    /// <summary>Reads the vacancy's status text from the StatusBadge next to the page heading (e.g. "Draft", "Open").</summary>
     public async Task<string?> GetStatusBadgeTextAsync()
     {
         var badge = page.Locator(".status-badge").First;
         return (await badge.TextContentAsync())?.Trim();
     }
 
-    /// <summary>Reads the current value of the Hiring Manager dropdown's visible text.</summary>
     public async Task<string?> GetSelectedHiringManagerTextAsync()
     {
         var group = page.Locator(".col-md-4").Filter(new() { HasText = "Hiring Manager" }).First;
@@ -482,14 +319,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
-    /// <summary>
-    /// Saves changes to an already-existing vacancy (edit mode's "Overview" tab Save button,
-    /// distinct from the applications/interviews tabs' own dialog Save buttons). Functionally
-    /// identical to <see cref="SaveNewVacancyAsync"/> — EditPageBase.OnSavedAsync navigates to
-    /// ListUrl ("/companies/{id}/vacancies") on any successful save, new or existing — but named
-    /// separately here for call-site clarity when editing an existing record (e.g. changing its
-    /// Position Profile).
-    /// </summary>
     public Task SaveExistingVacancyAsync() => SaveNewVacancyAsync();
 
     /// <summary>
@@ -532,21 +361,11 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>
-    /// Reads the current value of the (now-optional) "Advert Title (optional)" field itself —
-    /// i.e. the raw AdvertTitle, not the resolved "EffectiveTitle" shown in the page header/list;
-    /// see <see cref="GetHeaderTextAsync"/> for that.
-    /// </summary>
     public Task<string> GetTitleAsync() =>
         page.GetByPlaceholder("e.g. Senior Software Engineer").InputValueAsync();
 
-    /// <summary>The vacancy entity id parsed out of the current edit/view URL (/vacancies/{id}[/view]).</summary>
     public Guid GetIdFromUrl() => UrlIdParser.LastGuid(page.Url);
 
-    // ── Advert Title field — mutated field for concurrency tests ─────────────────
-    // Click-focus / select-all / delete / type-for-real / Tab-to-commit, matching
-    // DocumentTypeEditPage.SetDescriptionAsync, so the typed value actually round-trips to the
-    // Blazor-bound model on an existing vacancy.
     public async Task SetAdvertTitleAsync(string value)
     {
         var input = page.GetByPlaceholder("e.g. Senior Software Engineer");
@@ -567,7 +386,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         return await input.InputValueAsync();
     }
 
-    // ── Optimistic-concurrency conflict banner (shared SaveConflictBanner via EditPageBase) ──
     private ILocator ConcurrencyWarningBanner =>
         page.Locator(".save-conflict-banner[role='alert']")
             .Filter(new() { Has = page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }) });
@@ -595,9 +413,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await page.WaitForTimeoutAsync(300);
     }
 
-    // ── Close / unsaved-changes prompt (EditPageBase) ────────────────────────────
-    // Same shared UnsavedChangesDialog.razor component used by every EditPageBase-derived
-    // page (see DepartmentEditPage.cs for the representative test coverage of this behavior).
 
     private ILocator UnsavedChangesDialog => page.Locator("[role='dialog']:has-text('Unsaved Changes')");
 
@@ -631,16 +446,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
-    // ── Publish Vacancy (Draft/OnHold → Open) ────────────────────────────────────
-    // "Publish Vacancy" button, shown next to the Close Vacancy button whenever the loaded
-    // vacancy's status is Draft or OnHold (VacancyDetail.razor's CanPublish); calls
-    // VacancyService.PublishVacancyAsync (POST .../vacancies/{id}/publish) and reloads the
-    // vacancy on success, same pattern as CloseVacancyAsync.
 
-    // A bare instant IsVisibleAsync() here races the vacancy detail page's own Blazor render right
-    // after navigation (ClickVacancyAsync only waits for the navigation itself, not for
-    // VacancyDetail.razor's data fetch + CanPublish-gated button to actually render) — a bounded
-    // wait avoids reporting "not visible" for a button that's genuinely there a moment later.
     public async Task<bool> IsPublishButtonVisibleAsync()
     {
         try
@@ -657,13 +463,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
 
     public async Task PublishVacancyAsync()
     {
-        // Callers reach this right after ClickVacancyAsync's own post-navigation wait, which is
-        // satisfied by the tab strip/Position Profile combobox — not specifically by
-        // VacancyDetail.razor's own data fetch that gates CanPublish and renders this button. Under
-        // headless load that fetch can genuinely take longer than a headed run's timing masked, so
-        // wait for the button to actually appear (rather than relying on ClickAsync's own
-        // actionability wait alone, which some Playwright/Blazor render races can still slip past)
-        // before clicking it.
         var publishButton = page.GetByRole(AriaRole.Button, new() { Name = "Publish Vacancy" });
         try
         {
@@ -671,13 +470,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         }
         catch (TimeoutException)
         {
-            // Some arrange flows reach this page via a client-side SPA navigation preceded by
-            // several other round trips (e.g. creating a position profile via an account-switch
-            // dance, then navigating back through the vacancy list) rather than a single direct
-            // load — under headless/CI load that's more opportunity for VacancyDetail.razor's own
-            // CanPublish-gating data fetch to land in a stale/partially-hydrated render than the
-            // 30s budget above otherwise accounts for. A full reload forces a fresh fetch from
-            // scratch rather than continuing to wait on whatever render pass is already stuck.
             await page.ReloadAsync();
             await page.WaitForSelectorAsync(".e-tab, span[role='combobox']", new() { Timeout = 20_000 });
             await publishButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
@@ -686,15 +478,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await Assertions.Expect(publishButton).Not.ToBeVisibleAsync(new() { Timeout = 15_000 });
     }
 
-    // ── Tabs ──────────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// True if a tab with the exact given name (e.g. "Applications"/"Interviews") is present —
-    /// these are hidden entirely for a Draft-status vacancy (VacancyDetail.razor's "_vacancy is not
-    /// null &amp;&amp; _vacancy.Status != "Draft"" gate), not just disabled. The embedded "Kanban"
-    /// tab was removed entirely; the standalone Kanban board is reached via a "View Kanban Board"
-    /// button instead (see VacancyKanbanBoardPage.GoToStandaloneAsync).
-    /// </summary>
     public Task<bool> HasTabAsync(string name) =>
         page.GetByRole(AriaRole.Tab, new() { Name = name, Exact = true }).IsVisibleAsync();
 
@@ -710,7 +494,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync("[data-testid='vacancy-interviews-tab']", new() { Timeout = 15_000 });
     }
 
-    // ── Applications tab: Add Candidate ──────────────────────────────────────────
 
     public async Task ClickAddCandidateAsync()
     {
@@ -722,27 +505,9 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public Task SelectCandidateInAddDialogAsync(string nameOrEmailFragment) =>
         DropDownSelector.SelectAsync(page, page.Locator(".add-application-dialog"), nameOrEmailFragment);
 
-    /// <summary>
-    /// Selects a value from the "Source (optional)" dropdown in the (currently open) Add Candidate
-    /// dialog (VacancyApplicationsTab.razor's _sourceOptions — "Unspecified", "Direct", "Referral",
-    /// "External Recruiter", "Job Board", "Careers Site"). This is the dialog's second combobox
-    /// (index 1) — the Candidate picker is the first (index 0).
-    /// </summary>
     public Task SelectAddApplicationSourceAsync(string sourceLabel) =>
         DropDownSelector.SelectAsync(page, page.Locator(".add-application-dialog"), sourceLabel, index: 1);
 
-    /// <summary>
-    /// Selects a value from the "Recruiter" dropdown that only renders in the Add Candidate dialog
-    /// once Source="ExternalRecruiter" is picked. Indexing into the dialog's comboboxes by position
-    /// (this used to be "the dialog's third combobox, index 2") races that conditional render — if
-    /// this runs before Blazor has actually inserted the Recruiter combobox into the DOM (the
-    /// preceding Source selection only proves its own client-side value committed, not that the
-    /// server round trip which reveals this field has landed — same caveat DropDownSelector's own
-    /// doc comment calls out), Nth(2) can resolve against a stale 2-combobox DOM and either wait on
-    /// the wrong element or silently do nothing. Scoping to the field's own label group instead —
-    /// and waiting for that group to actually be visible first — ties this to the specific field
-    /// rather than a fragile position that depends on a prior async render having landed.
-    /// </summary>
     public async Task SelectAddApplicationRecruiterAsync(string agencyNameFragment)
     {
         var recruiterGroup = page.Locator(".add-application-dialog .mb-3").Filter(new() { HasText = "Recruiter" });
@@ -750,16 +515,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await DropDownSelector.SelectAsync(page, recruiterGroup, agencyNameFragment);
     }
 
-    /// <summary>
-    /// The non-blocking "This recruiter isn't currently assigned to this vacancy." warning
-    /// (data-testid="recruiter-not-assigned-warning") shown under the Recruiter dropdown when the
-    /// chosen recruiter isn't among this vacancy's currently-assigned active recruiters.
-    /// </summary>
-    // A bare instant IsVisibleAsync() here races the SignalR round-trip that actually invokes
-    // VacancyApplicationsTab.razor's OnSourceRecruiterChanged (which sets
-    // _recruiterNotAssignedWarning) — DropDownSelector's own post-selection wait reduces but does
-    // not guarantee that race is over by the time it returns (see its own doc comment). A bounded
-    // wait avoids reporting "not visible" for a warning that's genuinely there a moment later.
     public async Task<bool> IsRecruiterNotAssignedWarningVisibleAsync()
     {
         try
@@ -781,25 +536,11 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
 
-    /// <summary>
-    /// Clicks the Add Candidate dialog's "Add" button without waiting for the dialog to close — for
-    /// tests expecting client-side validation (e.g. "Please select a recruiter…") to keep it open.
-    /// </summary>
     public Task ClickAddApplicationSubmitButtonAsync() =>
         page.Locator(".add-application-dialog .e-footer-content button:has-text('Add')").ClickAsync();
 
-    /// <summary>
-    /// Reads the Applications grid's "Source" column text for the row matching
-    /// <paramref name="candidateNameFragment"/> — populated lazily per-application (see
-    /// VacancyApplicationsTab.razor's _sourceDetails/LoadAsync), so this may briefly show "—" while
-    /// that N+1 detail fetch is still in flight; callers should generally reload/re-check after the
-    /// add dialog has closed and LoadAsync has re-run.
-    /// </summary>
     public async Task<string?> GetApplicationSourceColumnTextAsync(string candidateNameFragment)
     {
-        // Column order (VacancyApplicationsTab.razor GridColumns): Candidate, Email, Status,
-        // Interview Outcome, Applied, Source, then the trailing header-less "Review CV" link column
-        // (ticket #1). The Source column is index 5 — ".Last" would now hit the Review CV cell.
         var cell = ApplicationRow(candidateNameFragment).First.Locator(".e-rowcell").Nth(5);
         return (await cell.TextContentAsync())?.Trim();
     }
@@ -816,9 +557,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     private ILocator ApplicationRow(string candidateNameFragment) =>
         ApplicationsTab.Locator(".e-grid .e-row").Filter(new() { HasText = candidateNameFragment });
 
-    // The row's STAGE badge specifically (data-testid="application-stage-badge" in the Status
-    // column). Not the row's first ".badge": an internal application's Candidate cell renders an
-    // "Internal" badge before it.
     private ILocator ApplicationStageBadge(string candidateNameFragment) =>
         ApplicationRow(candidateNameFragment).First.Locator("[data-testid='application-stage-badge'] .badge");
 
@@ -826,37 +564,27 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     // re-runs LoadAsync (loading indicator, then a fresh grid, then the lazily-fetched Source
     // details), so these retry until the post-reload DOM matches rather than reading a snapshot.
 
-    /// <summary>Waits until exactly <paramref name="expectedCount"/> application rows match <paramref name="candidateNameFragment"/>.</summary>
     public Task ExpectApplicationRowCountAsync(string candidateNameFragment, int expectedCount) =>
         Assertions.Expect(ApplicationRow(candidateNameFragment)).ToHaveCountAsync(expectedCount, new() { Timeout = 30_000 });
 
-    /// <summary>Waits for the row's Status badge to read <paramref name="expectedStage"/>.</summary>
     public Task ExpectApplicationStatusAsync(string candidateNameFragment, string expectedStage) =>
         Assertions.Expect(ApplicationStageBadge(candidateNameFragment))
             .ToHaveTextAsync(expectedStage, new() { Timeout = 30_000 });
 
-    /// <summary>Waits for the row's Source column (index 5 — see GetApplicationSourceColumnTextAsync) to contain <paramref name="expectedText"/>.</summary>
     public Task ExpectApplicationSourceAsync(string candidateNameFragment, string expectedText) =>
         Assertions.Expect(ApplicationRow(candidateNameFragment).First.Locator(".e-rowcell").Nth(5))
             .ToContainTextAsync(expectedText, new() { Timeout = 30_000 });
 
-    /// <summary>Waits for the Applications tab's success alert to contain <paramref name="expectedText"/>.</summary>
     public Task ExpectActionSuccessMessageAsync(string expectedText) =>
         Assertions.Expect(ApplicationsTab.Locator(".alert-success").First)
             .ToContainTextAsync(expectedText, new() { Timeout = 30_000 });
 
-    /// <summary>Returns the full trimmed text of the application row matching <paramref name="candidateNameFragment"/>, or null if not found.</summary>
     public async Task<string?> GetApplicationRowTextAsync(string candidateNameFragment)
     {
         var row = ApplicationRow(candidateNameFragment).First;
         return await row.IsVisibleAsync() ? (await row.TextContentAsync())?.Trim() : null;
     }
 
-    /// <summary>
-    /// Clicks the per-row "Review CV" link (data-testid="review-cv-link") in the Applications tab
-    /// grid for the row matching <paramref name="candidateNameFragment"/>, then waits for the
-    /// Review CV route to commit. See VacancyApplicationsTab.razor's last GridColumn.
-    /// </summary>
     public async Task ClickReviewCvForAsync(string candidateNameFragment)
     {
         var link = ApplicationRow(candidateNameFragment).First.Locator("[data-testid='review-cv-link']");
@@ -880,19 +608,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         return (await badge.TextContentAsync())?.Trim();
     }
 
-    /// <summary>
-    /// Selects the application row matching <paramref name="candidateNameFragment"/> (click
-    /// anywhere in the row — Syncfusion Grid's RowSelected fires from a plain row click, no
-    /// checkbox/radio needed here) and waits briefly for the toolbar's enabled state to catch up
-    /// (VacancyApplicationsTab.razor's RefreshToolbarStateAsync round-trips to re-enable the
-    /// relevant buttons after selection). Clicks the second cell (Email, column index 1), not the
-    /// first (Candidate) — that column renders as a hyperlink to the candidate's own edit page
-    /// (see VacancyApplicationsTab.razor's Candidate GridColumn), so clicking it navigates away
-    /// instead of just selecting the row.
-    /// </summary>
-    // Hidden marker rendered by VacancyApplicationsTab (SelectedApplicationMarker.razor) carrying the
-    // SERVER-side selected application id — set only after OnRowSelected has run
-    // RefreshToolbarStateAsync, which is what actually enables Offer/Hire/etc.
     private ILocator SelectionMarker => ApplicationsTab.Locator("[data-testid='selected-application-marker']");
 
     private async Task SelectApplicationRowAsync(string candidateNameFragment)
@@ -900,19 +615,10 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         var row = ApplicationRow(candidateNameFragment).First;
         await row.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
 
-        // Every <tr> carries its application id (VacancyApplicationsTab's RowDataBound hook).
         var applicationId = await row.GetAttributeAsync("data-application-id")
             ?? throw new InvalidOperationException(
                 $"Application row for '{candidateNameFragment}' has no data-application-id attribute.");
 
-        // Previously this clicked unconditionally and then trusted Syncfusion's client-side
-        // "e-active" class. Two problems: (1) the grid TOGGLES selection, so clicking a row that an
-        // earlier step had already selected (e.g. IsRecordOfferResponseToolbarItemEnabledAsync right
-        // before OpenMakeOfferDialogAsync) DESELECTED it — leaving "Offer" disabled; (2) "e-active"
-        // is set in the browser before the server-side RowSelected handler has run, so it never
-        // proved the toolbar had been re-enabled. Now: only click when the server doesn't already
-        // have THIS row selected, and wait for the server-side marker to confirm it. A click that
-        // was dropped mid re-render, or toggled a stale selection off, is simply re-issued.
         for (var attempt = 1; attempt <= 3; attempt++)
         {
             if (await SelectionMarker.GetAttributeAsync("data-selected-application-id") == applicationId)
@@ -927,16 +633,10 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             }
             catch (PlaywrightException) when (attempt < 3)
             {
-                // Dropped click or toggled-off selection — the loop re-checks and clicks again.
             }
         }
     }
 
-    /// <summary>
-    /// Deselects then reselects the row (used when Syncfusion's EnableToolbarItemsAsync interop
-    /// didn't land): clicks the currently-selected row to toggle it off, waits for the server-side
-    /// marker to clear, then selects it again via <see cref="SelectApplicationRowAsync"/>.
-    /// </summary>
     private async Task ReselectApplicationRowAsync(string candidateNameFragment)
     {
         var row = ApplicationRow(candidateNameFragment).First;
@@ -944,7 +644,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         if (applicationId is not null &&
             await SelectionMarker.GetAttributeAsync("data-selected-application-id") == applicationId)
         {
-            await row.Locator(".e-rowcell").Nth(1).ClickAsync(); // toggle off
+            await row.Locator(".e-rowcell").Nth(1).ClickAsync();
             await Assertions.Expect(SelectionMarker)
                 .ToHaveAttributeAsync("data-selected-application-id", "", new() { Timeout = 10_000 });
         }
@@ -965,11 +665,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     {
         var direct = ApplicationsTab.Locator(".e-toolbar").GetByRole(AriaRole.Button, new() { Name = name, Exact = exact });
 
-        // RefreshToolbarStateAsync's own round-trip (re-enabling the relevant toolbar buttons
-        // after SelectApplicationRowAsync's click) can still be in flight — a disabled Syncfusion
-        // toolbar item isn't necessarily exposed with role="button" until it's actually enabled, so
-        // "not visible yet" here can just mean "hasn't finished enabling", not "has overflowed".
-        // Poll for a few seconds before falling back to the overflow popup.
         var deadline = DateTime.UtcNow.AddSeconds(5);
         while (DateTime.UtcNow < deadline)
         {
@@ -988,9 +683,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             var overflowToggle = ApplicationsTab.Locator(".e-toolbar .e-nav-right, .e-toolbar .e-hscroll-bar .e-nav-right");
             if (await overflowToggle.CountAsync() == 0)
             {
-                // No overflow either — give the direct button one last, longer wait so the real
-                // failure (if any) surfaces as a clear timeout on it rather than on a toggle that
-                // was never going to appear.
                 await direct.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
                 resolved = direct;
             }
@@ -1006,14 +698,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         if (reselectCandidateNameFragment is null)
             return resolved;
 
-        // Being visible doesn't mean being ENABLED — Syncfusion's EnableToolbarItemsAsync JS
-        // interop (RefreshToolbarStateAsync) occasionally never lands even though the server-side
-        // state it's meant to apply is correct, leaving the item stuck aria-disabled="true"
-        // indefinitely (a plain Playwright click-retry loop just times out against it forever,
-        // since nothing ever nudges the interop to run again). If it's still disabled after a
-        // couple of seconds, force RefreshToolbarStateAsync to refire by deselecting and
-        // reselecting the row — the same recovery SelectApplicationRowAsync's own retry uses for
-        // a dropped click, applied here to a dropped enable-interop instead.
         var enableDeadline = DateTime.UtcNow.AddSeconds(3);
         while (DateTime.UtcNow < enableDeadline)
         {
@@ -1027,7 +711,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             if (await resolved.GetAttributeAsync("aria-disabled") != "true")
                 return resolved;
 
-            await ReselectApplicationRowAsync(reselectCandidateNameFragment); // deselect + reselect, verified server-side
+            await ReselectApplicationRowAsync(reselectCandidateNameFragment);
 
             var reDeadline = DateTime.UtcNow.AddSeconds(3);
             while (DateTime.UtcNow < reDeadline)
@@ -1041,11 +725,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         return resolved;
     }
 
-    /// <summary>
-    /// True if no per-row action buttons (the older Actions-column pattern) render inside any
-    /// application row — the toolbar (see <see cref="ApplicationsToolbarButton"/>) is now the only
-    /// place these actions live.
-    /// </summary>
     public async Task<bool> HasAnyPerRowApplicationActionButtonAsync()
     {
         var rows = ApplicationsTab.Locator(".e-grid .e-row");
@@ -1064,23 +743,10 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await SelectApplicationRowAsync(candidateNameFragment);
         await (await ApplicationsToolbarButtonAsync("Offer", exact: true, reselectCandidateNameFragment: candidateNameFragment)).ClickAsync();
 
-        // Ticket #2: the "Offer" toolbar item now opens the "Make an Offer" dialog instead of
-        // advancing directly. Accept the pre-populated defaults and submit.
-        //
-        // Syncfusion applies the "offer-candidate-dialog" CssClass to more than just the dialog
-        // itself (the modal container, and both footer buttons all pick it up too), so the plain
-        // class locator is ambiguous under Playwright's strict mode. The dialog role locator
-        // matches only the actual dialog element.
         var offerDialog = page.GetByRole(AriaRole.Dialog, new() { Name = "Make an Offer" });
         await offerDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await offerDialog.GetByRole(AriaRole.Button, new() { Name = "Make Offer" }).ClickAsync();
 
-        // Same reasoning as ClickWithdrawForAsync — OfferAsync sets _actionSuccess and awaits
-        // LoadAsync's grid refetch within the same event handler, with no intermediate render in
-        // between, so the alert showing this exact text only appears once the reload (and the
-        // row's now-moved stage) has already landed. Matching on text specifically, not just
-        // alert-success visibility, since an earlier action in the same flow can leave a
-        // differently-worded alert already visible.
         await Assertions.Expect(page.Locator("[data-testid='vacancy-applications-tab'] .alert-success"))
             .ToHaveTextAsync("Offer made to candidate.", new() { Timeout = 10_000 });
     }
@@ -1096,14 +762,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await SelectApplicationRowAsync(candidateNameFragment);
         await (await ApplicationsToolbarButtonAsync("Withdraw", reselectCandidateNameFragment: candidateNameFragment)).ClickAsync();
 
-        // WithdrawAsync sets _actionSuccess and awaits LoadAsync's grid refetch within the same
-        // event handler, with no intermediate render in between — so the alert showing this exact
-        // text only appears once the reload (and the row's now-updated "(Withdrawn)" status) has
-        // already landed. Matching on text specifically (not just alert-success visibility) matters
-        // here because an earlier action in the same flow (e.g. adding the candidate to the
-        // vacancy, which sets its own "Candidate added to vacancy." success message) can leave the
-        // .alert-success element already visible before this click, which would otherwise make a
-        // bare visibility wait resolve instantly against that stale banner.
         await Assertions.Expect(page.Locator("[data-testid='vacancy-applications-tab'] .alert-success"))
             .ToHaveTextAsync("Application withdrawn.", new() { Timeout = 10_000 });
     }
@@ -1114,33 +772,16 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await (await ApplicationsToolbarButtonAsync("Hire", reselectCandidateNameFragment: candidateNameFragment)).ClickAsync();
     }
 
-    // ── Schedule Interview dialog ────────────────────────────────────────────────
 
     public async Task WaitForScheduleDialogAsync() =>
         await page.Locator("[role='dialog'].schedule-interview-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
-    /// <summary>
-    /// Selects an interviewer from the Schedule Interview dialog's Interviewer dropdown.
-    /// DropDownSelector itself confirms Blazor's ValueChanged round-trip actually committed the
-    /// selection before returning — see its own doc comment.
-    /// </summary>
     public Task SelectInterviewerAsync(string nameFragment) =>
         DropDownSelector.SelectAsync(page, page.Locator(".schedule-interview-dialog"), nameFragment);
 
-    /// <param name="ddMMyyyyHHmm">
-    /// Must match the "Scheduled At" SfDateTimePicker's explicit Format="dd/MM/yyyy HH:mm" in
-    /// VacancyApplicationsTab.razor — 24-hour, no AM/PM suffix (e.g. "01/09/2026 10:00"). A string
-    /// the picker can't parse against that format silently leaves the bound value null rather than
-    /// erroring, which then fails ConfirmScheduleAsync's "select an interviewer and a scheduled
-    /// time" check and leaves the dialog open.
-    /// </param>
     public async Task FillScheduledAtAsync(string ddMMyyyyHHmm)
     {
-        // ".schedule-interview-dialog input.e-input" alone also matches the Interviewer
-        // dropdown's own readonly input, which comes first in DOM order — its wrapping
-        // span[role='combobox'] intercepts pointer events on that input, so a bare .First there
-        // can never actually be clicked. Scope to the "Scheduled At" field's own container.
         var group = page.Locator(".schedule-interview-dialog .mb-3").Filter(new() { HasText = "Scheduled At" });
         var input = group.Locator("input.e-input").First;
         await input.ClickAsync();
@@ -1154,11 +795,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await page.Locator("[role='dialog'].schedule-interview-dialog").WaitForAsync(
             new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
 
-        // The dialog goes visually Hidden ahead of the server round-trip that actually reloads
-        // the applications grid with the new "InterviewScheduled" status — same race class as
-        // SubmitAddNoteDialogAsync/ClickWithdrawForAsync elsewhere in this suite. A caller reading
-        // the application's status badge immediately after this returns can otherwise still see
-        // the pre-schedule value.
         await page.WaitForTimeoutAsync(250);
     }
 
@@ -1171,7 +807,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
 
-    // ── Hire dialog ───────────────────────────────────────────────────────────────
 
     public async Task WaitForHireDialogAsync() =>
         await page.Locator("[role='dialog'].hire-candidate-dialog").WaitForAsync(
@@ -1199,15 +834,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public Task SelectHireGenderAsync(string gender) =>
         DropDownSelector.SelectAsync(page, page.Locator(".hire-candidate-dialog"), gender, index: 1);
 
-    /// <summary>Fills the Employee Number field in the (currently open) Hire Candidate dialog.</summary>
-    /// <summary>
-    /// Fills the Hire dialog's Employee Number when the company is in Manual numbering mode; a
-    /// no-op in Automatic mode, where the dialog shows "An employee number will be assigned
-    /// automatically…" instead of the input (VacancyApplicationsTab.razor's _hireEmployeeNumberMode).
-    /// Waits for whichever of the two the dialog actually rendered rather than assuming a mode, so
-    /// callers don't have to flip the shared Acme numbering mode to use it (see CreateEmployeeTests'
-    /// remarks for why Acme's mode is never mutated by E2E tests).
-    /// </summary>
     public async Task FillHireEmployeeNumberAsync(string value)
     {
         var dialog = page.Locator(".hire-candidate-dialog");
@@ -1225,24 +851,12 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>
-    /// Selects a value from a Syncfusion SfDropDownList in the (currently open) Hire Candidate
-    /// dialog, identified by nearby label text — used for the Employment Type and Manager
-    /// dropdowns (Nationality and Gender have their own dedicated methods above, predating this
-    /// generic helper). As of the "Vacancy - Position Profile relationship" epic, the Department,
-    /// Location and Position Profile dropdowns this helper used to also target were removed from
-    /// the dialog entirely — those values are now derived server-side from the Vacancy's own
-    /// linked Position Profile and shown read-only; see
-    /// <see cref="GetHireDerivedPositionProfileTextAsync"/> and
-    /// <see cref="GetHireDerivedLocationTextAsync"/>.
-    /// </summary>
     public Task SelectHireDropdownAsync(string labelText, string optionText) =>
         DropDownSelector.SelectAsync(
             page,
             page.Locator(".hire-candidate-dialog .col-md-6").Filter(new() { HasText = labelText }).First,
             optionText);
 
-    /// <summary>Reads the current value of a Hire Candidate dialog dropdown's visible text, identified by nearby label text.</summary>
     public async Task<string?> GetSelectedHireDropdownTextAsync(string labelText)
     {
         var group = page.Locator(".hire-candidate-dialog .col-md-6")
@@ -1251,30 +865,12 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         return await group.Locator(".e-input-group input").First.InputValueAsync();
     }
 
-    /// <summary>
-    /// Reads the read-only "Position Profile" value shown in the (currently open) Hire Candidate
-    /// dialog (data-testid="hire-derived-position-profile") — derived server-side from the
-    /// Vacancy's own linked Position Profile (VacancyApplicationsTab.razor's OpenHireDialog sets
-    /// this from GetVacancyResponse.PositionProfileTitle, falling back to EffectiveTitle). No
-    /// longer a selectable dropdown as of the "Vacancy - Position Profile relationship" epic.
-    /// </summary>
     public async Task<string?> GetHireDerivedPositionProfileTextAsync() =>
         (await page.Locator("[data-testid='hire-derived-position-profile']").TextContentAsync())?.Trim();
 
-    /// <summary>
-    /// Reads the read-only "Location" value shown in the (currently open) Hire Candidate dialog
-    /// (data-testid="hire-derived-location") — derived server-side from the Vacancy's
-    /// EffectiveLocation (own Location override, or its linked Position Profile's location). No
-    /// longer a selectable dropdown as of the "Vacancy - Position Profile relationship" epic.
-    /// </summary>
     public async Task<string?> GetHireDerivedLocationTextAsync() =>
         (await page.Locator("[data-testid='hire-derived-location']").TextContentAsync())?.Trim();
 
-    /// <summary>
-    /// Returns true if the (currently open) Hire Candidate dialog contains a selectable dropdown
-    /// (span[role='combobox']) labelled with the given text — used to assert the removed manual
-    /// Department/Location/Position Profile dropdowns are genuinely gone, not just relabelled.
-    /// </summary>
     public async Task<bool> HasHireDropdownLabelAsync(string labelText) =>
         await page.Locator(".hire-candidate-dialog .col-md-6")
             .Filter(new() { HasText = labelText })
@@ -1288,15 +884,9 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
     }
 
-    /// <summary>
-    /// Clicks the Hire dialog's "Hire" button without waiting for the dialog to close — for tests
-    /// that expect client-side validation to keep the dialog open (see <see cref="SubmitHireAsync"/>
-    /// for the happy-path variant that waits for the dialog to hide after a successful hire).
-    /// </summary>
     public Task ClickHireSubmitButtonAsync() =>
         page.Locator(".hire-candidate-dialog .e-footer-content button:has-text('Hire')").ClickAsync();
 
-    /// <summary>Clicks "Cancel" on the (currently open) Hire Candidate dialog and waits for it to close.</summary>
     public async Task CancelHireDialogAsync()
     {
         await page.Locator(".hire-candidate-dialog .e-footer-content button:has-text('Cancel')").ClickAsync();
@@ -1307,38 +897,24 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task<bool> HasDialogErrorAsync(string dialogCssClass) =>
         await page.Locator($".{dialogCssClass} .alert-danger").IsVisibleAsync();
 
-    // ── Overview tab: Recruitment Agency dropdown (ticket #81/#94) ───────────────
-    // Optional SfDropDownList bound to Model.AssignedRecruiterId (FK to ExternalRecruiter, not the
-    // removed VacancyRecruiterAssignment/Recruiters-tab feature above). DataSource is active-only
-    // (VacancyDetail.razor's OnLoadedAsync calls ListExternalRecruitersAsync(isActive: true)), with
-    // a prepended "Not assigned" sentinel item (Guid.Empty) rather than ShowClearButton, per this
-    // codebase's convention for optional dropdowns. Scoped to ".col-md-4" like Hiring Manager above,
-    // since both fields share that column width in the "Recruitment Advert Details" card.
     private ILocator RecruitmentAgencyField =>
         page.Locator(".col-md-4").Filter(new() { HasText = "Recruitment Agency" }).First;
 
     public Task SelectRecruitmentAgencyAsync(string agencyNameFragment) =>
         DropDownSelector.SelectAsync(page, RecruitmentAgencyField, agencyNameFragment);
 
-    /// <summary>Reads the current value of the Recruitment Agency dropdown's visible text.</summary>
     public async Task<string?> GetSelectedRecruitmentAgencyTextAsync()
     {
         var input = RecruitmentAgencyField.Locator(".e-input-group input").First;
         return await input.InputValueAsync();
     }
 
-    /// <summary>
-    /// Opens the Recruitment Agency dropdown's popup without selecting anything, so its visible
-    /// option list can be inspected — e.g. to assert an inactive agency is excluded (the
-    /// DataSource is active-recruiters-only).
-    /// </summary>
     public async Task OpenRecruitmentAgencyDropdownAsync()
     {
         await RecruitmentAgencyField.Locator("span[role='combobox']").First.ClickAsync();
         await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
     }
 
-    /// <summary>Reads the visible option names from the (currently open) Recruitment Agency dropdown popup.</summary>
     public async Task<IReadOnlyList<string>> GetRecruitmentAgencyDropdownOptionsAsync()
     {
         var items = await page.Locator(".e-popup.e-ddl:visible .e-list-item:not(.e-hide)").AllAsync();
@@ -1354,17 +930,12 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         return await alert.IsVisibleAsync() ? (await alert.TextContentAsync())?.Trim() : null;
     }
 
-    // ── Interviews tab ────────────────────────────────────────────────────────────
 
     private ILocator InterviewRow(string candidateNameFragment) =>
         page.Locator("[data-testid='vacancy-interviews-tab'] .e-grid .e-row").Filter(new() { HasText = candidateNameFragment });
 
     public async Task<string?> GetInterviewOutcomeAsync(string candidateNameFragment)
     {
-        // Polls rather than checking IsVisibleAsync() instantly — same reasoning as
-        // GetApplicationStatusAsync above: OpenInterviewsTabAsync's wait only confirms the tab
-        // panel container is present, not that the async interviews grid has finished populating
-        // its rows, so an instant check can read the badge before it exists.
         var badge = InterviewRow(candidateNameFragment).First.Locator(".badge").First;
         try
         {
@@ -1394,20 +965,9 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
     }
 
-    // ── Ticket #2: Make an Offer dialog ─────────────────────────────────────────
-    // Opened from the Applications tab grid toolbar's "Offer" item (ItemModel Id="app-offer"),
-    // which as of Ticket #2 opens the Make an Offer dialog (CssClass="offer-candidate-dialog")
-    // rather than immediately advancing the application. New elements carry data-testid values:
-    // offer-position-profile-context, offer-salary, offer-salary-frequency,
-    // offer-proposed-start-date, offer-date, offer-notes (see VacancyApplicationsTab.razor).
 
     private ILocator OfferDialog => page.Locator("[role='dialog'].offer-candidate-dialog");
 
-    /// <summary>
-    /// Selects the application row and clicks the toolbar's "Offer" item (exact-name match — a
-    /// substring match would also hit "Record Offer Response"), then waits for the Make an Offer
-    /// dialog to open.
-    /// </summary>
     public async Task OpenMakeOfferDialogAsync(string candidateNameFragment)
     {
         await SelectApplicationRowAsync(candidateNameFragment);
@@ -1415,7 +975,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await OfferDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
     }
 
-    /// <summary>Reads the "Position Profile salary range" context block (data-testid="offer-position-profile-context").</summary>
     public async Task<string?> GetOfferPositionProfileContextTextAsync()
     {
         var ctx = page.Locator("[data-testid='offer-position-profile-context']");
@@ -1427,19 +986,10 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         page.Locator(".offer-candidate-dialog .col-md-6").Filter(new() { HasText = "Offered Salary" })
             .Locator("input.e-numerictextbox, input.e-input").First;
 
-    /// <summary>Reads the current (formatted) value shown in the "Offered Salary" numeric field.</summary>
     public Task<string> GetOfferedSalaryValueAsync() => OfferSalaryInput.InputValueAsync();
 
-    /// <summary>Retypes the "Offered Salary" numeric field — SfNumericTextBox needs a real click/select-all/type/Tab, a bare Fill bypasses its interop.</summary>
     public async Task SetOfferedSalaryAsync(string value)
     {
-        // The field is pre-populated as currency text ("£50,000", Format="c0"). A single
-        // Ctrl+A/Delete/type/Tab was fire-and-forget: when the clear hadn't fully landed before
-        // typing (same corruption documented on EmployeeEditPage.TypeIntoNumericInputAsync), the
-        // result was unparseable, SfNumericTextBox committed NULL, and OfferCandidateHandler then
-        // fell back to the profile's SalaryMin (request.OfferedSalary ?? SalaryMin) — the offer was
-        // saved at £50,000 instead of the typed value. Clear, confirm it's empty, type, blur, and
-        // confirm the committed (reformatted) value is exactly the one typed; retry the entry if not.
         var expectedDigits = new string(value.Where(char.IsDigit).ToArray());
         await Assertions.Expect(OfferSalaryInput).ToBeEnabledAsync(new() { Timeout = 30_000 });
 
@@ -1453,8 +1003,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             await OfferSalaryInput.PressSequentiallyAsync(value, new() { Delay = 30 });
             await page.Keyboard.PressAsync("Tab");
 
-            // After blur Syncfusion re-formats its committed value (e.g. "£65,000"); an unparsed
-            // entry instead leaves the field empty/unchanged.
             var committed = await OfferSalaryInput.InputValueAsync();
             if (new string(committed.Where(char.IsDigit).ToArray()) == expectedDigits)
                 return;
@@ -1499,7 +1047,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await page.Keyboard.PressAsync("Tab");
     }
 
-    /// <summary>Clicks "Make Offer" and waits for the dialog to close and the success alert to confirm the offer landed.</summary>
     public async Task SubmitOfferAsync()
     {
         await page.Locator(".offer-candidate-dialog .e-footer-content button:has-text('Make Offer')").ClickAsync();
@@ -1508,23 +1055,12 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             .ToHaveTextAsync("Offer made to candidate.", new() { Timeout = 15_000 });
     }
 
-    /// <summary>Clicks "Make Offer" without waiting for the dialog to close — for validation cases that keep it open.</summary>
     public Task ClickMakeOfferButtonAsync() =>
         page.Locator(".offer-candidate-dialog .e-footer-content button:has-text('Make Offer')").ClickAsync();
 
-    // ── Ticket #2: Record Offer Response dialog ─────────────────────────────────
-    // Toolbar item Id="app-offer-response", Text="Record Offer Response", disabled unless the
-    // selected application's OfferResponseStatus == "AwaitingResponse". Dialog CssClass=
-    // "offer-response-dialog" with a single dropdown (data-testid="offer-response-status").
 
     private ILocator OfferResponseDialog => page.Locator("[role='dialog'].offer-response-dialog");
 
-    /// <summary>
-    /// Returns whether the "Record Offer Response" toolbar item is currently enabled for the given
-    /// application row (selects it first). Syncfusion marks a disabled grid-toolbar item with the
-    /// "e-overlay" class; polls briefly since RefreshToolbarStateAsync re-enables items via a
-    /// server round-trip after row selection.
-    /// </summary>
     public async Task<bool> IsRecordOfferResponseToolbarItemEnabledAsync(string candidateNameFragment)
     {
         await SelectApplicationRowAsync(candidateNameFragment);
@@ -1557,15 +1093,9 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     {
         await page.Locator(".offer-response-dialog .e-footer-content button:has-text('Record Response')").ClickAsync();
         await OfferResponseDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
-        // The dialog hides ahead of the LoadAsync grid refetch that repaints the offer badge.
         await page.WaitForTimeoutAsync(300);
     }
 
-    /// <summary>
-    /// Reads the Applications grid "Offer: …" badge text (data-testid="offer-response-badge") for
-    /// the given row, or null if no offer badge is shown. Polls, since the badge appears/updates
-    /// only after LoadAsync re-runs post-offer / post-response.
-    /// </summary>
     public async Task<string?> GetOfferResponseBadgeTextAsync(string candidateNameFragment)
     {
         var badge = ApplicationRow(candidateNameFragment).First.Locator("[data-testid='offer-response-badge']");
@@ -1580,9 +1110,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         return (await badge.TextContentAsync())?.Trim();
     }
 
-    // ── Ticket #2: Hire dialog offer context ────────────────────────────────────
 
-    /// <summary>The "will seed first compensation record" accepted-offer info panel (data-testid="hire-offer-accepted-context").</summary>
     public async Task<string?> GetHireOfferAcceptedContextTextAsync()
     {
         var el = page.Locator("[data-testid='hire-offer-accepted-context']");
@@ -1597,7 +1125,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         return (await el.TextContentAsync())?.Trim();
     }
 
-    /// <summary>True if the Hire dialog shows the "record a new offer before hiring" warning (data-testid="hire-offer-blocked").</summary>
     public async Task<bool> IsHireOfferBlockedWarningVisibleAsync()
     {
         try
@@ -1612,7 +1139,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>Reads the current value of the Hire dialog's Start Date field (data-testid="hire-start-date").</summary>
     public async Task<string> GetHireStartDateValueAsync()
     {
         var input = page.Locator(".hire-candidate-dialog .e-date-wrapper input.e-input").First;
@@ -1633,23 +1159,15 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
 
     private ILocator ApplicationTypeFilter => ApplicationsTab.Locator("[data-testid='application-type-filter']");
 
-    /// <summary>Waits until exactly <paramref name="expectedCount"/> application rows are rendered in the grid.</summary>
     public Task ExpectApplicationRowTotalAsync(int expectedCount) =>
         Assertions.Expect(ApplicationRows).ToHaveCountAsync(expectedCount, new() { Timeout = 30_000 });
 
-    /// <summary>Waits for the application row with this id to be visible.</summary>
     public Task ExpectApplicationRowVisibleAsync(Guid applicationId) =>
         Assertions.Expect(ApplicationRowById(applicationId)).ToBeVisibleAsync(new() { Timeout = 30_000 });
 
-    /// <summary>Waits until no application row with this id is rendered.</summary>
     public Task ExpectApplicationRowAbsentAsync(Guid applicationId) =>
         Assertions.Expect(ApplicationRowById(applicationId)).ToHaveCountAsync(0, new() { Timeout = 30_000 });
 
-    /// <summary>
-    /// Asserts the row's data-internal flag and whether its Candidate cell carries the Internal badge.
-    /// The row is awaited visible first so the "no badge" case is never satisfied by a row that simply
-    /// hasn't rendered yet.
-    /// </summary>
     public async Task ExpectApplicationRowInternalAsync(Guid applicationId, bool isInternal)
     {
         var row = ApplicationRowById(applicationId);
@@ -1672,16 +1190,13 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         }
     }
 
-    /// <summary>Waits for the Application type filter's combobox to show <paramref name="label"/>.</summary>
     public Task ExpectApplicationTypeFilterValueAsync(string label) =>
         Assertions.Expect(ApplicationTypeFilter.Locator("span[role='combobox'] input").First)
             .ToHaveValueAsync(label, new() { Timeout = 15_000 });
 
-    /// <summary>Selects "All" / "Internal" / "External" in the Applications tab's Application type filter.</summary>
     public Task SelectApplicationTypeFilterAsync(string label) =>
         DropDownSelector.SelectAsync(page, ApplicationTypeFilter, label);
 
-    /// <summary>Waits for the Applications tab empty-state message to contain <paramref name="expectedText"/>.</summary>
     public Task ExpectApplicationsEmptyAsync(string expectedText) =>
         Assertions.Expect(ApplicationsTab.Locator("[data-testid='applications-empty']"))
             .ToContainTextAsync(expectedText, new() { Timeout = 30_000 });
@@ -1699,11 +1214,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
 
     private static readonly Regex ToolbarItemDisabledClass = new(@"(^|\s)e-overlay(\s|$)");
 
-    /// <summary>
-    /// Selects the row matching <paramref name="candidateNameFragment"/> (server-confirmed, see
-    /// SelectApplicationRowAsync) and waits for the toolbar item <paramref name="itemText"/> to be
-    /// enabled for it.
-    /// </summary>
     public async Task ExpectToolbarItemEnabledForRowAsync(string candidateNameFragment, string itemText)
     {
         await SelectApplicationRowAsync(candidateNameFragment);
@@ -1712,28 +1222,20 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             .Not.ToHaveClassAsync(ToolbarItemDisabledClass, new() { Timeout = 15_000 });
     }
 
-    /// <summary>Waits for the toolbar item <paramref name="itemText"/> to be disabled for the currently selected row.</summary>
     public Task ExpectToolbarItemDisabledAsync(string itemText) =>
         Assertions.Expect(ApplicationsToolbarItem(itemText))
             .ToHaveClassAsync(ToolbarItemDisabledClass, new() { Timeout = 15_000 });
 
-    /// <summary>Waits for a toolbar element carrying the given tooltip (title) text to exist.</summary>
     public Task ExpectToolbarTooltipAsync(string tooltipText) =>
         Assertions.Expect(ApplicationsTab.Locator($".e-toolbar [title='{tooltipText}']").First)
             .ToBeAttachedAsync(new() { Timeout = 15_000 });
 
-    /// <summary>Selects the application row and clicks the toolbar's "Appoint" item (opens the Complete internal appointment dialog).</summary>
     public async Task ClickAppointForAsync(string candidateNameFragment)
     {
         await SelectApplicationRowAsync(candidateNameFragment);
         await (await ApplicationsToolbarButtonAsync("Appoint", exact: true, reselectCandidateNameFragment: candidateNameFragment)).ClickAsync();
     }
 
-    /// <summary>
-    /// Asserts the row with this id shows (or doesn't show) the "Appointment in progress" hint
-    /// (data-testid="appointment-pending-hint"). The row is awaited visible first so the "absent"
-    /// case can't be satisfied by a row that simply hasn't rendered yet.
-    /// </summary>
     public async Task ExpectAppointmentPendingHintAsync(Guid applicationId, bool visible)
     {
         var row = ApplicationRowById(applicationId);

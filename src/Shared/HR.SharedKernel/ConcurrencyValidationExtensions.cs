@@ -12,10 +12,6 @@ public static class ConcurrencyValidationExtensions
     public const string MissingVersionMessage =
         "A concurrency version is required. Reload the page and try again.";
 
-    /// <summary>
-    /// Requires <paramref name="expectedVersionSelector"/> (the request's <c>ExpectedVersion</c>) to
-    /// be non-null. Use on every protected Update*Validator.
-    /// </summary>
     public static IRuleBuilderOptions<T, int?> RequireLoadedVersion<T>(
         this IRuleBuilder<T, int?> ruleBuilder)
         => ruleBuilder

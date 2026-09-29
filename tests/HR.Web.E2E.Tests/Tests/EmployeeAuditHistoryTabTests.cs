@@ -4,15 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the Audit tab on the employee edit page, including the detail dialog that shows
-/// field-level Before/After changes for a given audit event.
-///
-/// Uses "Tom Williams" (ID: 30000000-0000-0000-0000-000000000004), who has no seeded compensation
-/// or audit history, so a fresh Create-Compensation action performed within the test is the only
-/// audit event present — avoiding interference from other tests and from seed data (seed data is
-/// inserted directly into the database and does not go through the audited handlers).
-/// </summary>
 public sealed class EmployeeAuditHistoryTabTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -31,9 +22,6 @@ public sealed class EmployeeAuditHistoryTabTests(HrAdminPersonaFixture fixture) 
 
         await empEdit.GoToAsync(AcmeId, TomWilliams);
 
-        // Auto-retrying assertion rather than a single IsVisibleAsync() snapshot — the Audit tab
-        // item can render after GoToAsync's own wait condition (the Details tab's combobox) has
-        // already resolved on an earlier render pass, same race class as Probation/Notes/Assets.
         await EmployeeEditPage.SelectOwningGroupAsync(_page, "Audit");
         await Assertions.Expect(EmployeeEditPage.SectionTab(_page, "Audit"))
             .ToBeVisibleAsync(new() { Timeout = 15_000 });
@@ -45,11 +33,6 @@ public sealed class EmployeeAuditHistoryTabTests(HrAdminPersonaFixture fixture) 
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
 
-        // This test WRITES (a compensation record) and then reads the resulting audit history, so it
-        // uses its own fresh employee rather than Tom Williams: Tom is edited concurrently by dozens
-        // of other classes (contact details, leave, documents, notice period, …) and — contrary to
-        // this class's original assumption — now has seeded compensation of his own, so neither
-        // his edit page nor his audit history is a stable, test-owned surface.
         var employee = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "AuditComp");
 
         await login.GoToAsync();
@@ -67,8 +50,6 @@ public sealed class EmployeeAuditHistoryTabTests(HrAdminPersonaFixture fixture) 
 
         await empEdit.OpenAuditTabAsync();
 
-        // Wait for the audit grid to render the row (the tab's grid loads asynchronously after the
-        // tab switch) rather than taking a single instant IsVisibleAsync() snapshot.
         var row = empEdit.AuditHistoryRow("Compensation record created");
         await Assertions.Expect(row.First).ToBeVisibleAsync(new() { Timeout = 15_000 });
 
@@ -85,7 +66,6 @@ public sealed class EmployeeAuditHistoryTabTests(HrAdminPersonaFixture fixture) 
         // structured, non-sensitive fields EffectiveFrom / SalaryType / Currency — see
         // CompensationRecordCreatedAuditEvent.After), so "39500" must NOT appear here.
         Assert.DoesNotContain("39500", dialogText);
-        // Before values are unset for a Created event, so they must render as the "—" placeholder.
         Assert.Contains("—", dialogText);
 
         await empEdit.CloseAuditDetailDialogAsync();

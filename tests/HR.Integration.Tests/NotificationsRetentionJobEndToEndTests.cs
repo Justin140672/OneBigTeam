@@ -11,11 +11,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// NFR-07: end-to-end wiring for the notifications retention sweep — resolves the job from the real
-/// DI container and runs it against the real DbContexts. Detailed branch coverage lives in
-/// HR.Modules.Notifications.Tests/PurgeExpiredReadNotificationsJobTests.
-/// </summary>
 [Collection("Integration")]
 public class NotificationsRetentionJobEndToEndTests
 {
@@ -31,7 +26,6 @@ public class NotificationsRetentionJobEndToEndTests
     private async Task PlaceLegalHoldAsync(Guid companyId)
     {
         using var scope = _factory.Services.CreateScope();
-        // Creates the Company + CustomerSubscription rows (customer_subscriptions FKs to companies).
         await TestRoleSeeder.EnsureActiveSubscriptionAsync(scope, companyId);
 
         var db = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();

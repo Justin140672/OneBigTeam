@@ -4,11 +4,6 @@ using Xunit;
 
 namespace HR.Infrastructure.Tests;
 
-/// <summary>
-/// Security review finding 6: <see cref="SupabaseStorageBucketCheck.ContainsBucket"/> parses the
-/// Supabase "list buckets" response used by every *StorageHealthCheck so a missing/renamed bucket
-/// is reported unhealthy instead of a bare 2xx being treated as sufficient.
-/// </summary>
 public class SupabaseStorageBucketCheckTests
 {
     [Fact]

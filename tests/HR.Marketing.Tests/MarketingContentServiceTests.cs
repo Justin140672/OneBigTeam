@@ -21,7 +21,6 @@ public class MarketingContentServiceTests
         Assert.Equal(FeatureCatalog.All.Count, content.Features.Count);
         Assert.Equal(UpcomingFeatureCatalog.All.Count, content.Roadmap.Count);
         Assert.Contains(content.Features, f => f.Slug == "employee-management");
-        // Fallback must never expose drafts — seed content is treated as published/available.
         Assert.All(content.Features, f => Assert.Equal("Available", f.DeliveryStatus));
     }
 

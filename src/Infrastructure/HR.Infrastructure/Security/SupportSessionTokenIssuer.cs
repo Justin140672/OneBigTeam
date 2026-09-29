@@ -30,11 +30,6 @@ internal sealed class SupportSessionTokenIssuer(IConfiguration configuration) : 
             audience: SupportSessionTokenConstants.Audience,
             claims:
             [
-                // The acting platform administrator's own Supabase user id — never resolved
-                // against identity.user_profiles for a support-session token (see
-                // SupabaseCurrentUserResolutionMiddleware), but used as every audit event's
-                // ActorUserId during the session so the audit trail correctly attributes to the
-                // real administrator (see ISupportSessionTokenIssuer's remarks).
                 new Claim("sub", adminUserId.ToString()),
                 new Claim("email", adminEmail),
                 new Claim("company_id", companyId.ToString()),

@@ -14,14 +14,9 @@ internal sealed class FakeTaskCreator : ITaskCreator
 
     public List<CreatedTask> Created { get; } = [];
 
-    // OFF-03: lets tests inject a cross-module failure for a specific task (by title or by its
-    // OffboardingTask source id) to verify per-task isolation in OffboardingTaskSynchronizer /
-    // reconciliation without needing a second parallel fake.
     public HashSet<string> TitlesToFail { get; } = [];
     public HashSet<Guid> SourceEntityIdsToFail { get; } = [];
 
-    // Lets a test observe/assert arbitrary state (e.g. that the caller's DbContext already has no
-    // pending Added entries) at the exact moment each CreateAsync call happens.
     public Action? OnCreateAsyncInvoked { get; set; }
 
     public Task<Guid> CreateAsync(

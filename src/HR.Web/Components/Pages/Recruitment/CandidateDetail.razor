@@ -363,18 +363,10 @@
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
 
-    // Set when this page is reached from the Recruitment Kanban board (see
-    // VacancyKanbanBoard.OpenCandidate) so "Close" returns there instead of always falling back to
-    // the plain Candidate List — the board can be embedded in three different places (standalone
-    // route, Vacancy Detail tab, or the Recruitment Dashboard's Board view), so this carries
-    // whichever one the user actually came from.
     [SupplyParameterFromQuery(Name = "returnUrl")]
     [Parameter]
     public string? ReturnUrl { get; set; }
 
-    // Which screen launched the Add Candidate editor (Dashboard vs Candidates list), carried as a
-    // whitelisted "origin" query value — NOT an arbitrary URL — so Save/Close returns to the
-    // correct launch point. Unrecognized/missing values safely fall back to the Candidates list.
     [SupplyParameterFromQuery(Name = "origin")]
     [Parameter]
     public string? Origin { get; set; }
@@ -430,10 +422,8 @@
 
     // ── Application history (internal recruitment Ticket 6) ─────────────────────
 
-    // null = failed to load (distinct from an empty history).
     private List<ApplicationSearchItemModel>? _applications = [];
 
-    // Authoritative only via IsInternal (Source == Internal) — never inferred from EmployeeId.
     private bool IsInternalApplicant => _applications?.Any(a => a.IsInternal) == true;
 
     private async Task LoadApplicationsAsync()
@@ -453,21 +443,18 @@
     private string? _cvError;
     private string? _cvSuccess;
 
-    // GetCandidateResponse exposes no purge flag, so IsActive is the only lifecycle gate here.
     private bool CanUploadCv => Session.CanManageRecruitment && _candidate is { IsActive: true };
 
     private async Task LoadCvDocumentsAsync()
     {
         var response = await CandidateService.ListCandidateDocumentsAsync(CompanyId, Id!.Value);
-        // API order is newest first — keep it.
         _cvDocuments = response?.Items.Where(d => d.Kind == "Cv").ToList();
         StartScanPollingIfNeeded();
     }
 
-    // ── Malware-scan status (candidate documents are scanned asynchronously after upload) ──
 
     private const int ScanPollIntervalMs = 3_000;
-    private const int ScanPollMaxAttempts = 10; // ~30s, then the user can press Refresh.
+    private const int ScanPollMaxAttempts = 10;
     private CancellationTokenSource? _scanPollCts;
     private bool _cvRefreshing;
 
@@ -488,9 +475,6 @@
         }
     }
 
-    // Bounded auto-refresh while any row is still Pending/Scanning. A new call (initial load, upload,
-    // Refresh) replaces any running poll loop with a fresh ~30s budget; the loop stops once nothing
-    // is in progress, after the attempt cap, or on dispose.
     private void StartScanPollingIfNeeded()
     {
         StopScanPolling();
@@ -538,15 +522,12 @@
         }
         catch (OperationCanceledException)
         {
-            // Component disposed / polling superseded.
         }
         catch (ObjectDisposedException)
         {
-            // Circuit torn down mid-poll.
         }
         finally
         {
-            // Finished naturally → release it. (If superseded/disposed, StopScanPolling already did.)
             if (ReferenceEquals(_scanPollCts, cts))
             {
                 _scanPollCts = null;
@@ -617,7 +598,6 @@
             await LoadCvDocumentsAsync();
         }
 
-        // Re-key the InputFile so the same file can be picked again.
         _selectedCvFile = null;
         _cvFileInputKey++;
         _cvBusy = false;

@@ -18,7 +18,6 @@ public class LeaveTypeService(HrApiHttpClientFactory httpClientFactory)
         return result.Success ? result.Value : null;
     }
 
-    // No dedicated backend GetById endpoint — the list already returns full item detail.
     async Task<LeaveTypeEditModel?> IEditService<LeaveTypeEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
     {
         var list = await ListLeaveTypesAsync(companyId, includeInactive: true);

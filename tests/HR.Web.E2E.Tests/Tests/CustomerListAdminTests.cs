@@ -51,9 +51,6 @@ public sealed class CustomerListAdminTests(EmployeePersonaFixture fixture) : Rol
         await list.SearchAsync("Acme Corporation");
         Assert.True(await list.HasCompanyAsync("Acme Corporation"));
 
-        // Debounced (300ms) SfTextBox search — see CustomerList.razor's OnSearchChanged. SfTextBox's
-        // ValueChanged fires on the native change event (focus loss), not per keystroke, so a bare
-        // FillAsync never triggers it — Tab out to commit the value.
         var searchInput = _page.Locator(".customer-search-box input");
         await searchInput.FillAsync($"no-such-tenant-{Guid.NewGuid():N}");
         await searchInput.PressAsync("Tab");

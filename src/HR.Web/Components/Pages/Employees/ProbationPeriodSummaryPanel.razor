@@ -54,7 +54,6 @@
 
     private int TotalDays     => Math.Max(1, Record.ExpectedEndDate.DayNumber - Record.StartDate.DayNumber);
     private int TotalMonths   => (Record.ExpectedEndDate.Year - Record.StartDate.Year) * 12 + (Record.ExpectedEndDate.Month - Record.StartDate.Month);
-    // Use company-local date for business-calendar probation progress tracking.
     private int ElapsedDays   => Math.Clamp(CompanyTimeProvider.Today.DayNumber - Record.StartDate.DayNumber, 0, TotalDays);
     private int DaysRemaining => Math.Max(0, TotalDays - ElapsedDays);
     private int ProgressPercent => (int)Math.Round(ElapsedDays * 100.0 / TotalDays);

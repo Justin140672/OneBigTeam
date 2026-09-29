@@ -9,12 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Postgres integration coverage for PUT /candidates/{id}. See UpdateCandidateHandlerTests /
-/// UpdateCandidateValidatorTests in HR.Modules.Recruitment.Tests for the unit-level equivalent.
-/// Covers: anonymous 401, wrong-role 403, tenant-mismatch 403, happy 200 + persisted details,
-/// unknown candidate 404, cross-company 404, duplicate-email 409, unchanged-email 200, validation 422.
-/// </summary>
 [Collection("Integration")]
 public class UpdateCandidateEndpointTests
 {

@@ -9,12 +9,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Employees.Jobs;
 
-// Daily job that finalises departures for employees whose leaving process has reached its
-// leaving date. Scans across all companies in one query (no per-tenant loop), mirroring
-// OffboardingReminderJob/GenerateDueProbationReviewsJob. The actual finalisation (status
-// transition, access disabling, offboarding check, notification, audit) is delegated to
-// IEmployeeDepartureFinalizer so Start/AmendLeavingProcessHandler can trigger the exact same
-// idempotent path immediately when HR confirms a backdated LeavingDate.
 internal sealed class ProcessLeavingEmployeesJob(
     EmployeesDbContext dbContext,
     IClock clock,
@@ -22,10 +16,6 @@ internal sealed class ProcessLeavingEmployeesJob(
     IEmployeeDepartureFinalizer departureFinalizer,
     ILogger<ProcessLeavingEmployeesJob> logger)
 {
-    /// <summary>
-    /// Executes the departure finalisation job across all companies (normal Hangfire invocation)
-    /// or for a specific company when <paramref name="companyIdFilter"/> is provided (E2E test seam).
-    /// </summary>
     public async Task ExecuteAsync(Guid? companyIdFilter = null)
     {
         var now = clock.UtcNowOffset();
@@ -34,11 +24,6 @@ internal sealed class ProcessLeavingEmployeesJob(
         await ReconcileStrandedDeparturesAsync(now, companyIdFilter);
     }
 
-    /// <summary>
-    /// E2E test seam: same processing as <see cref="ExecuteAsync"/> but restricted to one employee,
-    /// so a test finalising its own leaver cannot also finalise other tests' due leavers running in
-    /// parallel in the same company.
-    /// </summary>
     public async Task ExecuteForEmployeeAsync(Guid companyId, Guid employeeId)
     {
         var now = clock.UtcNowOffset();
@@ -52,7 +37,6 @@ internal sealed class ProcessLeavingEmployeesJob(
         var query = dbContext.Employees
             .Where(e => e.Status == EmploymentStatus.Leaving);
 
-        // If a company filter is specified (E2E test seam), limit to that company only
         if (companyIdFilter.HasValue)
             query = query.Where(e => e.CompanyId == companyIdFilter.Value);
 
@@ -78,9 +62,6 @@ internal sealed class ProcessLeavingEmployeesJob(
             .GroupBy(p => p.EmployeeId)
             .ToDictionary(g => g.Key, g => g.OrderBy(p => p.StartedAt).First());
 
-        // Employees may belong to different companies each with their own configured time zone,
-        // so "today" (used as the leaving-date due boundary) must be resolved per company rather
-        // than once globally.
         var todayByCompany = new Dictionary<Guid, DateOnly>();
 
         foreach (var employee in leavingEmployees)
@@ -134,20 +115,11 @@ internal sealed class ProcessLeavingEmployeesJob(
         }
     }
 
-    // Recovers departures where an earlier FinalizeAsync attempt persisted the terminal state
-    // (EmployeeLeavingProcess -> Completed, Employee -> FormerEmployee) but crashed/threw before
-    // completing the downstream steps (offboarding check, manager notification, audit publish,
-    // integration publish, timeline write) — those employees are no longer Status == Leaving, so
-    // ProcessDueLeaversAsync above would never pick them up again. FinalizeAsync itself detects
-    // this state (Status == Completed but FinalisationCompletedAt still null) and resumes from the
-    // downstream steps only, so calling it again here is safe and does not repeat the terminal-state
-    // mutation.
     private async Task ReconcileStrandedDeparturesAsync(DateTimeOffset now, Guid? companyIdFilter = null, Guid? employeeIdFilter = null)
     {
         var query = dbContext.EmployeeLeavingProcesses
             .Where(p => p.Status == LeavingProcessStatus.Completed && p.FinalisationCompletedAt == null);
 
-        // If a company filter is specified (E2E test seam), limit to that company only
         if (companyIdFilter.HasValue)
             query = query.Where(p => p.CompanyId == companyIdFilter.Value);
 
@@ -195,9 +167,6 @@ internal sealed class ProcessLeavingEmployeesJob(
         }
     }
 
-    // Discards only entities carrying uncommitted modifications (Added/Modified/Deleted) from a
-    // failed finalisation attempt — anything still Unchanged (including employees/processes this
-    // method already loaded but hasn't reached yet in the loop) stays tracked and normally saveable.
     private void DetachDirtyEntries()
     {
         foreach (var entry in dbContext.ChangeTracker.Entries().Where(e => e.State != EntityState.Unchanged).ToList())

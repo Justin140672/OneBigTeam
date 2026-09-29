@@ -20,7 +20,6 @@ public class UpdateRecruitmentStageHandlerTests
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         await db.SaveChangesAsync();
 
-        // "Offer" is a non-terminal active stage; try to make it terminal Hired while "Hired" already is.
         var result = await Handler(db).HandleAsync(
             new UpdateRecruitmentStageRequest(companyId, stages.Offer.Id, "Offer", true, RecruitmentStageTerminalOutcome.Hired, ExpectedVersion: 1),
             CancellationToken.None);
@@ -97,7 +96,6 @@ public class UpdateRecruitmentStageHandlerTests
         await using var db = BuildContext(store);
         var companyId = Guid.NewGuid();
         RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
-        // Loaded stage itself is inactive, so the terminal-uniqueness guard is skipped entirely.
         var extra = RecruitmentStage.Create(Guid.NewGuid(), companyId, "Archived Outcome", 7, false, RecruitmentStageTerminalOutcome.None, Now);
         extra.SetActiveStatus(false, Now);
         db.RecruitmentStages.Add(extra);

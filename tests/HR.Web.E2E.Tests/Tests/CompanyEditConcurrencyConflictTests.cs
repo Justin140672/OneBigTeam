@@ -100,10 +100,8 @@ public sealed class CompanyEditConcurrencyConflictTests(PriyaShahPersonaFixture 
 
         try
         {
-            // ── Tab 1: start editing the first address line (loads Version v1) ──
             await companyEdit.SetFirstAddressLine1Async(firstTabValue);
 
-            // ── Tab 2 (same context / persona): load the same company and save first ──
             var otherPage = await _context.NewPageAsync();
             try
             {
@@ -118,7 +116,6 @@ public sealed class CompanyEditConcurrencyConflictTests(PriyaShahPersonaFixture 
                 await otherPage.CloseAsync();
             }
 
-            // ── Tab 1: saving now is stale → conflict banner, page stays, input preserved ──
             await companyEdit.SaveExpectingConflictAsync();
 
             Assert.True(await companyEdit.IsConcurrencyWarningVisibleAsync(),
@@ -126,14 +123,12 @@ public sealed class CompanyEditConcurrencyConflictTests(PriyaShahPersonaFixture 
             Assert.Contains("/edit", _page.Url);
             Assert.Equal(firstTabValue, await companyEdit.GetFirstAddressLine1Async());
 
-            // ── Tab 1: "Reload latest values" clears the banner and adopts the other tab's value ──
             await companyEdit.ClickReloadLatestValuesAsync();
 
             Assert.False(await companyEdit.IsConcurrencyWarningVisibleAsync(),
                 "Expected the conflict banner to clear after reloading latest values");
             Assert.Equal(otherTabValue, await companyEdit.GetFirstAddressLine1Async());
 
-            // ── Tab 1: re-edit against the fresh version and save successfully ──
             await companyEdit.SetFirstAddressLine1Async(finalValue);
             await companyEdit.SaveExpectingSuccessAsync();
 

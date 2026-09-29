@@ -14,18 +14,8 @@ public interface IAuditOutboxEntry
 {
     Guid Id { get; set; }
 
-    /// <summary>
-    /// Which publisher redelivers this entry: <see cref="OutboxChannel.Audit"/> (via
-    /// <c>IAuditEventPublisher</c>) or <see cref="OutboxChannel.Integration"/> (via
-    /// <c>IIntegrationEventPublisher</c>, for cross-module events such as employee creation whose
-    /// downstream onboarding/probation/leave/task/notification work must survive a process crash
-    /// between commit and delivery). Despite the name, this one table/entity now carries both -
-    /// renaming it repo-wide wasn't worth the churn once integration events needed the same
-    /// atomicity guarantee.
-    /// </summary>
     string Channel { get; set; }
 
-    /// <summary>Assembly-qualified CLR type name of the staged event, for redelivery.</summary>
     string EventTypeName { get; set; }
 
     string PayloadJson { get; set; }
@@ -40,10 +30,8 @@ public interface IAuditOutboxEntry
 
     DateTimeOffset? NextAttemptAt { get; set; }
 
-    /// <summary>Exception message only - never the event payload, which may hold sensitive data.</summary>
     string? LastError { get; set; }
 
-    /// <summary>Set once <see cref="AttemptCount"/> exceeds the dispatcher's retry ceiling.</summary>
     bool IsTerminallyFailed { get; set; }
 
     /// <summary>

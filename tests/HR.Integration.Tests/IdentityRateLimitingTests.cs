@@ -28,9 +28,6 @@ public sealed class IdentityRateLimitingTests : IClassFixture<IdentityRateLimitA
 {
     private readonly IdentityRateLimitApiWebApplicationFactory _factory;
 
-    // ApiWebApplicationFactory is injected only to force collection ordering: the shared collection
-    // fixture has already started the Postgres container and set ConnectionStrings__hr by the time
-    // this runs.
     public IdentityRateLimitingTests(IdentityRateLimitApiWebApplicationFactory factory, ApiWebApplicationFactory _)
     {
         _factory = factory;
@@ -115,7 +112,6 @@ public sealed class IdentityRateLimitingTests : IClassFixture<IdentityRateLimitA
         var rejectedOnA = await PostForgotPasswordAsync(clientA, email);
         Assert.Equal(HttpStatusCode.TooManyRequests, rejectedOnA.StatusCode);
 
-        // IP B, same email, has not made any requests yet — its own quota is untouched by A's usage.
         var firstOnB = await PostForgotPasswordAsync(clientB, email);
         Assert.Equal(HttpStatusCode.OK, firstOnB.StatusCode);
     }
@@ -136,7 +132,6 @@ public sealed class IdentityRateLimitingTests : IClassFixture<IdentityRateLimitA
         var rejectedOnA = await PostForgotPasswordAsync(client, emailA);
         Assert.Equal(HttpStatusCode.TooManyRequests, rejectedOnA.StatusCode);
 
-        // Same IP, different email — its own quota is untouched by email A's usage.
         var firstOnB = await PostForgotPasswordAsync(client, emailB);
         Assert.Equal(HttpStatusCode.OK, firstOnB.StatusCode);
     }

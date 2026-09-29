@@ -258,7 +258,6 @@
     private DialogMode _mode = DialogMode.Details;
     private ApplyNotice _notice = ApplyNotice.None;
 
-    // Read-only applicant identity — displayed only, never sent (the API resolves it server-side).
     private bool _workEmailLoaded;
     private bool _workEmailLoading;
     private string? _workEmail;
@@ -328,7 +327,6 @@
         }
         catch
         {
-            // Element not rendered / circuit gone — focus is best-effort.
         }
     }
 
@@ -416,7 +414,6 @@
         _pendingFocus = FocusTarget.CvInput;
     }
 
-    // Re-keys the InputFile so it is emptied (and the same file can be chosen again).
     private void ClearCv()
     {
         _cvFile = null;
@@ -464,7 +461,6 @@
             return;
         }
 
-        // NotEligible / EmailInUse / VacancyUnavailable / Failed: stay on the form, keep the file.
         _serverError = result.Message ?? "Your application could not be submitted. Please try again.";
         _pendingFocus = FocusTarget.ServerError;
     }
@@ -487,7 +483,6 @@
         _pendingFocus = FocusTarget.ApplyButton;
     }
 
-    // Resets the apply form (discarding any selected, never-uploaded file) and any notice.
     private void ResetApplyState()
     {
         _mode = DialogMode.Details;
@@ -498,7 +493,6 @@
 
     private void OnDialogClosing(BeforeCloseEventArgs args)
     {
-        // Don't let the close icon / Escape race an in-flight submission.
         if (_submitting)
             args.Cancel = true;
     }

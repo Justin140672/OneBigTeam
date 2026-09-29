@@ -5,26 +5,12 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Proves an Employee Leaving Process in one company can never be read or mutated by another
-/// company's caller, even when that caller supplies Company A's real employee id while
-/// authenticated (with a matching route/tenant header) as Company B — mirrors the reasoning in
-/// RecruitmentPositionProfileTenantIsolationTests, but for the four leaving-process endpoints.
-///
-/// This is distinct from the existing "Returns_Forbidden_When_Route_Company_Does_Not_Match_Auth_Tenant"
-/// tests in the individual *EndpointTests.cs files, which exercise TenantRouteAuthorizationMiddleware
-/// rejecting a route/header mismatch before the handler ever runs. Here the route and tenant header
-/// always agree (both Company B) — isolation has to come from the handlers' own CompanyId-scoped
-/// queries, which is what these tests actually verify.
-/// </summary>
 [Collection("Integration")]
 public class LeavingProcessTenantIsolationTests
 {
     private readonly ApiWebApplicationFactory _factory;
     private static readonly Guid HrAdminUser = new("dd000001-0000-0000-0000-000000000001");
 
-    // Relative to "today" rather than hardcoded literals — see StartLeavingProcessEndpointTests'
-    // identical fields for why a fixed near-term literal eventually becomes "backdated".
     private static readonly DateOnly LeavingDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
     private static readonly DateOnly LastWorkingDay = LeavingDate.AddDays(-1);
 
@@ -85,8 +71,6 @@ public class LeavingProcessTenantIsolationTests
         var employeeAId = await CreateEmployeeAsync(clientA, companyA);
         await StartLeavingProcessAsync(clientA, companyA, employeeAId);
 
-        // Authenticated as Company B (route and tenant header both companyB — no middleware
-        // rejection), but the employee id belongs to Company A's leaving process.
         using var clientB = await AuthenticatedClient(companyB);
         var response = await clientB.GetAsync($"/api/companies/{companyB}/employees/{employeeAId}/leaving-process");
 
@@ -115,8 +99,6 @@ public class LeavingProcessTenantIsolationTests
                 leavingReason = "Resignation"
             });
 
-        // StartLeavingProcessHandler looks up the employee scoped by (Id, CompanyId) — Company A's
-        // employee doesn't exist under Company B, so this must never succeed against Company A's data.
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 

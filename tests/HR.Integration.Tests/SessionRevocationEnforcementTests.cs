@@ -74,26 +74,18 @@ public sealed class SessionRevocationEnforcementTests : IAsyncLifetime
         var token = E2eFakeSupabaseJwt.CreateAccessToken(
             SupabaseProjectUrl, userId, "laura.bennett@acme.example", TimeSpan.FromMinutes(30));
 
-        // Step 1: "tab A" — the token is genuinely valid before any logout. A brand new HttpClient,
-        // used only for this one call.
         using (var beforeLogoutClient = _host.CreateClient())
         {
             var beforeLogoutResponse = await GetSecureAsync(beforeLogoutClient, token);
             Assert.Equal(HttpStatusCode.OK, beforeLogoutResponse.StatusCode);
         }
 
-        // Step 2: "tab A logs out" — a completely separate HTTP request/response cycle (its own
-        // fresh HttpClient and its own server-side DI scope), presenting the SAME token as the
-        // bearer, exactly as HR.Web's /logout does with the cookie's access token.
         using (var logoutClient = _host.CreateClient())
         {
             var logoutResponse = await PostLogoutAsync(logoutClient, token);
             Assert.Equal(HttpStatusCode.OK, logoutResponse.StatusCode);
         }
 
-        // Step 3: "tab B" — a brand new HttpClient/request that never touched the logout call above,
-        // replaying the ORIGINAL (pre-logout) token. This is the assertion that actually proves
-        // server-side enforcement: nothing but the raw token string survived from step 1 to here.
         using var afterLogoutClient = _host.CreateClient();
         var afterLogoutResponse = await GetSecureAsync(afterLogoutClient, token);
 
@@ -112,9 +104,6 @@ public sealed class SessionRevocationEnforcementTests : IAsyncLifetime
         var userId = Guid.NewGuid();
         var tokenA = E2eFakeSupabaseJwt.CreateAccessToken(
             SupabaseProjectUrl, userId, "laura.bennett@acme.example", TimeSpan.FromMinutes(30));
-        // A distinct token string for the same user id, issued a moment later — JwtSecurityTokenHandler
-        // stamps "iat"/"nbf" from DateTime.UtcNow, so a short delay guarantees a different signature
-        // even though every claim value besides timing is identical.
         await Task.Delay(1100);
         var tokenB = E2eFakeSupabaseJwt.CreateAccessToken(
             SupabaseProjectUrl, userId, "laura.bennett@acme.example", TimeSpan.FromMinutes(30));
@@ -172,18 +161,6 @@ public sealed class SessionRevocationEnforcementTests : IAsyncLifetime
         return client.SendAsync(request);
     }
 
-    /// <summary>
-    /// Self-contained Kestrel host wiring the real production pieces this ticket touches: the same
-    /// <see cref="SupabaseJwtBearerConfiguration"/> HR.Api's Program.cs configures (E2E/local-key
-    /// mode, so tokens are signed with <see cref="E2eFakeSupabaseJwt.SigningKey"/> rather than
-    /// requiring a live Supabase JWKS endpoint), a real <see cref="IdentityDbContext"/> against the
-    /// Postgres testcontainer, the real <see cref="SessionRevocationStore"/>, and a
-    /// "/api/logout" endpoint that mirrors the production
-    /// <c>HR.Modules.Identity.Features.Logout.Endpoint</c>'s own "sub"-from-ClaimsPrincipal +
-    /// LogoutHandler wiring exactly (same production <c>LogoutHandler</c> class, same claim source).
-    /// "/api/me" stands in for HR.Api's real simple authenticated endpoint used elsewhere in this
-    /// suite for authenticated-endpoint smoke tests.
-    /// </summary>
     private sealed class RevocationTestHost : IAsyncDisposable
     {
         private readonly WebApplication _app;
@@ -225,7 +202,6 @@ public sealed class SessionRevocationEnforcementTests : IAsyncLifetime
 
             var app = builder.Build();
 
-            // Migrate the identity schema once, before serving any request.
             await using (var scope = app.Services.CreateAsyncScope())
             {
                 var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
@@ -238,10 +214,6 @@ public sealed class SessionRevocationEnforcementTests : IAsyncLifetime
 
             app.MapGet("/api/me", () => Results.Ok(new { ok = true })).RequireAuthorization();
 
-            // Mirrors HR.Modules.Identity.Features.Logout.Endpoint's own bearer/"sub" extraction and
-            // LogoutHandler call verbatim (see that class's remarks): ASP.NET Core's authentication
-            // middleware always runs and populates HttpContext.User for a genuinely valid bearer, even
-            // though this endpoint itself is anonymous.
             app.MapPost("/api/logout", async (HttpContext httpContext, HR.Modules.Identity.Features.Logout.LogoutHandler handler) =>
             {
                 string? accessToken = null;
@@ -272,10 +244,6 @@ public sealed class SessionRevocationEnforcementTests : IAsyncLifetime
         public async ValueTask DisposeAsync() => await _app.DisposeAsync();
     }
 
-    /// <summary>No-op Supabase gateway: the real upstream sign-out call is irrelevant to this ticket
-    /// (see LogoutHandlerTests.Records_Revocation_Even_When_Upstream_Supabase_Sign_Out_Fails for the
-    /// "Supabase call independence" behaviour, already covered at the unit level) — this host only
-    /// needs SignOutAsync to not throw so LogoutHandler's happy path completes.</summary>
     private sealed class NoOpSupabaseAuthGateway : ISupabaseAuthGateway
     {
         public Task<Guid> CreateUserAsync(string email, string password, string redirectTo, CancellationToken cancellationToken)

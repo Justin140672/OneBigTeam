@@ -2,28 +2,11 @@ using System.Net.Http.Json;
 
 namespace HR.Web.E2E.Tests.Infrastructure;
 
-/// <summary>
-/// Test-only API seam for triggering employee departure finalisation in E2E tests without waiting
-/// for Hangfire scheduling. Calls the same /api/dev/departure-finaliser/{employeeId} test endpoint
-/// the ProcessLeavingEmployeesJob would normally invoke after the employee's leaving date passes,
-/// but manually — allowing deterministic testing of the complete departure flow without wall-clock
-/// dependencies or scheduling machinery.
-///
-/// Each test creates a fresh employee with a backdated leaving date (already due for finalization),
-/// then calls FinalizeAsync to complete the transition to FormerEmployee and verify all downstream
-/// effects (removal from lists, directory, auth denial, etc.) without any timing flakiness.
-/// </summary>
 public static class DepartureFinaliserApi
 {
     public static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid LauraUserId = Guid.Parse("30000000-0000-0000-0000-000000000005");
 
-    /// <summary>
-    /// Manually triggers departure finalisation for a specific employee, transitioning them from
-    /// "Leaving" to "FormerEmployee" status and invoking all downstream handlers (leave-policy
-    /// deactivation, audit logging, account access control, etc.). Returns true on success, false on
-    /// non-success status code. Throws on HTTP failures (network errors, timeouts).
-    /// </summary>
     public static async Task<bool> FinalizeAsync(string apiBaseUrl, Guid employeeId)
     {
         using var http = await CreateHrAdminClientAsync(apiBaseUrl);

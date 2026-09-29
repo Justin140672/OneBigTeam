@@ -40,10 +40,5 @@ internal sealed record UpdateHrSettingsResponse(
 	int LongAbsenceDayThreshold,
 	int WeekdayPatternOccurrenceThreshold,
 	int WeekdayPatternWindowDays,
-	// SET-08: non-null only when this update triggered an employee-renumbering side effect. Status
-	// is one of OutboxMessage.StatusPending/Processing/Processed/Failed — callers use this to know
-	// whether the numbering-format change is fully applied yet or still processing asynchronously,
-	// and (via GetEmployeeRenumberSideEffectStatus / RetryEmployeeRenumberSideEffect) to poll or
-	// retry a Failed side effect.
 	Guid? EmployeeRenumberSideEffectId = null,
 	string? EmployeeRenumberSideEffectStatus = null);

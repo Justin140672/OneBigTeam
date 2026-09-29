@@ -7,16 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Verifies the complete probation lifecycle as a single coherent flow:
-///
-///   Create record (all reviews past due)
-///     → Run job → ManagerCheckIn, HrReview and FinalDecision tasks created for manager
-///     → Manager completes ManagerCheckIn task
-///     → Manager completes HrReview task
-///     → Manager completes FinalDecision task with Pass outcome
-///     → Record transitions to Passed
-/// </summary>
 [Collection("Integration")]
 public class ProbationLifecycleEndToEndTests
 {
@@ -24,7 +14,6 @@ public class ProbationLifecycleEndToEndTests
 
     private static readonly Guid AdminUser = new("b1b1b1b1-0000-0000-0000-000000000001");
 
-    // 90-day probation that already ended 10 days ago: all three reviews are past due.
     private static readonly DateOnly ProbationStart = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-100));
     private static readonly DateOnly ProbationEnd   = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-10));
 
@@ -46,7 +35,6 @@ public class ProbationLifecycleEndToEndTests
         var managerId  = Guid.NewGuid();
         using var client = await AuthenticatedClient(AdminUser, companyId);
 
-        // ── Step 1: Create probation record ───────────────────────────────────
         var recordResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/probation-records",
             new
@@ -60,20 +48,14 @@ public class ProbationLifecycleEndToEndTests
         recordResp.EnsureSuccessStatusCode();
         var record = await recordResp.Content.ReadFromJsonAsync<IdPayload>();
 
-        // ── Step 2: Run the generation job ────────────────────────────────────
-        // All three review milestones are in the past, so all three are created.
         await RunGenerationJobAsync();
 
-        // ── Step 3: Verify three reviews were created ──────────────────────────
         var reviews = await GetReviewsAsync(client, companyId, record!.Id);
         Assert.Equal(3, reviews.Count);
         Assert.Contains(reviews, r => r.ReviewType == "ManagerCheckIn" && r.Status == "Pending");
         Assert.Contains(reviews, r => r.ReviewType == "HrReview"       && r.Status == "Pending");
         Assert.Contains(reviews, r => r.ReviewType == "FinalDecision"  && r.Status == "Pending");
 
-        // ── Step 4: Verify review tasks were created and routed correctly ─────
-        // PROB-04: ManagerCheckIn and FinalDecision go to the employee's manager; HrReview goes
-        // to the HR queue (here, the acting HR administrator), never to the manager.
         var managerTasks = await GetEmployeeTasksAsync(client, companyId, managerId);
         var probationTasks = managerTasks
             .Where(t => t.Source == "Probation" && t.ActionType == "Review")
@@ -89,7 +71,6 @@ public class ProbationLifecycleEndToEndTests
             reviews.Single(r => r.ReviewType == "HrReview").Id,
             hrProbationTasks[0].SourceEntityId);
 
-        // ── Step 5: Complete ManagerCheckIn task ──────────────────────────────
         var checkInTask = probationTasks
             .Single(t => reviews.Any(r => r.ReviewType == "ManagerCheckIn" && r.Id == t.SourceEntityId));
         var checkInResp = await client.PostAsync(
@@ -101,7 +82,6 @@ public class ProbationLifecycleEndToEndTests
         var checkInAfter = await GetReviewAsync(client, companyId, record.Id, checkInReview.Id);
         Assert.Equal("Completed", checkInAfter.Status);
 
-        // ── Step 6: Complete HrReview task (HR-queue assigned, not the manager) ─
         var hrReviewTask = hrProbationTasks
             .Single(t => reviews.Any(r => r.ReviewType == "HrReview" && r.Id == t.SourceEntityId));
         var hrResp = await client.PostAsync(
@@ -109,7 +89,6 @@ public class ProbationLifecycleEndToEndTests
             EmptyJson());
         hrResp.EnsureSuccessStatusCode();
 
-        // ── Step 7: Complete FinalDecision task with Pass outcome ──────────────
         var finalTask = probationTasks
             .Single(t => reviews.Any(r => r.ReviewType == "FinalDecision" && r.Id == t.SourceEntityId));
         var finalResp = await client.PostAsync(
@@ -117,18 +96,15 @@ public class ProbationLifecycleEndToEndTests
             Json(new { outcomeDecision = "Pass", outcomeReason = "All objectives met." }));
         finalResp.EnsureSuccessStatusCode();
 
-        // ── Step 8: Verify record has transitioned to Passed ──────────────────
         var finalRecord = await GetRecordAsync(client, companyId, record.Id);
         Assert.Equal("Passed", finalRecord.Status);
 
-        // ── Step 9: Verify FinalDecision review shows Pass outcome ─────────────
         var finalDecisionReview = reviews.Single(r => r.ReviewType == "FinalDecision");
         var finalReviewAfter = await GetReviewAsync(client, companyId, record.Id, finalDecisionReview.Id);
         Assert.Equal("Completed", finalReviewAfter.Status);
         Assert.Equal("Pass", finalReviewAfter.Outcome);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)
     {

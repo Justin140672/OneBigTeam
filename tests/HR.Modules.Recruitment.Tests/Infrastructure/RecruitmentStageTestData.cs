@@ -11,11 +11,6 @@ namespace HR.Modules.Recruitment.Tests.Infrastructure;
 /// </summary>
 internal static class RecruitmentStageTestData
 {
-    /// <summary>
-    /// Seeds the standard six-stage pipeline (mirroring RecruitmentStageSeeder.BuildDefaultStages) for
-    /// the given company directly into the DbContext (not saved — callers should SaveChangesAsync
-    /// alongside their other seed data).
-    /// </summary>
     public static SeededStages AddDefaultStages(RecruitmentDbContext db, Guid companyId, DateTimeOffset now, bool withPurposes = true)
     {
         var applicationReceived = RecruitmentStage.Create(Guid.NewGuid(), companyId, "Application Received", 1, false, RecruitmentStageTerminalOutcome.None, now, withPurposes ? RecruitmentStagePurpose.NewApplication : null);

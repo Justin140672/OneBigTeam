@@ -23,7 +23,6 @@ internal sealed class ListDirectoryEmployeesHandler
         ListDirectoryEmployeesRequest request,
         CancellationToken cancellationToken)
     {
-        // Directory is employee-facing and only ever shows current colleagues.
         var query = _dbContext.Employees
             .AsNoTracking()
             .Where(e => e.CompanyId == request.CompanyId && e.Status == EmploymentStatus.Active);
@@ -63,7 +62,6 @@ internal sealed class ListDirectoryEmployeesHandler
             .Take(request.PageSize)
             .ToListAsync(cancellationToken);
 
-        // Resolve display names with targeted bulk lookups — no N+1 (mirrors ListEmployeesHandler).
         var departmentIds = employees.Select(e => e.DepartmentId).ToHashSet();
         var locationIds = employees.Select(e => e.LocationId).ToHashSet();
         var positionProfileIds = employees.Select(e => e.PositionProfileId).ToHashSet();

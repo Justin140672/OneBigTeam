@@ -6,12 +6,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Covers POST /api/company-onboarding/checklist/tasks/{taskKey}/mark-complete
-/// (MarkOnboardingTaskComplete): the onboarding:manage policy, an unknown task key => 404, the
-/// happy path for a real registry task key, and that re-marking an already-complete task is
-/// idempotent (SetStatus(true) again, still 200).
-/// </summary>
 [Collection("Integration")]
 public class MarkOnboardingTaskCompleteEndpointTests
 {

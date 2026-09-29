@@ -62,12 +62,6 @@ internal sealed class CancelLeavingProcessHandler(
             return Result.Failure<CancelLeavingProcessResponse>(
                 Error.NotFound($"Employee '{request.EmployeeId}' was not found."));
 
-        // Reader returning null means no offboarding plan exists yet for this employee — the
-        // "not yet begun" case (same semantics GetEmployeeHandler relies on for ShowOffboardingTab).
-        // Any non-null status means a plan was created, which — per StartOffboardingHandler, which
-        // always calls Start() immediately after Create() — means offboarding has already started.
-        // The UI is responsible for confirming this with HR (with a stronger warning in that case)
-        // before calling this endpoint at all; this handler just acts on the outcome.
         var offboardingStatus = await offboardingStatusReader.GetStatusAsync(
             request.CompanyId, request.EmployeeId, cancellationToken);
         var offboardingAlreadyStarted = offboardingStatus is not null;
@@ -114,10 +108,6 @@ internal sealed class CancelLeavingProcessHandler(
                 offboardingAlreadyStarted),
             cancellationToken);
 
-        // Cross-module notification so consuming modules (e.g. Leave, LEAVE-05) restore the
-        // employee's current policy year entitlement to the figure it would have been had they
-        // never entered the leaving process, while leaving any usage/manual adjustment recorded
-        // during the leaving-pending period untouched.
         await integrationEventPublisher.PublishAsync(
             new EmployeeLeavingProcessCancelledIntegrationEvent(
                 leavingProcess.CompanyId, leavingProcess.EmployeeId, now),

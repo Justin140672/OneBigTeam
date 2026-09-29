@@ -195,12 +195,7 @@ else
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
-    // Employee.Status from GetEmployeeResponse — e.g. "Leaving" / "FormerEmployee" / etc. Used only
-    // for the workspace header badge; the authoritative employment-state transition logic lives
-    // server-side (EmployeeLeavingProcess/finalisation).
     [Parameter] public string? EmploymentStatus { get; set; }
-    // True when the incoming "?tab=" was literally "offboarding" (an old bookmark) — scrolls/focuses
-    // the checklist section instead of the leaving-details header once loaded.
     [Parameter] public bool FocusChecklist { get; set; }
     [Parameter] public EventCallback OnAmendRequested { get; set; }
     [Parameter] public EventCallback OnCancelRequested { get; set; }
@@ -217,10 +212,6 @@ else
     {
         _loading = _leavingLookup is null;
 
-        // EmployeeEdit's OnLeavingProcessAmended appends this flag to the forceLoad navigation it
-        // does after a successful Amend, since AmendLeavingProcessResponse.OffboardingAlreadyStarted
-        // otherwise wouldn't survive that full-page reload — this is the simplest way to carry it
-        // across, consistent with the ?tab= query-string pattern EmployeeEdit already uses.
         var query = QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query);
         _showOffboardingAlreadyStartedWarning =
             query.TryGetValue("offboardingAlreadyStarted", out var flag) && flag == "true";
@@ -262,7 +253,6 @@ else
         if (!_hasFocusedChecklist && FocusChecklist && !_loading && _leavingLookup?.Process is not null)
         {
             _hasFocusedChecklist = true;
-            // Named app.js function, not "eval": the CSP has no 'unsafe-eval'.
             await JsRuntime.InvokeVoidAsync("hrScrollIntoView", "leaving-checklist-section");
         }
     }
@@ -281,8 +271,6 @@ else
         _ => "bg-secondary"
     };
 
-    // SPEC-OFF-01 §Offboarding-plan state / Finalisation: distinguishes "leaving started but the
-    // offboarding plan hasn't been created/started yet" from a genuine in-progress/completed plan.
     private string OffboardingStatusLabel()
     {
         var overview = _offboardingLookup?.Overview;
@@ -314,7 +302,6 @@ else
         };
     }
 
-    // Same convention as EmployeeEmploymentTab.NoticePeriodSourceLabel.
     private static string NoticePeriodSourceLabel(string source) => source switch
     {
         "Employee"        => "Employee",
@@ -353,9 +340,6 @@ else
         _            => "bg-secondary"
     };
 
-    /// <summary>
-    /// Returns only past (non-current) leaving attempts, filtering out the current in-progress process.
-    /// </summary>
     private List<LeavingProcessHistoryItem> GetPastAttempts() =>
         _leavingHistory?.Items.Where(item => !item.IsCurrent).ToList() ?? new List<LeavingProcessHistoryItem>();
 }

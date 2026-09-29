@@ -55,11 +55,6 @@ internal sealed class ApproveLeaveRequestHandler(LeaveDbContext dbContext, ICloc
         var leaveType = await dbContext.LeaveTypes
             .SingleOrDefaultAsync(lt => lt.Id == leaveRequest.LeaveTypeId, cancellationToken);
 
-        // TOIL is not year-bound: earned in one year, taken in another, and is tracked as a
-        // ledger of individual awards ("buckets") rather than a single balance - see
-        // ToilLedgerService for the FIFO consumption/multi-bucket-split algorithm. The mutation
-        // and Approve() call both live in LeaveApprovalEffectsService (LEAVE-07) so manual
-        // approval and policy-driven automatic approval share identical behaviour.
         var effectResult = await approvalEffects.ApplyBalanceEffectsAndApproveAsync(
             leaveRequest, leaveType, request.ReviewedByEmployeeId, now, cancellationToken);
 

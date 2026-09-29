@@ -74,7 +74,6 @@ public sealed class AssetService(HrApiHttpClientFactory httpClientFactory)
         return result.Success ? result.Value : null;
     }
 
-    // ── Admin asset list / CRUD ────────────────────────────────────────────
 
     public async Task<ListAssetsAdminResponse?> ListAssetsAsync(Guid companyId)
     {
@@ -105,17 +104,11 @@ public sealed class AssetService(HrApiHttpClientFactory httpClientFactory)
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            // A client-side request timeout surfaces as OperationCanceledException even though the
-            // caller's own token was never cancelled — the request was already dispatched, so the
-            // server may have received and committed it.
             return MutationOutcome<CreateAssetResponse>.Ambiguous(
                 "The request timed out. It's safe to try again — a duplicate asset will not be created.");
         }
         catch (OperationCanceledException)
         {
-            // Cancellation requested by the caller. We cannot prove the request was never sent
-            // (it may already be in flight on the wire), so this must still be treated as
-            // ambiguous rather than assumed abandoned pre-dispatch.
             return MutationOutcome<CreateAssetResponse>.Ambiguous(
                 "The request was cancelled before a response was received.");
         }
@@ -156,9 +149,6 @@ public sealed class AssetService(HrApiHttpClientFactory httpClientFactory)
             catch (Exception ex) when (ex is System.Text.Json.JsonException or IOException
                 or OperationCanceledException or HttpRequestException)
             {
-                // Invalid/truncated success response, cancellation, or a transport failure while
-                // reading the body — the mutation may well have committed, but this client cannot
-                // confirm it from this response body.
                 return MutationOutcome<CreateAssetResponse>.Ambiguous(
                     "The server's response could not be read. It's safe to try again.");
             }
@@ -175,8 +165,6 @@ public sealed class AssetService(HrApiHttpClientFactory httpClientFactory)
         // itself be treated as ambiguous — fall back to a generic message instead.
         if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
         {
-            // Either a genuine duplicate asset number, or the idempotency layer's own "key reused
-            // for a different request" conflict.
             var conflictBody = await TryReadErrorEnvelopeAsync(response, cancellationToken);
             return MutationOutcome<CreateAssetResponse>.Rejected(
                 conflictBody?.Error ?? "An asset with that number already exists.");
@@ -249,10 +237,6 @@ public sealed class AssetService(HrApiHttpClientFactory httpClientFactory)
             : ApiSaveResult.Fail(result.DisplayMessage ?? "Failed to update asset.", result.IsConcurrencyConflict);
     }
 
-    // Callers that only know IEditService<AssetEditModel, Guid> (not idempotency-aware) get a
-    // fresh key generated per call - correct but with no cross-retry dedup benefit. The real UI
-    // path (EditPageBase<TModel, TKey>) detects IIdempotentCreateService<AssetEditModel> below and
-    // owns a real key's lifecycle across retries instead of hitting this overload.
     async Task<(AssetEditModel? Result, string? Error)> IEditService<AssetEditModel, Guid>.CreateAsync(
         Guid companyId, AssetEditModel model)
     {

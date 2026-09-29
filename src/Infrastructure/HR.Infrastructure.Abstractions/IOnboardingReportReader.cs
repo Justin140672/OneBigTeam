@@ -1,13 +1,5 @@
 namespace HR.Infrastructure.Abstractions;
 
-/// <summary>
-/// Company-wide (optionally employee-id-filtered) onboarding progress data for the Onboarding
-/// Progress Report (OBT-712), as owned by HR.Modules.Onboarding. Distinct from
-/// IOnboardingStatusReader, which only reads a single employee's latest onboarding status string
-/// and is not sufficient for a company-wide report. When employeeIds is supplied, results are
-/// restricted to those employees only — used by the Reporting module to apply row-level manager
-/// scoping without this reader knowing anything about callers/roles.
-/// </summary>
 public interface IOnboardingReportReader
 {
     Task<IReadOnlyList<OnboardingReportItem>> GetOnboardingReportAsync(
@@ -30,7 +22,4 @@ public sealed record OnboardingReportTaskItem(
     DateOnly? DueDate,
     string Owner,
     bool IsOverdue,
-    // The OnboardingTask's own id (its Tasks-module CompleteOnboardingTaskFromTask source entity
-    // id), added so consumers such as OutstandingOnboardingTasksWorkloadActionProvider can resolve
-    // the exact linked Task via IOpenTaskBySourceEntityReader without matching on title/employee.
     Guid TaskId = default);

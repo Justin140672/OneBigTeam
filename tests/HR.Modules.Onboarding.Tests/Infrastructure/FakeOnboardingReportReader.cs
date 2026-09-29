@@ -2,12 +2,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Onboarding.Tests.Infrastructure;
 
-/// <summary>
-/// Hand-rolled fake for <see cref="IOnboardingReportReader"/> — records the arguments it was
-/// called with (in particular, the employeeIds scoping filter used for row-level manager scoping)
-/// and returns a pre-configured set of items, optionally filtered by the supplied employeeIds to
-/// mimic the real reader's contract.
-/// </summary>
 internal sealed class FakeOnboardingReportReader : IOnboardingReportReader
 {
     private readonly IReadOnlyList<OnboardingReportItem> _items;

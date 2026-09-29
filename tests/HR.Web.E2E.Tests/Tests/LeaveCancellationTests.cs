@@ -4,11 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies that an employee can cancel a pending leave request and that the
-/// request is removed from the table — balance is unaffected because the request
-/// was never approved.
-/// </summary>
 public sealed class LeaveCancellationTests(EmployeePersonaFixture fixture) : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -18,7 +13,7 @@ public sealed class LeaveCancellationTests(EmployeePersonaFixture fixture) : Rol
 
     // Dates chosen to avoid collisions with other E2E tests.
     private const string StartDate = "12/01/2026";
-    private const string EndDate   = "16/01/2026"; // Mon–Fri = 5 working days
+    private const string EndDate   = "16/01/2026";
 
     [Fact]
     public async Task CancellingPendingLeaveRequest_RemovesItFromTheTable()
@@ -28,7 +23,6 @@ public sealed class LeaveCancellationTests(EmployeePersonaFixture fixture) : Rol
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
 
-        // ── Step 1: Login as Tom and record his current annual leave balance ──
         await login.GoToAsync();
         await login.LoginAsync(TomEmail);
 
@@ -38,17 +32,13 @@ public sealed class LeaveCancellationTests(EmployeePersonaFixture fixture) : Rol
         var initialBalance = await profile.GetAnnualLeaveRemainingAsync();
         Assert.NotNull(initialBalance);
 
-        // ── Step 2: Submit a leave request ───────────────────────────────────
         await profile.ClickRequestLeaveAsync();
         await profile.FillLeaveRequestAsync("Annual Leave", StartDate, EndDate, reason);
         await profile.SubmitLeaveRequestAsync();
 
-        // ── Step 3: Verify the request appears as Pending ─────────────────────
         await _page.WaitForSelectorAsync("table tbody tr", new() { Timeout = 15_000 });
         Assert.Equal("Pending", await profile.GetLeaveRequestStatusAsync(reason));
 
-        // ── Step 4: Cancel the leave request ─────────────────────────────────
-        // Find the row and click its "Cancel" action button.
         var row = _page.Locator("table tbody tr")
             .Filter(new() { HasText = reason })
             .First;
@@ -72,15 +62,12 @@ public sealed class LeaveCancellationTests(EmployeePersonaFixture fixture) : Rol
         await confirmDialog.GetByRole(AriaRole.Button, new() { Name = "Yes, Cancel Request" }).ClickAsync();
         await confirmDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 30_000 });
 
-        // ── Step 6: Row stays in the table but status changes to "Cancelled" ──
-        // The API keeps cancelled requests visible; only the Cancel button disappears.
         await _page.WaitForFunctionAsync(
             "document.body.innerText.includes('Cancelled')",
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
 
         Assert.Equal("Cancelled", await profile.GetLeaveRequestStatusAsync(reason));
 
-        // The Cancel button must no longer appear for that row.
         var row2 = _page.Locator("table tbody tr")
             .Filter(new() { HasText = reason })
             .First;
@@ -90,15 +77,10 @@ public sealed class LeaveCancellationTests(EmployeePersonaFixture fixture) : Rol
         Assert.False(cancelBtnStillVisible,
             "Cancel button should not appear once the request is cancelled");
 
-        // ── Step 7: Balance is unchanged — pending cancellation does not deduct
         var finalBalance = await profile.GetAnnualLeaveRemainingAsync();
         Assert.Equal(initialBalance, finalBalance);
     }
 
-    /// <summary>
-    /// Dismissing the confirmation dialog via its "No" button must leave the request untouched
-    /// (still Pending, with its "Cancel" action still available).
-    /// </summary>
     [Fact]
     public async Task DismissingCancelConfirmationDialog_LeavesRequestPending()
     {

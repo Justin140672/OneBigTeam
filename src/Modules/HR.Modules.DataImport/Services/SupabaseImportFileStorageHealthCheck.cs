@@ -4,14 +4,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Modules.DataImport.Services;
 
-/// <summary>
-/// Reliability review issue 2 (P1): readiness probe proving the configured Supabase Storage project
-/// backing import files is actually reachable — mirrors DocumentStorageHealthCheck. Only registered
-/// when Supabase import file storage is configured (see DataImportModule.AddImportFileStorage);
-/// Development/test environments using LocalImportFileStorageService have nothing to probe. Tagged
-/// "degraded" (not "critical"): data import is impaired, not the whole platform, if this dependency
-/// is unavailable.
-/// </summary>
 internal sealed class SupabaseImportFileStorageHealthCheck(
     IHttpClientFactory httpClientFactory,
     IOptions<SupabaseImportFileStorageOptions> options) : IHealthCheck

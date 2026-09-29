@@ -1,10 +1,5 @@
 namespace HR.Web.Models;
 
-// Mirrors HR.Modules.Employees.Features.GetEmployeeTimeline.EmployeeTimelineItem /
-// GetEmployeeTimelineResponse. EventType and Category are kept as plain strings here (rather than
-// referencing the module's internal enums, which HR.Web cannot see anyway) — they arrive as
-// JsonStringEnumConverter-serialized strings and are matched against known values in
-// EmployeeTimelineTab's icon/navigation mapping.
 public record EmployeeTimelineItemModel(
     Guid Id,
     DateOnly EventDate,

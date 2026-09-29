@@ -24,7 +24,6 @@ internal sealed class EmployeeEqualityDataConfiguration : IEntityTypeConfigurati
             .HasColumnName("employee_id")
             .IsRequired();
 
-        // Special-category data — stored as text (ciphertext is longer than plaintext, no length cap).
         builder.Property(x => x.GenderIdentity).HasColumnName("gender_identity").HasColumnType("text");
         builder.Property(x => x.GenderIdentitySelfDescribed).HasColumnName("gender_identity_self_described").HasColumnType("text");
         builder.Property(x => x.MarriedOrCivilPartnershipStatus).HasColumnName("married_or_civil_partnership_status").HasColumnType("text");

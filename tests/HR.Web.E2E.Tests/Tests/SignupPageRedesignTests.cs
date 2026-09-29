@@ -5,15 +5,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the redesigned /signup page (SignUp.razor + the new SignupHeader/SignupFooter
-/// components): the simplified header's "Log in" link (no more dead "Start free trial" link on
-/// this page), the fieldset/legend grouping, the real Terms of Service / Privacy Policy links,
-/// the existing-account (409 Conflict) redirect path from /signup-submit, and field round-
-/// tripping on a correctable error.
-///
-/// Like SignupToCheckYourEmailJourneyTests, this drives a plain HTML form (no Blazor circuit).
-/// </summary>
 public sealed class SignupPageRedesignTests(ParallelBlankPersonaFixture fixture)
     : RoleE2ETestBase<ParallelBlankPersonaFixture>(fixture)
 {
@@ -80,11 +71,6 @@ public sealed class SignupPageRedesignTests(ParallelBlankPersonaFixture fixture)
         await signUp.FillAsync(companyName, firstName, lastName, email, password);
         await signUp.SubmitAsync();
 
-        // /signup-submit now makes a real Supabase Auth account-creation call (see the
-        // "fixing supabase auth" work) before it can redirect — that's a genuine external network
-        // round trip, not a local Blazor/grid render, so it needs materially more headroom than
-        // the 20s that was enough for the old dev-stub signup. 40s matches the margin used
-        // elsewhere in this suite for other real-network-call waits.
         await _page.WaitForURLAsync(new Regex("/check-your-email"), new() { Timeout = 40_000 });
 
         return (companyName, firstName, lastName, email);
@@ -95,17 +81,11 @@ public sealed class SignupPageRedesignTests(ParallelBlankPersonaFixture fixture)
     {
         var (companyName, firstName, lastName, email) = await SignUpAsync();
 
-        // Attempt to sign up again with the same email — HR.Api's /api/signup returns 409
-        // Conflict, and /signup-submit redirects back to /signup with existingEmail=true plus
-        // the round-tripped field values.
         var signUp = new SignUpPage(_page, _fixture.MarketingBaseUrl);
         await signUp.GoToAsync();
         await signUp.FillAsync(companyName, firstName, lastName, email, "AnotherP@ss123");
         await signUp.SubmitAsync();
 
-        // Same real-Supabase-call reasoning as SignUpAsync's own wait above — this second submit
-        // also round-trips to Supabase (to discover the email already exists) before /signup-submit
-        // can redirect back.
         await _page.WaitForURLAsync(new Regex("/signup\\?"), new() { Timeout = 40_000 });
         Assert.Contains("existingEmail=true", _page.Url);
 
@@ -132,7 +112,6 @@ public sealed class SignupPageRedesignTests(ParallelBlankPersonaFixture fixture)
         await signUp.FillAsync(companyName, firstName, lastName, email, "AnotherP@ss123");
         await signUp.SubmitAsync();
 
-        // Same real-Supabase-call reasoning as above.
         await _page.WaitForURLAsync(new Regex("/signup\\?"), new() { Timeout = 40_000 });
 
         Assert.Equal(companyName, await signUp.GetCompanyNameValueAsync());

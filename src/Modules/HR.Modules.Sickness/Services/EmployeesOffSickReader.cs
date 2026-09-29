@@ -5,11 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Services;
 
-/// <summary>
-/// DSH-05 implementation of <see cref="IEmployeesOffSickReader"/>. An active sickness record is
-/// always open-ended (setting an end date closes it), so a record covers <c>onDate</c> when it is
-/// Active and its start date is on or before <c>onDate</c>.
-/// </summary>
 internal sealed class EmployeesOffSickReader(SicknessDbContext dbContext) : IEmployeesOffSickReader
 {
     public async Task<IReadOnlySet<Guid>> GetOffSickEmployeeIdsAsync(

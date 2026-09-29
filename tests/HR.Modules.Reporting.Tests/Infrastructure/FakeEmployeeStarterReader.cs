@@ -3,11 +3,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Reporting.Tests.Infrastructure;
 
-/// <summary>
-/// Hand-rolled fake for <see cref="IEmployeeStarterReader"/> — records the arguments it was called
-/// with and returns a pre-configured page of items, with an independently settable TotalCount so
-/// truncation behaviour can be exercised without materialising tens of thousands of fake rows.
-/// </summary>
 internal sealed class FakeEmployeeStarterReader : IEmployeeStarterReader
 {
     private readonly IReadOnlyList<EmployeeStarterReportItem> _items;

@@ -10,24 +10,11 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// NFR-03: verifies the production liveness (<c>/alive</c>) and readiness (<c>/health/ready</c>)
-/// endpoints. Uses its own <see cref="WebApplicationFactory{TEntryPoint}"/> (non-Development
-/// environment, its own Postgres container) so it can:
-/// <list type="bullet">
-/// <item>toggle a critical dependency down and assert readiness flips to 503 while liveness stays 200;</item>
-/// <item>assert a failing optional dependency yields 200 (Degraded), not 503;</item>
-/// <item>assert the public body discloses no per-check detail, connection strings, passwords or hosts;</item>
-/// <item>assert the token-gated detail view still never serialises exceptions or connection data.</item>
-/// </list>
-/// </summary>
 public sealed class HealthReadinessAndLivenessEndpointTests
     : IClassFixture<HealthReadinessAndLivenessEndpointTests.Factory>
 {
     private const string DetailToken = "nfr03-test-detail-token";
 
-    // A value that would only ever appear in output if a health check's Exception or Data
-    // dictionary were serialised — neither of which must ever be exposed.
     private const string Secret = "Password=sup3r-s3cret;Host=db.internal.acme;Port=5432";
 
     private readonly Factory _factory;
@@ -49,7 +36,6 @@ public sealed class HealthReadinessAndLivenessEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadAsStringAsync();
         Assert.Contains("Healthy", body);
-        // Liveness must never probe or disclose dependencies.
         Assert.DoesNotContain("checks", body);
         Assert.DoesNotContain(Secret, body);
     }
@@ -119,7 +105,6 @@ public sealed class HealthReadinessAndLivenessEndpointTests
         using var doc = JsonDocument.Parse(body);
         Assert.True(doc.RootElement.TryGetProperty("checks", out var checks));
         Assert.True(checks.GetArrayLength() > 0);
-        // Detail view exposes curated names/statuses/descriptions only.
         AssertNoInfrastructureDisclosure(body);
         Assert.DoesNotContain("stackTrace", body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("exception", body, StringComparison.OrdinalIgnoreCase);
@@ -142,21 +127,12 @@ public sealed class HealthReadinessAndLivenessEndpointTests
 
     public sealed class Factory : ApiWebApplicationFactory
     {
-        /// <summary>Toggled per-test to simulate a required dependency outage.</summary>
         public static bool CriticalDependencyDown { get; set; }
 
         protected override void ConfigureWebHost(IWebHostBuilder builder)
         {
             base.ConfigureWebHost(builder);
 
-            // "Test" (rather than "Staging") because the readiness token-gating this fixture wants
-            // to exercise only checks !IsDevelopment(), and "Test" is also one of the environments
-            // DataImportModule/DocumentsModule treat as allowed to fall back to their no-op local-
-            // storage/scanner implementations — avoiding both modules' Staging/Production guard,
-            // which requires real Supabase/ClamAv configuration, and avoiding registering a
-            // ClamAv health check that would try (and fail) to reach a real host, permanently
-            // tripping the "critical" tag this fixture's tests otherwise control themselves via
-            // CriticalDependencyDown.
             builder.UseEnvironment("Test");
 
             builder.ConfigureAppConfiguration((_, config) =>
@@ -170,12 +146,9 @@ public sealed class HealthReadinessAndLivenessEndpointTests
             builder.ConfigureServices(services =>
             {
                 services.AddHealthChecks()
-                    // A required dependency we can turn off on demand.
                     .AddCheck("nfr03_toggle_critical", () => CriticalDependencyDown
                         ? HealthCheckResult.Unhealthy("Simulated critical dependency outage.")
                         : HealthCheckResult.Healthy(), tags: ["ready", "critical"])
-                    // An optional dependency that is always failing, carrying sensitive-looking
-                    // text in its Exception and Data — neither must ever reach the response.
                     .AddCheck("nfr03_secret_probe", () => HealthCheckResult.Unhealthy(
                         description: "Optional dependency unavailable.",
                         exception: new InvalidOperationException(Secret),

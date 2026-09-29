@@ -2,10 +2,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Marketing.Domain;
 
-/// <summary>
-/// A roadmap / "coming soon" item shown on the marketing site. Global/system content — see
-/// <see cref="MarketingProduct"/> for the company_id exception rationale.
-/// </summary>
 internal sealed class MarketingRoadmapItem
 {
     private MarketingRoadmapItem() { }

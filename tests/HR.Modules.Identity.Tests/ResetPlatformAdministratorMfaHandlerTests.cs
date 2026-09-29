@@ -101,11 +101,9 @@ public class ResetPlatformAdministratorMfaHandlerTests(IdentityDatabaseFixture f
     public async Task HandleAsync_Returns_Conflict_When_Target_Is_The_Last_Enabled_PlatformOwner()
     {
         var ownerEmail = await SeedOwnerAsync();
-        // The only enabled owner is the caller; target owner has no other enabled owner besides itself.
         var (targetId, _, _) = await SeedTargetAsync(
             role: PlatformAdministratorRole.PlatformOwner, supabaseAuthUserId: Guid.NewGuid());
 
-        // Re-seed so the caller is the target (last enabled owner resetting itself).
         var gateway = new FakeSupabaseAuthGateway();
         var handler = BuildHandler(gateway, new FakeEmailSender(), new FakeAuditEventPublisher());
 
@@ -115,11 +113,8 @@ public class ResetPlatformAdministratorMfaHandlerTests(IdentityDatabaseFixture f
             targetEmail = (await db.PlatformAdministrators.FindAsync(targetId))!.Email;
         }
 
-        // Disable the other owner so `targetId` is genuinely the last enabled owner.
         await using (var db = fixture.BuildContext())
         {
-            // Disable every other enabled PlatformOwner (the shared fixture DB may carry rows seeded
-            // by sibling tests) so `targetId` is genuinely the last enabled owner.
             var others = db.PlatformAdministrators
                 .Where(a => a.Id != targetId && a.IsEnabled && a.Role == PlatformAdministratorRole.PlatformOwner)
                 .ToList();

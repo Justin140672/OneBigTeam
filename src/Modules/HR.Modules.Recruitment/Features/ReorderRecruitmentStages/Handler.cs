@@ -53,11 +53,6 @@ internal sealed class ReorderRecruitmentStagesHandler(
 
         var now = clock.UtcNowOffset();
 
-        // Two-phase update: the (company_id, display_order) unique index is checked immediately
-        // (not deferred) by Postgres per-statement within the transaction, so directly reassigning
-        // final 1..N values in one pass can collide with another row's current value mid-transaction
-        // (e.g. swapping positions 1 and 2). First move every row to a unique negative placeholder,
-        // then assign the real final values, each phase its own SaveChangesAsync/transaction.
         for (var i = 0; i < request.OrderedStageIds.Count; i++)
             stagesById[request.OrderedStageIds[i]].SetDisplayOrder(-(i + 1), now);
 

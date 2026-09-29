@@ -6,10 +6,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-// OFF-02 regression coverage: amending a leaving process's LastWorkingDay must propagate to the
-// employee's active offboarding plan and its outstanding OffboardingTasks (and the corresponding
-// Tasks-module TaskItems) — see OffboardingTaskSynchronisationOnLeavingProcessCancelledTests for
-// the analogous OFF-01 cancellation-sync coverage this mirrors.
 [Collection("Integration")]
 public class AmendLeavingProcessOffboardingSyncTests
 {
@@ -21,8 +17,6 @@ public class AmendLeavingProcessOffboardingSyncTests
     private static readonly Guid User4 = new("ffffffff-4200-0000-0000-000000000004");
     private static readonly Guid User5 = new("ffffffff-4200-0000-0000-000000000005");
 
-    // Relative to "today" — see other leaving-process tests for why a hardcoded near-term literal
-    // eventually becomes "backdated".
     private static readonly DateOnly OriginalLeavingDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
     private static readonly DateOnly OriginalLastWorkingDay = OriginalLeavingDate.AddDays(-1);
 
@@ -107,9 +101,6 @@ public class AmendLeavingProcessOffboardingSyncTests
     private static async Task<Guid> CompleteEmployeeTaskAsync(
         HttpClient client, Guid companyId, Guid employeeId, string titleContains)
     {
-        // Offboarding tasks generated for an employee with no manager (and the always-HR
-        // document-review task) are unassigned, so they surface via the unassigned-tasks inbox
-        // rather than the employee's own task list.
         var listResp = await client.GetAsync($"/api/companies/{companyId}/employees/{employeeId}/tasks");
         listResp.EnsureSuccessStatusCode();
         var payload = await listResp.Content.ReadFromJsonAsync<EmployeeTasksPayload>();
@@ -195,8 +186,6 @@ public class AmendLeavingProcessOffboardingSyncTests
         Assert.NotNull(amendPayload);
         Assert.Equal("Completed", amendPayload!.Status);
 
-        // The leaving process itself finalises to Completed, but the offboarding plan's
-        // LastWorkingDay must still reflect the (confirmed) backdated amendment.
         var overviewAfter = await GetOffboardingOverviewAsync(client, companyId, employeeId);
         Assert.Equal(backdatedLastWorkingDay, overviewAfter.LastWorkingDay);
         Assert.All(overviewAfter.Tasks, t => Assert.Equal(backdatedLastWorkingDay, t.DueDate));
@@ -220,9 +209,6 @@ public class AmendLeavingProcessOffboardingSyncTests
         var overviewAfterFirst = await GetOffboardingOverviewAsync(client, companyId, employeeId);
         Assert.Equal(newLastWorkingDay, overviewAfterFirst.LastWorkingDay);
 
-        // Second amendment carrying the identical dates/reason — the underlying LeavingProcess
-        // amendment itself is idempotent in effect (same values persisted again), and the
-        // downstream offboarding reschedule must remain a stable no-op: dates unchanged.
         var secondAmendResponse = await AmendLeavingProcessAsync(client, companyId, employeeId, newLeavingDate, newLastWorkingDay, expectedVersion: 2);
         Assert.Equal(HttpStatusCode.OK, secondAmendResponse.StatusCode);
 
@@ -240,8 +226,6 @@ public class AmendLeavingProcessOffboardingSyncTests
         var employeeId = await CreateEmployeeAsync(client, companyId);
         await StartLeavingProcessAsync(client, companyId, employeeId);
 
-        // Complete the HR "Review outstanding documents for employee exit" task before amending —
-        // its DueDate/CompletedAt must be provably untouched afterward.
         await CompleteEmployeeTaskAsync(client, companyId, employeeId, "Review outstanding documents");
 
         var overviewBefore = await GetOffboardingOverviewAsync(client, companyId, employeeId);
@@ -262,7 +246,6 @@ public class AmendLeavingProcessOffboardingSyncTests
         Assert.Equal(completedAtBefore, completedTaskAfter.CompletedAt);
         Assert.Equal(completedDueDateBefore, completedTaskAfter.DueDate);
 
-        // Every other, still-outstanding task must have moved to the new date.
         var outstandingTasksAfter = overviewAfter.Tasks.Where(t => t.Id != completedTaskAfter.Id);
         Assert.All(outstandingTasksAfter, t => Assert.Equal(newLastWorkingDay, t.DueDate));
     }

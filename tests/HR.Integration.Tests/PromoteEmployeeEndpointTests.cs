@@ -24,8 +24,6 @@ public class PromoteEmployeeEndpointTests
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, AdminUser1, SystemRoles.HrAdministrator);
-            // GetEmployee (used below to verify the position change took effect) is gated by
-            // "role:employee", which is a strict role check, not implied by HrAdministrator alone.
             await TestRoleSeeder.AssignRoleAsync(factory, AdminUser1, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, AdminUser2, SystemRoles.HrAdministrator);
             await TestRoleSeeder.AssignRoleAsync(factory, AdminUser3, SystemRoles.HrAdministrator);
@@ -96,7 +94,6 @@ public class PromoteEmployeeEndpointTests
         Assert.Equal("Strong performance", payload.GetProperty("reason").GetString());
         Assert.NotEqual(JsonValueKind.Null, payload.GetProperty("completedAt").ValueKind);
 
-        // The employee's position should be updated immediately since EffectiveDate <= today.
         var getResponse = await client.GetAsync($"/api/companies/{companyId}/employees/{employee}");
         getResponse.EnsureSuccessStatusCode();
         var employeePayload = await getResponse.Content.ReadFromJsonAsync<JsonElement>();

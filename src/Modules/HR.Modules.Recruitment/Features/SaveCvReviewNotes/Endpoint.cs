@@ -17,9 +17,6 @@ internal sealed class Endpoint(SaveCvReviewNotesHandler handler, ICurrentUser cu
         SaveCvReviewNotesRequest request,
         CancellationToken cancellationToken)
     {
-        // Reads the DB-resolved user id via ICurrentUser, not a raw ClaimTypes.NameIdentifier claim
-        // — the JWT bearer handler is configured with MapInboundClaims = false, so relying on the
-        // mapped claim type would Unauthorized every request unconditionally.
         if (currentUser.UserId is not Guid performedBy)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());

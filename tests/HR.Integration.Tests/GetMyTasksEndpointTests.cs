@@ -11,7 +11,6 @@ public class GetMyTasksEndpointTests(ApiWebApplicationFactory factory)
 {
     private static readonly Guid SeededCompanyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    // ── Auth ───────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_MyTasks_Returns_Unauthorized_When_No_Auth_Header()
@@ -23,7 +22,6 @@ public class GetMyTasksEndpointTests(ApiWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ── Happy path ─────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_MyTasks_Returns_Empty_List_When_No_Tasks_Assigned()
@@ -89,7 +87,6 @@ public class GetMyTasksEndpointTests(ApiWebApplicationFactory factory)
         Assert.Empty(payload!.Items);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId)
     {

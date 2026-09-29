@@ -29,11 +29,6 @@ internal sealed class LogoutHandler(
     public async Task<Result<LogoutResponse>> HandleAsync(
         string? accessToken, Guid? supabaseAuthUserId, CancellationToken cancellationToken)
     {
-        // Written before anything else in this handler, and awaited before the response is sent —
-        // see the class remarks for why this (not the Supabase call below) is the real security
-        // boundary. A missing sub claim (e.g. the presented bearer failed HR.Api's own signature/
-        // issuer/audience validation) means there is no reliably-identified session to revoke; the
-        // caller's cookie is still cleared regardless (HR.Web/HR.Admin.Web do that unconditionally).
         if (supabaseAuthUserId is { } userId)
         {
             await sessionRevocationStore.RevokeAsync(
@@ -52,7 +47,6 @@ internal sealed class LogoutHandler(
         }
         catch (InvalidOperationException ex)
         {
-            // SignOutAsync redacts tokens/links from its message; log without any token value.
             logger.LogWarning(ex, "Supabase server-side sign-out failed; the session cookie is still cleared by the caller.");
             return Result.Success(new LogoutResponse(false));
         }

@@ -56,7 +56,6 @@ public class ApplyForInternalVacancyConcurrencyTests(RecruitmentDatabaseFixture 
 
     private sealed record Round(Guid CompanyId, Guid EmployeeId, Guid VacancyA, Guid VacancyB, FakeEmployeeApplicantReader Reader);
 
-    /// <summary>Each round gets its own company, employee and work email so every count is scoped to it.</summary>
     private async Task<Round> SeedRoundAsync()
     {
         var companyId = Guid.NewGuid();
@@ -153,8 +152,6 @@ public class ApplyForInternalVacancyConcurrencyTests(RecruitmentDatabaseFixture 
                 Assert.Equal(CandidateDocumentKind.Cv, document.Kind);
                 Assert.Equal(r.EmployeeId, document.UploadedBy);
 
-                // Every intent this round created (the winner's and any the loser staged before it was
-                // refused or retried) is resolved — none is left for the reconciliation sweep.
                 var intents = await verify.CandidateDocumentDeletionOperations.AsNoTracking()
                     .Where(o => o.CompanyId == r.CompanyId)
                     .ToListAsync();
@@ -162,7 +159,6 @@ public class ApplyForInternalVacancyConcurrencyTests(RecruitmentDatabaseFixture 
                 Assert.All(intents, i => Assert.NotNull(i.ConfirmedAt));
                 Assert.Contains(intents, i => i.StorageKey == document.StorageKey);
 
-                // Storage: the winner's blob is kept; every other uploaded blob was compensated away.
                 var uploads = a.Storage.Uploads.Concat(b.Storage.Uploads).Select(u => u.StorageKey).ToList();
                 var deletions = a.Storage.Deletions.Concat(b.Storage.Deletions).ToList();
                 Assert.Contains(document.StorageKey, uploads);
@@ -226,8 +222,6 @@ public class ApplyForInternalVacancyConcurrencyTests(RecruitmentDatabaseFixture 
                     .ToListAsync();
                 Assert.All(intents, i => Assert.NotNull(i.ConfirmedAt));
 
-                // Both documents' blobs are kept; any blob staged under an abandoned (retried) attempt
-                // was compensated, so no orphan remains.
                 var keptKeys = documents.Select(d => d.StorageKey).ToHashSet();
                 var uploads = a.Storage.Uploads.Concat(b.Storage.Uploads).Select(u => u.StorageKey).ToList();
                 var deletions = a.Storage.Deletions.Concat(b.Storage.Deletions).ToList();
@@ -241,7 +235,6 @@ public class ApplyForInternalVacancyConcurrencyTests(RecruitmentDatabaseFixture 
         }
     }
 
-    // ----- ix_candidates_company_id_employee_id -----
 
     [Fact]
     public async Task Unique_Index_Rejects_Two_Candidates_Linked_To_Same_Employee_In_Same_Company()
@@ -258,7 +251,6 @@ public class ApplyForInternalVacancyConcurrencyTests(RecruitmentDatabaseFixture 
 
         await using (var db = fixture.BuildContext())
         {
-            // A second candidate (different email, so only the employee index can fire) linked via hire.
             var second = Candidate.Create(Guid.NewGuid(), companyId, "Priya", "Shah", $"priya.personal.{Guid.NewGuid():N}@example.com", null, null, Now);
             second.LinkToEmployee(employeeId, Now);
             db.Candidates.Add(second);

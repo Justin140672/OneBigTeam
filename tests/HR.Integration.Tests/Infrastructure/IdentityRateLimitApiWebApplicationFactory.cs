@@ -58,10 +58,6 @@ public sealed class IdentityRateLimitApiWebApplicationFactory : WebApplicationFa
         {
             configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                // See ContactApiWebApplicationFactory for why these are needed: this factory does
-                // not derive from ApiWebApplicationFactory, so it does not inherit the sensitive-data
-                // encryption keys that factory injects, which are required for EmployeesDbContext to
-                // construct successfully during startup migrations.
                 ["Infrastructure:SensitiveDataProtection:ActiveKeyId"] = "test",
                 ["Infrastructure:SensitiveDataProtection:Keys:test"] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                 ["Identity:RateLimits:identity-forgot-password:PermitLimit"] = PermitLimit.ToString(),
@@ -97,11 +93,6 @@ public sealed class IdentityRateLimitApiWebApplicationFactory : WebApplicationFa
     }
 }
 
-/// <summary>
-/// Test-only IStartupFilter (see IdentityRateLimitApiWebApplicationFactory's remarks) that sets
-/// HttpContext.Connection.RemoteIpAddress from an "X-Test-Remote-Ip" request header, when present,
-/// before any of Program.cs's own middleware runs. Never registered outside this test factory.
-/// </summary>
 public sealed class TestClientIpStartupFilter : Microsoft.AspNetCore.Hosting.IStartupFilter
 {
     public const string HeaderName = "X-Test-Remote-Ip";

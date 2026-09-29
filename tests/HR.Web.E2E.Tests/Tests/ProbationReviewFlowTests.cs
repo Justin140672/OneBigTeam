@@ -4,19 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// End-to-end smoke test verifying that completing a probation review via the task view
-/// is reflected on the employee's probation tab.
-///
-/// Uses the seeded Sophie Laurent employee (ID: 30000000-0000-0000-0000-000000000007,
-/// company: Acme 00000000-0000-0000-0000-000000000001) who has an active ManagerCheckIn
-/// review linked to task a0000000-0000-0000-0000-000000000026. This is a separate,
-/// independent review from the Carlos Rivera scenario used by ProbationReviewTaskTests,
-/// so completing it here does not affect that test's read-only assertions.
-///
-/// This test is designed to be resilient: if another test has already completed the review,
-/// this test simply verifies the completed state is visible on the probation tab.
-/// </summary>
 public sealed class ProbationReviewFlowTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     private static readonly Guid AcmeId           = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -24,15 +11,9 @@ public sealed class ProbationReviewFlowTests(CrossUserFixture fixture) : RoleE2E
     private static readonly Guid SophieLaurent     = Guid.Parse("30000000-0000-0000-0000-000000000007");
     private static readonly Guid ProbationTaskId   = Guid.Parse("a0000000-0000-0000-0000-000000000026");
 
-    // The "Complete probation review — Sophie Laurent" task is assigned to David Park
-    // (HrAdministrator) — Sophie is a department head with no line manager, and the probation
-    // review read is reporting-chain / HR scoped, so the assignee/reviewer must be HR.
     private const string ReviewerEmail = "david.park@acme.example";
     private const string LauraEmail = "laura.bennett@acme.example";
 
-    /// <summary>
-    /// Full flow: task view → complete review → probation tab shows Completed.
-    /// </summary>
     [Fact]
     public async Task CompletingReviewTask_IsReflectedOnProbationTab()
     {
@@ -40,7 +21,6 @@ public sealed class ProbationReviewFlowTests(CrossUserFixture fixture) : RoleE2E
         var taskView = new TaskViewPage(_page, _fixture.WebBaseUrl);
         var empEdit  = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
 
-        // ── Step 1: Log in as the review task assignee (David Park) and complete the review ──
 
         await login.GoToAsync();
         await login.LoginAsync(ReviewerEmail);
@@ -57,7 +37,6 @@ public sealed class ProbationReviewFlowTests(CrossUserFixture fixture) : RoleE2E
 
         Assert.Equal("Completed", await taskView.GetStatusAsync());
 
-        // ── Step 2: Switch to Laura (HR admin) and check the probation tab ──
 
         await login.SwitchAccountAsync(LauraEmail);
 
@@ -69,10 +48,6 @@ public sealed class ProbationReviewFlowTests(CrossUserFixture fixture) : RoleE2E
         Assert.Equal("Completed", reviewStatus);
     }
 
-    /// <summary>
-    /// Verifies the probation tab review grid is populated before any task completion
-    /// by navigating directly to the tab without touching the task.
-    /// </summary>
     [Fact]
     public async Task ProbationTab_ShowsReviewHistory_Independent_Of_Task_State()
     {

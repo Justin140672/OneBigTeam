@@ -2,16 +2,8 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for HR.Admin.Web's SupportRequestQueue.razor
-/// (/customers/{CompanyId}/support-requests) — the Admin Portal's staff-only grid of a single
-/// company's support requests, reached via CustomerDetailsPage's "Open support requests" link.
-/// Row selection navigates to AdminSupportRequestDetailPage.
-/// </summary>
 public sealed class AdminSupportRequestQueuePage(IPage page, string baseUrl)
 {
-    // Renders exactly one of: "Loading…", the "not authorised" dashboard-error div, the
-    // "No support requests found" empty state, or the populated grid.
     private const string ResolvedSelector = ".hr-grid, .dashboard-error, .activity-empty";
 
     public async Task GoToAsync(Guid companyId)
@@ -40,12 +32,6 @@ public sealed class AdminSupportRequestQueuePage(IPage page, string baseUrl)
             .WaitUntilVisibleAsync();
     }
 
-    /// <summary>
-    /// Clicks the grid row matching <paramref name="referenceOrTitleFragment"/> (SfGrid's
-    /// RowSelected event navigates to the detail page — see SupportRequestQueue.razor's
-    /// OnRowSelected) and waits for the resulting navigation to land on a support-requests/{id}
-    /// detail URL.
-    /// </summary>
     public async Task OpenRequestAsync(string referenceOrTitleFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });

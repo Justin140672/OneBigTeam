@@ -5,22 +5,6 @@ using FastEndpoints;
 
 namespace HR.Architecture.Tests;
 
-/// <summary>
-/// SEC-001 / TEST-002: enforces the tenant-scoped route naming convention that
-/// <see cref="HR.Modules.Identity.TenantRouteAuthorizationMiddleware"/> depends on.
-///
-/// That middleware only enforces cross-tenant isolation when a company-scoped route exposes the
-/// company's id through a route parameter literally named <c>companyId</c>. If a route under
-/// <c>/api/companies/{...}</c> names its first path parameter anything else (e.g.
-/// <c>/api/companies/{id:guid}</c>), the middleware silently skips it and any authenticated user
-/// can reach another tenant's data by supplying its GUID — exactly the SEC-001 regression.
-///
-/// This test reflects over every FastEndpoints <see cref="BaseEndpoint"/> subclass across the
-/// module assemblies (same enumeration style as
-/// <see cref="ResourceAuthorizationArchitectureTests"/>), reads each endpoint's configured route
-/// templates by invoking <c>Configure()</c> against a stand-in <see cref="EndpointDefinition"/>,
-/// and fails if any company-scoped route's first path parameter is not <c>companyId</c>.
-/// </summary>
 public class TenantScopedRouteConventionTests
 {
     private static readonly Assembly[] ModuleAssemblies =
@@ -109,12 +93,6 @@ public class TenantScopedRouteConventionTests
             Environment.NewLine + string.Join(Environment.NewLine, violations));
     }
 
-    /// <summary>
-    /// Instantiates the endpoint without running its constructor, gives it a stand-in
-    /// <see cref="EndpointDefinition"/>, runs <c>Configure()</c> (which is where FastEndpoints
-    /// endpoints declare their verbs/routes) and returns the configured route templates.
-    /// Any endpoint whose <c>Configure()</c> cannot be evaluated this way is skipped.
-    /// </summary>
     private static IReadOnlyCollection<string> TryReadRouteTemplates(Type endpointType)
     {
         try

@@ -109,13 +109,11 @@ public class UpdateProbationRecordConcurrencyEndpointTests
     {
         var (client, companyId, id, managerId, version) = await CreateRecordAsync();
 
-        // Someone else legitimately advances the version first.
         var legitimate = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/probation-records/{id}",
             BuildBody(companyId, id, managerId, "2026-10-01", "Legitimate change.", version));
         legitimate.EnsureSuccessStatusCode();
 
-        // A second caller still believes the old version is current.
         var stale = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/probation-records/{id}",
             BuildBody(companyId, id, managerId, "2026-11-01", "Stale attempt.", version));
@@ -228,8 +226,6 @@ public class UpdateProbationRecordConcurrencyEndpointTests
         });
         reviewResponse.EnsureSuccessStatusCode();
 
-        // Legitimate change (version -> version+1) changes ExpectedEndDate and recalculates the
-        // pending FinalDecision review (cancel old, create new).
         var legitimate = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/probation-records/{id}",
             BuildBody(companyId, id, managerId, "2026-12-01", "Legitimate recalculation trigger.", version));

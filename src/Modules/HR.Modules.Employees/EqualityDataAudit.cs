@@ -2,11 +2,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Employees;
 
-/// <summary>
-/// Voluntary equality monitoring data is special-category personal data. Audit payloads therefore
-/// carry NO answer values — only ids, timestamps and boolean "was X provided" flags. Self-service
-/// only: the subject and the actor are the same person.
-/// </summary>
 internal sealed record EqualityDataUpdatedAuditEvent(
     Guid CompanyId,
     Guid EmployeeId,

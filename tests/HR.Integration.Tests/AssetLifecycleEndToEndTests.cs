@@ -5,14 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Verifies the complete asset lifecycle as a single coherent flow:
-///
-///   Create category → Create asset → Assign to employee
-///     → Acknowledge task + notification created
-///     → Complete acknowledgement → Return task auto-created
-///     → Complete return → Asset back to Available, assignment inactive
-/// </summary>
 [Collection("Integration")]
 public class AssetLifecycleEndToEndTests
 {
@@ -40,7 +32,6 @@ public class AssetLifecycleEndToEndTests
         using var adminClient    = await AuthenticatedClient(AdminUser, companyId);
         using var employeeClient = await AuthenticatedClient(employeeId, companyId);
 
-        // ── Step 1: Create asset category and asset ────────────────────────────
         var categoryResp = await adminClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/asset-categories",
             new { companyId, name = "IT Equipment" });
@@ -62,68 +53,57 @@ public class AssetLifecycleEndToEndTests
         var asset = await assetResp.Content.ReadFromJsonAsync<AssetPayload>();
         Assert.Equal("Available", asset!.Status);
 
-        // ── Step 2: Assign asset to employee ───────────────────────────────────
         var assignResp = await adminClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/assets/{asset.Id}/assignments",
             new { companyId, assetId = asset.Id, employeeId, assignedBy = AdminUser });
         assignResp.EnsureSuccessStatusCode();
         var assignment = await assignResp.Content.ReadFromJsonAsync<AssignmentPayload>();
 
-        // Asset should now be Assigned.
         var assetAfterAssign = await adminClient.GetFromJsonAsync<AssetPayload>(
             $"/api/companies/{companyId}/assets/{asset.Id}");
         Assert.Equal("Assigned", assetAfterAssign!.Status);
 
-        // ── Step 3: Verify acknowledgement task was created for employee ───────
         var tasksAfterAssign = await GetEmployeeTasksAsync(adminClient, companyId, employeeId);
         var ackTask = Assert.Single(tasksAfterAssign, t => t.Source == "Asset" && t.ActionType == "Acknowledge");
         Assert.Equal("Open",   ackTask.Status);
         Assert.Equal(assignment!.Id, ackTask.SourceEntityId);
 
-        // ── Step 4: Verify notification was sent to employee ──────────────────
         var notifications = await employeeClient.GetFromJsonAsync<NotificationListPayload>(
             $"/api/companies/{companyId}/notifications/my");
         Assert.True(notifications!.UnreadCount >= 1,
             "Expected at least one notification for the employee after asset assignment task");
         Assert.Contains(notifications.Items, n => n.Type == "AssetAssigned" && !n.IsRead);
 
-        // ── Step 5: Employee completes the acknowledgement task ────────────────
         var ackCompleteResp = await employeeClient.PostAsync(
             $"/api/companies/{companyId}/tasks/{ackTask.Id}/complete",
             EmptyJson());
         ackCompleteResp.EnsureSuccessStatusCode();
 
-        // Assignment should now be acknowledged.
         var activeAssets = await adminClient.GetFromJsonAsync<List<EmployeeAssetPayload>>(
             $"/api/companies/{companyId}/employees/{employeeId}/assets");
         Assert.Single(activeAssets!);
         Assert.True(activeAssets![0].IsAcknowledged,
             "Expected assignment to be marked acknowledged after task completion");
 
-        // ── Step 6: Verify return task was auto-created after acknowledgement ──
         var tasksAfterAck = await GetEmployeeTasksAsync(adminClient, companyId, employeeId);
         var returnTask = Assert.Single(tasksAfterAck, t => t.Source == "Asset" && t.ActionType == "Return");
         Assert.Equal("Open", returnTask.Status);
         Assert.Equal(assignment.Id, returnTask.SourceEntityId);
 
-        // ── Step 7: Employee completes the return task ─────────────────────────
         var returnCompleteResp = await employeeClient.PostAsync(
             $"/api/companies/{companyId}/tasks/{returnTask.Id}/complete",
             EmptyJson());
         returnCompleteResp.EnsureSuccessStatusCode();
 
-        // ── Step 8: Assignment should be inactive (no active assets) ──────────
         var activeAssetsAfterReturn = await adminClient.GetFromJsonAsync<List<EmployeeAssetPayload>>(
             $"/api/companies/{companyId}/employees/{employeeId}/assets");
         Assert.Empty(activeAssetsAfterReturn!);
 
-        // ── Step 9: Asset status should be back to Available ──────────────────
         var assetAfterReturn = await adminClient.GetFromJsonAsync<AssetPayload>(
             $"/api/companies/{companyId}/assets/{asset.Id}");
         Assert.Equal("Available", assetAfterReturn!.Status);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)
     {

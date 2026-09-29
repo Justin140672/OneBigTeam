@@ -3,23 +3,12 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the Employee Starter report page
-/// (/companies/{companyId}/reporting/employee-starters — EmployeeStarterReportPage.razor):
-/// loading, the ReportFilterPanel (Department/Location/PositionProfile/EmploymentType/DateRange
-/// only — Manager and Status filters are hidden on this page), and export. Catalog-page coverage
-/// (card visibility/navigation) lives in <see cref="ReportCatalogTests"/>.
-/// </summary>
 public sealed class EmployeeStarterReportTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    private const string LauraEmail = "laura.bennett@acme.example"; // HR Administrator
+    private const string LauraEmail = "laura.bennett@acme.example";
 
-    /// <summary>
-    /// The "Start Date From" filter defaults to the 1st of the current month on first load
-    /// (EmployeeStarterReportPage.razor's _defaultStartDate), not blank or today's date.
-    /// </summary>
     [Fact]
     public async Task StartDateFromFilter_DefaultsToFirstOfCurrentMonth()
     {
@@ -73,11 +62,6 @@ public sealed class EmployeeStarterReportTests(HrAdminPersonaFixture fixture) : 
 
         var unfilteredRowCount = await report.GetRowCountAsync();
 
-        // "Engineering" is the seeded Acme department used throughout this suite (see
-        // DataImportWizardTests etc.) — DropDownSelector.SelectAsync's own post-selection
-        // round-trip assertion needs a real, non-empty expected value to match against (passing
-        // "" here made Regex.Escape("") produce an empty pattern that never matches the actually-
-        // selected item's text, failing even though selection itself succeeded).
         await report.SelectFilterAsync("Department", "Engineering");
         await report.ApplyFiltersAsync();
 

@@ -44,8 +44,6 @@ internal sealed class SharedCompanyDocumentAcknowledgementConfiguration : IEntit
         builder.Property(a => a.TaskId)
             .HasColumnName("task_id");
 
-        // Backfilled to true for rows created before this flag existed — they were all real
-        // confirmations made under the old UI-only checkbox gate.
         builder.Property(a => a.IsConfirmed)
             .HasColumnName("is_confirmed")
             .IsRequired()
@@ -56,8 +54,6 @@ internal sealed class SharedCompanyDocumentAcknowledgementConfiguration : IEntit
             .HasForeignKey(a => a.SharedCompanyDocumentId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // One acknowledgement row per (document, employee, version) — re-acknowledging the same
-        // version is an upsert, not a new row (enforced by the handler doing a lookup first).
         builder.HasIndex(a => new { a.SharedCompanyDocumentId, a.EmployeeId, a.VersionNumber }).IsUnique();
         builder.HasIndex(a => a.CompanyId);
     }

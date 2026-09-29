@@ -12,9 +12,6 @@ internal sealed class CompanyAssetNumberSettingsReader(CompaniesDbContext dbCont
             .AsNoTracking()
             .SingleOrDefaultAsync(s => s.CompanyId == companyId, cancellationToken);
 
-        // No persisted company_settings row defaults to Manual — unlike EmployeeNumberMode, a new
-        // company has no pre-existing "always manual" behaviour to preserve, so Manual (the same
-        // default CompanySettings.CreateDefault assigns for AssetNumberMode) is the safe default.
         return settings?.AssetNumberMode ?? AssetNumberMode.Manual;
     }
 

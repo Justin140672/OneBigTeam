@@ -9,12 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Verifies UploadSharedCompanyDocument / ListSharedCompanyDocuments end-to-end: the
-/// shared-document:manage policy (HR-only, Company Administrator excluded unless they also
-/// hold HrAdministrator, Manager excluded entirely), that a category from a different company
-/// cannot be used (tenant isolation), and that a new upload always lands as Draft.
-/// </summary>
 [Collection("Integration")]
 public class SharedCompanyDocumentEndpointTests
 {
@@ -170,7 +164,6 @@ public class SharedCompanyDocumentEndpointTests
         using var clientA = await ClientAs(companyA, hrInA);
         var categoryInA = await CreateCategoryAsync(clientA, companyA, "Policy");
 
-        // Same category id, but the caller now belongs to (and is uploading into) company B.
         using var clientB = await ClientAs(companyB, hrInB);
         var (_, response) = await UploadAsync(clientB, companyB, categoryInA);
 
@@ -250,9 +243,6 @@ public class SharedCompanyDocumentEndpointTests
         await UploadAsync(client, companyId, categoryId, title: "Some Policy");
 
         var list = await client.GetFromJsonAsync<ListPayload>($"/api/companies/{companyId}/shared-documents");
-        // No employee name reader data is seeded for this ad-hoc test user, so the field is
-        // populated but falls back to "Unknown" — this test asserts the field is present and
-        // wired up, not the specific display name.
         Assert.NotNull(list!.Items[0].UpdatedByName);
     }
 
@@ -305,7 +295,6 @@ public class SharedCompanyDocumentEndpointTests
         Assert.DoesNotContain(list!.Items, i => i.Title == "Company A Only Policy");
     }
 
-    // ── ListPublishedSharedCompanyDocuments (employee-facing simplified view) ─────
 
     [Fact]
     public async Task PublishedList_Returns_Unauthorized_Without_Auth()
@@ -373,7 +362,6 @@ public class SharedCompanyDocumentEndpointTests
         Assert.DoesNotContain(list!.Items, i => i.Title == "Company A Published Policy");
     }
 
-    // ── GetSharedCompanyDocument (HR full detail) ──────────────────────────────
 
     [Fact]
     public async Task GetDetail_Returns_Forbidden_For_Manager()
@@ -432,14 +420,10 @@ public class SharedCompanyDocumentEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    // ── GetPublishedSharedCompanyDocument (employee simplified detail) ────────
 
     [Fact]
     public async Task GetPublishedDetail_Response_Does_Not_Contain_Management_Only_Fields()
     {
-        // The core assertion for "Only management information should be visible to users with
-        // document-management permission": read the raw JSON and confirm none of the
-        // HR-only field names ever appear in the employee-facing response body.
         var companyId = Guid.NewGuid();
         var hrUserId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -516,7 +500,6 @@ public class SharedCompanyDocumentEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── AcknowledgeSharedCompanyDocument ────────────────────────────────────────
 
     [Fact]
     public async Task Acknowledge_Succeeds_For_Employee_On_A_Published_Document()
@@ -648,7 +631,6 @@ public class SharedCompanyDocumentEndpointTests
         Assert.True(saved.IsConfirmed);
     }
 
-    // ── GetSharedCompanyDocumentAuditHistory ────────────────────────────────────
 
     [Fact]
     public async Task AuditHistory_Returns_Unauthorized_Without_Auth()
@@ -710,9 +692,6 @@ public class SharedCompanyDocumentEndpointTests
     [Fact]
     public async Task AuditHistory_Returns_Empty_Items_For_A_Document_With_No_Audit_Entries()
     {
-        // The handler always returns 200 with an empty history list rather than 404 when no
-        // audit entries exist for the given document id — it does not verify the document
-        // itself exists, only that no matching audit rows were found.
         var companyId = Guid.NewGuid();
         var hrUserId  = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, hrUserId, SystemRoles.HrAdministrator);
@@ -729,7 +708,6 @@ public class SharedCompanyDocumentEndpointTests
     private sealed record AuditHistoryPayload(IReadOnlyList<AuditHistoryItemPayload> Items);
     private sealed record AuditHistoryItemPayload(DateTimeOffset OccurredAt, string Action, string User);
 
-    // ── DownloadSharedCompanyDocument ───────────────────────────────────────────
 
     [Fact]
     public async Task Download_Redirects_For_HrAdministrator_On_A_Draft_Document()
@@ -808,7 +786,7 @@ public class SharedCompanyDocumentEndpointTests
         {
             var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Documents.Persistence.DocumentsDbContext>();
             var stored = await db.SharedCompanyDocuments.SingleAsync(d => d.Id == doc!.Id);
-            stored.MarkScanning(DateTimeOffset.UtcNow); // UploadAsync helper marks Clean by default; revert to a not-yet-Clean state.
+            stored.MarkScanning(DateTimeOffset.UtcNow);
             await db.SaveChangesAsync();
         }
 
@@ -817,7 +795,6 @@ public class SharedCompanyDocumentEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    // ── UpdateSharedCompanyDocumentMetadata ─────────────────────────────────────
 
     [Fact]
     public async Task UpdateMetadata_Returns_Forbidden_For_Manager()
@@ -963,8 +940,6 @@ public class SharedCompanyDocumentEndpointTests
         using var clientB = await ClientAs(companyB, hrInB);
         var categoryInB = await CreateCategoryAsync(clientB, companyB, "Policy");
 
-        // Caller is HR in company A, editing a document in company A, but supplying a category
-        // id that belongs to company B.
         var response = await clientA.PutAsJsonAsync(
             $"/api/companies/{companyA}/shared-documents/{doc!.Id}",
             new { Title = "Title", CategoryId = categoryInB, ExpectedVersion = 2 });
@@ -998,7 +973,6 @@ public class SharedCompanyDocumentEndpointTests
 
     private sealed record UpdatePayload(Guid Id, string Title, int VersionNumber, string Status);
 
-    // ── UpdateSharedCompanyDocumentAudience ─────────────────────────────────────
 
     [Fact]
     public async Task UpdateAudience_Returns_Forbidden_For_Manager()
@@ -1087,7 +1061,6 @@ public class SharedCompanyDocumentEndpointTests
         IReadOnlyList<Guid> AudiencePositionProfileIds, IReadOnlyList<Guid> AudienceEmployeeIds,
         string AudienceDescription);
 
-    // ── PublishSharedCompanyDocument ─────────────────────────────────────────────
 
     [Fact]
     public async Task Publish_Returns_Forbidden_For_Manager()
@@ -1127,7 +1100,6 @@ public class SharedCompanyDocumentEndpointTests
         Assert.Equal("Published", payload!.Status);
         Assert.Equal(userId, payload.PublishedBy);
 
-        // A published document is now visible to employees via the published-list endpoint.
         var employeeId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee);
         using var employeeClient = await ClientAs(companyId, employeeId);
@@ -1205,7 +1177,6 @@ public class SharedCompanyDocumentEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    // ── UpdateSharedCompanyDocumentAcknowledgementSettings ──────────────────────
 
     [Fact]
     public async Task UpdateAcknowledgementSettings_Returns_Forbidden_For_Manager()
@@ -1254,7 +1225,6 @@ public class SharedCompanyDocumentEndpointTests
         Assert.Equal(new DateOnly(2027, 1, 1), payload.AcknowledgementDueDate);
         Assert.Equal("I confirm I have read the updated expenses policy.", payload.AcknowledgementStatement);
 
-        // Publish now succeeds, since the required due date has been set.
         var publishResponse = await client.PostAsync($"/api/companies/{companyId}/shared-documents/{doc.Id}/publish", EmptyJson());
         Assert.Equal(HttpStatusCode.OK, publishResponse.StatusCode);
     }
@@ -1300,7 +1270,6 @@ public class SharedCompanyDocumentEndpointTests
         Guid Id, Guid CompanyId, bool RequiresAcknowledgement,
         DateOnly? AcknowledgementDueDate, string? AcknowledgementStatement);
 
-    // ── GetSharedCompanyDocumentAcknowledgementProgress ─────────────────────────
 
     [Fact]
     public async Task AcknowledgementProgress_Returns_Forbidden_For_Manager()
@@ -1337,12 +1306,6 @@ public class SharedCompanyDocumentEndpointTests
         var (doc, _) = await UploadAsync(hrClient, companyId, categoryId, title: "Remote Working Policy");
         await PublishDirectlyAsync(companyId, doc!.Id, requiresAcknowledgement: true);
 
-        // GetSharedCompanyDocumentAcknowledgementProgress's eligible-employee lookup
-        // (EmployeeAudienceReader.GetEligibleEmployeeIdsAsync) queries real, Active rows in the
-        // Employees module — a bare role/claims assignment via TestRoleSeeder isn't enough for
-        // this employee to show up in the progress report, unlike the simpler per-employee
-        // audience check used when viewing published documents. Seed a real Active Employee with
-        // Id == employeeId so they're counted as eligible.
         await CreateActiveEmployeeAsync(companyId, employeeId);
 
         using var employeeClient = await ClientAs(companyId, employeeId);
@@ -1435,7 +1398,6 @@ public class SharedCompanyDocumentEndpointTests
 
     private sealed record PublishPayload(Guid Id, string Status, Guid PublishedBy, DateTimeOffset PublishedAt);
 
-    // ── UploadSharedCompanyDocumentVersion ──────────────────────────────────────
 
     [Fact]
     public async Task UploadVersion_Returns_Forbidden_For_Manager()
@@ -1584,7 +1546,6 @@ public class SharedCompanyDocumentEndpointTests
         return form;
     }
 
-    // ── DownloadSharedCompanyDocumentVersion ────────────────────────────────────
 
     [Fact]
     public async Task DownloadVersion_Returns_Unauthorized_Without_Auth()
@@ -1611,7 +1572,7 @@ public class SharedCompanyDocumentEndpointTests
             var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Documents.Persistence.DocumentsDbContext>();
             var version = await db.SharedCompanyDocumentVersions
                 .SingleAsync(v => v.SharedCompanyDocumentId == doc!.Id && v.VersionNumber == 1);
-            version.MarkScanning(DateTimeOffset.UtcNow); // UploadAsync helper marks Clean by default; revert.
+            version.MarkScanning(DateTimeOffset.UtcNow);
             await db.SaveChangesAsync();
         }
 
@@ -1694,7 +1655,6 @@ public class SharedCompanyDocumentEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    // ── ArchiveSharedCompanyDocument ─────────────────────────────────────────────
 
     [Fact]
     public async Task Archive_Returns_Forbidden_For_Manager()
@@ -1843,7 +1803,6 @@ public class SharedCompanyDocumentEndpointTests
         Guid Id, Guid CompanyId, string Status, Guid ArchivedBy, DateTimeOffset ArchivedAt,
         string ArchiveReason, int AcknowledgementTasksCancelled);
 
-    // ── ExpireSharedCompanyDocument ──────────────────────────────────────────────
 
     [Fact]
     public async Task Expire_Returns_Unauthorized_Without_Auth()
@@ -1969,8 +1928,6 @@ public class SharedCompanyDocumentEndpointTests
         Guid Id, Guid CompanyId, string Status, Guid ExpiredBy, DateTimeOffset ExpiredAt,
         int ReviewTasksCancelled);
 
-    // Seeds a Department directly via the Employees module's DbContext — there is no lighter-
-    // weight way to get a real, existence-checkable department id into an integration test.
     private async Task<Guid> SeedDepartmentAsync(Guid companyId, string name)
     {
         using var scope = _factory.Services.CreateScope();
@@ -1981,10 +1938,6 @@ public class SharedCompanyDocumentEndpointTests
         return department.Id;
     }
 
-    // Seeds a real, Active Employee row with Id == employeeId — needed for tests whose caller
-    // must be found by EmployeeAudienceReader.GetEligibleEmployeeIdsAsync (which queries real
-    // Active Employees rows), unlike simpler per-employee audience checks elsewhere that only
-    // need a role/claims assignment via TestRoleSeeder.
     private async Task CreateActiveEmployeeAsync(Guid companyId, Guid employeeId)
     {
         using var scope = _factory.Services.CreateScope();
@@ -2003,10 +1956,6 @@ public class SharedCompanyDocumentEndpointTests
         await db.SaveChangesAsync();
     }
 
-    // Directly flips a document to Published via the DbContext, bypassing the real Publish
-    // endpoint's validation — used by tests that need a Published document in a state the real
-    // endpoint wouldn't allow reaching (e.g. requires-acknowledgement without going through the
-    // acknowledgement-settings endpoint first).
     private async Task PublishDirectlyAsync(Guid companyId, Guid documentId, bool requiresAcknowledgement = false)
     {
         using var scope = _factory.Services.CreateScope();
@@ -2052,10 +2001,6 @@ public class SharedCompanyDocumentEndpointTests
         {
             payload = await response.Content.ReadFromJsonAsync<DocumentPayload>();
 
-            // Uploads are now scanned asynchronously via a Hangfire job (ScanUploadedFileJob),
-            // which never actually runs inside these integration tests — simulate a completed
-            // Clean scan directly so download/read tests exercised here don't need to know about
-            // ScanStatusAccessGuard (that guard itself is covered by dedicated tests).
             using var scope = _factory.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Documents.Persistence.DocumentsDbContext>();
             var doc = await db.SharedCompanyDocuments.SingleAsync(d => d.Id == payload!.Id);
@@ -2100,7 +2045,6 @@ public class SharedCompanyDocumentEndpointTests
         return form;
     }
 
-    // %PDF- followed by padding, so magic-byte content validation passes.
     private static byte[] PdfBytes()
     {
         var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };
@@ -2117,19 +2061,10 @@ public class SharedCompanyDocumentEndpointTests
         });
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
-        // Role-agnostic sync only — every caller of this helper already granted the specific
-        // role(s) it wants to test beforehand via AssignRoleAsync. Hardcoding a role here (this
-        // used to always grant SystemRoles.Manager) additionally granted it to every caller
-        // regardless of intent, which used to be harmless only because tenant resolution didn't
-        // actually key off UserProfile.CompanyId yet — now that it does, an unconditional extra
-        // role grant here changes real authorization outcomes.
         await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }
 
-    // Passing null as HttpContent to PostAsync omits the Content-Type header entirely, which
-    // FastEndpoints rejects with 415 Unsupported Media Type once past authorization — an empty
-    // JSON body is the minimal content that satisfies model binding for these no-payload actions.
     private static StringContent EmptyJson() =>
         new("{}", Encoding.UTF8, "application/json");
 

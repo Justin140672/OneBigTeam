@@ -50,7 +50,6 @@ public class UpdateFutureCompensationRecordHandlerTests
         var employee = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", new DateOnly(2024, 1, 1), true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         context.Employees.Add(employee);
 
-        // EffectiveFrom == today (2026-06-08) — already in effect, not future.
         var record = Compensation.Create(Guid.NewGuid(), companyId, employee.Id, new DateOnly(2026, 6, 8), SalaryType.Annual, 40000m, "GBP", null, null, null, CompensationChangeReason.NewHire, Guid.NewGuid(), now);
         context.Compensations.Add(record);
         await context.SaveChangesAsync();
@@ -156,7 +155,6 @@ public class UpdateFutureCompensationRecordHandlerTests
         Assert.Equal(0.5m, result.Value.FTE);
         Assert.Equal("Corrected", result.Value.Notes);
         Assert.Equal("Correction", result.Value.Reason);
-        // EffectiveFrom is not editable through this slice.
         Assert.Equal(new DateOnly(2027, 1, 1), result.Value.EffectiveFrom);
 
         var saved = await context.Compensations.SingleAsync();

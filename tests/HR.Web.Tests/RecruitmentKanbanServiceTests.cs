@@ -7,7 +7,6 @@ namespace HR.Web.Tests;
 
 public class RecruitmentKanbanServiceTests
 {
-    // ── GetKanbanAsync (representative read) ─────────────────────────────────────
 
     [Fact]
     public async Task GetKanbanAsync_Returns_Value_When_Api_Returns_Ok()
@@ -55,7 +54,6 @@ public class RecruitmentKanbanServiceTests
             () => service.GetKanbanAsync(Guid.NewGuid(), Guid.NewGuid(), cts.Token));
     }
 
-    // ── MoveApplicationStageAsync (write) ─────────────────────────────────────────
 
     [Fact]
     public async Task MoveApplicationStageAsync_Returns_Result_When_Api_Returns_Ok()

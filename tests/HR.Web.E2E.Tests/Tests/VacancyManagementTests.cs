@@ -4,22 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies Recruiter CRUD workflows for vacancies:
-/// - Seeded vacancies appear in the list.
-/// - A new vacancy can be created and appears in the list.
-/// - Validation errors surface when required fields are missing.
-/// - Plain employees and HR Administrators (who lack the Recruiter role) cannot reach the
-///   vacancies page.
-///
-/// Uses Marcus Diallo (Recruiter role) rather than Laura Bennett (HR Administrator) —
-/// recruitment:manage (vacancy creation) is Recruiter-only (see IdentityModule.AddRolePolicies);
-/// an HR Administrator does not automatically get recruitment access. recruitment:view (reading
-/// vacancies) stays broader at the API layer and would still let Laura read vacancy data
-/// directly, but the /vacancies workspace page itself is gated to Session.IsRecruiter (see
-/// VacancyList.razor OnBeforeLoadAsync), so she's still redirected away from it in the UI —
-/// this file exercises the write path throughout, so Marcus is used for the CRUD tests.
-/// </summary>
 public sealed class VacancyManagementTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -43,8 +27,6 @@ public sealed class VacancyManagementTests(CrossUserFixture fixture) : RoleE2ETe
         Assert.True(await vacancyList.HasVacancyAsync("HR Business Partner"),
             "Expected 'HR Business Partner' in the vacancy list");
 
-        // "Product Designer" is seeded Closed (see RecruitmentModule.cs), and the grid hides
-        // closed vacancies until "Show Inactive" is toggled.
         await vacancyList.ShowAllVacanciesAsync();
         Assert.True(await vacancyList.HasVacancyAsync("Product Designer"),
             "Expected 'Product Designer' in the vacancy list");
@@ -104,8 +86,6 @@ public sealed class VacancyManagementTests(CrossUserFixture fixture) : RoleE2ETe
         Assert.True(await vacancyDetail.HasAdvertDescriptionLabelAsync(),
             "Expected the 'Advert Description' label to render");
 
-        // The "(optional)" qualifier was removed from every field label on this card — the fields
-        // are still genuinely optional, just no longer labelled as such.
         Assert.False(await vacancyDetail.HasOptionalSuffixAsync(),
             "Did not expect any '(optional)' suffix on the Recruitment Advert Details card's field labels");
     }
@@ -123,7 +103,6 @@ public sealed class VacancyManagementTests(CrossUserFixture fixture) : RoleE2ETe
 
         await vacancyDetail.GoToNewAsync(AcmeId);
 
-        // Fill every required field except Position Profile, then try to save.
         await vacancyDetail.FillTitleAsync(vacancyTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
 
@@ -139,14 +118,6 @@ public sealed class VacancyManagementTests(CrossUserFixture fixture) : RoleE2ETe
             "Expected a validation error when saving a vacancy with no Position Profile selected");
     }
 
-    /// <summary>
-    /// As part of the "Refactor Duplicate Vacancy Fields" story, the Advert Title field was
-    /// renamed to "Advert Title (optional)" and is genuinely no longer required — it was
-    /// previously mandatory (this test used to assert a validation error on an empty title). A
-    /// vacancy can now be created with just a Position Profile and no Advert Title at all, in
-    /// which case "EffectiveTitle" (used everywhere a resolved title is displayed — the list's
-    /// Title column and this page's own header) falls back to the linked Position Profile's title.
-    /// </summary>
     [Fact]
     public async Task CreateVacancy_WithoutAdvertTitle_UsesPositionProfileTitleAsEffectiveTitle()
     {
@@ -158,15 +129,12 @@ public sealed class VacancyManagementTests(CrossUserFixture fixture) : RoleE2ETe
         var vacancyList   = new VacancyListPage(_page, _fixture.WebBaseUrl);
         var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
 
-        // Seed a Position Profile with a unique title so the assertions below can't collide with
-        // any other seeded/created vacancy's title.
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
         await ppList.GoToAsync(AcmeId);
         await ppList.ClickNewPositionProfileAsync();
         await ppEdit.FillTitleAsync(profileTitle);
-        // Department, Location and Default Leave Policy are now mandatory on Position Profile.
         await ppEdit.SelectDepartmentAsync("Engineering");
         await ppEdit.SelectLocationAsync("London Office");
         await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
@@ -184,19 +152,14 @@ public sealed class VacancyManagementTests(CrossUserFixture fixture) : RoleE2ETe
         await vacancyDetail.SelectHiringManagerAsync("James");
         await vacancyDetail.SaveNewVacancyAsync();
 
-        // The list's Title column shows the resolved EffectiveTitle — the linked Position
-        // Profile's title, since no Advert Title was set.
         Assert.True(await vacancyList.HasVacancyAsync(profileTitle),
             $"Expected the new vacancy to appear in the list showing '{profileTitle}' (the linked " +
             "Position Profile's title) as its effective title");
 
         await vacancyList.ClickVacancyAsync(profileTitle);
 
-        // The detail page's header also shows the resolved EffectiveTitle.
         Assert.Equal(profileTitle, await vacancyDetail.GetHeaderTextAsync());
 
-        // The raw Advert Title field itself is genuinely empty — EffectiveTitle is a fallback for
-        // display purposes only, not a value silently written back into AdvertTitle.
         Assert.Equal(string.Empty, await vacancyDetail.GetTitleAsync());
     }
 
@@ -241,7 +204,6 @@ public sealed class VacancyManagementTests(CrossUserFixture fixture) : RoleE2ETe
         var profileTitle = await PositionProfileTestHelpers.CreateUniquePositionProfileAsync(
             _page, _fixture.WebBaseUrl, AcmeId, login, LauraEmail, MarcusEmail);
 
-        // Create a vacancy with a known Position Profile so its value can be asserted after reopening.
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickNewVacancyAsync();
         await vacancyDetail.FillTitleAsync(vacancyTitle);
@@ -249,58 +211,31 @@ public sealed class VacancyManagementTests(CrossUserFixture fixture) : RoleE2ETe
         await vacancyDetail.SelectHiringManagerAsync("James");
         await vacancyDetail.SaveNewVacancyAsync();
 
-        // Give the vacancy an application — CanChangePositionProfile requires both Draft status
-        // AND zero applications, so a bare Draft vacancy alone is not enough to lock this field.
-        // The Applications tab only renders once the vacancy is Open (Draft hides it entirely),
-        // so this publishes first — CanChangePositionProfile is still false afterwards (status is
-        // no longer Draft at all, let alone Draft-with-zero-applications), just no longer for the
-        // application-count reason specifically. The field-locked assertion below still holds.
         await vacancyList.ClickVacancyAsync(vacancyTitle);
         await vacancyDetail.PublishVacancyAsync();
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickAddCandidateAsync();
-        // Search by last name (not email) here: the candidate dropdown's committed input is bound
-        // to FullName (DropDownListFieldSettings Text="FullName" in VacancyApplicationsTab.razor),
-        // so the shared DropDownSelector's post-selection value assertion needs the search text to
-        // also appear in that committed FullName value. The candidate service searches
-        // FirstName/LastName/Email server-side (ListCandidatesHandler), so searching by last name
-        // still uniquely matches this candidate.
         await vacancyDetail.SelectCandidateInAddDialogAsync(candidateLast);
         await vacancyDetail.SubmitAddApplicationAsync();
 
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickVacancyAsync(vacancyTitle);
 
-        // Position Profile still shows the value it was created with, but can no longer be changed.
         Assert.True(await vacancyDetail.IsPositionProfileDisabledAsync(),
             "Expected the Position Profile dropdown to be disabled once the vacancy has an application");
         Assert.Equal(profileTitle, await vacancyDetail.GetSelectedPositionProfileTextAsync());
 
-        // The vacancy's own fields card was renamed from "Vacancy Details" to "Recruitment Advert
-        // Details" as part of the "Derive Vacancy Role Information from Position Profile" story —
-        // confirm the new header renders; the edit behavior underneath it is unchanged and
-        // exercised by the assertions below.
         Assert.True(await vacancyDetail.HasRecruitmentAdvertDetailsHeaderAsync(),
             "Expected the vacancy's own details card to be headed 'Recruitment Advert Details'");
 
-        // The vacancy-level Department dropdown that used to also be asserted here was removed
-        // entirely by the "Refactor Duplicate Vacancy Fields" story. Asserted here (rather than
-        // only on the create form) specifically because this is edit mode on an existing vacancy,
-        // where the separate, unrelated "Linked Position Profile" card also renders a read-only
-        // Department <dt>/<dd> pair — proving the "Recruitment Advert Details" card scoping
-        // doesn't accidentally pick that up as a false negative.
         Assert.Equal(0, await vacancyDetail.CountDepartmentFieldsInAdvertDetailsCardAsync());
 
-        // Advert Title, Advert Description and Location all remain editable.
         var updatedTitle = $"{vacancyTitle} Updated";
         await vacancyDetail.FillTitleAsync(updatedTitle);
         Assert.Equal(updatedTitle, await vacancyDetail.GetTitleAsync());
 
         await vacancyDetail.FillDescriptionAsync("Updated by E2E test");
 
-        // Hiring Manager's Text field is WorkEmail (lowercase, e.g. "laura.bennett@acme.example")
-        // even though the dropdown's ItemTemplate displays "Laura Bennett" while the list is open —
-        // compare case-insensitively rather than assuming either casing for the committed value.
         await vacancyDetail.SelectHiringManagerAsync("Laura");
         Assert.Contains("laura", await vacancyDetail.GetSelectedHiringManagerTextAsync() ?? string.Empty,
             StringComparison.OrdinalIgnoreCase);
@@ -323,9 +258,6 @@ public sealed class VacancyManagementTests(CrossUserFixture fixture) : RoleE2ETe
         await login.LoginAsync(tomEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/vacancies");
-        // The guard is a client-side NavigateTo fired from VacancyList.razor's OnBeforeLoadAsync,
-        // which only runs once the interactive circuit has connected — NetworkIdle (a plain HTTP
-        // signal) routinely goes quiet before that. Poll the URL until the redirect actually lands.
         await WaitForUrlToStopContainingAsync("/vacancies");
 
         var finalUrl = _page.Url;
@@ -333,11 +265,6 @@ public sealed class VacancyManagementTests(CrossUserFixture fixture) : RoleE2ETe
             $"Expected a plain employee to be redirected away from the vacancies page, but ended up at: {finalUrl}");
     }
 
-    // HR Administrator (Laura) no longer holds the Recruiter role, so the vacancies list page
-    // guard (VacancyList.razor OnBeforeLoadAsync) redirects her away the same as a plain
-    // employee — even though the underlying recruitment:view API policy still lets her read
-    // vacancy data (see HrAdministrator_Gets_Ok_Listing_Vacancies in RecruitmentAuthorizationTests).
-    // The dedicated /vacancies workspace is Recruiter-only at the UI level by product decision.
     [Fact]
     public async Task HrAdministrator_IsRedirectedAway_FromVacanciesPage()
     {
@@ -349,9 +276,6 @@ public sealed class VacancyManagementTests(CrossUserFixture fixture) : RoleE2ETe
         await login.LoginAsync(lauraEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/vacancies");
-        // The guard is a client-side NavigateTo fired from VacancyList.razor's OnBeforeLoadAsync,
-        // which only runs once the interactive circuit has connected — NetworkIdle (a plain HTTP
-        // signal) routinely goes quiet before that. Poll the URL until the redirect actually lands.
         await WaitForUrlToStopContainingAsync("/vacancies");
 
         var finalUrl = _page.Url;

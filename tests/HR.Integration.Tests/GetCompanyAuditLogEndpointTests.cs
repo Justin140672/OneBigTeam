@@ -5,15 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Covers GET /api/companies/{companyId}/audit-log (GetCompanyAuditLog, AUD-05): the
-/// employee:manage policy and tenant isolation.
-///
-/// KNOWN-FAILING DEPENDENCY: the happy-path tests here currently fail in the integration harness
-/// with 'column a.actor_type does not exist' because of a broken foreign AUD-04 migration that
-/// has not yet been applied/fixed. These tests are written to the intended behaviour and should
-/// go green once that migration is corrected — do not delete or weaken them in the meantime.
-/// </summary>
 [Collection("Integration")]
 public class GetCompanyAuditLogEndpointTests
 {
@@ -125,7 +116,6 @@ public class GetCompanyAuditLogEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, hrInB, SystemRoles.HrAdministrator);
 
         using var clientA = await ClientAs(companyA, hrInA);
-        // Produce at least one auditable mutation in company A.
         await clientA.PostAsJsonAsync(
             $"/api/companies/{companyA}/public-holidays",
             new { companyId = companyA, date = "2026-12-25", name = "Christmas Day", countryCode = "GB" });

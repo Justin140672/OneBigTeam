@@ -10,14 +10,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Features.UploadEmployeeDocumentVersion;
 
-/// <summary>
-/// DOC-05: uploads a replacement file for an existing employee document (e.g. renewing an expired
-/// passport/visa/licence) as a NEW EmployeeDocument row linked to the one it replaces via
-/// PreviousVersionId, rather than mutating the existing row or creating an unrelated record (the
-/// bug this ticket exists to fix). The previous row is left completely untouched other than
-/// flipping IsLatestVersion to false — see EmployeeDocument.SupersedeAsPreviousVersion — so its
-/// own audit trail and any archive state remain intact.
-/// </summary>
 internal sealed class UploadEmployeeDocumentVersionHandler(
     DocumentsDbContext db,
     IDocumentStorageService storage,
@@ -76,8 +68,6 @@ internal sealed class UploadEmployeeDocumentVersionHandler(
 
         await using var fileStream = file.OpenReadStream();
 
-        // Virus scanning happens asynchronously via ScanUploadedFileJob (enqueued below) rather
-        // than inline — the row is stored with ScanStatus = Pending.
         var contentResult = fileValidator.ValidateContent(fileStream, file.ContentType);
         if (contentResult.IsFailure)
             return Result.Failure<UploadEmployeeDocumentVersionResponse>(contentResult.Error);
@@ -93,9 +83,6 @@ internal sealed class UploadEmployeeDocumentVersionHandler(
 
         var now = clock.UtcNowOffset();
 
-        // Title/description are carried forward from the previous version's Document row — a
-        // renewal is still "the same document" from the employee/HR point of view, just a new
-        // file with a new issue/expiry date.
         var newDocument = Document.Create(
             Guid.NewGuid(),
             request.CompanyId,
@@ -111,10 +98,6 @@ internal sealed class UploadEmployeeDocumentVersionHandler(
             uploadedBy,
             now);
 
-        // A new version starts a fresh expiry-reminder schedule naturally: EmployeeDocument.Create
-        // leaves every ExpiryReminder*SentAt / ExpiringSoonNotifiedAt / ExpiredNotifiedAt column
-        // null on the new row, the same reset DOC-03's UpdateExpiryDate performs explicitly — no
-        // separate reset call is needed here because this is a brand new row, not an in-place edit.
         var newVersion = EmployeeDocument.Create(
             Guid.NewGuid(),
             request.CompanyId,
@@ -131,9 +114,6 @@ internal sealed class UploadEmployeeDocumentVersionHandler(
         db.Documents.Add(newDocument);
         db.EmployeeDocuments.Add(newVersion);
 
-        // DOC-05: any outstanding request for this employee/document type is superseded by the
-        // new version — mirrors UploadRequestedDocumentHandler's fulfillment logic for the
-        // original-upload path.
         var outstandingRequest = await db.DocumentRequests
             .FirstOrDefaultAsync(
                 r => r.CompanyId == request.CompanyId
@@ -150,7 +130,6 @@ internal sealed class UploadEmployeeDocumentVersionHandler(
         }
         catch
         {
-            // Best-effort: remove the already-uploaded file so it doesn't become an orphan.
             try { await storage.DeleteAsync(storageKey, cancellationToken); } catch { }
             throw;
         }

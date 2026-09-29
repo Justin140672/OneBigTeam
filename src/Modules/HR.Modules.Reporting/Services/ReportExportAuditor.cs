@@ -41,9 +41,6 @@ internal sealed class ReportExportAuditor(
     {
         await PublishAsync(companyId, reportId, format, rowCount: null, managerScopeApplied, success: false, failureReason, request, cancellationToken);
 
-        // ADM-03: a post-authorization report generation failure is an administrative incident —
-        // surface it in the alerts inbox, grouped per report id. Best-effort: an alert-writer failure
-        // must never mask the original export failure the caller is already handling.
         try
         {
             await administrativeAlertWriter.RaiseAsync(new RaiseAdministrativeAlertCommand(
@@ -79,8 +76,6 @@ internal sealed class ReportExportAuditor(
         object request,
         CancellationToken cancellationToken)
     {
-        // Fail closed: if a report id isn't found in the catalogue (shouldn't happen in practice),
-        // treat it as Sensitive rather than silently under-auditing it.
         var sensitivity = ReportCatalog.TryGet(reportId, out var definition)
             ? definition.Sensitivity
             : ReportSensitivity.Sensitive;
@@ -101,11 +96,6 @@ internal sealed class ReportExportAuditor(
         await auditPublisher.PublishAsync(auditEvent, cancellationToken);
     }
 
-    /// <summary>
-    /// Structured filter criteria only — property name/value pairs from the export request (ids,
-    /// dates, enum/string filter values). Never touches the generated report's rows, so no employee
-    /// names or other exported PII can end up in the audit payload.
-    /// </summary>
     private static IReadOnlyDictionary<string, string?> BuildFilters(object request)
     {
         var filters = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);

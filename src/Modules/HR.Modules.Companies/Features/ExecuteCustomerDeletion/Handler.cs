@@ -68,8 +68,6 @@ internal sealed class ExecuteCustomerDeletionHandler(
                 Error.NotFound($"No subscription record was found for company '{request.CompanyId}'."));
         }
 
-        // Story 2: do not execute deletion while a full organisation data export is still being
-        // prepared for this company — the customer may still need to download it.
         if (await exportStatusReader.HasActiveExportAsync(subscription.CompanyId, cancellationToken))
         {
             return Result.Failure<ExecuteCustomerDeletionResponse>(Error.Conflict(

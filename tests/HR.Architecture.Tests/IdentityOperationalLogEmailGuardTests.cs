@@ -77,7 +77,6 @@ public class IdentityOperationalLogEmailGuardTests
             violations.AddRange(result.Violations.Select(v => $"{relative}:{v}"));
         }
 
-        // Sanity check: if this drops to zero the scanner (or the path) is broken, not the code clean.
         Assert.True(totalLogCalls >= 20,
             $"Expected to find the Identity module's log calls but found only {totalLogCalls} — the scanner is probably broken.");
 
@@ -88,8 +87,6 @@ public class IdentityOperationalLogEmailGuardTests
             Environment.NewLine + string.Join(Environment.NewLine, violations));
     }
 
-    // Proves the scanner itself detects what it claims to, so a silent regression in the lexer
-    // cannot turn the guard above into a no-op.
     [Theory]
     [InlineData("logger.LogWarning(\"Invite failed. To={Email}\", id);")]
     [InlineData("logger.LogWarning(\"Invite failed. To={to}\", id);")]
@@ -151,12 +148,6 @@ public class IdentityOperationalLogEmailGuardTests
     }
 }
 
-/// <summary>
-/// Syntactic scanner used by <see cref="IdentityOperationalLogEmailGuardTests"/>. See that class's
-/// remarks for the rules. Works on two same-length views of the source: <c>code</c> (comments
-/// blanked to spaces) and <c>masked</c> (comments blanked AND string/char literal contents replaced
-/// with '_'), so character offsets line up between them.
-/// </summary>
 internal static class LogCallScanner
 {
     internal sealed record ScanResult(int LogCallCount, IReadOnlyList<string> Violations);
@@ -169,7 +160,6 @@ internal static class LogCallScanner
 
     private static readonly Regex Identifier = new(@"[A-Za-z_][A-Za-z0-9_]*", RegexOptions.Compiled);
 
-    // {Name}, {@Name}, {$Name}, {Name:format}, {Name,alignment} — but not escaped {{Name}}.
     private static readonly Regex Placeholder = new(
         @"(?<!\{)\{\s*[@$]?(?<name>[A-Za-z_][A-Za-z0-9_]*)\s*(?:[,:][^{}]*)?\}(?!\})", RegexOptions.Compiled);
 
@@ -216,7 +206,6 @@ internal static class LogCallScanner
             var line = LineOf(source, match.Index);
             CheckArguments(code, masked, literals, open + 1, close, $"{line} ([LoggerMessage])", violations);
 
-            // Parameters of the decorated partial method: the first (...) after the attribute.
             var methodOpen = masked.IndexOf('(', close + 1);
             var methodClose = methodOpen < 0 ? -1 : FindClosingParen(masked, methodOpen);
             if (methodClose < 0)
@@ -255,11 +244,6 @@ internal static class LogCallScanner
             }
         }
 
-        // Identifiers in the argument code (string contents are masked, so template words don't count),
-        // evaluated per member-access chain. Any Email-named segment is a violation wherever it sits
-        // (req.Email.Trim() still logs the address). The bare words To/Recipient(s) commonly name an
-        // object rather than an address (recipient.EmployeeId is fine), so they only count as the
-        // final segment of a chain.
         foreach (Match chain in MemberChain.Matches(masked[start..end]))
         {
             var segments = chain.Value.Split('.', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
@@ -313,7 +297,6 @@ internal static class LogCallScanner
 
     internal sealed record Literal(int Start, int End, string Content, bool IsInterpolated);
 
-    // ---- Minimal C# lexer -------------------------------------------------------------------
 
     private static (string Code, string Masked, IReadOnlyList<Literal> Literals) Lex(string source)
     {
@@ -343,7 +326,6 @@ internal static class LogCallScanner
         }
     }
 
-    /// <summary>Lexes code until end of input (or an unmatched '}' when inside an interpolation hole).</summary>
     private static void LexCode(
         string s, ref int i, StringBuilder code, StringBuilder masked, List<Literal> literals, bool stopAtCloseBrace)
     {
@@ -396,7 +378,7 @@ internal static class LogCallScanner
                 else if (c == '}')
                 {
                     if (braceDepth == 0)
-                        return; // caller consumes the closing '}'
+                        return;
                     braceDepth--;
                 }
             }
@@ -419,9 +401,8 @@ internal static class LogCallScanner
         }
 
         if (p >= s.Length || s[p] != '"')
-            return false; // an identifier like @class, or a stray '$'
+            return false;
 
-        // Raw string literal: three or more quotes.
         var quoteRun = 0;
         while (p + quoteRun < s.Length && s[p + quoteRun] == '"')
             quoteRun++;
@@ -439,7 +420,7 @@ internal static class LogCallScanner
 
         var interpolated = dollars > 0;
         var content = new StringBuilder();
-        p++; // opening quote
+        p++;
         var bodyStart = p;
         while (p < s.Length)
         {
@@ -473,16 +454,15 @@ internal static class LogCallScanner
                     continue;
                 }
 
-                // Interpolation hole: lex as code (it may contain nested strings) up to its '}'.
                 p++;
                 LexCode(s, ref p, code, masked, literals, stopAtCloseBrace: true);
                 content.Append("{hole}");
-                p++; // closing '}'
+                p++;
                 continue;
             }
 
             if (!verbatim && c == '\n')
-                break; // unterminated regular string; stop at end of line
+                break;
 
             content.Append(c);
             p++;

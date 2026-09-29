@@ -13,7 +13,6 @@ internal sealed class Endpoint(
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/dashboards/hr/summary");
-        // Shared menu gate (Manager OR HrAdministrator), same as the Workload & HR Actions Report.
         Policies("reporting:view-workload-actions");
     }
 
@@ -21,8 +20,6 @@ internal sealed class Endpoint(
         GetHrDashboardSummaryRequest request,
         CancellationToken cancellationToken)
     {
-        // DSH-06 approved answer #2: the HR dashboard summary is HR-only. Rather than mint a new
-        // permission, narrow the shared workload-actions menu gate here with reporting:view-hr.
         if (!(await authorizationService.AuthorizeAsync(User, "reporting:view-hr")).Succeeded)
         {
             await Send.ResultAsync(TypedResults.Forbid());

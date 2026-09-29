@@ -5,13 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// AUD-07: GET .../companies/{companyId}/probation-records/{probationRecordId}/audit-history.
-/// Gated by <c>probation:manage</c>. Reads the real AuditDbContext via IAuditHistoryReader,
-/// newest-first, scoped by companyId.
-///
-/// Red until the foreign AUD-04 "actor_type" audit migration is fixed. Write the test correctly anyway.
-/// </summary>
 [Collection("Integration")]
 public class GetProbationRecordAuditHistoryEndpointTests
 {
@@ -103,7 +96,6 @@ public class GetProbationRecordAuditHistoryEndpointTests
     [Fact]
     public async Task Returns_Empty_History_For_Unknown_Record()
     {
-        // Handler always returns Result.Success -> 200 + empty Items for an unknown id (not 404).
         var companyId = Guid.NewGuid();
         using var client = await AdminClient(companyId);
 

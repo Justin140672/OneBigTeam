@@ -6,8 +6,6 @@ internal sealed record RespondToOfferRequest
     public Guid VacancyId { get; init; }
     public Guid ApplicationId { get; init; }
 
-    // "Accepted" | "Declined" | "Withdrawn". "AwaitingResponse" is not a valid target here — it is
-    // the state an offer starts in when made. Case-insensitive.
     public string Status { get; init; } = string.Empty;
 
     // Populated by the endpoint from the optional "Idempotency-Key" request header (ticket 3, P1

@@ -16,15 +16,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// DSH-06 stage 1: the Manager bounded dashboard summary endpoint
-/// (GET /api/companies/{companyId}/dashboards/manager/summary). Same cross-module composer as the HR
-/// variant but gated only by "reporting:view-workload-actions" (Manager OR HrAdministrator) — there is
-/// no managerId route param, the acting manager is the caller and each provider self-scopes a manager
-/// to their full reporting sub-tree (DSH-02). Reporting-line data is seeded via the real AssignManager
-/// HTTP endpoint using a dedicated HR bootstrap client, mirroring
-/// GetWorkloadActionsEndpointTests.Get_WorkloadActions_Manager_Only_Sees_Own_DirectReports_Items.
-/// </summary>
 [Collection("Integration")]
 public class GetManagerDashboardSummaryEndpointTests
 {
@@ -157,9 +148,6 @@ public class GetManagerDashboardSummaryEndpointTests
     [Fact]
     public async Task Get_ManagerDashboardSummary_DualRole_Caller_Sees_Only_TeamScoped_Items_Not_HrOnly_Or_OutOfHierarchy_Items()
     {
-        // Regression test for the reported bug: a user holding BOTH HR and Manager roles must see
-        // only their own reporting sub-tree on the Manager dashboard — never HR's company-wide data,
-        // and never another employee's overdue task outside their hierarchy.
         var companyId = Guid.NewGuid();
 
         var dualRoleUserId = await SeedEmployeeAsync(companyId, "Dana", "DualRole");
@@ -230,8 +218,6 @@ public class GetManagerDashboardSummaryEndpointTests
     [Fact]
     public async Task Get_ManagerDashboardSummary_ReturnToWorkReview_For_DirectReport_Now_Appears_As_OwnerActionable()
     {
-        // Regression coverage: previously the Sickness provider returned [] unconditionally for
-        // Manager scope, so a manager's own Return to Work review task never appeared at all.
         var companyId = Guid.NewGuid();
         var managerId = await SeedEmployeeAsync(companyId, "Meera", "Manager");
         var directReportId = await SeedEmployeeAsync(companyId, "Devon", "Report");
@@ -251,17 +237,13 @@ public class GetManagerDashboardSummaryEndpointTests
         var sickness = payload!.Categories.Single(c => c.Category == "Pending Sickness Actions");
         var employeeIds = sickness.Items.Select(i => i.EmployeeId).ToList();
 
-        // Present and owner-actionable for the manager's own report.
         Assert.Contains(directReportId, employeeIds);
         var ownItem = sickness.Items.Single(i => i.EmployeeId == directReportId);
         Assert.True(ownItem.IsOwnerActionable);
 
-        // Absent entirely for an employee outside the caller's reporting sub-tree (row-level
-        // tenant/hierarchy isolation) — not merely marked non-actionable.
         Assert.DoesNotContain(outOfHierarchyEmployeeId, employeeIds);
     }
 
-    // ── Seeding helpers ──────────────────────────────────────────────────────
 
     private async Task<Guid> SeedEmployeeAsync(Guid companyId, string firstName, string lastName)
     {

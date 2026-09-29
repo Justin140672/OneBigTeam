@@ -31,11 +31,6 @@ internal sealed class SessionRevocation
         };
     }
 
-    /// <summary>
-    /// Moves the revocation instant forward. Never moves it backward: a slower, out-of-order write
-    /// (e.g. two concurrent logout requests) must never un-revoke a session that a later logout
-    /// already covered.
-    /// </summary>
     public void RevokeAsOf(DateTimeOffset revokedAt)
     {
         if (revokedAt > RevokedAt)

@@ -8,15 +8,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Companies.Features.GetFailedPayments;
 
-/// <summary>
-/// Same defense-in-depth allow-list gate as ListCustomersHandler/GetCustomerBillingHistoryHandler
-/// (see their remarks). Platform-wide (not scoped to one customer) — queries Stripe once for all
-/// failed/unpaid invoices across the account (see IStripeGateway.ListFailedInvoicesAsync remarks for
-/// why this is two account-wide calls rather than N per-customer calls), then joins back to local
-/// Company/CustomerSubscription data by StripeCustomerId. "Last successful payment" is looked up
-/// per-customer, but only for the (expected small) set of customers currently appearing in the
-/// failed-payments list, not for every customer in the account.
-/// </summary>
 internal sealed class GetFailedPaymentsHandler(
     CompaniesDbContext dbContext,
     ICurrentUser currentUser,
@@ -73,8 +64,6 @@ internal sealed class GetFailedPaymentsHandler(
 
         var companyById = companies.ToDictionary(c => c.Id, c => c);
 
-        // Bounded by the number of distinct failing customers, not every customer in the account —
-        // see class remarks.
         var lastPaidInvoiceByStripeCustomerId = new Dictionary<string, StripeInvoiceSummary?>();
         foreach (var stripeCustomerId in stripeCustomerIds)
         {

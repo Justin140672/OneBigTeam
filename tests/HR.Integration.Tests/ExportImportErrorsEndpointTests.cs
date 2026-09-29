@@ -30,7 +30,6 @@ public class ExportImportErrorsEndpointTests
         var companyId = Guid.NewGuid();
         using var client = await AdminClient(companyId);
 
-        // Row 2 is missing the required "Last Name" value, producing a row error on validate.
         const string csv =
             "First Name,Last Name,Work Email,Start Date,Employee Number\n" +
             "John,,john.doe@example.com,2026-01-01,EMP001\n";
@@ -133,10 +132,6 @@ public class ExportImportErrorsEndpointTests
         return content;
     }
 
-    // Builds a minimal XLSX workbook (via ClosedXML) from comma-delimited "csv-shaped" header/data
-    // lines, so existing test fixtures (written as csv-style strings for readability) can still be
-    // uploaded against the now xlsx-only import endpoint — mirrors
-    // ConfirmImportSessionEndpointTests.BuildXlsxBytes.
     private static byte[] BuildXlsxBytes(string csvShapedContent)
     {
         var lines = csvShapedContent

@@ -6,10 +6,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-// DOC-05: GET .../documents/{id}/versions is gated the same way as GetArchivedEmployeeDocuments
-// (DOC-04) — "employee:manage" plus DocumentResourceAuthorizer.IsHrAdministratorAsync — an
-// HR-only scope narrower than the self/manager-hierarchy CanAccessEmployeeDocumentsAsync check
-// used by normal document read endpoints.
 [Collection("Integration")]
 public class GetEmployeeDocumentVersionHistoryEndpointTests
 {
@@ -57,7 +53,7 @@ public class GetEmployeeDocumentVersionHistoryEndpointTests
     {
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, HrAdmin.ToString());
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString()); // mismatched tenant
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, Guid.NewGuid().ToString());
 
         var response = await client.GetAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{Guid.NewGuid()}/documents/{Guid.NewGuid()}/versions");
@@ -96,7 +92,7 @@ public class GetEmployeeDocumentVersionHistoryEndpointTests
         var payload = await response.Content.ReadFromJsonAsync<HistoryPayload>();
         Assert.NotNull(payload);
         Assert.Equal(2, payload!.Versions.Count);
-        Assert.Equal(newVersion!.EmployeeDocumentId, payload.Versions[0].EmployeeDocumentId); // newest first
+        Assert.Equal(newVersion!.EmployeeDocumentId, payload.Versions[0].EmployeeDocumentId);
         Assert.True(payload.Versions[0].IsLatestVersion);
         Assert.Equal(original.EmployeeDocumentId, payload.Versions[1].EmployeeDocumentId);
         Assert.False(payload.Versions[1].IsLatestVersion);
@@ -124,7 +120,7 @@ public class GetEmployeeDocumentVersionHistoryEndpointTests
     private static MultipartFormDataContent BuildPdfUpload(string title = "Test Contract")
     {
         var pdfBytes = new byte[1024];
-        pdfBytes[0] = 0x25; pdfBytes[1] = 0x50; pdfBytes[2] = 0x44; pdfBytes[3] = 0x46; // %PDF
+        pdfBytes[0] = 0x25; pdfBytes[1] = 0x50; pdfBytes[2] = 0x44; pdfBytes[3] = 0x46;
 
         var content = new MultipartFormDataContent();
         content.Add(new StringContent(title), "Title");

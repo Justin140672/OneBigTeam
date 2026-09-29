@@ -123,7 +123,6 @@ public class CreateCandidateApplicationHandlerTests
         Assert.Empty(h.Audit.Published);
     }
 
-    // ----- Happy path -----
 
     [Fact]
     public async Task HandleAsync_Without_Cv_Creates_Candidate_And_Application_On_Initial_Stage()
@@ -179,7 +178,6 @@ public class CreateCandidateApplicationHandlerTests
         var companyId = Guid.NewGuid();
         var (vacancy, stages) = await SeedVacancyWithStagesAsync(db, companyId);
 
-        // The first stage is inactive, so the next active non-terminal stage (CV Review) is used.
         var first = await db.RecruitmentStages.SingleAsync(s => s.Id == stages.ApplicationReceived.Id);
         first.SetActiveStatus(false, Now);
         await db.SaveChangesAsync();
@@ -256,7 +254,6 @@ public class CreateCandidateApplicationHandlerTests
         Assert.Equal(Now, intent.ConfirmedAt);
     }
 
-    // ----- Audit -----
 
     [Fact]
     public async Task HandleAsync_With_Cv_Publishes_Cv_Reference_Changed_Audit_With_Actor()
@@ -280,7 +277,6 @@ public class CreateCandidateApplicationHandlerTests
         Assert.Equal(response.CvDocumentId, evt.NewCvDocumentId);
         Assert.Equal(performedBy, evt.ChangedByUserId);
 
-        // No source was supplied, so no source audit.
         Assert.Empty(h.Audit.Published.OfType<ApplicationSourceSetAuditEvent>());
     }
 
@@ -358,7 +354,6 @@ public class CreateCandidateApplicationHandlerTests
         Assert.Equal(recruiter.Id, result.Result.Value!.SourceExternalRecruiterId);
     }
 
-    // ----- Duplicate email -----
 
     [Fact]
     public async Task HandleAsync_Returns_Duplicate_For_Case_Insensitive_Trimmed_Email_And_Creates_Nothing()
@@ -387,7 +382,6 @@ public class CreateCandidateApplicationHandlerTests
         Assert.True(duplicate.ExistingCandidateIsActive);
         Assert.False(string.IsNullOrWhiteSpace(duplicate.Error));
 
-        // Only the pre-existing candidate; no application, no document, no intent, no upload, no audit.
         await AssertNothingCreatedAsync(h, expectedCandidates: 1);
     }
 
@@ -415,7 +409,6 @@ public class CreateCandidateApplicationHandlerTests
         var h = BuildHarness(db);
         var companyId = Guid.NewGuid();
         var (vacancy, _) = await SeedVacancyWithStagesAsync(db, companyId);
-        // Legacy rows: an older inactive record and a newer active one (differently cased).
         await SeedCandidateAsync(db, companyId, "emma.clarke@example.com", active: false, createdAt: Now.AddDays(-30));
         var active = await SeedCandidateAsync(db, companyId, "Emma.Clarke@example.com", active: true, createdAt: Now.AddDays(-1));
 
@@ -480,7 +473,6 @@ public class CreateCandidateApplicationHandlerTests
         Assert.Equal(2, await db.Candidates.CountAsync());
     }
 
-    // ----- Not found -----
 
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Vacancy_Missing_And_Creates_Nothing()
@@ -560,7 +552,6 @@ public class CreateCandidateApplicationHandlerTests
         await AssertNothingCreatedAsync(h);
     }
 
-    // ----- CV file validation -----
 
     [Fact]
     public async Task HandleAsync_Returns_Validation_For_Disallowed_File_Type_And_Creates_Nothing()
@@ -653,7 +644,6 @@ public class CreateCandidateApplicationHandlerTests
         await AssertNothingCreatedAsync(h);
     }
 
-    // ----- Stage availability -----
 
     [Fact]
     public async Task HandleAsync_Returns_Validation_When_No_Active_NonTerminal_Stage_And_Creates_Nothing()
@@ -661,7 +651,6 @@ public class CreateCandidateApplicationHandlerTests
         await using var db = BuildContext();
         var h = BuildHarness(db);
         var companyId = Guid.NewGuid();
-        // Only terminal stages exist — the seeder is a no-op because the company already has stages.
         db.RecruitmentStages.AddRange(
             RecruitmentStage.Create(Guid.NewGuid(), companyId, "Hired", 1, true, RecruitmentStageTerminalOutcome.Hired, Now),
             RecruitmentStage.Create(Guid.NewGuid(), companyId, "Rejected", 2, true, RecruitmentStageTerminalOutcome.Rejected, Now));

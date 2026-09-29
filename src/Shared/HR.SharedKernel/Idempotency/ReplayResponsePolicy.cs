@@ -32,11 +32,6 @@ public static class ReplayResponsePolicy
 
     private static readonly ConcurrentDictionary<Type, string?> Cache = new();
 
-    /// <summary>
-    /// Throws <see cref="InvalidOperationException"/> if <typeparamref name="TResponse"/> (or any
-    /// type it exposes a public property of, recursively) has a property whose name matches a
-    /// prohibited sensitive-data pattern.
-    /// </summary>
     public static void EnsureReplaySafe<TResponse>()
     {
         var violation = Cache.GetOrAdd(typeof(TResponse), static t => FindViolation(t, depth: 0, seen: []));
@@ -55,8 +50,6 @@ public static class ReplayResponsePolicy
         if (depth > MaxDepth || !seen.Add(type))
             return null;
 
-        // Don't descend into framework/primitive types - nothing user-defined lives there, and it
-        // would otherwise recurse into e.g. string's own properties.
         if (type.Namespace is null || type.Namespace.StartsWith("System", StringComparison.Ordinal))
             return null;
 

@@ -5,8 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Services;
 
-// OFF-03: implementation of the port Offboarding's reconciliation job uses to find leaving
-// processes with no corresponding active offboarding plan.
 internal sealed class ActiveLeavingProcessReader(EmployeesDbContext dbContext) : IActiveLeavingProcessReader
 {
     public async Task<IReadOnlyList<ActiveLeavingProcessItem>> GetInProgressLeavingProcessesAsync(

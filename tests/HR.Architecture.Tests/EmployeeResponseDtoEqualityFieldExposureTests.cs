@@ -15,8 +15,6 @@ public class EmployeeResponseDtoEqualityFieldExposureTests
 {
     private static readonly Assembly ModuleAssembly = typeof(EmployeesModule).Assembly;
 
-    // Equality field names (from EqualityEnums.cs / EmployeeEqualityData.cs). Any response property
-    // whose name equals one of these — or ends in "SelfDescribed" — is a leak.
     private static readonly string[] ForbiddenPropertyNames =
     [
         "GenderIdentity",
@@ -29,10 +27,6 @@ public class EmployeeResponseDtoEqualityFieldExposureTests
         "CaringResponsibilities",
     ];
 
-    // The ONLY namespaces permitted to expose equality answers, by design:
-    //  - GetMyEqualityData    : the employee reading back their own answers (self-service)
-    //  - SaveMyEqualityData   : the employee submitting their own answers (self-service)
-    //  - GetEqualityDiversityReport : anonymous aggregate counts/percentages only (no raw values)
     private static readonly string[] AllowedNamespaces =
     [
         "HR.Modules.Employees.Features.GetMyEqualityData",

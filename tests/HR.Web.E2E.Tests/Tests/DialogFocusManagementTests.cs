@@ -4,11 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// NFR-05: applies <see cref="DialogAccessibility"/>'s focus-trap and focus-restoration assertions
-/// to representative Syncfusion dialogs — the Request Leave dialog, the HrConfirmDialog used for
-/// leave-type deactivation, and the self-service Change Profile Photo dialog.
-/// </summary>
 public sealed class DialogFocusManagementTests(CrossUserFixture fixture)
     : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
@@ -59,8 +54,6 @@ public sealed class DialogFocusManagementTests(CrossUserFixture fixture)
         await leaveTypes.GoToAsync(AcmeId);
         await _page.Locator(".e-grid .e-row").Last.ClickAsync();
 
-        // Scope to the grid toolbar: once the confirm dialog opens it also contains a "Deactivate"
-        // button, so an unscoped GetByRole(Button, "Deactivate") is ambiguous mid-test.
         var trigger = _page.Locator(".e-toolbar-item")
             .GetByRole(AriaRole.Button, new() { Name = "Deactivate", Exact = true });
         await trigger.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
@@ -76,7 +69,6 @@ public sealed class DialogFocusManagementTests(CrossUserFixture fixture)
             },
             closeDialog: async () =>
             {
-                // Cancel out — no deactivation is performed.
                 await dialog.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
                 await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
             },

@@ -5,12 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// GetPlatformAdminMe (GET /api/platform-admin/me) exists so platform-administrator-only accounts
-/// (no UserRole/Employee/tenant at all) can be recognized without a tenant lookup — see
-/// GetPlatformAdminMe.Endpoint and PlatformAdminAuthorizationHandler. Unlike GetMe, this endpoint
-/// never resolves a company/tenant.
-/// </summary>
 [Collection("Integration")]
 public class GetPlatformAdminMeEndpointTests
 {
@@ -71,8 +65,6 @@ public class GetPlatformAdminMeEndpointTests
 
         var response = await client.GetAsync("/api/platform-admin/me");
 
-        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
-        // is Forbidden (403), not Unauthorized (401).
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -95,8 +87,6 @@ public class GetPlatformAdminMeEndpointTests
         var (_, seededEmail) = await PlatformAdministratorTestHelpers.SeedAdministratorAsync(
             _factory, PlatformAdministratorRole.SupportStaff, supabaseAuthUserId: supabaseUserId);
 
-        // Authenticate with the matching SupabaseAuthUserId but a different email header, proving
-        // the SupabaseAuthUserId branch of the match is exercised independently of the email branch.
         using var client = PlatformAdministratorTestHelpers.ClientFor(
             _factory, supabaseUserId, "someone-else@test.example");
 

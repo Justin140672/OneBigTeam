@@ -261,7 +261,7 @@ public class QueueInvitationBatchHandlerTests(IdentityDatabaseFixture fixture)
     {
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        var candidateReader = new FakeEmployeeInviteCandidateReader(); // nothing eligible at all
+        var candidateReader = new FakeEmployeeInviteCandidateReader();
         var jobClient = new RecordingBackgroundJobClient();
         var handler = BuildHandler(candidateReader, jobClient);
 
@@ -281,12 +281,9 @@ public class QueueInvitationBatchHandlerTests(IdentityDatabaseFixture fixture)
     [Fact]
     public async Task HandleAsync_Never_Queues_A_Cross_Company_Employee_Id()
     {
-        // The candidate reader is the sole source of eligibility for the request's own CompanyId —
-        // an id belonging to a different company simply won't be returned by it, so it's excluded
-        // as NotEligible the same way an unknown id would be, never queued.
         var companyId = Guid.NewGuid();
         var otherCompanyEmployeeId = Guid.NewGuid();
-        var candidateReader = new FakeEmployeeInviteCandidateReader(); // reader scoped to companyId returns none
+        var candidateReader = new FakeEmployeeInviteCandidateReader();
         var handler = BuildHandler(candidateReader);
 
         var result = await handler.HandleAsync(
@@ -320,7 +317,6 @@ public class QueueInvitationBatchHandlerTests(IdentityDatabaseFixture fixture)
         var batchCount = await db.InvitationBatches.CountAsync(b => b.CompanyId == companyId);
         Assert.Equal(1, batchCount);
 
-        // Only the first call's save should have enqueued the processing job.
         Assert.Single(jobClient.CreatedJobs);
     }
 
@@ -402,7 +398,6 @@ public class QueueInvitationBatchHandlerTests(IdentityDatabaseFixture fixture)
             r.EmployeeId == gmailId || r.EmployeeId == hotmailId || r.EmployeeId == yahooId));
         Assert.Empty(jobClient.CreatedJobs);
 
-        // Exactly one audit row for the whole request, and no batch-queued audit.
         var rejection = Assert.IsType<AccountCreationEmailRejectedAuditEvent>(Assert.Single(auditPublisher.PublishedEvents));
         Assert.Equal(3, rejection.RejectedCount);
         Assert.Equal(new[] { "gmail.com", "hotmail.co.uk", "yahoo.com" }, rejection.Domains);

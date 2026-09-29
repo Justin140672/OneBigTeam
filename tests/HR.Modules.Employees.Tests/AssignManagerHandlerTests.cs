@@ -170,21 +170,18 @@ public class AssignManagerHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_Conflict_For_Direct_Circular_Assignment()
     {
-        // A → B, then try to assign A as manager of B
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         var empA = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         var empB = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
-        // B reports to A
         empB.Assign(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), empA.Id, now);
         context.Employees.AddRange(empA, empB);
         await context.SaveChangesAsync();
 
         var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
 
-        // Try to assign B as manager of A — circular
         var result = await handler.HandleAsync(
             new AssignManagerRequest { CompanyId = companyId, Id = empA.Id, ManagerId = empB.Id },
             CancellationToken.None);
@@ -196,7 +193,6 @@ public class AssignManagerHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_Conflict_For_Deep_Circular_Assignment()
     {
-        // A → B → C, then try to assign A as manager of C
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
@@ -204,7 +200,6 @@ public class AssignManagerHandlerTests
         var empA = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         var empB = Employee.Create(Guid.NewGuid(), companyId, "Bob", "Jones", "bob@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         var empC = Employee.Create(Guid.NewGuid(), companyId, "Carol", "White", "carol@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
-        // B reports to A; C reports to B
         empB.Assign(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), empA.Id, now);
         empC.Assign(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), empB.Id, now);
         context.Employees.AddRange(empA, empB, empC);
@@ -212,7 +207,6 @@ public class AssignManagerHandlerTests
 
         var handler = new AssignManagerHandler(context, new FakeClock(FixedUtcNow), new NoOpIntegrationEventPublisher());
 
-        // Try to assign C as manager of A — would create A→B→C→A cycle
         var result = await handler.HandleAsync(
             new AssignManagerRequest { CompanyId = companyId, Id = empA.Id, ManagerId = empC.Id },
             CancellationToken.None);
@@ -224,7 +218,6 @@ public class AssignManagerHandlerTests
     [Fact]
     public async Task HandleAsync_Allows_Valid_Reassignment_Within_Hierarchy()
     {
-        // A → B → C, then reassign C to report to A directly (not circular)
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
@@ -323,7 +316,6 @@ public class AssignManagerHandlerTests
         Assert.True(first.IsSuccess);
         Assert.True(second.IsSuccess);
         Assert.Equal(first.Value!.ManagerId, second.Value!.ManagerId);
-        // Only the first (non-replayed) call should have published the ManagerChanged event.
         Assert.Single(publisher.Published);
     }
 

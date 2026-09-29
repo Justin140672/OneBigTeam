@@ -2,13 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the Vacancy Performance report
-/// (/companies/{companyId}/reporting/vacancy-performance — VacancyPerformanceReportPage.razor).
-/// Uses a date-range-only ReportFilterPanel (no group-by control on this page, unlike Sickness
-/// and Recruitment Pipeline) and exports via the same SfDropDownButton pattern as the other
-/// report pages.
-/// </summary>
 public sealed class VacancyPerformanceReportPage(IPage page, string baseUrl)
 {
     private const string RowsRenderedSelector = ".e-grid .e-row, .e-grid .e-emptyrow";
@@ -36,7 +29,6 @@ public sealed class VacancyPerformanceReportPage(IPage page, string baseUrl)
         return await page.Locator(".e-grid .e-row").CountAsync();
     }
 
-    // ── Filter panel (ReportFilterPanel — Date range only: "Start Date From"/"Start Date To") ──
 
     private ILocator FilterField(string labelText) =>
         page.Locator(".card-body .col-md-3").Filter(new() { HasText = labelText }).First;
@@ -65,7 +57,6 @@ public sealed class VacancyPerformanceReportPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 
-    // ── Export ─────────────────────────────────────────────────────────────────
 
     public async Task<IDownload> ExportAsync(string formatLabel)
     {

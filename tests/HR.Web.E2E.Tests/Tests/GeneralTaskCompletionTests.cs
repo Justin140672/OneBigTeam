@@ -4,32 +4,12 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies that an employee can view and complete a general (non-leave) task,
-/// and that the status changes to "Completed" after the action.
-///
-/// Uses Sarah Chen's seeded task "Review Q2 performance reports"
-/// (ID: a0000000-0000-0000-0000-000000000027), accessed directly via her own profile Tasks
-/// tab (a self-service route unaffected by the "/" dashboard redirect that now applies to her
-/// CompanyAdministrator + Manager role, which still lacks EmployeeEdit — see Home.razor).
-///
-/// This task is TaskSource.Workflow (a generic, non-domain-specific source) rather than the
-/// TaskSource.Manual it used to be — that source has been removed entirely. Workflow is the
-/// closest generic bucket, and this test genuinely needs a task that exercises the
-/// CompleteTaskPanel fallback (i.e. one that doesn't match any of the specialised
-/// Source+ActionType panel combinations in TaskViewDialog), so the fixture was kept as a
-/// newly-seeded Workflow task rather than deleted.
-///
-/// The dashboard-widget check (<see cref="Dashboard_ShowsGeneralTasksForEmployee"/>) uses Laura
-/// Bennett instead, since Sarah is redirected away from "/" and can never reach it.
-/// </summary>
 public sealed class GeneralTaskCompletionTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid SarahId = Guid.Parse("30000000-0000-0000-0000-000000000001");
     private static readonly Guid LauraId = Guid.Parse("30000000-0000-0000-0000-000000000005");
 
-    // Seeded task assigned to Sarah Chen (TaskSource.Workflow).
     private static readonly Guid TaskQ2ReviewId = Guid.Parse("a0000000-0000-0000-0000-000000000027");
 
     private const string SarahEmail = "sarah.chen@acme.example";
@@ -41,22 +21,17 @@ public sealed class GeneralTaskCompletionTests(HrAdminPersonaFixture fixture) : 
         var login    = new LoginPage(_page, _fixture.WebBaseUrl);
         var taskView = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
-        // ── Step 1: Login as Sarah ────────────────────────────────────────────
         await login.GoToAsync();
         await login.LoginAsync(SarahEmail);
 
-        // ── Step 2: Navigate directly to the seeded task ──────────────────────
         await taskView.GoToAsync(AcmeId, SarahId, TaskQ2ReviewId);
 
-        // ── Step 3: Verify title ──────────────────────────────────────────────
         var title = await taskView.GetTitleAsync();
         Assert.Contains("Q2", title, StringComparison.OrdinalIgnoreCase);
 
-        // ── Step 4: This is NOT a leave task — the review panel must be absent ─
         Assert.False(await taskView.HasLeaveReviewPanelAsync(),
             "Expected no 'Review Leave Request' panel on a general (non-leave) task");
 
-        // ── Step 5: Status should be "Not Started" ────────────────────────────
         var status = await taskView.GetStatusAsync();
         Assert.Equal("Not Started", status);
     }
@@ -64,17 +39,6 @@ public sealed class GeneralTaskCompletionTests(HrAdminPersonaFixture fixture) : 
     [Fact]
     public async Task ProfileTasksTab_ShowsGeneralTasksForEmployee()
     {
-        // Sarah Chen is seeded as CompanyAdministrator-only and is redirected away from "/"
-        // (see Home.razor), so this check uses Laura Bennett instead.
-        // Laura's previous "Review Q2 performance reports" / "Prepare board meeting agenda"
-        // tasks (TaskSource.Manual) were removed along with that source; her remaining seeded
-        // tasks — "Update annual leave policy documentation" (Leave) and "Acknowledge receipt
-        // of asset" (Asset) — are real, domain-sourced tasks that already existed for other
-        // purposes, so no new seed data was needed here.
-        //
-        // The old dashboard "My Tasks" widget (MyTasksWidget.razor) this used to check is dead
-        // code — no longer rendered anywhere. Laura's own profile Tasks tab is the current,
-        // role-agnostic place to find her full assigned-task list.
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var profile = new MyProfilePage(_page, _fixture.WebBaseUrl);
 
@@ -86,7 +50,6 @@ public sealed class GeneralTaskCompletionTests(HrAdminPersonaFixture fixture) : 
 
         var taskTitles = await profile.GetTaskTitlesAsync();
 
-        // Laura has several seeded tasks; at least one should appear in her task list.
         Assert.True(taskTitles.Count > 0,
             "Expected Laura to have tasks in her Tasks tab");
 
@@ -101,9 +64,6 @@ public sealed class GeneralTaskCompletionTests(HrAdminPersonaFixture fixture) : 
         var login    = new LoginPage(_page, _fixture.WebBaseUrl);
         var taskView = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
-        // Use "Analyse employee satisfaction survey results" (a0000000-0000-0000-0000-000000000028,
-        // TaskSource.Workflow) — a separate seeded task so this test does not conflict with
-        // other tests that use Q2.
         var taskSurveyId = Guid.Parse("a0000000-0000-0000-0000-000000000028");
 
         await login.GoToAsync();
@@ -111,14 +71,11 @@ public sealed class GeneralTaskCompletionTests(HrAdminPersonaFixture fixture) : 
 
         await taskView.GoToAsync(AcmeId, SarahId, taskSurveyId);
 
-        // Verify it is open / not yet completed.
         var statusBefore = await taskView.GetStatusAsync();
         Assert.NotEqual("Completed", statusBefore);
 
         await taskView.CompleteGeneralTaskAsync();
 
-        // Completing a task closes the dialog and refreshes the list — verify the change landed on
-        // the list row, not the (now-gone) dialog.
         Assert.Equal("Completed", await taskView.GetListTaskStatusAsync(taskSurveyId));
     }
 }

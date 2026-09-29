@@ -15,25 +15,9 @@ internal sealed class Employee : IVersionedAggregate
     public Guid LocationId { get; private set; }
     public Guid PositionProfileId { get; private set; }
     public Guid? ManagerId { get; private set; }
-    // True only for the single employee record auto-created for the admin who signed the company
-    // up (see SignUpHandler.CreateAdminEmployeeAsync / MarkAsInitialCompanyAdmin below). Used
-    // exclusively by DataImport's employee import: a row whose Work Email matches this specific
-    // employee is treated as an update to the seed record rather than a duplicate-email error —
-    // see EmployeeStagingRowValidator/ConfirmImportSessionHandler. Never set for any other employee.
     public bool IsInitialCompanyAdmin { get; private set; }
-    // Set when this employee is the initial company admin auto-created at signup with placeholder
-    // personal details (see EmployeeProvisioningService.MarkAsInitialCompanyAdminAsync) — drives
-    // the blocking "Complete your employee profile" dialog in HR.Web and the first Getting Started
-    // checklist item until CompleteInitialSetup is called.
     public bool RequiresInitialSetup { get; private set; }
     public DateTimeOffset? InitialSetupCompletedAt { get; private set; }
-    // NFR-08: idempotency key for automated, multi-step provisioning flows that create an employee
-    // as a side effect of an upstream action (currently: hiring a recruitment candidate). Format is
-    // "<source>:<entity>:<id>", e.g. "recruitment:application:{applicationId}". A filtered unique
-    // index on (company_id, source_reference) guarantees that re-running the upstream workflow after
-    // a partial failure can never create a second employee (and therefore never a second
-    // EmployeeCreated integration event, onboarding plan, probation record, leave initialisation or
-    // notification) for the same source. Null for employees created directly by a human.
     public string? SourceReference { get; private set; }
     public string FirstName { get; private set; } = string.Empty;
     public string LastName { get; private set; } = string.Empty;
@@ -63,14 +47,6 @@ internal sealed class Employee : IVersionedAggregate
     public DateOnly? ContinuousServiceDate { get; private set; }
     public DateOnly? ProbationEndDate { get; private set; }
     public DateOnly? LeavingDate { get; private set; }
-    // P1 fix (departure access disablement): set once ReconcileFormerEmployeeAccessJob has
-    // published (or confirmed no need to publish) an EmployeeDepartureFinalisedIntegrationEvent
-    // for this employee's existing HasSystemAccess=false state — covers employees whose departure
-    // was finalised before Identity started consuming that event to actually disable the linked
-    // ApplicationUser. Persisted (not computed) so the reconciliation sweep never reprocesses an
-    // employee twice, regardless of whether Identity's own disablement ultimately succeeded —
-    // downstream retry/visibility of the Identity-side disablement itself is handled entirely by
-    // HR.Modules.Identity.Domain.AccountDisablement, not by this flag.
     public DateTimeOffset? AccessDisablementReconciledAt { get; private set; }
     public NoticePeriodUnit? NoticePeriodUnitOverride { get; private set; }
     public int? NoticePeriodLengthOverride { get; private set; }
@@ -171,10 +147,6 @@ internal sealed class Employee : IVersionedAggregate
         UpdatedAt = now;
     }
 
-    // Used exclusively by EmployeeRenumberingService (IEmployeeRenumberingService) when a
-    // company's employee-number FORMAT changes while staying in Automatic mode — every employee
-    // is renumbered to the new format. Not used by any manual, user-facing edit path (see the
-    // Automatic-mode read-only guard in UpdateEmploymentDetailsHandler).
     public void SetEmployeeNumber(string employeeNumber)
     {
         EmployeeNumber = employeeNumber;
@@ -315,10 +287,5 @@ internal sealed class Employee : IVersionedAggregate
 
     private static string? Norm(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 
-    // Employee numbers are normalized to uppercase before storage, mirroring how WorkEmail is
-    // normalized (lowercased) before storage elsewhere in this entity — this keeps the
-    // case-insensitive uniqueness check a plain unique index on the stored value rather than a
-    // computed/expression index. Leading zeros are preserved since the value is never parsed as
-    // a number.
     private static string NormalizeEmployeeNumber(string employeeNumber) => employeeNumber.Trim().ToUpperInvariant();
 }

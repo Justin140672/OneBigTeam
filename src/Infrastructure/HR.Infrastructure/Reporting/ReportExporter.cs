@@ -8,11 +8,6 @@ using QuestPDF.Infrastructure;
 
 namespace HR.Infrastructure.Reporting;
 
-/// <summary>
-/// Generic, report-agnostic implementation of <see cref="IReportExporter"/>. Renders any
-/// tabular <see cref="ReportExportData"/> payload to CSV, Excel or PDF. Must never contain
-/// report-specific logic — the Employee Directory report is only the first consumer.
-/// </summary>
 internal sealed class ReportExporter : IReportExporter
 {
     public ReportExportFile Export(ReportExportFormat format, ReportExportData data)
@@ -46,14 +41,6 @@ internal sealed class ReportExporter : IReportExporter
             : value;
     }
 
-    /// <summary>
-    /// Neutralises spreadsheet-formula injection (CSV/Excel formula injection, aka CSV injection).
-    /// Any value that a spreadsheet application would interpret as the start of a formula
-    /// (=, +, -, @) is prefixed so it is opened as plain text rather than executed. Leading
-    /// whitespace and control characters are stripped before detection so they cannot be used
-    /// to bypass the check. Genuine numeric values (including negative numbers) are left
-    /// untouched so they remain usable as numbers.
-    /// </summary>
     private static string NeutralizeFormulaInjection(string? value)
     {
         if (string.IsNullOrEmpty(value))
@@ -70,7 +57,6 @@ internal sealed class ReportExporter : IReportExporter
         if (firstSignificantChar is not ('=' or '+' or '-' or '@'))
             return value;
 
-        // Genuine numeric values (e.g. "-42", " 3.14") are safe and must remain usable as numbers.
         if (double.TryParse(value, NumberStyles.Float | NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out _))
             return value;
 
@@ -153,12 +139,6 @@ internal sealed class ReportExporter : IReportExporter
         return new ReportExportFile(bytes, "application/pdf", $"{SafeFileName(data.ReportTitle)}.pdf");
     }
 
-    /// <summary>
-    /// Writes an untrusted string value into an Excel cell, explicitly as text, after
-    /// neutralising any spreadsheet-formula injection prefix. This prevents both formula
-    /// execution and ClosedXML/Excel auto-detection turning the value into a number, date
-    /// or formula.
-    /// </summary>
     private static void SetTextCell(IXLCell cell, string? value)
     {
         var neutralized = NeutralizeFormulaInjection(value ?? string.Empty);

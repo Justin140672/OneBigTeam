@@ -5,13 +5,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Tasks.Features.CandidateHired;
 
-/// <summary>
-/// Creates an unassigned (HR inbox) task when a candidate is hired. Mirrors
-/// NotifyHrOfFitNoteThresholdHandler/NotifyHrOfOverdueFitNoteHandler's approach — there is no
-/// existing mechanism to enumerate individual HR administrators for direct per-admin
-/// notification, so the task is left unassigned and surfaces in the HR Inbox
-/// (see GetUnassignedTasks) for any HR administrator to pick up.
-/// </summary>
 internal sealed class NotifyHrOfCandidateHiredHandler(
     ITaskCreator taskCreator,
     IEmployeeNameReader employeeNameReader) : IIntegrationEventHandler<CandidateHiredIntegrationEvent>

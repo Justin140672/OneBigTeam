@@ -94,7 +94,6 @@ public class GetEmployeeEndpointTests
         var companyA = Guid.NewGuid();
         var companyB = Guid.NewGuid();
 
-        // Create employee under company A
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, GetEmpUser3.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyA.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, GetEmpUser3, SystemRoles.HrAdministrator, companyA);
@@ -110,7 +109,6 @@ public class GetEmployeeEndpointTests
         var created = await createResponse.Content.ReadFromJsonAsync<EmployeePayload>();
         Assert.NotNull(created);
 
-        // Authenticated as companyA but route targets companyB — middleware blocks it.
         var response = await client.GetAsync($"/api/companies/{companyB}/employees/{created!.Id}");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -127,7 +125,6 @@ public class GetEmployeeEndpointTests
 
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
 
-        // Create department
         var deptResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/departments", new
         {
             companyId,
@@ -136,7 +133,6 @@ public class GetEmployeeEndpointTests
         deptResponse.EnsureSuccessStatusCode();
         var dept = await deptResponse.Content.ReadFromJsonAsync<DeptPayload>();
 
-        // Create a leave policy (mandatory FK on Position Profile creation)
         var leavePolicyResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/leave-policies", new
         {
             companyId,
@@ -147,7 +143,6 @@ public class GetEmployeeEndpointTests
         leavePolicyResponse.EnsureSuccessStatusCode();
         var leavePolicyId = (await leavePolicyResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
 
-        // Create position profile
         var posResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
         {
             companyId,
@@ -159,7 +154,6 @@ public class GetEmployeeEndpointTests
         posResponse.EnsureSuccessStatusCode();
         var pos = await posResponse.Content.ReadFromJsonAsync<PosPayload>();
 
-        // Create manager employee
         var mgrResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees",
             EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
@@ -168,7 +162,6 @@ public class GetEmployeeEndpointTests
         mgrResponse.EnsureSuccessStatusCode();
         var mgr = await mgrResponse.Content.ReadFromJsonAsync<EmployeePayload>();
 
-        // Create employee
         var empResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
         {
             companyId,
@@ -188,7 +181,6 @@ public class GetEmployeeEndpointTests
         empResponse.EnsureSuccessStatusCode();
         var created = await empResponse.Content.ReadFromJsonAsync<EmployeePayload>();
 
-        // Assign manager
         await client.PutAsJsonAsync($"/api/companies/{companyId}/employees/{created!.Id}/manager", new
         {
             companyId,
@@ -196,7 +188,6 @@ public class GetEmployeeEndpointTests
             managerId = mgr!.Id
         });
 
-        // Fetch and assert
         var response = await client.GetAsync($"/api/companies/{companyId}/employees/{created.Id}");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
@@ -216,10 +207,6 @@ public class GetEmployeeEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, GetEmpUser3, SystemRoles.HrAdministrator, companyId);
 
-        // Department, Location, Position Profile, Employee Number and Employment Type are all
-        // mandatory on employee creation — set up shared reference data once, then reuse it for
-        // every employee below (the reporting-chain relationships are what's under test, not
-        // these fields).
         var deptResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/departments",
             new { companyId, name = $"Dept-{Guid.NewGuid():N}" });
@@ -390,9 +377,6 @@ public class GetEmployeeEndpointTests
             return (await response.Content.ReadFromJsonAsync<EmployeePayload>())!;
         }
 
-        // A manager is required for a probation record to be auto-created on employee creation
-        // (CreateProbationOnEmployeeCreated.EmployeeCreatedHandler skips it when ManagerId is
-        // null) — an onboarding plan is always auto-created regardless.
         var managerId = await CreateEmployeeAsync("Manager", "Person", managerId: null);
         var employeeId = await CreateEmployeeAsync("Jamie", "Smith", managerId);
 
@@ -401,7 +385,6 @@ public class GetEmployeeEndpointTests
         Assert.True(initial.ShowProbationTab);
         Assert.False(initial.ShowOffboardingTab);
 
-        // Start offboarding — should now show alongside the still-active onboarding/probation.
         var startResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/offboarding/start",
             new { companyId, employeeId, lastWorkingDay = "2026-12-01", notes = (string?)null });
@@ -448,9 +431,6 @@ public class GetEmployeeEndpointTests
         Assert.True(afterOnboardingCompleted.ShowProbationTab);
         Assert.True(afterOnboardingCompleted.ShowOffboardingTab);
 
-        // Complete the probation record via a Passed FinalDecision review — ShowProbationTab
-        // should flip to false, independently of the already-completed onboarding and the
-        // still-active offboarding plan.
         var probationRecordResponse = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/probation-record");
         probationRecordResponse.EnsureSuccessStatusCode();
@@ -485,24 +465,19 @@ public class GetEmployeeEndpointTests
         Assert.False(afterProbationCompleted.ShowProbationTab);
         Assert.True(afterProbationCompleted.ShowOffboardingTab);
 
-        // Complete every remaining generated offboarding task — the plan should transition to
-        // Completed and ShowOffboardingTab should flip to false, leaving every lifecycle tab
-        // hidden. Jamie has a manager, so the 4 manager exit-checklist tasks are assigned
-        // directly to that manager (not unassigned) — only the 1 HR document-review task is
-        // unassigned (StartOffboardingHandler.CreateDocumentReviewTaskAsync always leaves it so).
         var remainingUnassignedResponse = await client.GetAsync($"/api/companies/{companyId}/tasks/unassigned");
         remainingUnassignedResponse.EnsureSuccessStatusCode();
         var unassignedOffboardingTasks = (await remainingUnassignedResponse.Content.ReadFromJsonAsync<UnassignedTasksPayload>())!.Items
             .Where(t => t.Source == "Offboarding")
             .ToList();
-        Assert.Single(unassignedOffboardingTasks); // the HR document-review task
+        Assert.Single(unassignedOffboardingTasks);
 
         var managerTasksResponse = await client.GetAsync($"/api/companies/{companyId}/employees/{managerId}/tasks");
         managerTasksResponse.EnsureSuccessStatusCode();
         var managerOffboardingTasks = (await managerTasksResponse.Content.ReadFromJsonAsync<EmployeeTasksPayload>())!.Items
             .Where(t => t.Source == "Offboarding")
             .ToList();
-        Assert.Equal(4, managerOffboardingTasks.Count); // the manager exit-checklist tasks
+        Assert.Equal(4, managerOffboardingTasks.Count);
 
         var offboardingTaskIds = unassignedOffboardingTasks.Select(t => t.Id)
             .Concat(managerOffboardingTasks.Select(t => t.Id));
@@ -566,10 +541,6 @@ public class GetEmployeeEndpointTests
         etResponse.EnsureSuccessStatusCode();
         var employmentTypeId = (await etResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
 
-        // No managerId supplied — CreateProbationOnEmployeeCreated.EmployeeCreatedHandler skips
-        // creating a probation record entirely when ManagerId is null, so ShowProbationTab starts
-        // (and stays) false without ever needing a Passed/Failed transition. Onboarding still
-        // auto-creates regardless of manager, so ShowOnboardingTab starts true here.
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
         {
             companyId,
@@ -599,7 +570,6 @@ public class GetEmployeeEndpointTests
         Assert.False(employee.ShowOffboardingTab);
     }
 
-    // ── ShowLeavingTab ────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_Employee_ShowLeavingTab_Flips_True_After_Leaving_Process_Started()
@@ -632,9 +602,6 @@ public class GetEmployeeEndpointTests
             {
                 companyId,
                 employeeId = created.Id,
-                // Relative to "today" rather than a hardcoded literal — see
-                // StartLeavingProcessEndpointTests for why a fixed near-term literal eventually
-                // becomes "backdated".
                 resignationReceivedDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-30).ToString("yyyy-MM-dd"),
                 leavingDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30).ToString("yyyy-MM-dd"),
                 lastWorkingDay = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(29).ToString("yyyy-MM-dd"),
@@ -650,10 +617,6 @@ public class GetEmployeeEndpointTests
         Assert.Equal("Leaving", afterPayload.Status);
     }
 
-    // ── notice period override / effective resolution ───────────────────────────
-    // Resolver priority-order logic itself is covered by EffectiveNoticePeriodResolverTests
-    // (unit) — these prove the endpoint round-trips the employee's own override and surfaces
-    // the resolved Effective* fields end-to-end.
 
     [Fact]
     public async Task Get_Employee_Returns_Employee_NoticePeriodOverride_And_Effective_Values_When_Set()
@@ -665,7 +628,6 @@ public class GetEmployeeEndpointTests
         await TestRoleSeeder.AssignRoleAsync(_factory, GetEmpUser1, SystemRoles.HrAdministrator, companyId);
 
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
-        // The PUT below sets an explicit employee number, only allowed in Manual mode.
         await EmployeeReferenceDataSeeder.SetEmployeeNumberModeManualAsync(client, companyId);
 
         var createResponse = await client.PostAsJsonAsync(
@@ -730,8 +692,6 @@ public class GetEmployeeEndpointTests
         Assert.NotNull(payload);
         Assert.Null(payload!.NoticePeriodUnitOverride);
         Assert.Null(payload.NoticePeriodLengthOverride);
-        // No CompanySettings row has been created for this company — CompanyNoticePeriodSettingsReader
-        // falls back to its hard-coded default of Months/1 (see CompanyNoticePeriodSettingsReader.cs).
         Assert.Equal("Months", payload.EffectiveNoticePeriodUnit);
         Assert.Equal(1, payload.EffectiveNoticePeriodLength);
         Assert.Equal("CompanyDefault", payload.EffectiveNoticePeriodSource);

@@ -41,7 +41,6 @@ public class ExportImportErrorsHandlerTests
         var companyId = Guid.NewGuid();
         var session = await SeedSessionAsync(db, companyId);
 
-        // Added out of RowNumber order to verify the handler orders by RowNumber, not insertion order.
         db.ImportRowErrors.Add(ImportRowError.Create(
             Guid.NewGuid(), companyId, session.Id, rowNumber: 3, ImportRowErrorSeverity.Error,
             "'LastName' is required, and 'WorkEmail' too", "FirstName=Jane", FixedNowOffset));

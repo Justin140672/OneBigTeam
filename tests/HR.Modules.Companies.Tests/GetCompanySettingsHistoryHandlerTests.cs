@@ -4,11 +4,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Companies.Tests;
 
-/// <summary>
-/// SET-02: reuses IAuditHistoryReader.GetPlatformAuditLogAsync exactly as GetAuditLogHandlerTests
-/// does — see its remarks — but always fixes companyId to the caller's own company (never null,
-/// unlike the platform-admin audit log) and restricts eventType to "company-settings.updated".
-/// </summary>
 public class GetCompanySettingsHistoryHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 6, 30, 10, 0, 0, TimeSpan.Zero);

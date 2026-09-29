@@ -9,11 +9,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Companies.Features.RetryEmployeeRenumberSideEffect;
 
-/// <summary>
-/// SET-08: "a failed renumber operation is visible and can be retried" — resets a Failed outbox
-/// row back to Pending and re-enqueues the job. Requires "hr-settings:manage", same as the
-/// settings endpoints that can trigger this side effect in the first place.
-/// </summary>
 internal sealed class RetryEmployeeRenumberSideEffectHandler(
     CompaniesDbContext dbContext,
     IClock clock,
@@ -68,8 +63,6 @@ internal sealed class RetryEmployeeRenumberSideEffectHandler(
 
             if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
             {
-                // Lost a race against a concurrent duplicate under the same key - the winner's
-                // attempt already enqueued the retry job, so don't enqueue a second one here.
                 return Result.Success(outcome.Response!);
             }
         }

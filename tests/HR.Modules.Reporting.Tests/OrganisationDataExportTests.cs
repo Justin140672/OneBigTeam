@@ -241,7 +241,6 @@ public class OrganisationDataExportTests
     [Fact]
     public void BeginAttempt_From_InProgress_At_Exact_Lease_Expiry_Is_Allowed()
     {
-        // IsLeaseExpired uses expires <= now, so the boundary instant counts as expired.
         var export = Claimed();
         var expiry = export.LeaseExpiresAt!.Value;
 
@@ -266,7 +265,6 @@ public class OrganisationDataExportTests
     [Fact]
     public void BeginAttempt_From_InProgress_With_Expired_Lease_Hands_Ownership_To_The_New_Worker()
     {
-        // First worker claimed 20 minutes ago and its 15-minute lease has expired.
         var export = Claimed(Now.AddMinutes(-20));
 
         var result = export.BeginAttempt(OtherToken, Now);
@@ -320,7 +318,6 @@ public class OrganisationDataExportTests
         Assert.True(NewPending().IsLeaseExpired(Now));
     }
 
-    // ----- Follow-up A: lease renewal (heartbeat) -----
 
     [Fact]
     public void RenewLease_By_Current_Owner_Pushes_Out_The_Expiry()
@@ -369,7 +366,6 @@ public class OrganisationDataExportTests
         Assert.Null(export.LeaseOwnerToken);
         Assert.Null(export.LeaseAcquiredAt);
         Assert.Null(export.LeaseExpiresAt);
-        // attempt history is preserved so the sweep can still give up after MaxAttempts
         Assert.Equal(1, export.AttemptCount);
     }
 
@@ -455,12 +451,11 @@ public class OrganisationDataExportTests
             export.ResetForRetry(Now);
         }
 
-        export.BeginAttempt(Token, Now); // the MaxAttempts-th attempt
+        export.BeginAttempt(Token, Now);
         Assert.Equal(OrganisationDataExport.MaxAttempts, export.AttemptCount);
         Assert.False(export.CanAttemptAgain);
     }
 
-    // ----- Follow-up D: ownership-guarded MarkFailed(ownerToken, ...) -----
 
     [Fact]
     public void MarkFailed_With_Owner_Token_Rejected_When_Superseded()
@@ -507,7 +502,6 @@ public class OrganisationDataExportTests
         Assert.Equal(OrganisationDataExport.StatusPending, export.Status);
     }
 
-    // ----- Follow-up H: recovery claim / reset -----
 
     [Fact]
     public void ClaimForRecovery_With_Empty_Token_Is_Validation_Failure()
@@ -538,7 +532,7 @@ public class OrganisationDataExportTests
     [Fact]
     public void ClaimForRecovery_While_Lease_Is_Still_Live_Is_Conflict()
     {
-        var export = Claimed(); // lease live for 15 minutes
+        var export = Claimed();
 
         var result = export.ClaimForRecovery(OtherToken, Now.AddMinutes(1));
 
@@ -580,7 +574,6 @@ public class OrganisationDataExportTests
         var export = Claimed(Now.AddMinutes(-20));
         Assert.True(export.ClaimForRecovery(OtherToken, Now).IsSuccess);
 
-        // A different recovery sweep (or the resurrected original worker) cannot reset it.
         var result = export.ResetForRetry(Token, Now.AddMinutes(1));
 
         Assert.True(result.IsFailure);
@@ -619,7 +612,6 @@ public class OrganisationDataExportTests
         Assert.Equal("conflict", result.Error.Code);
     }
 
-    // ----- Follow-up I: attempt-file cleanup marker -----
 
     [Theory]
     [InlineData(OrganisationDataExport.StatusPending)]

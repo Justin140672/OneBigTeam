@@ -3,17 +3,11 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the Leave Summary report page
-/// (/companies/{companyId}/reporting/leave-summary — LeaveSummaryReportPage.razor): loading
-/// (aggregated, non-paged grid), the inline PolicyYear/Department/GroupBy filters, and export.
-/// Catalog-page coverage (card visibility/navigation) lives in <see cref="ReportCatalogTests"/>.
-/// </summary>
 public sealed class LeaveSummaryReportTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    private const string LauraEmail = "laura.bennett@acme.example"; // HR Administrator
+    private const string LauraEmail = "laura.bennett@acme.example";
 
     [Fact]
     public async Task Page_Loads_WithExpectedColumns()
@@ -47,8 +41,6 @@ public sealed class LeaveSummaryReportTests(HrAdminPersonaFixture fixture) : Rol
 
         await report.GoToAsync(AcmeId);
 
-        // Default GroupBy is "Employee" (see LeaveSummaryReportPage.razor's _groupBy default),
-        // so its grouping column header should read "Employee" before any change.
         var headersBefore = await report.GetColumnHeadersAsync();
         Assert.Contains(headersBefore, h => h.Contains("Employee"));
 

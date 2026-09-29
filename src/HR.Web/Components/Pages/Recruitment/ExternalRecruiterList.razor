@@ -187,10 +187,6 @@
     {
         ClearActionError();
 
-        // Deactivation never breaks anything (the row is preserved, only flagged inactive — see
-        // SetExternalRecruiterActiveStatusHandler), but if the recruiter is still assigned to any
-        // active vacancy, warn the user first rather than deactivating silently. Activating never
-        // needs this check.
         if (!isActive)
         {
             var usage = await ExternalRecruiterService.GetUsageAsync(CompanyId, item.Id);
@@ -202,7 +198,6 @@
                 return;
             }
 
-            // Not in use — still confirm before deactivating, just without the usage warning.
             _simpleDeactivateTarget = item;
             return;
         }

@@ -118,12 +118,10 @@ public class SharedCompanyDocumentAudienceMatcherTests
             Rule(SharedCompanyDocumentAudienceRuleType.Position, positionId),
         };
 
-        // Matches the Department rule only — a different position, so the Position rule alone would fail.
         var matchingProfile = new EmployeeAudienceProfile(departmentId, null, Guid.NewGuid());
         var matchingResult = SharedCompanyDocumentAudienceMatcher.IsInAudience(rules, matchingProfile, Guid.NewGuid());
         Assert.True(matchingResult);
 
-        // Matches neither rule.
         var nonMatchingProfile = new EmployeeAudienceProfile(Guid.NewGuid(), null, Guid.NewGuid());
         var nonMatchingResult = SharedCompanyDocumentAudienceMatcher.IsInAudience(rules, nonMatchingProfile, Guid.NewGuid());
         Assert.False(nonMatchingResult);

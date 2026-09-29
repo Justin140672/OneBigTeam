@@ -21,7 +21,6 @@ internal static class ApiTestSupport
         return new HrApiHttpClientFactory(services.BuildServiceProvider().GetRequiredService<IHttpClientFactory>(), new CircuitSessionState());
     }
 
-    /// <summary>Returns a fixed status code with an optional JSON payload (serialized with the given options).</summary>
     public sealed class JsonResponseHandler(HttpStatusCode statusCode, object? payload, System.Text.Json.JsonSerializerOptions? jsonOptions = null) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(
@@ -34,7 +33,6 @@ internal static class ApiTestSupport
         }
     }
 
-    /// <summary>Returns a 2xx status with an unparseable body, to verify malformed-JSON handling is controlled, not throwing.</summary>
     public sealed class MalformedJsonHandler(HttpStatusCode statusCode = HttpStatusCode.OK) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(
@@ -48,7 +46,6 @@ internal static class ApiTestSupport
         }
     }
 
-    /// <summary>Simulates a network-level failure (DNS/connection failure) rather than an HTTP response.</summary>
     public sealed class ThrowingHandler : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(

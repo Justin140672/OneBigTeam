@@ -47,7 +47,6 @@ internal sealed class CreateRecruitmentStageHandler(
             return Result.Failure<CreateRecruitmentStageResponse>(
                 Error.Validation($"A recruitment stage named '{trimmedName}' already exists."));
 
-        // Unique DisplayOrder within a company.
         var duplicateDisplayOrder = await db.RecruitmentStages
             .AnyAsync(s => s.CompanyId == request.CompanyId && s.DisplayOrder == request.DisplayOrder, cancellationToken);
 

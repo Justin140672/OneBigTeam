@@ -5,9 +5,6 @@ using System.Text.Json;
 
 namespace HR.Web.Testing;
 
-// TEST-ONLY (E2E_TESTING-gated) DelegatingHandler on the "hrapi" typed client. Intercepts only the
-// PUT .../employees/me/contact-details request and, when the caller's email has a registered
-// control, lets an E2E test hold / release / fail that outbound save.
 internal sealed class E2eContactSaveControlHandler(E2eContactSaveControlStore store) : DelegatingHandler
 {
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)

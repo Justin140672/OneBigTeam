@@ -2,13 +2,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Reporting.Domain;
 
-/// <summary>
-/// Story 2 (customer organisation data export before account closure): a single request by a
-/// company administrator to generate a full, downloadable ZIP export of their organisation's data.
-/// The lifecycle is Pending -> InProgress -> Completed|Failed, with Completed exports later
-/// transitioning to Expired by the recurring purge job once <see cref="ExpiresAt"/> passes.
-/// All state transitions are guarded and return a <see cref="Result"/>.
-/// </summary>
 internal sealed class OrganisationDataExport : IVersionedAggregate
 {
     public const string StatusPending = "Pending";
@@ -17,7 +10,6 @@ internal sealed class OrganisationDataExport : IVersionedAggregate
     public const string StatusFailed = "Failed";
     public const string StatusExpired = "Expired";
 
-    /// <summary>Download availability window after completion.</summary>
     public const int RetentionDays = 7;
 
     /// <summary>
@@ -26,11 +18,6 @@ internal sealed class OrganisationDataExport : IVersionedAggregate
     /// </summary>
     public const int MaxAttempts = 3;
 
-    /// <summary>
-    /// Follow-up A: how long a worker's ownership lease on an in-progress export lasts before the
-    /// recovery sweep may reclaim it. The build job renews (heartbeats) the lease while it works, so a
-    /// healthy long-running export is never reclaimed; only a genuinely abandoned lease expires.
-    /// </summary>
     public const int LeaseDurationMinutes = 15;
 
     private OrganisationDataExport() { }
@@ -60,11 +47,6 @@ internal sealed class OrganisationDataExport : IVersionedAggregate
     /// <summary>Ticket 3: how many expected documents were missing from storage when the export failed.</summary>
     public int MissingDocumentCount { get; private set; }
 
-    /// <summary>
-    /// Follow-up I: when the retryable artefact-cleanup job last confirmed that every orphan attempt
-    /// archive for this (terminal) export had been removed from storage. Null until cleaned; a failed
-    /// cleanup leaves it null so the next run retries.
-    /// </summary>
     public DateTimeOffset? AttemptFilesCleanedAt { get; private set; }
 
     /// <summary>
@@ -96,13 +78,10 @@ internal sealed class OrganisationDataExport : IVersionedAggregate
     /// <summary>Ticket 3K: number of failed late-upload rechecks since the last success; drives the capped backoff.</summary>
     public int LateUploadRecheckAttemptCount { get; private set; }
 
-    /// <summary>Follow-up A: opaque token identifying the worker that currently owns this in-progress export.</summary>
     public Guid? LeaseOwnerToken { get; private set; }
 
-    /// <summary>Follow-up A: when the current worker acquired its ownership lease.</summary>
     public DateTimeOffset? LeaseAcquiredAt { get; private set; }
 
-    /// <summary>Follow-up A: when the current worker's ownership lease expires and recovery may reclaim the export.</summary>
     public DateTimeOffset? LeaseExpiresAt { get; private set; }
 
     /// <summary>Ticket 2 optimistic-concurrency token — guards the Pending -&gt; InProgress claim.</summary>
@@ -112,10 +91,8 @@ internal sealed class OrganisationDataExport : IVersionedAggregate
 
     public bool CanAttemptAgain => AttemptCount < MaxAttempts;
 
-    /// <summary>Follow-up H/I: the export has reached a terminal state and will not do any more work.</summary>
     public bool IsTerminal => Status is StatusCompleted or StatusFailed or StatusExpired;
 
-    /// <summary>Follow-up A: true when no worker holds a live ownership lease (never leased, or lease expired).</summary>
     public bool IsLeaseExpired(DateTimeOffset now) => LeaseExpiresAt is not { } expires || expires <= now;
 
     private void ClearLease()
@@ -188,11 +165,6 @@ internal sealed class OrganisationDataExport : IVersionedAggregate
         return Result.Success();
     }
 
-    /// <summary>
-    /// Follow-up A: heartbeat — extend the current owner's lease while the build job is still working.
-    /// Fails if the caller is not the current owner (it has been superseded) or the export is no
-    /// longer in progress, signalling the worker to abandon its attempt.
-    /// </summary>
     public Result RenewLease(Guid ownerToken, DateTimeOffset now)
     {
         if (Status != StatusInProgress || LeaseOwnerToken != ownerToken)
@@ -214,13 +186,6 @@ internal sealed class OrganisationDataExport : IVersionedAggregate
         return Result.Success();
     }
 
-    /// <summary>
-    /// Follow-up H: atomically claim recovery ownership of an apparently stalled InProgress export
-    /// before any file deletion or reset. Rechecks status and lease expiry: the claim is refused if
-    /// the export has completed/failed, if the original worker has renewed its lease, or if another
-    /// recovery sweep already took ownership. On success the recovery sweep holds the lease, so a
-    /// resurrected original worker can no longer renew, complete or fail the export.
-    /// </summary>
     public Result ClaimForRecovery(Guid recoveryToken, DateTimeOffset now)
     {
         if (recoveryToken == Guid.Empty)
@@ -238,10 +203,6 @@ internal sealed class OrganisationDataExport : IVersionedAggregate
         return Result.Success();
     }
 
-    /// <summary>
-    /// Follow-up H: return a stalled InProgress export to the queue, but only for the recovery sweep
-    /// that currently holds the lease (see <see cref="ClaimForRecovery"/>).
-    /// </summary>
     public Result ResetForRetry(Guid recoveryToken, DateTimeOffset now)
     {
         if (Status != StatusInProgress)
@@ -256,10 +217,6 @@ internal sealed class OrganisationDataExport : IVersionedAggregate
         return Result.Success();
     }
 
-    /// <summary>
-    /// Follow-up I: record that the retryable artefact-cleanup job has removed every orphan attempt
-    /// archive for this terminal export. Only valid once the export has finished.
-    /// </summary>
     public Result MarkAttemptFilesCleaned(DateTimeOffset now)
     {
         if (!IsTerminal)

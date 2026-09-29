@@ -9,11 +9,6 @@ using HR.SharedKernel;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Verifies that completing a task whose Source is Asset and ActionType is Return
-/// calls AssetReturnService, marking the assignment inactive and returning the asset
-/// status to Available.
-/// </summary>
 [Collection("Integration")]
 public class AssetReturnFromTaskEndToEndTests
 {
@@ -98,7 +93,6 @@ public class AssetReturnFromTaskEndToEndTests
         Assert.Equal("Available", assetAfterReturn!.Status);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)
     {

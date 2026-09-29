@@ -4,11 +4,6 @@ using Microsoft.EntityFrameworkCore.Design;
 
 namespace HR.Modules.Leave.Persistence;
 
-/// <summary>
-/// Design-time factory used by EF Core tooling (dotnet ef migrations).
-/// Set the LEAVE_CONNECTION_STRING environment variable or update the fallback
-/// to point at your local Postgres instance before running migrations.
-/// </summary>
 internal sealed class LeaveDbContextFactory : IDesignTimeDbContextFactory<LeaveDbContext>
 {
     public LeaveDbContext CreateDbContext(string[] args)

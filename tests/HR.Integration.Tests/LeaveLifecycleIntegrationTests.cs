@@ -25,7 +25,6 @@ public class LeaveLifecycleIntegrationTests
         }).GetAwaiter().GetResult();
     }
 
-    // ─── Happy-path lifecycle ──────────────────────────────────────────────────
 
     [Fact]
     public async Task Submit_Then_Approve_Deducts_Leave_Balance()
@@ -35,7 +34,7 @@ public class LeaveLifecycleIntegrationTests
         await SeedBalanceAsync(companyId, employeeId, leaveTypeId, policyId, entitlementDays: 25);
 
         var leaveRequestId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
-            "2026-08-03", "2026-08-07"); // Mon–Fri = 5 days
+            "2026-08-03", "2026-08-07");
 
         var approveResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}/approve",
@@ -56,7 +55,7 @@ public class LeaveLifecycleIntegrationTests
         await SeedBalanceAsync(companyId, employeeId, leaveTypeId, policyId, entitlementDays: 25);
 
         var leaveRequestId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
-            "2026-08-10", "2026-08-14"); // Mon–Fri = 5 days
+            "2026-08-10", "2026-08-14");
 
         await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}/approve",
@@ -80,7 +79,7 @@ public class LeaveLifecycleIntegrationTests
         await SeedBalanceAsync(companyId, employeeId, leaveTypeId, policyId, entitlementDays: 25);
 
         var leaveRequestId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
-            "2026-08-17", "2026-08-21"); // Mon–Fri = 5 days
+            "2026-08-17", "2026-08-21");
 
         var rejectResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}/reject",
@@ -101,7 +100,7 @@ public class LeaveLifecycleIntegrationTests
         await SeedBalanceAsync(companyId, employeeId, leaveTypeId, policyId, entitlementDays: 25);
 
         var leaveRequestId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
-            "2026-08-24", "2026-08-28"); // Mon–Fri = 5 days
+            "2026-08-24", "2026-08-28");
 
         await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}/approve",
@@ -118,7 +117,6 @@ public class LeaveLifecycleIntegrationTests
         Assert.Equal(25m, balance.RemainingDays);
     }
 
-    // ─── Auth guards ───────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Approve_Returns_Unauthorized_For_Anonymous_Request()
@@ -161,14 +159,12 @@ public class LeaveLifecycleIntegrationTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    // ─── Day count accuracy ────────────────────────────────────────────────────
 
     [Fact]
     public async Task Submit_Returns_Correct_TotalDays_In_Response()
     {
         var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
 
-        // Mon–Fri = 5 working days
         var (_, totalDays, status) = await SubmitLeaveRequestWithPartsAsync(
             client, companyId, employeeId, leaveTypeId,
             "2026-09-07", "FullDay", "2026-09-11", "FullDay");
@@ -184,7 +180,7 @@ public class LeaveLifecycleIntegrationTests
 
         var (_, totalDays, _) = await SubmitLeaveRequestWithPartsAsync(
             client, companyId, employeeId, leaveTypeId,
-            "2026-09-14", "Morning", "2026-09-14", "Morning"); // single Monday morning
+            "2026-09-14", "Morning", "2026-09-14", "Morning");
 
         Assert.Equal(0.5m, totalDays);
     }
@@ -194,7 +190,6 @@ public class LeaveLifecycleIntegrationTests
     {
         var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
 
-        // Mon morning (0.5) + Tue full (1) + Wed afternoon (0.5) = 2 days
         var (_, totalDays, _) = await SubmitLeaveRequestWithPartsAsync(
             client, companyId, employeeId, leaveTypeId,
             "2026-09-21", "Morning", "2026-09-23", "Afternoon");
@@ -207,7 +202,6 @@ public class LeaveLifecycleIntegrationTests
     {
         var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
 
-        // 2026-09-05 = Saturday, 2026-09-06 = Sunday — no working days
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-requests",
             new
@@ -221,7 +215,6 @@ public class LeaveLifecycleIntegrationTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    // ─── PendingDays balance tracking ─────────────────────────────────────────
 
     [Fact]
     public async Task Submit_Increases_PendingDays_On_Balance()
@@ -229,12 +222,12 @@ public class LeaveLifecycleIntegrationTests
         var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
 
         await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
-            "2026-09-28", "2026-10-02"); // Mon–Fri = 5 days
+            "2026-09-28", "2026-10-02");
 
         var balance = await GetBalanceAsync(client, companyId, employeeId, leaveTypeId);
         Assert.Equal(0m, balance.UsedDays);
         Assert.Equal(5m, balance.PendingDays);
-        Assert.Equal(25m, balance.RemainingDays); // RemainingDays is unaffected by pending
+        Assert.Equal(25m, balance.RemainingDays);
     }
 
     [Fact]
@@ -243,7 +236,7 @@ public class LeaveLifecycleIntegrationTests
         var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
 
         var leaveRequestId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
-            "2026-10-05", "2026-10-09"); // Mon–Fri = 5 days
+            "2026-10-05", "2026-10-09");
 
         await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}/approve",
@@ -261,7 +254,7 @@ public class LeaveLifecycleIntegrationTests
         var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
 
         var leaveRequestId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
-            "2026-10-12", "2026-10-16"); // Mon–Fri = 5 days
+            "2026-10-12", "2026-10-16");
 
         await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}/reject",
@@ -278,7 +271,7 @@ public class LeaveLifecycleIntegrationTests
         var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
 
         var leaveRequestId = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
-            "2026-10-19", "2026-10-23"); // Mon–Fri = 5 days
+            "2026-10-19", "2026-10-23");
 
         await client.DeleteAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{leaveRequestId}");
@@ -289,7 +282,6 @@ public class LeaveLifecycleIntegrationTests
         Assert.Equal(25m, balance.RemainingDays);
     }
 
-    // ─── State machine enforcement ─────────────────────────────────────────────
 
     [Fact]
     public async Task Approve_Already_Approved_Request_Returns_BadRequest()
@@ -382,14 +374,11 @@ public class LeaveLifecycleIntegrationTests
         Assert.Equal(HttpStatusCode.BadRequest, rejectAfterCancel.StatusCode);
     }
 
-    // ─── Insufficient balance ──────────────────────────────────────────────────
 
     [Fact]
     public async Task Submit_Returns_BadRequest_When_Balance_Insufficient()
     {
         var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
-        // Policy assigns a 25-day balance automatically; request 26 days to exceed it.
-        // 2026-09-07 (Mon) to 2026-10-12 (Mon) = 26 working days
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-requests",
             new
@@ -403,21 +392,18 @@ public class LeaveLifecycleIntegrationTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    // ─── Multiple requests cumulate correctly ──────────────────────────────────
 
     [Fact]
     public async Task Two_Approved_Requests_Cumulate_Balance_Deduction()
     {
         var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
 
-        // First request: Mon–Wed = 3 days
         var req1 = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
             "2026-11-30", "2026-12-02");
         await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-requests/{req1}/approve",
             new { companyId, employeeId, leaveRequestId = req1, reviewedByEmployeeId = UserId });
 
-        // Second request: Mon–Tue = 2 days
         var req2 = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
             "2026-12-07", "2026-12-08");
         await client.PostAsJsonAsync(
@@ -425,11 +411,10 @@ public class LeaveLifecycleIntegrationTests
             new { companyId, employeeId, leaveRequestId = req2, reviewedByEmployeeId = UserId });
 
         var balance = await GetBalanceAsync(client, companyId, employeeId, leaveTypeId);
-        Assert.Equal(5m, balance.UsedDays);      // 3 + 2
-        Assert.Equal(20m, balance.RemainingDays); // 25 − 5
+        Assert.Equal(5m, balance.UsedDays);
+        Assert.Equal(20m, balance.RemainingDays);
     }
 
-    // ─── List endpoint ─────────────────────────────────────────────────────────
 
     [Fact]
     public async Task List_Returns_All_Requests_For_Employee_With_Correct_Fields()
@@ -437,16 +422,15 @@ public class LeaveLifecycleIntegrationTests
         var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
 
         var id1 = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
-            "2026-12-14", "2026-12-14"); // 1 day
+            "2026-12-14", "2026-12-14");
 
         var id2 = await SubmitLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
-            "2026-12-15", "2026-12-16"); // 2 days
+            "2026-12-15", "2026-12-16");
 
         var listResponse = await ListLeaveRequestsAsync(client, companyId, employeeId);
 
         Assert.Equal(2, listResponse.Items.Count);
 
-        // Items returned newest-first (ordered by StartDate descending)
         Assert.Equal(id2, listResponse.Items[0].Id);
         Assert.Equal(id1, listResponse.Items[1].Id);
 
@@ -481,7 +465,6 @@ public class LeaveLifecycleIntegrationTests
         await SubmitLeaveRequestAsync(client, companyId, employeeIdA, leaveTypeId,
             "2026-12-21", "2026-12-21");
 
-        // Create a second employee in the same company
         var refData = await CreateReferenceDataAsync(client, companyId);
         var empBResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees",
@@ -528,7 +511,6 @@ public class LeaveLifecycleIntegrationTests
         Assert.Equal("Insufficient cover", item.RejectionReason);
     }
 
-    // ─── Preview endpoint ──────────────────────────────────────────────────────
 
     [Fact]
     public async Task Preview_Returns_Correct_TotalDays()
@@ -536,7 +518,7 @@ public class LeaveLifecycleIntegrationTests
         var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
 
         var preview = await PreviewLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
-            "2026-09-07", "FullDay", "2026-09-11", "FullDay"); // Mon–Fri = 5 days
+            "2026-09-07", "FullDay", "2026-09-11", "FullDay");
 
         Assert.Equal(5m, preview.TotalDays);
     }
@@ -545,8 +527,6 @@ public class LeaveLifecycleIntegrationTests
     public async Task Preview_Shows_WouldExceedBalance_When_Insufficient()
     {
         var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
-        // Policy auto-creates a 25-day balance; preview 26 days to exceed it.
-        // 2026-09-07 (Mon) to 2026-10-12 (Mon) = 26 working days
         var preview = await PreviewLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
             "2026-09-07", "FullDay", "2026-10-12", "FullDay");
 
@@ -560,14 +540,13 @@ public class LeaveLifecycleIntegrationTests
         var (client, companyId, leaveTypeId, employeeId, _) = await SetupAsync();
 
         var preview = await PreviewLeaveRequestAsync(client, companyId, employeeId, leaveTypeId,
-            "2026-09-14", "FullDay", "2026-09-18", "FullDay"); // 5 days from 25 available
+            "2026-09-14", "FullDay", "2026-09-18", "FullDay");
 
         Assert.Equal(5m, preview.TotalDays);
         Assert.False(preview.WouldExceedBalance);
         Assert.Equal(25m, preview.RemainingBalance);
     }
 
-    // ─── Helpers ───────────────────────────────────────────────────────────────
 
     private async Task<(HttpClient Client, Guid CompanyId, Guid LeaveTypeId, Guid EmployeeId, Guid PolicyId)> SetupAsync()
     {
@@ -576,8 +555,6 @@ public class LeaveLifecycleIntegrationTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, UserId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, UserId, SystemRoles.HrAdministrator, UserId);
 
-        // POST /api/companies (CreateCompany) was removed in 78a43344; seed the company directly
-        // via CompaniesDbContext instead, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
         var companyId = await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Lifecycle Test {Guid.NewGuid():N}");
 
         client.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
@@ -756,7 +733,6 @@ public class LeaveLifecycleIntegrationTests
         return (await response.Content.ReadFromJsonAsync<PreviewResponse>())!;
     }
 
-    // ─── Response records ──────────────────────────────────────────────────────
 
     private sealed record CompanyPayload(Guid Id);
     private sealed record PolicyPayload(Guid Id);

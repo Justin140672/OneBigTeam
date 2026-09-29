@@ -3,11 +3,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Reporting.Tests.Infrastructure;
 
-/// <summary>
-/// Hand-rolled fake for <see cref="IEmployeeDirectoryReader"/> — records the arguments it was
-/// called with so handler tests can assert the filter/pagination/sort mapping, and returns a
-/// pre-configured page of items.
-/// </summary>
 internal sealed class FakeEmployeeDirectoryReader : IEmployeeDirectoryReader
 {
     private readonly IReadOnlyList<EmployeeDirectoryReportItem> _items;

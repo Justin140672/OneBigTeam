@@ -9,8 +9,6 @@ public class WorkingPatternCompensationCalculatorTests
     [Fact]
     public async Task CalculateAsync_Uses_Company_Default_When_No_Employee_Override()
     {
-        // Company default: 5 days x 7.5 hours = 37.5 hours/week (this IS the FTE=1 baseline), so an
-        // employee with no override matches it exactly and gets FTE 1.0.
         var calculator = new WorkingPatternCompensationCalculator(new FakeCompanyWorkingPatternSettingsReader(5, 7.5m));
 
         var (hoursPerWeek, fte) = await calculator.CalculateAsync(
@@ -25,7 +23,6 @@ public class WorkingPatternCompensationCalculatorTests
     {
         var calculator = new WorkingPatternCompensationCalculator(new FakeCompanyWorkingPatternSettingsReader(5, 7.5m));
 
-        // 3 days x 7.5 hours = 22.5 hours/week => FTE = 22.5 / 37.5 = 0.6
         var (hoursPerWeek, fte) = await calculator.CalculateAsync(
             Guid.NewGuid(),
             workingDaysOverride: WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday,
@@ -41,8 +38,6 @@ public class WorkingPatternCompensationCalculatorTests
     {
         var calculator = new WorkingPatternCompensationCalculator(new FakeCompanyWorkingPatternSettingsReader(5, 7.5m));
 
-        // Company default 5 days, employee overrides hours/day to 4 => 5 x 4 = 20 hours/week.
-        // FTE = 20 / 37.5 rounded to 4dp.
         var (hoursPerWeek, fte) = await calculator.CalculateAsync(
             Guid.NewGuid(), workingDaysOverride: null, hoursPerDayOverride: 4m, CancellationToken.None);
 

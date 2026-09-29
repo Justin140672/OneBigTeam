@@ -9,12 +9,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Tests;
 
-/// <summary>
-/// OBT-721 workload action provider tests for pending leave approvals — mirrors the row-scoping
-/// coverage pattern established by GetProbationReportHandlerTests (HR sees company-wide, Manager is
-/// scoped to direct reports, Manager with no direct reports and non-HR/non-Manager callers get an
-/// empty list rather than an exception or company-wide data).
-/// </summary>
 public class LeavePendingApprovalsWorkloadActionProviderTests
 {
     private static LeaveDbContext BuildContext()
@@ -56,8 +50,6 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
         var result = await provider.GetActionsAsync(companyId, CallerWithSub(callerId), WorkloadScope.Hr, CancellationToken.None);
 
         Assert.Equal(2, result.Count);
-        // A pending leave request's approval task is always owned by the employee's manager — HR
-        // only ever sees these rows for oversight, never as something to click into and action.
         Assert.All(result, a => Assert.False(a.IsOwnerActionable));
         Assert.All(result, a => Assert.Equal("Owned by the employee's manager", a.OwnerLabel));
     }
@@ -84,7 +76,6 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
 
         var action = Assert.Single(result);
         Assert.Equal(directReportId, action.EmployeeId);
-        // The manager is the true owner of the approval task in the Manager workspace.
         Assert.True(action.IsOwnerActionable);
         Assert.Null(action.OwnerLabel);
     }
@@ -121,7 +112,6 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
             context, new FakeDirectReportsReader([]), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService(), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(null));
 
-        // No resolved current-user id at all — the caller can't even be resolved to an employee id.
         var result = await provider.GetActionsAsync(companyId, new ClaimsPrincipal(new ClaimsIdentity()), WorkloadScope.Manager, CancellationToken.None);
 
         Assert.Empty(result);
@@ -149,7 +139,6 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
         Assert.Equal("Approve Leave Request", action.ActionType);
         Assert.Equal("Pending Leave Approvals", action.ActionCategory);
         Assert.Equal(startDate, action.DueDate);
-        // No employee-profile fallback: this category is entirely task-backed.
         Assert.Equal("", action.DeepLinkUrl);
         Assert.Equal("Pending", action.Status);
     }
@@ -264,7 +253,6 @@ public class LeavePendingApprovalsWorkloadActionProviderTests
         context.LeaveRequests.Add(CreatePendingRequest(companyId, Guid.NewGuid(), new DateOnly(2026, 8, 3)));
         await context.SaveChangesAsync();
 
-        // Caller lacks reporting:view-hr entirely (only resolvable as a manager, if that).
         var provider = new LeavePendingApprovalsWorkloadActionProvider(
             context, new FakeDirectReportsReader(), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService(), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));

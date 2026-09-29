@@ -4,7 +4,6 @@ internal sealed record GetPermissionHistoryRequest
 {
     public Guid CompanyId { get; init; }
 
-    /// <summary>Restrict to history concerning this employee/user (as target or actor).</summary>
     public Guid? EmployeeId { get; init; }
 
     public Guid? ActorUserId { get; init; }

@@ -147,7 +147,6 @@ public class GetMyNotificationsHandlerTests
         Assert.Equal(0, result.TotalPages);
     }
 
-    // ── NOT-06: UnreadCount independence from paging/filters ────────────────
 
     [Fact]
     public async Task UnreadCount_Is_Not_Capped_By_PageSize_When_More_Than_Fifty_Unread()
@@ -207,7 +206,6 @@ public class GetMyNotificationsHandlerTests
         Assert.Equal(2, result.UnreadCount);
     }
 
-    // ── NOT-06: deterministic tie-break ordering ─────────────────────────────
 
     [Fact]
     public async Task Orders_By_CreatedAt_Then_Id_Descending_When_Timestamps_Are_Equal()
@@ -243,7 +241,6 @@ public class GetMyNotificationsHandlerTests
         Assert.Equal(first.Items.Select(i => i.Id).ToList(), second.Items.Select(i => i.Id).ToList());
     }
 
-    // ── NOT-06: pagination correctness ───────────────────────────────────────
 
     [Fact]
     public async Task Paginates_Correctly_Across_Multiple_Pages()
@@ -285,7 +282,6 @@ public class GetMyNotificationsHandlerTests
         Assert.Equal(55, combinedIds.Distinct().Count());
     }
 
-    // ── NOT-06: IsRead filter ─────────────────────────────────────────────────
 
     [Fact]
     public async Task Filters_By_IsRead_True_Returns_Only_Read_Notifications()
@@ -350,7 +346,6 @@ public class GetMyNotificationsHandlerTests
         Assert.Equal(2, result.Items.Count);
     }
 
-    // ── NOT-06: Type / Priority filters ──────────────────────────────────────
 
     [Fact]
     public async Task Filters_By_Type_Returns_Only_Matching_Rows()
@@ -393,7 +388,6 @@ public class GetMyNotificationsHandlerTests
         Assert.Equal("Urgent one", item.Title);
     }
 
-    // ── NOT-06: CreatedFrom / CreatedTo range filter (inclusive boundaries) ──
 
     [Fact]
     public async Task CreatedFrom_And_CreatedTo_Filter_Includes_Boundary_Values()
@@ -426,7 +420,6 @@ public class GetMyNotificationsHandlerTests
         Assert.DoesNotContain("After range", titles);
     }
 
-    // ── NOT-06: combined filters + pagination ────────────────────────────────
 
     [Fact]
     public async Task Combines_IsRead_Type_DateRange_And_Pagination()
@@ -438,7 +431,6 @@ public class GetMyNotificationsHandlerTests
         var from = Now.AddDays(-5);
         var to   = Now;
 
-        // Matching set: unread, TaskAssigned, within range — 3 of them.
         for (var i = 0; i < 3; i++)
         {
             ctx.Notifications.Add(Notification.Create(
@@ -446,19 +438,16 @@ public class GetMyNotificationsHandlerTests
                 from.AddDays(i), NotificationType.TaskAssigned));
         }
 
-        // Non-matching: read.
         var readOne = Notification.Create(
             Guid.NewGuid(), companyId, employeeId, "Read but otherwise matches", null, Guid.NewGuid(),
             from.AddDays(1), NotificationType.TaskAssigned);
         readOne.MarkAsRead();
         ctx.Notifications.Add(readOne);
 
-        // Non-matching: wrong type.
         ctx.Notifications.Add(Notification.Create(
             Guid.NewGuid(), companyId, employeeId, "Wrong type", null, Guid.NewGuid(),
             from.AddDays(1), NotificationType.LeaveApproved));
 
-        // Non-matching: outside range.
         ctx.Notifications.Add(Notification.Create(
             Guid.NewGuid(), companyId, employeeId, "Outside range", null, Guid.NewGuid(),
             from.AddDays(-1), NotificationType.TaskAssigned));

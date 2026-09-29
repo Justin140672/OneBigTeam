@@ -23,9 +23,6 @@ internal sealed class ResumeSubscriptionHandler(
                 Error.Unauthorized("No company context could be resolved for the current user."));
         }
 
-        // No client-supplied request body to fingerprint (EndpointWithoutRequest) - the resolved
-        // company id is the only thing that varies between calls, so it stands in for the
-        // fingerprint here.
         var scope = new IdempotencyScope(GetType().Name, companyId, Guid.Empty);
 
         var fingerprint = idempotencyKey is not null

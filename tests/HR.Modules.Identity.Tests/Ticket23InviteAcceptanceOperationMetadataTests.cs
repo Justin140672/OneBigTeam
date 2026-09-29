@@ -28,7 +28,6 @@ public class Ticket23InviteAcceptanceOperationMetadataTests(IdentityDatabaseFixt
     private static readonly DateTimeOffset Now = new(2026, 9, 21, 9, 0, 0, TimeSpan.Zero);
     private static readonly FakeClock Clock = new(Now.UtcDateTime);
 
-    // ── CreatePending: stamping from a supplied IExecutionContext ───────────────────────────────
 
     [Fact]
     public void CreatePending_With_Supplied_Context_Stamps_CorrelationId_From_Context_CorrelationId_And_CausationId_From_Context_MessageId()
@@ -57,10 +56,7 @@ public class Ticket23InviteAcceptanceOperationMetadataTests(IdentityDatabaseFixt
         Assert.NotEqual(Guid.Empty, operation.MessageId!.Value);
     }
 
-    // ── InviteAcceptanceReconciliationJob: restores persisted metadata as the ambient context ──
 
-    // Captures whatever execution context is ambient (via the supplied accessor) at the moment the
-    // reconciliation outcome's audit event is about to be published.
     private sealed class ContextCapturingAuditEventPublisher(IExecutionContextAccessor accessor) : IAuditEventPublisher
     {
         public IExecutionContext? ObservedDuringPublish { get; private set; }
@@ -90,8 +86,6 @@ public class Ticket23InviteAcceptanceOperationMetadataTests(IdentityDatabaseFixt
         db.InviteAcceptanceOperations.Add(operation);
         await db.SaveChangesAsync();
 
-        // Force CreatedAt stale enough for the reconciliation sweep to pick it up as a stale
-        // Pending operation.
         db.Entry(operation).Property("CreatedAt").CurrentValue = Now.AddMinutes(-20);
         await db.SaveChangesAsync();
 
@@ -126,7 +120,6 @@ public class Ticket23InviteAcceptanceOperationMetadataTests(IdentityDatabaseFixt
     [Fact]
     public async Task ExecuteAsync_Legacy_Row_With_Null_Metadata_Still_Restores_A_Fresh_Root_Context_Rather_Than_Throwing()
     {
-        // No supplied context — simulates a row written before this migration.
         var (operation, _) = await SeedStaleOperationAsync(null, null, executionContext: null);
 
         var accessor = new ExecutionContextAccessor();

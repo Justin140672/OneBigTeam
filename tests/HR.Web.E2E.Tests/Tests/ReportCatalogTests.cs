@@ -4,28 +4,13 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the report catalog landing page (/companies/{companyId}/reporting —
-/// ReportCatalogPage.razor): card rendering, search filtering, favourites (server-persisted via
-/// ReportingService.GetReportFavouritesAsync/Add/RemoveReportFavouriteAsync — previously
-/// localStorage-backed), and navigation into the Employee Directory, Employee Starter, Employee
-/// Leaver, Leave Summary, Leave Calendar, Sickness, Recruitment Pipeline, Vacancy Performance,
-/// Probation, Onboarding Progress, Offboarding Progress, Document Compliance and Company Document
-/// Acknowledgement reports. Access-control coverage (non-HR persona not
-/// seeing the Employee Directory card, direct-URL 403 handling on the report page itself) lives
-/// in <see cref="EmployeeDirectoryReportTests"/>.
-/// </summary>
 public sealed class ReportCatalogTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    private const string LauraEmail = "laura.bennett@acme.example"; // HR Administrator
-    private const string MarcusEmail = "marcus.diallo@acme.example"; // Recruiter
+    private const string LauraEmail = "laura.bennett@acme.example";
+    private const string MarcusEmail = "marcus.diallo@acme.example";
 
-    /// <summary>
-    /// The category heading for ReportCategory.Hr must render as "HR" (correct capitalisation),
-    /// not the raw PascalCase enum name "Hr" — see ReportCatalogPage.razor's CategoryLabel mapping.
-    /// </summary>
     [Fact]
     public async Task CatalogPage_HrCategoryHeading_RendersAsUppercaseHR()
     {
@@ -63,9 +48,6 @@ public sealed class ReportCatalogTests(HrAdminPersonaFixture fixture) : RoleE2ET
         Assert.True(await catalog.IsCardClickableAsync("Employee Directory"),
             "Expected the Employee Directory card to be clickable (no 'Coming soon' badge)");
 
-        // HR Headcount Summary was a phase-1 "Coming soon" placeholder card but is now a fully
-        // built, clickable report (see ReportRoutes.Map in ReportingModels.cs) — its clickability
-        // and navigation are covered by NewReportCard_IsClickable_AndNavigatesToCorrectRoute below.
         Assert.True(await catalog.IsCardClickableAsync("HR Headcount Summary"),
             "Expected the HR Headcount Summary card to be clickable (no 'Coming soon' badge) now that its report page exists");
     }
@@ -101,15 +83,6 @@ public sealed class ReportCatalogTests(HrAdminPersonaFixture fixture) : RoleE2ET
 
         await catalog.GoToAsync(AcmeId);
 
-        // "HR Headcount Summary" and "Employee Directory" are both in the "Hr" category, with
-        // "Employee Directory" sorting first alphabetically by default (E < H) — favouriting
-        // "HR Headcount Summary" should move it ahead of "Employee Directory".
-        //
-        // Self-heal rather than assert-and-fail: if an earlier run's assertion failure ever left
-        // this favourited despite the try/finally below, asserting False unconditionally would
-        // fail every subsequent run forever with no way to recover. Clear any pre-existing
-        // favourite first so this test is self-repairing against the shared, long-lived E2E dev
-        // database.
         if (await catalog.IsFavouritedAsync("HR Headcount Summary"))
             await catalog.ClickFavouriteAsync("HR Headcount Summary");
         Assert.False(await catalog.IsFavouritedAsync("HR Headcount Summary"));
@@ -122,10 +95,6 @@ public sealed class ReportCatalogTests(HrAdminPersonaFixture fixture) : RoleE2ET
             var titlesAfterFavouriting = await catalog.GetCardTitlesInCategoryAsync("Hr");
             Assert.Equal("HR Headcount Summary", titlesAfterFavouriting.FirstOrDefault());
 
-            // Reload — favourites now round-trip through the server (ReportingService.AddReportFavouriteAsync
-            // / GetReportFavouritesAsync), not localStorage, so a plain reload (not just client-side
-            // navigation) proves the toggle actually persisted server-side rather than only updating
-            // in-memory component state.
             await _page.ReloadAsync();
             await _page.WaitForSelectorAsync(".report-catalog-card, .hr-empty-state", new() { Timeout = 20_000 });
 
@@ -137,11 +106,6 @@ public sealed class ReportCatalogTests(HrAdminPersonaFixture fixture) : RoleE2ET
         }
         finally
         {
-            // Leaves LauraEmail's favourites clean for other tests relying on the seeded dev
-            // database — e.g. HrDashboardTests.FavouriteReportsWidget_ShowsEmptyState_WhenNothingFavourited
-            // asserts this persona has no favourites at all, same convention as
-            // HrDashboardTests.FavouriteReportsWidget_ShowsFavouritedReport_AndNavigatesToItOnClick's
-            // own cleanup.
             await catalog.GoToAsync(AcmeId);
             if (await catalog.IsFavouritedAsync("HR Headcount Summary"))
                 await catalog.ClickFavouriteAsync("HR Headcount Summary");
@@ -234,15 +198,6 @@ public sealed class ReportCatalogTests(HrAdminPersonaFixture fixture) : RoleE2ET
         await _page.WaitForURLAsync($"**/reporting/{routeSlug}", new() { Timeout = 15_000 });
     }
 
-    /// <summary>
-    /// Favourites persisting across reload is covered generically by
-    /// <see cref="FavouriteToggle_PersistsAcrossReload_AndSortsFirstInCategory"/> above using the
-    /// "HR Headcount Summary" catalog entry (a "Coming soon" card in the same "Hr" category as
-    /// Employee Directory — chosen there so sort-order assertions aren't entangled with a card
-    /// that also navigates). This test instead proves the same server round-trip specifically for
-    /// one of the newly added, now-clickable report cards, via a full navigation away (into the
-    /// report page itself) and back rather than a plain reload.
-    /// </summary>
     [Fact]
     public async Task FavouritingNewReportCard_PersistsAcrossNavigationAwayAndBack()
     {
@@ -255,32 +210,15 @@ public sealed class ReportCatalogTests(HrAdminPersonaFixture fixture) : RoleE2ET
 
         await catalog.GoToAsync(AcmeId);
 
-        // Self-heal rather than assert-and-fail here: if an earlier run's assertion failure ever
-        // slipped past the try/finally below (or a completely different bug left this favourited),
-        // asserting False unconditionally would fail every single subsequent run forever with no
-        // way to recover, since the very check that should trigger cleanup would itself be the
-        // thing failing. Clear any pre-existing favourite first so this test is self-repairing
-        // against the shared, long-lived E2E dev database.
         if (await catalog.IsFavouritedAsync("Employee Starter Report"))
             await catalog.ClickFavouriteAsync("Employee Starter Report");
         Assert.False(await catalog.IsFavouritedAsync("Employee Starter Report"));
 
-        // Guard the mutating middle section with try/finally so an assertion failure here still
-        // un-favourites the report before the test exits — without this, a failed assertion (e.g.
-        // the "survived navigation" check below) leaves "Employee Starter Report" permanently
-        // favourited on the shared, long-lived E2E dev database, which then pollutes every other
-        // test that reads Laura Bennett's favourites (HrDashboardTests.FavouriteReportsWidget_
-        // ShowsEmptyState_WhenNothingFavourited and ...ShowsFavouritedReport_AndNavigatesToItOnClick
-        // in particular — both assume "Employee Starter Report" starts unfavourited). Same pattern
-        // as FavouriteToggle_PersistsAcrossReload_AndSortsFirstInCategory above.
         try
         {
             await catalog.ClickFavouriteAsync("Employee Starter Report");
             Assert.True(await catalog.IsFavouritedAsync("Employee Starter Report"));
 
-            // Navigate away into the report page itself, then back to the catalog — proves the
-            // favourite round-tripped through the server rather than only surviving in the same
-            // component instance's in-memory state.
             await catalog.ClickCardAsync("Employee Starter Report");
             await _page.WaitForURLAsync("**/reporting/employee-starters", new() { Timeout = 15_000 });
             Assert.False(await report.HasLoadErrorAsync());
@@ -292,8 +230,6 @@ public sealed class ReportCatalogTests(HrAdminPersonaFixture fixture) : RoleE2ET
         }
         finally
         {
-            // Clean up so this test is repeatable against the shared, long-lived E2E dev database.
-            // GoToAsync back to the catalog first in case the try block failed before returning here.
             await catalog.GoToAsync(AcmeId);
             if (await catalog.IsFavouritedAsync("Employee Starter Report"))
                 await catalog.ClickFavouriteAsync("Employee Starter Report");

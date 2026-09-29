@@ -19,7 +19,6 @@ public interface IPostCommitFaultInjector
     Task MaybeFailAfterCommitAsync(string operationName, string? idempotencyKey, CancellationToken cancellationToken);
 }
 
-/// <summary>Production default: never fails. See <see cref="IPostCommitFaultInjector"/>.</summary>
 public sealed class NoOpPostCommitFaultInjector : IPostCommitFaultInjector
 {
     public Task MaybeFailAfterCommitAsync(string operationName, string? idempotencyKey, CancellationToken cancellationToken) =>

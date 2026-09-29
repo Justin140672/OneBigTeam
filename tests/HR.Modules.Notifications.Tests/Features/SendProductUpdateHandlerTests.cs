@@ -7,12 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Notifications.Tests.Features;
 
-/// <summary>
-/// Customer Release Notifications: exercises the real NotificationWriter/NotificationsDbContext
-/// path (same convention as NotifyOnLeaveRequestedHandlerTests) so assertions cover exactly what
-/// ends up persisted — SourceEntityId batching, ActionUrl override passthrough, per-recipient rows
-/// — not just what the handler intended to pass.
-/// </summary>
 public class SendProductUpdateHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 21, 9, 0, 0, TimeSpan.Zero);
@@ -154,10 +148,6 @@ public class SendProductUpdateHandlerTests
     [Fact]
     public async Task HandleAsync_Zero_Recipients_Writes_Nothing_But_Returns_Zero_Response_And_Publishes_Audit_Event()
     {
-        // No active companies resolved at all — reading the handler, there is no explicit
-        // "recipients.Count == 0 => skip" guard: the write loop is simply empty (0 iterations) and
-        // the audit publish still runs unconditionally with RecipientCount/CompanyCount both 0.
-        // This test pins that as the actual, intended no-op behaviour.
         var (handler, ctx, audit, activeCompanies, _, _) = Build();
         activeCompanies.ActiveCompanyIds = [];
 

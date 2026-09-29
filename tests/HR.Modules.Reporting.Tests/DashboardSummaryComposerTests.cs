@@ -6,11 +6,6 @@ using Microsoft.Extensions.Configuration;
 
 namespace HR.Modules.Reporting.Tests;
 
-/// <summary>
-/// DSH-06 stage 1: the shared cross-module dashboard summary composer behind the HR and Manager
-/// dashboard summary endpoints. Mirrors GetWorkloadActionsHandlerTests' provider-fan-out fakes — the
-/// composer never re-derives authorization, so fixed/throwing fake providers are a faithful stand-in.
-/// </summary>
 public class DashboardSummaryComposerTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 8, 30, 9, 0, 0, DateTimeKind.Utc);
@@ -144,7 +139,7 @@ public class DashboardSummaryComposerTests
         Assert.Equal(DashboardCategoryStatus.Loaded, loaded.Status);
         Assert.Equal(3, loaded.ActionableCount);
 
-        Assert.Equal(3, result.TotalActionableCount); // failed category excluded
+        Assert.Equal(3, result.TotalActionableCount);
         Assert.False(result.AllRequiredLoaded);
         Assert.True(result.HasPartialFailure);
     }
@@ -250,9 +245,6 @@ public class DashboardSummaryComposerTests
     [InlineData(WorkloadScope.Hr)]
     public async Task ComposeAsync_Passes_The_Requested_Scope_Through_To_Every_Provider(WorkloadScope requestedScope)
     {
-        // Regression coverage for the role-bleed fix: the composer must forward whichever scope its
-        // caller (GetManagerDashboardSummaryHandler / GetHrDashboardSummaryHandler) explicitly
-        // requested, never re-derive or default it.
         var recorder = new ScopeRecordingWorkloadActionProvider(LeaveCategory);
         var composer = Composer([recorder]);
 
@@ -261,10 +253,6 @@ public class DashboardSummaryComposerTests
         Assert.Equal(requestedScope, recorder.LastRequestedScope);
     }
 
-    /// <summary>
-    /// Minimal fake that records the <see cref="WorkloadScope"/> it was invoked with, so a test can
-    /// assert the composer forwarded the caller-supplied scope unchanged rather than re-deriving it.
-    /// </summary>
     private sealed class ScopeRecordingWorkloadActionProvider(string actionCategory) : IWorkloadActionProvider
     {
         public WorkloadScope? LastRequestedScope { get; private set; }

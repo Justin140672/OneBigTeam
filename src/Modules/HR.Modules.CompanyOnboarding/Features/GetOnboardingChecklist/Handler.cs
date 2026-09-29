@@ -42,9 +42,6 @@ internal sealed class GetOnboardingChecklistHandler(
 
             var completion = completionsByKey[task.Key];
 
-            // Sticky: a manual completion (e.g. via MarkOnboardingTaskComplete, used for
-            // "Download the Employee import template") is never reverted by a later checklist
-            // load just because the task's own live computation currently evaluates to false.
             var isCompleted = liveComputedCompleted || completion.IsCompleted;
 
             completion.SetStatus(isCompleted, now);
@@ -82,16 +79,6 @@ internal sealed class GetOnboardingChecklistHandler(
         return Result.Success(response);
     }
 
-    /// <summary>
-    /// Lazily materialises a <see cref="CompanyOnboardingTaskCompletion"/> row for every registry
-    /// task, returning the full set keyed by task key. This GET is hit concurrently (dashboard +
-    /// getting-started widget, multiple tabs/circuits), so a plain read-then-insert races: two
-    /// callers both see a missing row and both INSERT, the second violating
-    /// <c>IX_task_completions_company_id_task_key</c> and 500-ing the request. Insert the missing
-    /// rows in their own SaveChanges; if a concurrent caller won the race (23505), swallow it,
-    /// re-read, and carry on — the row now exists either way. Status updates happen on the caller's
-    /// own SaveChanges afterwards.
-    /// </summary>
     private async Task<Dictionary<string, CompanyOnboardingTaskCompletion>> EnsureCompletionRowsAsync(
         Guid companyId, DateTimeOffset now, CancellationToken cancellationToken)
     {
@@ -116,8 +103,6 @@ internal sealed class GetOnboardingChecklistHandler(
         }
         catch (DbUpdateException ex) when (IsUniqueViolation(ex))
         {
-            // A concurrent request inserted (some of) these first. Detach our losing inserts and
-            // re-read the now-complete set.
             foreach (var row in missing)
                 dbContext.Entry(row).State = EntityState.Detached;
 

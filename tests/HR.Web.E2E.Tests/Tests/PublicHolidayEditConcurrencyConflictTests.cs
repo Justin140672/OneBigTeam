@@ -78,12 +78,10 @@ public sealed class PublicHolidayEditConcurrencyConflictTests(HrAdminPersonaFixt
         var otherTabName  = $"{baseName} OtherTab";
         var finalName     = $"{baseName} Final";
 
-        // ── Tab 1: open the holiday editor and start editing the Name (loads Version v1) ──
         await phList.ClickHolidayAsync(baseName);
         var holidayId = phEdit.CurrentHolidayId();
         await phEdit.FillNameAsync(firstTabName);
 
-        // ── Tab 2 (same context / persona): load the same holiday and save first ──
         var otherPage = await _context.NewPageAsync();
         try
         {
@@ -99,7 +97,6 @@ public sealed class PublicHolidayEditConcurrencyConflictTests(HrAdminPersonaFixt
             await otherPage.CloseAsync();
         }
 
-        // ── Tab 1: saving now is stale → conflict banner, page stays, input preserved ──
         await phEdit.SaveExpectingConflictAsync();
 
         Assert.True(await phEdit.IsConcurrencyWarningVisibleAsync(),
@@ -107,14 +104,12 @@ public sealed class PublicHolidayEditConcurrencyConflictTests(HrAdminPersonaFixt
         Assert.Contains($"/public-holidays/{holidayId}", _page.Url);
         Assert.Equal(firstTabName, await phEdit.GetNameAsync());
 
-        // ── Tab 1: "Reload latest values" clears the banner and adopts the other tab's value ──
         await phEdit.ClickReloadLatestValuesAsync();
 
         Assert.False(await phEdit.IsConcurrencyWarningVisibleAsync(),
             "Expected the conflict banner to clear after reloading latest values");
         Assert.Equal(otherTabName, await phEdit.GetNameAsync());
 
-        // ── Tab 1: re-edit against the fresh version and save successfully ──
         await phEdit.FillNameAsync(finalName);
         await phEdit.SaveAsync();
 
@@ -122,7 +117,6 @@ public sealed class PublicHolidayEditConcurrencyConflictTests(HrAdminPersonaFixt
             $"Expected '{finalName}' in the list after saving against the reloaded version");
     }
 
-    /// <summary>Creates a uniquely-named holiday on the given far-future date and returns its name.</summary>
     private async Task<string> CreateHolidayAsync(
         PublicHolidayListPage phList, PublicHolidayEditPage phEdit, string ddMMyyyy)
     {

@@ -37,8 +37,6 @@ public class E2eTestingProductionGuardTests
         var originalConn = Environment.GetEnvironmentVariable("ConnectionStrings__hr");
 
         Environment.SetEnvironmentVariable("E2E_TESTING", "true");
-        // The guard runs after the connection string is read but before any DB access — give it a
-        // syntactically-valid dummy so we hit the guard, not the "connection string not found" throw.
         Environment.SetEnvironmentVariable(
             "ConnectionStrings__hr",
             "Host=localhost;Port=5432;Database=guard_test;Username=postgres;Password=postgres");

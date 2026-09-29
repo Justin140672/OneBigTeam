@@ -10,11 +10,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Tasks.Tests;
 
-/// <summary>
-/// OBT-721 workload action provider tests for the two Tasks providers: the self-scoped
-/// EmployeeTasksOverdueWorkloadActionProvider (caller only ever sees their own overdue tasks) and
-/// the ManagerTasksOverdueWorkloadActionProvider (Manager scoped to direct reports, HR company-wide).
-/// </summary>
 public class TasksOverdueWorkloadActionProvidersTests
 {
     private static readonly DateOnly Today = new(2026, 7, 29);
@@ -36,7 +31,6 @@ public class TasksOverdueWorkloadActionProvidersTests
             TaskPriority.Medium, TaskSource.Workflow, TaskActionType.Complete, dueDate,
             assignedEmployeeId, null, DateTimeOffset.UtcNow);
 
-    // ── EmployeeTasksOverdueWorkloadActionProvider (self-scoped) ────────────────
 
     [Fact]
     public async Task EmployeeProvider_Returns_Only_Callers_Own_Overdue_Tasks()
@@ -63,9 +57,6 @@ public class TasksOverdueWorkloadActionProvidersTests
     [Fact]
     public async Task EmployeeProvider_Excludes_Task_Due_Exactly_Today()
     {
-        // The query uses a strict "<" comparison against DateTime.UtcNow.Date (not the
-        // fixed `Today` constant used elsewhere in this file), so this must use the real
-        // current date to exercise the boundary correctly.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var callerId = Guid.NewGuid();
@@ -145,8 +136,6 @@ public class TasksOverdueWorkloadActionProvidersTests
     [Fact]
     public async Task EmployeeProvider_Sees_Own_Overdue_Tasks_Regardless_Of_RequestedScope()
     {
-        // Self-scoped: a personal overdue task legitimately belongs on both the Manager and HR
-        // dashboards, so this provider ignores requestedScope entirely.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var callerId = Guid.NewGuid();
@@ -163,7 +152,6 @@ public class TasksOverdueWorkloadActionProvidersTests
         Assert.Single(hrScopeResult);
     }
 
-    // ── ManagerTasksOverdueWorkloadActionProvider ───────────────────────────────
 
     [Fact]
     public async Task ManagerProvider_HrCaller_Sees_All_Overdue_Tasks_CompanyWide()
@@ -231,8 +219,6 @@ public class TasksOverdueWorkloadActionProvidersTests
     [Fact]
     public async Task ManagerProvider_HrCaller_Excludes_Task_Due_Exactly_Today()
     {
-        // Uses the real current date, not the fixed `Today` constant — see the
-        // EmployeeProvider equivalent test above for why.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var callerId = Guid.NewGuid();

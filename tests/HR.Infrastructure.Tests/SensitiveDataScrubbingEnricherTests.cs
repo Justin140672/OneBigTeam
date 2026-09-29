@@ -6,10 +6,6 @@ using Serilog.Events;
 
 namespace HR.Infrastructure.Tests;
 
-/// <summary>
-/// NFR-01: the Serilog enricher must scrub sensitive log-event properties before any sink sees
-/// them — both by property name (whole value redacted) and by value pattern (token scrubbed).
-/// </summary>
 public class SensitiveDataScrubbingEnricherTests
 {
     private sealed class CapturingSink : ILogEventSink
@@ -91,7 +87,6 @@ public class SensitiveDataScrubbingEnricherTests
         var ethnicGroup = Assert.Single(structure.Properties, p => p.Name == "EthnicGroup");
         Assert.Equal(SensitiveDataScrubber.Redacted, ScalarText(ethnicGroup.Value));
 
-        // Non-sensitive identifier is untouched.
         Assert.Equal("EMP-0001", ScalarText(evt.Properties["EmployeeId"]));
     }
 

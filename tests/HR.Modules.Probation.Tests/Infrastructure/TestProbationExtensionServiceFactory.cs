@@ -4,11 +4,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Probation.Tests.Infrastructure;
 
-/// <summary>
-/// Builds a ProbationExtensionService wired with in-memory fakes, for tests that exercise
-/// CompleteProbationReviewHandler / CompleteProbationReviewFromTaskAction but do not care about
-/// the extension side effects themselves (those get their own dedicated tests).
-/// </summary>
 internal static class TestProbationExtensionServiceFactory
 {
     public static ProbationExtensionService Build(

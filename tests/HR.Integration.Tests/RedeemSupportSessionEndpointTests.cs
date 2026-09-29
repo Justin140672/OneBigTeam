@@ -58,7 +58,6 @@ public class RedeemSupportSessionEndpointTests
         return (companyId, token);
     }
 
-    /// <summary>Seeds a session whose 20-minute expiry has already passed relative to "now".</summary>
     private async Task<(Guid CompanyId, string Token)> SeedExpiredSupportSessionAsync(DateTimeOffset issuedAt)
     {
         using var scope = _factory.Services.CreateScope();
@@ -165,15 +164,6 @@ public class RedeemSupportSessionEndpointTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    // Downstream authorization behaviour of a minted support-session identity ---------------------
-    // These simulate the resolved identity a real support-session JWT produces via
-    // TestAuthHandler.SupportSessionHeader rather than round-tripping a real signed JWT through the
-    // separate "SupportSession" JwtBearer scheme, which this WebApplicationFactory's TestAuthHandler
-    // entirely replaces for all integration tests (see TestAuthHandler's remarks). What's under test
-    // here is the authorization-handler behaviour downstream of resolution
-    // (SupabaseCurrentUserResolutionMiddleware / PermissionAuthorizationHandler /
-    // PlatformAdminAuthorizationHandler / TenantRouteAuthorizationMiddleware), which only ever reads
-    // resolved ClaimsPrincipal claims, not which scheme produced them.
 
     private HttpClient CreateSupportSessionClient(Guid supportSessionId, Guid companyId, string email = "admin@example.com")
     {

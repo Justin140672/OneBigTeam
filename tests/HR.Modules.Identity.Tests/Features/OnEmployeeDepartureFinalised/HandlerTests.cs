@@ -9,10 +9,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Tests.Features.OnEmployeeDepartureFinalised;
 
-// P1 fix (departure access disablement): this handler is now the ONLY trigger that reacts to an
-// employee's departure to enqueue durable disablement of the linked ApplicationUser — replaces
-// the former OnOffboardingPlanCompleted handler (deleted; offboarding-plan completion must never
-// disable an account by itself).
 [Collection("IdentityDatabase")]
 public class HandlerTests(IdentityDatabaseFixture fixture)
 {
@@ -200,10 +196,6 @@ public class HandlerTests(IdentityDatabaseFixture fixture)
         Assert.Empty(jobClient.CreatedJobs);
     }
 
-    // Both an ApplicationUser row and a UserProfile row can exist for the same employee id
-    // (e.g. a legacy local-auth account never cleaned up alongside a newer Supabase profile) —
-    // the handler must prefer/act on the ApplicationUser and never fall back to the profile
-    // when a user row is present.
     [Fact]
     public async Task HandleAsync_Prefers_ApplicationUser_Over_UserProfile_When_Both_Exist()
     {
@@ -225,7 +217,7 @@ public class HandlerTests(IdentityDatabaseFixture fixture)
 
         await using var db2 = fixture.BuildContext();
         var request = await db2.AccountDisablements.SingleAsync(d => d.EmployeeId == employeeId);
-        Assert.Equal(employeeId, request.ApplicationUserId); // resolved via ApplicationUser, same id by convention
+        Assert.Equal(employeeId, request.ApplicationUserId);
 
         var enqueued = Assert.Single(jobClient.CreatedJobs);
         Assert.Equal(request.Id, enqueued.Args[0]);

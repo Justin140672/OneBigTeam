@@ -207,7 +207,6 @@ public class AdministrativeAlertTests
         Assert.Throws<InvalidOperationException>(() => alert.Resolve(Guid.NewGuid(), null, Now));
     }
 
-    // Follow-up C: AffectedItemCount --------------------------------------------------------------
 
     [Fact]
     public void Raise_Copies_AffectedItemCount_From_The_Command()

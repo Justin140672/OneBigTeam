@@ -126,13 +126,6 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
     [Fact]
     public async Task ExecuteAsync_Creates_Task_And_Sends_Immediate_Reminder_For_NeverEngaged_Employee_Even_Outside_The_Window()
     {
-        // A never-engaged, eligible-and-outstanding employee gets their task and first notice on
-        // this run regardless of how far the due date is — this is the reconciliation behaviour:
-        // it's what lets an employee who is newly brought into the audience (department/location/
-        // position change, new hire, or an audience-rule edit) get assigned promptly rather than
-        // waiting until the due-soon window. The due-soon *window* still governs re-engagement
-        // nagging for employees who were already engaged earlier — see the "does not duplicate"
-        // and "already engaged" tests below.
         await using var db = BuildContext();
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -172,9 +165,6 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
 
         await job.ExecuteAsync();
 
-        // The real IOpenTaskBySourceEntityReader implementation queries the live Tasks database,
-        // so a task created on the first run is naturally visible to the second run's lookup —
-        // the fake needs this wired manually to reproduce that continuity.
         var firstRunTask = Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == employeeId);
         openTaskReader.AddOpenTaskForAssignee(doc.Id, employeeId, TaskActionType.Acknowledge, firstRunTask.Id);
 
@@ -187,9 +177,6 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
     [Fact]
     public async Task ExecuteAsync_Assigns_Task_To_An_Employee_Who_Enters_The_Audience_Between_Runs()
     {
-        // Simulates an employee whose department/location/position change brings them into the
-        // audience after an earlier run already processed everyone else — the reconciliation job
-        // picks them up on the very next run, without needing to re-touch anyone already handled.
         await using var db = BuildContext();
         var companyId       = Guid.NewGuid();
         var existingEmployee = Guid.NewGuid();
@@ -208,12 +195,9 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
         Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == existingEmployee);
         Assert.DoesNotContain(taskCreator.Created, t => t.AssignedEmployeeId == movedEmployee);
 
-        // Wire the first run's task into the fake reader so the second run sees existingEmployee
-        // as already engaged — mirrors the real DB-backed reader's natural continuity.
         var existingEmployeeTask = taskCreator.Created.Single(t => t.AssignedEmployeeId == existingEmployee);
         openTaskReader.AddOpenTaskForAssignee(doc.Id, existingEmployee, TaskActionType.Acknowledge, existingEmployeeTask.Id);
 
-        // The employee's department change lands — they now match the audience.
         audienceReader.EligibleEmployeeIds = [existingEmployee, movedEmployee];
 
         await job.ExecuteAsync();
@@ -221,15 +205,12 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
         Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == movedEmployee);
         var newHireTask = taskCreator.Created.Single(t => t.AssignedEmployeeId == movedEmployee);
         Assert.Equal(doc.Id, newHireTask.SourceEntityId);
-        // The existing employee is untouched by the second run — still exactly one task for them.
         Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == existingEmployee);
 
-        // Wire the second run's new task for movedEmployee before the third run.
         openTaskReader.AddOpenTaskForAssignee(doc.Id, movedEmployee, TaskActionType.Acknowledge, newHireTask.Id);
 
         await job.ExecuteAsync();
 
-        // A third run doesn't duplicate anything for either employee.
         Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == existingEmployee);
         Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == movedEmployee);
     }
@@ -237,11 +218,6 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
     [Fact]
     public async Task ExecuteAsync_Does_Not_Delete_A_Completed_Acknowledgement_For_An_Employee_Who_Has_Since_Left_The_Audience()
     {
-        // "Employees leaving the audience lose normal access, but completed acknowledgement
-        // history is never deleted" — the job has no delete/remove statement anywhere, so this is
-        // really just confirming that guarantee explicitly for the case that matters here: an
-        // employee acknowledges, then a department/location/position change takes them out of the
-        // audience, and a later run must leave their historical acknowledgement row untouched.
         await using var db = BuildContext();
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -337,9 +313,6 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
         var openTaskReader = new FakeOpenTaskBySourceEntityReader();
         var job = BuildJob(db, audienceReader, writer, taskCreator, openTaskReader: openTaskReader);
 
-        // Run twice — second run sees the existing reminder (still within the configured interval)
-        // and skips it. Wire the first run's task into the fake reader so the second run correctly
-        // sees the employee as already engaged, same as the real DB-backed reader would.
         await job.ExecuteAsync();
         var firstRunTask = taskCreator.Created.Single(t => t.AssignedEmployeeId == employeeId);
         openTaskReader.AddOpenTaskForAssignee(doc.Id, employeeId, TaskActionType.Acknowledge, firstRunTask.Id);
@@ -352,9 +325,6 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
     [Fact]
     public async Task ExecuteAsync_Creates_Acknowledgement_Task_For_NeverEngaged_Employee_In_DueSoon_Window()
     {
-        // Stands in for an employee added to the audience after Publish/UploadSharedCompanyDocumentVersion
-        // already ran their one-time task-creation loop (new hire, audience-rule change, etc) — no prior
-        // notification is seeded for them.
         await using var db = BuildContext();
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -415,19 +385,14 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
         var taskCreator = new FakeTaskCreator();
         var openTaskReader = new FakeOpenTaskBySourceEntityReader();
 
-        // First run: due date is within the due-soon window relative to FixedUtcNow — establishes
-        // both the reminder notification and the task.
         await BuildJob(db, audienceReader, writer, taskCreator, openTaskReader: openTaskReader).ExecuteAsync();
 
         Assert.Single(taskCreator.Created, t => t.AssignedEmployeeId == employeeId);
         Assert.Single(writer.Written, n => n.Type == NotificationType.SharedCompanyDocumentAcknowledgementReminder);
 
-        // Wire the first run's task into the fake reader (same as the real DB-backed reader would
-        // naturally see it) so the second run correctly treats the employee as already engaged.
         var firstRunTask = taskCreator.Created.Single(t => t.AssignedEmployeeId == employeeId);
         openTaskReader.AddOpenTaskForAssignee(doc.Id, employeeId, TaskActionType.Acknowledge, firstRunTask.Id);
 
-        // Second run: a later clock makes the SAME fixed due date now overdue.
         var laterClock = new FakeClock(FixedUtcNow.AddDays(10));
         await BuildJob(db, audienceReader, writer, taskCreator, laterClock, openTaskReader).ExecuteAsync();
 
@@ -438,10 +403,6 @@ public class SharedCompanyDocumentAcknowledgementReminderJobTests
     [Fact]
     public async Task ExecuteAsync_Does_Not_Send_Anything_To_An_Employee_Excluded_From_The_Audience()
     {
-        // Documentation case: archived/inactive employees are excluded upstream by
-        // IEmployeeAudienceReader.GetEligibleEmployeeIdsAsync, which this job trusts completely —
-        // simply not adding an employee to EligibleEmployeeIds reproduces that exclusion here,
-        // even though the job itself has no separate "is active" check of its own.
         await using var db = BuildContext();
         var companyId            = Guid.NewGuid();
         var excludedEmployeeId   = Guid.NewGuid();

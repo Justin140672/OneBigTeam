@@ -45,8 +45,6 @@ internal sealed class UpdateUserRolesHandler(
             }
         }
 
-        // IAM-01: the target user id must belong to the route company — otherwise a valid user id
-        // from another company could have its roles read/changed cross-tenant.
         var isMember = await targetUserCompanyGuard.IsMemberAsync(request.CompanyId, request.UserId, cancellationToken);
         if (!isMember)
             return Result.Failure<UpdateUserRolesResponse>(Error.NotFound("User was not found."));
@@ -75,8 +73,6 @@ internal sealed class UpdateUserRolesHandler(
 
         var now = clock.UtcNow;
 
-        // IAM-02: the mandatory Employee role can never be removed through this API — it is the
-        // floor role core session endpoints (GetMe, GetCompany, etc.) depend on.
         if (!requestedRoleIds.Contains(SystemRoles.Employee))
         {
             await PublishRejectionAsync(
@@ -91,11 +87,6 @@ internal sealed class UpdateUserRolesHandler(
 
         if (changedRoleIds.Count > 0)
         {
-            // IAM-02: privilege-escalation / role-administration-boundary guard. This applies
-            // whether the actor is editing another user or themselves — self-elevation is simply
-            // the case where request.UserId == actorUserId, and it's covered by the same check
-            // rather than a special case, so it can never be bypassed by a future policy change
-            // that lets more roles call this endpoint.
             var actorEffectiveRoles = actorUserId.HasValue
                 ? await authorizationService.GetEffectiveRolesAsync(actorUserId.Value, cancellationToken)
                 : new HashSet<Guid>();
@@ -113,12 +104,6 @@ internal sealed class UpdateUserRolesHandler(
             }
         }
 
-        // IAM-02: last-active-administrator lockout. Removing a lockout-protected role (Company
-        // Administrator, HR Administrator) is blocked if the target is the last active holder of
-        // that role in the company — evaluated per role, independently, so a multi-role initial
-        // company creator (Employee + Company Administrator + HR Administrator, see SignUp) can
-        // still have one of those roles removed as long as they are not the sole remaining holder
-        // of that specific role. There is no implicit coupling between the two admin roles.
         var removedProtectedRoleIds = toRemove
             .Select(ur => ur.RoleId)
             .Where(RoleAdministrationPolicy.IsLockoutProtected)
@@ -169,7 +154,7 @@ internal sealed class UpdateUserRolesHandler(
                 new UserRolesChangedAuditEvent(
                     request.CompanyId,
                     request.UserId,
-                    request.UserId, // ApplicationUser.Id == EmployeeId by convention
+                    request.UserId,
                     currentRoleIds,
                     requestedRoleIds,
                     actorUserId,
@@ -195,5 +180,5 @@ internal sealed class UpdateUserRolesHandler(
                 requestedRoleIds,
                 actorUserId,
                 now),
-            CancellationToken.None); // audited even if the caller's cancellation token is later triggered
+            CancellationToken.None);
 }

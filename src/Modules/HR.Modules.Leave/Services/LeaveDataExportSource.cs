@@ -5,10 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Services;
 
-/// <summary>
-/// Story 2: contributes the Leave module's principal data (leave requests, balances/allowances,
-/// policies) to the organisation data export. company_id enforced on every query.
-/// </summary>
 internal sealed class LeaveDataExportSource(LeaveDbContext db) : ILeaveDataExportSource
 {
     public async Task<IReadOnlyList<DataExportTable>> GetTablesAsync(Guid companyId, CancellationToken cancellationToken)

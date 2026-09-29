@@ -44,9 +44,6 @@ public class ActivatePlatformAdministratorEndpointTests
         var (administratorId, _) = await PlatformAdministratorTestHelpers.SeedAdministratorAsync(
             _factory, PlatformAdministratorRole.SupportStaff, email: email);
 
-        // Move the seeded row into a Pending* provisioning state (SeedAdministratorAsync always
-        // produces Active) directly via the domain API, mirroring what CreatePlatformAdministrator
-        // would have left behind.
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();

@@ -86,7 +86,6 @@ public class AppointInternalCandidateSideEffectsEndpointTests
         Assert.Equal(before, after);
         Assert.Equal(employeesBefore, await CountEmployeesAsync(_factory, companyId));
 
-        // The candidate stays linked to the SAME employee — no re-link to a new record.
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
         Assert.Equal(s.EmployeeId, (await db.Candidates.AsNoTracking().SingleAsync(c => c.Id == s.CandidateId)).EmployeeId);
@@ -112,7 +111,6 @@ public class AppointInternalCandidateSideEffectsEndpointTests
     [Fact]
     public async Task External_Hire_Still_Provisions_A_New_Employee_And_Its_Hr_Task()
     {
-        // Regression / positive control for the assertions above.
         var companyId = Guid.NewGuid();
         using var client = await ClientWithRolesAsync(_factory, companyId, SystemRoles.Recruiter);
         var s = await SeedAsync(_factory, companyId, source: ApplicationSource.Direct);
@@ -140,7 +138,6 @@ public class AppointInternalCandidateSideEffectsEndpointTests
         Assert.Equal(s.HiredStageId, application.CurrentStageId);
         Assert.Null(application.AppointmentStatus);
 
-        // The existing employee is untouched by an external hire.
         Assert.Empty(await GetPromotionsAsync(_factory, s.EmployeeId));
     }
 

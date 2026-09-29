@@ -25,9 +25,6 @@ internal sealed class GetOrganisationChartHandler
             .AsNoTracking()
             .Where(e => e.CompanyId == request.CompanyId);
 
-        // Status is an optional filter rather than a hardcoded "Active only" — the caller (the
-        // Organisation Chart page) defaults its own Status dropdown to Active, but HR can widen
-        // or change this, e.g. to review who's on leave or check a leaver's old reporting line.
         if (request.Status is not null)
             query = query.Where(e => e.Status == request.Status);
 
@@ -42,7 +39,6 @@ internal sealed class GetOrganisationChartHandler
             .ThenBy(e => e.FirstName)
             .ToListAsync(cancellationToken);
 
-        // Resolve display names with three targeted lookups — no N+1.
         var departmentIds = employees.Select(e => e.DepartmentId).ToHashSet();
         var locationIds = employees.Select(e => e.LocationId).ToHashSet();
         var positionProfileIds = employees.Select(e => e.PositionProfileId).ToHashSet();
@@ -68,10 +64,6 @@ internal sealed class GetOrganisationChartHandler
                 .ToDictionaryAsync(p => p.Id, p => p.Title, cancellationToken)
             : new Dictionary<Guid, string>();
 
-        // Employee.ProfileImageUrl is a legacy field that nothing writes to any more — current
-        // profile photos live in the Documents module, resolved here via IProfilePhotoReader
-        // (same cross-module bulk-lookup pattern as the department/location/position dictionaries
-        // above, just backed by another module instead of a local table).
         var employeeIds = employees.Select(e => e.Id).ToList();
         var photoUrls = await _profilePhotoReader.GetCurrentPhotoUrlsAsync(
             request.CompanyId, employeeIds, cancellationToken);

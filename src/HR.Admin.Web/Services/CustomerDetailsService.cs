@@ -7,12 +7,6 @@ public sealed class CustomerDetailsService(HrApiHttpClientFactory httpClientFact
 {
     private HttpClient Http => httpClientFactory.CreateClient();
 
-    /// <summary>
-    /// Returns null when the call fails, the caller isn't authorised (401/403), or the company
-    /// isn't found (404) — same null-means-"show error state" contract as
-    /// CustomerListService.GetCustomersOrNullAsync. The page shows one generic error banner and
-    /// does not distinguish between these cases.
-    /// </summary>
     public async Task<CustomerDetailsResponse?> GetCustomerDetailsOrNullAsync(
         Guid companyId,
         CancellationToken cancellationToken = default)
@@ -31,12 +25,6 @@ public sealed class CustomerDetailsService(HrApiHttpClientFactory httpClientFact
         }
     }
 
-    /// <summary>
-    /// Shared execution for every Subscription Management admin action below. Returns true on a
-    /// successful (2xx) response; false on any failure (401/403/404/400 or a transport error) so
-    /// the calling page can show a single generic error banner, same null/false-means-"show error"
-    /// contract as GetCustomerDetailsOrNullAsync above.
-    /// </summary>
     private async Task<bool> PostActionAsync<TRequest>(
         string path, TRequest request, CancellationToken cancellationToken)
     {
@@ -81,21 +69,12 @@ public sealed class CustomerDetailsService(HrApiHttpClientFactory httpClientFact
             new SubscriptionActionRequest(reason),
             cancellationToken);
 
-    /// <summary>
-    /// Schedules a permanent deletion (Customer Lifecycle epic) using the server's default 30-day
-    /// countdown — no countdownDays supplied here, matching the "keep the UI simple" convention.
-    /// </summary>
     public Task<bool> ScheduleDeletionAsync(Guid companyId, string reason, CancellationToken cancellationToken = default) =>
         PostActionAsync(
             $"api/companies/admin/customers/{companyId}/subscription/schedule-deletion",
             new ScheduleDeletionRequest(companyId, reason, CountdownDays: null),
             cancellationToken);
 
-    /// <summary>
-    /// Generates a time-boxed support-session access token for "Login as customer" (Support epic).
-    /// Returns null on any failure (401/403/404/400 or a transport error), same null-means-"show
-    /// error" contract as GetCustomerDetailsOrNullAsync above.
-    /// </summary>
     public async Task<GenerateSupportSessionResponse?> GenerateSupportSessionAsync(
         Guid companyId, string reason, CancellationToken cancellationToken = default)
     {
@@ -117,10 +96,6 @@ public sealed class CustomerDetailsService(HrApiHttpClientFactory httpClientFact
         }
     }
 
-    /// <summary>
-    /// Revokes a previously generated support session. No request body — route-bound, same
-    /// no-body-POST convention as the endpoint contract. Returns null on any failure.
-    /// </summary>
     public async Task<RevokeSupportSessionResponse?> RevokeSupportSessionAsync(
         Guid supportSessionId, CancellationToken cancellationToken = default)
     {
@@ -142,12 +117,6 @@ public sealed class CustomerDetailsService(HrApiHttpClientFactory httpClientFact
         }
     }
 
-    /// <summary>
-    /// Returns null when the call fails, the caller isn't authorised (401/403), or the company
-    /// isn't found (404) — same null-means-"show error state" contract as
-    /// GetCustomerDetailsOrNullAsync above. Each successful call also causes the API to persist a
-    /// new billing snapshot row, which is why this page shows a growing "history" table over time.
-    /// </summary>
     public async Task<CustomerBillingBreakdownResponse?> GetBillingBreakdownOrNullAsync(
         Guid companyId,
         CancellationToken cancellationToken = default)

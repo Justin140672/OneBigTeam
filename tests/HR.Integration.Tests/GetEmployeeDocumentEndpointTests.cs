@@ -18,7 +18,6 @@ public class GetEmployeeDocumentEndpointTests
     private static readonly Guid AcmeCompanyId   = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid AcmeContractId  = Guid.Parse("50000000-0000-0000-0000-000000000001");
 
-    // Seeded: Sarah Chen's contract
     private static readonly Guid SarahEmployeeId = Guid.Parse("30000000-0000-0000-0000-000000000001");
     private static readonly Guid SarahContractDocId = Guid.Parse("70000000-0000-0000-0000-000000000001");
 
@@ -44,9 +43,6 @@ public class GetEmployeeDocumentEndpointTests
     [Fact]
     public async Task Returns_NotFound_For_Unknown_Document()
     {
-        // DOC-01: uses an HR-administrator caller, which is unconditionally in-scope for
-        // SarahEmployeeId — a plain, unrelated employee caller is now denied with 403 before the
-        // handler's NotFound lookup ever runs (see DocumentsResourceAuthorizationTests).
         using var client = await AdminClient();
         var response     = await client.GetAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{SarahEmployeeId}/documents/{Guid.NewGuid()}");
@@ -56,9 +52,6 @@ public class GetEmployeeDocumentEndpointTests
     [Fact]
     public async Task Returns_NotFound_When_EmployeeId_Does_Not_Match()
     {
-        // DOC-01: uses an HR-administrator caller so the mismatched-employeeId 404 (from the
-        // handler) is what's under test here, not resource authorization (see
-        // DocumentsResourceAuthorizationTests for the peer-denial case).
         using var client = await AdminClient();
         var response     = await client.GetAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{Guid.NewGuid()}/documents/{SarahContractDocId}");
@@ -87,14 +80,12 @@ public class GetEmployeeDocumentEndpointTests
         using var client = await AdminClient();
         var employeeId   = Guid.NewGuid();
 
-        // Upload a document
         var uploadResp = await client.PostAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{employeeId}/documents",
             BuildPdfUpload(AcmeContractId, "Get Test Doc", expiryDate: new DateOnly(2028, 1, 1)));
         uploadResp.EnsureSuccessStatusCode();
         var uploaded = await uploadResp.Content.ReadFromJsonAsync<UploadPayload>();
 
-        // Fetch it by ID
         var getResp = await client.GetAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{employeeId}/documents/{uploaded!.EmployeeDocumentId}");
 
@@ -109,9 +100,6 @@ public class GetEmployeeDocumentEndpointTests
     [Fact]
     public async Task Response_Body_Does_Not_Contain_A_DownloadUrl_Property()
     {
-        // DOC-02: the detail endpoint used to leak a signed download URL, bypassing virus-scan
-        // gating and download auditing. Assert the raw JSON body has no such property at all,
-        // rather than just relying on the strongly-typed DTO no longer declaring the field.
         using var client = await AdminClient();
         var response     = await client.GetAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{SarahEmployeeId}/documents/{SarahContractDocId}");
@@ -130,10 +118,6 @@ public class GetEmployeeDocumentEndpointTests
     [InlineData("Failed")]
     public async Task Returns_OK_With_Metadata_Regardless_Of_Scan_Status(string scanStatusName)
     {
-        // DOC-02: the detail endpoint is metadata-only and must never gate on scan status - only
-        // the download endpoint does that (see DocumentScanStatusGatingEndpointTests).
-        // FileScanStatus is internal, so [InlineData] uses a string and we parse it here rather
-        // than exposing the enum on a public test method signature (CS0051).
         var scanStatus = Enum.Parse<FileScanStatus>(scanStatusName);
         var employeeId = Guid.NewGuid();
         var employeeDocumentId = await SeedDocumentWithScanStatusAsync(employeeId, scanStatus);
@@ -182,7 +166,6 @@ public class GetEmployeeDocumentEndpointTests
         return employeeDocument.Id;
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AdminClient()
     {

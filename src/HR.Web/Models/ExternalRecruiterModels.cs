@@ -3,7 +3,6 @@ using HR.Web.Services;
 
 namespace HR.Web.Models;
 
-// ── LIST ──────────────────────────────────────────────────────────────────────
 
 public record ListExternalRecruitersResponse(
     IReadOnlyList<ExternalRecruiterListItemModel> Items,
@@ -19,13 +18,9 @@ public record ExternalRecruiterListItemModel(
     string? ContactEmail,
     string? ContactTelephone,
     bool IsActive,
-    // Ticket #81: count of Vacancy rows currently assigned to this recruiter (Vacancy.AssignedRecruiterId)
-    // — matches ListExternalRecruitersHandler's rationale on the API side. This is now a current-snapshot
-    // count, not an all-time count (the previous VacancyRecruiterAssignment history table is removed).
     int LinkedVacancyCount,
     DateTimeOffset CreatedAt);
 
-// ── GET ───────────────────────────────────────────────────────────────────────
 
 public record GetExternalRecruiterResponse(
     Guid Id,
@@ -42,7 +37,6 @@ public record GetExternalRecruiterResponse(
     // Ticket 2: optimistic-concurrency token.
     int Version = 0);
 
-// ── CREATE ────────────────────────────────────────────────────────────────────
 
 public record CreateExternalRecruiterRequest(
     Guid CompanyId,
@@ -66,7 +60,6 @@ public record CreateExternalRecruiterResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
-// ── UPDATE ────────────────────────────────────────────────────────────────────
 
 public record UpdateExternalRecruiterRequest(
     Guid CompanyId,
@@ -94,7 +87,6 @@ public record UpdateExternalRecruiterResponse(
     DateTimeOffset UpdatedAt,
     int Version = 0);
 
-// ── ACTIVE STATUS ─────────────────────────────────────────────────────────────
 
 public record SetExternalRecruiterActiveStatusRequest(Guid CompanyId, Guid ExternalRecruiterId, bool IsActive);
 
@@ -105,8 +97,6 @@ public record SetExternalRecruiterActiveStatusResponse(
     bool IsActive,
     DateTimeOffset UpdatedAt);
 
-// ── ACTIVITY SUMMARY (#79) ────────────────────────────────────────────────────
-// No fee/commission/contract/invoicing fields anywhere — explicitly out of scope.
 
 public record GetExternalRecruiterActivitySummaryResponse(
     Guid ExternalRecruiterId,
@@ -116,16 +106,12 @@ public record GetExternalRecruiterActivitySummaryResponse(
     int CandidatesIntroducedCount,
     int CandidatesHiredCount);
 
-// Ticket #81: DateInstructed (from the now-removed VacancyRecruiterAssignment row) no longer exists —
-// Vacancy.OpenedAt is used instead as the closest available date signal, and is nullable because a
-// vacancy that never opened (still Draft) has no OpenedAt.
 public record VacancyActivityItemModel(
     Guid VacancyId,
     string? AdvertTitle,
     string Status,
     DateOnly? DateInstructed);
 
-// ── USAGE CHECK (deactivation warning) ───────────────────────────────────────
 
 public sealed record GetExternalRecruiterUsageResponse(
     Guid ExternalRecruiterId,
@@ -133,7 +119,6 @@ public sealed record GetExternalRecruiterUsageResponse(
     int ActiveVacancyCount,
     IReadOnlyList<string> VacancyLabels);
 
-// ── EDIT MODEL ────────────────────────────────────────────────────────────────
 
 public sealed class ExternalRecruiterEditModel : IHasVersion
 {

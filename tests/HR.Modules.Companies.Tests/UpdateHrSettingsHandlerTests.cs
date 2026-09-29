@@ -427,8 +427,6 @@ public class UpdateHrSettingsHandlerTests
 		context.Companies.Add(company);
 		await context.SaveChangesAsync();
 
-		// First update succeeds and bumps Version from 1 to 3 (UpdateHrPolicy and
-		// UpdateAssetNumberSettings each increment the shared Version counter once).
 		var firstHandler = new UpdateHrSettingsHandler(
 			context,
 			new FakeClock(new DateTime(2026, 6, 5, 11, 0, 0, DateTimeKind.Utc)),
@@ -440,7 +438,6 @@ public class UpdateHrSettingsHandlerTests
 		Assert.True(firstResult.IsSuccess);
 		Assert.Equal(5, firstResult.Value!.Version);
 
-		// Second attempt is submitted against the stale Version = 1 read before the first update.
 		var auditPublisher = new CapturingAuditEventPublisher();
 		var secondHandler = new UpdateHrSettingsHandler(
 			context,
@@ -540,7 +537,6 @@ public class UpdateHrSettingsHandlerTests
 		var auditEvent = Assert.IsType<HrSettingsUpdatedAuditEvent>(auditEvt);
 
 		Assert.NotNull(auditEvent.PreviousSettings);
-		// Defaults established by CompanySettings.CreateDefault.
 		Assert.Equal(30, auditEvent.PreviousSettings!.ProbationCheckpointDay1);
 		Assert.Equal(60, auditEvent.PreviousSettings.ProbationCheckpointDay2);
 		Assert.Equal(90, auditEvent.PreviousSettings.ProbationCheckpointDay3);
@@ -569,7 +565,6 @@ public class UpdateHrSettingsHandlerTests
 		return new CompaniesDbContext(options);
 	}
 
-	// --- SET-08: durable/recoverable employee-renumber side effect scenarios --------------------
 
 	[Fact]
 	public async Task HandleAsync_FormatChange_While_Staying_Automatic_Creates_Pending_Outbox_Message_And_Enqueues_Job()
@@ -577,7 +572,6 @@ public class UpdateHrSettingsHandlerTests
 		await using var context = BuildContext();
 		var now = new DateTimeOffset(new DateTime(2026, 8, 26, 10, 0, 0, DateTimeKind.Utc));
 		var company = Company.Create(Guid.NewGuid(), "Acme", now);
-		// CreateDefault seeds EmployeeNumberMode=Automatic, Prefix=null, MinimumLength=4.
 		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
 		context.Companies.Add(company);
 		await context.SaveChangesAsync();
@@ -627,8 +621,6 @@ public class UpdateHrSettingsHandlerTests
 			new FakeClock(new DateTime(2026, 8, 26, 11, 0, 0, DateTimeKind.Utc)),
 			new NoOpAuditEventPublisher(), jobClient, new FakeCurrentUser(null));
 
-		// Stay Automatic, keep prefix/minimum-length exactly as CreateDefault's — only WorkingDays
-		// changes, so no format change is detected at all.
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with
 			{
@@ -653,7 +645,6 @@ public class UpdateHrSettingsHandlerTests
 		await using var context = BuildContext();
 		var now = new DateTimeOffset(new DateTime(2026, 8, 26, 10, 0, 0, DateTimeKind.Utc));
 		var company = Company.Create(Guid.NewGuid(), "Acme", now);
-		// CreateDefault: Automatic, prefix null, minlength 4.
 		company.SetSettings(CompanySettings.CreateDefault(company.Id, now), now);
 		context.Companies.Add(company);
 		await context.SaveChangesAsync();
@@ -664,7 +655,6 @@ public class UpdateHrSettingsHandlerTests
 			new FakeClock(new DateTime(2026, 8, 26, 11, 0, 0, DateTimeKind.Utc)),
 			new NoOpAuditEventPublisher(), jobClient, new FakeCurrentUser(null));
 
-		// Format changes (prefix + minlength) AND mode switches Automatic -> Manual.
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with
 			{
@@ -688,7 +678,6 @@ public class UpdateHrSettingsHandlerTests
 		var now = new DateTimeOffset(new DateTime(2026, 8, 26, 10, 0, 0, DateTimeKind.Utc));
 		var company = Company.Create(Guid.NewGuid(), "Acme", now);
 		var settings = CompanySettings.CreateDefault(company.Id, now);
-		// Manually flip to Manual first so the "before" mode is Manual for this scenario.
 		settings.UpdateHrPolicy(
 			WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday | WorkingDays.Thursday | WorkingDays.Friday,
 			7.5m, 1, 25, 6, true, false, false, 7, 1, "", 3, NoticePeriodUnit.Months, 1, true,
@@ -705,7 +694,6 @@ public class UpdateHrSettingsHandlerTests
 
 		var currentVersion = (await context.CompanySettings.SingleAsync()).Version;
 
-		// Format changes AND mode switches Manual -> Automatic.
 		var result = await handler.HandleAsync(
 			ValidRequest(company.Id) with
 			{
@@ -819,8 +807,6 @@ public class UpdateHrSettingsHandlerTests
 			new FakeClock(new DateTime(2026, 8, 26, 12, 0, 0, DateTimeKind.Utc)),
 			new NoOpAuditEventPublisher(), new NoOpBackgroundJobClient(), new FakeCurrentUser(null));
 
-		// Same employee-number format (no format change) — only an unrelated field (WorkingDays)
-		// changes — must succeed even though a renumber for this company is still Pending.
 		var secondResult = await secondHandler.HandleAsync(
 			ValidRequest(company.Id) with
 			{
@@ -834,7 +820,6 @@ public class UpdateHrSettingsHandlerTests
 			CancellationToken.None);
 
 		Assert.True(secondResult.IsSuccess);
-		// Still only the one outbox row from the first call — this update didn't trigger another.
 		Assert.Single(context.OutboxMessages);
 	}
 
@@ -864,8 +849,6 @@ public class UpdateHrSettingsHandlerTests
 			CancellationToken.None);
 		Assert.True(firstResult.IsSuccess);
 
-		// Manually transition the in-flight row to Processed, simulating the background job having
-		// completed the first renumber.
 		var firstOutboxMessage = await context.OutboxMessages.SingleAsync();
 		firstOutboxMessage.MarkProcessing(now.AddMinutes(30));
 		firstOutboxMessage.MarkProcessed(now.AddMinutes(31));
@@ -907,8 +890,6 @@ public class UpdateHrSettingsHandlerTests
 		context.Companies.Add(company);
 		await context.SaveChangesAsync();
 
-		// Simulate EmployeeNumberGenerator's raw counter UPDATE having advanced the counter after the
-		// admin's form loaded — it writes next_employee_number only, never Version.
 		context.Entry(settings).Property(s => s.NextEmployeeNumber).CurrentValue = 57;
 		await context.SaveChangesAsync();
 

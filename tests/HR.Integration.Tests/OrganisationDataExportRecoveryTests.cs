@@ -155,7 +155,6 @@ public class OrganisationDataExportRecoveryTests
             {
                 var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
                 var export = OrganisationDataExport.Create(companyId, CompanyAdmin, "Admin", DateTimeOffset.UtcNow.AddMinutes(-60));
-                // claim 40 minutes ago: the 15-minute lease is long expired
                 export.BeginAttempt(Guid.NewGuid(), DateTimeOffset.UtcNow.AddMinutes(-40));
                 db.OrganisationDataExports.Add(export);
                 await db.SaveChangesAsync();
@@ -200,7 +199,6 @@ public class OrganisationDataExportRecoveryTests
             {
                 var db = scope.ServiceProvider.GetRequiredService<ReportingDbContext>();
                 var export = OrganisationDataExport.Create(companyId, CompanyAdmin, "Admin", DateTimeOffset.UtcNow.AddMinutes(-60));
-                // just claimed: lease is live for another 15 minutes
                 export.BeginAttempt(Guid.NewGuid(), DateTimeOffset.UtcNow);
                 db.OrganisationDataExports.Add(export);
                 await db.SaveChangesAsync();
@@ -247,7 +245,6 @@ public class OrganisationDataExportRecoveryTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, AcmeCompanyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, CompanyAdmin, SystemRoles.Employee, AcmeCompanyId);
         await TestRoleSeeder.AssignRoleAsync(_factory, CompanyAdmin, SystemRoles.CompanyAdministrator, AcmeCompanyId);
-        // 5e985cea: organisation-data exports require BOTH Company Administrator and HR Administrator roles.
         await TestRoleSeeder.AssignRoleAsync(_factory, CompanyAdmin, SystemRoles.HrAdministrator, AcmeCompanyId);
         return client;
     }

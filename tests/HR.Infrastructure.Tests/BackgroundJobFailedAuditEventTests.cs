@@ -3,12 +3,6 @@ using HR.SharedKernel;
 
 namespace HR.Infrastructure.Tests;
 
-/// <summary>
-/// OBT-REM-11: a background-job failure audit row must never carry the raw exception message —
-/// not even after regex scrubbing — and must be deterministically keyed on the Hangfire job id so
-/// a retried job (or a duplicate OnPerformed callback for the same attempt) yields exactly one row.
-/// Only a fixed, closed-set failure category derived from the exception's .NET type is persisted.
-/// </summary>
 public class BackgroundJobFailedAuditEventTests
 {
     private static readonly DateTimeOffset When = new(2026, 9, 3, 12, 0, 0, TimeSpan.Zero);
@@ -42,8 +36,6 @@ public class BackgroundJobFailedAuditEventTests
         Assert.DoesNotContain(raw, e.Summary);
         var metadataJson = System.Text.Json.JsonSerializer.Serialize(Meta(e));
         Assert.DoesNotContain(raw, metadataJson);
-        // The message text (or any scrubbed derivative of it) is nowhere in the metadata at all —
-        // only the fixed category/exception-type fields are present.
         Assert.Equal(nameof(InvalidOperationException), MetaString(e, "ExceptionType"));
         Assert.Equal("ValidationOrDataIntegrityError", MetaString(e, "FailureCategory"));
     }

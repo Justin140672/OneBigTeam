@@ -3,12 +3,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Employees.Tests.Infrastructure;
 
-/// <summary>
-/// Deterministic stand-in for <see cref="ISensitiveDataProtector"/>. Mimics the real token shape
-/// (<c>OBTENC1:{keyId}:{payload}</c>) closely enough for tests to assert "column is ciphertext"
-/// while still round-tripping through the <see cref="HR.Modules.Employees.Persistence.EmployeesDbContext"/>
-/// value converter.
-/// </summary>
 internal sealed class FakeSensitiveDataProtector : ISensitiveDataProtector
 {
     public const string Prefix = "OBTENC1:test:";

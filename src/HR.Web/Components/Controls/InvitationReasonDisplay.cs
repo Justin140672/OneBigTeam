@@ -10,7 +10,6 @@ public static class InvitationReasonDisplay
 {
     public const string PublicEmailDomain = "PublicEmailDomain";
 
-    /// <summary>Short label, suitable for a table cell.</summary>
     public static string Label(string? reason) => reason switch
     {
         null or ""          => "—",
@@ -23,7 +22,6 @@ public static class InvitationReasonDisplay
         _                   => reason,
     };
 
-    /// <summary>Longer explanation, suitable for a sentence in an alert.</summary>
     public static string Explanation(string? reason) => reason switch
     {
         PublicEmailDomain => "Organisation email required. An organisation email address is required to create an account.",

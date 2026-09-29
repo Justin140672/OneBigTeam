@@ -3,13 +3,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Companies.Tests.Infrastructure;
 
-/// <summary>
-/// Minimal test double for <see cref="IEmployeeDirectoryReader"/> — returns a pre-configured
-/// total count so <c>GetSubscriptionDetailsHandler</c> tests can assert
-/// <c>ActiveEmployeeCount</c> without a real reporting query. Mirrors
-/// HR.Modules.Reporting.Tests.Infrastructure.FakeEmployeeDirectoryReader but lives locally since
-/// module tests don't reference each other's test projects.
-/// </summary>
 internal sealed class FakeEmployeeDirectoryReader : IEmployeeDirectoryReader
 {
     public int TotalCountToReturn { get; set; }

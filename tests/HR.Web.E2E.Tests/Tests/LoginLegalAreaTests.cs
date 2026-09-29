@@ -3,12 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Story 3: the compact legal / trust area beneath the login form links out to the marketing
-/// site's policy pages. Verifies all six expected links render, that every href is an absolute
-/// URL (marketing may be on a different domain) and that the policy paths are present.
-/// Uses <see cref="ParallelBlankPersonaFixture"/> so the unauthenticated login form renders.
-/// </summary>
 public sealed class LoginLegalAreaTests(ParallelBlankPersonaFixture fixture)
     : RoleE2ETestBase<ParallelBlankPersonaFixture>(fixture)
 {
@@ -45,7 +39,6 @@ public sealed class LoginLegalAreaTests(ParallelBlankPersonaFixture fixture)
             Assert.Contains(links, l => l.Href.Contains(path, StringComparison.Ordinal));
         }
 
-        // The "return to website" link points at the marketing base URL root (no policy path).
         Assert.Contains(links, l => l.Text.Contains("Return to", StringComparison.OrdinalIgnoreCase));
     }
 }

@@ -57,11 +57,6 @@ else
 }
 
 @code {
-    // The catalog endpoint already scopes results to what a Manager is permitted to see
-    // (reporting:view-* policies — probation, onboarding, leave summary, workload actions are all
-    // Manager-visible; each report's own handler further row-scopes the data itself to the
-    // manager's direct reports). Showing every returned item here is therefore already "reports
-    // relevant to their team" with no extra client-side filtering needed.
     private bool _loading = true;
     private List<ReportCatalogItemModel> _reports = [];
 

@@ -5,10 +5,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Marketing.Domain;
 
-/// <summary>
-/// A single marketed product feature ("Employee Management", "Leave Management", ...). Global/system
-/// content — see <see cref="MarketingProduct"/> for the company_id exception rationale.
-/// </summary>
 internal sealed class MarketingFeature
 {
     internal static readonly Regex SlugPattern = new(
@@ -27,7 +23,6 @@ internal sealed class MarketingFeature
     public string Intro { get; private set; } = string.Empty;
     public string? DetailedContent { get; private set; }
 
-    /// <summary>Serialized <see cref="IReadOnlyList{T}"/> of benefit strings, stored as jsonb.</summary>
     public string BenefitsJson { get; private set; } = "[]";
 
     public string? YouTubeId { get; private set; }
@@ -39,7 +34,6 @@ internal sealed class MarketingFeature
     public DateTimeOffset UpdatedAt { get; private set; }
     public Guid? UpdatedByUserId { get; private set; }
 
-    /// <summary>De/serializes <see cref="BenefitsJson"/>. Not mapped by EF (see configuration).</summary>
     public IReadOnlyList<string> Benefits
     {
         get => JsonSerializer.Deserialize<List<string>>(

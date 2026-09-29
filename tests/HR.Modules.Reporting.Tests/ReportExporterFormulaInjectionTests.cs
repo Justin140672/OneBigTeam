@@ -5,10 +5,6 @@ using HR.Infrastructure.Reporting;
 
 namespace HR.Modules.Reporting.Tests;
 
-/// <summary>
-/// Covers REP-01: spreadsheet-formula-injection (CSV injection) neutralization in
-/// <see cref="ReportExporter"/> for both CSV and Excel export paths.
-/// </summary>
 public class ReportExporterFormulaInjectionTests
 {
     private readonly ReportExporter _sut = new();
@@ -22,7 +18,6 @@ public class ReportExporterFormulaInjectionTests
     private static string DecodeCsv(ReportExportFile file)
         => Encoding.UTF8.GetString(file.Content);
 
-    // 1. Malicious employee name in a row is neutralized in CSV export.
     [Fact]
     public void ExportCsv_MaliciousEmployeeName_IsNeutralizedWithLeadingApostrophe()
     {
@@ -36,7 +31,6 @@ public class ReportExporterFormulaInjectionTests
         Assert.Contains("'=cmd|", DecodeCsv(file));
     }
 
-    // 2. +, -, @ prefixes are all neutralized (except genuine numbers, covered separately).
     [Theory]
     [InlineData("+1+1")]
     [InlineData("-2+3+cmd|' /C calc'!A0")]
@@ -50,7 +44,6 @@ public class ReportExporterFormulaInjectionTests
         Assert.Contains("'" + maliciousValue, DecodeCsv(file));
     }
 
-    // 3. Genuine negative numbers must remain untouched (usable as numbers).
     [Theory]
     [InlineData("-42")]
     [InlineData("-3.14")]
@@ -98,7 +91,6 @@ public class ReportExporterFormulaInjectionTests
         Assert.Contains("\"Smith, \"\"Bob\"\"\"", DecodeCsv(file));
     }
 
-    // 7. Excel export: malicious department name is stored as literal text, not a formula.
     [Fact]
     public void ExportExcel_MaliciousDepartmentName_IsStoredAsTextNotFormula()
     {
@@ -113,16 +105,11 @@ public class ReportExporterFormulaInjectionTests
         var worksheet = workbook.Worksheets.First();
         var cell = worksheet.Cell(2, 2);
 
-        // ClosedXML/Excel treat a leading apostrophe as a "force text" marker: it is consumed
-        // to select the text data type and is not retained as part of the stored string. What
-        // matters for injection protection is that the cell is stored as literal text (not a
-        // formula) and, when opened, displays the formula-looking string rather than executing it.
         Assert.False(cell.HasFormula);
         Assert.True(string.IsNullOrEmpty(cell.FormulaA1));
         Assert.Equal("=HYPERLINK(\"http://evil\")", cell.GetString());
     }
 
-    // 8. Excel export: column headers are also neutralized.
     [Fact]
     public void ExportExcel_MaliciousColumnHeader_IsNeutralized()
     {
@@ -141,7 +128,6 @@ public class ReportExporterFormulaInjectionTests
         Assert.Equal("=cmd|' /C calc'!A0", headerCell.GetString());
     }
 
-    // 9a. Generic free-text value category.
     [Fact]
     public void ExportCsv_GenericFreeTextValue_IsNeutralized()
     {
@@ -152,13 +138,6 @@ public class ReportExporterFormulaInjectionTests
         Assert.Contains("'=1+1", DecodeCsv(file));
     }
 
-    // 9b. Report title / filename category: SafeFileName strips invalid filename characters
-    // (it does not, and does not need to, neutralize formula prefixes). A filename is never
-    // opened as a spreadsheet formula by a spreadsheet application — it is only ever used as
-    // an OS-level file name — so "=" is not an injection vector there. This test documents
-    // that the produced filename is a safe, valid OS file name for a malicious-looking title,
-    // without asserting formula-neutralization of the filename itself (which is out of scope
-    // and not a real vulnerability for REP-01).
     [Fact]
     public void ExportCsv_ReportTitleStartingWithFormulaPrefix_ProducesValidOsFileName()
     {

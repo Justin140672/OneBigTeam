@@ -310,8 +310,6 @@ public class PositionProfileService(HrApiHttpClientFactory httpClientFactory)
         }
         catch
         {
-            // Non-JSON / empty error body (e.g. a bare 500) — don't let a deserialisation failure
-            // bubble out as an unhandled exception.
             return (false, "Failed to save inherited roles.");
         }
     }

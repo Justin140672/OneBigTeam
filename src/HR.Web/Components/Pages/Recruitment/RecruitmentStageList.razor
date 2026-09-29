@@ -155,12 +155,6 @@
 
     protected override Task OnBeforeLoadAsync()
     {
-        // Recruiter-only, matching the backend's recruitment:manage policy (CreateRecruitmentStage/
-        // UpdateRecruitmentStage/ReorderRecruitmentStages/SetRecruitmentStageActiveStatus) — an HR
-        // Administrator does not automatically get recruitment access, by deliberate design (see
-        // IdentityModule.cs's recruitment:manage policy comment). CanManageEmployees was too broad
-        // here and let HR Administrators reach this page directly even though the Recruitment
-        // Dashboard's own "Recruitment Settings" button is already Recruiter-only.
         if (!Session.CanManageRecruitment)
             Navigation.NavigateTo("/access-denied", replace: true);
         return Task.CompletedTask;
@@ -226,10 +220,6 @@
     {
         ClearActionError();
 
-        // Deactivating never breaks anything (the stage row is preserved, just hidden from new
-        // selection — see SetRecruitmentStageActiveStatusHandler), but if any active vacancy's
-        // applications currently sit on this stage, warn the user first rather than deactivating
-        // silently. Activating never needs this check.
         if (!isActive)
         {
             var usage = await RecruitmentStageService.GetUsageAsync(CompanyId, item.Id);
@@ -241,7 +231,6 @@
                 return;
             }
 
-            // Not in use — still confirm before deactivating, just without the usage warning.
             _simpleDeactivateTarget = item;
             return;
         }
@@ -287,9 +276,6 @@
             await LoadAsync();
     }
 
-    // Move-up/down is the reorder mechanism (no drag-drop precedent found in this codebase's grid
-    // usage) — recompute the full ordered id list (including inactive stages, since the reorder
-    // endpoint reassigns DisplayOrder 1..N by list position for every stage) and send it whole.
     private async Task MoveUpAsync(RecruitmentStageListItem item) => await MoveAsync(item, -1);
 
     private async Task MoveDownAsync(RecruitmentStageListItem item) => await MoveAsync(item, 1);
@@ -298,9 +284,6 @@
     {
         ClearActionError();
 
-        // Reorder must operate on the full set (active + inactive) in true DisplayOrder, regardless
-        // of the current "show inactive" filter applied to Items — the endpoint requires every one
-        // of the company's stages to be present in the submitted list, with no omissions.
         var all = await RecruitmentStageService.ListStagesAsync(CompanyId);
         if (all?.Items is null) return;
 
@@ -308,11 +291,6 @@
         var index = ordered.FindIndex(i => i.Id == item.Id);
         if (index < 0) return;
 
-        // The swap target must be the nearest neighbour that's actually VISIBLE in the current grid
-        // (active-only unless "Show inactive" is on), not simply the physically adjacent stage in
-        // raw DisplayOrder. Otherwise, when an inactive stage happens to sit immediately next to this
-        // one, swapping with it silently reassigns DisplayOrder server-side while leaving the visible
-        // grid's row order completely unchanged — "Move up"/"Move down" then appears to do nothing.
         bool IsVisible(RecruitmentStageListItem candidate) => ShowInactive || candidate.IsActive;
 
         var targetIndex = index + delta;

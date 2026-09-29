@@ -105,7 +105,7 @@ public class UpdateCompanyDocumentCategoryHandlerTests
         var result = await Handler(db).HandleAsync(
             new UpdateCompanyDocumentCategoryRequest
             {
-                CompanyId  = Guid.NewGuid(), // different company
+                CompanyId  = Guid.NewGuid(),
                 CategoryId = categoryId,
                 Name       = "Handbook",
                 ExpectedVersion = 1,

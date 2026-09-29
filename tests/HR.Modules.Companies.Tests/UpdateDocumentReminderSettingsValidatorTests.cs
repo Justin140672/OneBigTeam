@@ -63,7 +63,6 @@ public class UpdateDocumentReminderSettingsValidatorTests
         Assert.True(validator.Validate(ValidRequest() with { Version = 1 }).IsValid);
     }
 
-    // ── Positive-value checks, each slot independently ──────────────────────────
 
     [Fact]
     public void Validate_Fails_When_OffsetDays1_Is_Zero()
@@ -108,13 +107,11 @@ public class UpdateDocumentReminderSettingsValidatorTests
     [Fact]
     public void Validate_Passes_When_OffsetDays_Value_Is_One()
     {
-        // Boundary: 1 is the smallest allowed positive value.
         var validator = new UpdateDocumentReminderSettingsValidator();
         var result = validator.Validate(ValidRequest() with { OffsetDays1 = 3, OffsetDays2 = 2, OffsetDays3 = 1 });
         Assert.True(result.IsValid);
     }
 
-    // ── At least one configured while enabled ───────────────────────────────────
 
     [Fact]
     public void Validate_Fails_When_Enabled_And_All_Offsets_Are_Null()
@@ -161,7 +158,6 @@ public class UpdateDocumentReminderSettingsValidatorTests
         Assert.True(result.IsValid);
     }
 
-    // ── Uniqueness ───────────────────────────────────────────────────────────────
 
     [Fact]
     public void Validate_Fails_When_OffsetDays1_And_OffsetDays2_Are_Equal()
@@ -187,7 +183,6 @@ public class UpdateDocumentReminderSettingsValidatorTests
         Assert.False(result.IsValid);
     }
 
-    // ── Strict-decreasing ordering, including "skip slot 2" ─────────────────────
 
     [Fact]
     public void Validate_Fails_When_OffsetDays1_Is_Less_Than_OffsetDays2()
@@ -200,8 +195,6 @@ public class UpdateDocumentReminderSettingsValidatorTests
     [Fact]
     public void Validate_Fails_When_OffsetDays1_Equals_OffsetDays2()
     {
-        // Equality is covered by the uniqueness rule too, but this pins down that the ordering
-        // rule itself is a strict (not "greater-than-or-equal") comparison.
         var validator = new UpdateDocumentReminderSettingsValidator();
         var result = validator.Validate(ValidRequest() with { OffsetDays1 = 30, OffsetDays2 = 30, OffsetDays3 = null });
         Assert.False(result.IsValid);
@@ -226,7 +219,6 @@ public class UpdateDocumentReminderSettingsValidatorTests
     [Fact]
     public void Validate_Passes_When_OffsetDays2_Is_Null_And_OffsetDays1_Is_Greater_Than_OffsetDays3()
     {
-        // Valid "skip slot 2" case explicitly called out in the spec: 90 / null / 7.
         var validator = new UpdateDocumentReminderSettingsValidator();
         var result = validator.Validate(ValidRequest() with { OffsetDays1 = 90, OffsetDays2 = null, OffsetDays3 = 7 });
         Assert.True(result.IsValid);
@@ -235,7 +227,6 @@ public class UpdateDocumentReminderSettingsValidatorTests
     [Fact]
     public void Validate_Fails_When_OffsetDays2_Is_Null_And_OffsetDays1_Is_Not_Greater_Than_OffsetDays3()
     {
-        // Invalid "skip slot 2" case explicitly called out in the spec: 5 / null / 7.
         var validator = new UpdateDocumentReminderSettingsValidator();
         var result = validator.Validate(ValidRequest() with { OffsetDays1 = 5, OffsetDays2 = null, OffsetDays3 = 7 });
         Assert.False(result.IsValid);

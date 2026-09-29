@@ -8,22 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Features.ProcessDocumentExpiryNotifications;
 
-/// <summary>
-/// DOC-03: evaluates every employee document with an expiry date for the given company and fires
-/// whichever of the four notification stages (90/30/7 days before expiry, plus overdue/expired)
-/// have newly crossed their threshold as of "today" in the company's own time zone.
-///
-/// Each stage is tracked by its own persisted "sent at" column on <see cref="EmployeeDocument"/>
-/// (ExpiryReminder90/30/7SentAt, plus the pre-existing ExpiringSoonNotifiedAt/ExpiredNotifiedAt for
-/// the overdue stage) and is only ever fired once per expiry date — a stage already sent is a safe
-/// no-op on every subsequent run, including Hangfire retries and catch-up runs after a missed day.
-/// Multiple stages can fire in the same run if the job has not executed for a while (e.g. a
-/// document created with an expiry date already inside the 30-day window fires both the 90-day and
-/// 30-day stages together the first time it is evaluated).
-///
-/// Called both by <see cref="DocumentExpiryReminderJob"/> (the automatic daily per-company job —
-/// see DOC-03) and by the manual /expiry-notifications endpoint retained for on-demand/admin use.
-/// </summary>
 internal sealed class ProcessDocumentExpiryNotificationsHandler(
     DocumentsDbContext db,
     IClock clock,
@@ -36,15 +20,6 @@ internal sealed class ProcessDocumentExpiryNotificationsHandler(
         ProcessDocumentExpiryNotificationsRequest request,
         CancellationToken cancellationToken)
     {
-        // SET-07: the company's configured reminder schedule replaces the previously hardcoded
-        // 90/30/7-day stages. ExpiryReminderStage.NinetyDays/ThirtyDays/SevenDays are now purely
-        // positional slots (slot 1/2/3, furthest-out first) — the *SentAt column each maps to on
-        // EmployeeDocument no longer necessarily corresponds to its historical day count once a
-        // company customises the schedule, but per-slot idempotency (see IsStageAlreadySent /
-        // EmployeeDocument.MarkExpiryReminderSent) is unaffected by that, since idempotency keys off
-        // (document, expiry date, stage slot), never the configured day count itself. A disabled
-        // reminder schedule (RemindersEnabled=false) or a null slot skips upcoming-expiry stage
-        // evaluation entirely; the separate overdue/expired path below is unaffected by this setting.
         var reminderSettings = await documentReminderSettingsReader.GetDocumentReminderSettingsAsync(request.CompanyId, cancellationToken);
 
         var reminderStages = reminderSettings.RemindersEnabled
@@ -57,12 +32,6 @@ internal sealed class ProcessDocumentExpiryNotificationsHandler(
         var widestLookaheadDays = reminderStages.Count == 0 ? 0 : reminderStages.Max(s => s.Days);
         var widestThreshold = today.AddDays(widestLookaheadDays);
 
-        // Read-only projection to gather event data — no change tracking needed. Superset query:
-        // anything within the widest (90-day) lookahead, or already expired and not yet notified.
-        // Exact per-stage evaluation happens in-memory below against the tracked entity.
-        // SET-07: when reminders are disabled (or no stage is configured) the upcoming-expiry half
-        // of this condition matches nothing (reminderStages.Count == 0), leaving only the
-        // always-on overdue/expired half — reminders being off never suppresses the overdue alert.
         var remindersActive = reminderStages.Count > 0;
 
         var candidates = await (
@@ -89,7 +58,6 @@ internal sealed class ProcessDocumentExpiryNotificationsHandler(
         if (candidates.Count == 0)
             return new ProcessDocumentExpiryNotificationsResponse(0, 0);
 
-        // Load entities for update with full tracking.
         var ids      = candidates.Select(c => c.EmployeeDocumentId).ToList();
         var entities = await db.EmployeeDocuments
             .Where(ed => ids.Contains(ed.Id))
@@ -146,9 +114,6 @@ internal sealed class ProcessDocumentExpiryNotificationsHandler(
 
                     entity.MarkExpiryReminderSent(stage, now);
 
-                    // Keep the legacy ExpiringSoonNotifiedAt flag (consumed elsewhere, e.g. the
-                    // "expiring soon" workload action) in sync with the 30-day stage — the closest
-                    // equivalent of its original single-threshold meaning.
                     if (stage == ExpiryReminderStage.ThirtyDays)
                         entity.MarkExpiringSoonNotified(now);
 
@@ -197,11 +162,6 @@ internal sealed class ProcessDocumentExpiryNotificationsHandler(
             Reminder7Count:    reminderCounts[ExpiryReminderStage.SevenDays]);
     }
 
-    /// <summary>
-    /// SET-07: maps the company's configured (up to 3) day-offsets onto the fixed
-    /// NinetyDays/ThirtyDays/SevenDays stage slots by position (slot 1/2/3), skipping any null slot.
-    /// The stage enum member names are now purely positional/historical — see the class-level remarks.
-    /// </summary>
     private static IReadOnlyList<(ExpiryReminderStage Stage, int Days)> BuildReminderStages(
         CompanyDocumentReminderSettings settings)
     {
@@ -223,8 +183,6 @@ internal sealed class ProcessDocumentExpiryNotificationsHandler(
     };
 }
 
-/// <summary>System actor id used for automated task creation, mirroring the SystemActor pattern
-/// used elsewhere in this module (e.g. the pre-existing local const of the same value).</summary>
 internal static class DocumentsSystemActor
 {
     public static readonly Guid Id = Guid.Empty;

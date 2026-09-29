@@ -39,7 +39,6 @@ public class InternalApplicationIdentificationEndpointTests
         _factory = factory;
     }
 
-    // ---- Helpers ---------------------------------------------------------------------------------
 
     private async Task<HttpClient> RecruiterClientAsync(Guid companyId)
     {
@@ -97,8 +96,6 @@ public class InternalApplicationIdentificationEndpointTests
         var legacyCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Noah", "Patel", $"noah.{Guid.NewGuid():N}@example.com", null, null, now);
         var legacyApp = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, legacyCandidate.Id, received.Id, null, now.AddSeconds(2));
 
-        // Mirrors HireCandidate: the external candidate is linked to their new employee record, but
-        // the application's Source stays Direct.
         var hiredEmployeeId = Guid.NewGuid();
         var hiredCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", $"liam.{Guid.NewGuid():N}@example.com", null, null, now);
         hiredCandidate.LinkToEmployee(hiredEmployeeId, now);
@@ -133,7 +130,6 @@ public class InternalApplicationIdentificationEndpointTests
     private static string ReportUrl(Guid companyId, string report) =>
         $"/api/companies/{companyId}/reporting/{report}";
 
-    /// <summary>Returns the CSV cells of the single data line that starts with <paramref name="firstCell"/>.</summary>
     private static string[] CsvRowStartingWith(string body, string firstCell)
     {
         var line = body
@@ -143,7 +139,6 @@ public class InternalApplicationIdentificationEndpointTests
         return line.Split(',').Select(c => c.Trim('"')).ToArray();
     }
 
-    // ---- Authentication ---------------------------------------------------------------------------
 
     [Theory]
     [InlineData("vacancies/{v}/applications?isInternal=true")]
@@ -168,7 +163,6 @@ public class InternalApplicationIdentificationEndpointTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ---- GET application detail -------------------------------------------------------------------
 
     [Fact]
     public async Task Get_Application_Detail_Internal_Returns_IsInternal_True_And_EmployeeId()
@@ -227,8 +221,6 @@ public class InternalApplicationIdentificationEndpointTests
     [Fact]
     public async Task Get_Application_Detail_For_Application_Created_Via_Employee_Apply_Endpoint_Is_Internal()
     {
-        // End to end: a plain employee applies through the real self-apply endpoint, then a recruiter
-        // sees the application flagged as internal with the employee's id.
         var companyId = Guid.NewGuid();
         var employeeUserId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeUserId, SystemRoles.Employee, companyId);
@@ -264,7 +256,6 @@ public class InternalApplicationIdentificationEndpointTests
         Assert.Equal(employeeUserId, item.EmployeeId);
     }
 
-    // ---- GET vacancy application list -------------------------------------------------------------
 
     [Fact]
     public async Task Get_Vacancy_Applications_Without_Filter_Returns_All_With_IsInternal_And_EmployeeId()
@@ -345,7 +336,6 @@ public class InternalApplicationIdentificationEndpointTests
         Assert.Equal(seeded.DirectApplicationId, Assert.Single(payload!.Items).Id);
     }
 
-    // ---- GET kanban -------------------------------------------------------------------------------
 
     [Fact]
     public async Task Get_Kanban_Internal_And_External_Share_Stage_Column_With_IsInternal_And_EmployeeId()
@@ -359,7 +349,6 @@ public class InternalApplicationIdentificationEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<KanbanPayload>();
         Assert.NotNull(payload);
-        // Same six configured stage columns — no separate internal column.
         Assert.Equal(6, payload!.Columns.Count);
 
         var cvReview = payload.Columns.Single(c => c.StageId == seeded.CvReviewStageId);
@@ -381,7 +370,6 @@ public class InternalApplicationIdentificationEndpointTests
         Assert.Null(legacyCard.EmployeeId);
     }
 
-    // ---- GET search -------------------------------------------------------------------------------
 
     [Fact]
     public async Task Get_Search_IsInternal_True_Returns_Only_Internal_With_Stage_And_Withdrawn_Fields()
@@ -503,7 +491,6 @@ public class InternalApplicationIdentificationEndpointTests
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
-    // ---- Recruitment pipeline report --------------------------------------------------------------
 
     [Theory]
     [InlineData("", 4, 1, 1, 1)]
@@ -566,7 +553,6 @@ public class InternalApplicationIdentificationEndpointTests
         Assert.Equal(expectedCandidates, row[2]);
     }
 
-    // ---- Vacancy performance report ---------------------------------------------------------------
 
     [Theory]
     [InlineData("", 4, 1, 1, true)]
@@ -588,7 +574,6 @@ public class InternalApplicationIdentificationEndpointTests
         Assert.Equal(candidates, row.CandidateCount);
         Assert.Equal(interviews, row.InterviewCount);
         Assert.Equal(offers, row.OfferCount);
-        // The only hire is the hired EXTERNAL candidate — never attributed to the internal slice.
         Assert.Equal(expectHireDate, row.HireDate is not null);
     }
 
@@ -611,7 +596,6 @@ public class InternalApplicationIdentificationEndpointTests
         Assert.Equal(expectedCandidates, row[2]);
     }
 
-    // ---- Recruitment pipeline summary report ------------------------------------------------------
 
     [Theory]
     [InlineData("", 4, 2, 1, 1)]
@@ -655,7 +639,6 @@ public class InternalApplicationIdentificationEndpointTests
         Assert.Equal(expectedCandidates, row[5]);
     }
 
-    // ---- Employee-apply seeding (end-to-end test only) ---------------------------------------------
 
     private async Task SeedEmployeeAsync(Guid userId, Guid companyId)
     {
@@ -691,7 +674,7 @@ public class InternalApplicationIdentificationEndpointTests
     private static MultipartFormDataContent PdfCvForm()
     {
         var bytes = new byte[2048];
-        bytes[0] = 0x25; bytes[1] = 0x50; bytes[2] = 0x44; bytes[3] = 0x46; // %PDF
+        bytes[0] = 0x25; bytes[1] = 0x50; bytes[2] = 0x44; bytes[3] = 0x46;
         var fileContent = new ByteArrayContent(bytes);
         fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");
         var content = new MultipartFormDataContent();
@@ -699,7 +682,6 @@ public class InternalApplicationIdentificationEndpointTests
         return content;
     }
 
-    // ---- Payloads ---------------------------------------------------------------------------------
 
     private sealed record DetailPayload(Guid Id, string? Source, bool IsInternal, Guid? EmployeeId);
 

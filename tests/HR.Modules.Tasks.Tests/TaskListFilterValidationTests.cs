@@ -24,7 +24,6 @@ public class TaskListFilterValidationTests
     private static readonly string[] InvalidValues =
         ["Compeleted", "Completedx", "7", "0", "-1", "Open,Closed", "Open Closed", "Closed", "Urgent", "None"];
 
-    // ── GetMyTasks ────────────────────────────────────────────────────────
 
     [Theory]
     [MemberData(nameof(StatusCases))]
@@ -52,7 +51,6 @@ public class TaskListFilterValidationTests
         Assert.DoesNotContain(errors, e => e.PropertyName == "Priority");
     }
 
-    // ── GetEmployeeTasks ──────────────────────────────────────────────────
 
     [Theory]
     [MemberData(nameof(StatusCases))]
@@ -70,7 +68,6 @@ public class TaskListFilterValidationTests
                 new GetEmployeeTasksRequest { CompanyId = Company, EmployeeId = Subject, Priority = priority }),
             expectValid);
 
-    // ── data ──────────────────────────────────────────────────────────────
 
     public static IEnumerable<object?[]> StatusCases()
     {
@@ -86,7 +83,6 @@ public class TaskListFilterValidationTests
         foreach (var v in InvalidValues) yield return [v, false];
     }
 
-    // ── helpers ───────────────────────────────────────────────────────────
 
     private static GetMyTasksRequest MyRequest(string? status = null, string? priority = null)
         => new() { CompanyId = Company, Status = status, Priority = priority };

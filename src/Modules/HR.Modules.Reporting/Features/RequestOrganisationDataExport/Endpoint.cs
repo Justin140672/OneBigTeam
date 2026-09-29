@@ -4,11 +4,6 @@ using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Reporting.Features.RequestOrganisationDataExport;
 
-/// <summary>
-/// Story 2: a company administrator requests a full downloadable export of their organisation's
-/// data ahead of account closure. Gated by "role:company-administrator" and a caller-tenant check,
-/// mirroring DOC-04's PurgeEligibleArchivedEmployeeDocuments endpoint.
-/// </summary>
 internal sealed class Endpoint(
     RequestOrganisationDataExportHandler handler,
     ICurrentUser currentUser)

@@ -58,9 +58,6 @@ public class GetGenderSplitHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        // Gender is a required (non-nullable) EF property, so null/empty values can never be
-        // persisted — only whitespace-only values can reach the database while still being
-        // "not really specified" from a reporting perspective. Cover that case three times.
         var whitespaceGender1 = NewEmployee(companyId, "Alice", "Smith", "   ");
         whitespaceGender1.Activate(Now);
         var whitespaceGender2 = NewEmployee(companyId, "Bob", "Jones", " ");
@@ -115,7 +112,6 @@ public class GetGenderSplitHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        // 1 of 3 -> 33.3, 1 of 3 -> 33.3, 1 of 3 -> 33.3 which sums to 99.9 without adjustment.
         var female = NewEmployee(companyId, "Alice", "Smith", "Female");
         female.Activate(Now);
         var male = NewEmployee(companyId, "Bob", "Jones", "Male");

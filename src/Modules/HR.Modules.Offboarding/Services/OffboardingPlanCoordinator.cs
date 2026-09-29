@@ -10,10 +10,6 @@ using HR.Modules.Offboarding;
 
 namespace HR.Modules.Offboarding.Services;
 
-// Wraps the existing StartOffboardingHandler so other modules (Employees, via the
-// IOffboardingPlanCoordinator port declared in HR.Infrastructure.Abstractions) can trigger the
-// same plan/checklist generation used by the manual "Start Offboarding" action, without
-// duplicating its task-generation logic and without a direct module-to-module reference.
 internal sealed class OffboardingPlanCoordinator(
     StartOffboardingHandler startOffboardingHandler,
     OffboardingDbContext dbContext,
@@ -31,9 +27,6 @@ internal sealed class OffboardingPlanCoordinator(
         Guid? replacementManagerEmployeeId,
         CancellationToken cancellationToken)
     {
-        // OFF-08: this coordinator path is always the system-driven auto-start triggered by
-        // Employees' StartLeavingProcess handler, never a direct human "Start Offboarding" action
-        // (that goes through StartOffboarding's Endpoint, which resolves the real actor).
         var request = new StartOffboardingRequest(
             companyId, employeeId, lastWorkingDay, notes, replacementManagerEmployeeId,
             ActorEmployeeId: OffboardingSystemActor.Id);
@@ -145,11 +138,6 @@ internal sealed class OffboardingPlanCoordinator(
                 cancellationToken);
         }
 
-        // Always re-run the cross-module sync, regardless of whether the plan was just
-        // transitioned above or was already Cancelled — see the idempotency note above. The full
-        // set of the plan's OffboardingTask ids is passed every time; ITaskCanceller filters out
-        // anything already Completed/Cancelled on its side, so a repeat call with the same ids is
-        // cheap and a genuine no-op once everything is in sync.
         var allOffboardingTaskIds = await dbContext.OffboardingTasks
             .Where(t => t.OffboardingPlanId == plan.Id)
             .Select(t => t.Id)
@@ -170,21 +158,6 @@ internal sealed class OffboardingPlanCoordinator(
         }
     }
 
-    // OFF-02: called by Offboarding's consumer of EmployeeLeavingDateSetIntegrationEvent whenever
-    // Employees' StartLeavingProcess or AmendLeavingProcess handler sets/amends the leaving
-    // date/last working day. Reconciles the active plan's LastWorkingDay and every outstanding
-    // OffboardingTask's due date to the given newLastWorkingDay, then propagates the same date to
-    // the corresponding Tasks-module TaskItems.
-    //
-    // Idempotent, mirroring CancelOutstandingTasksAsync's shape:
-    //  - No plan at all, or the most recent plan already Completed/Cancelled: no-op — a leaving
-    //    date can be amended before offboarding has started (nothing to reschedule yet; the plan
-    //    will be created with the correct LastWorkingDay when it does start) or after it has
-    //    finished/been withdrawn (a terminal plan must never be touched by this).
-    //  - Plan's LastWorkingDay already equals newLastWorkingDay, and every outstanding task's
-    //    DueDate already matches too: no local changes, no audit event — but the Tasks-module sync
-    //    below still always runs (self-healing after a partial prior failure), same as cancellation.
-    // Best-effort by design: this must never throw in a way that aborts the caller's own request.
     public async Task RescheduleOutstandingTasksAsync(
         Guid companyId,
         Guid employeeId,
@@ -243,11 +216,6 @@ internal sealed class OffboardingPlanCoordinator(
                 cancellationToken);
         }
 
-        // Always re-run the cross-module sync, mirroring CancelOutstandingTasksAsync — this is
-        // what makes the method self-healing if a previous call's local save succeeded but the
-        // Tasks-module call below failed or the process crashed before reaching it. Passing every
-        // outstanding OffboardingTask id every time is cheap: ITaskRescheduler only rewrites (and
-        // notifies for) tasks whose TaskItem.DueDate doesn't already match newLastWorkingDay.
         if (outstandingTasks.Count == 0)
             return;
 

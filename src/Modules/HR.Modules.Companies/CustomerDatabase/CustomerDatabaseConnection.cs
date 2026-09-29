@@ -23,7 +23,6 @@ internal sealed class CustomerDatabaseConnection
 
     public async Task<string?> GetConnectionStringAsync(Guid companyId, CancellationToken cancellationToken = default)
     {
-        // Check cache if not expired (60-second TTL)
         if (_cache.Length > 0 && DateTimeOffset.UtcNow < _cacheExpiry)
         {
             var cachedEntry = _cache.Span[0];
@@ -33,7 +32,6 @@ internal sealed class CustomerDatabaseConnection
             }
         }
 
-        // Query customer_database_assignments by company_id
         var assignment = await _platformDb.CustomerDatabaseAssignments
             .AsNoTracking()
             .FirstOrDefaultAsync(a => a.CompanyId == companyId, cancellationToken);
@@ -45,14 +43,12 @@ internal sealed class CustomerDatabaseConnection
                 "No active database assignment found for this company.");
         }
 
-        // If database_key is null/empty, return null (signals shared database)
         if (string.IsNullOrEmpty(assignment.DatabaseKey))
         {
             CacheResult(companyId, null);
             return null;
         }
 
-        // Look up secure config key: CustomerDatabases:{database_key}:ConnectionString
         var configKey = $"CustomerDatabases:{assignment.DatabaseKey}:ConnectionString";
         var connectionString = _config[configKey];
 

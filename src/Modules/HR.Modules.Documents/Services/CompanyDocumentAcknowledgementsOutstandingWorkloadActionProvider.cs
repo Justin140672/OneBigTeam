@@ -5,12 +5,6 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace HR.Modules.Documents.Services;
 
-/// <summary>
-/// OBT-721 Workload &amp; HR Actions Report provider for outstanding company document
-/// acknowledgements. HR-only, reuses ICompanyDocumentAcknowledgementReportReader (already used by
-/// GetCompanyDocumentAcknowledgementReport/Handler.cs). One WorkloadAction per (document, employee)
-/// pair that has not yet acknowledged the current published version.
-/// </summary>
 internal sealed class CompanyDocumentAcknowledgementsOutstandingWorkloadActionProvider(
     ICompanyDocumentAcknowledgementReportReader acknowledgementReportReader,
     IEmployeeDepartmentReader employeeDepartmentReader,

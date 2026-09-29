@@ -46,7 +46,6 @@ public class ApplicationConcurrencyHandlerTests
         return new Seed(dbName, companyId, vacancy.Id, candidate.Id, application.Id, stages);
     }
 
-    // ---- MoveApplicationStageHandler --------------------------------------------------------
 
     private static MoveApplicationStageHandler MoveStageHandler(RecruitmentDbContext db, FakeAuditPublisher? audit = null, FakeIntegrationEventPublisher? events = null) =>
         new(db, new FakeClock(FixedUtcNow),
@@ -154,7 +153,6 @@ public class ApplicationConcurrencyHandlerTests
         // integration tests (see IdempotentApplicationTransitionConcurrencyEndpointTests).
     }
 
-    // ---- HireCandidateHandler ----------------------------------------------------------------
 
     private static HireCandidateHandler HireHandler(
         RecruitmentDbContext db,
@@ -247,10 +245,6 @@ public class ApplicationConcurrencyHandlerTests
         var vacancyA = await ctxA.Vacancies.SingleAsync();
         var readerA = ResolvableReader(vacancyA.PositionProfileId, out _, out _);
         await ctxA.Applications.SingleAsync();
-        // Pre-track the Candidate too (identity-map trick, mirroring the Application above): without
-        // this, HireHandler's own Candidate query on ctxA would hit the InMemory store fresh and pick
-        // up the winner's already-committed EmployeeId link, turning this into a "conflict" (candidate
-        // already linked) rather than the "concurrency" case this test targets.
         await ctxA.Candidates.SingleAsync();
 
         Guid winningEmployeeId;
@@ -272,10 +266,6 @@ public class ApplicationConcurrencyHandlerTests
         Assert.True(loser.IsFailure);
         Assert.Equal("concurrency", loser.Error.Code);
 
-        // See the NOTE in HireCandidate_Stale_Version_Returns_Concurrency_Failure_And_Application_Candidate_Remain_Consistent
-        // above re: EF InMemory not applying SaveChanges atomically across entities — only the
-        // Application-level guarantee is asserted at the unit level; the full cross-entity guarantee
-        // is covered by the Postgres integration test.
         await using var verify = new RecruitmentDbContext(Options(seed.DbName));
         var savedApplication = await verify.Applications.SingleAsync();
         Assert.Equal(seed.Stages.Hired.Id, savedApplication.CurrentStageId);
@@ -318,7 +308,6 @@ public class ApplicationConcurrencyHandlerTests
         // verified against real PostgreSQL by IdempotentApplicationTransitionConcurrencyEndpointTests.
     }
 
-    // ---- RejectCandidateHandler ---------------------------------------------------------------
 
     [Fact]
     public async Task RejectCandidate_Stale_Version_Returns_Concurrency_Failure_And_Writes_Nothing()
@@ -385,7 +374,6 @@ public class ApplicationConcurrencyHandlerTests
         // reliably model this cross-entity rollback; verified against real PostgreSQL separately.
     }
 
-    // ---- OfferCandidateHandler ------------------------------------------------------------------
 
     private static OfferCandidateHandler OfferHandler(RecruitmentDbContext db, FakeAuditPublisher? audit = null) =>
         new(
@@ -461,7 +449,6 @@ public class ApplicationConcurrencyHandlerTests
         // reliably model this cross-entity rollback; verified against real PostgreSQL separately.
     }
 
-    // ---- MoveApplicationForwardHandler ------------------------------------------------------------
 
     private static MoveApplicationForwardHandler ForwardHandler(RecruitmentDbContext db, FakeAuditPublisher? audit = null) =>
         new(

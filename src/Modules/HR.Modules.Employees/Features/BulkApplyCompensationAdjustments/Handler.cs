@@ -23,9 +23,6 @@ internal sealed class BulkApplyCompensationAdjustmentsHandler(
         var results = new List<BulkCompensationAdjustmentResultItem>();
         var pendingAuditEvents = new List<(Compensation Record, Compensation? Previous, decimal PreviousSalary)>();
 
-        // Whole batch is written in a single transaction: validation of every item happens as it's
-        // written (via CompensationRecordWriter's overlap check) and any failure rolls back the
-        // entire batch — nothing is left partially applied.
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
 
         foreach (var item in request.Items)
@@ -68,9 +65,6 @@ internal sealed class BulkApplyCompensationAdjustmentsHandler(
 
         await transaction.CommitAsync(cancellationToken);
 
-        // Audit events are published only after the transaction has committed successfully,
-        // matching the rest of this codebase's convention (audit writes go to a separate
-        // AuditDbContext and are not part of the business transaction).
         var now = clock.UtcNowOffset();
 
         foreach (var (record, previous, previousSalary) in pendingAuditEvents)

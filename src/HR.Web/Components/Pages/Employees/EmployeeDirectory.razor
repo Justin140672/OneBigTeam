@@ -192,8 +192,6 @@
         _items = result?.Items ?? [];
         _totalCount = result?.TotalCount ?? _items.Count;
 
-        // Populate the filter dropdowns from the distinct departments/locations present in results,
-        // but only when unfiltered so the option lists don't collapse to the current selection.
         if (departmentId is null && locationId is null && string.IsNullOrWhiteSpace(_search))
         {
             _departmentOptions = BuildOptions("All departments",

@@ -117,12 +117,9 @@ internal sealed class TaskCompletionOperation : IVersionedAggregate
         LastAttemptAt = now;
     }
 
-    /// <summary>True when <paramref name="workerId"/> is the current, non-expired claim holder.</summary>
     public bool IsClaimedBy(Guid workerId, DateTimeOffset now) =>
         ClaimedBy == workerId && LeaseExpiresAt is { } expiresAt && expiresAt > now;
 
-    /// <summary>Releases the claim once the claimed work has been completed (successfully or not) —
-    /// leaves the row claimable again immediately rather than waiting out the rest of the lease.</summary>
     public void ReleaseClaim()
     {
         ClaimedBy = null;

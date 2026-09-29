@@ -134,13 +134,6 @@ public sealed class EmployeeNotesTabTests(HrAdminPersonaFixture fixture) : RoleE
     [Fact]
     public async Task NotesGrid_ShowsPager_WhenNotesExceedPageSize()
     {
-        // EmployeeNotesGrid.razor's PageSize is 10 (HrGrid default AllowPaging=true). The first 10
-        // are seeded via a direct authenticated call to the same CreateEmployeeNote endpoint the
-        // Add Note dialog itself calls (still a real handler round trip, still a real note — not a
-        // DB-seeding shortcut) so this test isn't paying for 11 slow Syncfusion dialog round-trips
-        // just to get past one page. The 11th note — the one that actually needs to push the grid
-        // past a page and surface the pager — is added through the real dialog, so this still
-        // proves the genuine UI path triggers pagination correctly, not just that seeded data does.
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
 
@@ -168,26 +161,12 @@ public sealed class EmployeeNotesTabTests(HrAdminPersonaFixture fixture) : RoleE
             "Expected a pager once an 11th note exceeds the grid's page size");
     }
 
-    /// <summary>
-    /// Creates <paramref name="count"/> HR notes for <paramref name="employeeId"/> via a direct
-    /// authenticated call to POST /api/companies/{companyId}/employees/{employeeId}/notes — the
-    /// same endpoint the Add Note dialog itself calls. See
-    /// EmployeeTimelineTabTests.SeedNotesAsync's doc comment for the full rationale (not a
-    /// DB-seeding shortcut, just a faster transport than repeated Syncfusion dialog round-trips).
-    /// </summary>
     private async Task SeedNotesAsync(Guid employeeId, int count)
     {
         const string lauraUserId = "30000000-0000-0000-0000-000000000005";
 
         using var http = new HttpClient { BaseAddress = new Uri(_fixture.ApiBaseUrl) };
 
-        // /api/dev/persona/{userId} performs a real, network-dependent Supabase password-grant
-        // login (see HR.Api's Program.cs remarks on that endpoint) — unlike most other E2E auth
-        // paths, which are faked under E2E_TESTING=true. A genuine transient failure/rate-limit
-        // response under this suite's concurrency can surface as a 500 here (same root cause
-        // already identified for /api/dev/ensure-employee-login — see AssetAcknowledgementTaskTests'
-        // EnsureEmployeeLoginAsync). Retry a couple of times, and surface the response body on a
-        // final failure so a genuine server bug is immediately diagnosable.
         HttpResponseMessage? sessionResponse = null;
         string? sessionBody = null;
         for (var attempt = 1; attempt <= 3; attempt++)

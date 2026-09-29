@@ -11,8 +11,6 @@ internal sealed class ListCandidateDocumentsHandler(RecruitmentDbContext db)
         ListCandidateDocumentsRequest request,
         CancellationToken cancellationToken)
     {
-        // Newest first. The Id tie-break keeps the order (and therefore which CV is "current")
-        // deterministic if two uploads ever share a timestamp — GetApplication uses the same order.
         var rows = await db.CandidateDocuments
             .AsNoTracking()
             .Where(cd => cd.CompanyId == request.CompanyId && cd.CandidateId == request.CandidateId)

@@ -8,35 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Sickness.Jobs;
 
-/// <summary>
-/// Sends fit-note evidence reminders as a request approaches its due date, and marks it overdue
-/// (with a further, higher-priority notification and an integration event) once the due date has
-/// passed.
-///
-/// <para>
-/// OBT-REM-04: retry-safe. The <c>Pending → Overdue</c> status transition is committed per request
-/// <b>before</b> any notification is written or event is published, so a mid-batch failure never
-/// rolls a committed transition back. A save failure for one request only detaches that request from
-/// the change tracker (not the whole batch — see OBT-REM-10 below), so later requests in the same
-/// batch still transition and persist correctly.
-/// </para>
-/// <para>
-/// OBT-REM-10: the overdue notification and the overdue integration event are tracked with two
-/// independent, durable progress markers (<see cref="SicknessEvidenceRequest.OverdueNotifiedAt"/>
-/// and <see cref="SicknessEvidenceRequest.OverdueEventPublishedAt"/>), each committed immediately
-/// after the corresponding side effect succeeds. This means a retry repairs exactly the work that
-/// did not finish — e.g. if the notification was written but publishing the event then failed, a
-/// retry finds <c>OverdueNotifiedAt</c> already set (skips re-notifying) and
-/// <c>OverdueEventPublishedAt</c> still null (publishes the missing event), instead of skipping the
-/// whole block. The event itself carries a deterministic identity — the evidence request id — a
-/// request can only transition Pending → Overdue once (Reschedule resets the markers if it is ever
-/// re-anchored into the future), so consumers can safely treat the request id as a natural
-/// idempotency key. Every consumer of <c>SicknessEvidenceOverdueIntegrationEvent</c> must be
-/// idempotent for that identity (e.g. the Tasks module's overdue-fit-note handler checks for an
-/// existing open task for the source entity before creating another).
-/// One failing employee is logged and skipped without blocking the rest of the batch.
-/// </para>
-/// </summary>
 internal sealed class SicknessEvidenceReminderJob(
     SicknessDbContext db,
     INotificationWriter notificationWriter,
@@ -46,7 +17,6 @@ internal sealed class SicknessEvidenceReminderJob(
 {
     private const int ReminderWindowDays = 2;
 
-    // How far back to keep reconciling missing overdue notifications after the status transition.
     private const int OverdueReconciliationDays = 30;
 
     public async Task ExecuteAsync(CancellationToken cancellationToken = default)
@@ -107,8 +77,6 @@ internal sealed class SicknessEvidenceReminderJob(
 
     private async Task MarkOverdueAndNotifyAsync(DateOnly today, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        // Step 1: durably transition each newly-overdue request. Commit per request so one failure
-        // does not undo earlier transitions and a retry resumes from where it stopped.
         var newlyOverdue = await db.SicknessEvidenceRequests
             .Where(r => r.Status == SicknessEvidenceRequestStatus.Pending && r.DueDate < today)
             .ToListAsync(cancellationToken);
@@ -124,10 +92,6 @@ internal sealed class SicknessEvidenceReminderJob(
             }
             catch (Exception exception) when (exception is not OperationCanceledException)
             {
-                // OBT-REM-10: detach only the failed entity. Clearing the whole change tracker
-                // here would also detach every other still-pending item already loaded into
-                // `newlyOverdue`, silently preventing their MarkOverdue() calls from being
-                // persisted on later iterations of this same loop.
                 DetachQuietly(request);
                 logger.LogError(
                     exception,
@@ -136,9 +100,6 @@ internal sealed class SicknessEvidenceReminderJob(
             }
         }
 
-        // Step 2: reconcile the overdue notification and overdue event for every recently-overdue
-        // request, each guarded by its own durable progress marker so the two are repaired
-        // independently.
         var reconcileFrom = today.AddDays(-OverdueReconciliationDays);
 
         var overdue = await (
@@ -183,10 +144,6 @@ internal sealed class SicknessEvidenceReminderJob(
 
                 if (request.OverdueEventPublishedAt is null)
                 {
-                    // Deterministic identity: a request transitions Pending -> Overdue at most
-                    // once (Reschedule resets both markers if it is ever re-anchored into the
-                    // future), so the request id itself is a stable, natural idempotency key for
-                    // every consumer of this event.
                     await eventPublisher.PublishAsync(new SicknessEvidenceOverdueIntegrationEvent(
                         request.CompanyId,
                         item.EmployeeId,

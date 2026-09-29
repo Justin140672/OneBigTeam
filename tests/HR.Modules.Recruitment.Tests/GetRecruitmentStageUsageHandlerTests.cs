@@ -78,9 +78,6 @@ public class GetRecruitmentStageUsageHandlerTests
     public async Task HandleAsync_Counts_Application_On_OnHold_Vacancy() =>
         await AssertCountsApplicationOnActiveVacancyAsync(VacancyStatus.OnHold);
 
-    // Not a [Theory] — VacancyStatus is internal to HR.Modules.Recruitment and cannot be used as
-    // a public test-method parameter (xUnit discovery requires public parameter types), so each
-    // status is exercised via its own thin [Fact] wrapper above instead.
     private async Task AssertCountsApplicationOnActiveVacancyAsync(VacancyStatus status)
     {
         await using var db = BuildContext();

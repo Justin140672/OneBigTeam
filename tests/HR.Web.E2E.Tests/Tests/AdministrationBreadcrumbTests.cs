@@ -4,13 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Administrative wayfinding breadcrumbs. From an employment type edit page an HR admin sees an
-/// "Employment Types" crumb that returns to the list URL.
-///
-/// (The former "Administration" root crumb was removed with the Administration Home hub — see
-/// HubBreadcrumb.razor's own remarks — so the trail now starts at the parent list.)
-/// </summary>
 public sealed class AdministrationBreadcrumbTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");

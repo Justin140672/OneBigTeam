@@ -4,11 +4,6 @@ using HR.Modules.Employees.Contracts;
 
 namespace HR.Modules.Companies.Tests.Domain;
 
-/// <summary>
-/// SET-03: CompanySettings.Version is a persisted, application-managed optimistic-concurrency
-/// token, incremented by exactly one on every mutation method regardless of which slice of fields
-/// it touches (company profile vs HR policy vs asset numbering vs probation checkpoints).
-/// </summary>
 public class CompanySettingsVersionTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 25, 10, 0, 0, TimeSpan.Zero);

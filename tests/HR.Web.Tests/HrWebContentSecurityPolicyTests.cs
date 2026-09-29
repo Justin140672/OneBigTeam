@@ -6,13 +6,6 @@ using Microsoft.Extensions.Hosting;
 
 namespace HR.Web.Tests;
 
-/// <summary>
-/// [P2] Content Security Policy for HR.Web — directive-level assertions on the parsed header (never
-/// substring checks on the raw string), covering the production policy, the development-only
-/// allowances and the configuration guard rails. Pipeline behaviour (every response, fresh nonce,
-/// nonce applied to App.razor's inline scripts) is covered by
-/// <see cref="HrWebContentSecurityPolicyPipelineTests"/>.
-/// </summary>
 public class HrWebContentSecurityPolicyTests
 {
     private const string Nonce = "dGVzdC1ub25jZS0xMjM0NQ==";

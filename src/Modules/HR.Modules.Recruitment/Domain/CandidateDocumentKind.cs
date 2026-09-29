@@ -9,9 +9,7 @@ namespace HR.Modules.Recruitment.Domain;
 /// </summary>
 internal enum CandidateDocumentKind
 {
-    /// <summary>A general supporting document (cover letter, portfolio, right-to-work evidence, ...).</summary>
     Other = 0,
 
-    /// <summary>The candidate's curriculum vitae / resume. The most recently uploaded CV is treated as current.</summary>
     Cv = 1,
 }

@@ -17,14 +17,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// DSH-06 stage 1: the HR bounded dashboard summary endpoint
-/// (GET /api/companies/{companyId}/dashboards/hr/summary). Shares the cross-module
-/// <see cref="HR.Infrastructure.Abstractions.IWorkloadActionProvider"/> fan-out with the Workload &amp;
-/// HR Actions Report, so this locks (a) the endpoint's two-stage gate — the shared
-/// "reporting:view-workload-actions" menu policy, then an in-endpoint "reporting:view-hr" narrowing —
-/// and (b) that each provider's own row-level company scoping is honoured through the composer.
-/// </summary>
 [Collection("Integration")]
 public class GetHrDashboardSummaryEndpointTests
 {
@@ -76,8 +68,6 @@ public class GetHrDashboardSummaryEndpointTests
     [Fact]
     public async Task Get_HrDashboardSummary_Returns_Forbidden_For_Manager_Without_Hr()
     {
-        // Manager clears the shared "reporting:view-workload-actions" menu gate but fails the
-        // in-endpoint "reporting:view-hr" narrowing.
         var companyId = Guid.NewGuid();
         using var client = await ClientFor(companyId, Guid.NewGuid(), SystemRoles.Manager);
 
@@ -98,7 +88,6 @@ public class GetHrDashboardSummaryEndpointTests
         var payload = await response.Content.ReadFromJsonAsync<SummaryPayload>();
         Assert.NotNull(payload);
         Assert.NotNull(payload!.Categories);
-        // JSON contract lock — envelope flags always present even on a clean run.
         Assert.All(payload.Categories, c => Assert.False(string.IsNullOrWhiteSpace(c.Status)));
     }
 
@@ -149,8 +138,6 @@ public class GetHrDashboardSummaryEndpointTests
     [Fact]
     public async Task Get_HrDashboardSummary_Pending_Leave_Approval_Is_Not_OwnerActionable_For_Hr()
     {
-        // A pending leave request's approval task is always owned by the employee's manager —
-        // HR sees the row for company-wide oversight only, never as directly actionable.
         var companyId = Guid.NewGuid();
         var employeeId = await SeedEmployeeAsync(companyId, "Layla", "Leaver");
         await SeedLeaveRequestAsync(companyId, employeeId, Today.AddDays(5));
@@ -202,7 +189,6 @@ public class GetHrDashboardSummaryEndpointTests
         var companyId = Guid.NewGuid();
         var employeeId = await SeedEmployeeAsync(companyId, "Nadia", "Newstarter");
         await SeedOutstandingOnboardingTaskAsync(companyId, employeeId);
-        // No Tasks-module TaskItem seeded — the onboarding task has no linked open task.
 
         using var client = await ClientFor(companyId, Guid.NewGuid(), SystemRoles.HrAdministrator);
         var payload = await client.GetFromJsonAsync<SummaryPayload>(Url(companyId));
@@ -217,8 +203,6 @@ public class GetHrDashboardSummaryEndpointTests
     [Fact]
     public async Task Get_HrDashboardSummary_Multiple_Outstanding_Onboarding_Tasks_With_Same_Title_Resolve_Distinct_TaskIds()
     {
-        // Two different employees each have an onboarding task with the identical title — proves
-        // resolution is keyed by the onboarding task's own id, not by title/employee matching.
         var companyId = Guid.NewGuid();
         var employeeA = await SeedEmployeeAsync(companyId, "Anna", "Alpha");
         var employeeB = await SeedEmployeeAsync(companyId, "Bruno", "Beta");
@@ -244,7 +228,6 @@ public class GetHrDashboardSummaryEndpointTests
             category.Items.Single(i => i.EmployeeId == employeeB).TaskId);
     }
 
-    // ── Seeding helpers (mirrors GetWorkloadActionsEndpointTests) ─────────────
 
     private async Task<Guid> SeedEmployeeAsync(Guid companyId, string firstName, string lastName)
     {
@@ -310,7 +293,6 @@ public class GetHrDashboardSummaryEndpointTests
         return task.Id;
     }
 
-    /// <summary>Seeds a real open Tasks-module TaskItem whose SourceEntityId links back to a source-module task/record id.</summary>
     private async Task<Guid> SeedOpenTaskLinkedToSourceAsync(
         Guid companyId, Guid sourceEntityId, TaskSource source, TaskActionType actionType, Guid assignedEmployeeId)
     {

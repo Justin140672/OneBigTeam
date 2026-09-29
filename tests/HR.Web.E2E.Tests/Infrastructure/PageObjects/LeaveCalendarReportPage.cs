@@ -2,12 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the Leave Calendar report
-/// (/companies/{companyId}/reporting/leave-calendar — LeaveCalendarReportPage.razor). This
-/// report is export-oriented per its ticket, so its Export SfDropDownButton uses "e-primary"
-/// styling rather than the "e-flat" style used by the other report pages.
-/// </summary>
 public sealed class LeaveCalendarReportPage(IPage page, string baseUrl)
 {
     private const string RowsRenderedSelector = ".e-grid .e-row, .e-grid .e-emptyrow";
@@ -35,7 +29,6 @@ public sealed class LeaveCalendarReportPage(IPage page, string baseUrl)
         return await page.Locator(".e-grid .e-row").CountAsync();
     }
 
-    // ── Inline filters ─────────────────────────────────────────────────────────
 
     private ILocator YearInput => page.Locator(".card-body .col-md-3")
         .Filter(new() { HasText = "Year" }).First.Locator("input");
@@ -64,7 +57,6 @@ public sealed class LeaveCalendarReportPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 
-    // ── Export ─────────────────────────────────────────────────────────────────
 
     public async Task<IDownload> ExportAsync(string formatLabel)
     {

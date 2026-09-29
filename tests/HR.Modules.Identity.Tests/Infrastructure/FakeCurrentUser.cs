@@ -38,11 +38,6 @@ internal sealed class FakeCurrentUser : ICurrentUser
     public static FakeCurrentUser Anonymous =>
         new(null, null, null, isAuthenticated: false);
 
-    /// <summary>
-    /// P1 "Login as Customer": a resolved support-session caller — carries the acting admin's real
-    /// email (for display/audit) but must never be treated as that admin's real authenticated
-    /// identity by any authorization handler.
-    /// </summary>
     public static FakeCurrentUser SupportSession(Guid userId, string? email = null, string? tenantId = null, Guid? supportSessionId = null) =>
         new(userId, email ?? "admin@example.com", tenantId, isAuthenticated: true, isSupportSession: true, supportSessionId: supportSessionId ?? Guid.NewGuid());
 }

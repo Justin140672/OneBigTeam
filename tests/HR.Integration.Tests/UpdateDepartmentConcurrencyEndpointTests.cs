@@ -21,7 +21,6 @@ public class UpdateDepartmentConcurrencyEndpointTests
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.HrAdministrator);
-            // GetDepartment (used to read the pre-edit Version) is gated on role:employee.
             await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.Employee);
         }).GetAwaiter().GetResult();
     }

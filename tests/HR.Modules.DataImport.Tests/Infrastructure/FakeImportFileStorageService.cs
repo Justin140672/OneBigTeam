@@ -35,17 +35,8 @@ internal sealed class FakeImportFileStorageService : IImportFileStorageService
 
     public List<string> Deletions { get; } = [];
 
-    /// <summary>
-    /// Test helper: when greater than zero, the next N calls to <see cref="DeleteAsync"/> throw
-    /// (simulating a transient storage failure) instead of succeeding, decrementing by one per
-    /// call. Used to exercise the retry/failed-attempt paths in ValidateImportSessionHandler and
-    /// PurgeImportSessionFilesJob.
-    /// </summary>
     public int ThrowOnNextDeleteAttempts { get; set; }
 
-    /// <summary>Test helper: records the CancellationToken passed to each DeleteAsync call, so
-    /// tests can assert compensation used an independent cleanup token rather than a cancelled
-    /// request token.</summary>
     public List<CancellationToken> DeleteCancellationTokens { get; } = [];
 
     public Task DeleteAsync(string storageKey, CancellationToken cancellationToken)
@@ -72,10 +63,6 @@ internal sealed class FakeImportFileStorageService : IImportFileStorageService
         return Task.FromResult(stream);
     }
 
-    /// <summary>
-    /// Test helper: seeds content for a storage key without going through UploadAsync
-    /// (e.g. when a session was created directly rather than via the upload endpoint).
-    /// </summary>
     public void SeedContent(string storageKey, byte[] content)
     {
         _contentByStorageKey[storageKey] = content;

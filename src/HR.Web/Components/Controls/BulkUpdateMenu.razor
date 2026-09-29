@@ -7,13 +7,8 @@
 @code {
     [Parameter] public EventCallback<string> OnItemSelected { get; set; }
 
-    // The dropdown button itself always stays enabled — "Import" and "Download Template" don't
-    // require any row selection, only "Selected Employees" does (it operates on whatever rows are
-    // currently checked in the grid), so only that one item is conditionally disabled.
     [Parameter] public bool HasSelection { get; set; }
 
-    // Number of rows currently checked — shown in the button label so the count of employees
-    // that "Selected Employees" would act on is visible without opening the dropdown.
     [Parameter] public int SelectedCount { get; set; }
 
     private string ButtonText => SelectedCount > 0 ? $"Update selected ({SelectedCount})" : "Update selected";
@@ -23,10 +18,6 @@
 
     protected override void OnParametersSet()
     {
-        // Rebuild only when HasSelection actually changes rather than on every parameter binding
-        // evaluation — SfDropDownButton's Items is bound directly to this field (not recomputed
-        // as a live property), since handing it a brand-new list instance on every access confuses
-        // its own data-source change detection and can leave the popup failing to open/populate.
         if (HasSelection != _lastHasSelection)
         {
             _items = BuildItems(HasSelection);

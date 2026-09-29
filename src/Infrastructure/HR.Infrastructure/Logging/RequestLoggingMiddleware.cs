@@ -60,7 +60,6 @@ public sealed class RequestLoggingMiddleware(
         }
         catch (Exception ex) when (LogError(ex, method, path, sw.ElapsedMilliseconds))
         {
-            // LogError always returns false — exception is re-thrown
         }
     }
 

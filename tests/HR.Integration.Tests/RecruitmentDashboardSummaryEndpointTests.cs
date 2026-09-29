@@ -5,20 +5,11 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Covers the two endpoints backing the Recruitment dashboard widget:
-/// GetInterviewsTodayCount (Recruitment module) and GetOutstandingTaskCount (Tasks module).
-/// </summary>
 [Collection("Integration")]
 public class RecruitmentDashboardSummaryEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 
-    // Was hardcoded ("dd000001-...") — collided with GetMeEndpointTests/LeaveAuthorizationTests,
-    // each assigning the same literal GUID a different, conflicting role, now that all test
-    // classes share one database (see IntegrationTestCollection). Guid.NewGuid() is evaluated once
-    // per static initialization (stable across this class's own tests), guaranteed unique across
-    // every other file.
     private static readonly Guid HrAdminUserId  = Guid.NewGuid();
     private static readonly Guid EmployeeUserId = Guid.NewGuid();
 
@@ -29,11 +20,6 @@ public class RecruitmentDashboardSummaryEndpointTests
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUserId, SystemRoles.HrAdministrator);
-            // Also granted Recruiter: these tests exercise interviews-today-count/outstanding-task
-            // counting logic, not authorization, and this user drives the Recruitment-side setup
-            // calls (SeedApplicationAsync needs recruitment:manage; scheduling interviews needs
-            // candidate:view). GetOutstandingTaskCount itself is also gated on candidate:view
-            // (a plain Recruiter can call it directly — see GetOutstandingTaskCount/Endpoint.cs).
             await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUserId, SystemRoles.Recruiter);
             await TestRoleSeeder.AssignRoleAsync(factory, EmployeeUserId, SystemRoles.Employee);
         }).GetAwaiter().GetResult();
@@ -50,9 +36,6 @@ public class RecruitmentDashboardSummaryEndpointTests
 
     private async Task<(Guid VacancyId, Guid CandidateId, Guid ApplicationId)> SeedApplicationAsync(HttpClient client, Guid companyId)
     {
-        // PositionProfileId is required on Vacancy creation (recruitment:manage) but seeding one
-        // requires employee:manage, a permission Recruiter does not hold, so it is seeded directly
-        // via EF (EmployeeReferenceDataSeeder) rather than through the HTTP-authenticated client.
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
 
         var vacancyResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/vacancies", new
@@ -88,7 +71,6 @@ public class RecruitmentDashboardSummaryEndpointTests
         return (vacancy.Id, candidate.Id, application!.Id);
     }
 
-    // ── GetInterviewsTodayCount ──────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_InterviewsTodayCount_Returns_Unauthorized_For_Anonymous_Request()
@@ -166,7 +148,6 @@ public class RecruitmentDashboardSummaryEndpointTests
         Assert.Equal(0, payload!.Count);
     }
 
-    // ── GetOutstandingTaskCount ───────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_OutstandingTaskCount_Returns_Unauthorized_For_Anonymous_Request()
@@ -208,8 +189,6 @@ public class RecruitmentDashboardSummaryEndpointTests
             });
         scheduleResponse.EnsureSuccessStatusCode();
 
-        // Scheduling an interview creates two tasks: a "Review" prep task and a "Complete"
-        // feedback task. Only the feedback task should be counted here.
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/tasks/outstanding-count?source=Recruitment&actionType=Complete");
 

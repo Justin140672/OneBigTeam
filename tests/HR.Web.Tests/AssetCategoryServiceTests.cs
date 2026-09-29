@@ -10,7 +10,6 @@ public class AssetCategoryServiceTests
     private static UpdateAssetCategoryRequest SampleRequest(Guid companyId, Guid id) =>
         new(companyId, id, "Laptops", "IT equipment", 3);
 
-    // ── UpdateAsync(ApiSaveResult) ───────────────────────────────────────────────
 
     [Fact]
     public async Task UpdateAsync_Returns_Ok_When_Api_Returns_Success()
@@ -87,7 +86,6 @@ public class AssetCategoryServiceTests
         Assert.NotNull(result.ErrorMessage);
     }
 
-    // ── CreateAsync ───────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task CreateAsync_Returns_Result_When_Api_Returns_Created()
@@ -102,7 +100,6 @@ public class AssetCategoryServiceTests
         Assert.Null(error);
     }
 
-    // ── DeactivateAsync ───────────────────────────────────────────────────────────
 
     [Fact]
     public async Task DeactivateAsync_Returns_Null_When_Api_Returns_NoContent()
@@ -126,13 +123,10 @@ public class AssetCategoryServiceTests
         Assert.Equal("Asset category not found.", error);
     }
 
-    // ── ListAssetCategoriesAsync (representative read) ───────────────────────────
 
     [Fact]
     public async Task ListAssetCategoriesAsync_Returns_Items_When_Api_Returns_Ok()
     {
-        // The API returns a raw JSON array for this endpoint (wrapped into ListAssetCategoriesResponse
-        // client-side), not a { Items: [...] } envelope.
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, Array.Empty<object>()));
         var service = new AssetCategoryService(factory);
 

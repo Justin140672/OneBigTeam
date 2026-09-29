@@ -1,7 +1,5 @@
 namespace HR.Admin.Web.Models;
 
-// App-local DTOs matching the /api/notifications/admin/operational-alerts contract — same
-// "app-local DTO matching the API contract" convention as every other *Models.cs file.
 public sealed record OperationalAlertListResponse(
     IReadOnlyList<OperationalAlertListItem> Items,
     int TotalCount,

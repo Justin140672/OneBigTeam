@@ -100,10 +100,6 @@ public class UpdateCompanyConcurrencyEndpointTests
     [Fact]
     public async Task Put_Company_Returns_Forbidden_For_Tenant_With_No_Company()
     {
-        // Under SEC-001 tenant isolation the route companyId must equal the caller's resolved
-        // tenant, and CustomerSubscription has a hard FK to Company — so a "own tenant but company
-        // row missing" 404 is unreachable for this mutation. Syncing the caller to a fresh tenant
-        // with no seeded company/subscription surfaces as ReadOnlyModeMiddleware's 403 first.
         var tenantId = Guid.NewGuid();
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UserId.ToString());

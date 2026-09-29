@@ -32,13 +32,6 @@ public class DocumentsModuleVirusScanRegistrationTests
             })
             .Build();
 
-    /// <summary>
-    /// Reliability review issue 6: since issue 2 introduced the same fail-fast storage guard
-    /// (AddStorageService) alongside the pre-existing malware-scanning guard, a Production/Staging
-    /// registration test now needs BOTH a fully configured scanner AND fully configured document
-    /// storage to succeed — a fixture with only ClamAv config throws on the storage check before
-    /// ever reaching the scanner assertions.
-    /// </summary>
     private static IConfiguration ConfigurationWithClamAvAndStorage() =>
         new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -106,8 +99,6 @@ public class DocumentsModuleVirusScanRegistrationTests
         var services = new ServiceCollection();
         var environment = new HostingEnvironment { EnvironmentName = Environments.Production };
 
-        // Requires storage config too (issue 2's fail-fast storage guard runs in the same
-        // AddDocumentsModule call) — see ConfigurationWithClamAvAndStorage for why.
         services.AddDocumentsModule(ConnectionString, ConfigurationWithClamAvAndStorage(), environment);
 
         var scannerDescriptor = services.Single(d => d.ServiceType == typeof(IVirusScanService));
@@ -117,8 +108,6 @@ public class DocumentsModuleVirusScanRegistrationTests
             d.ServiceType.Name.Contains("HealthCheckService", StringComparison.Ordinal)
             || d.ServiceType == typeof(Microsoft.Extensions.Diagnostics.HealthChecks.IHealthCheck));
 
-        // AddHealthChecks registers HealthCheckServiceOptions configuration; verify our specific
-        // check name is present among the configured registrations.
         var provider = services.BuildServiceProvider();
         var options = provider.GetRequiredService<
             Microsoft.Extensions.Options.IOptions<Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckServiceOptions>>().Value;
@@ -128,9 +117,6 @@ public class DocumentsModuleVirusScanRegistrationTests
     [Fact]
     public void Production_With_Full_Config_Registers_Both_Real_Scanner_And_Durable_Storage()
     {
-        // Reliability review issue 6: proves a fully-configured production module registers BOTH
-        // real malware scanning AND durable (Supabase) document storage together — the two
-        // fail-fast guards are independent but must both succeed for the module to start.
         var services = new ServiceCollection();
         var environment = new HostingEnvironment { EnvironmentName = Environments.Production };
 
@@ -179,10 +165,6 @@ public class DocumentsModuleVirusScanRegistrationTests
     [Fact]
     public void E2eTesting_With_ClamAv_Config_Still_Registers_NoOp_Scanner()
     {
-        // HR.AppHost injects Documents__ClamAv__Host unconditionally, so an E2E run always has
-        // ClamAv config — E2E_TESTING must still force the no-op scanner (the real scanner's job
-        // can't download uploads from E2E storage and failed every scan, so nothing uploaded in an
-        // E2E run ever became downloadable).
         var previous = System.Environment.GetEnvironmentVariable("E2E_TESTING");
         System.Environment.SetEnvironmentVariable("E2E_TESTING", "true");
         try

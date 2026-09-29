@@ -6,14 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// OBT-REM-13: end-to-end coverage of TaskCreator's idempotency-key path that specifically needs a
-/// real PostgreSQL backend — unlike EF Core's InMemory provider, only a real Postgres testcontainer
-/// enforces the partial unique index on (company_id, idempotency_key)
-/// ("ix_task_items_company_id_idempotency_key") and surfaces Npgsql's PostgresException shape, which
-/// is what actually drives TaskCreator.TrySaveIdempotentlyAsync's duplicate-detection catch clause.
-/// See HR.Modules.Tasks.Tests for isolated unit-level coverage of the non-conflict-path logic.
-/// </summary>
 [Collection("Integration")]
 public class TaskCreatorIdempotencyIntegrationTests
 {
@@ -44,7 +36,6 @@ public class TaskCreatorIdempotencyIntegrationTests
             idempotencyKey: idempotencyKey);
     }
 
-    // 1. Two concurrent handlers processing the same event -----------------------------------------
 
     [Fact]
     public async Task Concurrent_CreateAsync_Calls_For_Same_Key_Produce_Exactly_One_Task()
@@ -69,7 +60,6 @@ public class TaskCreatorIdempotencyIntegrationTests
         Assert.Equal(idA, tasks[0].Id);
     }
 
-    // 2. Sequential replay of the same event ---------------------------------------------------------
 
     [Fact]
     public async Task Sequential_CreateAsync_Calls_For_Same_Key_Return_Same_Id_And_Create_No_Second_Task()
@@ -92,7 +82,6 @@ public class TaskCreatorIdempotencyIntegrationTests
         Assert.Single(tasks);
     }
 
-    // 3. Same idempotency key in different companies -> no false collision --------------------------
 
     [Fact]
     public async Task Same_Idempotency_Key_In_Different_Companies_Creates_A_Task_Per_Company()
@@ -118,7 +107,6 @@ public class TaskCreatorIdempotencyIntegrationTests
         Assert.Contains(tasks, t => t.CompanyId == companyB && t.Id == idB);
     }
 
-    // 4. Different workflow keys against the same source entity -> both tasks created ---------------
 
     [Fact]
     public async Task Different_Idempotency_Keys_For_Same_Company_Both_Create_Tasks()

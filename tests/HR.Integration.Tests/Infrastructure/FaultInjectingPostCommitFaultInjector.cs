@@ -20,8 +20,6 @@ internal sealed class FaultInjectingPostCommitFaultInjector : IPostCommitFaultIn
     private string? _armedOperationName;
     private string? _armedIdempotencyKey;
 
-    /// <summary>Arms the double to throw exactly once the next time <see cref="MaybeFailAfterCommitAsync"/>
-    /// is called with this exact operation name and idempotency key.</summary>
     public void ArmOnce(string operationName, string idempotencyKey)
     {
         lock (_lock)
@@ -31,7 +29,6 @@ internal sealed class FaultInjectingPostCommitFaultInjector : IPostCommitFaultIn
         }
     }
 
-    /// <summary>Disarms the double so no subsequent call throws, regardless of arguments.</summary>
     public void Reset()
     {
         lock (_lock)

@@ -2,17 +2,6 @@ using HR.Web.Services;
 
 namespace HR.Web.Navigation;
 
-/// <summary>
-/// ADM-07 — the canonical administrative navigation groups. The same ordered set backs the
-/// sidebar's Administration grouping.
-///
-/// ADM (nav simplification) — the generic "Compliance" group was removed (its only destination,
-/// the Compliance Centre, is no longer in navigation; the page stays reachable by direct URL and
-/// remains API-protected). The generic "Company" group was replaced by
-/// <see cref="CompanyAdministration"/>, a role-specific section only a Company Administrator
-/// populates (Company Profile, Subscription &amp; Billing) — there is no longer a generic
-/// company/administration landing bucket, and the Administration Home hub is no longer in nav.
-/// </summary>
 public enum AdminNavGroup
 {
     PeopleAndUsers = 0,
@@ -35,7 +24,6 @@ public static class AdminNavGroupInfo
     };
 }
 
-/// <summary>A single administrative destination the user can navigate to.</summary>
 public sealed record AdminDestination(
     string Key,
     string Title,
@@ -44,16 +32,8 @@ public sealed record AdminDestination(
     string IconCss,
     IReadOnlyList<string> Keywords);
 
-/// <summary>A group header plus the destinations visible within it, in display order.</summary>
 public sealed record AdminNavSection(AdminNavGroup Group, string Label, IReadOnlyList<AdminDestination> Destinations);
 
-/// <summary>
-/// Capability flags the administrative navigation depends on. Kept as a plain value so the
-/// visibility filtering can be unit-tested without bUnit or an <see cref="AppSession"/> round trip.
-/// Every flag is permission-derived on <see cref="AppSession"/> — the authoritative UI gate per the
-/// ADM-05 administrative role separation matrix. UI hiding is a usability layer only; the API is the
-/// enforcement boundary.
-/// </summary>
 public sealed record AdminNavCapabilities(
     bool CanReadEmployees,
     bool CanManageEmployees,
@@ -78,23 +58,14 @@ public sealed record AdminNavCapabilities(
         session.CanManageHrSettings,
         session.CanViewUsers);
 
-    /// <summary>True when the user can reach at least one administrative destination.</summary>
     public bool HasAnyAdministrativeAccess =>
         CanReadEmployees || CanManageEmployees || CanManageRecruitment || CanManageLeavePolicies ||
         CanManageSharedDocuments || CanViewReporting ||
         CanManageCompany || CanManageCompanyConfiguration || CanManageHrSettings || CanViewUsers;
 }
 
-/// <summary>
-/// ADM-07 — the single source of truth for administrative destinations in the tenant app. Pure:
-/// no rendering, no DI. <see cref="Build"/> returns only the destinations the given capabilities
-/// may reach, so anything derived from it (the sidebar Administration groups, the quick-nav
-/// palette) inherits the permission filtering for free and can never surface a page the user
-/// cannot open.
-/// </summary>
 public static class AdminNavigation
 {
-    /// <summary>Every destination the given capabilities can reach, ordered by group then declaration order.</summary>
     public static IReadOnlyList<AdminDestination> Build(AdminNavCapabilities caps, Guid companyId)
     {
         var c = companyId;
@@ -102,7 +73,6 @@ public static class AdminNavigation
 
         var all = new List<(bool Visible, AdminDestination Destination)>
         {
-            // ---- People and users ----
             (caps.CanReadEmployees || caps.CanManageEmployees, new("employees", "Employees", AdminNavGroup.PeopleAndUsers,
                 Co("employees"), "fa-solid fa-users", ["people", "staff", "directory", "colleagues", "team"])),
             (caps.CanManageEmployees, new("departments", "Departments", AdminNavGroup.PeopleAndUsers,
@@ -124,23 +94,11 @@ public static class AdminNavigation
             (caps.CanManageEmployees, new("asset-categories", "Asset Categories", AdminNavGroup.PeopleAndUsers,
                 Co("asset-categories"), "fa-solid fa-boxes-stacked", ["equipment groups", "asset types"])),
 
-            // ---- Company administration (Company Administrator only) ----
-            // ADM (nav simplification): the generic "Company" bucket, its Administration Home hub
-            // link and the duplicate Support Requests entry (still rendered by MainLayout's own
-            // dedicated block) were removed. Company Profile stays for whoever holds company:manage;
-            // Subscription & Billing is Company-Administrator-only (see 30-administrative-role-
-            // separation-matrix.md) — CanManageCompany is true iff the user holds the
-            // CompanyAdministrator role, and the API enforces the same via subscription:manage.
             (caps.CanManageCompanyConfiguration || caps.CanManageCompany, new("company-profile", "Company Profile & Addresses", AdminNavGroup.CompanyAdministration,
                 Co("edit"), "fa-solid fa-building", ["company", "legal name", "branding", "addresses", "registered office"])),
             (caps.CanManageCompany, new("subscription", "Subscription & Billing", AdminNavGroup.CompanyAdministration,
                 "/subscription", "fa-solid fa-credit-card", ["plan", "invoices", "payment", "billing"])),
 
-            // ---- HR configuration ----
-            // Position Profiles lives here (not People and users): it is job-role configuration —
-            // titles, permission sets, required documents/assets, onboarding template and notice
-            // defaults — consumed when setting an employee up, not a people directory screen. The
-            // breadcrumb on the Position Profile pages says "HR configuration" to match.
             (caps.CanManageEmployees, new("position-profiles", "Position Profiles", AdminNavGroup.HrConfiguration,
                 Co("position-profiles"), "fa-solid fa-id-badge", ["jobs", "roles", "titles", "positions"])),
             (caps.CanManageHrSettings, new("hr-settings", "HR Settings", AdminNavGroup.HrConfiguration,
@@ -164,7 +122,6 @@ public static class AdminNavigation
             (caps.CanManageRecruitment, new("external-recruiters", "External Recruiters", AdminNavGroup.HrConfiguration,
                 Co("external-recruiters"), "fa-solid fa-people-arrows", ["agencies", "recruitment partners"])),
 
-            // ---- Reports ----
             (caps.CanViewReporting, new("reporting", "Reporting", AdminNavGroup.Reports,
                 Co("reporting"), "fa-solid fa-chart-column", ["reports", "analytics", "saved views", "exports"])),
         };
@@ -174,7 +131,6 @@ public static class AdminNavigation
             .ToList();
     }
 
-    /// <summary>The visible destinations grouped into ordered sections — the sidebar Administration surface.</summary>
     public static IReadOnlyList<AdminNavSection> Sections(AdminNavCapabilities caps, Guid companyId) =>
         Build(caps, companyId)
             .GroupBy(d => d.Group)

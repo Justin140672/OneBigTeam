@@ -3,13 +3,8 @@ using HR.Web.E2E.Tests.Infrastructure;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the location type list page (/companies/{companyId}/location-types).
-/// </summary>
 public sealed class LocationTypeListPage(IPage page, string baseUrl)
 {
-    // See DepartmentListPage for why row-selector waits (not just ".e-grid") are required:
-    // Syncfusion's EJ2 grid populates ".e-row"/".e-rowcell" in a separate JS render pass.
     private const string RowsRenderedSelector = ".e-grid .e-row, .e-grid .e-emptyrow, .alert-danger";
 
     public async Task GoToAsync(Guid companyId)
@@ -28,13 +23,9 @@ public sealed class LocationTypeListPage(IPage page, string baseUrl)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
-        // Pagination-aware: LocationTypeList pages client-side at 20 rows with no search box, and
-        // every run adds more "E2E Location Type <random>" rows, so a just-created one can sort
-        // onto page 2+.
         return await page.HasGridCellOnAnyPageAsync(nameFragment);
     }
 
-    /// <summary>The href of the grid row link whose text contains <paramref name="nameFragment"/>.</summary>
     public async Task<string> GetRowHrefAsync(string nameFragment)
     {
         var href = await page.Locator(".e-rowcell a").Filter(new() { HasText = nameFragment }).First.GetAttributeAsync("href");
@@ -49,13 +40,9 @@ public sealed class LocationTypeListPage(IPage page, string baseUrl)
             .Filter(new() { HasText = nameFragment })
             .First;
         await row.ClickAsync();
-        // Blazor re-renders the toolbar after row selection; wait for the button to be enabled.
         var btn = page.GetByRole(AriaRole.Button, new() { Name = "Deactivate" });
         await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await btn.ClickAsync();
-        // Opens a confirmation dialog (HrConfirmDialog) rather than deactivating immediately —
-        // scoped to the dialog since its own confirm button shares the "Deactivate" label with
-        // the toolbar button just clicked above.
         var confirmButton = page.GetByRole(AriaRole.Dialog).GetByRole(AriaRole.Button, new() { Name = "Deactivate", Exact = true });
         await confirmButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await confirmButton.ClickAsync();

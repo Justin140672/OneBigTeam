@@ -5,13 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// LEAVE-01: resource-level (self / manager-hierarchy / HR-admin) authorization for the nine Leave
-/// endpoints guarded by <c>HR.Modules.Leave.Services.LeaveResourceAuthorizer</c>. Endpoint-level
-/// Policies(...) only prove tenant/role membership; they never prove the caller has a relationship
-/// to the specific employeeId in the route, so these tests exercise that resource-ownership check
-/// end-to-end over real HTTP, mirroring CompleteTaskAuthorizationTests's pattern for SEC-003.
-/// </summary>
 [Collection("Integration")]
 public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
 {
@@ -26,9 +19,6 @@ public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
 
     private static readonly Guid OtherCompanyId = Guid.NewGuid();
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Self-service group: Submit / Preview / Cancel (CanActOnOwnLeaveAsync)
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Submit_Returns_Unauthorized_For_Anonymous_Request()
@@ -90,8 +80,6 @@ public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
     [Fact]
     public async Task Submit_Returns_Forbidden_For_Direct_Manager_Submitting_On_Behalf_Of_Report()
     {
-        // LEAVE-01: managers get view/approve access only, never self-service actions on behalf
-        // of a report — submitting/previewing/cancelling leave "as" someone else is HR-admin only.
         var manager = await CreateEmployeeAsync();
         var report = await CreateEmployeeAsync();
 
@@ -227,10 +215,6 @@ public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
         var employee = await CreateEmployeeAsync();
         using var client = await AuthenticatedClient(employee);
 
-        // A caller from a different company attempting to act on this employeeId — the
-        // authorizer's self-check compares raw ids only, so cross-tenant callers are denied via
-        // the peer/manager-hierarchy path (they are never self, HR-admin, or an in-hierarchy
-        // manager of a resource in a company they aren't a member of).
         var crossCompanyCaller = Guid.NewGuid();
         using var crossClient = factory.CreateClient();
         crossClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, crossCompanyCaller.ToString());
@@ -243,9 +227,6 @@ public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // View group: Get / List / GetEmployeeLeaveBalance (CanViewAsync)
-    // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_LeaveRequest_Returns_Unauthorized_For_Anonymous_Request()
@@ -299,9 +280,9 @@ public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
     [Fact]
     public async Task Get_LeaveRequest_Allows_Skip_Level_Manager_In_Three_Level_Hierarchy()
     {
-        var seniorManager = await CreateEmployeeAsync(); // C
-        var manager = await CreateEmployeeAsync();       // B
-        var employee = await CreateEmployeeAsync();      // A
+        var seniorManager = await CreateEmployeeAsync();
+        var manager = await CreateEmployeeAsync();
+        var employee = await CreateEmployeeAsync();
         await AssignPolicyAsync(employee);
 
         using var employeeClient = await AuthenticatedClient(employee);
@@ -358,8 +339,6 @@ public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
     [Fact]
     public async Task Get_LeaveRequest_Returns_Forbidden_For_Own_Manager_Viewed_Bottom_Up()
     {
-        // Denial case: being someone's report does not grant you view rights over your manager's
-        // resources — the hierarchy check is one-directional (manager -> report only).
         var manager = await CreateEmployeeAsync();
         var report = await CreateEmployeeAsync();
         await AssignPolicyAsync(manager);
@@ -476,9 +455,6 @@ public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // GetLeaveBalanceHistory now carries "role:employee" at the FastEndpoints level (matching
-    // GetEmployeeLeaveBalance), so the resource-authorization check in LeaveResourceAuthorizer.
-    // CanViewAsync (self / manager-in-hierarchy / HR-admin) is reachable by managers too.
 
     [Fact]
     public async Task GetLeaveBalanceHistory_Allows_Employee_Viewing_Own_History()
@@ -627,8 +603,6 @@ public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
     [Fact]
     public async Task Approve_Returns_Forbidden_For_Self_Approval()
     {
-        // CanApproveOrRejectAsync has no self path — an employee (even one holding the manager
-        // role) can never approve their own leave request.
         var employee = await CreateEmployeeAsync();
         await AssignPolicyAsync(employee);
 
@@ -667,9 +641,6 @@ public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
     [Fact]
     public async Task Approve_Ignores_Client_Supplied_ReviewedByEmployeeId_And_Uses_Authenticated_Caller()
     {
-        // SEC: ReviewedByEmployeeId supplied in the request body must never be trusted — an
-        // impersonation attempt (claiming someone else approved) must be silently overwritten
-        // with the authenticated caller's own id before authorization or persistence.
         var employee = await CreateEmployeeAsync();
         await AssignPolicyAsync(employee);
         var manager = await CreateEmployeeAsync();
@@ -809,9 +780,6 @@ public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
         Assert.NotEqual(impersonationTarget, payload.ReviewedByEmployeeId);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId, bool hrAdministrator = false, bool manager = false)
     {
@@ -829,12 +797,6 @@ public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
         return client;
     }
 
-    /// <summary>
-    /// Creates a real employee via the employees API and returns its id. An employee's id doubles
-    /// as the identity user id for the linked account (see GetMyEmployeeHandler's `e.Id == userId`
-    /// lookup), so this id is used both as the leave resource's EmployeeId and as the
-    /// TestAuthHandler.UserHeader value when acting "as" that employee.
-    /// </summary>
     private async Task<Guid> CreateEmployeeAsync()
     {
         using var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true);
@@ -872,11 +834,6 @@ public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
         response.EnsureSuccessStatusCode();
     }
 
-    /// <summary>
-    /// Assigns a leave policy with AllowNegativeBalance=true to the employee, so
-    /// SubmitLeaveRequestHandler's balance check never blocks the submissions these authorization
-    /// tests need to set up (they exist purely to exercise authorization, not balance rules).
-    /// </summary>
     private async Task AssignPolicyAsync(Guid employeeId)
     {
         using var hrClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true);

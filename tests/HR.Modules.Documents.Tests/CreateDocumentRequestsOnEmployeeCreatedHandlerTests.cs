@@ -48,7 +48,6 @@ public class CreateDocumentRequestsOnEmployeeCreatedHandlerTests
         new(id ?? Guid.NewGuid(), documentTypeId, IsMandatory: true,
             DueDaysAfterStart: dueDaysAfterStart, RequiresExpiryDate: false);
 
-    // ── DocumentRequest creation ─────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Creates_DocumentRequests_For_All_Active_Required_Documents()
@@ -175,7 +174,6 @@ public class CreateDocumentRequestsOnEmployeeCreatedHandlerTests
         Assert.Equal(new DateTimeOffset(FixedUtcNow, TimeSpan.Zero), request.CreatedAt);
     }
 
-    // ── Task creation ─────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Creates_One_Upload_Task_Per_DocumentRequest()
@@ -314,9 +312,9 @@ public class CreateDocumentRequestsOnEmployeeCreatedHandlerTests
             new Dictionary<Guid, string> { [docTypeId] = "Passport" });
         var evt = MakeEvent(companyId, employeeId, Guid.NewGuid());
 
-        await handler.HandleAsync(evt, CancellationToken.None); // first time — creates request + task
-        await handler.HandleAsync(evt, CancellationToken.None); // second time — skips duplicate
+        await handler.HandleAsync(evt, CancellationToken.None);
+        await handler.HandleAsync(evt, CancellationToken.None);
 
-        Assert.Single(taskCreator.Created); // only one task total
+        Assert.Single(taskCreator.Created);
     }
 }

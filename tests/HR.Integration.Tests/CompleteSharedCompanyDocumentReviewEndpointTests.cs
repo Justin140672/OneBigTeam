@@ -14,11 +14,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Verifies CompleteSharedCompanyDocumentReview end-to-end: the shared-document:manage policy,
-/// that the reviewer identity is always resolved from the caller's own claims (never accepted
-/// from the request body), tenant isolation, and validation of ReviewNotes.
-/// </summary>
 [Collection("Integration")]
 public class CompleteSharedCompanyDocumentReviewEndpointTests
 {
@@ -85,11 +80,6 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
     [Fact]
     public async Task CompleteReview_AfterUploadingRenewedVersion_StillPersists_LastReviewedFields()
     {
-        // Regression check for a reported E2E failure (CompleteReview_WithRenewedFile_...): the
-        // Complete Review dialog, when a renewed file is attached, chains two real HTTP calls —
-        // upload-version first, then complete-review — mirroring that exact sequence here via the
-        // real API/DB (not fakes) to determine whether the "Last reviewed by" fields genuinely
-        // fail to persist server-side, or whether the E2E failure is purely a UI-side timing issue.
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
@@ -130,11 +120,6 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
     [Fact]
     public async Task CompleteReview_Closes_Open_Review_Task_Created_By_DetectDocumentsDueForReviewJob()
     {
-        // Proves the fix for "Prevent Duplicate Review Tasks": completing a review must close
-        // the open Review task DetectDocumentsDueForReviewJob created for this document
-        // (sourceEntityId = document.Id, TaskSource.Document, TaskActionType.Review) — otherwise
-        // the job's openReviewTaskIds check keeps skipping the document forever once its next
-        // ReviewDate comes due.
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
@@ -169,12 +154,6 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
     [Fact]
     public async Task CompleteReview_Persists_Audit_Record()
     {
-        // shared_company_document.review_completed's EmployeeId is always null (see
-        // SharedCompanyDocumentReviewCompletedAuditEvent), so — just like
-        // AuditHistoryIntegrationTests.UpdateCompanySettings_Persists_Audit_Record — it can never
-        // appear via the employee-scoped GetEmployeeAuditHistory endpoint. Read AuditDbContext
-        // directly via the test host's DI container instead, proving the audit event raised by the
-        // handler actually lands in the audit table end-to-end.
         var companyId = Guid.NewGuid();
         var userId    = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
@@ -232,9 +211,6 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
         Assert.Equal(HttpStatusCode.OK, detailResponse.StatusCode);
         var detail = await detailResponse.Content.ReadFromJsonAsync<GetDetailPayload>();
 
-        // Both reviews complete on the same real-world day, so ReviewDate ties between the two
-        // rows and the newest-first ordering isn't guaranteed between them — just assert both
-        // are present rather than asserting a specific order.
         Assert.Equal(2, detail!.ReviewHistory.Count);
         Assert.Contains(detail.ReviewHistory, h => h.ReviewNotes == "First review.");
         Assert.Contains(detail.ReviewHistory, h => h.ReviewNotes == "Second review.");
@@ -355,12 +331,6 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
-    // ── Renewal-via-review journey ──────────────────────────────────────────────
-    // These prove the "Keep Previous Versions" acceptance criteria hold for the *combined*
-    // flow the UI actually drives: upload a new version via the existing, unmodified
-    // UploadSharedCompanyDocumentVersion endpoint, then complete the review via this
-    // endpoint. Each endpoint already has full isolated coverage elsewhere; this file only
-    // proves the two-call sequence composes correctly.
 
     [Fact]
     public async Task RenewalViaReview_Retains_Both_Versions_And_Updates_Review_Fields()
@@ -375,7 +345,6 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
             client, companyId, categoryId, title: "Remote Working Policy",
             reviewFrequency: "Yearly", reviewDate: new DateOnly(2020, 1, 1));
 
-        // Step 1: renew the file — the same call the UI makes before completing the review.
         var versionResponse = await client.PostAsync(
             $"/api/companies/{companyId}/shared-documents/{doc!.Id}/versions",
             BuildVersionUpload("Updated for 2026 legislation.", requiresReacknowledgement: false));
@@ -383,7 +352,6 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
         var versionPayload = await versionResponse.Content.ReadFromJsonAsync<VersionUploadPayload>();
         Assert.Equal(2, versionPayload!.VersionNumber);
 
-        // Step 2: complete the review — the same call the UI makes immediately afterwards.
         var reviewResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/shared-documents/{doc.Id}/complete-review",
             new { ReviewNotes = "Renewed with updated 2026 legislation." });
@@ -393,14 +361,12 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
         Assert.Equal(HttpStatusCode.OK, detailResponse.StatusCode);
         var detail = await detailResponse.Content.ReadFromJsonAsync<GetDetailPayload>();
 
-        // Both the old and new file remain in the version history, distinctly numbered.
         Assert.Equal(2, detail!.VersionHistory.Count);
         var v1 = Assert.Single(detail.VersionHistory, v => v.VersionNumber == 1);
         var v2 = Assert.Single(detail.VersionHistory, v => v.VersionNumber == 2);
         Assert.Equal("Superseded", v1.PublicationStatus);
         Assert.Equal(detail.Status, v2.PublicationStatus);
 
-        // The review fields reflect the completed review, exactly as in the non-renewal case.
         Assert.Equal(DateOnly.FromDateTime(DateTime.UtcNow), detail.LastReviewedAt);
         Assert.Equal(userId, detail.LastReviewedByEmployeeId);
         Assert.Equal("Renewed with updated 2026 legislation.", detail.LastReviewNotes);
@@ -427,7 +393,6 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
             client, companyId, categoryId, title: "Remote Working Policy",
             reviewFrequency: "Yearly", reviewDate: new DateOnly(2020, 1, 1));
 
-        // First renewal cycle: v1 -> v2, then review.
         var firstVersionResponse = await client.PostAsync(
             $"/api/companies/{companyId}/shared-documents/{doc!.Id}/versions",
             BuildVersionUpload("First renewal.", requiresReacknowledgement: false));
@@ -436,8 +401,6 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
             $"/api/companies/{companyId}/shared-documents/{doc.Id}/complete-review",
             new { ReviewNotes = "First review." });
 
-        // Second renewal cycle: v2 -> v3, then review again — proves this isn't a one-shot
-        // special case.
         var secondVersionResponse = await client.PostAsync(
             $"/api/companies/{companyId}/shared-documents/{doc.Id}/versions",
             BuildVersionUpload("Second renewal.", requiresReacknowledgement: false));
@@ -538,7 +501,6 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
         return form;
     }
 
-    // %PDF- followed by padding, so magic-byte content validation passes.
     private static byte[] PdfBytes()
     {
         var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };
@@ -552,12 +514,6 @@ public class CompleteSharedCompanyDocumentReviewEndpointTests
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
-        // Role-agnostic sync only — every caller of this helper already granted the specific
-        // role(s) it wants to test beforehand via AssignRoleAsync. Hardcoding a role here (this
-        // used to always grant SystemRoles.HrAdministrator) additionally granted it to every
-        // caller regardless of intent, which used to be harmless only because tenant resolution
-        // didn't actually key off UserProfile.CompanyId yet — now that it does, an unconditional
-        // extra role grant here changes real authorization outcomes.
         await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
         return client;
     }

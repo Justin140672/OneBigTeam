@@ -2,10 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the onboarding template create/edit page (OnboardingTemplateEdit.razor).
-/// Routes: /companies/{id}/onboarding-templates/new  and  /companies/{id}/onboarding-templates/{id}
-/// </summary>
 public sealed class OnboardingTemplateEditPage(IPage page, string baseUrl)
 {
     private const string NamePlaceholder = "e.g. Standard Engineering Onboarding";
@@ -25,9 +21,6 @@ public sealed class OnboardingTemplateEditPage(IPage page, string baseUrl)
 
     public Guid GetIdFromUrl() => UrlIdParser.LastGuid(page.Url);
 
-    // This page is @rendermode InteractiveServer: type character by character (each keystroke raises
-    // its own input event once the circuit is live), then verify the value committed and retype once
-    // if it didn't — same technique as EmploymentTypeEditPage.FillTextBoxAsync.
     private async Task FillTextBoxAsync(string placeholder, string value)
     {
         var input = page.GetByPlaceholder(placeholder);
@@ -69,11 +62,6 @@ public sealed class OnboardingTemplateEditPage(IPage page, string baseUrl)
     public async Task SaveAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
-        // The post-save navigation back to the list is a forceLoad (EditPageBase.NavigateToList)
-        // whose browser "load" event waits on every Syncfusion CSS/font/script resource — under
-        // maxParallelThreads=15 that routinely outlasts a plain WaitForURLAsync (default waitUntil:
-        // "Load"). Wait on "Commit" and let the grid-row wait below be the real readiness gate —
-        // same fix as the Group A login flow.
         await page.WaitForURLAsync("**/onboarding-templates",
             new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
         await page.WaitForSelectorAsync(
@@ -103,7 +91,6 @@ public sealed class OnboardingTemplateEditPage(IPage page, string baseUrl)
         await page.WaitForTimeoutAsync(300);
     }
 
-    // ── Legacy helpers retained for OnboardingTemplateManagementTests (task checklist). ──
 
     public Task GoToAsync(Guid companyId, Guid templateId) => GoToEditAsync(companyId, templateId);
 
@@ -136,11 +123,6 @@ public sealed class OnboardingTemplateEditPage(IPage page, string baseUrl)
         await FillTaskTitleAsync(title);
     }
 
-    /// <summary>
-    /// Expands the first checklist task (if needed) and waits for its title input to hold
-    /// <paramref name="expected"/>. Used after "Reload latest values" to assert the checklist now
-    /// mirrors the server's task list rather than the stale in-progress edit.
-    /// </summary>
     public async Task<string> WaitForFirstTaskTitleAsync(string expected)
     {
         await EnsureFirstTaskExpandedAsync();

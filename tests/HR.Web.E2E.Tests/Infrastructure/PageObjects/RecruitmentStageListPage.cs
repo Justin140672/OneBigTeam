@@ -3,16 +3,8 @@ using HR.Web.E2E.Tests.Infrastructure;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for RecruitmentStageList.razor (/companies/{companyId}/recruitment-stages,
-/// ticket #100). Follows the same conventions as EmploymentTypeListPage: an HrGrid-based list with
-/// a toolbar Add/Activate/Deactivate/Show Inactive set, plus per-row Move up/down reorder buttons
-/// that don't exist on EmploymentType's list.
-/// </summary>
 public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
 {
-    // Same rationale as EmploymentTypeListPage.RowsRenderedSelector: the EJ2 grid populates rows
-    // asynchronously after the Blazor component mounts.
     private const string RowsRenderedSelector = ".e-grid .e-row, .e-grid .e-emptyrow, .alert-danger";
 
     public async Task GoToAsync(Guid companyId)
@@ -56,8 +48,6 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
     public async Task<string?> GetTerminalOutcomeAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
-        // The Terminal Outcome column renders a StatusBadge in its own cell; grab the last badge-like
-        // cell text in the row rather than the active-status badge (bg-success/bg-secondary) cell.
         var cells = Row(nameFragment).Locator(".e-rowcell");
         var count = await cells.CountAsync();
         for (var i = count - 1; i >= 0; i--)
@@ -69,10 +59,6 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
         return null;
     }
 
-    /// <summary>
-    /// Reads the "Purpose" column cell for the named row. Returns "None" when the cell shows the
-    /// muted "—" placeholder, otherwise the badge label ("New application", "Interview", "Offer").
-    /// </summary>
     public async Task<string?> GetPurposeAsync(string nameFragment)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
@@ -105,7 +91,6 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
         var names = new List<string>();
         for (var i = 0; i < count; i++)
         {
-            // Name column is the row's link cell (second column, after Order).
             var link = rows.Nth(i).Locator("a").First;
             names.Add((await link.TextContentAsync())?.Trim() ?? "");
         }
@@ -116,18 +101,6 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
 
     public async Task MoveDownAsync(string nameFragment) => await MoveAsync(nameFragment, "Move down", delta: +1);
 
-    /// <summary>
-    /// Clicks the named row's Move up/down button and waits for its position to actually change
-    /// by <paramref name="delta"/> rows before returning. Reorder is a real server round-trip
-    /// (ReorderRecruitmentStages), and both the spinner-clear wait and the "rows rendered" wait
-    /// this used to rely on are no-ops here: rows already existed before the click (this only ever
-    /// reorders an existing row, never adds one), so both resolve instantly regardless of whether
-    /// the actual reorder has landed — the exact same "container exists" race already fixed
-    /// elsewhere in this suite, just not previously caught here because the symptom (index math
-    /// off by one, e.g. ReorderStage_MoveUpAndDown_PersistsAcrossReload's persistent "Expected 5,
-    /// Actual 6") looked like shared-state pollution rather than a same-page timing race. Poll the
-    /// row's actual position instead of trusting either heuristic.
-    /// </summary>
     private async Task MoveAsync(string nameFragment, string buttonTitle, int delta)
     {
         var namesBefore = await GetNamesInOrderAsync();
@@ -159,9 +132,6 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
         var btn = page.GetByRole(AriaRole.Button, new() { Name = "Deactivate" });
         await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await btn.ClickAsync();
-        // Opens a confirmation dialog (HrConfirmDialog) rather than deactivating immediately —
-        // scoped to the dialog since its own confirm button shares the "Deactivate" label with
-        // the toolbar button just clicked above.
         var confirmButton = page.GetByRole(AriaRole.Dialog).GetByRole(AriaRole.Button, new() { Name = "Deactivate", Exact = true });
         await confirmButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await confirmButton.ClickAsync();
@@ -173,9 +143,6 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
         await Row(nameFragment).ClickAsync();
-        // Exact = true: "Activate" is a substring of "Deactivate", so without this the locator
-        // resolves to both toolbar buttons (strict-mode violation) when a Deactivate button is
-        // also present — same bug found in ExternalRecruiterListPage.cs.
         var btn = page.GetByRole(AriaRole.Button, new() { Name = "Activate", Exact = true });
         await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
         await btn.ClickAsync();

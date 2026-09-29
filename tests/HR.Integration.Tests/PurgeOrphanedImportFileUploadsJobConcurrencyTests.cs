@@ -8,20 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// P1 fix (Sept 2026): PurgeOrphanedImportFileUploadsJob's deletion phase must never delete a file
-/// out from under a request that just confirmed its upload intent, and must never touch storage for
-/// an intent still inside its grace period. HR.Modules.DataImport.Tests/PurgeOrphanedImportFileUploadsJobTests.cs
-/// covers this against the EF InMemory provider; this asserts the same guarantee against a real
-/// PostgreSQL database (Testcontainers, via ApiWebApplicationFactory) — the optimistic-concurrency
-/// token (OrphanedImportFileUpload.Version) depends on real UPDATE ... WHERE version = @p row-count
-/// semantics that the InMemory provider only approximates.
-///
-/// Reaches into the real DataImportDbContext via the test host's DI container and calls the
-/// (InternalsVisibleTo-exposed) internal domain methods directly, mirroring
-/// ConfirmImportSessionResumabilityEndpointTests' established pattern for simulating interleaving
-/// there is no HTTP-level fault-injection hook for.
-/// </summary>
 [Collection("Integration")]
 public class PurgeOrphanedImportFileUploadsJobConcurrencyTests
 {
@@ -49,7 +35,7 @@ public class PurgeOrphanedImportFileUploadsJobConcurrencyTests
         }
 
         var intent = OrphanedImportFileUpload.CreateReserved(
-            Guid.NewGuid(), companyId, storageKey, now.AddHours(-2)); // past the default grace period
+            Guid.NewGuid(), companyId, storageKey, now.AddHours(-2));
         seedDb.OrphanedImportFileUploads.Add(intent);
         await seedDb.SaveChangesAsync();
 
@@ -72,12 +58,6 @@ public class PurgeOrphanedImportFileUploadsJobConcurrencyTests
     [Fact]
     public async Task A_Request_Confirming_Its_Intent_After_The_Job_Has_Loaded_It_Wins_The_Race_And_The_File_Survives()
     {
-        // Real interleaving against real Postgres: the job's own DbContext loads a deletion-eligible
-        // candidate (as DeleteConfirmedOrphansAsync's SELECT would), a separate request-like context
-        // then confirms that same intent (as UploadImportFileHandler's ConfirmedAt save would), and
-        // only then does the job attempt its claim step immediately before the destructive storage
-        // call. The claim must fail with a genuine Postgres row-version conflict, and the file already
-        // uploaded to real storage must never be deleted.
         var companyId = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
 
@@ -96,17 +76,12 @@ public class PurgeOrphanedImportFileUploadsJobConcurrencyTests
         seedDb.OrphanedImportFileUploads.Add(intent);
         await seedDb.SaveChangesAsync();
 
-        // Simulates the resolution phase of an earlier sweep already having proven this row
-        // deletion-eligible, and the job's deletion-phase query having just loaded it (a tracked,
-        // still-unconfirmed snapshot) — the exact state DeleteConfirmedOrphansAsync's candidates loop
-        // is in immediately before its claim step.
         await using var jobScope = _factory.Services.CreateAsyncScope();
         var jobDb = jobScope.ServiceProvider.GetRequiredService<DataImportDbContext>();
         var tracked = await jobDb.OrphanedImportFileUploads.SingleAsync(o => o.Id == intent.Id);
         tracked.MarkDeletionEligible(now.AddHours(-1));
         await jobDb.SaveChangesAsync();
 
-        // A confirming request wins the race, via a fully independent scope/connection/transaction.
         await using (var confirmingScope = _factory.Services.CreateAsyncScope())
         {
             var confirmingDb = confirmingScope.ServiceProvider.GetRequiredService<DataImportDbContext>();
@@ -115,12 +90,9 @@ public class PurgeOrphanedImportFileUploadsJobConcurrencyTests
             await confirmingDb.SaveChangesAsync();
         }
 
-        // The job's claim step: touch the row under its concurrency token immediately before the
-        // destructive storage call would happen.
         tracked.BeginDeletionAttempt(now);
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => jobDb.SaveChangesAsync());
 
-        // Storage was never touched — the file the now-confirmed session depends on still exists.
         Assert.True(await storage.ExistsAsync(storageKey, CancellationToken.None));
 
         await using var verifyScope = _factory.Services.CreateAsyncScope();

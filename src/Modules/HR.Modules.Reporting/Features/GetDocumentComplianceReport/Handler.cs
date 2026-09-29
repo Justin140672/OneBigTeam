@@ -19,8 +19,6 @@ internal sealed class GetDocumentComplianceReportHandler(
         if (items.Count == 0)
             return Result.Success(new GetDocumentComplianceReportResponse([], 0, 0, 0, 0, false));
 
-        // Summary totals (REP-05) are computed from the full filtered set below, before the
-        // display cap is applied to the returned rows.
         var totalCount = items.Count;
         var isTruncated = totalCount > ReportLimits.DisplayRowLimit;
         var cappedItems = items.Take(ReportLimits.DisplayRowLimit).ToList();

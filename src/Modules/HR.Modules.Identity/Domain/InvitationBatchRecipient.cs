@@ -1,12 +1,5 @@
 namespace HR.Modules.Identity.Domain;
 
-/// <summary>
-/// One recipient of a bulk invitation batch (see <see cref="InvitationBatch"/>). Email is a
-/// server-resolved snapshot taken at queue time — never client supplied. <see cref="InviteId"/> is
-/// only set once a <see cref="UserInvite"/> has actually been created for this recipient, so a retry
-/// of email delivery (ProcessInvitationBatchJob) never creates a second UserInvite for the same
-/// recipient.
-/// </summary>
 internal sealed class InvitationBatchRecipient
 {
     private InvitationBatchRecipient() { }
@@ -50,9 +43,6 @@ internal sealed class InvitationBatchRecipient
         FailureReason = null;
     }
 
-    /// <summary>Records that a UserInvite has been created for this recipient — must be set (and
-    /// saved) before attempting email delivery, so a crash between invite-creation and email-send
-    /// never results in a second UserInvite being created on retry.</summary>
     public void RecordInviteCreated(Guid inviteId)
     {
         InviteId = inviteId;

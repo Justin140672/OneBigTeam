@@ -218,8 +218,6 @@
 
     protected override string? ListUrl => $"/companies/{CompanyId}/external-recruiters";
 
-    // Soft, non-blocking warning (not a validation error) — surfaced on blur rather than debounced
-    // on every keystroke to keep this simple, per the ticket's "keep it simple" guidance.
     private async Task OnAgencyNameBlurAsync()
     {
         _duplicateWarning = null;
@@ -238,7 +236,6 @@
         }
         else if (result?.Items.Count > 0)
         {
-            // A similarly-named (but not exact) active agency exists — still worth a soft nudge.
             _duplicateWarning = $"A similarly named active recruiter already exists (\"{result.Items[0].AgencyName}\") — please check this isn't a duplicate.";
         }
     }

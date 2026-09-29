@@ -2,11 +2,6 @@ using System.Net;
 
 namespace HR.Modules.DataImport.Tests.Infrastructure;
 
-/// <summary>
-/// Minimal <see cref="HttpMessageHandler"/> test double for exercising
-/// SupabaseImportFileStorageHealthCheck with no network access. Records every request and returns
-/// a caller-configured canned response, or a thrown transport exception.
-/// </summary>
 internal sealed class FakeHttpMessageHandler : HttpMessageHandler
 {
     public List<HttpRequestMessage> Requests { get; } = [];

@@ -3,18 +3,11 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the Probation report page
-/// (/companies/{companyId}/reporting/probation — ProbationReportPage.razor): loading (grid and
-/// summary stat cards — this page has no ReportFilterPanel or group-by control, only the five
-/// summary cards above the grid), and export. Catalog-page navigation coverage lives in
-/// <see cref="ReportCatalogTests"/>.
-/// </summary>
 public sealed class ProbationReportTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    private const string LauraEmail = "laura.bennett@acme.example"; // HR Administrator
+    private const string LauraEmail = "laura.bennett@acme.example";
 
     [Fact]
     public async Task Page_Loads_WithSummaryCardsAndGridColumns()
@@ -29,8 +22,6 @@ public sealed class ProbationReportTests(HrAdminPersonaFixture fixture) : RoleE2
 
         Assert.False(await report.HasLoadErrorAsync());
 
-        // Summary stat cards should each render a non-negative integer (never the -1 parse-failure
-        // sentinel), proving the report's aggregate counts loaded successfully.
         Assert.True(await report.GetStatValueAsync("Current Probation") >= 0);
         Assert.True(await report.GetStatValueAsync("Due Reviews") >= 0);
         Assert.True(await report.GetStatValueAsync("Overdue Reviews") >= 0);

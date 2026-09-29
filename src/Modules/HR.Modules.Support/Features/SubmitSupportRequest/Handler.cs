@@ -86,11 +86,6 @@ internal sealed class SubmitSupportRequestHandler(
 
         db.SupportRequests.Add(entity);
 
-        // Reliability review issue 4 (P1): every storage key acquired below is tracked in this
-        // ownership scope. Commit() is only called after persistence genuinely succeeds — any
-        // other exit (an early Result.Failure return, or an exception thrown from the copy/scan/
-        // upload/persist sequence, including a second file's upload failing) reaches
-        // DisposeAsync without a commit, guaranteeing cleanup regardless of which step failed.
         await using var cleanupScope = new UploadedAttachmentCleanupScope(
             attachmentStorage, serviceScopeFactory, clock, executionContextAccessor, logger);
 
@@ -187,16 +182,10 @@ internal sealed class SubmitSupportRequestHandler(
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
-                // Reliability review issue 4 (P1): the caller's own cancellation must propagate as
-                // OperationCanceledException, not be swallowed into a generic "scan failed" Result
-                // — callers (and ASP.NET Core's request pipeline) rely on that type to distinguish
-                // "client went away" from a genuine business failure.
                 throw;
             }
             catch
             {
-                // Fail closed: an unreachable/errored scanner must never let a file through
-                // unscanned (mirrors HR.Modules.Documents' ScanUploadedFileJob failure handling).
                 return Result.Failure<List<(IFormFile, string)>>(
                     Error.Validation("Attachment scanning is temporarily unavailable. Please try again shortly."));
             }
@@ -229,16 +218,9 @@ internal sealed class SubmitSupportRequestHandler(
                 return candidate;
         }
 
-        // Extremely unlikely fallback — guarantees uniqueness via a GUID suffix.
         return $"SUP-{now.Year}-{Guid.NewGuid():N}"[..20];
     }
 
-    /// <summary>
-    /// Builds the "view request" link from a trusted, configured base URI plus fixed path
-    /// segments, validating the scheme before it is ever HTML-encoded (by SupportEmailRenderer) for the anchor's <c>href</c>
-    /// attribute. <paramref name="requestId"/> is a server-generated GUID, but is included via
-    /// <see cref="Uri"/> composition rather than string concatenation regardless.
-    /// </summary>
     private static string? BuildAdminRequestLink(string? configuredBaseUrl, Guid requestId)
     {
         if (string.IsNullOrWhiteSpace(configuredBaseUrl))
@@ -247,8 +229,6 @@ internal sealed class SubmitSupportRequestHandler(
         if (!Uri.TryCreate(configuredBaseUrl.TrimEnd('/'), UriKind.Absolute, out var baseUri))
             return null;
 
-        // Only ever build a link from an http(s) configured base — never trust/construct a link
-        // using a scheme that could execute in a mail client (e.g. javascript:).
         if (baseUri.Scheme != Uri.UriSchemeHttp && baseUri.Scheme != Uri.UriSchemeHttps)
             return null;
 

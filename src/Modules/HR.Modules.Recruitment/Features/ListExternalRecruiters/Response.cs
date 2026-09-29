@@ -14,7 +14,5 @@ internal sealed record ExternalRecruiterListItem(
     string? ContactEmail,
     string? ContactTelephone,
     bool IsActive,
-    // All-time count of vacancy links (active + historical/inactive assignments) — see
-    // ListExternalRecruitersHandler for the rationale of counting all rather than active-only.
     int LinkedVacancyCount,
     DateTimeOffset CreatedAt);

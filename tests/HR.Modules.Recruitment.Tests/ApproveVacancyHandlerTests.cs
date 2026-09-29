@@ -21,9 +21,6 @@ public class ApproveVacancyHandlerTests
     [Fact]
     public Task HandleAsync_Approves_Open_Vacancy() => HandleAsync_Approves_Vacancy_For_Status(VacancyStatus.Open);
 
-    // Not a [Theory] — VacancyStatus is internal to HR.Modules.Recruitment and cannot be used as a
-    // public Theory parameter (see the identical note in GetExternalRecruiterUsageHandlerTests /
-    // GetRecruitmentStageUsageHandlerTests). Each status is exercised via its own [Fact] above.
     private async Task HandleAsync_Approves_Vacancy_For_Status(VacancyStatus status)
     {
         await using var db = BuildContext();

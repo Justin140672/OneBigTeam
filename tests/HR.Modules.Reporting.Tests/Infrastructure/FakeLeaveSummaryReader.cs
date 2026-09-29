@@ -2,11 +2,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Reporting.Tests.Infrastructure;
 
-/// <summary>
-/// Hand-rolled fake for <see cref="ILeaveSummaryReader"/> — returns a pre-configured set of
-/// unaggregated per-employee/per-leave-type rows, used to test GetLeaveSummaryReportHandler's
-/// grouping and LeaveTypeId filtering behaviour.
-/// </summary>
 internal sealed class FakeLeaveSummaryReader : ILeaveSummaryReader
 {
     private readonly IReadOnlyList<LeaveSummaryReportRow> _rows;

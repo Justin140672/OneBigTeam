@@ -187,7 +187,6 @@ public class PurgeExpiredOrganisationDataExportsJobTests
         public HashSet<string> ThrowForKeys { get; } = [];
         public List<string> Log { get; set; } = [];
 
-        /// <summary>Follow-up D: attempt keys returned by <see cref="ListAttemptKeysAsync"/>, keyed by exportId.</summary>
         public Dictionary<Guid, List<string>> AttemptKeys { get; } = [];
 
         public Task<IReadOnlyList<string>> ListAttemptKeysAsync(Guid companyId, Guid exportId, CancellationToken cancellationToken) =>

@@ -19,18 +19,11 @@ internal sealed class AttendanceAlert
     public Guid EmployeeId { get; private set; }
     public AttendanceAlertRule Rule { get; private set; }
 
-    /// <summary>The evidence window the alert was raised from — used for duplicate prevention (SICK-04: no
-    /// repeated alert for the same employee+rule+window) and for scoping what dates are displayed.</summary>
     public DateOnly EvidencePeriodStart { get; private set; }
     public DateOnly EvidencePeriodEnd { get; private set; }
 
-    /// <summary>Count backing the pattern (spell count, weekday occurrence count, or 1 for LongAbsence/
-    /// MissingReturnToWorkReview) — the only figure shown to managers under the reduced view (see
-    /// Features/ListAttendanceAlerts).</summary>
     public int OccurrenceCount { get; private set; }
 
-    /// <summary>Human-readable explanation built only from dates/counts — never medical notes, evidence
-    /// notes, or sickness category. HR-only field (see Features/ListAttendanceAlerts).</summary>
     public string Description { get; private set; } = string.Empty;
 
     public DateTimeOffset CreatedAt { get; private set; }

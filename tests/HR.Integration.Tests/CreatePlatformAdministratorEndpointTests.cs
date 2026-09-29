@@ -48,8 +48,6 @@ public class CreatePlatformAdministratorEndpointTests
         var response = await client.PostAsJsonAsync(
             "/api/platform-administrators", new { email = "new-admin2@test.example", role = "SupportStaff" });
 
-        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
-        // is Forbidden (403), not Unauthorized (401).
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -120,8 +118,6 @@ public class CreatePlatformAdministratorEndpointTests
         Assert.Equal(newEmail.ToLowerInvariant(), reloaded.Email);
     }
 
-    /// <summary>P1: a brand-new provider account — the handler mints a pending Supabase user and
-    /// stamps a correlation id, landing the new row in PendingProvisioning.</summary>
     [Fact]
     public async Task Post_PlatformAdministrators_Returns_PendingProvisioning_For_New_Provider_Account()
     {
@@ -143,9 +139,6 @@ public class CreatePlatformAdministratorEndpointTests
         Assert.Contains(_factory.SupabaseAuthGateway.PendingUsersCreatedWithMetadata, u => u.Email == newEmail.ToLowerInvariant());
     }
 
-    /// <summary>P1: an identity-provider account already exists for this email — the handler must
-    /// NOT create a duplicate account, instead requesting a password reset as the link-verification
-    /// mechanism, landing the row in PendingLinkVerification.</summary>
     [Fact]
     public async Task Post_PlatformAdministrators_Returns_PendingLinkVerification_For_Existing_Provider_Account()
     {

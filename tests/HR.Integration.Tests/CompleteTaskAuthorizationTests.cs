@@ -7,18 +7,11 @@ using HR.Modules.Tasks.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// SEC-003: only the task's assignee, the assignee's direct manager, or an HR Administrator may
-/// complete a task via POST /api/companies/{companyId}/tasks/{id}/complete. Endpoint-level
-/// Policies("role:employee") only proves tenant membership, not resource ownership, so these
-/// tests exercise the resource-ownership authorization check performed in CompleteTaskHandler.
-/// </summary>
 [Collection("Integration")]
 public class CompleteTaskAuthorizationTests(ApiWebApplicationFactory factory)
 {
     private static readonly Guid SeededCompanyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    // ── Anonymous ──────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Complete_Task_Returns_Unauthorized_When_No_Auth_Header()
@@ -32,7 +25,6 @@ public class CompleteTaskAuthorizationTests(ApiWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ── Unrelated peer ─────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Complete_Task_Returns_Forbidden_For_Unrelated_Peer_Employee()
@@ -51,7 +43,6 @@ public class CompleteTaskAuthorizationTests(ApiWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── Assignee ───────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Complete_Task_Returns_Ok_For_The_Assignee()
@@ -71,7 +62,6 @@ public class CompleteTaskAuthorizationTests(ApiWebApplicationFactory factory)
         Assert.Equal("Completed", payload!.Status);
     }
 
-    // ── Direct manager ─────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Complete_Task_Returns_Ok_For_The_Assignees_Direct_Manager()
@@ -118,14 +108,13 @@ public class CompleteTaskAuthorizationTests(ApiWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── Skip-level manager (three-level hierarchy) ────────────────────────────
 
     [Fact]
     public async Task Complete_Task_Returns_Ok_For_Skip_Level_Manager_In_Three_Level_Hierarchy()
     {
-        var seniorManager = await CreateEmployeeAsync(); // C
-        var manager = await CreateEmployeeAsync();       // B
-        var report = await CreateEmployeeAsync();        // A
+        var seniorManager = await CreateEmployeeAsync();
+        var manager = await CreateEmployeeAsync();
+        var report = await CreateEmployeeAsync();
 
         using (var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true))
         {
@@ -144,7 +133,6 @@ public class CompleteTaskAuthorizationTests(ApiWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    // ── Company Administrator (not HR Administrator) ──────────────────────────
 
     [Fact]
     public async Task Complete_Task_Returns_Forbidden_For_CompanyAdministrator_Who_Is_Not_Assignee_Or_Manager()
@@ -166,7 +154,6 @@ public class CompleteTaskAuthorizationTests(ApiWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── AssignedUserId-only task ───────────────────────────────────────────────
 
     [Fact]
     public async Task Complete_Task_Returns_Ok_For_Manager_Of_AssignedUserId_Only_Task()
@@ -191,7 +178,6 @@ public class CompleteTaskAuthorizationTests(ApiWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    // ── HR administrator override ─────────────────────────────────────────────
 
     [Fact]
     public async Task Complete_Task_Returns_Ok_For_HrAdministrator_Even_When_Not_Assignee_Or_Manager()
@@ -208,7 +194,6 @@ public class CompleteTaskAuthorizationTests(ApiWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    // ── Idempotency guard vs. authorization ordering ─────────────────────────
 
     [Fact]
     public async Task Complete_Task_Returns_Forbidden_For_Unauthorized_Caller_Even_When_Already_Completed()
@@ -230,7 +215,6 @@ public class CompleteTaskAuthorizationTests(ApiWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── Cancelled task, authorized caller (existing behavior unchanged) ──────
 
     [Fact]
     public async Task Complete_Task_Returns_Conflict_For_Cancelled_Task_When_Caller_Is_Authorized_Assignee()
@@ -251,7 +235,6 @@ public class CompleteTaskAuthorizationTests(ApiWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
 
-    // ── Unassigned tasks ───────────────────────────────────────────────────────
 
     [Fact]
     public async Task Complete_Task_Returns_Forbidden_For_Unassigned_Task_When_Caller_Is_Not_HrAdministrator()
@@ -283,7 +266,6 @@ public class CompleteTaskAuthorizationTests(ApiWebApplicationFactory factory)
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId, bool hrAdministrator = false)
     {
@@ -298,13 +280,6 @@ public class CompleteTaskAuthorizationTests(ApiWebApplicationFactory factory)
         return client;
     }
 
-    /// <summary>
-    /// Creates a real employee record via the employees API and returns its id. Note that in
-    /// this system an employee's id doubles as the identity user id for the linked account (see
-    /// GetMyEmployeeHandler's `e.Id == userId` lookup) — so this same id is used both as the
-    /// task's AssignedEmployeeId and as the TestAuthHandler.UserHeader value when acting "as"
-    /// that employee.
-    /// </summary>
     private async Task<Guid> CreateEmployeeAsync()
     {
         using var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true);

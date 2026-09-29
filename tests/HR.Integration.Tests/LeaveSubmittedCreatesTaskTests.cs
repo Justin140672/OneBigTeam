@@ -8,11 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Verifies the cross-module side effect: submitting a leave request creates
-/// a task (and notification) for the employee's manager via the in-process
-/// LeaveRequestedIntegrationEvent → LeaveRequestedHandler pipeline.
-/// </summary>
 [Collection("Integration")]
 public class LeaveSubmittedCreatesTaskTests
 {
@@ -76,12 +71,10 @@ public class LeaveSubmittedCreatesTaskTests
         var orphan         = await CreateEmployeeAsync(client, "Orphan", "Employee");
         await AssignPolicyAsync(client, orphan.Id, policyId);
 
-        // No manager assigned — handler should still succeed (task goes unassigned)
         var response = await SubmitLeaveAsync(client, orphan.Id);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────────────
 
     private async Task<(HttpClient Client, Guid PolicyId, EmpPayload Manager, EmpPayload Report)> SetupAsync()
     {
@@ -90,7 +83,6 @@ public class LeaveSubmittedCreatesTaskTests
         var manager  = await CreateEmployeeAsync(client, "Leave", "Manager");
         var report   = await CreateEmployeeAsync(client, "Leave", "Report");
 
-        // Assign manager to the report
         var assignResp = await client.PutAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/employees/{report.Id}/manager",
             new { companyId = SeededCompanyId, id = report.Id, managerId = manager.Id });

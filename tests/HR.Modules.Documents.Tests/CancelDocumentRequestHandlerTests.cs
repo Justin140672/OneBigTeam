@@ -42,7 +42,6 @@ public class CancelDocumentRequestHandlerTests
         return (docType, request);
     }
 
-    // ── Happy path ───────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Returns_Success_For_Requested_Document()
@@ -132,7 +131,6 @@ public class CancelDocumentRequestHandlerTests
         Assert.Equal(docType.Name,     evt.DocumentTypeName);
     }
 
-    // ── Failure paths ────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Request_Does_Not_Exist()

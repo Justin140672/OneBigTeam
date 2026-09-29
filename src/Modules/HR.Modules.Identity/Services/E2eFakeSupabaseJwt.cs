@@ -32,12 +32,6 @@ internal static class E2eFakeSupabaseJwt
 
     public static SecurityKey SigningKey { get; } = new SymmetricSecurityKey(KeyBytes);
 
-    /// <summary>
-    /// Mints a locally-signed access token shaped to satisfy HR.Api's real Supabase
-    /// TokenValidationParameters (issuer/audience/lifetime) and the claims HR.Modules.Identity reads
-    /// literally off the principal (CurrentUserClaims.SupabaseUserId = "sub", .Email = "email") —
-    /// see SupabaseCurrentUserResolutionMiddleware / HttpContextCurrentUser.
-    /// </summary>
     public static string CreateAccessToken(string supabaseProjectUrl, Guid userId, string email, TimeSpan lifetime)
     {
         var handler = new JwtSecurityTokenHandler();

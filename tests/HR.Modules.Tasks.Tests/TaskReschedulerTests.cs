@@ -187,8 +187,6 @@ public class TaskReschedulerTests
         Assert.Equal(new DateOnly(2026, 8, 1), saved.DueDate);
     }
 
-    // Idempotency: calling again with the same date is a genuine no-op — returns 0 and does not
-    // write a second TaskDateChanged notification.
     [Fact]
     public async Task RescheduleManyBySourceEntitiesAsync_Called_Twice_With_Same_Date_Is_Idempotent_And_Does_Not_Duplicate_Notification()
     {
@@ -214,8 +212,6 @@ public class TaskReschedulerTests
         Assert.Single(notificationWriter.Written, n => n.Type == NotificationType.TaskDateChanged);
     }
 
-    // Dedup: two changed tasks assigned to the same employee should only trigger one TaskDateChanged
-    // notification for that employee, not one per task.
     [Fact]
     public async Task RescheduleManyBySourceEntitiesAsync_Writes_One_TaskDateChanged_Notification_Per_Distinct_Assignee()
     {
@@ -242,8 +238,6 @@ public class TaskReschedulerTests
         Assert.Equal(assignee, notification.EmployeeId);
     }
 
-    // Stale TaskDueSoon/TaskOverdue notifications must be removed once a task's due date moves,
-    // regardless of direction — they no longer reflect the new date.
     [Fact]
     public async Task RescheduleManyBySourceEntitiesAsync_Removes_Stale_DueSoon_And_Overdue_Notifications()
     {

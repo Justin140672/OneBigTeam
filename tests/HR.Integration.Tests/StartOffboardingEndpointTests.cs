@@ -140,8 +140,6 @@ public class StartOffboardingEndpointTests
         using var client = await AdminClient(companyId);
         var employeeId = await CreateEmployeeAsync(client, companyId);
 
-        // Future last-working-day: a backdated (past) departure reroutes some tasks to HR
-        // reconciliation instead of leaving them unassigned, which would break the assertion below.
         var lastWorkingDay = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30).ToString("yyyy-MM-dd");
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/offboarding/start",
@@ -150,9 +148,6 @@ public class StartOffboardingEndpointTests
         var payload = await response.Content.ReadFromJsonAsync<OffboardingPlanPayload>();
         Assert.NotNull(payload);
 
-        // OFF-03: every OffboardingTask generated for the plan must have a corresponding
-        // Tasks-module TaskItem created via the durable-write-then-sync flow — assert this against
-        // the real Tasks-module endpoint rather than mocking the cross-module boundary.
         var unassignedResponse = await client.GetAsync($"/api/companies/{companyId}/tasks/unassigned");
         unassignedResponse.EnsureSuccessStatusCode();
         var unassigned = await unassignedResponse.Content.ReadFromJsonAsync<UnassignedTasksPayload>();
@@ -167,10 +162,6 @@ public class StartOffboardingEndpointTests
     [Fact]
     public async Task Post_StartOffboarding_Concurrent_Requests_Result_In_Exactly_One_Active_Plan()
     {
-        // Genuine concurrency against the real Postgres-backed unique partial index
-        // (ix_offboarding_plans_company_id_employee_id_active) — this is the actual guarantee that
-        // "repeated or concurrent requests do not duplicate plans" relies on; the handler's
-        // AnyAsync pre-check alone has a TOCTOU race and cannot be relied on to prove this.
         var companyId = Guid.NewGuid();
         using var client = await AdminClient(companyId);
         var employeeId = await CreateEmployeeAsync(client, companyId);

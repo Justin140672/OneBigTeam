@@ -71,9 +71,6 @@ internal sealed class AppointInternalCandidateHandler(
         if (application.AppointmentStatus == InternalAppointmentStatus.Completed)
             return Fail(Error.Conflict("This internal appointment has already been completed."));
 
-        // Recovery: an earlier attempt was interrupted after the Employees module recorded the change.
-        // The decision was already made and applied, so complete it as recorded (the new request's
-        // values are not re-applied) rather than re-validating against the employee's changed state.
         if (application.AppointmentStatus == InternalAppointmentStatus.Pending)
         {
             var recorded = await appointmentService.ResumeBySourceReferenceAsync(
@@ -125,7 +122,6 @@ internal sealed class AppointInternalCandidateHandler(
         if (candidate.EmployeeId is not { } employeeId)
             return Fail(Error.Validation("This internal application's candidate is not linked to an employee."));
 
-        // Company-scoped read: an employee of another company is indistinguishable from a missing one.
         var employee = await applicantReader.GetApplicantAsync(request.CompanyId, employeeId, cancellationToken);
         if (employee is null)
             return Fail(Error.Validation("The employee linked to this application was not found in this company."));
@@ -136,8 +132,6 @@ internal sealed class AppointInternalCandidateHandler(
         if (!request.NoManager && request.ManagerId == employeeId)
             return Fail(Error.Validation("An employee cannot be their own manager."));
 
-        // Same derivation as HireCandidate: the role, department and location all come from the
-        // vacancy's own position profile, never from client input.
         var positionProfile = await positionProfileReader.GetSummaryAsync(
             request.CompanyId, vacancy.PositionProfileId, cancellationToken);
 
@@ -155,7 +149,6 @@ internal sealed class AppointInternalCandidateHandler(
             return Fail(Error.Validation(
                 "An effective date is required — none was supplied and no proposed start date was recorded on the offer."));
 
-        // Step 1: persist Pending before touching the Employees module.
         var pendingVersion = application.Version;
         application.BeginInternalAppointment(employeeId, performedBy, clock.UtcNowOffset());
 
@@ -165,7 +158,6 @@ internal sealed class AppointInternalCandidateHandler(
         if (pendingSave.IsFailure)
             return Fail(pendingSave.Error);
 
-        // Step 2: record the employee change (idempotent on the application's source reference).
         var appointmentResult = await appointmentService.AppointAsync(
             new InternalAppointmentRequest(
                 request.CompanyId,
@@ -190,9 +182,6 @@ internal sealed class AppointInternalCandidateHandler(
 
         if (appointmentResult.IsFailure)
         {
-            // Employees committed nothing, so release the Pending marker; the application stays on its
-            // current stage and can be corrected and retried. If this save loses a race, the marker is
-            // cleared by InternalAppointmentReconciliationJob instead.
             var abandonVersion = application.Version;
             application.AbandonInternalAppointment(clock.UtcNowOffset());
 
@@ -207,7 +196,6 @@ internal sealed class AppointInternalCandidateHandler(
             return Fail(appointmentResult.Error);
         }
 
-        // Step 3: complete the Recruitment side.
         return await CompleteAsync(application, hiredStageId.Value, appointmentResult.Value!, performedBy, cancellationToken);
     }
 
@@ -249,7 +237,6 @@ internal sealed class AppointInternalCandidateHandler(
             InternalAppointmentStatus.Completed.ToString()));
     }
 
-    // EmployeePromotion.Reason is limited to 500 characters.
     private static string BuildReason(string roleTitle)
     {
         var reason = $"Internal appointment: {roleTitle}";

@@ -127,7 +127,6 @@ public class GetUserDetailsHandlerTests(IdentityDatabaseFixture fixture)
             await db.SaveChangesAsync();
         }
 
-        // Audience reader returns nothing for this employee => no position resolvable.
         var result = await BuildHandler()
             .HandleAsync(new GetUserDetailsRequest { CompanyId = companyId, EmployeeId = employeeId }, CancellationToken.None);
 
@@ -155,7 +154,6 @@ public class GetUserDetailsHandlerTests(IdentityDatabaseFixture fixture)
             {
                 [employeeId] = new EmployeeAudienceProfile(null, null, positionProfileId),
             });
-        // FakePositionProfileReader with no summaries => GetSummaryAsync returns null.
         var result = await BuildHandler(audienceReader: audienceReader)
             .HandleAsync(new GetUserDetailsRequest { CompanyId = companyId, EmployeeId = employeeId }, CancellationToken.None);
 

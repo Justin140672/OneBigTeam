@@ -79,10 +79,6 @@ namespace HR.Modules.Companies;
 
 public static class CompaniesModule
 {
-    /// <summary>
-    /// Registers Phase D's ReadOnlyModeMiddleware. Must be called after UseIdentityModule (and
-    /// UseAuthentication) so the current tenant is already resolvable via ICurrentTenant.
-    /// </summary>
     public static IApplicationBuilder UseCompaniesModule(this IApplicationBuilder app)
     {
         app.UseMiddleware<ReadOnlyModeMiddleware>();
@@ -106,13 +102,7 @@ public static class CompaniesModule
             options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "platform")));
 
-        // System Health Dashboard (Platform Monitoring epic) — "database" proxies overall Postgres
-        // connectivity (see CompaniesDatabaseHealthCheck remarks), "stripe" is a live account-balance
-        // reachability probe.
         services.AddHealthChecks()
-            // NFR-03: the database is a critical dependency — if it is Unhealthy the service is
-            // "not ready" (503 on /health/ready). Stripe is a degraded (optional) dependency —
-            // its loss does not take the platform offline.
             .AddCheck<CompaniesDatabaseHealthCheck>("database", tags: ["ready", "critical"])
             .AddCheck<StripeHealthCheck>("stripe", tags: ["degraded"]);
 
@@ -135,26 +125,12 @@ public static class CompaniesModule
         await db.Database.MigrateAsync();
     }
 
-    /// <summary>
-    /// Orchestrates the required startup sequence: Platform migration, Companies migration and seeding.
-    /// This method is the single source of truth for the production startup order — used by both Program.cs
-    /// (via migrationRunner.RunAsync) and integration tests to ensure ordering consistency.
-    ///
-    /// Platform migration runs first to create the platform schema and tables (empty). Then Companies
-    /// migration runs, which includes RemovePlatformTablesFromCompanies — this migration copies data
-    /// from the old companies.platform_* tables to the new platform.platform_* tables, then drops the old ones.
-    /// This ordering ensures existing data is preserved during schema migration. Platform foreign key
-    /// to companies.companies is safe because the companies table is created by early Companies migrations.
-    /// </summary>
     public static async Task MigrateAndSeedCoreApplicationAsync(this IServiceProvider services)
     {
-        // Step 1: Platform migration (creates empty platform tables first)
         await services.MigratePlatformAsync();
 
-        // Step 2: Companies migration (includes RemovePlatformTablesFromCompanies which copies data before drop)
         await services.MigrateCompaniesAsync();
 
-        // Step 3: Seed companies data
         await services.SeedCompaniesAsync();
     }
 
@@ -166,10 +142,6 @@ public static class CompaniesModule
         var now = DateTimeOffset.UtcNow;
 
         var acmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-        // Include(Settings): the "if (acme.Settings is null)" guard below must reflect what's
-        // actually in the DB. Without this the navigation is always null on an existing DB, so the
-        // seeder tries to INSERT a second company_settings row and SaveChanges fails with a
-        // duplicate PK_company_settings on every app start after the first.
         var acme = await db.Companies.Include(c => c.Settings).SingleOrDefaultAsync(c => c.Id == acmeId);
         if (acme is null)
         {
@@ -197,14 +169,6 @@ public static class CompaniesModule
             db.Companies.Add(betaCorp);
         }
 
-        // Gamma Industries: dedicated to SubscriptionBillingJourneyTests.
-        // ActiveSubscription_Cancel_ShowsConfirmation_AndSchedulesCancellation ONLY — every other
-        // Beta-Corp-mutating subscription test still shares Beta Corp behind BetaCorpCleanupSemaphore.
-        // That test kept flaking even with the semaphore fix: this is Blazor Server, so a test's
-        // page (navigated to before it acquires the semaphore) is a live circuit that doesn't
-        // auto-update when a DIFFERENT test's circuit cancels/resumes Beta Corp concurrently — giving
-        // this one test its own company removes the shared state entirely rather than trying to
-        // out-race that staleness.
         var gammaId = Guid.Parse("00000000-0000-0000-0000-000000000003");
         var gamma = await db.Companies.Include(c => c.Settings).SingleOrDefaultAsync(c => c.Id == gammaId);
         if (gamma is null)
@@ -217,13 +181,6 @@ public static class CompaniesModule
             db.Companies.Add(gamma);
         }
 
-        // All seeded dev/E2E companies must have a persisted company_settings row, same as every
-        // real company gets from CompanyProvisioner.ProvisionCompanyAsync on signup — without one,
-        // EmployeeNumberGenerator.GenerateNextAsync (Automatic mode's atomic next-number counter)
-        // has no row to claim/increment against and throws. CreateDefault() only supplies the same
-        // Automatic-mode defaults a real company already gets; it does not change either company's
-        // numbering mode. Guarded by Settings being null so this never overwrites a mode an admin
-        // has since changed via HR Settings.
         if (acme.Settings is null)
         {
             acme.SetSettings(CompanySettings.CreateDefault(acmeId, now), now);
@@ -239,18 +196,12 @@ public static class CompaniesModule
 
         await db.SaveChangesAsync();
 
-        // Seeded dev companies: Acme stays Trial to support trial-state E2E tests; Beta Corp and
-        // Gamma Industries are activated to support subscription lifecycle/mutation tests. Real
-        // trials only start via the self-service SignUp flow (Identity's SignUp feature, via
-        // ICompanyProvisioner).
-        // Acme: Trial state (tests trial display, "Start subscription" button, trial days remaining)
         if (!await db.CustomerSubscriptions.AnyAsync(s => s.CompanyId == acmeId))
         {
             var acmeSubscription = CustomerSubscription.StartTrial(acmeId, now, trialLengthDays: 14);
             db.CustomerSubscriptions.Add(acmeSubscription);
         }
 
-        // Beta Corp: Active state (tests manage billing, cancel/resume workflows, active subscription)
         if (!await db.CustomerSubscriptions.AnyAsync(s => s.CompanyId == betaCorpId))
         {
             var betaSubscription = CustomerSubscription.StartTrial(betaCorpId, now, trialLengthDays: 14);
@@ -263,8 +214,6 @@ public static class CompaniesModule
             db.CustomerSubscriptions.Add(betaSubscription);
         }
 
-        // Gamma Industries: Active state, dedicated to a single mutation test (see the comment on
-        // the company seed above) — never contended by anything else.
         if (!await db.CustomerSubscriptions.AnyAsync(s => s.CompanyId == gammaId))
         {
             var gammaSubscription = CustomerSubscription.StartTrial(gammaId, now, trialLengthDays: 14);
@@ -282,7 +231,6 @@ public static class CompaniesModule
         if (!await db.PublicHolidays.AnyAsync())
         {
             db.PublicHolidays.AddRange(
-                // 2025 — England & Wales
                 PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000101"), acmeId, new DateOnly(2025,  1,  1), "New Year's Day",          "GB", now),
                 PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000102"), acmeId, new DateOnly(2025,  4, 18), "Good Friday",             "GB", now),
                 PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000103"), acmeId, new DateOnly(2025,  4, 21), "Easter Monday",           "GB", now),
@@ -292,7 +240,6 @@ public static class CompaniesModule
                 PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000107"), acmeId, new DateOnly(2025, 12, 25), "Christmas Day",           "GB", now),
                 PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000108"), acmeId, new DateOnly(2025, 12, 26), "Boxing Day",              "GB", now),
 
-                // 2026 — England & Wales
                 PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000201"), acmeId, new DateOnly(2026,  1,  1), "New Year's Day",          "GB", now),
                 PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000202"), acmeId, new DateOnly(2026,  4,  3), "Good Friday",             "GB", now),
                 PublicHoliday.Create(Guid.Parse("B0000000-0000-0000-0000-000000000203"), acmeId, new DateOnly(2026,  4,  6), "Easter Monday",           "GB", now),
@@ -365,23 +312,11 @@ public static class CompaniesModule
         services.AddScoped<IValidator<GetCompanyAuditLogRequest>, GetCompanyAuditLogValidator>();
         services.AddScoped<IValidator<UploadCompanyLogoRequest>, UploadCompanyLogoValidator>();
 
-        // Getting Started checklist task definitions (HR.Modules.CompanyOnboarding epic, Phase A) —
-        // multi-registered against the shared IOnboardingTaskDefinition contract so
-        // CompanyOnboarding's OnboardingTaskRegistry can aggregate them without referencing
-        // HR.Modules.Companies directly.
         services.AddScoped<IOnboardingTaskDefinition, CompleteCompanyDetailsTask>();
         services.AddScoped<IOnboardingTaskDefinition, ConfigureHrSettingsTask>();
 
-        // Phase B (trial/subscription tracking) — optional checklist item, excluded from the
-        // mandatory completion percentage.
         services.AddScoped<IOnboardingTaskDefinition, StartSubscriptionTask>();
 
-        // Phase C — Stripe checkout + webhook.
-        // Real Stripe gateway swapped for a no-op fake under E2E_TESTING — same rationale/pattern
-        // as HR.Modules.Identity.IdentityModule's ISupabaseAuthGateway swap (see
-        // E2eStripeGateway's own remarks for why this was needed: E2E-reachable code paths that
-        // call Stripe were otherwise always hitting the real API, even against seeded companies'
-        // fake "dev-stub-customer" Stripe customer ids).
         var isE2ETestingForStripe = string.Equals(
             Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
         if (isE2ETestingForStripe)
@@ -395,38 +330,28 @@ public static class CompaniesModule
         services.AddScoped<CreateCheckoutSessionHandler>();
         services.AddScoped<StripeWebhookHandler>();
 
-        // Phase D — subscription management (details, cancel/resume, billing portal).
         services.AddScoped<GetSubscriptionDetailsHandler>();
         services.AddScoped<CancelSubscriptionHandler>();
         services.AddScoped<ResumeSubscriptionHandler>();
         services.AddScoped<CreateBillingPortalSessionHandler>();
 
-        // Admin Portal customer list.
         services.AddScoped<ListCustomersHandler>();
         services.AddScoped<IValidator<ListCustomersRequest>, ListCustomersValidator>();
 
-        // Admin Portal customer details.
         services.AddScoped<GetCustomerDetailsHandler>();
 
-        // Admin Portal customer billing breakdown (persists a history snapshot on each view).
         services.AddScoped<GetCustomerBillingBreakdownHandler>();
         services.AddScoped<IValidator<GetCustomerBillingBreakdownRequest>, GetCustomerBillingBreakdownValidator>();
 
-        // Admin Portal customer billing history (live Stripe invoice lookup, no local invoice data).
         services.AddScoped<GetCustomerBillingHistoryHandler>();
         services.AddScoped<IValidator<GetCustomerBillingHistoryRequest>, GetCustomerBillingHistoryValidator>();
 
-        // Admin Portal Failed Payments Dashboard (Billing epic) — platform-wide, not scoped to a
-        // single customer.
         services.AddScoped<GetFailedPaymentsHandler>();
         services.AddScoped<IValidator<GetFailedPaymentsRequest>, GetFailedPaymentsValidator>();
 
-        // Admin Portal customer support view (Support epic) — condensed troubleshooting summary.
         services.AddScoped<GetCustomerSupportViewHandler>();
         services.AddScoped<IValidator<GetCustomerSupportViewRequest>, GetCustomerSupportViewValidator>();
 
-        // Admin Portal subscription management (Subscription Management epic) — support
-        // intervention actions for a platform administrator, each audited via IAuditEventPublisher.
         services.AddScoped<ExtendCustomerTrialHandler>();
         services.AddScoped<IValidator<ExtendCustomerTrialRequest>, ExtendCustomerTrialValidator>();
         services.AddScoped<AdminCancelSubscriptionHandler>();
@@ -442,11 +367,6 @@ public static class CompaniesModule
         services.AddScoped<SetCustomerOriginalStatusHandler>();
         services.AddScoped<IValidator<SetCustomerOriginalStatusRequest>, SetCustomerOriginalStatusValidator>();
 
-        // Admin Portal Permanent Deletion Queue (Customer Lifecycle epic) — schedule/cancel/execute
-        // support interventions, each audited via IAuditEventPublisher, plus the platform-wide
-        // /deletion-queue list. "Execute" is a status-only, reversible-in-principle transition — see
-        // ExecuteCustomerDeletionHandler's remarks for the explicit scope line (no real data
-        // destruction here).
         services.AddScoped<ScheduleCustomerDeletionHandler>();
         services.AddScoped<IValidator<ScheduleCustomerDeletionRequest>, ScheduleCustomerDeletionValidator>();
         services.AddScoped<CancelCustomerDeletionHandler>();
@@ -455,17 +375,12 @@ public static class CompaniesModule
         services.AddScoped<IValidator<ExecuteCustomerDeletionRequest>, ExecuteCustomerDeletionValidator>();
         services.AddScoped<GetDeletionQueueHandler>();
 
-        // NFR-07 legal hold — a platform administrator can suspend all retention deletion for a
-        // company (litigation hold / investigation / dispute) and lift it later. Enforced by
-        // ILegalHoldStatusReader in the retention/purge handlers and jobs across other modules.
         services.AddScoped<PlaceCompanyLegalHoldHandler>();
         services.AddScoped<IValidator<PlaceCompanyLegalHoldRequest>, PlaceCompanyLegalHoldValidator>();
         services.AddScoped<LiftCompanyLegalHoldHandler>();
         services.AddScoped<IValidator<LiftCompanyLegalHoldRequest>, LiftCompanyLegalHoldValidator>();
         services.AddScoped<ILegalHoldStatusReader, LegalHoldStatusReader>();
 
-        // Admin Portal "Login As Customer" support sessions (Support epic) — company-scoped,
-        // time-boxed, single-use, revocable, audited access grants for platform administrators.
         services.AddScoped<GenerateSupportSessionHandler>();
         services.AddScoped<IValidator<GenerateSupportSessionRequest>, GenerateSupportSessionValidator>();
         services.AddScoped<RevokeSupportSessionHandler>();
@@ -473,25 +388,14 @@ public static class CompaniesModule
         services.AddScoped<RedeemSupportSessionHandler>();
         services.AddScoped<IValidator<RedeemSupportSessionRequest>, RedeemSupportSessionValidator>();
 
-        // Admin Portal Job Monitoring (Background Jobs epic) — platform-wide, not scoped to a
-        // single customer. Retry is audited via IAuditEventPublisher like the other admin actions.
         services.AddScoped<ListBackgroundJobsHandler>();
         services.AddScoped<RetryBackgroundJobHandler>();
         services.AddScoped<IValidator<RetryBackgroundJobRequest>, RetryBackgroundJobValidator>();
 
-        // Admin Portal System Health Dashboard (Platform Monitoring epic) — platform-wide, not
-        // scoped to a single customer. Aggregates the named health checks registered above and by
-        // the other modules/Infrastructure via the framework's HealthCheckService rather than
-        // re-implementing each check here.
         services.AddScoped<GetSystemHealthHandler>();
 
-        // Admin Portal Application Metrics dashboard (Platform Monitoring epic) — platform-wide,
-        // not scoped to a single customer.
         services.AddScoped<GetApplicationMetricsHandler>();
 
-        // Admin Portal Platform Audit Log (Audit epic) — platform-wide, not scoped to a single
-        // customer. Queries the existing cross-cutting IAuditHistoryReader/AuditDbContext rather
-        // than a new audit table.
         services.AddScoped<GetAuditLogHandler>();
         services.AddScoped<IValidator<GetAuditLogRequest>, GetAuditLogValidator>();
 
@@ -500,18 +404,11 @@ public static class CompaniesModule
         services.AddScoped<GetCustomerDatabaseAssignmentHandler>();
         services.AddScoped<CustomerDatabaseConnection>();
 
-        // Admin Portal Platform Settings (Platform Monitoring/Admin epic) — platform-wide singleton
-        // row (trial length, default pricing display, support contact, maintenance mode, feature
-        // flags), lazy-seeded on first read/write, each write audited via IAuditEventPublisher.
         services.AddScoped<GetPlatformSettingsHandler>();
         services.AddScoped<IValidator<GetPlatformSettingsRequest>, GetPlatformSettingsValidator>();
         services.AddScoped<UpdatePlatformSettingsHandler>();
         services.AddScoped<IValidator<UpdatePlatformSettingsRequest>, UpdatePlatformSettingsValidator>();
 
-        // Story 4 — configurable progressive subscription pricing. The single authoritative model
-        // (bands + minimum monthly charge) lives on the PlatformSettings singleton and is consumed
-        // by marketing, customer billing and the Admin app. GET/PUT are platform-admin only; the
-        // public feed is anonymous (marketing site).
         services.AddScoped<GetSubscriptionPricingConfigHandler>();
         services.AddScoped<IValidator<GetSubscriptionPricingConfigRequest>, GetSubscriptionPricingConfigValidator>();
         services.AddScoped<UpdateSubscriptionPricingConfigHandler>();

@@ -10,11 +10,6 @@ using Xunit;
 
 namespace HR.Infrastructure.Tests.Storage;
 
-/// <summary>
-/// Security review finding 6: <see cref="SupabaseSupportAttachmentStorageHealthCheck"/> must report
-/// Unhealthy when the configured bucket is missing from the "list buckets" response, not just when
-/// the HTTP call itself fails.
-/// </summary>
 public class SupabaseSupportAttachmentStorageHealthCheckTests
 {
     private static SupabaseSupportAttachmentStorageOptions Options() => new()

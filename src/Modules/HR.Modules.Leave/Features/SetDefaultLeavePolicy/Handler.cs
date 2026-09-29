@@ -53,11 +53,6 @@ internal sealed class SetDefaultLeavePolicyHandler(LeaveDbContext dbContext, ICl
                 p => p.CompanyId == request.CompanyId && p.IsDefault,
                 cancellationToken);
 
-        // Two separate SaveChanges calls, not one batch: the partial unique index on
-        // (company_id) WHERE is_default only defers/checks per-statement, not per-transaction, so
-        // if both the unmark and the mark went through in the same batch there'd be a moment where
-        // EF could send "mark new default" before "unmark old default" has committed, transiently
-        // violating uniqueness even though the end state is valid.
         if (currentDefault is not null)
         {
             currentDefault.UnmarkAsDefault(now);
@@ -68,9 +63,6 @@ internal sealed class SetDefaultLeavePolicyHandler(LeaveDbContext dbContext, ICl
 
         if (request.IdempotencyKey is { } key)
         {
-            // Third SaveChanges call: the two-phase unmark/mark save above must already have
-            // committed for the uniqueness-index reason documented above, so the idempotency
-            // record is claimed in its own final save rather than batched with either of them.
             var outcome = await dbContext.SaveIdempotentAsync<IdempotencyRecord, object?>(dbContext.IdempotencyRecords, 
                 scope, key, fingerprint!, StatusCodes.Status204NoContent, null, now, cancellationToken);
 

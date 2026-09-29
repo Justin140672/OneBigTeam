@@ -44,8 +44,6 @@ public class CreateAssetIdempotencyIntegrationTests
         Assert.Equal(HttpStatusCode.Created, first.StatusCode);
         var firstBody = await first.Content.ReadFromJsonAsync<AssetPayload>();
 
-        // Simulate losing that response and resending through a BRAND NEW HttpRequestMessage with
-        // the same key.
         var second = await SendCreateAsync(client, companyId, payload, idempotencyKey);
         Assert.Equal(HttpStatusCode.Created, second.StatusCode);
         var secondBody = await second.Content.ReadFromJsonAsync<AssetPayload>();
@@ -57,7 +55,7 @@ public class CreateAssetIdempotencyIntegrationTests
         var db = scope.ServiceProvider.GetRequiredService<AssetsDbContext>();
 
         var assets = await db.Assets.Where(a => a.CompanyId == companyId).ToListAsync();
-        Assert.Single(assets); // one asset, one number consumed - not two
+        Assert.Single(assets);
 
         var idempotencyRows = await db.IdempotencyRecords
             .Where(r => r.Key == idempotencyKey.ToString() && r.CompanyId == companyId)
@@ -82,7 +80,7 @@ public class CreateAssetIdempotencyIntegrationTests
         {
             companyId,
             categoryId,
-            name = "A Different Laptop", // material change under the same key
+            name = "A Different Laptop",
         };
         var second = await SendCreateAsync(client, companyId, changedPayload, idempotencyKey);
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
@@ -128,9 +126,6 @@ public class CreateAssetIdempotencyIntegrationTests
         var response = await SendCreateAsync(client, companyId, payload, idempotencyKey);
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        // The handler's own inline dispatch (immediately after commit, via the real publisher)
-        // already delivered this successfully - rewind it to "never delivered" so the failure
-        // scenario below exercises genuine recovery rather than a no-op on an already-empty batch.
         using (var rewindScope = _factory.Services.CreateScope())
         {
             var db = rewindScope.ServiceProvider.GetRequiredService<AssetsDbContext>();
@@ -192,7 +187,6 @@ public class CreateAssetIdempotencyIntegrationTests
         }
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────────────
 
     private static Task<HttpResponseMessage> SendCreateAsync(
         HttpClient client, Guid companyId, object payload, Guid idempotencyKey)
@@ -208,7 +202,6 @@ public class CreateAssetIdempotencyIntegrationTests
     private static object CreateAssetPayload(Guid companyId, Guid categoryId) => new
     {
         companyId,
-        // No assetNumber - the company is in Automatic mode, so the handler generates one.
         categoryId,
         name = "Idempotency Test Laptop",
     };

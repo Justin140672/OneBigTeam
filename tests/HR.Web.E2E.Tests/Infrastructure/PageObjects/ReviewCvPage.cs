@@ -32,11 +32,6 @@ public sealed class ReviewCvPage(IPage page, string baseUrl)
         await WaitForLoadedAsync();
     }
 
-    /// <summary>
-    /// Waits until the page shell and its interactive controls have rendered — the container div,
-    /// the notes textarea and the Save Notes button. With prerender disabled the page is blank
-    /// until the interactive circuit connects, so gate on the shell first.
-    /// </summary>
     public async Task WaitForLoadedAsync()
     {
         await page.WaitForSelectorAsync(".app-shell", new() { Timeout = 30_000 });
@@ -46,10 +41,8 @@ public sealed class ReviewCvPage(IPage page, string baseUrl)
             .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
     }
 
-    /// <summary>The application id parsed out of the current /review-cv URL (last GUID before the query string).</summary>
     public Guid GetApplicationIdFromUrl() => UrlIdParser.LastGuid(page.Url);
 
-    // ── Read-only candidate / vacancy / stage summary ───────────────────────────
 
     public async Task<string?> GetCandidateNameAsync() =>
         (await Root.Locator("[data-testid='review-cv-candidate-name']").TextContentAsync())?.Trim();
@@ -83,18 +76,10 @@ public sealed class ReviewCvPage(IPage page, string baseUrl)
     public async Task<string?> GetCurrentStageAsync() =>
         (await Root.Locator("[data-testid='review-cv-current-stage']").TextContentAsync())?.Trim();
 
-    // ── CV review notes ─────────────────────────────────────────────────────────
-    // The notes field is an HrTextBox (SfTextBox Multiline) — a bare <textarea class="e-input">.
     private ILocator NotesTextArea => page.Locator("[data-testid='review-cv-notes'] textarea");
 
     public Task<string> GetNotesAsync() => NotesTextArea.InputValueAsync();
 
-    /// <summary>
-    /// Click-focus / select-all / delete / type-for-real / Tab-to-commit — the technique the rest
-    /// of this suite uses for HrTextBox fields (see CandidateEditPage.SetPhoneAsync) so the typed
-    /// value actually round-trips to the Blazor-bound model (SfTextBox commits on blur, not on the
-    /// "input" event Playwright's FillAsync dispatches).
-    /// </summary>
     public async Task SetNotesAsync(string value)
     {
         await NotesTextArea.ClickAsync();
@@ -145,7 +130,6 @@ public sealed class ReviewCvPage(IPage page, string baseUrl)
 
     public async Task<string?> GetCvPanelTitleAsync() => (await CvPanelTitle.TextContentAsync())?.Trim();
 
-    /// <summary>Auto-retrying assertion on the CV panel title.</summary>
     public Task ExpectCvPanelTitleAsync(string expected) =>
         Assertions.Expect(CvPanelTitle).ToHaveTextAsync(expected, new() { Timeout = 15_000 });
 
@@ -163,41 +147,19 @@ public sealed class ReviewCvPage(IPage page, string baseUrl)
 
     public Task<bool> IsNoCvMessageVisibleAsync() => NoCvMessage.IsVisibleAsync();
 
-    /// <summary>True when the "Legacy CV link" (the candidate's ResumeUrl) is rendered.</summary>
     public Task<bool> IsLegacyLinkVisibleAsync() => LegacyLink.IsVisibleAsync();
 
-    /// <summary>True when the application-scoped CV actions section is rendered (application not withdrawn).</summary>
     public Task<bool> IsApplicationCvActionsVisibleAsync() => ApplicationActions.IsVisibleAsync();
 
-    /// <summary>
-    /// Heading of the application CV actions section — <see cref="ReplaceHeading"/> when the
-    /// application has a submitted CV, <see cref="UploadHeading"/> when it has none.
-    /// </summary>
     public async Task<string?> GetReplaceHeadingAsync() => (await ActionsHeading.TextContentAsync())?.Trim();
 
-    /// <summary>Auto-retrying assertion on the application CV actions heading.</summary>
     public Task ExpectReplaceHeadingAsync(string expected) =>
         Assertions.Expect(ActionsHeading).ToHaveTextAsync(expected, new() { Timeout = 15_000 });
 
-    /// <summary>Text of the section's submit button — "Replace CV" or "Upload CV".</summary>
     public async Task<string?> GetReplaceSubmitTextAsync() => (await ReplaceSubmitButton.TextContentAsync())?.Trim();
 
-    /// <summary>
-    /// True when "Use candidate's current CV for this application" is offered — only when the
-    /// candidate has a current CV that differs from this application's CV.
-    /// </summary>
     public Task<bool> IsUseCurrentCvVisibleAsync() => UseCurrentCvButton.IsVisibleAsync();
 
-    /// <summary>
-    /// Selects an in-memory PDF named <paramref name="fileName"/> in the application CV section and
-    /// clicks its submit button ("Replace CV" / "Upload CV"). The button is disabled until InputFile's
-    /// OnChange has round-tripped to the circuit (_selectedFile set), so wait for it to become enabled
-    /// rather than sleeping. ReplaceApplicationCvAsync in ReviewCv.razor uploads the candidate
-    /// document, records it as THIS application's CV, sets _success and reloads the page data inside
-    /// one event handler; Blazor only re-renders again when that handler completes, so seeing
-    /// <paramref name="expectedSuccessText"/> (<see cref="CvReplacedSuccess"/> or
-    /// <see cref="CvUploadedSuccess"/>) means the CV panel reflects the post-replace state.
-    /// </summary>
     public async Task ReplaceCvAsync(string fileName, byte[] content, string expectedSuccessText)
     {
         await ReplaceFileInput.SetInputFilesAsync(new FilePayload
@@ -214,10 +176,6 @@ public sealed class ReviewCvPage(IPage page, string baseUrl)
             .ToHaveTextAsync(expectedSuccessText, new() { Timeout = 30_000 });
     }
 
-    /// <summary>
-    /// Clicks "Use candidate's current CV for this application" and waits for its success alert,
-    /// which (as with <see cref="ReplaceCvAsync"/>) renders only once the post-save reload finished.
-    /// </summary>
     public async Task UseCurrentCvAsync()
     {
         await Assertions.Expect(UseCurrentCvButton).ToBeEnabledAsync(new() { Timeout = 15_000 });
@@ -227,20 +185,13 @@ public sealed class ReviewCvPage(IPage page, string baseUrl)
             .ToHaveTextAsync(UseCurrentCvSuccess, new() { Timeout = 30_000 });
     }
 
-    /// <summary>Follows "Manage candidate CVs" to the candidate details page (carries a returnUrl back here).</summary>
     public async Task ClickManageCandidateCvsAsync()
     {
         await ManageCandidateCvsLink.ClickAsync();
         await page.WaitForURLAsync(u => u.Contains("/candidates/") && !u.Contains("/review-cv"), new() { Timeout = 30_000 });
     }
 
-    // ── Actions ─────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Clicks Save Notes and waits for the "CV review notes saved." success alert. SaveNotesAsync
-    /// in ReviewCv.razor sets _success and then re-fetches the application within the same handler,
-    /// so the alert only appears once the save (and re-load) has landed.
-    /// </summary>
     public async Task SaveNotesAsync()
     {
         await page.Locator("[data-testid='review-cv-save-notes']").ClickAsync();
@@ -257,11 +208,6 @@ public sealed class ReviewCvPage(IPage page, string baseUrl)
         return await error.IsVisibleAsync() ? (await error.TextContentAsync())?.Trim() : null;
     }
 
-    /// <summary>
-    /// Clicks Move Forward and waits for the client-side NavigateTo back to the origin (BackTarget)
-    /// to leave the /review-cv route. On success ReviewCv.razor advances the application to the next
-    /// active non-terminal stage and navigates away; on failure it shows a .alert-danger and stays.
-    /// </summary>
     public async Task MoveForwardAsync()
     {
         await page.Locator("[data-testid='review-cv-move-forward']").ClickAsync();

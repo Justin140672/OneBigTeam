@@ -19,7 +19,6 @@ public class EmergencyContactsEndpointTests
     {
         _factory = factory;
 
-        // Seed HrAdministrator role so tests can call employee:manage endpoints.
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, EcUser1, SystemRoles.HrAdministrator);
@@ -37,7 +36,6 @@ public class EmergencyContactsEndpointTests
     {
         var companyId = Guid.NewGuid();
 
-        // Use the admin user to create the employee record
         using var adminClient = _factory.CreateClient();
         adminClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, adminUserId.ToString());
         adminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
@@ -68,8 +66,6 @@ public class EmergencyContactsEndpointTests
 
         await TestRoleSeeder.AssignRoleAsync(_factory, created!.Id, SystemRoles.Employee);
 
-        // Return a client that acts as the created employee (sub = employee ID)
-        // so /me/ endpoints can find the record.
         var employeeClient = _factory.CreateClient();
         employeeClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, created!.Id.ToString());
         employeeClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
@@ -119,7 +115,6 @@ public class EmergencyContactsEndpointTests
         return (departmentId, locationId, positionProfileId, employmentTypeId);
     }
 
-    // ── Authorization ──────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_My_Emergency_Contacts_Returns_Unauthorized_For_Anonymous_Request()
@@ -148,7 +143,6 @@ public class EmergencyContactsEndpointTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ── Initial state ──────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_My_Emergency_Contacts_Returns_Empty_List_Initially()
@@ -165,7 +159,6 @@ public class EmergencyContactsEndpointTests
         Assert.Empty(payload!.Contacts);
     }
 
-    // ── Add ────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Post_My_Emergency_Contact_Creates_And_Returns_Contact()
@@ -241,14 +234,12 @@ public class EmergencyContactsEndpointTests
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
-    // ── Full round-trip ────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Full_Roundtrip_Add_Update_Delete_And_Get_Employee_Contacts()
     {
         var (client, companyId, employeeId) = await CreateEmployeeAsync(EcUser4);
 
-        // Add contact
         var addResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/me/emergency-contacts",
             new { name = "Bob Smith", relationship = "Parent", phoneNumber = "01234 567890" });
@@ -257,7 +248,6 @@ public class EmergencyContactsEndpointTests
         var added = await addResponse.Content.ReadFromJsonAsync<ContactPayload>();
         Assert.NotNull(added);
 
-        // GET /me should list it
         var listResponse = await client.GetAsync(
             $"/api/companies/{companyId}/employees/me/emergency-contacts");
         Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
@@ -266,13 +256,11 @@ public class EmergencyContactsEndpointTests
         Assert.Single(list!.Contacts);
         Assert.Equal("Bob Smith", list.Contacts[0].Name);
 
-        // Update it
         var updateResponse = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/me/emergency-contacts/{added!.Id}",
             new { name = "Robert Smith", relationship = "Father", phoneNumber = "01234 999999", email = "robert@example.com" });
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
 
-        // GET /me should reflect update
         var listAfterUpdate = await client.GetAsync(
             $"/api/companies/{companyId}/employees/me/emergency-contacts");
         var updatedList = await listAfterUpdate.Content.ReadFromJsonAsync<ContactsPayload>();
@@ -281,8 +269,6 @@ public class EmergencyContactsEndpointTests
         Assert.Equal("Father", updatedList.Contacts[0].Relationship);
         Assert.Equal("robert@example.com", updatedList.Contacts[0].Email);
 
-        // HR admin GET should also see it — the non-"/me" route is gated by employee:read, which a
-        // plain employee (which `client` acts as) does not hold, so use an HR-admin client.
         using var adminClient = _factory.CreateClient();
         adminClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, EcUser4.ToString());
         adminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
@@ -295,32 +281,27 @@ public class EmergencyContactsEndpointTests
         var adminList = await adminResponse.Content.ReadFromJsonAsync<ContactsPayload>();
         Assert.Single(adminList!.Contacts);
 
-        // Delete it
         var deleteResponse = await client.DeleteAsync(
             $"/api/companies/{companyId}/employees/me/emergency-contacts/{added.Id}");
         Assert.Equal(HttpStatusCode.NoContent, deleteResponse.StatusCode);
 
-        // GET /me should be empty again
         var listAfterDelete = await client.GetAsync(
             $"/api/companies/{companyId}/employees/me/emergency-contacts");
         var emptyList = await listAfterDelete.Content.ReadFromJsonAsync<ContactsPayload>();
         Assert.Empty(emptyList!.Contacts);
     }
 
-    // ── Isolation ──────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Delete_Returns_404_For_Contact_Belonging_To_Different_Employee()
     {
         var (client1, companyId1, _) = await CreateEmployeeAsync(EcUser1);
 
-        // User1 adds a contact
         var addResponse = await client1.PostAsJsonAsync(
             $"/api/companies/{companyId1}/employees/me/emergency-contacts",
             new { name = "Test Contact", relationship = "Friend", phoneNumber = "07700 000000" });
         var added = await addResponse.Content.ReadFromJsonAsync<ContactPayload>();
 
-        // Different company/user — should 404
         var client2 = _factory.CreateClient();
         client2.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, EcUser2.ToString());
         client2.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId1.ToString());

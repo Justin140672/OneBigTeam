@@ -9,8 +9,6 @@ internal sealed class Endpoint(GetStaleVacanciesHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/vacancies/stale");
-        // Matches CreateVacancy/ScheduleInterview's policy — actionable recruitment-pipeline
-        // insight for Recruiter + HrAdministrator only.
         Policies("recruitment:manage");
     }
 

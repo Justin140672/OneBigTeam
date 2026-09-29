@@ -2,11 +2,6 @@ using HR.Modules.Sickness.Tests.Infrastructure;
 
 namespace HR.Modules.Sickness.Tests;
 
-/// <summary>
-/// DSH-02: the test double's hierarchy mode must be a real BFS closure with a visited-set so that
-/// cyclic / self-referential reporting-line inputs terminate, and re-parenting is reflected on the
-/// next read. See specifications/architecture/11-manager-hierarchy-scope.md.
-/// </summary>
 public class FakeDirectReportsReaderTests
 {
     private static readonly Guid Company = Guid.NewGuid();

@@ -2,11 +2,6 @@ using HR.Modules.DataImport.Domain;
 
 namespace HR.Modules.DataImport.Tests;
 
-/// <summary>
-/// OBT-REM-08: unit coverage for the durable per-row confirmation-progress domain methods on
-/// ImportStagingEmployee. A row is only IsFullyConfirmed once MarkFullyConfirmed has been called;
-/// none of the individual Mark* steps imply completion of any other step.
-/// </summary>
 public class ImportStagingEmployeeTests
 {
     private static readonly DateTimeOffset FixedNow = new(2026, 6, 30, 10, 0, 0, TimeSpan.Zero);
@@ -118,8 +113,6 @@ public class ImportStagingEmployeeTests
         Assert.False(row.IsFullyConfirmed);
 
         row.MarkManagerAssignmentProcessed(FixedNow);
-        // Every individual step has now run, but the row is only fully confirmed once
-        // MarkFullyConfirmed itself is explicitly called - it is not inferred from the other steps.
         Assert.False(row.IsFullyConfirmed);
 
         row.MarkFullyConfirmed(FixedNow);
@@ -130,9 +123,6 @@ public class ImportStagingEmployeeTests
     [Fact]
     public void MarkFullyConfirmed_Can_Be_Called_Even_When_Some_Steps_Are_Still_Null()
     {
-        // The domain method itself does not enforce the invariant (ConfirmImportSessionHandler
-        // does, by only calling it once every mandatory field is non-null) - this documents that
-        // the guard lives at the handler/orchestration layer, not in the entity.
         var row = CreateRow();
 
         row.MarkFullyConfirmed(FixedNow);

@@ -59,8 +59,6 @@ internal sealed class EmployeesDbContext : DbContext
             stored => Decrypt(protector, stored));
 
         var entity = modelBuilder.Entity<EmployeeEqualityData>();
-        // The converter only ever runs for non-null values (EF skips nulls), so the
-        // non-nullable <string,string> converter is safe on these nullable properties.
 #pragma warning disable CS8620
         entity.Property(x => x.GenderIdentity).HasConversion(converter);
         entity.Property(x => x.GenderIdentitySelfDescribed).HasConversion(converter);
@@ -77,7 +75,6 @@ internal sealed class EmployeesDbContext : DbContext
 #pragma warning restore CS8620
     }
 
-    // Tolerates not-yet-encrypted plaintext during the field roll-out.
     private static string Decrypt(ISensitiveDataProtector protector, string stored)
         => protector.TryUnprotect(stored, out var plaintext) ? plaintext! : stored;
 

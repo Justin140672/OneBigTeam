@@ -109,8 +109,6 @@ public class PurgeCandidateDocumentStorageJobTests
     {
         await using var db = BuildContext();
         var operation = SeedOperation(db);
-        // Drive AttemptCount up to MaxAttempts - 1 so the next Claim (inside ProcessAsync)
-        // reaches MaxAttempts, making this the final attempt.
         for (var i = 0; i < PurgeCandidateDocumentStorageJob.MaxAttempts - 1; i++)
             operation.Claim(Guid.NewGuid(), Now);
         await db.SaveChangesAsync();
@@ -149,9 +147,9 @@ public class PurgeCandidateDocumentStorageJobTests
 
         var saved = await db.CandidateDocumentDeletionOperations.SingleAsync(o => o.Id == operation.Id);
         Assert.Equal(CandidateDocumentDeletionOperation.StatusHeld, saved.Status);
-        Assert.Equal(0, saved.AttemptCount); // A hold must never consume a retry attempt.
+        Assert.Equal(0, saved.AttemptCount);
         Assert.Null(saved.FailureReason);
-        Assert.Equal(operation.StorageKey, saved.StorageKey); // Storage key retained for later resume.
+        Assert.Equal(operation.StorageKey, saved.StorageKey);
 
         Assert.Single(auditPublisher.Published.OfType<CandidateDocumentDeletionSuspendedForLegalHoldAuditEvent>());
     }
@@ -159,9 +157,6 @@ public class PurgeCandidateDocumentStorageJobTests
     [Fact]
     public async Task ProcessAsync_Suspends_A_Hold_Placed_Between_Failed_Retries_Without_Duplicating_The_Suspend_Audit()
     {
-        // A hold placed AFTER an earlier failed attempt (not just before the very first one) — the
-        // operation is already sitting Pending (reset by the reconciliation sweep) with a non-zero
-        // AttemptCount from its prior failure when the hold takes effect.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var operation = SeedOperation(db, companyId: companyId);
@@ -184,7 +179,7 @@ public class PurgeCandidateDocumentStorageJobTests
 
         var saved = await db.CandidateDocumentDeletionOperations.SingleAsync(o => o.Id == operation.Id);
         Assert.Equal(CandidateDocumentDeletionOperation.StatusHeld, saved.Status);
-        Assert.Equal(1, attemptCountAfterFirstHeldCheck); // Only the earlier genuine failure counted.
+        Assert.Equal(1, attemptCountAfterFirstHeldCheck);
         Assert.Equal(1, saved.AttemptCount);
         Assert.Empty(storage.Deletions);
 
@@ -198,7 +193,7 @@ public class PurgeCandidateDocumentStorageJobTests
         var companyId = Guid.NewGuid();
         var operation = SeedOperation(db, companyId: companyId);
         var storage = new FakeCandidateDocumentStorageService();
-        var legalHold = new FakeLegalHoldStatusReader(); // No held companies.
+        var legalHold = new FakeLegalHoldStatusReader();
         var auditPublisher = new FakeAuditPublisher();
 
         await BuildJob(db, storage, legalHold, auditPublisher).ProcessAsync(operation.Id);

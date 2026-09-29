@@ -44,10 +44,6 @@ internal sealed class ReconcileHistoricalLeaveDeactivationsJob(
     IBackgroundJobClient backgroundJobClient,
     ILogger<ReconcileHistoricalLeaveDeactivationsJob> logger)
 {
-    // Bounds per-page and per-run cost — this sweep must never issue one unbounded query over the
-    // entire departure history. At BatchSize=200 and MaxBatchesPerRun=5, each run processes at most
-    // 1,000 historical departures; a large backlog is drained over several scheduled runs rather than
-    // in one long-running pass.
     private const int BatchSize = 200;
     private const int MaxBatchesPerRun = 5;
 
@@ -66,7 +62,7 @@ internal sealed class ReconcileHistoricalLeaveDeactivationsJob(
         }
 
         if (progress.IsComplete)
-            return; // One-time historical sweep already finished — permanent no-op from here on.
+            return;
 
         var currentEmployeeIdsByCompany = new Dictionary<Guid, HashSet<Guid>>();
         var totalRepairedThisRun = 0;
@@ -103,9 +99,6 @@ internal sealed class ReconcileHistoricalLeaveDeactivationsJob(
                         currentEmployeeIdsByCompany[departure.CompanyId] = currentIds;
                     }
 
-                    // Rehire safety: this employee is a current (non-former) employee again, so a
-                    // leave-policy assignment found active today may be a legitimate post-rehire
-                    // assignment — never deactivate it based on a stale historical departure record.
                     if (currentIds.Contains(departure.EmployeeId))
                         continue;
 
@@ -118,8 +111,6 @@ internal sealed class ReconcileHistoricalLeaveDeactivationsJob(
                         .FirstOrDefaultAsync(
                             a => a.CompanyId == departure.CompanyId && a.EmployeeId == departure.EmployeeId);
 
-                    // Mirrors EmployeeDepartureFinalisedHandler's/ReconcileMissingLeaveDeactivationsJob's
-                    // own guard: nothing to deactivate.
                     if (assignment is null || !assignment.IsActive)
                         continue;
 
@@ -136,10 +127,6 @@ internal sealed class ReconcileHistoricalLeaveDeactivationsJob(
                 }
                 catch (DbUpdateException ex)
                 {
-                    // Backstop for the race the pre-check above narrows but cannot fully close —
-                    // another run/the normal event-driven path/the daily reconciliation job won the
-                    // insert first. Logged (not silently skipped) per the requirement that outstanding
-                    // failures be recorded, even though this specific race is benign.
                     logger.LogWarning(
                         ex,
                         "ReconcileHistoricalLeaveDeactivationsJob: concurrent creation detected for employee {EmployeeId} (company {CompanyId}) — skipping.",
@@ -172,8 +159,6 @@ internal sealed class ReconcileHistoricalLeaveDeactivationsJob(
 
             if (page.Count < BatchSize)
             {
-                // Reached the end of the history on this page — mark complete now rather than waiting
-                // for an extra run that would just find an empty page.
                 progress.MarkComplete(now);
                 await dbContext.SaveChangesAsync();
                 break;

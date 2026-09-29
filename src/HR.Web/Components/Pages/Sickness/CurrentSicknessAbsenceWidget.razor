@@ -85,7 +85,6 @@
             return;
         }
 
-        // Use company-local date for business-calendar sickness absence reporting (days-off calculations).
         _today = CompanyTimeProvider.Today;
 
         var absencesTask   = SicknessService.GetCurrentSicknessAbsencesAsync(Session.CompanyId);

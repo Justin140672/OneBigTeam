@@ -4,12 +4,6 @@ using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Probation.Features.GetMyProbationStatus;
 
-// Self-scoped: resolves the employee via ICurrentUser.UserId (this app's resolved Employee/UserId,
-// NOT the raw Supabase "sub" claim — see GetMyEmployee/Endpoint.cs) — no role check is required
-// beyond being authenticated, since a caller can only ever see their own probation status through
-// this route. This exists because the HR-only GetProbationRecordByEmployee endpoint
-// ("probation:manage") 403s for a real employee viewing their own profile, which MyProfile.razor's
-// blanket catch{} was silently swallowing.
 internal sealed class Endpoint(GetMyProbationStatusHandler handler, ICurrentUser currentUser)
     : EndpointWithoutRequest<GetMyProbationStatusResponse>
 {

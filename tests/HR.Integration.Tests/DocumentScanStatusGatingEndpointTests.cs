@@ -9,20 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Covers ScanStatusAccessGuard end-to-end: every download/read endpoint that gates on a
-/// scannable file's ScanStatus currently maps a validation failure to 404 NotFound (see each
-/// endpoint's Configure()/HandleAsync — DownloadEmployeeDocument, DownloadSharedCompanyDocument,
-/// DownloadSharedCompanyDocumentVersion, GetEmployeeProfilePhoto all `TypedResults.NotFound` on
-/// any Result.Failure, not just "not found").
-///
-/// Unlike most other tests in this suite, Hangfire's in-process server IS actually running in
-/// this test host (AddHangfireServer), so ScanUploadedFileJob really does execute after a real
-/// upload — racing any state a test tries to force afterwards. To keep these tests deterministic,
-/// rows are seeded directly via DocumentsDbContext (never through the real upload endpoint, so no
-/// scan job is ever enqueued for them) rather than uploading and then trying to catch the row in
-/// a Pending state before the background job gets to it.
-/// </summary>
 [Collection("Integration")]
 public class DocumentScanStatusGatingEndpointTests
 {
@@ -93,9 +79,6 @@ public class DocumentScanStatusGatingEndpointTests
         Assert.NotNull(response.Headers.Location);
     }
 
-    // Anonymous (401) coverage for this endpoint already exists in
-    // DownloadEmployeeDocumentEndpointTests.Returns_Unauthorized_Without_Auth — not duplicated
-    // here.
 
     private async Task<(Guid DocumentId, Guid EmployeeDocumentId)> SeedEmployeeDocumentAsync(
         Guid employeeId, FileScanStatus scanStatus)
@@ -115,7 +98,7 @@ public class DocumentScanStatusGatingEndpointTests
         switch (scanStatus)
         {
             case FileScanStatus.Pending:
-                break; // Create() already defaults to Pending.
+                break;
             case FileScanStatus.Clean:
                 document.MarkScanClean(now);
                 break;

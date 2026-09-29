@@ -110,13 +110,6 @@
         var stagesResult = await RecruitmentStageService.ListStagesAsync(Session.CompanyId);
         var stages = stagesResult?.Items ?? [];
 
-        // "Hired" has a reliable data-driven signal — the stage(s) whose TerminalOutcome == Hired
-        // (there is normally exactly one, enforced by HireCandidateHandler's "no active 'Hired'
-        // terminal recruitment stage configured" check).
-        //
-        // DSH-04: "Offers awaiting response" now comes from the authoritative metric endpoint
-        // (applications across every stage carrying purpose = Offer), replacing the old
-        // last-non-terminal-stage-by-DisplayOrder inference.
         var hiredStageIds = stages.Where(s => s.TerminalOutcome == RecruitmentStageTerminalOutcome.Hired).Select(s => s.Id).ToList();
 
         var offersTask = SourceLoader.LoadAsync("Offers & Recent Hires", "Offers awaiting response",
@@ -128,9 +121,6 @@
         var hireResults = await Task.WhenAll(hireTasks);
 
         _offers = _offersRes.IsLoaded ? _offersRes.Value?.Items ?? [] : [];
-        // "Recent hires" stands in for "upcoming start dates" — Recruitment doesn't own an
-        // Employee start date once hired, so the most recent hire transitions are the closest
-        // proxy available without crossing into the Employees module's data.
         _recentHires = hireResults.Where(r => r is not null).SelectMany(r => r!.Items).ToList();
     }
 

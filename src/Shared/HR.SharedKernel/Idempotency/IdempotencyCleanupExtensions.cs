@@ -19,13 +19,6 @@ public static class IdempotencyCleanupExtensions
 {
     public const int DefaultBatchSize = 200;
 
-    /// <summary>
-    /// Deletes expired idempotency records in bounded batches until the backlog for this call is
-    /// drained (a batch smaller than <paramref name="batchSize"/> means nothing expired remains
-    /// right now - anything still arriving after that is picked up by the job's next scheduled run,
-    /// so a large backlog is worked off over multiple runs rather than blocking one run indefinitely).
-    /// Logs the removed count and elapsed time on completion or failure - never the stored responses.
-    /// </summary>
     public static async Task<int> CleanupExpiredIdempotencyRecordsWithLoggingAsync<TRecord>(
         this DbSet<TRecord> records,
         DateTimeOffset now,

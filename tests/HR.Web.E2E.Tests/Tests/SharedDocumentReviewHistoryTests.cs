@@ -87,9 +87,6 @@ public sealed class SharedDocumentReviewHistoryTests(HrAdminPersonaFixture fixtu
             Assert.Equal(ReviewerName, await detail.GetReviewHistoryRowCellAsync(0, 1));
             Assert.Equal(reviewNotes, await detail.GetReviewHistoryRowCellAsync(0, 2));
 
-            // Format ("d") is culture-dependent, so only assert the year we expect is present
-            // rather than an exact dd/MM vs MM/dd rendering — same reasoning as
-            // SharedDocumentVersionHistoryTests' Effective Date assertion.
             var reviewDateCell = await detail.GetReviewHistoryRowCellAsync(0, 0);
             Assert.Contains(DateTime.Today.Year.ToString(), reviewDateCell);
         }
@@ -125,8 +122,6 @@ public sealed class SharedDocumentReviewHistoryTests(HrAdminPersonaFixture fixtu
             await detail.CompleteReviewAsync(secondReviewNotes);
             Assert.Equal(2, await detail.WaitForReviewHistoryRowCountAsync(2));
 
-            // Sorted newest-first server-side (no client-side sort on top) — the second/most
-            // recent review's row is expected at index 0, the first review's row at index 1.
             Assert.Equal(secondReviewNotes, await detail.GetReviewHistoryRowCellAsync(0, 2));
             Assert.Equal(firstReviewNotes, await detail.GetReviewHistoryRowCellAsync(1, 2));
 
@@ -160,8 +155,6 @@ public sealed class SharedDocumentReviewHistoryTests(HrAdminPersonaFixture fixtu
             var headers = await detail.GetReviewHistoryColumnHeadersAsync();
             Assert.Equal(["Review Date", "Reviewer", "Notes", "Previous Review Date"], headers);
 
-            // Complete a review so there's an actual row to inspect for row-level action
-            // controls, not just an empty grid's header row.
             await detail.CompleteReviewAsync($"Reviewed {Guid.NewGuid():N}");
             Assert.Equal(1, await detail.WaitForReviewHistoryRowCountAsync(1));
 
@@ -173,11 +166,6 @@ public sealed class SharedDocumentReviewHistoryTests(HrAdminPersonaFixture fixtu
         }
     }
 
-    // Uploads a shared document from the Shared Documents list page (same flow as
-    // SharedDocumentUploadTests / SharedDocumentVersionHistoryTests / SharedDocumentCompleteReviewTests),
-    // with no Review Frequency configured — the "Review Document" button is available to an HR
-    // Administrator regardless of Review Frequency (per SharedDocumentCompleteReviewTests'
-    // "LoadDetailPage_ShowsReviewDocumentButtonForHrAdministrator"), so this file doesn't need it.
     private async Task UploadDocumentAsync(string title, string filePath)
     {
         await _page.GotoAsync(_fixture.WebBaseUrl + $"/companies/{AcmeId}/shared-documents");
@@ -190,7 +178,6 @@ public sealed class SharedDocumentReviewHistoryTests(HrAdminPersonaFixture fixtu
 
         await dialog.GetByPlaceholder("Document title").FillAsync(title);
 
-        // Select a category via the shared Syncfusion SfDropDownList helper.
         var categoryGroup = dialog.Locator(".col-md-6").Filter(new() { HasText = "Category" });
         await DropDownSelector.SelectAsync(_page, categoryGroup, "Policy");
 
@@ -203,8 +190,6 @@ public sealed class SharedDocumentReviewHistoryTests(HrAdminPersonaFixture fixtu
         await _page.WaitForSelectorAsync($"text={title}", new() { Timeout = 15_000 });
     }
 
-    // Reads the document id straight from the list row's link href, avoiding a separate
-    // click+navigate+wait round trip (same pattern as e.g. SharedDocumentVersionHistoryTests).
     private async Task<Guid> GetUploadedDocumentIdAsync(string title)
     {
         var href = await _page.Locator(".e-rowcell a").Filter(new() { HasText = title }).First.GetAttributeAsync("href");
@@ -212,7 +197,6 @@ public sealed class SharedDocumentReviewHistoryTests(HrAdminPersonaFixture fixtu
         return Guid.Parse(href.Split('/').Last());
     }
 
-    // %PDF- followed by padding, so magic-byte content validation passes.
     private static byte[] BuildTestPdf()
     {
         var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };

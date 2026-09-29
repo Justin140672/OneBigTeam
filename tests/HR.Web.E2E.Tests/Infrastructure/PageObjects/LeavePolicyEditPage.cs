@@ -2,10 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the leave policy create/edit page.
-/// Routes: /companies/{id}/leave-policies/new  and  /companies/{id}/leave-policies/{id}
-/// </summary>
 public sealed class LeavePolicyEditPage(IPage page, string baseUrl)
 {
     public async Task GoToNewAsync(Guid companyId)

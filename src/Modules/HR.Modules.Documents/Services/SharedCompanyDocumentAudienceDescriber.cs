@@ -3,11 +3,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Documents.Services;
 
-/// <summary>
-/// Builds the human-readable "who can see this" summary shown on the HR detail screen and
-/// returned by the audience-update endpoint — shared so both always describe a rule set the same
-/// way.
-/// </summary>
 internal sealed class SharedCompanyDocumentAudienceDescriber(
     IEmployeeAudienceReader audienceReader,
     IEmployeeNameReader employeeNameReader)

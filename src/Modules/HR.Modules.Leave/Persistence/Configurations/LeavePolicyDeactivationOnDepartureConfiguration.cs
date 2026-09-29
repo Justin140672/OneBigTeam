@@ -55,9 +55,6 @@ internal sealed class LeavePolicyDeactivationOnDepartureConfiguration : IEntityT
         builder.HasIndex(d => d.CompanyId);
         builder.HasIndex(d => new { d.Status, d.RequestedAt });
 
-        // At most one durable deactivation record per (company, employee) — repeated delivery of
-        // the same (or a reconciliation-republished) EmployeeDepartureFinalisedIntegrationEvent must
-        // never enqueue a second deactivation attempt for the same employee's assignment.
         builder.HasIndex(d => new { d.CompanyId, d.EmployeeId })
             .IsUnique()
             .HasDatabaseName("ix_leave_policy_deactivations_on_departure_company_employee");

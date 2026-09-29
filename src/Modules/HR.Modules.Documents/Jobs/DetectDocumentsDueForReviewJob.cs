@@ -47,10 +47,6 @@ internal sealed class DetectDocumentsDueForReviewJob(
 {
     public async Task ExecuteAsync()
     {
-        // ReviewDate due-ness depends on each company's own configured time zone, so the "due"
-        // filter cannot be applied globally in the initial query — candidates are fetched broadly
-        // (status + ReviewDate set) and then filtered per company below using that company's
-        // "today".
         var allDocumentsWithReviewDate = await db.SharedCompanyDocuments
             .AsNoTracking()
             .Where(d => d.Status != SharedCompanyDocumentStatus.Archived
@@ -79,8 +75,6 @@ internal sealed class DetectDocumentsDueForReviewJob(
             var documents = companyGroup.ToList();
             var documentIds = documents.Select(d => d.Id).ToList();
 
-            // Batched, company-scoped check for an already-open Review task per document —
-            // one call across all candidate document ids for this company, not N+1.
             var openReviewTaskIds = await openTaskReader.GetOpenTaskIdsAsync(
                 companyId, documentIds, CancellationToken.None, TaskActionType.Review);
 
@@ -96,10 +90,6 @@ internal sealed class DetectDocumentsDueForReviewJob(
                 var reviewOwnerName = reviewOwnerNames.GetValueOrDefault(reviewOwnerId, "Unknown Employee");
                 var description = $"{reviewOwnerName}, please review '{document.Title}'. Review was due {document.ReviewDate:d MMM yyyy}.";
 
-                // notifyAssignee: false — the generic "New task assigned" notification would carry
-                // the task's own id as SourceEntityId, not the document's. A dedicated notification is
-                // written below instead, with SourceEntityId set to the document's id, so clicking it
-                // links directly to the document rather than the task.
                 await taskCreator.CreateAsync(
                     companyId,
                     createdBy:          document.CreatedBy,

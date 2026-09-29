@@ -125,7 +125,6 @@
 
     private (string Css, string Label) GetTaskBadge(OnboardingTaskOverviewItem t)
     {
-        // Use company-local date for business-calendar onboarding task due-date comparisons.
         var today = CompanyTimeProvider.Today;
         if (t.Status == "Pending" && t.DueDate.HasValue && t.DueDate.Value < today)
             return ("text-bg-danger", "Overdue");

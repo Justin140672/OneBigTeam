@@ -4,14 +4,6 @@ using System.Reflection;
 
 namespace HR.Architecture.Tests;
 
-/// <summary>
-/// AUD-04: verifies that every IAuditEvent implementation satisfies the actor attribution rules:
-/// - Human-typed events (the default) must supply ActorUserId or ActorEmployeeId.
-/// - Background and integration-handler events must be explicitly typed as non-Human.
-///
-/// Events that cannot be instantiated with default parameters (e.g. structs, complex types)
-/// are skipped — a separate test should cover those.
-/// </summary>
 public class AuditActorAttributionTests
 {
     private static readonly Assembly[] ModuleAssemblies =
@@ -57,8 +49,6 @@ public class AuditActorAttributionTests
             if (instance is not IAuditEvent evt)
                 continue;
 
-            // Non-Human events must be explicitly typed — the default ActorType is Human,
-            // so if both actors are null and the type is still Human it's an error.
             if (evt.ActorType == AuditActorType.Human)
             {
                 if (!evt.ActorUserId.HasValue && !evt.ActorEmployeeId.HasValue)
@@ -150,7 +140,6 @@ public class AuditActorAttributionTests
     }
 }
 
-// ── Test fixtures ─────────────────────────────────────────────────────────────────────────────
 
 internal sealed class NullActorHumanEvent : IAuditEvent
 {
@@ -166,7 +155,6 @@ internal sealed class NullActorHumanEvent : IAuditEvent
     public object?        Before          => null;
     public object?        After           => null;
     public object?        Metadata        => null;
-    // ActorType defaults to Human
 }
 
 internal sealed class NoActorScheduledJobEvent : IAuditEvent

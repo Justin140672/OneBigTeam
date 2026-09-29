@@ -13,18 +13,11 @@ internal sealed class Endpoint(
     IAuthorizationService authorizationService)
     : Endpoint<RecordSicknessRequest, RecordSicknessResponse>
 {
-    // Mirrors HR.Modules.Identity.Domain.SystemPermissions.SicknessManage. Sickness cannot reference
-    // Identity's internal SystemPermissions/SystemRoles directly, so the permission id is duplicated
-    // here as the sanctioned escape hatch for checking a policy other than the endpoint's own
-    // (see GetTeamSicknessToday.Endpoint for the established pattern).
     private static readonly Guid SicknessManagePermissionId = new("00000000-0000-0000-0001-000000000015");
 
     public override void Configure()
     {
         Post("/api/companies/{companyId:guid}/employees/{employeeId:guid}/sickness-records");
-        // "sickness:view-team" (Manager + HrAdministrator). Managers are restricted below to
-        // recording sickness for their own direct reports only; HR administrators may record for
-        // any employee in the company.
         Policies("sickness:view-team");
     }
 
@@ -38,8 +31,6 @@ internal sealed class Endpoint(
         {
             var managerId = await managerReader.GetManagerIdAsync(request.CompanyId, request.EmployeeId, cancellationToken);
 
-            // NOT User.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's
-            // resolved Employee/UserId (see ICurrentUser.UserId usage above for the rationale).
             if (currentUser.UserId is not { } authenticatedEmployeeId
                 || managerId != authenticatedEmployeeId)
             {

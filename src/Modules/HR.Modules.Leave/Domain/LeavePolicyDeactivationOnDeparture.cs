@@ -77,8 +77,6 @@ internal sealed class LeavePolicyDeactivationOnDeparture
         FailureReason = null;
     }
 
-    /// <summary>Final, visible, detectable failure state — never a silently stuck "processing"
-    /// row. Left for a support/HR action or the reconciliation sweep to pick up.</summary>
     public void MarkFailed(string reason, DateTimeOffset now)
     {
         Status = StatusFailed;
@@ -86,7 +84,6 @@ internal sealed class LeavePolicyDeactivationOnDeparture
         FailureReason = reason;
     }
 
-    /// <summary>Resets a Failed record back to Pending so a retry sweep can re-enqueue it.</summary>
     public void ResetForRetry()
     {
         if (Status != StatusFailed)

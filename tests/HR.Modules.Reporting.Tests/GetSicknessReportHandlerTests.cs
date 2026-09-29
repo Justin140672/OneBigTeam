@@ -32,7 +32,6 @@ public class GetSicknessReportHandlerTests
     [Fact]
     public async Task HandleAsync_BradfordScore_Is_Spells_Squared_Times_DaysAbsent()
     {
-        // SICK-04: Bradford Factor = S^2 * D. One spell (S=1), 2 days absent (D=2) => 1*1*2 = 2.
         var reader = new FakeSicknessReportReader(
         [
             new SicknessReportRecordItem(Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 1, 1), null, 2m),
@@ -49,7 +48,6 @@ public class GetSicknessReportHandlerTests
     [Fact]
     public async Task HandleAsync_BradfordScore_Scales_With_Spell_Count_Squared()
     {
-        // Two spells (S=2), 4 total days absent (D=4) => 2^2 * 4 = 16.
         var employeeId = Guid.NewGuid();
         var reader = new FakeSicknessReportReader(
         [
@@ -126,7 +124,6 @@ public class GetSicknessReportHandlerTests
     [Fact]
     public async Task HandleAsync_Above_DisplayRowLimit_Is_Truncated_But_Reports_Full_Total()
     {
-        // Grouped by employee (default), so distinct employees are needed to exceed the cap.
         const int overLimitBy = 500;
         var totalGroups = ReportLimits.DisplayRowLimit + overLimitBy;
         var records = Enumerable.Range(0, totalGroups)

@@ -59,7 +59,7 @@ public class ExpireEmployeeRoleOverridesJobTests(IdentityDatabaseFixture fixture
         var userId = await SeedUser("mixed-expiry");
         var companyId = Guid.NewGuid();
         var expiredId = await SeedOverride(companyId, userId, SystemRoles.Manager, expiresAt: Now.AddDays(-1));
-        var expiringNowId = await SeedOverride(companyId, userId, SystemRoles.Recruiter, expiresAt: Now); // boundary: ExpiresAt == now
+        var expiringNowId = await SeedOverride(companyId, userId, SystemRoles.Recruiter, expiresAt: Now);
         var permanentId = await SeedOverride(companyId, userId, SystemRoles.Employee, expiresAt: null);
         var futureId = await SeedOverride(companyId, userId, SystemRoles.HrAdministrator, expiresAt: Now.AddDays(1));
 

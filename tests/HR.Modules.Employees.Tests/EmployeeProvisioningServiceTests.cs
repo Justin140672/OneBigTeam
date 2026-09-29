@@ -64,7 +64,6 @@ public class EmployeeProvisioningServiceTests
                 "EMP-0001", employmentTypeId, departmentId, locationId, positionProfileId),
             CancellationToken.None);
 
-        // Same work email in the same company should conflict.
         var result = await service.CreateFromCandidateAsync(
             new EmployeeProvisioningRequest(
                 companyId, "Emma", "Clarke", "emma.clarke@example.com",

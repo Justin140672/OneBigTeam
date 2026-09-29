@@ -93,10 +93,6 @@
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
     [Parameter, EditorRequired] public Guid VacancyId { get; set; }
 
-    // Session-scoped "remember filters" — the search text lives in the parent (Dashboard) when this
-    // component is reused there, so it survives switching between Kanban/List views without a new
-    // persistence mechanism. Falls back to local state when used standalone (e.g. the Vacancy Detail
-    // tab) via the getter/setter pair below.
     [Parameter] public string SearchText { get; set; } = string.Empty;
     [Parameter] public EventCallback<string> SearchTextChanged { get; set; }
 
@@ -117,10 +113,6 @@
     // InDisplayOrder_IncludingEmptyColumns when this parameter was first introduced.
     [Parameter] public bool ShowTerminalStages { get; set; }
 
-    // UI-only toggle — when the board is embedded in a page that already renders its own search
-    // box / vacancy context above the board (RecruitmentDashboard.razor's unified toolbar row),
-    // the board's own internal toolbar would be a redundant duplicate. Defaults to true so
-    // standalone callers (VacancyKanbanPage) keep their existing toolbar unchanged.
     [Parameter] public bool ShowToolbar { get; set; } = true;
 
     private bool _loading = true;
@@ -160,26 +152,13 @@
 
     private Task LoadAsync() => LoadAsync(showSpinner: true);
 
-    // Full three-way load (Kanban + candidates + stages) — required on initial load since none of
-    // _candidateEmails / _stageOutcomes are populated yet. Drag-and-drop reloads use the lighter
-    // ReloadKanbanOnlyAsync below instead, since candidates/stages don't change when a card moves.
     private async Task LoadAsync(bool showSpinner)
     {
         if (showSpinner) _loading = true;
         _error = null;
 
         var kanbanTask = KanbanService.GetKanbanAsync(CompanyId, VacancyId);
-        // Bulk-loaded once so the search box can match candidate email — the Kanban response itself
-        // only carries name/stage/dates (see GetRecruitmentKanbanResponse), no email or employee
-        // number field. See report: this is a known contract gap for ticket #69's email/employee
-        // number search scope.
-        // ListAllCandidatesAsync, not one oversized page: ListCandidatesValidator caps PageSize at
-        // 100, so the previous pageSize=200 request always failed validation and left every card
-        // without an email for the search box to match.
         var candidatesTask = CandidateService.ListAllCandidatesAsync(CompanyId);
-        // Only needed for the StageId -> TerminalOutcome lookup used by card styling — reused rather
-        // than re-fetched from scratch every board load isn't worth the added caching complexity
-        // here since a Kanban board load is already a multi-request operation.
         var stagesTask = RecruitmentStageService.ListStagesAsync(CompanyId);
 
         await Task.WhenAll(kanbanTask, candidatesTask, stagesTask);
@@ -207,9 +186,6 @@
         if (showSpinner) _loading = false;
     }
 
-    // Kanban-only reload used after drag-and-drop — reuses the already-cached _candidateEmails and
-    // _stageOutcomes dictionaries instead of re-fetching candidates/stages, since neither changes
-    // when a card's stage moves.
     private async Task ReloadKanbanOnlyAsync()
     {
         _error = null;
@@ -239,11 +215,6 @@
         get
         {
             var visibleStageIds = VisibleColumns.Select(c => c.StageId).ToHashSet();
-            // Withdrawn applications stay under their current stage server-side (see
-            // GetRecruitmentKanbanHandler's remarks — there's no dedicated "Withdrawn" column) but
-            // are never shown on the board itself: a withdrawn candidate can't be moved (the server
-            // rejects it, see OnDropAsync), so surfacing it here only invited a confusing "why won't
-            // this card drag" experience with no useful action attached to it.
             var cards = _cards.Where(c => visibleStageIds.Contains(c.StageId) && !c.IsWithdrawn);
 
             if (string.IsNullOrWhiteSpace(SearchText))
@@ -271,10 +242,6 @@
 
     private async Task OpenCandidate(KanbanCandidateModel candidate)
     {
-        // Carry a returnUrl so CandidateDetail.razor's "Close" button comes back to wherever this
-        // board is actually embedded (the standalone Kanban route, or the Recruitment Dashboard's
-        // Board view) instead of always falling back to the plain Candidate List — previously the
-        // card click had no memory of where it was opened from.
         var returnUrl = Navigation.ToBaseRelativePath(Navigation.Uri);
 
         var candidateUrl = $"/companies/{CompanyId}/candidates/{candidate.CandidateId}" +
@@ -282,8 +249,6 @@
         Navigation.NavigateTo(candidateUrl);
     }
 
-    // Ticket #1: open the Review CV screen, carrying a returnUrl back to wherever this board is
-    // embedded (same rationale as OpenCandidate above).
     private void ReviewCv(KanbanCandidateModel candidate)
     {
         var returnUrl = Navigation.ToBaseRelativePath(Navigation.Uri);
@@ -296,9 +261,6 @@
 
     private void OnDragEnd() => _draggedCard = null;
 
-    // Native HTML5 drop — no separate widget-owned drag state to reconcile against a reloaded
-    // DataSource (the SfKanban-based implementation's failure mode), so the handler is just: was a
-    // card actually being dragged, is the target a different stage, persist, then refresh.
     private async Task OnDropAsync(Guid targetStageId)
     {
         var moved = _draggedCard;
@@ -310,10 +272,6 @@
         await MoveApplicationAsync(moved, targetStageId);
     }
 
-    // Shared by both the drag-and-drop drop handler above and the keyboard-accessible "Move to
-    // stage…" card menu (KanbanCandidateCard.OnMoveToStage) — both paths call the exact same
-    // KanbanService method the server-side authorization/validation already gates, so neither path
-    // bypasses or duplicates that logic.
     private async Task MoveApplicationAsync(KanbanCandidateModel candidate, Guid targetStageId)
     {
         if (candidate.StageId == targetStageId)
@@ -321,10 +279,6 @@
 
         var (result, error) = await KanbanService.MoveApplicationStageAsync(CompanyId, VacancyId, candidate.ApplicationId, targetStageId);
 
-        // ReloadKanbanOnlyAsync always clears _error at its own start (a fresh load has no error
-        // yet), so on failure the error message must be applied AFTER the reload, not before —
-        // setting it first (then reloading) silently wiped it out, leaving the card correctly
-        // snapped back but with no visible explanation why.
         await ReloadKanbanOnlyAsync();
 
         _error = result is null ? (error ?? "Failed to move candidate to the new stage.") : null;

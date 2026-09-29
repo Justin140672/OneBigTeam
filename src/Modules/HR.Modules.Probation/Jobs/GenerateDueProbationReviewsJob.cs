@@ -36,10 +36,6 @@ internal sealed class GenerateDueProbationReviewsJob(
         if (activeRecords.Count == 0)
             return;
 
-        // Records may belong to different companies each with their own configured time zone,
-        // checkpoint schedule and HR administrator roster, so "today" (the review due-date
-        // boundary), the checkpoint days and the HR queue must all be resolved per company rather
-        // than once globally.
         var todayByCompany = new Dictionary<Guid, DateOnly>();
         var checkpointDaysByCompany = new Dictionary<Guid, IReadOnlyList<int>>();
         var hrAdministratorIdsByCompany = new Dictionary<Guid, IReadOnlyList<Guid>>();
@@ -105,9 +101,6 @@ internal sealed class GenerateDueProbationReviewsJob(
             reviewsToCreate.Count,
             reviewsToCreate.Select(x => x.Review.ProbationRecordId).Distinct().Count());
 
-        // PROB-07: system-generated review creation — actor is ProbationSystemActor.Id, clearly
-        // distinguishing this scheduled/automatic creation from a human directly creating a review
-        // via CreateProbationReviewHandler.
         foreach (var (review, record) in reviewsToCreate)
         {
             await auditPublisher.PublishAsync(new ProbationReviewCreatedAuditEvent(
@@ -135,10 +128,6 @@ internal sealed class GenerateDueProbationReviewsJob(
                 var assigneeId = ProbationReviewAssignment.ResolveTaskAssignee(
                     record, review.ReviewType, hrAdministratorIds);
 
-                // notifyAssignee: false — the review-due notification below is more specific (and,
-                // for HrReview, fans out to every HR administrator rather than just the single
-                // deterministic task assignee), so we don't also want the generic "New task
-                // assigned" notification duplicating it for the assignee.
                 await taskCreator.CreateAsync(
                     record.CompanyId,
                     record.EmployeeId,
@@ -159,13 +148,6 @@ internal sealed class GenerateDueProbationReviewsJob(
         }
     }
 
-    /// <summary>
-    /// Notifies the audience confirmed for this review type that it is now due. Idempotent against
-    /// duplicate job execution: guarded by <see cref="INotificationWriter.ExistsAsync"/> keyed on
-    /// (recipient, review id, notification type), so a rerun over the same review — e.g. after a
-    /// crash mid-batch — never sends a second copy. Notification text only ever includes the review
-    /// type and due date; it never includes review notes or other free-text content.
-    /// </summary>
     private async Task NotifyReviewDueAsync(
         ProbationRecord record,
         ProbationReview review,
@@ -210,13 +192,6 @@ internal sealed class GenerateDueProbationReviewsJob(
         }
     }
 
-    /// <summary>
-    /// PROB-06: NotStarted records become Active as soon as this daily job runs on/after their
-    /// StartDate, so they are picked up by the Active/ReviewDue query immediately below in the
-    /// same pass — a future starter therefore never waits an extra day between "start date
-    /// reached" and "first review scheduling opportunity". See ProbationRecord.ActivateIfDue and
-    /// ProbationStatus.NotStarted for why this transition lives here rather than at read time.
-    /// </summary>
     private async Task ActivateDueNotStartedRecordsAsync(DateTimeOffset now)
     {
         var notStartedRecords = await dbContext.ProbationRecords

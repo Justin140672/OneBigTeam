@@ -51,8 +51,6 @@ public class InviteAcceptanceReconciliationJobTests(IdentityDatabaseFixture fixt
         db.InviteAcceptanceOperations.Add(operation);
         await db.SaveChangesAsync();
 
-        // Force UpdatedAt to the desired staleness — the domain method always stamps "now" at the
-        // time it's called, so backdate it directly via EF for stale-scenario tests.
         db.Entry(operation).Property("UpdatedAt").CurrentValue =
             updatedAt ?? Now.AddMinutes(-20);
         await db.SaveChangesAsync();
@@ -94,8 +92,6 @@ public class InviteAcceptanceReconciliationJobTests(IdentityDatabaseFixture fixt
     [Fact]
     public async Task ExecuteAsync_Cancels_Stale_Pending_Operation_Cancelled_Before_Supabase_Creation()
     {
-        // No Supabase account exists at all for this email — the interruption happened before
-        // AcceptInvite ever reached CreateConfirmedUserAsync (or that call itself failed).
         var (operation, invite) = await SeedStalePendingOperationAsync(i => i.Cancel(CreatedAt.AddMinutes(2)));
 
         var gateway = new FakeSupabaseAuthGateway();
@@ -120,9 +116,6 @@ public class InviteAcceptanceReconciliationJobTests(IdentityDatabaseFixture fixt
     [Fact]
     public async Task ExecuteAsync_Orphans_Stale_Pending_Operation_Cancelled_After_Matching_Supabase_Account_Created()
     {
-        // Simulates "cancelled during/after Supabase creation but before the local final save" —
-        // a real account exists, stamped with THIS operation's own provisioning-correlation id,
-        // exactly as AcceptInvite's CreateConfirmedUserAsync call would have left it.
         var (operation, invite) = await SeedStalePendingOperationAsync(i => i.Cancel(CreatedAt.AddMinutes(2)));
 
         var supabaseUserId = Guid.NewGuid();
@@ -150,9 +143,6 @@ public class InviteAcceptanceReconciliationJobTests(IdentityDatabaseFixture fixt
     [Fact]
     public async Task ExecuteAsync_Never_Orphans_A_Foreign_Account_With_No_Matching_Correlation_Id()
     {
-        // A DIFFERENT (pre-existing/unrelated) Supabase account happens to share this email, but its
-        // metadata does NOT carry this operation's own id — must never be touched or reported as
-        // this operation's orphan.
         var (operation, invite) = await SeedStalePendingOperationAsync(i => i.Cancel(CreatedAt.AddMinutes(2)));
 
         var foreignUserId = Guid.NewGuid();
@@ -179,8 +169,6 @@ public class InviteAcceptanceReconciliationJobTests(IdentityDatabaseFixture fixt
     [Fact]
     public async Task ExecuteAsync_Completes_Stale_Pending_Operation_Whose_Invite_Was_Actually_Claimed()
     {
-        // "After normal completion": AcceptInvite's own retry actually finished (invite Claimed)
-        // before this job ran — converge forward, never touch Supabase at all for this case.
         var (operation, invite) = await SeedStalePendingOperationAsync(i => i.Claim(CreatedAt.AddMinutes(2)));
 
         var gateway = new FakeSupabaseAuthGateway();
@@ -223,7 +211,7 @@ public class InviteAcceptanceReconciliationJobTests(IdentityDatabaseFixture fixt
         await BuildJob(db, auditPublisher, gateway).ExecuteAsync();
 
         var reloaded = await db.InviteAcceptanceOperations.SingleAsync(o => o.Id == operation.Id);
-        Assert.Equal(InviteAcceptanceOperation.StatusPending, reloaded.Status); // untouched
+        Assert.Equal(InviteAcceptanceOperation.StatusPending, reloaded.Status);
         Assert.Empty(auditPublisher.PublishedEvents);
     }
 
@@ -308,7 +296,7 @@ public class InviteAcceptanceReconciliationJobTests(IdentityDatabaseFixture fixt
         await BuildJob(db, auditPublisher).ExecuteAsync();
 
         var reloaded = await db.InviteAcceptanceOperations.SingleAsync(o => o.Id == operation.Id);
-        Assert.Equal(InviteAcceptanceOperation.StatusSupabaseConfirmed, reloaded.Status); // untouched
+        Assert.Equal(InviteAcceptanceOperation.StatusSupabaseConfirmed, reloaded.Status);
 
         Assert.Empty(auditPublisher.PublishedEvents);
     }

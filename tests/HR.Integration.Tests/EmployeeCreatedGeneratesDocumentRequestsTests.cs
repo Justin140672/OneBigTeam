@@ -25,7 +25,6 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
         }).GetAwaiter().GetResult();
     }
 
-    // ── DocumentRequest creation ──────────────────────────────────────────────────
 
     [Fact]
     public async Task CreateEmployee_WithPositionProfile_GeneratesDocumentRequests_For_Each_RequiredDocument()
@@ -154,7 +153,6 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
-    // ── Upload task creation ──────────────────────────────────────────────────────
 
     [Fact]
     public async Task CreateEmployee_WithPositionProfile_Creates_One_Upload_Task_Per_DocumentRequest()
@@ -238,7 +236,6 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
         Assert.DoesNotContain(tasks, t => t.Source == "Document");
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
@@ -328,12 +325,6 @@ public class EmployeeCreatedGeneratesDocumentRequestsTests
         resp.EnsureSuccessStatusCode();
     }
 
-    // Department/Location/EmploymentType/EmployeeNumber are all mandatory on employee creation —
-    // seed fresh reference data per call. A null positionProfileId means "use a fresh, bare
-    // position profile with no required documents of its own" (no employee can be created
-    // without a real PositionProfileId any more, so a true "without position profile" scenario is
-    // no longer reachable via the API — a profile with zero required documents is the closest
-    // equivalent and produces the same zero-DocumentRequests outcome these tests assert on).
     private async Task<Guid> CreateEmployeeAsync(HttpClient client, Guid companyId, Guid? positionProfileId = null)
     {
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);

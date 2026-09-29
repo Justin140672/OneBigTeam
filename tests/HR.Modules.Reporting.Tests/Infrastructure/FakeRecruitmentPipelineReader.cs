@@ -2,10 +2,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Reporting.Tests.Infrastructure;
 
-/// <summary>
-/// Hand-rolled fake for <see cref="IRecruitmentPipelineReader"/> — records the arguments it was
-/// called with and returns pre-configured recruiter/vacancy rows.
-/// </summary>
 internal sealed class FakeRecruitmentPipelineReader : IRecruitmentPipelineReader
 {
     private readonly IReadOnlyList<RecruitmentPipelineRecruiterRow> _recruiterRows;

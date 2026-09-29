@@ -49,10 +49,6 @@ public sealed class SignupToCheckYourEmailJourneyTests(ParallelBlankPersonaFixtu
 
         await _page.GetByRole(AriaRole.Button, new() { Name = "Start free trial" }).ClickAsync();
 
-        // /signup-submit now makes a real Supabase Auth account-creation call before it can
-        // redirect (see the "fixing supabase auth" work) — a genuine external network round trip,
-        // not a local render, so it needs more headroom than the 20s that was enough for the old
-        // dev-stub signup.
         await _page.WaitForURLAsync(new Regex("/check-your-email"), new() { Timeout = 40_000 });
 
         return email;

@@ -124,9 +124,6 @@ public class ReturnUrlValidatorTests
     [Fact]
     public void ValidateInternalPath_RejectsCandidateDetailListUrlOpenRedirect()
     {
-        // Real attack scenario: attacker links to:
-        // /companies/{id}/candidates/new?returnUrl=//attacker.example
-        // The component would use this returnUrl as the fallback for Close button
         var result = ReturnUrlValidator.ValidateInternalPath("//attacker.example");
         Assert.Null(result);
     }
@@ -134,8 +131,6 @@ public class ReturnUrlValidatorTests
     [Fact]
     public void ValidateInternalPath_RejectsReviewCvBackTargetOpenRedirect()
     {
-        // Real attack scenario: attacker links to:
-        // /companies/{cid}/vacancies/{vid}/applications/{aid}/review-cv?returnUrl=https://attacker.example
         var result = ReturnUrlValidator.ValidateInternalPath("https://attacker.example");
         Assert.Null(result);
     }
@@ -143,8 +138,6 @@ public class ReturnUrlValidatorTests
     [Fact]
     public void ValidateInternalPath_RejectsEmployeeListBackUrlOpenRedirect()
     {
-        // Real attack scenario: attacker links to:
-        // /companies/{id}/employees?returnUrl=javascript:alert('xss')
         var result = ReturnUrlValidator.ValidateInternalPath("javascript:alert('xss')");
         Assert.Null(result);
     }
@@ -152,7 +145,6 @@ public class ReturnUrlValidatorTests
     [Fact]
     public void ValidateInternalPath_RejectsEncodedJavascriptUri()
     {
-        // Double-encoded or partially-encoded attempt to bypass filter
         var result = ReturnUrlValidator.ValidateInternalPath("/path%3ajavascript:alert()");
         Assert.Null(result);
     }
@@ -160,7 +152,6 @@ public class ReturnUrlValidatorTests
     [Fact]
     public void ValidateInternalPath_AllowsValidInternalNavigationWithComplexQuery()
     {
-        // Real app scenario: return to a filtered, sorted, paginated list view
         var returnUrl = "/companies/abc-123/employees?page=3&filter=department%3DHR&sort=-salary#employee-grid";
         var result = ReturnUrlValidator.ValidateInternalPath(returnUrl);
         Assert.Equal(returnUrl, result);

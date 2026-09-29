@@ -7,12 +7,6 @@ public sealed class BackgroundJobsService(HrApiHttpClientFactory httpClientFacto
 {
     private HttpClient Http => httpClientFactory.CreateClient();
 
-    /// <summary>
-    /// Returns null when the call fails or the caller isn't authorised (401/403) — same
-    /// null-means-"show sign-in/not-authorised state" contract as FailedPaymentsService. Real
-    /// enforcement happens server-side (HR.Api's "platform:admin" policy plus
-    /// ListBackgroundJobsHandler's PlatformAdmin:AllowedEmails allow-list); this is UI-side only.
-    /// </summary>
     public async Task<BackgroundJobsResponse?> GetBackgroundJobsOrNullAsync(CancellationToken cancellationToken = default)
     {
         try
@@ -29,7 +23,6 @@ public sealed class BackgroundJobsService(HrApiHttpClientFactory httpClientFacto
         }
     }
 
-    /// <summary>Requeues a failed job. Returns true only on a confirmed successful retry.</summary>
     public async Task<bool> RetryJobAsync(string jobId, string reason, CancellationToken cancellationToken = default)
     {
         try

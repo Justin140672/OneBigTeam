@@ -10,13 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// End-to-end coverage for the "Vacancy - Position Profile relationship" epic's final story: a hired
-/// employee's Department/Location/PositionProfile are derived exclusively from the Vacancy's linked
-/// Position Profile (via HireCandidateHandler -> IPositionProfileReader), never from independent
-/// client-supplied values — HireCandidateRequest no longer even carries those fields. Also proves
-/// OfferCandidate surfaces the linked Position Profile's employment defaults as read-only context.
-/// </summary>
 [Collection("Integration")]
 public class HireCandidateFromVacancyPositionProfileEndToEndTests
 {
@@ -46,7 +39,6 @@ public class HireCandidateFromVacancyPositionProfileEndToEndTests
         using var client = await AuthenticatedClient(companyId);
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
 
-        // 1. Create a Vacancy against the seeded Position Profile.
         var createVacancyResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/vacancies", new
         {
             companyId,
@@ -58,7 +50,6 @@ public class HireCandidateFromVacancyPositionProfileEndToEndTests
         var vacancy = await createVacancyResponse.Content.ReadFromJsonAsync<VacancyPayload>();
         Assert.NotNull(vacancy);
 
-        // 2. Create a Candidate + Application against that vacancy.
         var createCandidateResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/candidates", new
         {
             companyId,
@@ -81,7 +72,6 @@ public class HireCandidateFromVacancyPositionProfileEndToEndTests
         var application = await createApplicationResponse.Content.ReadFromJsonAsync<ApplicationPayload>();
         Assert.NotNull(application);
 
-        // 3. Transition through Interview.
         var scheduleInterviewResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancy.Id}/applications/{application!.Id}/interviews", new
             {
@@ -107,9 +97,6 @@ public class HireCandidateFromVacancyPositionProfileEndToEndTests
             });
         Assert.Equal(HttpStatusCode.OK, recordOutcomeResponse.StatusCode);
 
-        // 4. Offer the candidate — assert the offer response surfaces the position profile's
-        //    employment defaults (the seeded profile has none set, so they should be null, but the
-        //    PositionProfileId itself must match the vacancy's).
         var offerResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancy.Id}/applications/{application.Id}/offer", new
             {
@@ -122,8 +109,6 @@ public class HireCandidateFromVacancyPositionProfileEndToEndTests
         Assert.NotNull(offer);
         Assert.Equal(referenceData.PositionProfileId, offer!.PositionProfileId);
 
-        // 5. Hire the candidate. HireCandidateRequest carries no Department/Location/PositionProfile
-        //    fields at all — those are derived server-side from the Vacancy's linked Position Profile.
         var hireResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancy.Id}/applications/{application.Id}/hire", new
             {
@@ -141,8 +126,6 @@ public class HireCandidateFromVacancyPositionProfileEndToEndTests
         var hire = await hireResponse.Content.ReadFromJsonAsync<HirePayload>();
         Assert.NotNull(hire);
 
-        // 6. Assert the resulting Employee row has the SAME PositionProfileId (and derived Department)
-        //    as the Vacancy's, not any independently-supplied value.
         using var scope = _factory.Services.CreateScope();
         var employeesDb = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
         var employee = await employeesDb.Employees.SingleAsync(e => e.Id == hire!.EmployeeId);

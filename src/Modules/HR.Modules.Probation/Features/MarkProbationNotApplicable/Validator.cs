@@ -10,9 +10,6 @@ internal sealed class MarkProbationNotApplicableValidator : AbstractValidator<Ma
         RuleFor(r => r.EmployeeId).NotEmpty();
         RuleFor(r => r.Reason).MaximumLength(1000).When(r => r.Reason is not null);
 
-        // Either all three are supplied (used only to create a placeholder record when none
-        // exists yet) or none are — the handler decides which case it's in based on whether a
-        // record already exists, so a partial set here would be ambiguous.
         RuleFor(r => r.ManagerEmployeeId)
             .NotEmpty()
             .When(r => r.StartDate is not null || r.ExpectedEndDate is not null)

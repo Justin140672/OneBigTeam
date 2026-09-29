@@ -154,7 +154,6 @@ public class RenameReportViewEndpointTests
         await CreateViewAsync(client, companyId, name: "First");
         var second = await CreateViewAsync(client, companyId, name: "Second");
 
-        // Case-insensitive and whitespace-insensitive collision with the other view's name.
         var response = await client.PatchAsJsonAsync(
             $"/api/companies/{companyId}/reporting/saved-views/{second.Id}",
             new { companyId, viewId = second.Id, name = "  first  " });

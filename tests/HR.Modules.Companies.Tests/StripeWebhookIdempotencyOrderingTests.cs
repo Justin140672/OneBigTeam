@@ -56,14 +56,13 @@ public class StripeWebhookIdempotencyOrderingTests
         await using (var c = Ctx())
             updatedAtAfterFirst = (await c.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId)).UpdatedAt;
 
-        // Redelivery at a later wall-clock time.
         await using (var c2 = Ctx())
             await Handler(c2, gw, Now.AddHours(9)).HandleAsync("p", "s", CancellationToken.None);
 
         await using var verify = Ctx();
         var persisted = await verify.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
         Assert.Equal(SubscriptionStatus.PastDue, persisted.Status);
-        Assert.Equal(updatedAtAfterFirst, persisted.UpdatedAt); // 2nd delivery did not re-apply
+        Assert.Equal(updatedAtAfterFirst, persisted.UpdatedAt);
 
         var rows = await verify.ProcessedStripeEvents.Where(e => e.StripeEventId == "evt_dup").ToListAsync();
         Assert.Single(rows);

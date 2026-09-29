@@ -9,15 +9,6 @@ using Microsoft.Extensions.Configuration;
 
 namespace HR.Modules.Companies.Features.ReinstateCustomerSubscription;
 
-/// <summary>
-/// Same defense-in-depth allow-list gate as ExtendCustomerTrialHandler (see its remarks). Calls
-/// IStripeGateway's resume operation when a live Stripe subscription still exists (CancelAtPeriodEnd
-/// pending) — matches ResumeSubscription's precedent. When the subscription has already reached the
-/// terminal Canceled status there is no live Stripe subscription left to resume; the domain method
-/// (CustomerSubscription.ReinstateCancelledSubscription) documents this as a local support override
-/// that must be followed up with manual Stripe reconciliation — flagged as a risk/assumption in this
-/// story's report, not silently assumed to be billing-complete.
-/// </summary>
 internal sealed class ReinstateCustomerSubscriptionHandler(
     CompaniesDbContext dbContext,
     IStripeGateway stripeGateway,

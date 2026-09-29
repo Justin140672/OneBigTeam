@@ -119,10 +119,6 @@ internal sealed class PromoteEmployeeHandler(
 
         dbContext.EmployeePromotions.Add(promotion);
 
-        // Snapshot taken before finalization for use as the idempotency-replay payload only — a
-        // replayed request never re-runs FinalizeAsync below, so its cached response must reflect
-        // the state as of the original save, not the (possibly later-finalized) final state. The
-        // actual method return value is rebuilt from final entity state further down instead.
         PromoteEmployeeResponse BuildResponse() => new(
             promotion.Id,
             promotion.CompanyId,
@@ -145,9 +141,6 @@ internal sealed class PromoteEmployeeHandler(
             var outcome = await dbContext.SaveIdempotentAsync<IdempotencyRecord, PromoteEmployeeResponse>(dbContext.IdempotencyRecords, 
                 scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
 
-            // Lost a race against a concurrent duplicate under the same key - this attempt's
-            // promotion row was rolled back along with it, so skip our own post-save side effects
-            // and hand back the winner's result untouched.
             if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
                 return Result.Success(outcome.Response!);
         }
@@ -169,22 +162,12 @@ internal sealed class PromoteEmployeeHandler(
                 promotion.Reason),
             cancellationToken);
 
-        // A same-day or backdated effective date should apply immediately rather than waiting for
-        // tomorrow's job run — the handler and ProcessPromotionsJob's own catch-up condition both
-        // use <= so coverage is seamless with no gap.
         if (request.EffectiveDate <= today)
         {
             await promotionFinalizer.FinalizeAsync(employee, promotion, actorEmployeeId, now, cancellationToken);
         }
         else
         {
-            // Not finalized yet — FinalizeAsync (and the "Promoted" timeline entry it triggers via
-            // EmployeePromotedIntegrationEvent) only runs once ProcessPromotionsJob reaches this
-            // promotion's EffectiveDate. Write the entry eagerly here too, dated with EffectiveDate,
-            // so a still-pending promotion is visible on the timeline (with the "Upcoming" badge)
-            // rather than only appearing once it actually takes effect. sourceRecordId=promotion.Id
-            // lets CreateTimelineEntryOnEmployeePromoted's own write (same EventType+SourceRecordId)
-            // dedupe against this one when finalization eventually happens.
             var titles = await dbContext.PositionProfiles
                 .AsNoTracking()
                 .Where(p => p.CompanyId == request.CompanyId &&

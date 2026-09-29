@@ -24,12 +24,6 @@
 </SfDialog>
 
 @code {
-    // Generic app-wide confirmation "message box" — mirrors UnsavedChangesDialog's structure
-    // (plain SfDialog + parameter-driven content/callbacks) so any page can show a consistent
-    // Yes/No confirmation instead of hand-rolling inline grid confirmation UI or ad-hoc dialogs.
-    // DangerConfirm toggles between the "standard confirmation" and "destructive confirmation"
-    // shared patterns from the same component — see HrDestructiveConfirmDialog for the
-    // explicitly-named destructive wrapper used by delete/deactivate call sites.
     [Parameter] public bool Visible { get; set; }
     [Parameter] public string Title { get; set; } = "Confirm";
     [Parameter] public string Message { get; set; } = "Are you sure?";
@@ -40,10 +34,6 @@
     [Parameter] public EventCallback OnConfirmed { get; set; }
     [Parameter] public EventCallback OnCancelled { get; set; }
 
-    // The footer Cancel button and the close-icon/Escape/backdrop path both need to end in
-    // OnCancelled — but the footer button already invokes it directly, and SfDialog's Closed
-    // event then fires anyway once Visible flips to false in response, which would invoke
-    // OnCancelled a second time. This mirrors EditDialogBase's _suppressNextClosedEvent guard.
     private bool _suppressNextClosed;
 
     private Task HandleClosed()
@@ -54,9 +44,6 @@
             return Task.CompletedTask;
         }
 
-        // Soft-cancel: close icon, Escape, and backdrop click all behave like the Cancel button,
-        // except while a confirm/cancel action is already in flight (Busy) — ignore those so an
-        // in-progress save can't be raced by a stray close.
         return Busy ? Task.CompletedTask : OnCancelled.InvokeAsync();
     }
 

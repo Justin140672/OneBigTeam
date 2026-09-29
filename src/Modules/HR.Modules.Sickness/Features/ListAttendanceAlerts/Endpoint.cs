@@ -13,9 +13,6 @@ internal sealed class Endpoint(
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/attendance-alerts");
-        // "sickness:review" (Manager + HrAdministrator) — same policy as
-        // GetOverdueReturnToWorkReviews. The policy only proves role membership; row-level scope
-        // (SICK-02) and the HR-only vs. reduced manager view (SICK-04) are both applied below.
         Policies("sickness:review");
     }
 

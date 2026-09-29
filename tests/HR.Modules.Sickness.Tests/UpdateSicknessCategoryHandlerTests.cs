@@ -96,7 +96,7 @@ public class UpdateSicknessCategoryHandlerTests
 
         var result = await handler.HandleAsync(new UpdateSicknessCategoryRequest
         {
-            CompanyId = Guid.NewGuid(), // different company
+            CompanyId = Guid.NewGuid(),
             Id = categoryId,
             Name = "Updated",
             DisplayOrder = 1
@@ -122,7 +122,7 @@ public class UpdateSicknessCategoryHandlerTests
         {
             CompanyId = companyId,
             Id = fluId,
-            Name = "Cold", // conflicts with existing
+            Name = "Cold",
             DisplayOrder = 2
         }, CancellationToken.None);
 
@@ -144,7 +144,7 @@ public class UpdateSicknessCategoryHandlerTests
         {
             CompanyId = companyId,
             Id = categoryId,
-            Name = "Cold", // same name, same record — ok
+            Name = "Cold",
             DisplayOrder = 3,
             ExpectedVersion = 1
         }, CancellationToken.None);
@@ -175,9 +175,6 @@ public class UpdateSicknessCategoryHandlerTests
         Assert.Equal(new DateTimeOffset(FixedUtcNow, TimeSpan.Zero), result.Value!.UpdatedAt);
     }
 
-    // SICK-06: actor is resolved server-side from the caller (threaded via
-    // UpdateSicknessCategoryRequest.ActorEmployeeId). Before reflects pre-mutation values, After
-    // reflects post-mutation values.
     [Fact]
     public async Task HandleAsync_Publishes_Audit_Event_With_ActorEmployeeId_And_BeforeAfter_Values()
     {

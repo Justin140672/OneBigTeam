@@ -6,11 +6,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Infrastructure.Storage;
 
-/// <summary>
-/// Hosted implementation of <see cref="IOrganisationDataExportStorage"/> backed by Supabase
-/// Storage, mirroring <see cref="SupabaseSupportAttachmentStorageService"/>. Key convention:
-/// organisation-exports/{companyId}/{exportId}.zip.
-/// </summary>
 internal sealed class SupabaseOrganisationDataExportStorage : IOrganisationDataExportStorage
 {
     private readonly HttpClient _httpClient;

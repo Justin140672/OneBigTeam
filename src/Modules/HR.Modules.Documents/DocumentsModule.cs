@@ -99,23 +99,11 @@ public static class DocumentsModule
     private static void AddStorageService(
         IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
-        // The options validator resolves IHostEnvironment via constructor injection to gate the
-        // Development/Test-only HTTP allowance (security review finding 6). The host already
-        // registers IHostEnvironment in production; TryAddSingleton is a no-op there and only
-        // matters for tests that build a bare IServiceCollection.
         services.TryAddSingleton(environment);
 
         services.Configure<FileUploadOptions>(configuration.GetSection("Documents:FileUpload"));
         services.AddScoped<IFileUploadValidator, FileUploadValidator>();
 
-        // E2E_TESTING always forces the no-op scanner, same as FakeSupabaseAuthGateway/
-        // FakeStripeGateway elsewhere in this app — HR.AppHost injects Documents__ClamAv__Host/Port
-        // unconditionally (not gated by E2E_TESTING, unlike the Supabase/Stripe fakes' own env
-        // checks), so without this the E2E suite would always attempt a real ClamAV scan. ClamAV's
-        // container can take well over a minute to finish loading its virus-definition database on
-        // a cold start — long past Aspire's own container-health WaitFor — during which every scan
-        // attempt fails/hangs, leaving every pending-photo/document row stuck on ScanStatus.Pending
-        // (or eventually Failed) no matter how long a test polls for it.
         var isE2ETestingForVirusScan = string.Equals(
             Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
 
@@ -137,22 +125,11 @@ public static class DocumentsModule
         // modules via the shared HR.Infrastructure.Abstractions.IUploadedFileScanner contract.
         services.AddScoped<HR.Infrastructure.Abstractions.IUploadedFileScanner, UploadedFileScannerAdapter>();
 
-        // E2E_TESTING must win over the ClamAv config: HR.AppHost injects Documents__ClamAv__Host
-        // unconditionally, so without this guard the E2E run wired the real scanner, whose job has to
-        // download the upload from the E2E document storage (not a reachable HTTP endpoint) and so
-        // failed every attempt — uploads stayed Pending/Failed and never became downloadable (e.g.
-        // an HR-uploaded profile photo never replaced the initials). This guard existed before the
-        // fail-closed change (93eaf9dc) and was dropped by it; E2E_TESTING itself is refused outside
-        // Development, so Staging/Production still always get ClamAV (or fail closed below).
         if (!isE2ETestingForVirusScan && hasClamAvConfig)
         {
             services.AddOptions<ClamAvOptions>().Bind(clamAvSection).ValidateOnStart();
             services.AddSingleton<Microsoft.Extensions.Options.IValidateOptions<ClamAvOptions>, ClamAvOptionsValidator>();
             services.AddScoped<IVirusScanService, ClamAvVirusScanService>();
-            // Tags match the "ready"/"critical" convention used by every other dependency check
-            // registered across the app (see HR.ServiceDefaults.HealthCheckEndpoints) — a module
-            // cannot reference that shared-host project directly, so the tag strings are duplicated
-            // here rather than adding a new cross-project dependency for two constants.
             services.AddHealthChecks().AddCheck<ClamAvHealthCheck>(
                 "clam-av",
                 failureStatus: HealthStatus.Unhealthy,
@@ -160,8 +137,6 @@ public static class DocumentsModule
         }
         else if (isNoOpAllowedEnvironment)
         {
-            // No ClamAv configured (local/dev default) — same environment-based fallback
-            // pattern as the Supabase-vs-local storage switch below.
             services.AddScoped<IVirusScanService, NoOpVirusScanService>();
         }
         else
@@ -201,10 +176,6 @@ public static class DocumentsModule
                 + "Development or an explicit automated-test environment.");
         }
 
-        // Dev-only local delivery route re-checks (see ILocalStorageObjectResolver). This module owns
-        // the Documents and profile-photo tables, so it is authoritative for both buckets. They are
-        // only consumed by the Development-only route in HR.Api, so they are not registered outside
-        // the Development/explicit-test environments.
         if (isNoOpAllowedEnvironment)
         {
             services.AddScoped<ILocalStorageObjectResolver, DocumentsLocalStorageObjectResolver>();
@@ -293,9 +264,6 @@ public static class DocumentsModule
         services.AddScoped<UploadEmployeeDocumentHandler>();
         services.AddScoped<IValidator<UploadEmployeeDocumentRequest>, UploadEmployeeDocumentValidator>();
 
-        // DOC-05: version history for employee documents — a replacement upload creates a new
-        // linked EmployeeDocument row (see EmployeeDocument.PreviousVersionId/IsLatestVersion)
-        // rather than an unrelated record.
         services.AddScoped<UploadEmployeeDocumentVersionHandler>();
         services.AddScoped<IValidator<UploadEmployeeDocumentVersionRequest>, UploadEmployeeDocumentVersionValidator>();
 
@@ -335,9 +303,6 @@ public static class DocumentsModule
         // without one (see CompleteProfilePhotoReviewFromTaskAction for details).
         services.AddScoped<ITaskCompletionAction, CompleteProfilePhotoReviewFromTaskAction>();
 
-        // Recovers pending profile-photo submissions left without an active HR review task (a
-        // missing/lost task creation, or a submission that predates the idempotency-keyed task
-        // creation fix).
         services.AddScoped<ReconcileMissingProfilePhotoReviewTasksJob>();
 
         services.AddScoped<GetEmployeeDocumentHandler>();
@@ -346,7 +311,6 @@ public static class DocumentsModule
         services.AddScoped<ListEmployeeDocumentsHandler>();
         services.AddScoped<IValidator<ListEmployeeDocumentsRequest>, ListEmployeeDocumentsValidator>();
 
-        // DOC-06: company-wide document search/filter, distinct from ListEmployeeDocuments.
         services.AddScoped<SearchEmployeeDocumentsHandler>();
         services.AddScoped<IValidator<SearchEmployeeDocumentsRequest>, SearchEmployeeDocumentsValidator>();
 
@@ -358,8 +322,6 @@ public static class DocumentsModule
         services.AddScoped<DeleteEmployeeDocumentHandler>();
         services.AddScoped<DownloadEmployeeDocumentHandler>();
 
-        // DOC-04: recoverable archive/restore for employee documents, plus the separately
-        // authorised (role:company-administrator) permanent-purge retention process.
         services.AddScoped<GetArchivedEmployeeDocumentsHandler>();
         services.AddScoped<IValidator<GetArchivedEmployeeDocumentsRequest>, GetArchivedEmployeeDocumentsValidator>();
 
@@ -369,8 +331,6 @@ public static class DocumentsModule
         services.AddScoped<PurgeEligibleArchivedEmployeeDocumentsHandler>();
         services.AddScoped<IValidator<PurgeEligibleArchivedEmployeeDocumentsRequest>, PurgeEligibleArchivedEmployeeDocumentsValidator>();
 
-        // DOC-01: centralised resource-level (self/manager-hierarchy/HR administrator)
-        // authorization shared by every employee-document and document-request endpoint.
         services.AddScoped<Services.DocumentResourceAuthorizer>();
 
         services.AddScoped<GetExpiringDocumentsHandler>();
@@ -389,9 +349,6 @@ public static class DocumentsModule
         services.AddScoped<ICompanyDocumentAcknowledgementReportReader, CompanyDocumentAcknowledgementReportReader>();
         services.AddScoped<IDocumentStorageReader, DocumentStorageReader>();
 
-        // Admin Portal Application Metrics dashboard (Platform Monitoring epic) — platform-wide,
-        // not scoped to a single customer. Consumed by HR.Modules.Companies via this
-        // Infrastructure.Abstractions interface.
         services.AddScoped<IPlatformDocumentActivityReader, PlatformDocumentActivityReader>();
 
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
@@ -413,7 +370,6 @@ public static class DocumentsModule
         services.AddScoped<IWorkloadActionProvider, CompanyDocumentAcknowledgementsOutstandingWorkloadActionProvider>();
         services.AddScoped<IWorkloadActionProvider, SharedCompanyDocumentReviewsDueWorkloadActionProvider>();
 
-        // Getting Started checklist task definition (HR.Modules.CompanyOnboarding epic, Phase A).
         services.AddScoped<IOnboardingTaskDefinition, ReviewCompanyDocumentsTask>();
     }
 
@@ -428,9 +384,6 @@ public static class DocumentsModule
             "detect-documents-due-for-review",
             job => job.ExecuteAsync(),
             Cron.Daily(10));
-        // DOC-03: automatic daily processing of the 90/30/7-day-before-expiry reminder schedule
-        // and the overdue/expired notification for every company, replacing reliance on an HR
-        // user or external caller manually invoking the /expiry-notifications endpoint.
         jobManager.AddOrUpdate<DocumentExpiryReminderJob>(
             "document-expiry-reminders",
             job => job.ExecuteAsync(),
@@ -461,9 +414,8 @@ public static class DocumentsModule
         var db  = scope.ServiceProvider.GetRequiredService<DocumentsDbContext>();
         var now = DateTimeOffset.UtcNow;
 
-        // ── Acme Corporation ─────────────────────────────────────────────────
         var acmeId    = Guid.Parse("00000000-0000-0000-0000-000000000001");
-        var acmeHrMgr = Guid.Parse("30000000-0000-0000-0000-000000000005"); // Laura Bennett
+        var acmeHrMgr = Guid.Parse("30000000-0000-0000-0000-000000000005");
 
         var acmeContract       = Guid.Parse("50000000-0000-0000-0000-000000000001");
         var acmePassport       = Guid.Parse("50000000-0000-0000-0000-000000000002");
@@ -511,8 +463,6 @@ public static class DocumentsModule
                 Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000006"), acmeId, null, "Employee Handbook 2026",             null, acmeOther,     "employee-handbook-2026.pdf",          2097152,  "application/pdf", "seed/acme/other/employee-handbook-2026.pdf",               new DateOnly(2027, 1, 1),  acmeHrMgr, now),
                 Document.Create(Guid.Parse("60000000-0000-0000-0000-000000000007"), acmeId, null, "Remote Working Policy",             null, acmeOther,     "remote-working-policy.pdf",            307200,  "application/pdf", "seed/acme/other/remote-working-policy.pdf",                new DateOnly(2027, 6, 30), acmeHrMgr, now),
             };
-            // Seed documents represent already-existing, trusted content — same as the migration
-            // backfill for pre-existing production rows — so they start Clean rather than Pending.
             foreach (var seedDoc in acmeDocuments)
                 seedDoc.MarkScanClean(now);
             db.Documents.AddRange(acmeDocuments);
@@ -520,11 +470,6 @@ public static class DocumentsModule
             await db.SaveChangesAsync();
         }
 
-        // Reconciliation: the guard above only ever fires once per company, so a long-lived shared
-        // database can be carrying these fixed-GUID rows from an older version of this seed with
-        // stale Title/DocumentTypeId values (observed: rows showing the bare DocumentType name —
-        // "Contract"/"Other" — instead of a real title). Bring exactly these known ids back in
-        // line with the current expected values on every startup; harmless once already correct.
         var expectedAcmeDocuments = new Dictionary<Guid, (string Title, Guid DocumentTypeId)>
         {
             [Guid.Parse("60000000-0000-0000-0000-000000000001")] = ("Employment Contract – Sarah Chen", acmeContract),
@@ -560,9 +505,9 @@ public static class DocumentsModule
 
         if (!await db.DocumentRequests.AnyAsync(r => r.CompanyId == acmeId))
         {
-            var empJamesId  = Guid.Parse("30000000-0000-0000-0000-000000000002"); // James Okafor
-            var empTomId    = Guid.Parse("30000000-0000-0000-0000-000000000004"); // Tom Williams
-            var empCarlosId = Guid.Parse("30000000-0000-0000-0000-000000000010"); // Carlos Rivera
+            var empJamesId  = Guid.Parse("30000000-0000-0000-0000-000000000002");
+            var empTomId    = Guid.Parse("30000000-0000-0000-0000-000000000004");
+            var empCarlosId = Guid.Parse("30000000-0000-0000-0000-000000000010");
 
             db.DocumentRequests.AddRange(
                 DocumentRequest.Create(
@@ -630,9 +575,8 @@ public static class DocumentsModule
             await db.SaveChangesAsync();
         }
 
-        // ── Beta Corp ─────────────────────────────────────────────────────────
         var betaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
-        var betaEngMgr = Guid.Parse("30000000-0000-0000-0000-000000000011"); // Alice Morgan
+        var betaEngMgr = Guid.Parse("30000000-0000-0000-0000-000000000011");
 
         var betaContract       = Guid.Parse("50000000-0000-0000-0000-000000000011");
         var betaPassport       = Guid.Parse("50000000-0000-0000-0000-000000000012");

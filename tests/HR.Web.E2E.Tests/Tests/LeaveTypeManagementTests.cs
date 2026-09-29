@@ -30,9 +30,6 @@ public sealed class LeaveTypeManagementTests(HrAdminPersonaFixture fixture) : Ro
 
         await typeEdit.FillNameAsync(typeName);
         await typeEdit.FillCodeAsync(typeCode);
-        // Default Days is only editable for a type literally named "Annual Leave" (item 50 —
-        // see LeaveTypeEdit.razor's IsAnnualLeave); this type isn't, so the field renders as
-        // read-only text and there's nothing to fill.
         await typeEdit.SaveAsync();
 
         Assert.True(await typeList.HasItemAsync(typeName),
@@ -57,7 +54,6 @@ public sealed class LeaveTypeManagementTests(HrAdminPersonaFixture fixture) : Ro
         await typeList.ClickNewAsync();
         await typeEdit.FillNameAsync(typeName);
         await typeEdit.FillCodeAsync(typeCode);
-        // See CreateLeaveType_AppearsInList — Default Days only applies to the "Annual Leave" type.
         await typeEdit.SaveAsync();
 
         await typeList.GoToAsync(AcmeId);
@@ -89,7 +85,6 @@ public sealed class LeaveTypeManagementTests(HrAdminPersonaFixture fixture) : Ro
         await typeList.ClickNewAsync();
         await typeEdit.FillNameAsync(originalName);
         await typeEdit.FillCodeAsync(typeCode);
-        // See CreateLeaveType_AppearsInList — Default Days only applies to the "Annual Leave" type.
         await typeEdit.SaveAsync();
 
         await typeList.GoToAsync(AcmeId);
@@ -107,7 +102,6 @@ public sealed class LeaveTypeManagementTests(HrAdminPersonaFixture fixture) : Ro
         await _page.GotoAsync($"{_fixture.WebBaseUrl}{updatedHref}");
         await _page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
 
-        // Reload the page directly to confirm the change persisted server-side, not just in local state.
         await _page.ReloadAsync();
         await _page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
 

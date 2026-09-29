@@ -21,8 +21,6 @@ internal sealed class CapturingEmployeeRenumberingService : IEmployeeRenumbering
     }
 }
 
-/// <summary>SET-08: fake used by EmployeeRenumberSideEffectJobTests to simulate a renumbering
-/// failure (transient or permanent) without depending on real HR.Modules.Employees logic.</summary>
 internal sealed class ThrowingEmployeeRenumberingService : IEmployeeRenumberingService
 {
     private readonly List<Guid> _calls = [];

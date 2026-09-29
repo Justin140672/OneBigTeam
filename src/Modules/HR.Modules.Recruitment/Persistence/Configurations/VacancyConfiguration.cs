@@ -31,9 +31,6 @@ internal sealed class VacancyConfiguration : IEntityTypeConfiguration<Vacancy>
             .HasColumnName("position_profile_id")
             .IsRequired();
 
-        // Optional recruitment-specific override of the Position Profile's canonical title — renamed
-        // (via column rename, preserving existing data) from the previously-required "title" column.
-        // See Vacancy.AdvertTitle's remarks.
         builder.Property(v => v.AdvertTitle)
             .HasColumnName("advert_title")
             .HasMaxLength(200);

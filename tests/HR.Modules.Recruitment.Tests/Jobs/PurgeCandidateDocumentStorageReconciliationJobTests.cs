@@ -112,7 +112,7 @@ public class PurgeCandidateDocumentStorageReconciliationJobTests
 
         var reloaded = await db.CandidateDocumentDeletionOperations.SingleAsync(o => o.Id == operation.Id);
         Assert.Equal(CandidateDocumentDeletionOperation.StatusProcessing, reloaded.Status);
-        Assert.True(reloaded.LeaseExpiresAt > Now); // re-claimed under a fresh lease
+        Assert.True(reloaded.LeaseExpiresAt > Now);
 
         Assert.Single(jobClient.CreatedJobs, j => (Guid)j.Args[0] == operation.Id);
     }
@@ -130,7 +130,7 @@ public class PurgeCandidateDocumentStorageReconciliationJobTests
         Assert.DoesNotContain(jobClient.CreatedJobs, j => (Guid)j.Args[0] == operation.Id);
 
         var reloaded = await db.CandidateDocumentDeletionOperations.SingleAsync(o => o.Id == operation.Id);
-        Assert.Equal(CandidateDocumentDeletionOperation.StatusProcessing, reloaded.Status); // untouched
+        Assert.Equal(CandidateDocumentDeletionOperation.StatusProcessing, reloaded.Status);
     }
 
     [Fact]
@@ -206,7 +206,7 @@ public class PurgeCandidateDocumentStorageReconciliationJobTests
         Assert.Empty(auditPublisher.Published);
 
         var reloaded = await db.CandidatePurgeAuditDeliveries.SingleAsync(d => d.Id == delivery.Id);
-        Assert.Equal(1, reloaded.AttemptCount); // untouched by this sweep
+        Assert.Equal(1, reloaded.AttemptCount);
     }
 
     // ---- Ticket 18 (P1): Held operations are re-checked, not blindly re-enqueued every sweep ----
@@ -225,7 +225,7 @@ public class PurgeCandidateDocumentStorageReconciliationJobTests
         Assert.DoesNotContain(jobClient.CreatedJobs, j => (Guid)j.Args[0] == operation.Id);
 
         var reloaded = await db.CandidateDocumentDeletionOperations.SingleAsync(o => o.Id == operation.Id);
-        Assert.Equal(CandidateDocumentDeletionOperation.StatusHeld, reloaded.Status); // untouched
+        Assert.Equal(CandidateDocumentDeletionOperation.StatusHeld, reloaded.Status);
         Assert.Empty(auditPublisher.Published);
     }
 
@@ -238,14 +238,13 @@ public class PurgeCandidateDocumentStorageReconciliationJobTests
 
         var jobClient = new RecordingBackgroundJobClient();
         var auditPublisher = new FakeAuditPublisher();
-        // Hold has been lifted — the fake reports no companies under hold.
         await BuildJob(db, jobClient, auditPublisher, new FakeLegalHoldStatusReader()).ExecuteAsync();
 
         var reloaded = await db.CandidateDocumentDeletionOperations.SingleAsync(o => o.Id == operation.Id);
         // Ticket 19 (P2): claimed straight to Processing on resume (not left Pending).
         Assert.Equal(CandidateDocumentDeletionOperation.StatusProcessing, reloaded.Status);
         Assert.NotNull(reloaded.ClaimedBy);
-        Assert.Equal(operation.StorageKey, reloaded.StorageKey); // never lost while held
+        Assert.Equal(operation.StorageKey, reloaded.StorageKey);
 
         Assert.Single(jobClient.CreatedJobs, j => (Guid)j.Args[0] == operation.Id);
         Assert.Single(auditPublisher.Published.OfType<CandidateDocumentDeletionResumedAfterLegalHoldAuditEvent>());
@@ -273,7 +272,7 @@ public class PurgeCandidateDocumentStorageReconciliationJobTests
         Assert.DoesNotContain(jobClient.CreatedJobs, j => (Guid)j.Args[0] == operation.Id);
 
         var reloaded = await db.CandidateDocumentDeletionOperations.SingleAsync(o => o.Id == operation.Id);
-        Assert.Equal(CandidateDocumentDeletionOperation.StatusFailed, reloaded.Status); // untouched
+        Assert.Equal(CandidateDocumentDeletionOperation.StatusFailed, reloaded.Status);
         Assert.True(reloaded.IsTerminallyFailed);
     }
 

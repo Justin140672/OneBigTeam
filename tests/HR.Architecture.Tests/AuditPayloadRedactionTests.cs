@@ -14,10 +14,6 @@ namespace HR.Architecture.Tests;
 /// </summary>
 public class AuditPayloadRedactionTests
 {
-    /// <summary>
-    /// All assemblies that may contain IAuditEvent implementations.
-    /// Extend when new modules are added.
-    /// </summary>
     private static readonly Assembly[] ModuleAssemblies =
     [
         typeof(HR.Modules.Employees.EmployeesModule).Assembly,
@@ -34,7 +30,7 @@ public class AuditPayloadRedactionTests
         typeof(HR.Modules.Assets.AssetsModule).Assembly,
         typeof(HR.Modules.Notifications.NotificationsModule).Assembly,
         typeof(HR.Modules.Reporting.ReportingModule).Assembly,
-        typeof(HR.SharedKernel.IAuditEvent).Assembly, // shared events in SharedKernel.Events
+        typeof(HR.SharedKernel.IAuditEvent).Assembly,
     ];
 
     [Fact]
@@ -47,7 +43,7 @@ public class AuditPayloadRedactionTests
             .Where(t => !t.IsAbstract && !t.IsInterface && typeof(IAuditEvent).IsAssignableFrom(t))
             .ToList();
 
-        Assert.NotEmpty(auditEventTypes); // guard against misconfigured assembly list
+        Assert.NotEmpty(auditEventTypes);
 
         foreach (var type in auditEventTypes)
         {
@@ -79,11 +75,6 @@ public class AuditPayloadRedactionTests
         }
     }
 
-    /// <summary>
-    /// Attempts to create a default instance of an audit event type using the smallest
-    /// available constructor, supplying default values for all parameters.
-    /// Returns null when construction is not possible (e.g. abstract types, no ctor).
-    /// </summary>
     private static IAuditEvent? TryCreateInstance(Type type)
     {
         try
@@ -103,7 +94,7 @@ public class AuditPayloadRedactionTests
         }
         catch
         {
-            return null; // If we can't instantiate it, skip — a separate test should catch that.
+            return null;
         }
     }
 

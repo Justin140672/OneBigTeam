@@ -6,12 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Services;
 
-/// <summary>
-/// Answers "is this employee in this document's audience" and "which employees are eligible for
-/// this document" against the <see cref="SharedCompanyDocumentAudienceRule"/> table — a document
-/// with no rule rows applies to every active employee, and any rule row matching the employee is
-/// enough (rules are OR'd together, not ANDed).
-/// </summary>
 internal sealed class SharedCompanyDocumentAudienceMatcher(
     DocumentsDbContext db,
     IEmployeeAudienceReader audienceReader)

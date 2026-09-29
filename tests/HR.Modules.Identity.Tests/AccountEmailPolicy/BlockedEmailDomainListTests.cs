@@ -10,7 +10,6 @@ namespace HR.Modules.Identity.Tests.AccountEmailPolicy;
 /// </summary>
 public class BlockedEmailDomainListTests
 {
-    // ── Embedded resource ───────────────────────────────────────────────────────
 
     [Fact]
     public void ReadEmbeddedEntries_Loads_A_NonEmpty_List()
@@ -64,7 +63,6 @@ public class BlockedEmailDomainListTests
         Assert.Equal(BlockedEmailDomainList.ReadEmbeddedEntries().Count, domains.Count);
     }
 
-    // ── ParseEntries ────────────────────────────────────────────────────────────
 
     [Fact]
     public void ParseEntries_Trims_Lines_Handles_CrLf_And_Skips_Comments_And_Blanks()
@@ -81,7 +79,6 @@ public class BlockedEmailDomainListTests
         Assert.Empty(BlockedEmailDomainList.ParseEntries("# only\n# comments\n\n"));
     }
 
-    // ── Build ───────────────────────────────────────────────────────────────────
 
     [Theory]
     [InlineData("not a domain")]
@@ -161,7 +158,6 @@ public class BlockedEmailDomainListTests
         Assert.Contains("xn--bcher-kva.example", (IEnumerable<string>)domains);
     }
 
-    // ── Policy construction with additional entries ─────────────────────────────
 
     [Fact]
     public void Policy_Built_With_Additional_Entry_Blocks_It_And_Its_Subdomains()
@@ -171,7 +167,6 @@ public class BlockedEmailDomainListTests
         Assert.Equal(AccountEmailDomainVerdict.Blocked, policy.Evaluate("person@custom-disposable.test").Verdict);
         Assert.Equal(AccountEmailDomainVerdict.Blocked, policy.Evaluate("person@inbox.custom-disposable.test").Verdict);
         Assert.Equal(AccountEmailDomainVerdict.Allowed, policy.Evaluate("person@not-custom-disposable.test").Verdict);
-        // Embedded baseline still applies.
         Assert.Equal(AccountEmailDomainVerdict.Blocked, policy.Evaluate("person@gmail.com").Verdict);
     }
 
@@ -203,7 +198,6 @@ public class BlockedEmailDomainListTests
         Assert.Contains("denylist is invalid", ex.Message);
     }
 
-    // ── Options validator ───────────────────────────────────────────────────────
 
     [Fact]
     public void OptionsValidator_Succeeds_For_Default_Options()

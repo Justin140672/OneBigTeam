@@ -36,7 +36,6 @@ public class LeavingDateChangeHandlerTests
             new FakeCompanyLeaveSettingsReader(),
             new FakeEmployeeStartDateReader(new DateOnly(2020, 1, 1)));
 
-        // Leaving mid-year (June 30) — roughly half a year's entitlement remains.
         var leavingDate = new DateOnly(2026, 6, 30);
         await handler.HandleAsync(
             new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, leavingDate, leavingDate, now),
@@ -71,8 +70,6 @@ public class LeavingDateChangeHandlerTests
             new FakeCompanyLeaveSettingsReader(),
             new FakeEmployeeStartDateReader(new DateOnly(2020, 1, 1)));
 
-        // Set an initial leaving date, then amend it earlier — applying repeated events must
-        // converge on the figure implied by the *current* leaving date, never stack reductions.
         await handler.HandleAsync(
             new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, new DateOnly(2026, 9, 30), new DateOnly(2026, 9, 30), now),
             CancellationToken.None);
@@ -85,7 +82,6 @@ public class LeavingDateChangeHandlerTests
 
         Assert.True(afterAmend < afterFirst);
 
-        // Re-delivering the same (amended) event again must be a no-op relative to the current value.
         await handler.HandleAsync(
             new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, new DateOnly(2026, 3, 31), new DateOnly(2026, 3, 31), now),
             CancellationToken.None);
@@ -261,17 +257,11 @@ public class LeavingDateChangeHandlerTests
             new FakeCompanyLeaveSettingsReader(),
             new FakeEmployeeStartDateReader(new DateOnly(2020, 1, 1)));
 
-        // Leaving date backdated to a date already in the past relative to "now" — half the year
-        // (Jan 1 - Jun 30 inclusive, 181 of 365 days).
         await handler.HandleAsync(
             new EmployeeLeavingDateSetIntegrationEvent(companyId, employeeId, new DateOnly(2026, 6, 30), new DateOnly(2026, 6, 30), now),
             CancellationToken.None);
 
         var updated = await context.LeaveBalances.SingleAsync();
-        // LeaveEntitlementCalculator.CalculateEntitlement rounds pro-rated entitlement to the
-        // nearest half day (AwayFromZero) — see its RoundToNearestHalfDay helper — so the
-        // expectation here must match that rounding, not the unrounded fraction.
-        // 24 * 181 / 365 = 11.8904... rounds to the nearest half day = 12.0
         Assert.Equal(12.0m, updated.EntitlementDays);
     }
 

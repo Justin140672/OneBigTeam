@@ -2,21 +2,8 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the Workload &amp; HR Actions report
-/// (/companies/{companyId}/reporting/workload-actions — WorkloadActionsReportPage.razor).
-/// Unlike the other report pages, this one has no export button, no HrGrid-backed grid columns
-/// (it uses <c>HrGrid</c> per section but the same column set every time), an "Apply Filters" /
-/// "Clear" button pair (not just "Apply Filters"), an optional Group By dropdown that switches
-/// the page from a single flat grid to one grid per group heading (rendered as <c>&lt;h5&gt;</c>
-/// elements followed by a grid), and a per-row "Go" link/button that client-side navigates via
-/// <c>WorkloadActionRowModel.DeepLinkUrl</c> instead of triggering a download or opening a dialog.
-/// </summary>
 public sealed class WorkloadActionsReportPage(IPage page, string baseUrl)
 {
-    // The page renders one HrGrid per group when grouped, or a single one when flat — either way,
-    // at least one grid row/emptyrow (or the "No outstanding actions" info alert) appears once
-    // loading has finished.
     private const string LoadedSelector =
         ".e-grid .e-row, .e-grid .e-emptyrow, .alert-info";
 
@@ -32,7 +19,6 @@ public sealed class WorkloadActionsReportPage(IPage page, string baseUrl)
         await page.Locator(".alert-info", new() { HasText = "No outstanding actions. Everything is up to date." })
             .IsVisibleAsync();
 
-    // ── Summary stat cards ─────────────────────────────────────────────────────
 
     private ILocator StatCard(string labelText) =>
         page.Locator(".card").Filter(new() { HasText = labelText }).First;
@@ -43,7 +29,6 @@ public sealed class WorkloadActionsReportPage(IPage page, string baseUrl)
         return int.TryParse(text?.Trim(), out var value) ? value : -1;
     }
 
-    // ── Filters ────────────────────────────────────────────────────────────────
 
     private ILocator FilterField(string labelText) => page.Locator(".card-body .col-md-3")
         .Filter(new() { HasText = labelText }).First;
@@ -66,12 +51,6 @@ public sealed class WorkloadActionsReportPage(IPage page, string baseUrl)
     public Task SelectGroupByAsync(string groupByLabel) =>
         DropDownSelector.SelectAsync(page, FilterField("Group By"), groupByLabel);
 
-    /// <summary>
-    /// Sets the Due Date From/To range via the Syncfusion date picker inputs — used to force a
-    /// window the seeded E2E environment's outstanding actions cannot fall inside, since the
-    /// Status/Action Type dropdowns are populated only from real loaded row data and can never
-    /// offer a guaranteed-nonexistent value (see WorkloadActionsReportPage.razor.LoadAsync).
-    /// </summary>
     public async Task SetDueDateRangeAsync(DateOnly from, DateOnly to)
     {
         await FilterField("Due Date From").Locator("input").FillAsync(from.ToString("dd/MM/yyyy"));
@@ -83,12 +62,6 @@ public sealed class WorkloadActionsReportPage(IPage page, string baseUrl)
     public async Task ApplyFiltersAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Apply Filters" }).ClickAsync();
-        // LoadedSelector can resolve against grid rows (or the info alert) Blazor is still
-        // reusing from *before* the click, same "resolves against stale content" race already
-        // documented on GetGroupHeadingsAsync below — callers that immediately check
-        // IsEmptyStateVisibleAsync()/GetRowCountAsync() right after this can otherwise briefly
-        // read a state that hasn't caught up with the new filter yet. A short settle after the
-        // selector-level wait gives the new render a tick to actually land.
         await page.WaitForSelectorAsync(LoadedSelector, new() { Timeout = 15_000 });
         await page.WaitForTimeoutAsync(300);
     }
@@ -96,19 +69,11 @@ public sealed class WorkloadActionsReportPage(IPage page, string baseUrl)
     public async Task ClearFiltersAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Clear" }).ClickAsync();
-        // Same stale-content race as ApplyFiltersAsync above — LoadedSelector can resolve against
-        // rows/alert still left over from before the click.
         await page.WaitForSelectorAsync(LoadedSelector, new() { Timeout = 15_000 });
         await page.WaitForTimeoutAsync(300);
     }
 
-    // ── Grid / grouping ────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Total row count across every rendered grid (flat single grid when not grouped, or summed
-    /// across all per-group grids when Group By is set) — 0 when the empty-state alert is shown
-    /// instead of any grid.
-    /// </summary>
     public async Task<int> GetRowCountAsync()
     {
         await page.WaitForSelectorAsync(LoadedSelector, new() { Timeout = 15_000 });
@@ -128,24 +93,8 @@ public sealed class WorkloadActionsReportPage(IPage page, string baseUrl)
         return count;
     }
 
-    /// <summary>
-    /// Group section headings (the <c>&lt;h5&gt;</c> elements rendered above each per-group grid
-    /// when a Group By value is applied), including the trailing "(N)" item count — empty when
-    /// not grouped.
-    /// </summary>
     public async Task<IReadOnlyList<string>> GetGroupHeadingsAsync()
     {
-        // ApplyFiltersAsync's own wait (LoadedSelector = ".e-grid .e-row, ...") can resolve against
-        // grid rows Blazor is reusing from before the click, returning before the group headings
-        // for the *new* grouping have actually rendered. Wait for either a heading or the
-        // empty-state alert directly so this doesn't race that re-render.
-        //
-        // Waits for a heading or specifically the report's own empty-state alert (not just any
-        // ".alert-info", which can be satisfied by an unrelated informational alert before the new
-        // grouping has rendered), then reads every heading in ONE atomic snapshot. Previously this
-        // took AllAsync() and then read each heading with TextContentAsync()'s 30s auto-wait — when
-        // the grouped view re-rendered its sections after the snapshot (each group mounts its own
-        // grid), every stale per-index read hung for 30s.
         var emptyState = page.Locator(".alert-info", new() { HasText = "No outstanding actions. Everything is up to date." });
         await page.Locator("h5.mt-4").Or(emptyState).First
             .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
@@ -162,18 +111,10 @@ public sealed class WorkloadActionsReportPage(IPage page, string baseUrl)
         return result;
     }
 
-    // ── Row actions ────────────────────────────────────────────────────────────
 
     private ILocator GoButtons => page.Locator(".e-grid .e-row").GetByRole(AriaRole.Button, new() { Name = "Go" });
 
     public async Task<int> GetGoButtonCountAsync() => await GoButtons.CountAsync();
 
-    /// <summary>
-    /// Clicks the "Go" action button on the first grid row. For most action types this triggers a
-    /// client-side navigation away from the report (via <c>Navigation.NavigateTo</c> in the page's
-    /// code-behind); task-type actions instead open the task in-place via TaskViewDialog without
-    /// changing the URL (see WorkloadActionsReportPage.razor's GoToAction) — callers must check for
-    /// either outcome rather than assuming navigation always happens.
-    /// </summary>
     public Task ClickFirstRowGoButtonAsync() => GoButtons.First.ClickAsync();
 }

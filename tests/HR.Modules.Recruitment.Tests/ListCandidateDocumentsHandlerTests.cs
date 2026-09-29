@@ -127,7 +127,7 @@ public class ListCandidateDocumentsHandlerTests
         Assert.True(result.IsSuccess);
         var items = result.Value!.Items;
         Assert.Equal(2, items.Count);
-        Assert.Equal(newerCv.Id, items[0].Id); // newest first
+        Assert.Equal(newerCv.Id, items[0].Id);
         Assert.True(items[0].IsCurrentCv);
         Assert.Equal(olderCv.Id, items[1].Id);
         Assert.False(items[1].IsCurrentCv);
@@ -148,7 +148,7 @@ public class ListCandidateDocumentsHandlerTests
         var result = await ListAsync(db, companyId, candidate.Id);
 
         var items = result.Value!.Items;
-        Assert.Equal(coverLetter.Id, items[0].Id); // newest first
+        Assert.Equal(coverLetter.Id, items[0].Id);
         Assert.False(items[0].IsCurrentCv);
         Assert.Equal(cv.Id, items[1].Id);
         Assert.True(items[1].IsCurrentCv);
@@ -187,8 +187,6 @@ public class ListCandidateDocumentsHandlerTests
 
         var result = await ListAsync(db, companyId, candidate.Id);
 
-        // Identical timestamps: the higher Id sorts first and is therefore the current CV.
-        // (InMemory compares Guids with the .NET comparer, the same one Max() uses here.)
         var expectedCurrentId = new[] { first.Id, second.Id }.Max();
         var items = result.Value!.Items;
         Assert.Equal(expectedCurrentId, items[0].Id);
@@ -232,7 +230,6 @@ public class ListCandidateDocumentsHandlerTests
         Assert.Equal(2, items.Single(i => i.Id == oldCv.Id).ReferencingApplicationCount);
         Assert.Equal(1, items.Single(i => i.Id == newCv.Id).ReferencingApplicationCount);
         Assert.Equal(0, items.Single(i => i.Id == unreferenced.Id).ReferencingApplicationCount);
-        // The older CV is retained and still referenced, but it is not the current CV.
         Assert.False(items.Single(i => i.Id == oldCv.Id).IsCurrentCv);
         Assert.True(items.Single(i => i.Id == newCv.Id).IsCurrentCv);
     }
@@ -247,7 +244,6 @@ public class ListCandidateDocumentsHandlerTests
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Engineer", null, Guid.NewGuid(), Now);
         db.Candidates.Add(candidate);
         db.Vacancies.Add(vacancy);
-        // An application exists for the candidate, but no CV has been recorded against it.
         db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.CvReview.Id, null, Now));
         db.CandidateDocuments.Add(Doc(companyId, candidate.Id, "cv.pdf", Now));
         await db.SaveChangesAsync();

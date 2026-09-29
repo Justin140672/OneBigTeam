@@ -5,8 +5,6 @@ using HR.Web.Services;
 
 namespace HR.Web.Models;
 
-// Name and Addresses are saved together via a single UpdateCompanyRequest, so they share one
-// model/EditContext (owned by CompanyEdit) even though they're shown on separate tabs.
 public sealed class CompanyDetailsEditModel : IHasVersion
 {
     [Required, MaxLength(200)]
@@ -52,15 +50,12 @@ public sealed class CompanyAddressEditModel
     public string? PostcodeRegexPattern { get; set; }
 }
 
-// Company Administrator territory — regional display settings only. HR-policy fields live in
-// HrSettingsEditModel (see HrSettingsPage), reachable only to HR Administrators.
 public sealed class CompanySettingsEditModel
 {
     public string? TimeZone { get; set; }
     public string? Locale { get; set; }
 }
 
-// HR Administrator territory — HR-policy fields moved out of CompanySettingsEditModel.
 public sealed class HrSettingsEditModel
 {
     public HashSet<string> WorkingWeek { get; set; } = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
@@ -92,9 +87,6 @@ public sealed class HrSettingsEditModel
     public string? EmployeeNumberPrefix { get; set; }
     [Range(1, int.MaxValue, ErrorMessage = "Next employee number must be greater than 0.")]
     public int NextEmployeeNumber { get; set; } = 1;
-    // The value NextEmployeeNumber was loaded with — only a changed value is sent on save, so an
-    // unrelated settings save never rewinds the live counter (which Automatic-mode employee
-    // creation advances concurrently).
     public int NextEmployeeNumberOriginal { get; set; } = 1;
     [Range(1, 10, ErrorMessage = "Minimum numeric length must be between 1 and 10.")]
     public int EmployeeNumberMinimumLength { get; set; } = 1;
@@ -107,9 +99,6 @@ public sealed class HrSettingsEditModel
     [Range(1, 10, ErrorMessage = "Minimum numeric length must be between 1 and 10.")]
     public int AssetNumberMinimumLength { get; set; } = 1;
 
-    // Baselines captured on load, used purely to detect a format change (prefix/minimum length)
-    // to Employee/Asset numbering while staying in Automatic mode, so the page can warn the user
-    // before save that this will trigger an automatic renumber of existing records.
     public EmployeeNumberMode EmployeeNumberOriginalMode { get; set; }
     public string? EmployeeNumberOriginalPrefix { get; set; }
     public int EmployeeNumberOriginalMinimumLength { get; set; }
@@ -117,8 +106,5 @@ public sealed class HrSettingsEditModel
     public string? AssetNumberOriginalPrefix { get; set; }
     public int AssetNumberOriginalMinimumLength { get; set; }
 
-    // SET-03 optimistic-concurrency counter for the shared CompanySettings row. Captured on load,
-    // sent back on save, and refreshed from the save response so repeated saves in one sitting
-    // don't hit a phantom "changed by someone else" conflict.
     public int Version { get; set; }
 }

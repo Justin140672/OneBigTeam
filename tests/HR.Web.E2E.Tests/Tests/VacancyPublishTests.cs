@@ -3,16 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the "Publish Vacancy" button (VacancyDetail.razor's CanPublish/PublishVacancyAsync,
-/// backed by the Recruitment module's PublishVacancy feature — POST
-/// .../vacancies/{id}/publish, which calls Vacancy.Open() to move Draft/OnHold to Open). Before
-/// this feature existed, a vacancy created via CreateVacancy stayed in Draft status forever —
-/// there was no UI or API path to open one.
-///
-/// Uses Marcus Diallo (Recruiter role) — recruitment:manage is Recruiter-only (see
-/// IdentityModule.AddRolePolicies), matching the convention in VacancyEditCloseBehaviorTests.
-/// </summary>
 public sealed class VacancyPublishTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -47,8 +37,6 @@ public sealed class VacancyPublishTests(RecruiterPersonaFixture fixture) : RoleE
         Assert.True(await vacancyDetail.IsPublishButtonVisibleAsync(),
             "A newly-created Draft vacancy should show the Publish Vacancy button");
 
-        // Draft-status tabs are hidden entirely (see item #21 — VacancyDetail.razor's
-        // "_vacancy.Status != 'Draft'" gate).
         Assert.False(await vacancyDetail.HasTabAsync("Applications"));
         Assert.False(await vacancyDetail.HasTabAsync("Interviews"));
     }
@@ -86,7 +74,6 @@ public sealed class VacancyPublishTests(RecruiterPersonaFixture fixture) : RoleE
         Assert.True(await vacancyDetail.HasTabAsync("Applications"));
         Assert.True(await vacancyDetail.HasTabAsync("Interviews"));
 
-        // The Vacancy List's "Show active" filter (item #11) should now surface it too.
         await vacancyList.GoToAsync(AcmeId);
         Assert.True(await vacancyList.HasVacancyAsync(vacancyTitle));
     }

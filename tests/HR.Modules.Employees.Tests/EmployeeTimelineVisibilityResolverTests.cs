@@ -4,7 +4,6 @@ namespace HR.Modules.Employees.Tests;
 
 public class EmployeeTimelineVisibilityResolverTests
 {
-    // ── HrOnly ───────────────────────────────────────────────────────────────
 
     [Fact]
     public void HrOnly_Is_Visible_To_Hr()
@@ -34,7 +33,6 @@ public class EmployeeTimelineVisibilityResolverTests
             EmployeeTimelineVisibility.HrOnly, viewerIsHr: false, viewerIsSelf: false, viewerIsManager: false));
     }
 
-    // ── EmployeeAndHr ────────────────────────────────────────────────────────
 
     [Fact]
     public void EmployeeAndHr_Is_Visible_To_Hr()
@@ -64,7 +62,6 @@ public class EmployeeTimelineVisibilityResolverTests
             EmployeeTimelineVisibility.EmployeeAndHr, viewerIsHr: false, viewerIsSelf: false, viewerIsManager: false));
     }
 
-    // ── AuthorisedInternal ───────────────────────────────────────────────────
 
     [Fact]
     public void AuthorisedInternal_Is_Visible_To_Hr()
@@ -90,16 +87,10 @@ public class EmployeeTimelineVisibilityResolverTests
     [Fact]
     public void AuthorisedInternal_Is_Not_Visible_To_Unrelated_Viewer()
     {
-        // e.g. a recruiter or any other employee with no relationship (not HR, not self, not manager).
         Assert.False(EmployeeTimelineVisibilityResolver.CanView(
             EmployeeTimelineVisibility.AuthorisedInternal, viewerIsHr: false, viewerIsSelf: false, viewerIsManager: false));
     }
 
-    // ── Combinations that must never grant access to an unrelated viewer ───────
-    // (Kept as individual Facts rather than a Theory with InlineData, since
-    // EmployeeTimelineVisibility is internal to the module and a public Theory
-    // method cannot expose an internal type as a parameter - CS0051 - even with
-    // InternalsVisibleTo granting this test assembly access to it.)
 
     [Fact]
     public void Unrelated_Viewer_Never_Sees_HrOnly_Tier()

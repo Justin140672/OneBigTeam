@@ -5,9 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests.Infrastructure;
 
-// NOT-06: direct DbContext seeding gives full control over CreatedAt/Type/Priority/IsRead —
-// TaskSeeder only ever produces TaskAssigned/Normal notifications via the domain flow, which
-// isn't enough to exercise GetMyNotifications' new filters/pagination/ordering.
 internal static class NotificationSeeder
 {
     public static async Task<Guid> SeedAsync(

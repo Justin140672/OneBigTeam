@@ -75,7 +75,6 @@ public class ApplyForInternalVacancyEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    // ---- Helpers ---------------------------------------------------------------------------------
 
     private async Task<HttpClient> ClientAs(Guid userId, Guid companyId)
     {
@@ -107,15 +106,10 @@ public class ApplyForInternalVacancyEndpointTests
     private static (string, string, byte[]) PdfCv(string fileName = "priya-cv.pdf")
     {
         var bytes = new byte[2048];
-        bytes[0] = 0x25; bytes[1] = 0x50; bytes[2] = 0x44; bytes[3] = 0x46; // %PDF
+        bytes[0] = 0x25; bytes[1] = 0x50; bytes[2] = 0x44; bytes[3] = 0x46;
         return (fileName, "application/pdf", bytes);
     }
 
-    /// <summary>
-    /// Seeds the applying employee's Employee row directly (Id == the test user id), with the given
-    /// status. Employee.Create leaves an employee in Draft; Active goes through the real Activate()
-    /// domain method, the other states through the reflection test helper.
-    /// </summary>
     private async Task SeedEmployeeAsync(
         Guid userId,
         Guid companyId,
@@ -192,7 +186,6 @@ public class ApplyForInternalVacancyEndpointTests
         Assert.False(string.IsNullOrWhiteSpace(body.Error));
     }
 
-    // ---- Authentication ---------------------------------------------------------------------------
 
     [Fact]
     public async Task Post_Returns_Unauthorized_For_Anonymous()
@@ -204,7 +197,6 @@ public class ApplyForInternalVacancyEndpointTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ---- Happy path -------------------------------------------------------------------------------
 
     [Fact]
     public async Task Post_By_Plain_Employee_Creates_Linked_Candidate_Internal_Application_Cv_And_Audit()
@@ -226,7 +218,6 @@ public class ApplyForInternalVacancyEndpointTests
         Assert.NotEqual(Guid.Empty, created.CvDocumentId);
         Assert.Equal($"/api/companies/{companyId}/internal-vacancies/{vacancyId}", response.Headers.Location?.OriginalString);
 
-        // The employee-facing response carries no recruiter-facing pipeline data.
         using (var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync()))
         {
             foreach (var forbidden in new[] { "currentStageId", "notes", "firstName", "lastName", "email" })
@@ -280,7 +271,6 @@ public class ApplyForInternalVacancyEndpointTests
         Assert.Equal(HappyPathUser, cvChanged!.ActorUserId);
     }
 
-    // ---- Duplicates and reuse ---------------------------------------------------------------------
 
     [Fact]
     public async Task Post_Same_Vacancy_Twice_Returns_Conflict_Already_Applied_And_Keeps_One_Application()
@@ -333,7 +323,6 @@ public class ApplyForInternalVacancyEndpointTests
         Assert.Equal(2, await db.CandidateDocuments.CountAsync(d => d.CompanyId == companyId && d.CandidateId == candidate.Id));
     }
 
-    // ---- Tenancy and visibility -------------------------------------------------------------------
 
     [Fact]
     public async Task Post_To_Another_Companys_Route_Returns_Forbidden()
@@ -386,7 +375,6 @@ public class ApplyForInternalVacancyEndpointTests
         await AssertNothingCreatedAsync(companyId);
     }
 
-    // ---- Validation --------------------------------------------------------------------------------
 
     [Fact]
     public async Task Post_Without_CvFile_Returns_UnprocessableEntity_And_Creates_Nothing()
@@ -419,7 +407,6 @@ public class ApplyForInternalVacancyEndpointTests
         await AssertNothingCreatedAsync(companyId);
     }
 
-    // ---- Eligibility -------------------------------------------------------------------------------
 
     [Fact]
     public async Task Post_By_Leaving_Employee_Returns_Forbidden_Not_Eligible()
@@ -490,7 +477,6 @@ public class ApplyForInternalVacancyEndpointTests
         await AssertNothingCreatedAsync(companyId);
     }
 
-    // ---- Email already used by an external candidate ----------------------------------------------
 
     [Fact]
     public async Task Post_When_Work_Email_Belongs_To_Unlinked_External_Candidate_Returns_Conflict_And_Leaves_It_Untouched()
@@ -516,7 +502,6 @@ public class ApplyForInternalVacancyEndpointTests
         Assert.Equal(workEmail.ToUpperInvariant(), external.Email);
     }
 
-    // ---- HasApplied on the internal vacancy list --------------------------------------------------
 
     [Fact]
     public async Task Get_Internal_Vacancies_Reports_HasApplied_Only_For_The_Applied_Vacancy()
@@ -541,7 +526,6 @@ public class ApplyForInternalVacancyEndpointTests
         Assert.False(items[notApplied]);
     }
 
-    // ---- Recruiters cannot record the Internal source ---------------------------------------------
 
     [Fact]
     public async Task Recruiter_CreateApplication_With_Internal_Source_Returns_UnprocessableEntity()

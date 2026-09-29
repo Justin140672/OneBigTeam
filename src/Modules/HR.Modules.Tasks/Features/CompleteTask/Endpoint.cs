@@ -14,8 +14,6 @@ internal sealed class Endpoint(CompleteTaskHandler handler, ICurrentUser current
 
     public override async Task HandleAsync(CompleteTaskRequest request, CancellationToken cancellationToken)
     {
-        // NOT User.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's resolved
-        // Employee/UserId (see GetMyEmployee/Endpoint.cs for the rationale).
         if (currentUser.UserId is not { } completedBy)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());

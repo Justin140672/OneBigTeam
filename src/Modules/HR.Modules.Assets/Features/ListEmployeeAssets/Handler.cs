@@ -13,7 +13,6 @@ internal sealed class ListEmployeeAssetsHandler(AssetsDbContext db, AssetResourc
         Guid? callerUserId,
         CancellationToken cancellationToken)
     {
-        // Self, direct manager or HR administrator only.
         if (callerUserId is not { } callerId
             || !await authorizer.CanViewEmployeeAssetsAsync(
                 request.CompanyId, callerId, request.EmployeeId, cancellationToken))

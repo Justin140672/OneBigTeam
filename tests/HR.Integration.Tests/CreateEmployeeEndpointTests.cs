@@ -12,7 +12,6 @@ public class CreateEmployeeEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
 
-    // Pre-seeded user IDs that have the HrAdministrator role.
     private static readonly Guid User1 = new("aaaaaaaa-0000-0000-0000-000000000001");
     private static readonly Guid User2 = new("aaaaaaaa-0000-0000-0000-000000000002");
     private static readonly Guid User3 = new("aaaaaaaa-0000-0000-0000-000000000003");
@@ -30,9 +29,6 @@ public class CreateEmployeeEndpointTests
     {
         _factory = factory;
 
-        // Seed HrAdministrator (to create employees) and CompanyAdministrator + Employee (to
-        // update/read company settings via PUT/GET .../settings, which the employee-number
-        // scenarios below need) for each test user so the permission checks pass.
         Task.Run(async () =>
         {
             foreach (var userId in new[] { User1, User2, User3, User4, User5, User6, User7, User8, User9, User10, User11, User12 })
@@ -44,24 +40,12 @@ public class CreateEmployeeEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    // UpdateCompanySettings (used by SetEmployeeNumberModeAsync below) requires a real
-    // companies.companies row to exist — unlike CreateEmployee, which never checks the Company
-    // table directly. Scenarios that call SetEmployeeNumberModeAsync must seed a real company via
-    // this helper rather than using an arbitrary Guid as companyId.
-    // POST /api/companies (CreateCompany) was removed in 78a43344; this now provisions the
-    // company directly via CompaniesDbContext, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
     private async Task<Guid> CreateCompanyAsync(HttpClient client, string? name = null)
     {
         _ = client;
         return await CompanyTestSeeder.CreateCompanyAsync(_factory, name ?? $"Employee Number Test Co {Guid.NewGuid():N}");
     }
 
-    // Was calling PUT /api/companies/{id}/settings (UpdateCompanySettingsHandler), which only
-    // persists TimeZone/Locale and silently ignores every other field in the request body
-    // (including employeeNumberMode) — it still returned 200 OK, so CreateEmployee's
-    // "Automatic mode" checks kept reading back the default Manual mode and failing with
-    // "Employee number is required.". The actual employee-number/HR settings live behind
-    // PUT /api/companies/{id}/hr-settings (UpdateHrSettingsHandler/UpdateHrSettingsRequest).
     private static async Task SetEmployeeNumberModeAsync(
         HttpClient client, Guid companyId, string mode, string? prefix = null, int nextEmployeeNumber = 1, int minimumLength = 1)
     {
@@ -129,9 +113,6 @@ public class CreateEmployeeEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, User1, SystemRoles.HrAdministrator, companyId);
 
-        // Department, Location, Position Profile, Employment Type and Employee Number are all
-        // mandatory on employee creation — seed the minimum real reference data required for any
-        // employee to be created at all (see EmployeeReferenceDataSeeder for why).
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
 
         var response = await client.PostAsJsonAsync(
@@ -164,9 +145,6 @@ public class CreateEmployeeEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, User2, SystemRoles.HrAdministrator, companyId);
 
-        // Base reference data used for the manager (whose own department/position-profile isn't
-        // under test here); a distinct department + position profile are created afterwards to
-        // verify the employee-under-test picks up its own explicitly-assigned values.
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
 
         var managerResponse = await client.PostAsJsonAsync(
@@ -266,8 +244,6 @@ public class CreateEmployeeEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, User4, SystemRoles.HrAdministrator, companyId);
 
-        // Location/PositionProfile/EmploymentType are real (seeded) so the NotFound is
-        // attributable specifically to the unknown DepartmentId, not some other missing lookup.
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
@@ -400,7 +376,6 @@ public class CreateEmployeeEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
-        // Manual is the default mode, but set it explicitly for clarity.
         await SetEmployeeNumberModeAsync(client, companyId, "Manual");
 
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", new
@@ -477,8 +452,6 @@ public class CreateEmployeeEndpointTests
         var payload = await response.Content.ReadFromJsonAsync<EmployeePayload>();
         Assert.NotNull(payload);
 
-        // The response contract doesn't currently surface EmployeeNumber, so assert against the
-        // company settings' advanced counter — proof a number was actually claimed.
         var settingsResponse = await client.GetAsync($"/api/companies/{companyId}/hr-settings");
         settingsResponse.EnsureSuccessStatusCode();
         var settings = await settingsResponse.Content.ReadFromJsonAsync<SettingsPayload>();
@@ -544,8 +517,6 @@ public class CreateEmployeeEndpointTests
 
         var tasks = Enumerable.Range(0, concurrentCreations).Select(_ =>
         {
-            // A fresh HttpClient per concurrent request, sharing the same auth/tenant headers,
-            // avoids any accidental serialization introduced by reusing one HttpClient instance.
             var concurrentClient = _factory.CreateClient();
             concurrentClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User12.ToString());
             concurrentClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
@@ -636,7 +607,6 @@ public class CreateEmployeeEndpointTests
         Assert.Equal(HttpStatusCode.Created, responseB1.StatusCode);
 
         var settingsAResponse = await client.GetAsync($"/api/companies/{companyB}/hr-settings");
-        // Still scoped to companyB via the tenant header set above.
         settingsAResponse.EnsureSuccessStatusCode();
         var settingsB = await settingsAResponse.Content.ReadFromJsonAsync<SettingsPayload>();
         Assert.NotNull(settingsB);
@@ -780,8 +750,6 @@ public class CreateEmployeeEndpointTests
         Assert.Single(employees);
     }
 
-    // Regression: Post_Employees_Creates_Employee_With_Draft_Status above already exercises the
-    // no-Idempotency-Key path (no header sent) and confirms normal Created behaviour is unaffected.
 
     private sealed record DepartmentPayload(Guid Id);
     private sealed record PositionProfilePayload(Guid Id);

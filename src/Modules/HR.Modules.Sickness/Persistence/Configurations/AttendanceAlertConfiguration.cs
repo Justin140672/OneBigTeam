@@ -55,9 +55,6 @@ internal sealed class AttendanceAlertConfiguration : IEntityTypeConfiguration<At
 
         builder.HasIndex(a => a.CompanyId);
 
-        // SICK-04 duplicate-prevention guard: never more than one alert per employee+rule+evidence
-        // window. Enforced at the database level (not just in application code) so a job retry
-        // racing another instance still cannot create a duplicate.
         builder.HasIndex(a => new { a.CompanyId, a.EmployeeId, a.Rule, a.EvidencePeriodStart, a.EvidencePeriodEnd })
             .IsUnique();
     }

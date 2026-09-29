@@ -1,5 +1,3 @@
-// SEA-08: Search security matrix — task search cross-company isolation,
-// consistent out-of-range page behaviour and validator coverage.
 using HR.Modules.Tasks.Contracts;
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Features.GetMyTasks;
@@ -15,7 +13,6 @@ public class TaskSearchSecurityTests
 {
     private static readonly DateTimeOffset Now = new(2026, 8, 28, 9, 0, 0, TimeSpan.Zero);
 
-    // ── Cross-company isolation — GetMyTasks ───────────────────────────────
 
     [Fact]
     public async Task GetMyTasks_TotalCount_Excludes_Other_Company_Tasks()
@@ -28,7 +25,7 @@ public class TaskSearchSecurityTests
         ctx.TaskItems.AddRange(
             MakeTask(companyA, userId),
             MakeTask(companyA, userId),
-            MakeTask(companyB, userId));   // same user, different company
+            MakeTask(companyB, userId));
         await ctx.SaveChangesAsync();
 
         var result = await new GetMyTasksHandler(ctx, new FakeEmployeeNameReader()).HandleAsync(
@@ -57,7 +54,6 @@ public class TaskSearchSecurityTests
         Assert.Empty(result.Items);
     }
 
-    // ── Cross-company isolation — GetEmployeeTasks ────────────────────────
 
     [Fact]
     public async Task GetEmployeeTasks_TotalCount_Excludes_Other_Company_Tasks()
@@ -70,7 +66,7 @@ public class TaskSearchSecurityTests
         ctx.TaskItems.AddRange(
             MakeTaskForEmployee(companyA, employeeId),
             MakeTaskForEmployee(companyA, employeeId),
-            MakeTaskForEmployee(companyB, employeeId));  // same employee, different company
+            MakeTaskForEmployee(companyB, employeeId));
         await ctx.SaveChangesAsync();
 
         var result = await new GetEmployeeTasksHandler(ctx, new FakeEmployeeNameReader()).HandleAsync(
@@ -80,7 +76,6 @@ public class TaskSearchSecurityTests
         Assert.Equal(2, result.TotalCount);
     }
 
-    // ── Validator coverage ─────────────────────────────────────────────────
 
     [Fact]
     public void GetMyTasksValidator_Rejects_Zero_PageNumber()
@@ -106,7 +101,6 @@ public class TaskSearchSecurityTests
         Assert.False(result.IsValid);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────
 
     private static TaskItem MakeTask(Guid companyId, Guid assignedEmployeeId) =>
         TaskItem.Create(Guid.NewGuid(), companyId, Guid.NewGuid(),

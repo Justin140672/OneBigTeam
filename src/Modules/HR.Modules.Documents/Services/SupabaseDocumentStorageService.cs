@@ -56,7 +56,6 @@ internal sealed class SupabaseDocumentStorageService : IDocumentStorageService
 
         var result = await response.Content.ReadFromJsonAsync<SignedUrlResponse>(cancellationToken: cancellationToken);
 
-        // Supabase returns a path-only signedURL; prepend the project URL to make it absolute
         var signedUrl = result!.SignedUrl;
         return signedUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase)
             ? new Uri(signedUrl)

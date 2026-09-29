@@ -343,9 +343,6 @@ else
     private CurrentCompensationModel? _currentCompensation;
     private bool _hasInternalVacancies;
 
-    // Backing data for the "Request Leave" quick-action dialog, rendered directly on this tab
-    // so it opens on top of whatever tab the user is currently viewing instead of forcing a
-    // navigation to the Leave tab first.
     private IReadOnlyList<LeaveBalanceItemModel> _allBalances = [];
     private WorkingDays _effectiveWorkingDays = WorkingDays.Monday | WorkingDays.Tuesday |
         WorkingDays.Wednesday | WorkingDays.Thursday | WorkingDays.Friday;
@@ -372,9 +369,6 @@ else
         var requestsTask   = LeaveService.ListLeaveRequestsAsync(CompanyId, EmployeeId);
         var tasksTask      = TaskService.GetMyTasksAsync(CompanyId);
         var sicknessTask   = SicknessService.GetMySicknessRecordsAsync(CompanyId, EmployeeId);
-        // Self-scoped endpoint (employees/me/probation-status) — the HR-only
-        // GetProbationRecordByEmployee ("probation:manage") 403s for a real employee viewing
-        // their own profile, which used to be silently swallowed by a blanket catch{}.
         var probationTask  = ProbationService.GetMyProbationStatusAsync(CompanyId);
         var onboardingTask = OnboardingService.GetMyOnboardingStatusAsync(CompanyId);
         var holidaysTask   = PublicHolidayService.ListAsync(CompanyId);
@@ -401,7 +395,6 @@ else
         }
         catch
         {
-            // Individual results are salvaged below.
         }
 
         static T? Result<T>(Task<T?> t) => t.IsCompletedSuccessfully ? t.Result : default;
@@ -448,7 +441,6 @@ else
     {
         if (sickness is null) return;
 
-        // Open/ongoing records have no TotalDays yet, so only completed records are summed.
         var completedDays = sickness.Records
             .Where(r => r.TotalDays.HasValue)
             .Sum(r => r.TotalDays!.Value);

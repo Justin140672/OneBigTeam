@@ -51,7 +51,6 @@ public class RecruitmentAdministrationAuthorizationTests
     {
         _factory = factory;
 
-        // Every persona holds the Employee floor role, mirroring production.
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, EmployeeUser, SystemRoles.Employee);
@@ -91,9 +90,6 @@ public class RecruitmentAdministrationAuthorizationTests
             response.StatusCode is not (HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized),
             $"Expected the request to pass authorization (not 401/403) but got {(int)response.StatusCode} {response.StatusCode}");
 
-    // ─────────────────────────────────────────────────────────────────────────────────
-    // Seed test data helpers
-    // ─────────────────────────────────────────────────────────────────────────────────
 
     private async Task<Guid> SeedVacancyAsync(HttpClient recruiterClient, Guid companyId)
     {
@@ -126,9 +122,6 @@ public class RecruitmentAdministrationAuthorizationTests
         return recruiter.Id;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────────────
-    // 1. ListVacancies: GET /api/companies/{companyId}/vacancies
-    // ─────────────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task ListVacancies_IsAllowed_ForRecruiter()
@@ -195,9 +188,6 @@ public class RecruitmentAdministrationAuthorizationTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────────────
-    // 2. GetVacancy: GET /api/companies/{companyId}/vacancies/{vacancyId}
-    // ─────────────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task GetVacancy_IsAllowed_ForRecruiter()
@@ -266,9 +256,6 @@ public class RecruitmentAdministrationAuthorizationTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────────────
-    // 3. ListExternalRecruiters: GET /api/companies/{companyId}/external-recruiters
-    // ─────────────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task ListExternalRecruiters_IsAllowed_ForRecruiter()
@@ -335,9 +322,6 @@ public class RecruitmentAdministrationAuthorizationTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────────────
-    // 4. GetExternalRecruiter: GET /api/companies/{companyId}/external-recruiters/{externalRecruiterId}
-    // ─────────────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task GetExternalRecruiter_IsAllowed_ForRecruiter()
@@ -406,9 +390,6 @@ public class RecruitmentAdministrationAuthorizationTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────────────
-    // 5. GetExternalRecruiterActivitySummary: GET /api/companies/{companyId}/external-recruiters/{externalRecruiterId}/activity-summary
-    // ─────────────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task GetExternalRecruiterActivitySummary_IsAllowed_ForRecruiter()
@@ -483,9 +464,6 @@ public class RecruitmentAdministrationAuthorizationTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────────────
-    // 6. ListRecruitmentStages: GET /api/companies/{companyId}/recruitment-stages
-    // ─────────────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task ListRecruitmentStages_IsAllowed_ForRecruiter()
@@ -552,9 +530,6 @@ public class RecruitmentAdministrationAuthorizationTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────────────
-    // 7. GetVacanciesNeedingPositionProfileReview: GET /api/companies/{companyId}/vacancies/position-profile-matches/review
-    // ─────────────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task GetVacanciesNeedingPositionProfileReview_IsAllowed_ForRecruiter()
@@ -621,9 +596,6 @@ public class RecruitmentAdministrationAuthorizationTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────────────
-    // Payload models for deserialization
-    // ─────────────────────────────────────────────────────────────────────────────────
 
     private sealed record VacancyPayload(Guid Id, Guid CompanyId);
 }

@@ -27,12 +27,6 @@ internal sealed class PermissionDenialAuditThrottle(IClock clock)
 
     private readonly ConcurrentDictionary<(Guid UserId, Guid PermissionId), DenialWindowState> _state = new();
 
-    /// <summary>
-    /// Records a denial and returns whether it should be audited. Returns true exactly once per
-    /// window (the first denial) and once more if/when the burst reaches
-    /// <see cref="RepeatedDenialThreshold"/> denials inside that same window (the escalation entry,
-    /// <paramref name="isRepeatedEscalation"/> = true) — every other denial in between is suppressed.
-    /// </summary>
     public bool ShouldAudit(Guid userId, Guid permissionId, out bool isRepeatedEscalation, out int denialCountInWindow)
     {
         var now = clock.UtcNowOffset();
@@ -59,7 +53,6 @@ internal sealed class PermissionDenialAuditThrottle(IClock clock)
 
         if (state.Count >= RepeatedDenialThreshold && !state.EscalatedInWindow)
         {
-            // Mark escalated so we don't re-audit every subsequent denial in the same window.
             _state.TryUpdate(key, state with { EscalatedInWindow = true }, state);
             isRepeatedEscalation = true;
             return true;

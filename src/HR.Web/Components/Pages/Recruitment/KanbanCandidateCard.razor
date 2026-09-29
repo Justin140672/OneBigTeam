@@ -67,21 +67,12 @@
 @code {
     [Parameter, EditorRequired] public KanbanCandidateModel Candidate { get; set; } = default!;
     [Parameter] public string RecruiterName { get; set; } = "Unassigned";
-    // StageId -> TerminalOutcome lookup result for this candidate's current stage, resolved by the
-    // parent board (see VacancyKanbanBoard's _stageOutcomes) — None for non-terminal stages.
     [Parameter] public RecruitmentStageTerminalOutcome TerminalOutcome { get; set; } = RecruitmentStageTerminalOutcome.None;
     [Parameter] public EventCallback<KanbanCandidateModel> OnOpen { get; set; }
 
-    // Stages offered by the "Move to stage…" menu — the parent board passes exactly the columns
-    // currently visible on the board (minus this card's own current stage), never a client-invented
-    // list. The server (MoveApplicationStageAsync's endpoint) still owns all real authorization/
-    // validation — this menu is just a keyboard-accessible alternative to dragging, not a parallel
-    // rules engine.
     [Parameter] public IReadOnlyList<KanbanColumnModel> AvailableStages { get; set; } = [];
     [Parameter] public EventCallback<Guid> OnMoveToStage { get; set; }
 
-    // Ticket #1: navigates to the Review CV screen for this candidate (parent board wires the route
-    // + returnUrl, same pattern as OnOpen).
     [Parameter] public EventCallback<KanbanCandidateModel> OnReviewCv { get; set; }
 
     private bool _menuOpen;

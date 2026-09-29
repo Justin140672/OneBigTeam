@@ -9,13 +9,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Recruitment.Tests;
 
-/// <summary>
-/// [P1] CandidateDocumentScanDispatchInterceptor enqueues ScanCandidateDocumentJob for every newly
-/// inserted CandidateDocument once the insert is saved. The InMemory provider has no real
-/// transactions, so only the no-ambient-transaction path (SaveChanges is the commit) is covered here;
-/// the transaction-commit path is covered by CandidateDocumentScanGatingEndpointTests in
-/// HR.Integration.Tests against Postgres.
-/// </summary>
 public class CandidateDocumentScanDispatchInterceptorTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 26, 9, 0, 0, TimeSpan.Zero);
@@ -133,7 +126,6 @@ public class CandidateDocumentScanDispatchInterceptorTests
         db.CandidateDocuments.Add(second);
         await db.SaveChangesAsync();
 
-        // Then a save with nothing new.
         await db.SaveChangesAsync();
 
         Assert.Equal(new[] { first.Id, second.Id }, ScanJobIds(client));
@@ -156,7 +148,6 @@ public class CandidateDocumentScanDispatchInterceptorTests
 
         await using var verify = NewContext(new RecordingBackgroundJobClient());
         var saved = await verify.CandidateDocuments.AsNoTracking().SingleAsync(d => d.Id == document.Id);
-        // Still Pending, so ReconcileCandidateDocumentScansJob will dispatch it later.
         Assert.Equal(CandidateDocumentScanStatus.Pending, saved.ScanStatus);
     }
 }

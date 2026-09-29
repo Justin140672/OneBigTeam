@@ -40,7 +40,6 @@ public sealed class OrganisationDataExportConcurrencyGateTests
         var third = await gate.AcquireAsync(CancellationToken.None);
         Assert.Null(third);
 
-        // Releasing one slot lets a further acquisition succeed.
         await first!.DisposeAsync();
         var fourth = await gate.AcquireAsync(CancellationToken.None);
         Assert.NotNull(fourth);
@@ -60,9 +59,8 @@ public sealed class OrganisationDataExportConcurrencyGateTests
         Assert.NotNull(b);
 
         await a!.DisposeAsync();
-        await a.DisposeAsync(); // second dispose must be a no-op
+        await a.DisposeAsync();
 
-        // Exactly one slot freed: one acquire succeeds, the next times out.
         var c = await gate.AcquireAsync(CancellationToken.None);
         Assert.NotNull(c);
 

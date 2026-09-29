@@ -134,12 +134,6 @@ internal sealed class EmployeeCreatedHandler(
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    /// <summary>
-    /// Returns the active checklist tasks for the employee's onboarding template, or null if
-    /// the employee has no position profile, the profile has no linked template, or the
-    /// template currently has no active tasks — in every such case callers must fall back to
-    /// the default hardcoded onboarding checklist to remain backward compatible.
-    /// </summary>
     private async Task<IReadOnlyList<OnboardingTemplateTaskItem>?> GetTemplateTasksAsync(
         EmployeeCreatedIntegrationEvent e,
         CancellationToken cancellationToken)

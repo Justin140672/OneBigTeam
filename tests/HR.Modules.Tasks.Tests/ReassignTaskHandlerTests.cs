@@ -23,8 +23,6 @@ public class ReassignTaskHandlerTests
         FakeRoleAuthorizationService? authorizationService = null,
         FakeDirectReportsReader? directReportsReader = null) =>
         new(context, notif ?? new FakeNotificationWriter(), Clock, audit ?? new FakeAuditPublisher(),
-            // DSH-01: defaults to an HR-Administrator caller so tests unrelated to reassignment
-            // authorization don't need to wire up assignee/manager relationships.
             new TasksResourceAuthorizer(
                 authorizationService ?? new FakeRoleAuthorizationService(HrAdministratorRoleId),
                 directReportsReader ?? new FakeDirectReportsReader()));
@@ -293,7 +291,6 @@ public class ReassignTaskHandlerTests
         Assert.Empty(notif.Written);
     }
 
-    // ── DSH-01: resource-ownership authorization ──────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Returns_Forbidden_For_Unrelated_Caller()

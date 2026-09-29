@@ -1,9 +1,5 @@
 namespace HR.Web.Components.Pages.Employees;
 
-/// <summary>
-/// Top-level navigation groups for the employee profile screen. Enum order here also drives
-/// the order of the outer tab strip.
-/// </summary>
 public enum EmployeeProfileGroup
 {
     Overview,
@@ -14,12 +10,6 @@ public enum EmployeeProfileGroup
     Activity
 }
 
-/// <summary>
-/// Individual sub-sections of the employee profile screen. These are the stable keys that
-/// replace the old hand-computed positional tab indices — nothing here is positional, and the
-/// integer values are only persisted to localStorage (see <c>EmployeeEdit.OnAfterRenderAsync</c>),
-/// so do not reorder existing members without accepting that stored "last section" values reset.
-/// </summary>
 public enum EmployeeProfileSection
 {
     Details,
@@ -61,7 +51,6 @@ public static class EmployeeProfileNavigation
         _ => group.ToString()
     };
 
-    /// <summary>Canonical display order of every section, grouped.</summary>
     public static readonly IReadOnlyList<EmployeeProfileSectionDef> All = new List<EmployeeProfileSectionDef>
     {
         new(EmployeeProfileGroup.Overview, EmployeeProfileSection.Details, "details", "Details"),
@@ -76,10 +65,6 @@ public static class EmployeeProfileNavigation
         new(EmployeeProfileGroup.TasksRecords, EmployeeProfileSection.Documents, "documents", "Documents"),
         new(EmployeeProfileGroup.TasksRecords, EmployeeProfileSection.Acknowledgements, "acknowledgements", "Acknowledgement History"),
         new(EmployeeProfileGroup.TasksRecords, EmployeeProfileSection.Onboarding, "onboarding", "Onboarding"),
-        // SPEC-OFF-01: the old separate "Offboarding" tab was merged into the single "Leaving &
-        // Offboarding" workspace (EmployeeLeavingTab.razor) — EmployeeProfileSection.Offboarding is
-        // kept only as a deep-link/bookmark alias (see ParseTab below and GetOffboardingOverview's
-        // OnNavigateToOffboarding caller), it is no longer a distinct entry in the tab strip.
         new(EmployeeProfileGroup.TasksRecords, EmployeeProfileSection.Leaving, "leaving", "Leaving & Offboarding"),
         new(EmployeeProfileGroup.Assets, EmployeeProfileSection.Assets, "assets", "Assets"),
         new(EmployeeProfileGroup.Activity, EmployeeProfileSection.Timeline, "timeline", "Timeline"),
@@ -87,7 +72,6 @@ public static class EmployeeProfileNavigation
         new(EmployeeProfileGroup.Activity, EmployeeProfileSection.Audit, "audit", "Audit"),
     };
 
-    /// <summary>Order of the outer group strip.</summary>
     public static readonly IReadOnlyList<EmployeeProfileGroup> GroupOrder = new[]
     {
         EmployeeProfileGroup.Overview,
@@ -103,14 +87,6 @@ public static class EmployeeProfileNavigation
 
     public static EmployeeProfileGroup GroupOf(EmployeeProfileSection section) => Def(section).Group;
 
-    /// <summary>
-    /// Maps a legacy or current <c>?tab=</c> query value onto a section. Every value the old
-    /// positional switch understood (<c>probation, leave, sickness, documents, onboarding,
-    /// offboarding, leaving, timeline</c>) is still accepted, and because the new scheme keys off
-    /// the per-section <see cref="EmployeeProfileSectionDef.Key"/> the caller can now also deep-link
-    /// to any other section (e.g. <c>?tab=compensation</c> -&gt; Career &amp; Pay &gt; Compensation).
-    /// Returns <c>null</c> for an unrecognised value so the caller falls back to the default section.
-    /// </summary>
     public static EmployeeProfileSection? ParseTab(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -128,8 +104,6 @@ public static class EmployeeProfileNavigation
             "compensation-history" => EmployeeProfileSection.Compensation,
             "promotion" or "promotion-history" => EmployeeProfileSection.Promotions,
             "emergency" or "emergency-contact" => EmployeeProfileSection.EmergencyContacts,
-            // "offboarding" is no longer its own tab key (see All above) — old bookmarks/links using
-            // ?tab=offboarding still land on the unified Leaving & Offboarding workspace.
             "offboarding" => EmployeeProfileSection.Leaving,
             _ => null
         };

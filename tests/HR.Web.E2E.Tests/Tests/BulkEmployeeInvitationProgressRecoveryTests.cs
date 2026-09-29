@@ -3,7 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>Split out of BulkEmployeeInvitationTests for real cross-test parallelism — see BulkEmployeeInvitationGettingStartedTests' remarks.</summary>
 public sealed class BulkEmployeeInvitationProgressRecoveryTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -34,11 +33,8 @@ public sealed class BulkEmployeeInvitationProgressRecoveryTests(HrAdminPersonaFi
 
         await progressPanel.WaitForVisibleAsync();
 
-        // Refresh the page entirely — InvitationBatchProgressPanel.OnParametersSetAsync re-fetches
-        // via GET .../invitation-batches/latest rather than relying on any client-held state, so
-        // the just-queued batch's progress must still be visible afterwards.
         await _page.ReloadAsync();
-        await empList.IsInviteModeBannerVisibleAsync(); // settle: wait for the page shell to repaint
+        await empList.IsInviteModeBannerVisibleAsync();
         await progressPanel.WaitForVisibleAsync();
 
         await progressPanel.WaitForCompletedAsync();

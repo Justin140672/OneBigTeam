@@ -14,10 +14,6 @@ internal sealed record OfferCandidateResponse(
     DateTimeOffset AppliedAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    // Read-only informational context surfaced from the Vacancy's linked Position Profile (via
-    // IPositionProfileReader.GetEmploymentDefaultsAsync) so HR can see the role's defined
-    // compensation/terms while deciding to make an offer. Null only if the linked profile can no
-    // longer be found (Vacancy.PositionProfileId is otherwise always populated).
     Guid PositionProfileId,
     string? PositionProfileTitle,
     decimal? SalaryMin,

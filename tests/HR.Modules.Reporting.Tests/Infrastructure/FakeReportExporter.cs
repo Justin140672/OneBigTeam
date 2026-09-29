@@ -2,11 +2,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Reporting.Tests.Infrastructure;
 
-/// <summary>
-/// Hand-rolled fake for <see cref="IReportExporter"/> — records the format/data it was called
-/// with and returns a pre-configured file, so export handler tests can assert both the inbound
-/// mapping and the outbound response without depending on the real ClosedXML/QuestPDF/CSV code.
-/// </summary>
 internal sealed class FakeReportExporter : IReportExporter
 {
     private readonly ReportExportFile _file;

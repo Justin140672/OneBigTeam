@@ -12,14 +12,6 @@ using static HR.Web.Tests.ApiTestSupport;
 
 namespace HR.Web.Tests;
 
-/// <summary>
-/// CodeQL #59 (cross-site scripting, flagged on the support request description): the
-/// description a user submits is rendered on SupportRequestDetail.razor via Razor text
-/// interpolation (<c>@_detail.Description</c>), which HTML-encodes, never via
-/// <see cref="MarkupString"/>. The "StringContent" CodeQL traced is the outbound multipart request
-/// body built by <see cref="SupportService.SubmitSupportRequestAsync"/> (text/plain form field sent
-/// to the API), not an HTML response. These tests pin all three facts without bUnit.
-/// </summary>
 public class SupportRequestDescriptionEncodingTests
 {
     private const string MaliciousDescription = "<script>alert(1)</script><img src=x onerror=alert(2)>\"'&";
@@ -102,7 +94,6 @@ public class SupportRequestDescriptionEncodingTests
         throw new InvalidOperationException("Could not locate the repository root from " + AppContext.BaseDirectory);
     }
 
-    /// <summary>Emits exactly what Razor compiles <c>&lt;dd&gt;@_detail.Description&lt;/dd&gt;</c> to.</summary>
     public sealed class DescriptionProbe : ComponentBase
     {
         [Parameter]
@@ -118,7 +109,6 @@ public class SupportRequestDescriptionEncodingTests
 
     private sealed record CapturedPart(string? Name, string ContentTypeName, string? MediaType, string Value);
 
-    /// <summary>Reads every multipart part inside SendAsync (the service disposes the content afterwards).</summary>
     private sealed class MultipartCapturingHandler : HttpMessageHandler
     {
         public List<CapturedPart> Parts { get; } = [];

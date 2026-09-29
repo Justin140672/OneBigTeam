@@ -25,7 +25,6 @@ public class UserInviteEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    // ── SendInvite ────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Post_Invite_Returns_Unauthorized_For_Anonymous_Request()
@@ -85,7 +84,6 @@ public class UserInviteEndpointTests
         Assert.False(string.IsNullOrWhiteSpace(payload!.Token));
         Assert.True(payload.ExpiresAt > DateTimeOffset.UtcNow);
 
-        // Verify invite email was dispatched
         var sent = _factory.EmailSender.Sent.SingleOrDefault(e => e.ToEmail == email);
         Assert.NotNull(sent);
         Assert.Contains(payload.Token, sent!.HtmlBody);
@@ -116,7 +114,6 @@ public class UserInviteEndpointTests
         Assert.NotNull(sent);
         Assert.Equal(email, sent!.ToEmail);
         Assert.Equal("You have been invited to One Big Team", sent.Subject);
-        // The link built by FakeInviteLinkBuilder must appear in the body
         Assert.Contains($"https://test.local/invite/{payload!.Token}", sent.HtmlBody);
     }
 
@@ -144,7 +141,6 @@ public class UserInviteEndpointTests
         Assert.Equal(HttpStatusCode.OK, second.StatusCode);
         Assert.NotEqual(firstPayload!.Token, secondPayload!.Token);
 
-        // Only one pending invite should remain in the DB
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         var count = await db.UserInvites
@@ -152,7 +148,6 @@ public class UserInviteEndpointTests
         Assert.Equal(1, count);
     }
 
-    // ── AcceptInvite ──────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Post_Accept_Returns_NotFound_For_Unknown_Token()
@@ -180,8 +175,6 @@ public class UserInviteEndpointTests
         var payload = await response.Content.ReadFromJsonAsync<AcceptPayload>();
         Assert.Equal(employeeId, payload!.UserId);
 
-        // Verify a real Supabase-backed UserProfile (not a local-auth ApplicationUser — see
-        // Endpoint.cs's remarks) and role were created in DB.
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         Assert.True(await db.UserProfiles.AnyAsync(p => p.Id == employeeId));
@@ -199,12 +192,10 @@ public class UserInviteEndpointTests
 
         using var client = _factory.CreateClient();
 
-        // First accept
         var first = await client.PostAsJsonAsync("/api/invites/accept",
             new { token, password = "SecurePass1!" });
         Assert.Equal(HttpStatusCode.OK, first.StatusCode);
 
-        // Second accept — should conflict
         var second = await client.PostAsJsonAsync("/api/invites/accept",
             new { token, password = "SecurePass1!" });
         Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
@@ -214,7 +205,6 @@ public class UserInviteEndpointTests
     public async Task Post_Accept_Returns_BadRequest_For_Expired_Token()
     {
         var employeeId = Guid.NewGuid();
-        // Seed an already-expired invite
         var token = await SeedInviteAsync(employeeId, expiredDaysOffset: -1);
 
         using var client = _factory.CreateClient();
@@ -248,18 +238,12 @@ public class UserInviteEndpointTests
         Assert.False(await db.UserProfiles.AnyAsync(p => p.Id == employeeId));
         Assert.False(await db.UserRoles.AnyAsync(ur => ur.UserId == employeeId));
 
-        // No account was ever created via the Supabase gateway for this email.
         Assert.DoesNotContain(_factory.SupabaseAuthGateway.ConfirmedUsersCreated, u => u.Email == email);
 
         var reloaded = await db.UserInvites.SingleAsync(i => i.Id == inviteId);
         Assert.False(reloaded.IsClaimed);
     }
 
-    // Sequential race: an admin cancels the invite, then the invitee (working from a stale page)
-    // submits acceptance. This deterministically exercises the IsCancelled short-circuit rather
-    // than the underlying Version concurrency token (which guards the case where both requests
-    // race on the same in-flight read — see HR.Modules.Identity.Tests/CancelInviteHandlerTests for
-    // a direct concurrency-token test using two DbContexts against the same store).
     [Fact]
     public async Task Post_Accept_After_Cancel_Endpoint_Call_Returns_Conflict()
     {
@@ -313,8 +297,6 @@ public class UserInviteEndpointTests
             var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
             token = (await db.UserInvites.SingleAsync(i => i.Id == inviteId)).Token;
 
-            // Simulates a previous request that already created the InviteAcceptanceOperation row
-            // (Status = Pending) and called Supabase, but crashed before the local commit.
             var operation = InviteAcceptanceOperation.CreatePending(
                 Guid.NewGuid(), inviteId, companyId, employeeId, email, DateTimeOffset.UtcNow);
             operationId = operation.Id;
@@ -359,7 +341,6 @@ public class UserInviteEndpointTests
         Assert.Equal(InviteAcceptanceOperation.StatusCompleted, reloadedOperation.Status);
         Assert.Equal(resolvedSupabaseUserId, reloadedOperation.SupabaseAuthUserId);
 
-        // No fresh Supabase account was created — this was a resumed attempt.
         Assert.DoesNotContain(_factory.SupabaseAuthGateway.ConfirmedUsersCreated, u => u.Email == email);
     }
 
@@ -371,8 +352,6 @@ public class UserInviteEndpointTests
         var email = $"clash.{Guid.NewGuid():N}@example.com";
         var inviteId = await IdentityUserAdminTestHelpers.SeedInviteAsync(_factory, companyId, employeeId, email);
 
-        // A genuinely unrelated pre-existing account already owns the Supabase identity that
-        // GetUserIdByEmailAsync will resolve for this email.
         var otherEmployeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId, "Other", "Person");
         var unrelatedSupabaseUserId = Guid.NewGuid();
 
@@ -410,7 +389,6 @@ public class UserInviteEndpointTests
         var reloadedInvite = await verifyDb.UserInvites.SingleAsync(i => i.Id == inviteId);
         Assert.False(reloadedInvite.IsClaimed);
 
-        // The pre-existing unrelated profile was left untouched.
         var untouched = await verifyDb.UserProfiles.SingleAsync(p => p.Id == otherEmployeeId);
         Assert.Equal(unrelatedSupabaseUserId, untouched.SupabaseAuthUserId);
     }
@@ -430,8 +408,6 @@ public class UserInviteEndpointTests
             token = (await db.UserInvites.SingleAsync(i => i.Id == inviteId)).Token;
         }
 
-        // EmailAlreadyRegisteredException is thrown, but GetUserIdByEmailAsync cannot resolve an id
-        // for this email (not present in UserIdsByEmail) — there is nothing safe to resume.
         _factory.SupabaseAuthGateway.EmailAlreadyRegisteredFor = email;
 
         using var client = _factory.CreateClient();
@@ -525,7 +501,7 @@ public class UserInviteEndpointTests
         _factory.SupabaseAuthGateway.UserIdsByEmail[email] = unrelatedSupabaseUserId;
         _factory.SupabaseAuthGateway.MetadataByEmail[email] = new Dictionary<string, string>
         {
-            ["provisioning_operation_id"] = Guid.NewGuid().ToString(), // some other operation's id
+            ["provisioning_operation_id"] = Guid.NewGuid().ToString(),
         };
 
         using var client = _factory.CreateClient();
@@ -569,8 +545,6 @@ public class UserInviteEndpointTests
     [Fact]
     public async Task Post_Accept_First_Time_Creates_Pending_Operation_That_Reaches_Completed()
     {
-        // Confirms the new InviteAcceptanceOperation row is created and driven straight through to
-        // Completed within a single uninterrupted request (the "no interruption" happy path).
         var employeeId = Guid.NewGuid();
         var (token, inviteId, _) = await SeedInviteAsync(employeeId, expiredDaysOffset: 7, cancelled: false);
 
@@ -589,7 +563,6 @@ public class UserInviteEndpointTests
         Assert.NotNull(operation.CompletedAt);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
 
     private async Task<string> SeedInviteAsync(Guid employeeId, int expiredDaysOffset)
     {
@@ -606,11 +579,9 @@ public class UserInviteEndpointTests
         var now = DateTimeOffset.UtcNow;
         var invite = UserInvite.Create(employeeId, Guid.NewGuid(), $"invite.{Guid.NewGuid():N}@example.com", now);
 
-        // Manually adjust expiry for expired-token tests by replacing the invite
-        // with one constructed at a past time so ExpiresAt is in the past.
         if (expiredDaysOffset < 0)
         {
-            var pastNow = now.AddDays(expiredDaysOffset - 7); // created far enough back that 7-day window passed
+            var pastNow = now.AddDays(expiredDaysOffset - 7);
             invite = UserInvite.Create(employeeId, Guid.NewGuid(), invite.Email, pastNow);
         }
 

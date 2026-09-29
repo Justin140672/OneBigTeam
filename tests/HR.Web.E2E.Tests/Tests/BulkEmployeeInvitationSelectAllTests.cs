@@ -3,7 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>Split out of BulkEmployeeInvitationTests for real cross-test parallelism — see BulkEmployeeInvitationGettingStartedTests' remarks.</summary>
 public sealed class BulkEmployeeInvitationSelectAllTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -19,10 +18,6 @@ public sealed class BulkEmployeeInvitationSelectAllTests(HrAdminPersonaFixture f
         await login.GoToAsync();
         await login.LoginAsync(HrAdminEmail);
 
-        // BulkInvite[3] isn't referenced directly below — this test only needs "at least one
-        // eligible candidate exists", which every still-uninvited pool member already guarantees.
-        // Reserving this index (rather than relying on another test's own reserved member) keeps
-        // this test's precondition independent of execution order.
         _ = SeededE2eEmployees.BulkInvite[3];
 
         await empList.GoToInviteModeAsync(AcmeId);

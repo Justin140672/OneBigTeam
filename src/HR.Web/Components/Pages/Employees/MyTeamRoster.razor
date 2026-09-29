@@ -110,10 +110,6 @@
         await LoadAsync();
     }
 
-    // @bind-Value already keeps _search current; ValueChange (fired on the underlying <input>'s
-    // native "change"/blur event, not on every keystroke) just needs to exist to trigger the
-    // re-render that recomputes _filteredItems — same wiring as EmployeeDirectory.razor's search
-    // box, which Playwright drives via FillAsync + Tab (see EmployeeDirectoryPage.SearchAsync).
     private void OnSearchChanged(Syncfusion.Blazor.Inputs.ChangedEventArgs args) { }
 
     private string ProfileUrl(Guid employeeId) => $"/companies/{CompanyId}/employees/{employeeId}/team-view";

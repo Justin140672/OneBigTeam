@@ -17,7 +17,6 @@ internal sealed class GetHrSettingsHandler(CompaniesDbContext dbContext)
 
         if (settings is null)
         {
-            // Company exists but has no customised settings — return defaults
             var exists = await dbContext.Companies
                 .AsNoTracking()
                 .AnyAsync(c => c.Id == request.CompanyId, cancellationToken);

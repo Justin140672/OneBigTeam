@@ -3,16 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies two Employee Edit page layout changes on the Employment tab
-/// (EmployeeEmploymentTab.razor):
-/// - "Hours"/"FTE"/"Effective From" read-only fields render alongside "Current Salary".
-/// - The "Organisation" card renders above the "Dates" card.
-///
-/// Uses the seeded "Sarah Chen" employee (ID: 30000000-0000-0000-0000-000000000001), who has a
-/// current compensation record (see EmployeeCompensationTabTests' own header comment), so her
-/// Hours/FTE/Effective From fields are populated rather than showing the "—" empty-state.
-/// </summary>
 public sealed class EmployeeEmploymentTabUiUpdatesTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId    = Guid.Parse("00000000-0000-0000-0000-000000000001");

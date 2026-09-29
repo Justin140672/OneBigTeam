@@ -2,17 +2,13 @@ using HR.Web.Components.Pages.Dashboards;
 
 namespace HR.Web.Tests;
 
-/// <summary>
-/// DSH-07: pure key-to-next-index maths for the WAI-ARIA tabs keyboard pattern on the
-/// operational dashboards (<see cref="DashboardTabKeyboard.NextIndex"/>).
-/// </summary>
 public class DashboardTabKeyboardTests
 {
     [Theory]
     [InlineData("ArrowRight", 0, 3, 1)]
     [InlineData("ArrowRight", 1, 3, 2)]
-    [InlineData("ArrowRight", 2, 3, 0)] // wraps past the last tab back to the first
-    [InlineData("ArrowDown", 0, 3, 1)]  // ArrowDown is an alias for ArrowRight
+    [InlineData("ArrowRight", 2, 3, 0)]
+    [InlineData("ArrowDown", 0, 3, 1)]
     [InlineData("ArrowDown", 2, 3, 0)]
     public void NextIndex_ForwardKeys_AdvanceWithWrapAround(string key, int current, int count, int expected)
     {
@@ -22,8 +18,8 @@ public class DashboardTabKeyboardTests
     [Theory]
     [InlineData("ArrowLeft", 2, 3, 1)]
     [InlineData("ArrowLeft", 1, 3, 0)]
-    [InlineData("ArrowLeft", 0, 3, 2)] // wraps past the first tab round to the last
-    [InlineData("ArrowUp", 0, 3, 2)]   // ArrowUp is an alias for ArrowLeft
+    [InlineData("ArrowLeft", 0, 3, 2)]
+    [InlineData("ArrowUp", 0, 3, 2)]
     [InlineData("ArrowUp", 2, 3, 1)]
     public void NextIndex_BackwardKeys_RetreatWithWrapAround(string key, int current, int count, int expected)
     {
@@ -74,25 +70,25 @@ public class DashboardTabKeyboardTests
     public void NextIndex_RealisticThreeTabSequence_PipelineActivityInsights()
     {
         const int count = 3;
-        var index = 0; // Pipeline
+        var index = 0;
 
         index = DashboardTabKeyboard.NextIndex("ArrowRight", index, count)!.Value;
-        Assert.Equal(1, index); // Activity
+        Assert.Equal(1, index);
 
         index = DashboardTabKeyboard.NextIndex("ArrowRight", index, count)!.Value;
-        Assert.Equal(2, index); // Insights
+        Assert.Equal(2, index);
 
         index = DashboardTabKeyboard.NextIndex("ArrowRight", index, count)!.Value;
-        Assert.Equal(0, index); // wrapped back to Pipeline
+        Assert.Equal(0, index);
 
         index = DashboardTabKeyboard.NextIndex("End", index, count)!.Value;
-        Assert.Equal(2, index); // jumped to Insights
+        Assert.Equal(2, index);
 
         index = DashboardTabKeyboard.NextIndex("ArrowLeft", index, count)!.Value;
-        Assert.Equal(1, index); // Activity
+        Assert.Equal(1, index);
 
         index = DashboardTabKeyboard.NextIndex("Home", index, count)!.Value;
-        Assert.Equal(0, index); // back to Pipeline
+        Assert.Equal(0, index);
     }
 
     [Fact]

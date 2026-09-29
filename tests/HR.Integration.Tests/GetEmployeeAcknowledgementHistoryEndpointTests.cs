@@ -8,12 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Covers GET /api/companies/{companyId}/employees/{employeeId}/acknowledgement-history
-/// (GetEmployeeAcknowledgementHistory): the role:employee endpoint policy, the endpoint's
-/// tenant-match check, and its "self OR shared-document:manage" branch — an employee may read
-/// their own history; anyone else needs the HR management policy.
-/// </summary>
 [Collection("Integration")]
 public class GetEmployeeAcknowledgementHistoryEndpointTests
 {
@@ -72,8 +66,6 @@ public class GetEmployeeAcknowledgementHistoryEndpointTests
         var companyId  = Guid.NewGuid();
         var managerId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        // Employee role satisfies the endpoint's role:employee policy; Manager does not carry
-        // shared-document:manage, so the "not self" branch must Forbid.
         await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Employee);
         await TestRoleSeeder.AssignRoleAsync(_factory, managerId, SystemRoles.Manager);
         using var client = await ClientAs(companyId, managerId);

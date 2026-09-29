@@ -6,18 +6,8 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Documents.Tests;
 
-/// <summary>
-/// TEST-004 — ClamAV INSTREAM adapter. <see cref="ClamAvVirusScanService"/> talks raw TCP to clamd
-/// and has no injectable socket seam, so these tests stand up a minimal in-process fake clamd on a
-/// loopback port and assert the reply-line -> <see cref="VirusScanResult"/> mapping:
-/// clean / infected / malformed / unreachable. Critically, an "infected" or unrecognised reply can
-/// NEVER be reported as clean.
-/// </summary>
 public class ClamAvVirusScanServiceTests
 {
-    /// <summary>Accepts a single connection, consumes the INSTREAM bytes and writes back a fixed
-    /// reply line. If <paramref name="reply"/> is null the connection is accepted then dropped
-    /// (simulates clamd closing mid-scan).</summary>
     private sealed class FakeClamd : IAsyncDisposable
     {
         private readonly TcpListener _listener;
@@ -45,7 +35,6 @@ public class ClamAvVirusScanServiceTests
                 using var client = await _listener.AcceptTcpClientAsync();
                 await using var stream = client.GetStream();
 
-                // Drain whatever the client sends for a short window (command + chunks + terminator).
                 var buffer = new byte[4096];
                 client.ReceiveTimeout = 200;
                 var readUntil = DateTime.UtcNow.AddMilliseconds(150);
@@ -61,7 +50,7 @@ public class ClamAvVirusScanServiceTests
                 }
 
                 if (reply is null)
-                    return; // drop the connection without replying
+                    return;
 
                 var bytes = Encoding.ASCII.GetBytes(reply + "\n");
                 await stream.WriteAsync(bytes);
@@ -69,7 +58,6 @@ public class ClamAvVirusScanServiceTests
             }
             catch
             {
-                // best effort — the test asserts on the client side
             }
         }
 
@@ -108,7 +96,6 @@ public class ClamAvVirusScanServiceTests
     [Fact]
     public async Task ScanAsync_Reply_Containing_Both_FOUND_And_OK_Is_Treated_As_Infected()
     {
-        // Defence against a reply like "stream: OK-ish.Thing FOUND" being misread as clean.
         await using var clamd = FakeClamd.Start("stream: Some.OK.Named.Thing FOUND");
         var result = await Build(clamd.Port).ScanAsync(File(), "x", CancellationToken.None);
 
@@ -154,7 +141,6 @@ public class ClamAvVirusScanServiceTests
     [Fact]
     public async Task ScanAsync_Scanner_Unreachable_Throws_Not_Clean()
     {
-        // Nothing listening on this port.
         var freePort = GetUnusedPort();
         await Assert.ThrowsAnyAsync<Exception>(
             () => Build(freePort).ScanAsync(File(), "doc.pdf", CancellationToken.None));

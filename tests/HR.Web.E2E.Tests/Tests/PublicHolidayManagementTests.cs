@@ -4,11 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies HR Administrator CRUD workflows for public holidays:
-/// - Seeded public holidays appear in the list.
-/// - A new holiday can be created and appears in the list.
-/// </summary>
 public sealed class PublicHolidayManagementTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -26,7 +21,6 @@ public sealed class PublicHolidayManagementTests(HrAdminPersonaFixture fixture) 
 
         await phList.GoToAsync(AcmeId);
 
-        // The seeded holidays include Christmas Day and New Year's Day.
         Assert.True(await phList.HasHolidayAsync("Christmas Day"),
             "Expected 'Christmas Day' in the 2026 public holidays list");
         Assert.True(await phList.HasHolidayAsync("New Year"),
@@ -70,10 +64,8 @@ public sealed class PublicHolidayManagementTests(HrAdminPersonaFixture fixture) 
 
         await phEdit.GoToNewAsync(AcmeId);
 
-        // Try to save with no data filled.
         await _page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
 
-        // Wait for the error to appear (PublicHolidayEdit validates synchronously before any API call).
         await _page.WaitForFunctionAsync(
             "document.querySelector('.alert-danger, .validation-message') !== null " +
             "|| !window.location.href.includes('/public-holidays/new')",
@@ -95,8 +87,6 @@ public sealed class PublicHolidayManagementTests(HrAdminPersonaFixture fixture) 
         await login.LoginAsync(tomEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/public-holidays");
-        // See WaitForUrlToStopContainingAsync's doc comment: the redirect is a client-side Blazor
-        // NavigateTo, not a full navigation, so NetworkIdle is not a reliable completion signal.
         await WaitForUrlToStopContainingAsync("/public-holidays");
 
         var finalUrl = _page.Url;

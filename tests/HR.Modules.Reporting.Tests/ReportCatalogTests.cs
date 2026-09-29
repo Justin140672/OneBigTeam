@@ -85,8 +85,6 @@ public class ReportCatalogTests
         }
     }
 
-    // REP-06: every catalogue entry must carry an explicit sensitivity classification driving
-    // export audit policy (HR.Modules.Reporting.Services.ReportExportAuditor).
     [Theory]
     [InlineData("employee-directory", "Sensitive")]
     [InlineData("employee-starters", "Sensitive")]
@@ -128,9 +126,6 @@ public class ReportCatalogTests
     [Fact]
     public void All_Catalogue_Entries_Are_Covered_By_The_Sensitivity_Classification_Above()
     {
-        // Guards against a new report being added to the catalogue without also being added to the
-        // classification test above (and, per the REP-06 spec, without a deliberate Sensitive/Standard
-        // decision being made for it).
         var classifiedIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "employee-directory", "employee-starters", "employee-leavers", "leave-summary", "leave-calendar",

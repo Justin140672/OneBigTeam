@@ -11,9 +11,6 @@ internal sealed class ListAttendanceAlertsHandler(SicknessDbContext dbContext)
         bool isHrAdministrator,
         CancellationToken cancellationToken)
     {
-        // authorizedEmployeeIds is null for HR Administrators (company-wide, unrestricted). For
-        // managers it is their full reporting hierarchy — resolved server-side by the endpoint via
-        // SicknessResourceAuthorizer, never trusted from the client (mirrors SICK-02).
         if (authorizedEmployeeIds is not null && authorizedEmployeeIds.Count == 0)
             return new ListAttendanceAlertsResponse([]);
 

@@ -37,7 +37,6 @@ public class CorrelationIdMiddlewareEndpointTests
     [Fact]
     public async Task Valid_NFormat_Guid_Header_Is_Accepted_And_Echoed_As_A_Guid()
     {
-        // "N" format (no dashes) is one of the formats Guid.TryParse accepts without qualification.
         var supplied = Guid.NewGuid();
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(CorrelationIdMiddleware.HeaderName, supplied.ToString("N"));
@@ -126,7 +125,6 @@ public class CorrelationIdMiddlewareEndpointTests
     public async Task Header_With_Disallowed_Characters_Is_Replaced_With_A_Freshly_Generated_Guid()
     {
         using var client = _factory.CreateClient();
-        // Spaces and angle brackets are outside the allow-list even though the value is short.
         var supplied = "<script>alert(1)</script>";
         client.DefaultRequestHeaders.TryAddWithoutValidation(CorrelationIdMiddleware.HeaderName, supplied);
 
@@ -140,8 +138,6 @@ public class CorrelationIdMiddlewareEndpointTests
     [Fact]
     public async Task Header_Value_At_Exactly_The_Maximum_Allowed_Length_Boundary_Is_Accepted()
     {
-        // Exactly MaxHeaderLength (128) allowed characters — the length policy accepts values AT
-        // the boundary, only rejecting values that exceed it (see Oversized_Header_Is_Replaced...).
         using var client = _factory.CreateClient();
         var supplied = new string('a', 128);
         client.DefaultRequestHeaders.Add(CorrelationIdMiddleware.HeaderName, supplied);

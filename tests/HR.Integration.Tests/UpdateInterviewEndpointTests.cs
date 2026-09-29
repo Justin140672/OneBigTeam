@@ -9,12 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Postgres integration coverage for PUT /vacancies/{v}/applications/{a}/interviews/{i}. See
-/// UpdateInterviewHandlerTests in HR.Modules.Recruitment.Tests for the unit-level equivalent.
-/// Covers: anonymous 401, wrong-role 403, happy 200 + persisted reschedule, unknown application 404,
-/// unknown interview 404, cross-company 404, non-pending outcome 400, duration validation 422.
-/// </summary>
 [Collection("Integration")]
 public class UpdateInterviewEndpointTests
 {

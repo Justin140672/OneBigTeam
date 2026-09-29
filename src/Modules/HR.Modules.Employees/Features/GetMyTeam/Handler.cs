@@ -14,8 +14,6 @@ internal sealed class GetMyTeamHandler(
     public async Task<GetMyTeamResponse> HandleAsync(
         Guid companyId, Guid managerId, bool includeIndirect, CancellationToken cancellationToken)
     {
-        // Pulled flat and walked in memory via ManagerId links — same established pattern as
-        // GetOrganisationChartHandler (no recursive-CTE pattern exists anywhere in this codebase).
         var employees = await dbContext.Employees
             .AsNoTracking()
             .Where(e => e.CompanyId == companyId && e.Status == EmploymentStatus.Active)

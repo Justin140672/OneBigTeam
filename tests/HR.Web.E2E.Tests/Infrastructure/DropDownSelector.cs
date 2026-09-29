@@ -3,52 +3,16 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure;
 
-/// <summary>
-/// The single shared way to select a value from a Syncfusion SfDropDownList (rendered as
-/// span[role='combobox'], opening a ".e-popup.e-ddl" popup of ".e-list-item" entries). Click the
-/// combobox, wait for its popup, click the matching item, then confirm Blazor's ValueChanged
-/// round-trip actually committed the selection into the combobox's own input.
-///
-/// This is the ONLY method any page object should use to drive a Syncfusion combobox — every call
-/// site that previously hand-tuned its own wait budget (a widened attempt count, or a page object
-/// "warming up" a dropdown before the real interaction) was working around a gap here rather than
-/// something genuinely specific to that field.
-///
-/// After clicking the item this confirms the ValueChanged round-trip committed the selection into
-/// the combobox's input — not just that the popup closed client-side — so a caller that immediately
-/// acts on the bound value (submits a form, opens another dialog, reads the value back) can't race
-/// the round-trip and see the previous (or empty) value. Matches via "contains" (a Regex, not exact
-/// equality) since callers sometimes pass a distinguishing fragment rather than the full label.
-/// </summary>
 public static class DropDownSelector
 {
-    /// <param name="scope">
-    /// The locator that already narrows down to the right field/dialog — a label-filtered field
-    /// group (e.g. page.Locator(".col-12").Filter(new() { HasText = "New Manager" }).First), a
-    /// dialog locator, or the page itself when there's only one combobox in scope.
-    /// </param>
-    /// <param name="index">Which combobox within <paramref name="scope"/>, when it contains more than one (defaults to the first).</param>
     public static async Task SelectAsync(IPage page, ILocator scope, string text, int index = 0)
     {
         var combobox = scope.Locator("span[role='combobox']").Nth(index);
 
-        // If the combobox already shows this value (a dialog whose dropdown defaults to the
-        // first/only option, or a caller re-selecting the same value across repeated iterations),
-        // opening the popup is a no-op selection-wise — and can be actively harmful: Syncfusion
-        // pre-highlights the already-active item on open, and since no ValueChanged fires for a
-        // same-value click, the popup can auto-close before Playwright's actionability check on
-        // that item completes, surfacing as a spurious "element is not visible" timeout. Skip the
-        // whole open/click flow when there's nothing to change.
         var currentValue = await combobox.Locator("input").First.InputValueAsync();
         if (Regex.IsMatch(currentValue ?? "", Regex.Escape(text)))
             return;
 
-        // Cold-start cost: the FIRST SfDropDownList popup opened on a freshly-loaded page pays a
-        // large, one-time interop init on top of the component's own — measured across several call
-        // sites (EmployeeEditPage.SelectManagerAsync, SelectNoticePeriodUnitAsync, the Position
-        // Profile field on a freshly-opened Employment tab). Once ANY popup has been instantiated on
-        // a page, every later one opens quickly. A page-wide, pre-existing ".e-popup.e-ddl" is proof
-        // some dropdown already paid this cost — size the open budget below accordingly.
         var pageAlreadyWarm = await page.Locator(".e-popup.e-ddl").CountAsync() > 0;
 
         // Open THIS combobox's popup. A combobox that has only just mounted (e.g. the first field
@@ -70,17 +34,6 @@ public static class DropDownSelector
         var finalOpenTimeout = pageAlreadyWarm ? 15_000 : 30_000;
         var openAttempts = pageAlreadyWarm ? 4 : 5;
 
-        // A visible DOM element does not mean Syncfusion's JS interop has finished attaching this
-        // combobox's click listener yet — Blazor Server registers that interop from
-        // OnAfterRenderAsync, a separate SignalR round trip that happens strictly after the markup
-        // that made the element "visible" to Playwright already rendered. Under headless Chromium
-        // this render-to-listener-bound gap is measurably wider than headed (different
-        // paint/microtask scheduling), so a click dispatched the instant the element becomes visible
-        // can land in that gap and be silently swallowed — no popup, no error, nothing to retry on
-        // for a plain ClickAsync/WaitForAsync pair. Hovering first forces Playwright to actually move
-        // the mouse onto the element (rather than "click" jumping straight to a synthetic
-        // mousedown/mouseup at its coordinates), and the short pause after gives that interop
-        // round-trip a realistic chance to complete before the real click is attempted.
         await combobox.HoverAsync(new() { Timeout = openTimeout });
         await page.WaitForTimeoutAsync(pageAlreadyWarm ? 150 : 350);
 
@@ -88,12 +41,6 @@ public static class DropDownSelector
         {
             try
             {
-                // The combobox itself can detach mid-click under headless timing (a dialog still
-                // settling its own async field-population re-renders the field group the combobox
-                // lives in). `combobox` is a locator, not a handle, so it re-resolves fresh against
-                // the current DOM on every attempt below — but ClickAsync can still throw if the
-                // element detaches between resolution and the actual click. Catch that alongside the
-                // open-popup timeout below rather than only guarding the wait.
                 await combobox.ClickAsync(new() { Timeout = attempt < openAttempts ? openTimeout : finalOpenTimeout });
                 await openPopup.First.WaitForAsync(new()
                 {
@@ -104,22 +51,11 @@ public static class DropDownSelector
             }
             catch (PlaywrightException) when (attempt < openAttempts)
             {
-                // Click landed before the open handler was bound, opened-then-closed, or the
-                // combobox/field group detached and was re-rendered mid-click. Reset to a
-                // known-closed state so the next click opens rather than re-toggling. The settle
-                // wait here is longer than the original 150ms — headless needs more real time
-                // between "click didn't register" and the JS listener actually being bound, not
-                // just another instant retry that lands in the same gap.
                 await page.Keyboard.PressAsync("Escape");
                 await page.WaitForTimeoutAsync(300);
             }
         }
 
-        // Now the popup has opened, Syncfusion has set aria-owns on the combobox pointing at this
-        // field's own popup id ("{id}_popup"). Reading it here lets every wait below be scoped to
-        // THIS combobox's popup — on a dialog with several dropdowns the unscoped ".e-popup.e-ddl"
-        // is not unique. Fall back to the currently-visible popup (only one is) when aria-owns is
-        // genuinely absent for this component's configuration.
         string? popupId = null;
         for (var attempt = 0; attempt < 8 && popupId is null; attempt++)
         {
@@ -128,13 +64,6 @@ public static class DropDownSelector
         }
         var popup = popupId is not null ? page.Locator($"#{popupId}") : openPopup;
 
-        // The open loop above confirmed the popup became visible at least once, but Syncfusion can
-        // toggle it straight back shut — a same-frame open/close when the combobox re-renders while
-        // the interop is still settling (headless timing). aria-owns is then never set (popupId
-        // stays null) and the unscoped wait below just burns its budget on a popup that is closed,
-        // surfacing as "waiting for Locator(\".e-popup.e-ddl:visible\") to be visible". If the popup
-        // isn't visible here, re-open it (Escape to a known-closed state first) and re-read
-        // aria-owns — up to a few times — before falling through to the item wait.
         for (var reopen = 1; reopen <= 3; reopen++)
         {
             if (await popup.First.IsVisibleAsync()) break;
@@ -158,22 +87,8 @@ public static class DropDownSelector
 
         await popup.First.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = finalOpenTimeout });
 
-        // The popup container can become visible a tick before its item list is actually populated
-        // (a separate JS render pass) — wait for at least one genuinely-selectable (non-hidden)
-        // item to exist before filtering/clicking, not just any ".e-list-item" node (Syncfusion can
-        // render placeholder/hidden items into the DOM before the real list settles).
         await popup.Locator(".e-list-item:not(.e-hide)").First.WaitForAsync(new() { Timeout = finalOpenTimeout });
 
-        // Standard (non-server-filtered) comboboxes render their full item list into the popup up
-        // front, so the matching item is normally already there. Server-loading comboboxes (the
-        // Manager / Review Owner / Add Candidate pickers) fire a debounced Filtering round trip on
-        // open with an empty search term and populate an initial page (e.g.
-        // EmployeeEmploymentTab.OnManagerFilteringAsync's first 50 alphabetically) — fine when the
-        // target happens to be in that first page, but not otherwise. Give the initial list a short
-        // bounded look, then fall back to typing the search text into the combobox's own input
-        // (which is what drives AllowFiltering server round trips — see
-        // TaskReassignmentTests' hand-rolled equivalent) and waiting for the debounce + server
-        // response to actually replace the list before clicking.
         var item = popup.Locator(".e-list-item:not(.e-hide)").Filter(new() { HasText = text }).First;
         var foundInInitialList = true;
         try
@@ -187,31 +102,12 @@ public static class DropDownSelector
 
         if (!foundInInitialList)
         {
-            // An SfDropDownList (as opposed to a SfComboBox) keeps its own combobox input readonly;
-            // with AllowFiltering it renders a separate search box INSIDE the open popup instead —
-            // a "span.e-filter-parent" wrapping an "input.e-input" (confirmed against
-            // sf-dropdownlist.min.js's own filterInput = t.querySelector("input.e-input") — there is
-            // no ".e-input-filter" class in this widget, that was this method's own earlier, wrong
-            // guess and matched nothing, silently falling through to the same readonly combobox
-            // input every time). Prefer the popup's own filter box when present, otherwise fall back
-            // to the combobox input (editable ComboBox-style pickers, which have no popup-level
-            // filter box at all).
             var popupFilterInput = popup.Locator("span.e-filter-parent input.e-input").First;
             var filterInput = await popupFilterInput.CountAsync() > 0 ? popupFilterInput : combobox.Locator("input").First;
 
-            // FillAsync sets the value and dispatches a bare "input" event, but this widget's own
-            // filtering is driven through Syncfusion's KeyboardEvents wrapper (keydown-based) rather
-            // than listening for "input" directly — a bare Fill can land without ever making the
-            // component re-query/re-render its list. Type it as real keystrokes instead (dispatches
-            // the full keydown/keypress/input/keyup sequence per character), which is what an actual
-            // user interaction produces and what the component's own key handling expects.
             await filterInput.ClickAsync();
             await filterInput.PressSequentiallyAsync(text, new() { Delay = 40 });
 
-            // Re-scope after typing: a server-filtered list swaps its items out from under the
-            // popup (same detach-and-replace behaviour the retry loop below already guards
-            // against), so re-resolving the locator picks up the post-filter DOM rather than a
-            // stale reference to pre-filter nodes.
             item = popup.Locator(".e-list-item:not(.e-hide)").Filter(new() { HasText = text }).First;
             await item.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
         }
@@ -220,13 +116,6 @@ public static class DropDownSelector
         {
             try
             {
-                // Final attempt bypasses Playwright's own "stable" actionability check (Force):
-                // on some fields (e.g. a server-filtered popup whose container keeps reflowing
-                // while other page content is still loading around it) the target item is
-                // genuinely visible and enabled the whole time but never settles into a stable
-                // bounding box long enough for the default check to pass, even though a real user
-                // click would land on it without issue. Visibility was already confirmed above,
-                // so forcing here doesn't risk clicking the wrong/hidden element.
                 await item.ClickAsync(new()
                 {
                     Timeout = attempt < 3 ? 5_000 : 30_000,
@@ -236,27 +125,14 @@ public static class DropDownSelector
             }
             catch (PlaywrightException) when (attempt < 3)
             {
-                // Item detached mid-click (server filter results just replaced the list) — the
-                // locator will re-resolve against the fresh DOM on the next attempt.
             }
         }
 
-        // A handful of dropdowns (e.g. SupportRequestQueue's status column) render a humanized
-        // ValueTemplate ("Under Review") while keeping the bound Value as the raw enum string
-        // ("UnderReview"). The native <input> exposes the raw value, so match either the exact
-        // selected text or its no-space form.
         await Assertions.Expect(combobox.Locator("input").First)
             .ToHaveValueAsync(
                 new Regex($"{Regex.Escape(text)}|{Regex.Escape(text.Replace(" ", ""))}"),
                 new() { Timeout = 10_000 });
 
-        // The assertion above only proves the client-side widget updated its own input text —
-        // Syncfusion Blazor Server components do that optimistically in JS on click, ahead of the
-        // SignalR round-trip that actually commits the bound value server-side. There is no generic
-        // provably-server-committed DOM signal. Waiting for the popup to hide plus a short debounce
-        // is a pragmatic mitigation for that race (same fixed-wait pattern used elsewhere in this
-        // suite for Blazor Server timing). Best-effort only — the value is already confirmed
-        // committed by this point, so a timeout here isn't a real failure.
         try
         {
             await popup.First.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 5_000 });

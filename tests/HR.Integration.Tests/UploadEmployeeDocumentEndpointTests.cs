@@ -59,7 +59,6 @@ public class UploadEmployeeDocumentEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, AcmeCompanyId.ToString());
         await TestRoleSeeder.SyncCompanyAsync(_factory, userId, AcmeCompanyId);
 
-        // uploadedBy (userId) != employeeId in route
         var response = await client.PostAsync(
             $"/api/companies/{AcmeCompanyId}/employees/{Guid.NewGuid()}/documents",
             BuildPdfUpload(AcmeContractTypeId));
@@ -69,7 +68,6 @@ public class UploadEmployeeDocumentEndpointTests
     [Fact]
     public async Task Returns_Forbidden_For_Employee_Upload_Even_To_Own_Record()
     {
-        // Employees must use the document-request upload endpoint; direct upload is manager-only.
         var userId       = Guid.NewGuid();
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
@@ -133,11 +131,6 @@ public class UploadEmployeeDocumentEndpointTests
         uploadResponse.EnsureSuccessStatusCode();
         var uploaded = await uploadResponse.Content.ReadFromJsonAsync<UploadPayload>();
 
-        // Uploads are scanned asynchronously via a Hangfire job (ScanUploadedFileJob). Unlike
-        // most other tests in this suite, Hangfire's in-process server IS actually running here
-        // (AddHangfireServer), so the real job races with anything this test writes directly to
-        // the DB — poll instead of doing a one-shot manual write, and fall back to forcing Clean
-        // only if the job hasn't finished after a reasonable wait.
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Documents.Persistence.DocumentsDbContext>();
@@ -183,7 +176,7 @@ public class UploadEmployeeDocumentEndpointTests
     private static MultipartFormDataContent BuildPdfUpload(Guid documentTypeId, string title = "Test Contract")
     {
         var pdfBytes = new byte[1024];
-        pdfBytes[0] = 0x25; pdfBytes[1] = 0x50; pdfBytes[2] = 0x44; pdfBytes[3] = 0x46; // %PDF
+        pdfBytes[0] = 0x25; pdfBytes[1] = 0x50; pdfBytes[2] = 0x44; pdfBytes[3] = 0x46;
 
         var content = new MultipartFormDataContent();
         content.Add(new StringContent(title), "Title");

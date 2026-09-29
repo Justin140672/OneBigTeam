@@ -10,7 +10,7 @@ public class ProbationReviewSchedulerTests
     [Fact]
     public void BuildSchedule_Default_Checkpoints_Produce_ManagerCheckIn_HrReview_And_FinalDecision()
     {
-        var expectedEndDate = new DateOnly(2026, 4, 1); // 90-day probation
+        var expectedEndDate = new DateOnly(2026, 4, 1);
 
         var schedule = ProbationReviewScheduler.BuildSchedule(StartDate, expectedEndDate, [30, 60, 90]);
 
@@ -48,7 +48,6 @@ public class ProbationReviewSchedulerTests
     [Fact]
     public void BuildSchedule_Short_Probation_Only_First_Checkpoint_Survives()
     {
-        // 40-day probation with default [30, 60, 90]: day 30 survives, 60/90 do not.
         var expectedEndDate = StartDate.AddDays(40);
 
         var schedule = ProbationReviewScheduler.BuildSchedule(StartDate, expectedEndDate, [30, 60, 90]);
@@ -62,7 +61,6 @@ public class ProbationReviewSchedulerTests
     [Fact]
     public void BuildSchedule_Never_Produces_Numbered_Checkpoint_On_Or_After_EndDate()
     {
-        // Checkpoint at exactly the end date offset must be skipped, not clamped.
         var expectedEndDate = StartDate.AddDays(30);
 
         var schedule = ProbationReviewScheduler.BuildSchedule(StartDate, expectedEndDate, [30, 60]);
@@ -71,7 +69,6 @@ public class ProbationReviewSchedulerTests
             schedule.Where(e => e.ReviewType != ProbationReviewType.FinalDecision),
             e => Assert.True(e.DueDate < expectedEndDate));
 
-        // Only FinalDecision remains since the sole checkpoint (30) equals the end date offset.
         var entry = Assert.Single(schedule);
         Assert.Equal(ProbationReviewType.FinalDecision, entry.ReviewType);
     }
@@ -83,7 +80,7 @@ public class ProbationReviewSchedulerTests
 
         var schedule = ProbationReviewScheduler.BuildSchedule(StartDate, expectedEndDate, [10, 20, 30, 40]);
 
-        Assert.Equal(3, schedule.Count); // 2 checkpoints + FinalDecision
+        Assert.Equal(3, schedule.Count);
         Assert.Equal((ProbationReviewType.ManagerCheckIn, StartDate.AddDays(10)), schedule[0]);
         Assert.Equal((ProbationReviewType.HrReview, StartDate.AddDays(20)), schedule[1]);
         Assert.Equal((ProbationReviewType.FinalDecision, expectedEndDate), schedule[2]);

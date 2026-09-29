@@ -94,7 +94,6 @@ public class UploadRequestedDocumentHandlerTests
             File              = file ?? FakePdfFile(),
         };
 
-    // ── Success path ─────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Creates_Document_And_EmployeeDocument()
@@ -183,7 +182,6 @@ public class UploadRequestedDocumentHandlerTests
         Assert.Equal(req.Id, result.Value!.DocumentRequestId);
     }
 
-    // ── Validation failures ───────────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Request_Does_Not_Exist()
@@ -271,8 +269,6 @@ public class UploadRequestedDocumentHandlerTests
     [Fact]
     public async Task HandleAsync_Stores_Document_With_Pending_ScanStatus()
     {
-        // Virus scanning now happens asynchronously (ScanUploadedFileJob, enqueued after
-        // persistence) rather than inline during upload.
         await using var db = BuildContext();
         var companyId  = Guid.NewGuid();
         var employeeId = Guid.NewGuid();

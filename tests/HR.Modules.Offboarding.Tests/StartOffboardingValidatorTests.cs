@@ -57,9 +57,6 @@ public class StartOffboardingValidatorTests
     public void Validate_Passes_When_LastWorkingDay_Is_Any_NonDefault_Date()
     {
         var validator = new StartOffboardingValidator();
-        // Boundary: the single day immediately after default(DateOnly) must already be valid —
-        // proves the rule is an exact NotEqual(default) check, not an off-by-one "must be after
-        // some other date" comparison.
         var request = ValidRequest() with { LastWorkingDay = default(DateOnly).AddDays(1) };
 
         var result = validator.Validate(request);

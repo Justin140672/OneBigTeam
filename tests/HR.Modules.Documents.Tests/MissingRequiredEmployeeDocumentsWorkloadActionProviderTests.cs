@@ -5,10 +5,6 @@ using HR.Modules.Documents.Tests.Infrastructure;
 
 namespace HR.Modules.Documents.Tests;
 
-/// <summary>
-/// OBT-721 workload action provider tests for employees missing required documents. HR-only, one
-/// WorkloadAction per missing document type per employee.
-/// </summary>
 public class MissingRequiredEmployeeDocumentsWorkloadActionProviderTests
 {
     private static ClaimsPrincipal AnyCaller() => new(new ClaimsIdentity());

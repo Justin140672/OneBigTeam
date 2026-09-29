@@ -15,7 +15,6 @@ internal sealed class FakeTaskCanceller : ITaskCanceller
     public IReadOnlyList<CancelAllCall> CancelAllCalls => _cancelAllCalls;
     public int CancelAllCallCount => _cancelAllCalls.Count;
 
-    /// <summary>Number of tasks CancelAllBySourceEntityAsync should report as cancelled — configure per test.</summary>
     public int CancelAllReturnCount { get; set; }
 
     public Task CancelBySourceEntityAsync(
@@ -40,7 +39,6 @@ internal sealed class FakeTaskCanceller : ITaskCanceller
         return Task.FromResult(CancelAllReturnCount);
     }
 
-    /// <summary>Number of tasks CancelManyBySourceEntitiesAsync should report as cancelled — configure per test.</summary>
     public int CancelManyReturnCount { get; set; }
 
     public Task<int> CancelManyBySourceEntitiesAsync(

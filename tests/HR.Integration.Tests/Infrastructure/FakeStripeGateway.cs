@@ -2,12 +2,6 @@ using HR.Modules.Companies.Services;
 
 namespace HR.Integration.Tests.Infrastructure;
 
-/// <summary>
-/// Test double for the Companies module's internal IStripeGateway, registered as a singleton
-/// against the shared integration test host (see ApiWebApplicationFactory). Never calls real
-/// Stripe. Safe to mutate per-test because the assembly disables test parallelization
-/// (see AssemblyInfo.cs), so tests run strictly sequentially against the shared factory.
-/// </summary>
 internal sealed class FakeStripeGateway : IStripeGateway
 {
     public string CheckoutUrlToReturn { get; set; } = "https://checkout.stripe.com/test-session";
@@ -16,15 +10,6 @@ internal sealed class FakeStripeGateway : IStripeGateway
 
     public Exception? ExceptionToThrowOnConstructEvent { get; set; }
 
-    /// <summary>
-    /// OBT-REM-09: for tests that need two DIFFERENT events delivered concurrently (e.g. via
-    /// Task.WhenAll against two HttpClient requests), <see cref="WebhookEventToReturn"/> alone
-    /// cannot distinguish between the two in-flight requests since it is a single shared field.
-    /// Callers that need distinct events per request can post a distinct raw payload string per
-    /// request and register the matching event here; ConstructAndParseWebhookEvent looks the
-    /// payload up in this map first and falls back to WebhookEventToReturn, so existing
-    /// single-event tests are unaffected.
-    /// </summary>
     public Dictionary<string, StripeWebhookEvent> WebhookEventsByPayload { get; } = [];
 
     public Task<string> CreateCheckoutSessionAsync(

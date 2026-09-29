@@ -39,13 +39,6 @@ public static class SupportSessionJwtBearerConfiguration
         };
     }
 
-    /// <summary>
-    /// Cheap, unvalidated peek at a bearer token's "iss" claim, used only to pick which of the two
-    /// registered JwtBearer schemes should perform the real (signature-validating) authentication
-    /// for this request. Never trusted for anything security-relevant by itself — the selected
-    /// scheme still fully validates signature/issuer/audience/lifetime before any claim is used.
-    /// Returns false (falls back to the real Supabase scheme) for any malformed/non-JWT value.
-    /// </summary>
     public static bool LooksLikeSupportSessionToken(string? bearerToken)
     {
         if (string.IsNullOrWhiteSpace(bearerToken))

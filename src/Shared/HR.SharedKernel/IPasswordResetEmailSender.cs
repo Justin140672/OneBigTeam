@@ -1,10 +1,5 @@
 namespace HR.SharedKernel;
 
-/// <summary>
-/// Sends password-reset emails via a branded template (e.g. the Postmark <c>password-reset</c>
-/// template). Mirrors <see cref="IInvitationEmailSender"/>: the interface carries the
-/// reset-specific template parameters rather than a raw HTML body.
-/// </summary>
 public interface IPasswordResetEmailSender
 {
     /// <summary>

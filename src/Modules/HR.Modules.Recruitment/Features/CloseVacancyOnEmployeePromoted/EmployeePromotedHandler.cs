@@ -7,10 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.CloseVacancyOnEmployeePromoted;
 
-// Ticket: when an employee is promoted into a position profile that has an open vacancy attached,
-// that vacancy is now filled and should be closed automatically rather than left open. Mirrors the
-// existing manual CloseVacancy feature but is triggered by EmployeePromotedIntegrationEvent
-// (published by EmployeePromotionFinalizer) instead of a direct user action.
 internal sealed class EmployeePromotedHandler(
     RecruitmentDbContext db,
     IClock clock,

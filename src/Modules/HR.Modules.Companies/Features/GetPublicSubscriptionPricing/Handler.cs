@@ -7,11 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Companies.Features.GetPublicSubscriptionPricing;
 
-/// <summary>
-/// Anonymous marketing feed for the configurable subscription pricing model (Story 4). Returns the
-/// persisted PlatformSettings pricing config, or <see cref="SubscriptionPricingConfig.Default"/>
-/// when the singleton has never been seeded. Never lazy-seeds (read-only, unauthenticated).
-/// </summary>
 internal sealed class GetPublicSubscriptionPricingHandler(PlatformDbContext dbContext)
 {
     public async Task<Result<GetPublicSubscriptionPricingResponse>> HandleAsync(

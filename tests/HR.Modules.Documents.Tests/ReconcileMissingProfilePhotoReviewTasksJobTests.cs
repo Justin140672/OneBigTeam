@@ -9,10 +9,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Documents.Tests;
 
-// Guarantees every current pending profile-photo submission has exactly one active HR review task,
-// recovering both a review task that was never created and one that was somehow closed without the
-// submission being resolved. Relies on ITaskCreator.CreateAsync's own idempotency to make repeat
-// runs a safe no-op.
 public class ReconcileMissingProfilePhotoReviewTasksJobTests
 {
     private static DocumentsDbContext BuildDbContext() =>
@@ -27,9 +23,6 @@ public class ReconcileMissingProfilePhotoReviewTasksJobTests
             => Task.FromResult<IReadOnlyDictionary<Guid, string>>(names ?? new Dictionary<Guid, string>());
     }
 
-    // Wraps a FakeTaskCreator and throws for any sourceEntityId in the configured failure set — used
-    // to verify the job's own per-item catch block does not let one submission's failure stop the
-    // rest of the batch from being processed.
     private sealed class ThrowingTaskCreator(FakeTaskCreator inner, HashSet<Guid> failFor) : ITaskCreator
     {
         public Task<Guid> CreateAsync(
@@ -142,7 +135,6 @@ public class ReconcileMissingProfilePhotoReviewTasksJobTests
             db, throwingCreator, new FakeEmployeeNameReader(),
             NullLogger<ReconcileMissingProfilePhotoReviewTasksJob>.Instance);
 
-        // The job's own per-item try/catch must swallow the failure and keep processing the batch.
         await job.ExecuteAsync();
 
         var created = Assert.Single(innerCreator.Created);

@@ -195,8 +195,6 @@ public class SearchApplicationsHandlerTests
         Guid LegacyNullSourceId,
         Guid HiredExternalId);
 
-    // Internal, external Direct, legacy null-Source and hired external (Candidate.EmployeeId set,
-    // Source Direct) applications across two vacancies in one company.
     private static async Task<MixedSeed> SeedMixedAsync(RecruitmentDbContext db)
     {
         var companyId = Guid.NewGuid();

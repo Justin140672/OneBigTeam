@@ -82,7 +82,6 @@ public class SetEmployeeWorkingPatternEndpointTests
             $"/api/companies/{SeededCompanyId}/employees/{employee.Id}/working-pattern",
             new { companyId = SeededCompanyId, employeeId = employee.Id, hoursPerDayOverride = 6.5m });
 
-        // GetMyEmployee uses employee.Id as the userId (sub claim)
         using var selfClient = await SelfClient(employee.Id);
         var meResp = await selfClient.GetAsync(
             $"/api/companies/{SeededCompanyId}/employees/me");
@@ -98,12 +97,10 @@ public class SetEmployeeWorkingPatternEndpointTests
         using var client = await AdminClient();
         var employee     = await CreateEmployeeAsync(client);
 
-        // First set an override
         await client.PutAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/employees/{employee.Id}/working-pattern",
             new { companyId = SeededCompanyId, employeeId = employee.Id, hoursPerDayOverride = 7.0m });
 
-        // Then clear it by sending nulls
         var clearResp = await client.PutAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/employees/{employee.Id}/working-pattern",
             new { companyId = SeededCompanyId, employeeId = employee.Id,
@@ -115,7 +112,6 @@ public class SetEmployeeWorkingPatternEndpointTests
         Assert.Null(payload.WorkingDaysOverride);
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AdminClient()
     {

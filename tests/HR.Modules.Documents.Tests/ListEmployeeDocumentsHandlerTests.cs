@@ -255,8 +255,6 @@ public class ListEmployeeDocumentsHandlerTests
         Assert.True(result.Value!.Items[0].IsAcknowledged);
     }
 
-    // DOC-04: archived (soft-deleted) employee documents must behave as if they don't exist
-    // through the normal list endpoint.
     [Fact]
     public async Task HandleAsync_Excludes_Archived_EmployeeDocuments()
     {

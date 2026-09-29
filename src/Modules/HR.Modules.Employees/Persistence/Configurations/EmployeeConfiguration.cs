@@ -90,10 +90,6 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.Property(e => e.InitialSetupCompletedAt)
             .HasColumnName("initial_setup_completed_at");
 
-        // NFR-08: idempotency key for automated provisioning flows. Filtered unique index so the
-        // vast majority of rows (human-created employees, source_reference IS NULL) are unaffected,
-        // while a redelivered/retried upstream workflow can never insert a second employee for the
-        // same source.
         builder.Property(e => e.SourceReference)
             .HasColumnName("source_reference")
             .HasMaxLength(200);
@@ -227,17 +223,6 @@ internal sealed class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.HasIndex(e => e.ManagerId);
         builder.HasIndex(e => new { e.CompanyId, e.Status });
 
-        // EmployeeNumber is normalized to uppercase before storage (see Employee.NormalizeEmployeeNumber),
-        // so a plain unique index on the stored value enforces case-insensitive uniqueness per
-        // company without needing a computed/expression index — same pattern as the
-        // (CompanyId, WorkEmail) unique index above, which relies on WorkEmail being lowercased
-        // before storage.
-        //
-        // Filtered to exclude the empty-string sentinel ("no employee number assigned yet", used
-        // by legacy/pre-Automatic-mode records and the BackfillEmployeeNumbers feature) so that
-        // MULTIPLE employees in the same company can simultaneously have a blank EmployeeNumber
-        // pending backfill, while every real (non-blank) employee number still remains unique per
-        // company.
         builder.HasIndex(e => new { e.CompanyId, e.EmployeeNumber })
             .IsUnique()
             .HasFilter("employee_number <> ''");

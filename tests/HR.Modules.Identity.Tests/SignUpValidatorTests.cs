@@ -212,7 +212,6 @@ public class SignUpValidatorTests
 
         var result = validator.Validate(request);
 
-        // NotEmpty() rejects whitespace-only strings in FluentValidation.
         Assert.False(result.IsValid);
     }
 }

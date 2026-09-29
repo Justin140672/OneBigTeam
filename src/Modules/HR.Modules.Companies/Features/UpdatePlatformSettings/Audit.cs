@@ -10,12 +10,6 @@ internal sealed record PlatformSettingsAuditSnapshot(
     string? MaintenanceModeMessage,
     string FeatureFlagsJson);
 
-/// <summary>
-/// Records a platform-administrator change to the platform-wide settings singleton. Plugs into the
-/// existing cross-cutting IAuditEventPublisher/AuditDbContext infrastructure already used by every
-/// other module (see e.g. HR.Modules.Companies.Features.ExtendCustomerTrial.Audit) rather than a new
-/// module-local audit table.
-/// </summary>
 internal sealed record PlatformSettingsUpdatedAuditEvent(
     Guid SettingsId,
     Guid? ActorUserId,

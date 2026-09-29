@@ -2,19 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for HR.Admin.Web's OperationalAlerts.razor (/operational-alerts) — the
-/// platform-admin-only list of system-generated operational alerts (Follow-up B). A debounced
-/// company-id <c>SfTextBox</c>, two native <c>&lt;select&gt;</c> filters (category, then status —
-/// status defaults to "open"), a Syncfusion grid, and a server-side Previous/Next pager. Row click
-/// navigates to /operational-alerts/{id}.
-///
-/// The page renders exactly one of: "Loading…" text, the ".dashboard-error" not-authorised banner,
-/// the ".activity-empty" no-results paragraph, or the grid — <see cref="SettledSelector"/> waits for
-/// any settled state. Both filter <c>&lt;select&gt;</c> elements share the CSS class
-/// "failed-payments-status-filter" (reused from FailedPayments.razor's toolbar), so they're
-/// addressed positionally: category is index 0, status is index 1.
-/// </summary>
 public sealed class OperationalAlertsPage(IPage page, string baseUrl)
 {
     private const string SettledSelector =
@@ -23,11 +10,6 @@ public sealed class OperationalAlertsPage(IPage page, string baseUrl)
     public async Task GotoAsync()
     {
         await page.GotoAsync($"{baseUrl}/operational-alerts");
-        // Widened 20s -> 30s to match this suite's established convention for a real server
-        // round-trip (OperationalAlertsService's query) under concurrent E2E load — the wait
-        // condition itself is correct (all 4 states genuinely exist in OperationalAlerts.razor:
-        // "Loading…"/.dashboard-error/.activity-empty/.e-grid), so a failure here is app-under-
-        // load latency, not a stale locator.
         await page.WaitForSelectorAsync(SettledSelector, new() { Timeout = 30_000 });
     }
 
@@ -51,11 +33,6 @@ public sealed class OperationalAlertsPage(IPage page, string baseUrl)
     private ILocator CategorySelect => page.Locator("select.failed-payments-status-filter").Nth(0);
     private ILocator StatusSelect => page.Locator("select.failed-payments-status-filter").Nth(1);
 
-    /// <summary>
-    /// Types into the debounced (300ms) SfTextBox company-id filter. SfTextBox commits its bound
-    /// value on the native change event (focus loss), not per keystroke — Tab out, then wait past
-    /// the debounce window so the reload has actually been triggered.
-    /// </summary>
     public async Task SetCompanyIdFilterAsync(Guid companyId)
     {
         await CompanyIdInput.FillAsync(companyId.ToString());
@@ -87,11 +64,9 @@ public sealed class OperationalAlertsPage(IPage page, string baseUrl)
         return await page.Locator(".e-grid .e-row").CountAsync();
     }
 
-    /// <summary>Text of every rendered cell under the given grid column header.</summary>
     public async Task<IReadOnlyList<string>> ColumnValuesAsync(string headerText)
     {
         await page.WaitForSelectorAsync(SettledSelector, new() { Timeout = 15_000 });
-        // Resolve the column's 0-based index from its header, then read that <td> per row.
         var headers = await page.Locator(".e-grid .e-headercell .e-headertext").AllTextContentsAsync();
         var index = -1;
         for (var i = 0; i < headers.Count; i++)

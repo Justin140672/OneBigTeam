@@ -70,7 +70,6 @@ public class SubscriptionPricingConfigHandlerTests
         var handler = new UpdateSubscriptionPricingConfigHandler(
             context, new FakeCurrentUser(Guid.NewGuid()), new FakeClock(Now.UtcDateTime), audit);
 
-        // Gap between band 1 (ends 50) and band 2 (starts 60).
         var request = new UpdateSubscriptionPricingConfigRequest(
             new[]
             {
@@ -121,12 +120,11 @@ public class SubscriptionPricingConfigHandlerTests
     }
 
     [Theory]
-    [InlineData(1, 50, 2)]   // first band not starting at 1 handled elsewhere; here valid-ish shape
+    [InlineData(1, 50, 2)]
     public void PlatformSettings_UpdatePricingConfig_Rejects_Invalid(int start, int end, int _)
     {
         var settings = PlatformSettings.CreateDefault(Now);
 
-        // Overlap: band 2 starts before band 1 ends.
         var invalid = new SubscriptionPricingConfig(
             new[]
             {

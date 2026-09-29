@@ -5,11 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// GET .../companies/{companyId}/sickness-records/current — the "who is off sick right now" view.
-/// Gated by <c>sickness:manage</c>; returns only <see cref="HR.Modules.Sickness.Domain.SicknessStatus.Active"/>
-/// records for the route company, ordered by start date.
-/// </summary>
 [Collection("Integration")]
 public class GetCurrentSicknessAbsencesEndpointTests
 {

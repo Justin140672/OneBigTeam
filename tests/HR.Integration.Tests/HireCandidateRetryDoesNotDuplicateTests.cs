@@ -8,15 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// NFR-08 failure-injection: HireCandidateHandler provisions the employee in the Employees
-/// DbContext (its own transaction) BEFORE it commits application.RecordHire + candidate.LinkToEmployee
-/// to the Recruitment schema. If the process dies between those two commits, the candidate is left
-/// unlinked. This test reproduces that partial-failure state (by reverting the Recruitment-side
-/// changes after a successful hire) and then retries the hire, asserting that the retry does NOT
-/// create a second employee / probation record / onboarding plan — the stable
-/// SourceReference "recruitment:application:{applicationId}" makes provisioning idempotent.
-/// </summary>
 [Collection("Integration")]
 public class HireCandidateRetryDoesNotDuplicateTests
 {
@@ -78,19 +69,14 @@ public class HireCandidateRetryDoesNotDuplicateTests
             employmentTypeId = referenceData.EmploymentTypeId,
         };
 
-        // 1. First hire succeeds.
         var firstHire = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancy.Id}/applications/{application!.Id}/hire", HireBody());
         Assert.Equal(HttpStatusCode.OK, firstHire.StatusCode);
         var hire = await firstHire.Content.ReadFromJsonAsync<HirePayload>();
         var employeeId = hire!.EmployeeId;
 
-        // Baseline counts after the (fully successful) first hire.
         var (employeesBefore, probationBefore, onboardingBefore) = await CountsAsync(companyId, employeeId);
 
-        // 2. Reproduce the partial failure: the Recruitment-side commit was lost — unlink the
-        //    candidate and move the application back to a non-terminal stage, as if RecordHire /
-        //    LinkToEmployee never happened.
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
@@ -108,13 +94,11 @@ public class HireCandidateRetryDoesNotDuplicateTests
                 nonTerminalStageId, application.Id);
         }
 
-        // 3. Retry the hire.
         var retryHire = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancy.Id}/applications/{application.Id}/hire", HireBody());
         Assert.Equal(HttpStatusCode.OK, retryHire.StatusCode);
         var retried = await retryHire.Content.ReadFromJsonAsync<HirePayload>();
 
-        // Same employee — provisioning was idempotent on the application source reference.
         Assert.Equal(employeeId, retried!.EmployeeId);
 
         var (employeesAfter, probationAfter, onboardingAfter) = await CountsAsync(companyId, employeeId);
@@ -123,7 +107,6 @@ public class HireCandidateRetryDoesNotDuplicateTests
         Assert.Equal(onboardingBefore, onboardingAfter);
         Assert.Equal(1, employeesAfter);
 
-        // Candidate ends up linked to that one employee.
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();

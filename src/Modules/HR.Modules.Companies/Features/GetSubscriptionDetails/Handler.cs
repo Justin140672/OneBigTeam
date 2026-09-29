@@ -40,9 +40,6 @@ internal sealed class GetSubscriptionDetailsHandler(
             sortDescending: false,
             cancellationToken);
 
-        // Friendly name only when the subscription's stored price matches the configured plan
-        // price id — otherwise fall back to the raw Stripe price id rather than inventing a
-        // plan catalogue, per the plan's "don't over-engineer" guidance.
         var planName = subscription.PriceId is null
             ? null
             : subscription.PriceId == stripeOptions.Value.PriceId

@@ -10,7 +10,6 @@ public class SearchEmployeeDocumentsHandlerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 13, 10, 0, 0, TimeSpan.Zero);
 
-    // ── Company scoping ────────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Excludes_Documents_From_Other_Companies()
@@ -49,7 +48,6 @@ public class SearchEmployeeDocumentsHandlerTests
         Assert.Empty(result.Value!.Items);
     }
 
-    // ── Access scope ───────────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Null_AllowedEmployeeIds_Returns_All_Company_Documents()
@@ -86,7 +84,6 @@ public class SearchEmployeeDocumentsHandlerTests
         Assert.Equal("Allowed Doc", result.Value.Items[0].Title);
     }
 
-    // ── Archived exclusion ─────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Excludes_Archived_By_Default()
@@ -161,7 +158,6 @@ public class SearchEmployeeDocumentsHandlerTests
         Assert.Empty(result.Value!.Items);
     }
 
-    // ── SearchText ─────────────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_SearchText_Matches_Title_Case_Insensitively()
@@ -215,7 +211,6 @@ public class SearchEmployeeDocumentsHandlerTests
         Assert.Empty(result.Value!.Items);
     }
 
-    // ── Exact filters ──────────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Filters_By_DocumentTypeId()
@@ -276,7 +271,6 @@ public class SearchEmployeeDocumentsHandlerTests
         Assert.Equal("Expired Doc", result.Value.Items[0].Title);
     }
 
-    // ── Uploaded date range (CreatedAt) ────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_UploadedFrom_Excludes_Earlier_CreatedAt()
@@ -314,7 +308,6 @@ public class SearchEmployeeDocumentsHandlerTests
         Assert.Equal("OnBoundary", result.Value.Items[0].Title);
     }
 
-    // ── Expiry date range ──────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_ExpiresFrom_Excludes_Documents_With_No_ExpiryDate()
@@ -355,7 +348,6 @@ public class SearchEmployeeDocumentsHandlerTests
         Assert.Contains(result.Value.Items, i => i.Title == "OnEnd");
     }
 
-    // ── Pagination and ordering ────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Paginates_Results_And_Reports_TotalCount_And_TotalPages()
@@ -385,7 +377,6 @@ public class SearchEmployeeDocumentsHandlerTests
         var companyId = Guid.NewGuid();
         var type = await SeedType(db, companyId);
 
-        // Two documents share the exact same CreatedAt to exercise the Id tiebreaker.
         var idLow = Guid.Parse("00000000-0000-0000-0000-000000000001");
         var idHigh = Guid.Parse("00000000-0000-0000-0000-000000000002");
 
@@ -399,7 +390,6 @@ public class SearchEmployeeDocumentsHandlerTests
         Assert.Equal(["TieLow", "TieHigh", "Oldest"], result.Value!.Items.Select(i => i.Title));
     }
 
-    // ── Employee name resolution ───────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Resolves_Employee_Name_From_Reader()
@@ -444,7 +434,6 @@ public class SearchEmployeeDocumentsHandlerTests
         var uploaderA  = Guid.NewGuid();
         var uploaderB  = Guid.NewGuid();
 
-        // SeedDoc uses Guid.NewGuid() for uploadedBy internally; we seed manually to control uploader.
         var docA = Document.Create(Guid.NewGuid(), companyId, employeeId, "DocA", null, type.Id, "a.pdf", 100, "application/pdf", "key/a.pdf", null, uploaderA, Now);
         var edA  = EmployeeDocument.Create(Guid.NewGuid(), companyId, employeeId, docA.Id, Guid.NewGuid(), Now);
         var docB = Document.Create(Guid.NewGuid(), companyId, employeeId, "DocB", null, type.Id, "b.pdf", 100, "application/pdf", "key/b.pdf", null, uploaderB, Now);
@@ -461,7 +450,6 @@ public class SearchEmployeeDocumentsHandlerTests
         Assert.Equal("DocA", result.Value.Items[0].Title);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────
 
     private static SearchEmployeeDocumentsHandler Handler(
         DocumentsDbContext db, Dictionary<Guid, string>? names = null) =>

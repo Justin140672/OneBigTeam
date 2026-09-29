@@ -6,15 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Services;
 
-/// <summary>
-/// LEAVE-07: the balance/TOIL-ledger mutation and audit/notification side effects of approving a
-/// leave request, factored out of ApproveLeaveRequestHandler so the exact same outcome (ledger
-/// consumption, notification, audit event, integration event) is produced whether a request is
-/// approved manually by a reviewer or automatically at submission time because its leave policy
-/// does not require approval. Callers own SaveChangesAsync — ApplyBalanceEffectsAsync only stages
-/// entity mutations (including leaveRequest.Approve(...)); PublishApprovalOutcomeAsync performs
-/// the post-save notification/audit/integration-event fan-out.
-/// </summary>
 internal sealed class LeaveApprovalEffectsService(
     LeaveDbContext dbContext,
     INotificationWriter notificationWriter,
@@ -23,10 +14,6 @@ internal sealed class LeaveApprovalEffectsService(
     IAuditEventPublisher auditPublisher,
     ToilLedgerService toilLedgerService)
 {
-    /// <summary>
-    /// Consumes the TOIL ledger or records LeaveBalance usage as appropriate for the request's
-    /// leave type, then marks the request Approved. Does not call SaveChangesAsync.
-    /// </summary>
     public async Task<Result> ApplyBalanceEffectsAndApproveAsync(
         LeaveRequest leaveRequest,
         LeaveType? leaveType,
@@ -66,18 +53,11 @@ internal sealed class LeaveApprovalEffectsService(
                       && b.PolicyYear == policyYear,
                     cancellationToken);
 
-            // A balance-tracked leave type must have a balance row for the request's policy year -
-            // approving without one would silently skip deducting usage. Fail cleanly instead.
             if (balance is null)
                 return Result.Failure(
                     Error.Validation(
                         $"No leave balance found for policy year {policyYear}. The request cannot be approved until a balance exists for this employee and leave type."));
 
-            // P2: submission only checks available balance at the moment the request is created -
-            // a pending request does not reserve leave. Multiple individually-valid pending requests
-            // can therefore be approved sequentially without ever hitting a concurrency conflict, so
-            // this check must be re-run here (using the same accrual math as submission/preview,
-            // LEAVE-04) rather than relying solely on optimistic concurrency to catch the conflict.
             if (leaveType is not null)
             {
                 var policy = await dbContext.LeavePolicies
@@ -109,22 +89,12 @@ internal sealed class LeaveApprovalEffectsService(
         return Result.Success();
     }
 
-    /// <summary>
-    /// Notification + audit + integration event fan-out for an approved request. Must be called
-    /// after SaveChangesAsync has persisted the approval.
-    /// </summary>
     public async Task PublishApprovalOutcomeAsync(
         LeaveRequest leaveRequest,
         Guid reviewedByEmployeeId,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
-        // NOT-03: LeaveApproved is one of the six template-backed notification types (see
-        // NotificationTemplateCatalogue). The rendered in-app title/body reproduce exactly what the
-        // previous inline strings produced ("Your leave request has been approved" /
-        // "Your leave from {StartDate:d MMM yyyy} to {EndDate:d MMM yyyy} has been approved."),
-        // since StartDate/EndDate are formatted here with the same "d MMM yyyy" format before being
-        // passed as token values.
         var writeResult = await notificationWriter.WriteTemplatedAsync(
             Guid.NewGuid(), leaveRequest.CompanyId, leaveRequest.EmployeeId,
             NotificationType.LeaveApproved,
@@ -138,8 +108,6 @@ internal sealed class LeaveApprovalEffectsService(
             now,
             cancellationToken);
 
-        // StartDate/EndDate are always supplied above, so this should never actually fail — but
-        // surface it loudly rather than silently swallowing a template regression.
         if (writeResult.IsFailure)
             throw new InvalidOperationException($"Failed to write LeaveApproved notification: {writeResult.Error.Message}");
 

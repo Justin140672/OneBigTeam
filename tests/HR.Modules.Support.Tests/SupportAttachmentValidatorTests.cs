@@ -83,10 +83,6 @@ public class SupportAttachmentValidatorTests
     [InlineData("con.png")]
     public void ValidateFile_Does_Not_Throw_On_Malicious_FileName(string maliciousFileName)
     {
-        // The validator itself must never throw on a hostile file name (path traversal, reserved
-        // Windows device names, etc.) — path-safety is enforced by using a GUID-based storage key
-        // elsewhere (SubmitSupportRequestHandler / SupabaseSupportAttachmentStorageService), not by
-        // this validator, but a crash here would still be a denial-of-service bug.
         var exception = Record.Exception(() => _validator.ValidateFile(maliciousFileName, "image/png", 1024));
 
         Assert.Null(exception);
@@ -105,8 +101,6 @@ public class SupportAttachmentValidatorTests
     [Fact]
     public void ValidateContentSignature_Rejects_Mismatched_Header()
     {
-        // Declares image/png but the bytes are a plain text file — the classic "renamed executable"
-        // attack this check exists to catch.
         var content = new MemoryStream("not a real png"u8.ToArray());
 
         var result = _validator.ValidateContentSignature(content, "image/png");

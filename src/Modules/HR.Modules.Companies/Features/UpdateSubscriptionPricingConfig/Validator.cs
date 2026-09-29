@@ -2,11 +2,6 @@ using FluentValidation;
 
 namespace HR.Modules.Companies.Features.UpdateSubscriptionPricingConfig;
 
-/// <summary>
-/// Coarse shape validation only — the authoritative structural rules (contiguity, single final
-/// unlimited band, gaps/overlaps, final band covering all remaining employees) live in
-/// <see cref="HR.SharedKernel.Pricing.SubscriptionPricingConfig.Validate"/> and run in the handler.
-/// </summary>
 internal sealed class UpdateSubscriptionPricingConfigValidator : AbstractValidator<UpdateSubscriptionPricingConfigRequest>
 {
     public UpdateSubscriptionPricingConfigValidator()

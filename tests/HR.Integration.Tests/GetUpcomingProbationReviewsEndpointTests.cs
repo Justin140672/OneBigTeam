@@ -46,7 +46,6 @@ public class GetUpcomingProbationReviewsEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, User1, SystemRoles.HrAdministrator, companyId);
 
-        // Create a record but no reviews.
         var recordResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-records", new
         {
             companyId,
@@ -87,7 +86,6 @@ public class GetUpcomingProbationReviewsEndpointTests
         recordResponse.EnsureSuccessStatusCode();
         var record = await recordResponse.Content.ReadFromJsonAsync<RecordPayload>();
 
-        // Create a review due within the next 30 days.
         var dueDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(10).ToString("yyyy-MM-dd");
         await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-reviews", new
         {
@@ -130,7 +128,6 @@ public class GetUpcomingProbationReviewsEndpointTests
         recordResponse.EnsureSuccessStatusCode();
         var record = await recordResponse.Content.ReadFromJsonAsync<RecordPayload>();
 
-        // Create and complete a review.
         var dueDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(5).ToString("yyyy-MM-dd");
         var reviewResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/probation-reviews", new
         {

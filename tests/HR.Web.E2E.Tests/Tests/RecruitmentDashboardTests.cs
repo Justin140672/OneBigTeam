@@ -5,20 +5,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the Recruiter-only dashboard
-/// (src/HR.Web/Components/Pages/Dashboards/RecruitmentDashboard.razor), reached via
-/// "/dashboard/recruitment". The page guards on Session.IsRecruiter and redirects any other role
-/// to Session.MyProfileUrl — this is a stricter gate than the widgets' own internal checks
-/// (CanManageEmployees || IsRecruiter): an HR Administrator who is not also a Recruiter (e.g.
-/// Laura Bennett) can no longer reach this route at all, unlike the pre-restructure single
-/// dashboard where she saw the Recruitment widget via CanManageEmployees alone. Marcus Diallo is
-/// the only seeded persona with the Recruiter role, so he is used for every "positive" scenario.
-///
-/// The exact Open Vacancies count is not asserted beyond "at least the seeded 'Senior Software
-/// Engineer' vacancy" since other E2E tests in this suite create additional open vacancies
-/// against the same shared Acme company.
-/// </summary>
 public sealed class RecruitmentDashboardTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private const string MarcusEmail = "marcus.diallo@acme.example";
@@ -42,9 +28,6 @@ public sealed class RecruitmentDashboardTests(RecruiterPersonaFixture fixture) :
     [Fact]
     public async Task HrAdministrator_WithoutRecruiterRole_IsRedirectedAway_FromRecruitmentDashboard()
     {
-        // Laura is an HrAdministrator (CanManageEmployees) but not a Recruiter — under the old
-        // single dashboard she would have seen the Recruitment widget via CanManageEmployees
-        // alone, but the new route-level guard on Session.IsRecruiter blocks her entirely.
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();

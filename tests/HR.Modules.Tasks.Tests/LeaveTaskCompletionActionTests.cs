@@ -32,7 +32,6 @@ public class LeaveTaskCompletionActionTests
             OutcomeReason:     outcomeReason,
             DispatchOperationId: dispatchOperationId ?? Guid.Empty);
 
-    // ── Approve ────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task ExecuteAsync_Approve_Calls_ApproveAsync()
@@ -126,7 +125,6 @@ public class LeaveTaskCompletionActionTests
         Assert.Null(leaveService.Calls[0].Reason);
     }
 
-    // ── Guard clauses ──────────────────────────────────────────────────────────
 
     [Fact]
     public async Task ExecuteAsync_Returns_Validation_Failure_When_No_Decision()

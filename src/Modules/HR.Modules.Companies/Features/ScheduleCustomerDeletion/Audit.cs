@@ -2,12 +2,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Companies.Features.ScheduleCustomerDeletion;
 
-/// <summary>
-/// Records a platform-administrator scheduling a company for permanent deletion. Uses the same
-/// cross-cutting IAuditEventPublisher as every other audited action in this module (see
-/// ExtendCustomerTrial's Audit.cs remarks). Surfaced on the Platform Audit Log
-/// (/audit-log) alongside CancelCustomerDeletion and ExecuteCustomerDeletion.
-/// </summary>
 internal sealed record CustomerDeletionScheduledAuditEvent(
     Guid CompanyId,
     Guid? ActorUserId,

@@ -311,7 +311,6 @@
     private int _totalCount;
     private int _currentPage = 1;
 
-    // ── Bulk invitations ────────────────────────────────────────────────────
     [SupplyParameterFromQuery(Name = "mode")]
     public string? Mode { get; set; }
 
@@ -358,9 +357,6 @@
 
     protected override async Task OnBeforeLoadAsync()
     {
-        // employee:read (Manager / Recruiter / HR Administrator — NOT a CompanyAdministrator-only
-        // user), matching this list's API policy and the ADM-05 intent. Manage-level actions on
-        // the page (create, edit) are gated separately below / per-row.
         if (!Session.CanReadEmployees)
         {
             Navigation.NavigateTo("/access-denied", replace: true);
@@ -386,16 +382,8 @@
             icon:    "fa-solid fa-money-bill-wave",
             onClick: OnBulkUpdateClicked,
             tooltip: "Update compensation for selected employees",
-            // The dropdown itself also offers "Import" and "Download Template", neither of which
-            // needs a row selected — only the "Selected Employees" item does (see
-            // BulkUpdateMenuTemplate/HandleBulkUpdateMenuItemSelected below, which itself
-            // re-validates that a selection exists for that specific action).
             selectionDependent: false);
 
-        // Bulk invitations: works on manually selected rows from the normal (non-invite-mode)
-        // grid too, not just the dedicated invitation-mode grid below. Session.CanManageUsers is
-        // available synchronously here (unlike _canManageUserAccounts, which OnBeforeLoadAsync
-        // hasn't set yet at ConfigureToolbar time).
         if (Session.CanManageUsers)
         {
             AddToolbarAction(
@@ -408,10 +396,6 @@
         }
     }
 
-    // Classifies a normal-grid selection (which can include already-invited/already-has-account
-    // employees, unlike the invitation-mode candidate list) into eligible recipients vs. excluded,
-    // mirroring the server-side exclusion reasons (NotEligible/MissingEmail/AlreadyInvited/
-    // AlreadyHasAccount/DuplicateEmail) closely enough for a client-side preview.
     private async Task OnInviteSelectedClicked(EmployeeListItemModel _)
     {
         if (Grid is null) return;
@@ -484,9 +468,6 @@
         _showInviteConfirmDialog = false;
         _actionSuccess = "Invitations queued — you can navigate away, processing will continue.";
 
-        // Surface server-side exclusions (e.g. PublicEmailDomain) so the administrator can see
-        // exactly which selected employees were not invited and why. Names are resolved from the
-        // recipients shown in the confirm dialog; fall back to the email if the id isn't found.
         var namesById = _inviteConfirmRecipients
             .GroupBy(r => r.EmployeeId)
             .ToDictionary(g => g.Key, g => g.First().Name);
@@ -502,8 +483,6 @@
         if (_inviteModeGrid is not null)
             await _inviteModeGrid.ClearSelectionAsync();
 
-        // The selection has now been consumed — apply any grid refresh that was deferred while it
-        // was in progress (see HandleInvitationRecipientsUpdatedAsync).
         if (_recipientRefreshPending)
         {
             _recipientRefreshPending = false;
@@ -514,22 +493,8 @@
             await _progressPanel.ShowBatchAsync(result.BatchId);
     }
 
-    // Set when a progress-driven refresh arrived while the administrator had rows selected in the
-    // normal grid; applied once that selection is consumed (or on the next poll with no selection).
     private bool _recipientRefreshPending;
 
-    // Fired by InvitationBatchProgressPanel when a poll observes newly-sent recipients or a
-    // transition to Completed, so the "User Account" column (and invitation-mode candidate grid)
-    // reflect the outcome without a full page reload.
-    //
-    // The panel tracks the company's latest batch, which can belong to ANOTHER administrator's
-    // (or a concurrent session's) invitation run, and polls it every 3s. Reloading the normal grid
-    // re-binds its rows and clears any selection the administrator is in the middle of building,
-    // so an in-progress "Invite selected"/"Update selected" silently found nothing selected
-    // (OnInviteSelectedClicked returns early on an empty selection). Never reload the grid out
-    // from under a live selection: defer it until the selection has been used or cleared. The
-    // invitation-mode grid tracks its own selection by employee id across reloads, so it can
-    // always refresh immediately.
     private async Task HandleInvitationRecipientsUpdatedAsync()
     {
         if (_inviteModeGrid is not null)
@@ -552,8 +517,6 @@
         var selected = await Grid.GetSelectedRecordsAsync();
         if (selected.Count == 0)
         {
-            // Never a silent no-op: tell the user why nothing opened (e.g. the grid was refreshed
-            // and its selection cleared since the rows were ticked).
             _actionError = "Select at least one employee to update.";
             return;
         }
@@ -564,14 +527,6 @@
         _showBulkUpdateDialog = true;
     }
 
-    // Swaps the plain "hr-bulk-update" toolbar button (registered via ConfigureToolbar/
-    // AddToolbarAction with selectionDependent: false, so the dropdown itself is always enabled —
-    // "Import" and "Download Template" don't need a selection, only "Selected Employees" does,
-    // which BulkUpdateMenu disables itself via its own HasSelection parameter, passed through here)
-    // for a Template-based dropdown mounting BulkUpdateMenu, and replaces the base toolbar's plain
-    // Print/Export/Columns buttons with a single "More" overflow menu (OverflowActionsMenu) so the
-    // toolbar keeps visual priority on the frequently-used actions (search, filters, Add, Update
-    // selected) — mirroring how GridToolbar itself mounts ExportMenu for "hr-export".
     private IEnumerable<object> EmployeeToolbar =>
         GridToolbar
             .Where(item => item is not Syncfusion.Blazor.Navigations.ItemModel im
@@ -702,9 +657,6 @@
         await LoadAsync();
     }
 
-    // Tracks the grid's own client-side paging (over the up-to-100 rows already fetched for the
-    // current search/filter) so ResultSummaryText's "X–Y of Z" range reflects whichever page the
-    // user has actually paged to, not just the page the last server fetch happened to land on.
     private void OnGridActionComplete(Syncfusion.Blazor.Grids.ActionEventArgs<EmployeeListItemModel> args)
     {
         if (args.RequestType == Syncfusion.Blazor.Grids.Action.Paging)
@@ -752,11 +704,6 @@
     protected override string? GetViewUrl(EmployeeListItemModel item) =>
         $"/companies/{CompanyId}/employees/{item.Id}/view";
 
-    // Clicking anywhere in a row (other than the checkbox-selection column, whose own toggle must
-    // stay purely a selection gesture) opens that employee's profile — not just the "Employee"
-    // identity cell's own link — so row navigation doesn't rely on users noticing which cell is
-    // clickable. The identity cell's <a> already stops propagation on its own inner "Invite User"
-    // link (see @onclick:stopPropagation above) so that action isn't hijacked by this handler.
     private void OnRecordClick(Syncfusion.Blazor.Grids.RecordClickEventArgs<EmployeeListItemModel> args)
     {
         if (args.Column?.Type == Syncfusion.Blazor.Grids.ColumnType.CheckBox) return;
@@ -781,9 +728,6 @@
         _                => "bg-light text-dark"
     };
 
-    // (icon css class, text css class, label) — maps the raw UserAccountStatus strings to the
-    // three canonical account-state labels ("Active", "Invited", "No account"), surfacing an
-    // expired invitation distinctly as "Invite expired" and a deactivated account as "Disabled".
     private static (string Icon, string CssClass, string Label) AccountStateDisplay(string status) => status switch
     {
         "Active"              => ("fa-solid fa-circle-check", "text-success", "Active"),
@@ -803,9 +747,6 @@
         _                    => "none"
     };
 
-    // Per-row account actions offered by the "User Account" column menu. Actions that need
-    // identifiers the list API does not return (invite id for resend, user id for disable) route
-    // the admin to the user-administration detail page where those operations live.
     private List<DropDownMenuItem> AccountMenuItems(EmployeeListItemModel row)
     {
         var items = new List<DropDownMenuItem>();

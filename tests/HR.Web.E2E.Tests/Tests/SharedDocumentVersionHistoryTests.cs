@@ -4,20 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the Version History grid extension on SharedDocumentDetail.razor: the "Publication
-/// Status" and "Effective Date" columns, and the per-version "Download" link that hits
-/// api/companies/{id}/shared-documents/{id}/versions/{n}/download.
-///
-/// The shared-document page itself (navigation, the HR-administrator-only guard, uploading a
-/// document, and the "Upload New Version" dialog's own field validation) already has coverage in
-/// SharedDocumentUploadTests — this file is scoped narrowly to the version-history grid built on
-/// top of that pre-existing flow, and does not duplicate upload/publish/audience/acknowledgement
-/// coverage.
-///
-/// Uses Laura Bennett (laura.bennett@acme.example, HrAdministrator) against the seeded Acme
-/// company, matching SharedDocumentUploadTests.
-/// </summary>
 public sealed class SharedDocumentVersionHistoryTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -44,29 +30,15 @@ public sealed class SharedDocumentVersionHistoryTests(HrAdminPersonaFixture fixt
 
             var headers = await detail.GetVersionColumnHeadersAsync();
             Assert.Contains(headers, h => h.Contains("Publication Status"));
-            // Effective Date is asserted below via GetVersionDetailAsync's per-row "Details" popup,
-            // not as a grid column header — see the comment on that assertion for why (it moved out
-            // of the grid as part of a compaction). Asserting it here too was stale and always false
-            // post-compaction.
             Assert.Contains(headers, h => h.Contains("Download"));
 
             Assert.Equal(1, await detail.WaitForVersionRowCountAsync(1));
 
             var fileNameFragment = Path.GetFileName(tempFile);
 
-            // Newly uploaded documents start as Draft (per "new documents are created as
-            // drafts", also asserted at list level in SharedDocumentUploadTests) — the current
-            // version's Publication Status must reflect that, not a hardcoded "Published"/etc.
-            // SharedDocumentDetail.razor's Version column renders "v{VersionNumber}", plus a
-            // "Current" badge (concatenated with no separator in InnerText) for whichever row is
-            // the document's current version — this is the only version, so it's always current.
             Assert.Equal("v1Current", await detail.GetVersionRowCellAsync(fileNameFragment, 0));
             Assert.Equal("Draft", await detail.GetVersionRowCellAsync(fileNameFragment, 1));
 
-            // Effective Date moved out of the grid's own columns and into the per-row "Details"
-            // popup as part of the grid's compaction — see SharedDocumentDetailPage.GetVersionDetailAsync.
-            // Format is culture-dependent, so only assert the year we set is present rather than
-            // asserting an exact dd/MM vs MM/dd rendering.
             var (_, _, effectiveDateCell) = await detail.GetVersionDetailAsync(fileNameFragment);
             Assert.Contains("2026", effectiveDateCell);
 
@@ -108,8 +80,6 @@ public sealed class SharedDocumentVersionHistoryTests(HrAdminPersonaFixture fixt
             var firstFileNameFragment  = Path.GetFileName(firstFile);
             var secondFileNameFragment = Path.GetFileName(secondFile);
 
-            // v1 is no longer the document's current version — its row must read "Superseded"
-            // regardless of the document's own (still-Draft) status.
             Assert.Equal("v1", await detail.GetVersionRowCellAsync(firstFileNameFragment, 0));
             Assert.Equal("Superseded", await detail.GetVersionRowCellAsync(firstFileNameFragment, 1));
 
@@ -117,9 +87,6 @@ public sealed class SharedDocumentVersionHistoryTests(HrAdminPersonaFixture fixt
             Assert.NotNull(firstHref);
             Assert.Contains($"shared-documents/{documentId}/versions/1/download", firstHref);
 
-            // v2 is now the current version — its Publication Status tracks the document's live
-            // status (still "Draft"; this test never publishes). Version cell carries the "Current"
-            // badge suffix now too — see the comment above on the first assertion in this file.
             Assert.Equal("v2Current", await detail.GetVersionRowCellAsync(secondFileNameFragment, 0));
             Assert.Equal("Draft", await detail.GetVersionRowCellAsync(secondFileNameFragment, 1));
 
@@ -134,9 +101,6 @@ public sealed class SharedDocumentVersionHistoryTests(HrAdminPersonaFixture fixt
         }
     }
 
-    // Uploads a shared document from the Shared Documents list page (same flow as
-    // SharedDocumentUploadTests) and leaves the browser on that list, with the new title visible
-    // in the grid so its row's href can be read to discover the generated document id.
     private async Task UploadDocumentAsync(string title, string filePath, string? effectiveDateDdMmYyyy)
     {
         await _page.GotoAsync(_fixture.WebBaseUrl + $"/companies/{AcmeId}/shared-documents");
@@ -149,14 +113,11 @@ public sealed class SharedDocumentVersionHistoryTests(HrAdminPersonaFixture fixt
 
         await dialog.GetByPlaceholder("Document title").FillAsync(title);
 
-        // Select a category via the shared Syncfusion SfDropDownList helper.
         var categoryGroup = dialog.Locator(".col-md-6").Filter(new() { HasText = "Category" });
         await DropDownSelector.SelectAsync(_page, categoryGroup, "Policy");
 
         if (effectiveDateDdMmYyyy is not null)
         {
-            // The Effective Date picker is the first of two SfDatePicker fields (Effective Date,
-            // then Review Date) in this dialog.
             var effectiveDateInput = dialog.Locator(".e-date-wrapper input.e-input").First;
             await effectiveDateInput.ClickAsync();
             await effectiveDateInput.FillAsync(effectiveDateDdMmYyyy);
@@ -172,8 +133,6 @@ public sealed class SharedDocumentVersionHistoryTests(HrAdminPersonaFixture fixt
         await _page.WaitForSelectorAsync($"text={title}", new() { Timeout = 15_000 });
     }
 
-    // Reads the document id straight from the list row's link href, avoiding a separate
-    // click+navigate+wait round trip (same pattern as e.g. EmploymentTypeEditCloseBehaviorTests).
     private async Task<Guid> GetUploadedDocumentIdAsync(string title)
     {
         var href = await _page.Locator(".e-rowcell a").Filter(new() { HasText = title }).First.GetAttributeAsync("href");
@@ -181,7 +140,6 @@ public sealed class SharedDocumentVersionHistoryTests(HrAdminPersonaFixture fixt
         return Guid.Parse(href.Split('/').Last());
     }
 
-    // %PDF- followed by padding, so magic-byte content validation passes.
     private static byte[] BuildTestPdf()
     {
         var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };

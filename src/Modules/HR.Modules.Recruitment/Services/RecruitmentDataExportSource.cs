@@ -5,11 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Services;
 
-/// <summary>
-/// Story 2: contributes the Recruitment module's principal data (vacancies, candidates,
-/// applications, interviews) to the organisation data export. Offers are represented by the
-/// offer-approval fields already carried on the application row. company_id enforced on every query.
-/// </summary>
 internal sealed class RecruitmentDataExportSource(RecruitmentDbContext db) : IRecruitmentDataExportSource
 {
     public async Task<IReadOnlyList<DataExportTable>> GetTablesAsync(Guid companyId, CancellationToken cancellationToken)

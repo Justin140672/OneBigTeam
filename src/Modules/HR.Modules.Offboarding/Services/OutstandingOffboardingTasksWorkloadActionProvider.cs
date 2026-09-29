@@ -6,12 +6,6 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace HR.Modules.Offboarding.Services;
 
-/// <summary>
-/// OBT-721 Workload &amp; HR Actions Report provider for outstanding offboarding tasks. Reuses
-/// IOffboardingReportReader (already used by GetOffboardingProgressReport/Handler.cs). HR-only,
-/// matching GetOffboardingProgressReport's "reporting:view-hr" policy tier — offboarding has no
-/// manager-scoped tier, unlike onboarding/probation.
-/// </summary>
 internal sealed class OutstandingOffboardingTasksWorkloadActionProvider(
     IOffboardingReportReader offboardingReportReader,
     IEmployeeDepartmentReader employeeDepartmentReader,
@@ -42,10 +36,6 @@ internal sealed class OutstandingOffboardingTasksWorkloadActionProvider(
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow.Date);
 
-        // Each outstanding offboarding task is actioned via its own Task (TaskActionType.Complete,
-        // keyed by the OffboardingTask id as SourceEntityId — see
-        // CompleteOffboardingTaskFromTaskAction/OffboardingTaskSynchronizer.cs). Resolve the exact
-        // linked task per offboarding task rather than matching by title/employee.
         var allTaskIds = items.SelectMany(i => i.OutstandingTaskIds ?? []).ToList();
         var openTaskIds = await taskReader.GetOpenTaskIdsAsync(
             companyId, allTaskIds, cancellationToken, TaskActionType.Complete);
@@ -75,8 +65,6 @@ internal sealed class OutstandingOffboardingTasksWorkloadActionProvider(
                     DueDate: item.LastWorkingDay,
                     AssignedTo: null,
                     Status: item.LastWorkingDay < today ? "Overdue" : "Outstanding",
-                    // No employee-profile fallback: this category is entirely task-backed. See
-                    // OutstandingOnboardingTasksWorkloadActionProvider for the same pattern.
                     DeepLinkUrl: "",
                     TaskId: linkedTaskId));
             }

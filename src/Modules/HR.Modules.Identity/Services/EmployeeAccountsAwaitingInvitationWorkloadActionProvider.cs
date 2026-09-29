@@ -7,15 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Services;
 
-/// <summary>
-/// OBT-721 Workload &amp; HR Actions Report provider for employee accounts awaiting invitation.
-/// HR-only. Identity owns UserInvite directly, so this queries IdentityDbContext rather than going
-/// through a cross-module reader — same derivation rules documented on
-/// EmployeeUserAccountStatusReader (PendingInvitation = not claimed/cancelled/expired,
-/// InvitationExpired = not claimed/cancelled but past ExpiresAt). Employees with no invite at all
-/// ("NoUser") are out of scope here — there is nothing outstanding to action until HR sends an
-/// invite in the first place.
-/// </summary>
 internal sealed class EmployeeAccountsAwaitingInvitationWorkloadActionProvider(
     IdentityDbContext dbContext,
     IEmployeeDepartmentReader employeeDepartmentReader,
@@ -45,9 +36,6 @@ internal sealed class EmployeeAccountsAwaitingInvitationWorkloadActionProvider(
         if (invites.Count == 0)
             return [];
 
-        // Only the most recent outstanding invite per employee — resending creates fresh
-        // token/expiry on the same row (UserInvite.Resend) so there is at most one live row per
-        // employee in practice, but keep this defensive in case of legacy duplicates.
         var latestPerEmployee = invites
             .GroupBy(i => i.EmployeeId)
             .Select(g => g.First())

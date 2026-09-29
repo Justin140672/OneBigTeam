@@ -26,8 +26,6 @@ internal sealed class Endpoint(CreateCandidateApplicationHandler handler, ICurre
 
         var outcome = await handler.HandleAsync(request, performedBy, cancellationToken);
 
-        // A duplicate email is a 409 whose body also identifies the existing candidate, so the client
-        // can offer "select existing" rather than creating a second record.
         if (outcome.DuplicateCandidate is { } duplicate)
         {
             await Send.ResultAsync(TypedResults.Conflict(duplicate));

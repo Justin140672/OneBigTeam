@@ -6,15 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Services;
 
-/// <summary>
-/// Seeds a single reasonable default Onboarding Template ("Standard Onboarding") with a starter
-/// checklist the first time a company's onboarding template list is requested, mirroring the
-/// per-company idempotent lazy-seeding pattern used by
-/// HR.Modules.Recruitment.Services.RecruitmentStageSeeder for default recruitment stages. A no-op
-/// once a company already has at least one OnboardingTemplate row, so this is always safe to call
-/// unconditionally. Templates remain fully editable/deactivatable afterward via the existing
-/// CRUD features.
-/// </summary>
 internal sealed class OnboardingTemplateSeeder(EmployeesDbContext db)
 {
     public async Task EnsureDefaultTemplateSeededAsync(Guid companyId, DateTimeOffset now, CancellationToken cancellationToken)

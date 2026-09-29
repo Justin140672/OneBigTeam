@@ -83,7 +83,6 @@ public class PricingCalculatorTests
     [Fact]
     public void Calculate_SeventyFiveEmployeeWorkedExampleMatchesPricingPageCopy()
     {
-        // 50 x £2.00 = £100.00, plus 25 x £1.75 = £43.75, total £143.75/month.
         var result = PricingCalculator.Calculate(75, Config);
 
         Assert.Equal(143.75m, result.Monthly);
@@ -100,7 +99,7 @@ public class PricingCalculatorTests
             },
             100.00m);
 
-        Assert.Equal(100.00m, PricingCalculator.Calculate(10, custom).Monthly); // 50 -> floored to 100
-        Assert.Equal(170.00m, PricingCalculator.Calculate(50, custom).Monthly); // 50 + 120
+        Assert.Equal(100.00m, PricingCalculator.Calculate(10, custom).Monthly);
+        Assert.Equal(170.00m, PricingCalculator.Calculate(50, custom).Monthly);
     }
 }

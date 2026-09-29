@@ -68,12 +68,6 @@ public class ToilExpiryConcurrencyTests
     {
         var (companyId, _, _, bucketId) = await SeedDueToilAwardAsync(awardedDays: 6m);
 
-        // Two independent scopes -> two independent LeaveDbContext/ToilExpiryService instances,
-        // exactly like two overlapping ToilExpiryJob iterations (or a retried/duplicated Hangfire
-        // execution) would get. Task.WhenAll gives Postgres a genuine opportunity to interleave the
-        // two SELECT ... FOR UPDATE calls - whichever arrives second blocks until the first's
-        // transaction commits, then re-reads fresh ledger state rather than acting on a stale
-        // snapshot (see ToilExpiryService's class doc comment).
         using var scopeA = _factory.Services.CreateScope();
         using var scopeB = _factory.Services.CreateScope();
         var serviceA = scopeA.ServiceProvider.GetRequiredService<ToilExpiryService>();
@@ -83,9 +77,6 @@ public class ToilExpiryConcurrencyTests
         var taskB = serviceB.ExpireCompanyAsync(companyId, AsOf, CancellationToken.None);
         var results = await Task.WhenAll(taskA, taskB);
 
-        // Both calls "succeed" - no exception/crash - but exactly one of them actually created the
-        // Expired transaction; the other found the bucket already accounted for (via the in-memory
-        // idempotency guard, backstopped by the unique filtered index) and is a safe no-op.
         Assert.Contains(results, r => r.TransactionsCreated == 1);
         Assert.Contains(results, r => r.TransactionsCreated == 0);
 
@@ -95,11 +86,11 @@ public class ToilExpiryConcurrencyTests
         var expiredTransactions = await verifyDb.ToilTransactions
             .Where(t => t.RelatedTransactionId == bucketId && t.Type == ToilTransactionType.Expired)
             .ToListAsync();
-        Assert.Single(expiredTransactions); // never double-expired
+        Assert.Single(expiredTransactions);
         Assert.Equal(6m, expiredTransactions[0].Days);
 
         var balance = await verifyDb.LeaveBalances.SingleAsync(b => b.CompanyId == companyId);
-        Assert.Equal(0m, balance.RemainingDays); // deducted exactly once, not twice
+        Assert.Equal(0m, balance.RemainingDays);
     }
 
     [Fact]
@@ -114,14 +105,6 @@ public class ToilExpiryConcurrencyTests
         var consumeDb = consumeScope.ServiceProvider.GetRequiredService<LeaveDbContext>();
         var consumeLedger = new ToilLedgerService(consumeDb);
 
-        // ToilLedgerService.ConsumeAsync only stages entity mutations - callers own
-        // SaveChangesAsync (see its doc comment) - so this wraps both steps to mirror what
-        // ApproveLeaveRequestHandler/LeaveApprovalEffectsService would do for a real leave
-        // approval consuming this same TOIL balance, racing the expiry job. A losing consume
-        // surfaces as DbUpdateConcurrencyException here exactly as it would in the real handler's
-        // own try/catch (SubmitLeaveRequestHandler/SubmitLeaveRequestDraftHandler/
-        // ApproveLeaveRequestHandler) - both outcomes are legitimate depending on which writer
-        // Postgres let proceed first.
         async Task<bool> ConsumeAsync()
         {
             var consumeResult = await consumeLedger.ConsumeAsync(
@@ -162,9 +145,6 @@ public class ToilExpiryConcurrencyTests
 
         if (consumeWon)
         {
-            // Consume's 4-day usage committed before (or independently of) expiry's read - expiry
-            // must only expire the true remainder (10 - 4 = 6), never the full original 10 (which
-            // would silently double-count the 4 already used).
             Assert.Equal(4m, used);
             Assert.NotNull(expired);
             Assert.Equal(6m, expired!.Days);
@@ -178,9 +158,6 @@ public class ToilExpiryConcurrencyTests
             Assert.Equal(10m, expired!.Days);
         }
 
-        // Whichever branch won, the ledger and the aggregate balance stay internally consistent:
-        // usage + expiry always accounts for exactly the 10 awarded days - never more (double
-        // spend/double expiry), never less (a lost update).
         Assert.Equal(10m, used + expired!.Days);
         Assert.Equal(0m, balance.RemainingDays);
     }
@@ -216,7 +193,7 @@ public class ToilExpiryConcurrencyTests
         };
 
         var expiryTask = expiryService.ExpireCompanyAsync(companyId, AsOf, CancellationToken.None);
-        await reachedPause.Task; // expiry now holds the row lock, inside its transaction, and is paused
+        await reachedPause.Task;
 
         using var consumeScope = _factory.Services.CreateScope();
         var consumeDb = consumeScope.ServiceProvider.GetRequiredService<LeaveDbContext>();
@@ -262,14 +239,14 @@ public class ToilExpiryConcurrencyTests
         var consumeSucceeded = await consumeTask;
 
         Assert.Equal(1, expiryResult.TransactionsCreated);
-        Assert.False(consumeSucceeded); // lost the race - the bucket had already expired by the time it ran
+        Assert.False(consumeSucceeded);
 
         using var verifyScope = _factory.Services.CreateScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<LeaveDbContext>();
 
         var expired = await verifyDb.ToilTransactions
             .SingleAsync(t => t.RelatedTransactionId == bucketId && t.Type == ToilTransactionType.Expired);
-        Assert.Equal(10m, expired.Days); // full award - the usage never got to reduce it
+        Assert.Equal(10m, expired.Days);
 
         Assert.False(await verifyDb.ToilTransactions.AnyAsync(t => t.RelatedTransactionId == bucketId && t.Type == ToilTransactionType.Used));
 
@@ -277,29 +254,17 @@ public class ToilExpiryConcurrencyTests
         Assert.Equal(0m, balance.RemainingDays);
     }
 
-    /// <summary>
-    /// Same load-before-lock window as above, but with a concurrent TOIL usage *reversal* instead of
-    /// a fresh usage. A Used transaction is committed against the bucket before expiry starts, so
-    /// expiry's own (correct) calculation only expires the true remainder. The reversal of that same
-    /// usage is then attempted while expiry is paused holding the row lock - it must also block for
-    /// the whole pause, only proceeding once expiry's transaction has committed.
-    /// </summary>
     [Fact]
     public async Task Concurrent_Toil_Usage_Reversal_Attempted_During_The_Locked_Read_Window_Blocks_Until_Expiry_Commits()
     {
         var (companyId, employeeId, _, bucketId) = await SeedDueToilAwardAsync(awardedDays: 10m);
         var leaveRequestId = Guid.NewGuid();
 
-        // Commit a 4-day usage against the bucket up front (not part of the race) so expiry's
-        // calculation has a real drawdown to account for.
         using (var preScope = _factory.Services.CreateScope())
         {
             var preDb = preScope.ServiceProvider.GetRequiredService<LeaveDbContext>();
             var preLedger = new ToilLedgerService(preDb);
             var leaveTypeId = (await preDb.LeaveTypes.SingleAsync(lt => lt.CompanyId == companyId)).Id;
-            // occurredOn must be strictly before the bucket's ExpiresOn (seeded one day before AsOf) -
-            // otherwise GetOpenBucketsOrderedAsync's "bucket.ExpiresOn <= asOf" guard treats the
-            // bucket as already unavailable and this pre-seeding consume fails outright.
             var consumeResult = await preLedger.ConsumeAsync(
                 companyId, employeeId, leaveTypeId, 4m, leaveRequestId, Guid.NewGuid(), AsOf.AddDays(-2),
                 allowNegativeBalance: false, DateTimeOffset.UtcNow, CancellationToken.None);
@@ -348,9 +313,6 @@ public class ToilExpiryConcurrencyTests
                 }
                 catch (DbUpdateConcurrencyException) when (attempt < 5)
                 {
-                    // Blocked on expiry's row lock, then lost the concurrency-token check purely
-                    // because expiry's commit advanced Version while this attempt was blocked -
-                    // retry with a fresh read of the now-committed state.
                 }
             }
 
@@ -367,33 +329,19 @@ public class ToilExpiryConcurrencyTests
         var reversalCount = await reverseTask;
 
         Assert.Equal(1, expiryResult.TransactionsCreated);
-        Assert.Equal(1, reversalCount); // reversal proceeded only after expiry committed
+        Assert.Equal(1, reversalCount);
 
         using var verifyScope = _factory.Services.CreateScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<LeaveDbContext>();
 
         var expired = await verifyDb.ToilTransactions
             .SingleAsync(t => t.RelatedTransactionId == bucketId && t.Type == ToilTransactionType.Expired);
-        // Expiry's calculation only ever saw the 4-day usage that had already committed before it
-        // started (never the reversal, which was still blocked) - remaining = 10 - 4 = 6.
         Assert.Equal(6m, expired.Days);
 
-        // 10 awarded - 4 used - 6 expired + 4 reversed (applied strictly after expiry committed).
         var balance = await verifyDb.LeaveBalances.SingleAsync(b => b.CompanyId == companyId);
         Assert.Equal(4m, balance.RemainingDays);
     }
 
-    /// <summary>
-    /// P1.1 follow-up: <see cref="ToilExpiryJob"/>'s bounded per-company retry loop. Forces the
-    /// first attempt's <c>SaveChangesAsync</c> to fail with <see cref="DbUpdateConcurrencyException"/>
-    /// by mutating the tracked balance's concurrency-token <c>OriginalValue</c> (the same technique
-    /// <c>DbContextConcurrencyExtensions.SaveChangesWithConcurrencyAsync</c> uses in production to
-    /// pin an expected version) via <see cref="ToilExpiryService.TestOnlyAfterLockedLoadAsync"/> -
-    /// genuinely defeating the real row lock from a second connection is impossible (it would simply
-    /// block, as proven by the two tests above), so this is the deterministic way to provoke this
-    /// exact EF Core failure mode. The job must then retry with a brand new scope/transaction (never
-    /// reusing the first attempt's now-faulted change tracker) and succeed on attempt 2.
-    /// </summary>
     [Fact]
     public async Task ToilExpiryJob_Retries_With_A_Fresh_Scope_And_Succeeds_After_One_Forced_Concurrency_Conflict()
     {
@@ -426,7 +374,7 @@ public class ToilExpiryConcurrencyTests
 
         await job.ExecuteAsync();
 
-        Assert.Equal(2, attemptsSeen); // attempt 1 (forced failure) then attempt 2 (succeeds)
+        Assert.Equal(2, attemptsSeen);
         Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains(companyId.ToString()));
         Assert.DoesNotContain(logger.Entries, e => e.Level == LogLevel.Error && e.Message.Contains(companyId.ToString()));
 
@@ -441,15 +389,6 @@ public class ToilExpiryConcurrencyTests
         Assert.Equal(0m, balance.RemainingDays);
     }
 
-    /// <summary>
-    /// P1.1 follow-up: retry exhaustion. Forces every attempt (all
-    /// <see cref="ToilExpiryJob"/>'s <c>MaxAttemptsPerCompany</c> = 3) for one company to fail with
-    /// <see cref="DbUpdateConcurrencyException"/>, using the same forced-staleness technique as
-    /// above. Asserts no partial ledger/balance state leaks for that company, the failure is logged
-    /// as an error, and - processed in the very same <see cref="ToilExpiryJob.ExecuteAsync"/> batch
-    /// run - a second, healthy company is entirely unaffected and successfully expires its own due
-    /// award.
-    /// </summary>
     [Fact]
     public async Task ToilExpiryJob_Logs_An_Error_And_Leaves_No_Partial_State_When_Every_Retry_Attempt_Fails_While_A_Healthy_Company_Still_Succeeds()
     {
@@ -464,7 +403,6 @@ public class ToilExpiryConcurrencyTests
                 if (balances.TryGetValue(failingBalanceId, out var balance))
                 {
                     Interlocked.Increment(ref attemptsSeen);
-                    // Force every attempt for this company to fail - never let it succeed.
                     dbContext.Entry(balance).Property(nameof(IVersionedAggregate.Version)).OriginalValue =
                         balance.Version + 1;
                 }
@@ -481,7 +419,7 @@ public class ToilExpiryConcurrencyTests
 
         await job.ExecuteAsync();
 
-        Assert.Equal(3, attemptsSeen); // MaxAttemptsPerCompany - every attempt forced to fail
+        Assert.Equal(3, attemptsSeen);
         Assert.Contains(
             logger.Entries,
             e => e.Level == LogLevel.Error && e.Message.Contains(failingCompanyId.ToString()));
@@ -492,13 +430,11 @@ public class ToilExpiryConcurrencyTests
         using var verifyScope = _factory.Services.CreateScope();
         var verifyDb = verifyScope.ServiceProvider.GetRequiredService<LeaveDbContext>();
 
-        // No partial ledger/balance changes for the company that exhausted every retry.
         Assert.False(await verifyDb.ToilTransactions.AnyAsync(t => t.RelatedTransactionId == failingBucketId && t.Type == ToilTransactionType.Expired));
         var failingBalance = await verifyDb.LeaveBalances.SingleAsync(b => b.Id == failingBalanceId);
         Assert.Equal(6m, failingBalance.RemainingDays);
         Assert.Equal(1, failingBalance.Version);
 
-        // The healthy company, processed in the same batch run, is entirely unaffected.
         var healthyExpired = await verifyDb.ToilTransactions
             .SingleAsync(t => t.RelatedTransactionId == healthyBucketId && t.Type == ToilTransactionType.Expired);
         Assert.Equal(5m, healthyExpired.Days);
@@ -506,15 +442,6 @@ public class ToilExpiryConcurrencyTests
         Assert.Equal(0m, healthyBalance.RemainingDays);
     }
 
-    /// <summary>
-    /// Routes every <see cref="ToilExpiryService"/> resolved from the wrapped scope factory through
-    /// <paramref name="configureService"/> before returning it, so a test can arm
-    /// <see cref="ToilExpiryService.TestOnlyAfterLockedLoadAsync"/> on the fresh instance
-    /// <see cref="ToilExpiryJob"/> resolves for every attempt/company, without needing to fork
-    /// <see cref="ToilExpiryJob"/>'s own scoping logic. Everything else (the real Postgres-backed
-    /// <see cref="LeaveDbContext"/>, real <see cref="ToilLedgerService"/>, etc.) is resolved exactly
-    /// as in production.
-    /// </summary>
     private sealed class HookInjectingScopeFactory(IServiceScopeFactory inner, Action<ToilExpiryService> configureService)
         : IServiceScopeFactory
     {
@@ -551,7 +478,6 @@ public class ToilExpiryConcurrencyTests
             Task.FromResult(timeZoneId);
     }
 
-    /// <summary>Captures every log entry's level and formatted message for assertions.</summary>
     private sealed class CapturingLogger<T> : ILogger<T>
     {
         public List<(LogLevel Level, string Message)> Entries { get; } = [];

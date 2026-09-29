@@ -17,10 +17,6 @@ internal sealed class Company : IVersionedAggregate
 
     public void IncrementVersion() => Version++;
 
-    // Kept as a computed shim so existing read-sites (UI badges, response DTOs) that only care
-    // about "is this company usable right now" don't need a sweep — grepped all readers of
-    // Company.IsActive before making this change and none of them need to distinguish
-    // PendingVerification from Deactivated, they only ever branched on true/false.
     public bool IsActive => Status == CompanyStatus.Active;
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }

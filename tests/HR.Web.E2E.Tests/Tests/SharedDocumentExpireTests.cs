@@ -4,21 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the "Mark Expired" action on SharedDocumentDetail.razor: the header "Mark Expired"
-/// button (visible only while Status is Draft or Published, alongside Archive), its confirmation
-/// dialog's wording and Cancel behavior, the resulting Expired state (Status badge and both the
-/// "Mark Expired" and "Archive" buttons disappearing), and the mutual exclusivity of the two
-/// buttons once a document has already been Archived or Expired.
-///
-/// Upload (and Publish) here follow the same UI flows already covered in
-/// SharedDocumentUploadTests / SharedDocumentPublishTests — this file does not re-assert
-/// upload-dialog field validation or the publish flow itself, only what "Mark Expired" adds on
-/// top. Modeled directly on SharedDocumentArchiveTests, which covers the sibling Archive action.
-///
-/// Uses Laura Bennett (laura.bennett@acme.example, HrAdministrator) against the seeded Acme
-/// company, matching the other Shared Documents E2E tests.
-/// </summary>
 public sealed class SharedDocumentExpireTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -47,7 +32,6 @@ public sealed class SharedDocumentExpireTests(HrAdminPersonaFixture fixture) : R
             Assert.Equal("Published", await detail.GetStatusAsync());
             Assert.True(await detail.IsExpireButtonVisibleAsync(),
                 "Expected the Mark Expired button to be visible for a Published document");
-            // Archive stays available too — both actions are offered while Draft or Published.
             Assert.True(await detail.IsArchiveButtonVisibleAsync(),
                 "Expected the Archive button to remain visible alongside Mark Expired");
 
@@ -120,7 +104,6 @@ public sealed class SharedDocumentExpireTests(HrAdminPersonaFixture fixture) : R
         var expiredTempFile   = Path.Combine(Path.GetTempPath(), $"shared-doc-{Guid.NewGuid():N}.pdf");
         try
         {
-            // Document A: archive it, then confirm Mark Expired is no longer offered.
             await UploadDocumentAsync(archivedTitle, archivedTempFile);
             var archivedDocumentId = await GetUploadedDocumentIdAsync(archivedTitle);
             await detail.GoToAsync(AcmeId, archivedDocumentId);
@@ -130,7 +113,6 @@ public sealed class SharedDocumentExpireTests(HrAdminPersonaFixture fixture) : R
             Assert.False(await detail.IsExpireButtonVisibleAsync(),
                 "Expected the Mark Expired button to be hidden once the document is Archived");
 
-            // Document B: mark it expired, then confirm Archive is no longer offered.
             await UploadDocumentAsync(expiredTitle, expiredTempFile);
             var expiredDocumentId = await GetUploadedDocumentIdAsync(expiredTitle);
             await detail.GoToAsync(AcmeId, expiredDocumentId);
@@ -147,10 +129,6 @@ public sealed class SharedDocumentExpireTests(HrAdminPersonaFixture fixture) : R
         }
     }
 
-    // Uploads a shared document from the Shared Documents list page (same flow as
-    // SharedDocumentArchiveTests / SharedDocumentUploadTests / SharedDocumentVersionHistoryTests)
-    // and leaves the browser on that list, with the new title visible in the grid so its row's
-    // href can be read to discover the generated document id.
     private async Task UploadDocumentAsync(string title, string filePath)
     {
         await _page.GotoAsync(_fixture.WebBaseUrl + $"/companies/{AcmeId}/shared-documents");
@@ -163,7 +141,6 @@ public sealed class SharedDocumentExpireTests(HrAdminPersonaFixture fixture) : R
 
         await dialog.GetByPlaceholder("Document title").FillAsync(title);
 
-        // Select a category via the shared Syncfusion SfDropDownList helper.
         var categoryGroup = dialog.Locator(".col-md-6").Filter(new() { HasText = "Category" });
         await DropDownSelector.SelectAsync(_page, categoryGroup, "Policy");
 
@@ -176,9 +153,6 @@ public sealed class SharedDocumentExpireTests(HrAdminPersonaFixture fixture) : R
         await _page.WaitForSelectorAsync($"text={title}", new() { Timeout = 15_000 });
     }
 
-    // Reads the document id straight from the list row's link href, avoiding a separate
-    // click+navigate+wait round trip (same pattern as e.g. EmploymentTypeEditCloseBehaviorTests
-    // and SharedDocumentVersionHistoryTests).
     private async Task<Guid> GetUploadedDocumentIdAsync(string title)
     {
         var href = await _page.Locator(".e-rowcell a").Filter(new() { HasText = title }).First.GetAttributeAsync("href");
@@ -186,7 +160,6 @@ public sealed class SharedDocumentExpireTests(HrAdminPersonaFixture fixture) : R
         return Guid.Parse(href.Split('/').Last());
     }
 
-    // %PDF- followed by padding, so magic-byte content validation passes.
     private static byte[] BuildTestPdf()
     {
         var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };

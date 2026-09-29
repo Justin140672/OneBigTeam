@@ -2,9 +2,6 @@ using HR.Modules.Documents.Domain;
 
 namespace HR.Modules.Documents.Tests;
 
-// DOC-04: domain-level coverage of EmployeeDocument.Archive/Restore, independent of the handlers
-// that call them (DeleteEmployeeDocumentHandlerTests / RestoreEmployeeDocumentHandlerTests already
-// exercise these indirectly, but the guard/state-transition behaviour deserves a direct test).
 public class EmployeeDocumentArchiveRestoreTests
 {
     private static readonly DateTimeOffset CreatedAt = new(2026, 1, 1, 9, 0, 0, TimeSpan.Zero);
@@ -93,10 +90,6 @@ public class EmployeeDocumentArchiveRestoreTests
     [Fact]
     public void Restore_On_Never_Archived_Document_Still_Sets_Restored_Fields()
     {
-        // Restore has no explicit guard against being called on a non-archived document — the
-        // handler is responsible for enforcing that invariant (RestoreEmployeeDocumentHandler
-        // returns Conflict before calling Restore). This test pins the domain method's own
-        // unconditional behaviour so a future change to that contract is caught here.
         var empDoc = CreateEmployeeDocument();
         var restoredBy = Guid.NewGuid();
         var restoredAt = CreatedAt.AddDays(1);

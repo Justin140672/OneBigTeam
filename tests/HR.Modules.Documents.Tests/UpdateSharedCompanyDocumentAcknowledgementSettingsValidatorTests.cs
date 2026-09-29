@@ -6,10 +6,6 @@ public class UpdateSharedCompanyDocumentAcknowledgementSettingsValidatorTests
 {
     private static readonly UpdateSharedCompanyDocumentAcknowledgementSettingsValidator Validator = new();
 
-    // Unlike Upload, a blank statement is valid here even when RequiresAcknowledgement is true —
-    // EditSharedCompanyDocumentAcknowledgementDialog.razor documents the field as optional (falling
-    // back to a default placeholder shown to employees), and the handler normalizes blank input to
-    // null rather than rejecting it.
     [Fact]
     public void Validate_RequiresAcknowledgement_With_Null_AcknowledgementStatement_Passes()
     {

@@ -23,7 +23,6 @@ public class GetPendingProfilePhotoByIdHandlerTests
         var pending = PendingProfilePhoto.Create(
             Guid.NewGuid(), companyId, employeeId, "pending.png", 222, "image/png",
             storageKey, employeeId, DateTimeOffset.UtcNow);
-        // Default download-success fixtures assume a clean scan.
         pending.MarkScanClean(DateTimeOffset.UtcNow);
         db.PendingProfilePhotos.Add(pending);
         db.SaveChanges();
@@ -70,8 +69,6 @@ public class GetPendingProfilePhotoByIdHandlerTests
     [Fact]
     public async Task HandleAsync_Does_Not_Leak_Pending_Photo_From_Another_Company()
     {
-        // Same pending-photo Id, but the request's CompanyId doesn't match the row's CompanyId —
-        // this is the tenant-isolation guarantee for the by-id lookup (Id alone is not enough).
         await using var db = BuildContext();
         var employeeId     = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
@@ -107,8 +104,6 @@ public class GetPendingProfilePhotoByIdHandlerTests
         Assert.Equal("not_found", result.Error.Code);
     }
 
-    // Theory parameters must be a publicly accessible type (xUnit requires public test methods),
-    // but FileScanStatus is internal — pass the enum's underlying int value instead and cast.
     [Theory]
     [InlineData((int)FileScanStatus.Pending, "This document is currently being security checked.")]
     [InlineData((int)FileScanStatus.Scanning, "This document is currently being security checked.")]
@@ -127,7 +122,7 @@ public class GetPendingProfilePhotoByIdHandlerTests
             "pending/key.png", employeeId, DateTimeOffset.UtcNow);
         switch (status)
         {
-            case FileScanStatus.Pending: break; // Create() defaults to Pending
+            case FileScanStatus.Pending: break;
             case FileScanStatus.Scanning: pending.MarkScanning(DateTimeOffset.UtcNow); break;
             case FileScanStatus.Infected: pending.MarkScanInfected("EICAR.Test.File", DateTimeOffset.UtcNow); break;
             case FileScanStatus.Failed: pending.MarkScanFailed("scanner unreachable", DateTimeOffset.UtcNow); break;

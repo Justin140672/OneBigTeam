@@ -47,7 +47,6 @@ public sealed record DocumentTypeListResponse(IReadOnlyList<DocumentTypeItem> It
 
 public sealed record DocumentTypeItem(Guid Id, string Name, string? Description, bool IsActive, bool AllowEmployeeUpload);
 
-// --- Document Type CRUD models ---
 
 public record ListDocumentTypesAdminResponse(List<DocumentTypeListItemModel> Items);
 
@@ -120,7 +119,6 @@ public sealed record GetDocumentRequestResponse(
     string?   RequestedByName,
     DateTimeOffset CreatedAt);
 
-// ── DASHBOARD: EXPIRING DOCUMENTS ────────────────────────────────────────────────
 
 public sealed record GetExpiringDocumentsResponse(IReadOnlyList<ExpiringDocumentItem> Items);
 
@@ -132,7 +130,6 @@ public sealed record ExpiringDocumentItem(
     DateOnly ExpiryDate,
     DocumentExpiryStatus ExpiryStatus);
 
-// ── DASHBOARD: DOCUMENT REVIEWS DUE ──────────────────────────────────────────────
 
 public sealed record GetSharedCompanyDocumentsDueForReviewResponse(IReadOnlyList<SharedCompanyDocumentDueForReviewItem> Items);
 
@@ -155,7 +152,6 @@ public sealed record SharedCompanyDocumentDueForReviewItem(
     string UpdatedByName,
     bool IsOverdue);
 
-// --- Shared Company Documents ---
 
 public sealed record CompanyDocumentCategoryListResponse(IReadOnlyList<CompanyDocumentCategoryItem> Items);
 
@@ -208,7 +204,6 @@ public sealed record PublishedSharedCompanyDocumentItem(
     DateTimeOffset? PublishedAt,
     string AcknowledgementStatus);
 
-// --- Shared Company Document detail (HR full view) ---
 
 public sealed record SharedCompanyDocumentDetailResponse(
     Guid Id,
@@ -278,7 +273,6 @@ public sealed record SharedCompanyDocumentReviewHistoryModel(
     string? ReviewNotes,
     DateOnly? PreviousReviewDate);
 
-// --- Shared Company Document acknowledgement progress (HR full view) ---
 
 public sealed record SharedCompanyDocumentAcknowledgementProgressResponse(
     Guid DocumentId,
@@ -305,7 +299,6 @@ public sealed record SharedCompanyDocumentAcknowledgementProgressItem(
     int? VersionNumber,
     string? AcknowledgementStatement);
 
-// --- Shared Company Document detail (employee simplified view) ---
 
 public sealed record PublishedSharedCompanyDocumentDetailResponse(
     Guid Id,

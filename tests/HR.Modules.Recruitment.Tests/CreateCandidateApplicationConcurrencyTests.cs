@@ -49,7 +49,6 @@ public class CreateCandidateApplicationConcurrencyTests(RecruitmentDatabaseFixtu
         return new Participant(db, storage, new CreateCandidateApplicationHandler(intake));
     }
 
-    /// <summary>Each round gets its own company so every count below is scoped to that round.</summary>
     private async Task<(Guid CompanyId, Guid VacancyId)> SeedCompanyAsync()
     {
         var companyId = Guid.NewGuid();
@@ -185,8 +184,6 @@ public class CreateCandidateApplicationConcurrencyTests(RecruitmentDatabaseFixtu
                 Assert.Equal(winner.CandidateId, document.CandidateId);
                 Assert.Equal(CandidateDocumentKind.Cv, document.Kind);
 
-                // Every upload intent created in this round (the winner's and, if the loser got far
-                // enough to upload, the loser's) is resolved — none is left for the reconciliation sweep.
                 var intents = await verify.CandidateDocumentDeletionOperations.AsNoTracking()
                     .Where(o => o.CompanyId == companyId)
                     .ToListAsync();
@@ -194,8 +191,6 @@ public class CreateCandidateApplicationConcurrencyTests(RecruitmentDatabaseFixtu
                 Assert.All(intents, i => Assert.NotNull(i.ConfirmedAt));
                 Assert.Contains(intents, i => i.StorageKey == document.StorageKey);
 
-                // Storage: the winner's blob is kept; any blob the loser uploaded (only if it passed the
-                // pre-check before the winner committed) has been compensated away.
                 var uploads = a.Storage.Uploads.Concat(b.Storage.Uploads).Select(u => u.StorageKey).ToList();
                 var deletions = a.Storage.Deletions.Concat(b.Storage.Deletions).ToList();
                 Assert.Contains(document.StorageKey, uploads);

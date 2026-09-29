@@ -83,7 +83,6 @@ public class PurgeEligibleArchivedEmployeeDocumentsHandlerTests
         await using var db = BuildContext();
         var companyId       = Guid.NewGuid();
         var employeeId      = Guid.NewGuid();
-        // 89 days ago — one day short of the 90-day retention boundary.
         var archivedAt       = Now.AddDays(-(PurgeEligibleArchivedEmployeeDocumentsHandler.MinimumRetentionDays - 1));
         var (doc, empDoc)   = await SeedArchived(db, companyId, employeeId, archivedAt, "key/too-recent.pdf");
         var storage           = new FakeDocumentStorageService();
@@ -154,8 +153,6 @@ public class PurgeEligibleArchivedEmployeeDocumentsHandlerTests
         eligibleEmpDoc.Archive(Guid.NewGuid(), "old", archivedAt);
         db.EmployeeDocuments.Add(eligibleEmpDoc);
 
-        // Second EmployeeDocument still links to the same Document row — the underlying Document
-        // must survive the purge even though eligibleEmpDoc is removed.
         var otherEmpDoc = EmployeeDocument.Create(Guid.NewGuid(), companyId, otherEmployeeId, doc.Id, Guid.NewGuid(), Now);
         db.EmployeeDocuments.Add(otherEmpDoc);
 

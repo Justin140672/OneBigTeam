@@ -3,11 +3,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Documents.Tests.Infrastructure;
 
-/// <summary>
-/// Wraps <see cref="FakeNotificationWriter"/> and throws on a configurable number of the next
-/// <see cref="WriteAsync"/> calls, to simulate a partial-failure mid-run. All other members
-/// delegate straight through, so a re-run after the fault sees whatever was already recorded.
-/// </summary>
 internal sealed class FaultInjectingNotificationWriter(FakeNotificationWriter inner) : INotificationWriter
 {
     public int FailNextWrites { get; set; }

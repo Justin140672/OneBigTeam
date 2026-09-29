@@ -9,13 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Covers POST /api/companies/{companyId}/shared-documents/{documentId}/reissue-acknowledgement
-/// (ReissueSharedCompanyDocumentAcknowledgement): the shared-document:manage policy, tenant
-/// isolation, and the handler's guard branches — document must exist, be Published, and require
-/// acknowledgement. The "notify outstanding employees" happy path is exercised with an empty
-/// audience so it returns a NotifiedCount of 0 without needing seeded Employee rows.
-/// </summary>
 [Collection("Integration")]
 public class ReissueSharedCompanyDocumentAcknowledgementEndpointTests
 {

@@ -5,17 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// SET-08: covers the durable/recoverable employee-renumber side effect created by
-/// UpdateHrSettings when the employee-number FORMAT changes while staying Automatic, plus the
-/// GetEmployeeRenumberSideEffectStatus / RetryEmployeeRenumberSideEffect endpoints.
-///
-/// The real Hangfire background-job execution is replaced with a no-op fake in
-/// ApiWebApplicationFactory (see FakeBackgroundJobClient), so a side effect created through these
-/// endpoints never actually transitions past Pending in this test harness — the true
-/// Failed -&gt; retried -&gt; Processed happy path is covered at the job level by
-/// EmployeeRenumberSideEffectJobTests in HR.Modules.Companies.Tests, not here.
-/// </summary>
 [Collection("Integration")]
 public class EmployeeRenumberSideEffectEndpointTests
 {
@@ -46,14 +35,6 @@ public class EmployeeRenumberSideEffectEndpointTests
         return await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Renumber Side Effect Test {Guid.NewGuid():N}", companyId: tenantId);
     }
 
-    // A brand-new test company has no persisted CompanySettings row at all yet (CompanyTestSeeder
-    // does not seed one, unlike the real signup flow's CompanyProvisioner). UpdateHrSettingsHandler
-    // only triggers the renumber side effect when the format changes while the company was ALREADY
-    // in Automatic mode beforehand — establishing settings for the very first time never counts as
-    // a "format change while staying Automatic" (previousEmployeeNumberMode is null, not Automatic,
-    // on that first call), mirroring the pre-existing "never on a Manual&lt;-&gt;Automatic switch" rule.
-    // So every test below first calls EstablishAutomaticModeAsync (a baseline PUT establishing
-    // Automatic mode with no side effect expected) before making the actual format-changing PUT.
     private async Task<int> EstablishAutomaticModeAsync(HttpClient client, Guid companyId)
     {
         var response = await client.PutAsJsonAsync(
@@ -182,8 +163,6 @@ public class EmployeeRenumberSideEffectEndpointTests
         var putPayload = await putResponse.Content.ReadFromJsonAsync<UpdateHrSettingsPayload>();
         Assert.NotNull(putPayload?.EmployeeRenumberSideEffectId);
 
-        // The side effect is still Pending (no real Hangfire job ran in this test harness) — only
-        // a Failed side effect can be retried.
         var retryResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employee-renumber-side-effects/{putPayload!.EmployeeRenumberSideEffectId}/retry",
             new { });

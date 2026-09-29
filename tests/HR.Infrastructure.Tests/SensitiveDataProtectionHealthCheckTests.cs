@@ -28,9 +28,6 @@ public class SensitiveDataProtectionHealthCheckTests
 
     private static IServiceProvider BuildProviderWithMisconfiguredProtector()
     {
-        // Mirrors InfrastructureModule.AddSensitiveDataProtection's lazy factory registration: the
-        // factory itself throws SensitiveDataProtectionException when resolved, because no keys are
-        // configured.
         var services = new ServiceCollection();
         services.AddSingleton<ISensitiveDataProtector>(_ =>
             AesGcmSensitiveDataProtector.Create(new SensitiveDataProtectionOptions()));

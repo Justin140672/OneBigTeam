@@ -144,7 +144,6 @@ public class ListAssetsEndpointTests
         var asset = await CreateAssetAsync(client, companyId, categoryId, "A001", "Laptop");
         await CreateAssetAsync(client, companyId, categoryId, "A002", "Desk");
 
-        // Assign the first asset
         await client.PostAsJsonAsync($"/api/companies/{companyId}/assets/{asset.Id}/assignments", new
         {
             companyId,

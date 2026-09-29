@@ -11,7 +11,6 @@ namespace HR.Modules.Documents.Tests;
 
 public class ListSharedCompanyDocumentsHandlerTests
 {
-    // Today is 2026-07-13.
     private static readonly DateTimeOffset Now = new(2026, 7, 13, 10, 0, 0, TimeSpan.Zero);
 
     private sealed class FakeEmployeeNameReader(Dictionary<Guid, string>? names = null) : IEmployeeNameReader
@@ -67,8 +66,6 @@ public class ListSharedCompanyDocumentsHandlerTests
     [Fact]
     public async Task HandleAsync_Includes_Draft_Documents()
     {
-        // The list endpoint backs the HR management screen, so drafts must be visible there —
-        // unlike the employee-facing "published documents" list.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var category  = await SeedCategory(db, companyId);
@@ -196,7 +193,6 @@ public class ListSharedCompanyDocumentsHandlerTests
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
-        // No entry for reviewOwnerId in the lookup dictionary.
         var result = await Handler(db, new Dictionary<Guid, string>()).HandleAsync(
             new ListSharedCompanyDocumentsRequest { CompanyId = companyId },
             CancellationToken.None);

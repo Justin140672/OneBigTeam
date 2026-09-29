@@ -26,7 +26,6 @@ public class GetEmployeeTasksEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    // ── Auth ───────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_EmployeeTasks_Returns_Unauthorized_When_No_Auth_Header()
@@ -42,12 +41,6 @@ public class GetEmployeeTasksEndpointTests
     [Fact]
     public async Task Get_EmployeeTasks_Returns_Ok_For_Authenticated_User_With_No_Role()
     {
-        // Endpoint requires only the baseline "role:employee" policy (any authenticated
-        // employee), not employee:manage, so employees can view their own tasks without
-        // needing management permissions. IAM-07: the caller must still pass resource-level
-        // authorization, so this requests the caller's own tasks (self-access) rather than an
-        // arbitrary employeeId — an unrelated employeeId is covered by the authorization-matrix
-        // tests below.
         var unprivilegedUser = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, unprivilegedUser, SystemRoles.Employee);
 
@@ -62,7 +55,6 @@ public class GetEmployeeTasksEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    // ── Happy path ─────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Get_EmployeeTasks_Returns_Empty_When_Employee_Has_No_Tasks()
@@ -119,10 +111,6 @@ public class GetEmployeeTasksEndpointTests
         Assert.All(payload.Items, item => Assert.Equal("Open", item.Status));
     }
 
-    // ── IAM-07: resource-ownership authorization matrix ───────────────────────
-    // Unlike GetTask, this check runs directly in the Endpoint (the target employeeId is known
-    // from the route, no DB lookup needed first) — see Endpoint.cs. Mirrors
-    // CompleteTaskAuthorizationTests's matrix for the same underlying TasksResourceAuthorizer.
 
     [Fact]
     public async Task Get_EmployeeTasks_Returns_Ok_For_Self()
@@ -157,9 +145,9 @@ public class GetEmployeeTasksEndpointTests
     [Fact]
     public async Task Get_EmployeeTasks_Returns_Ok_For_Skip_Level_Manager_In_Three_Level_Hierarchy()
     {
-        var seniorManager = await CreateEmployeeAsCallerAsync(); // C
-        var manager = await CreateEmployeeAsCallerAsync();       // B
-        var report = await CreateEmployeeAsCallerAsync();        // A
+        var seniorManager = await CreateEmployeeAsCallerAsync();
+        var manager = await CreateEmployeeAsCallerAsync();
+        var report = await CreateEmployeeAsCallerAsync();
 
         using (var setupClient = await AuthenticatedAsAsync(Guid.NewGuid(), hrAdministrator: true))
         {
@@ -231,7 +219,6 @@ public class GetEmployeeTasksEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── Helpers ────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient()
     {
@@ -263,11 +250,6 @@ public class GetEmployeeTasksEndpointTests
         response.EnsureSuccessStatusCode();
     }
 
-    /// <summary>
-    /// Creates a real employee record whose id doubles as the identity user id used for
-    /// TestAuthHandler.UserHeader, so the returned id can act as a caller in
-    /// AuthenticatedAsAsync — mirrors CompleteTaskAuthorizationTests.CreateEmployeeAsync.
-    /// </summary>
     private async Task<Guid> CreateEmployeeAsCallerAsync()
     {
         using var setupClient = await AuthenticatedAsAsync(Guid.NewGuid(), hrAdministrator: true);
@@ -289,8 +271,6 @@ public class GetEmployeeTasksEndpointTests
                 dateOfBirth = "1990-01-01",
                 nationality = "British",
                 gender = "Male",
-                // Max 50 chars (CreateEmployeeValidator) — a full firstName-lastName-guid
-                // combination can exceed that, so use a short, still-unique suffix instead.
                 employeeNumber = $"EN-{Guid.NewGuid():N}"[..20],
                 employmentTypeId = Guid.Parse("40000000-0000-0000-0000-000000000001"),
                 departmentId = Guid.Parse("10000000-0000-0000-0000-000000000001"),

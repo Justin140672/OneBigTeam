@@ -10,11 +10,6 @@ using Xunit;
 
 namespace HR.Modules.DataImport.Tests;
 
-/// <summary>
-/// Security review finding 6: <see cref="SupabaseImportFileStorageHealthCheck"/> must report
-/// Unhealthy when the configured bucket is missing from the "list buckets" response, not just when
-/// the HTTP call itself fails.
-/// </summary>
 public class SupabaseImportFileStorageHealthCheckTests
 {
     private static SupabaseImportFileStorageOptions Options() => new()

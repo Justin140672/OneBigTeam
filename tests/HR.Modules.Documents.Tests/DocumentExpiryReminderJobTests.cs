@@ -105,7 +105,6 @@ public class DocumentExpiryReminderJobTests
         await using var db = BuildContext(dbName);
         var job = BuildJob(db);
 
-        // Should not throw and should leave the single document untouched.
         await job.ExecuteAsync();
 
         var doc = await db.EmployeeDocuments.SingleAsync();

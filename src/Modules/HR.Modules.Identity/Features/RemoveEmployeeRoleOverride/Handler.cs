@@ -51,10 +51,6 @@ internal sealed class RemoveEmployeeRoleOverrideHandler(
         if (existing is null)
             return Result.Failure<RemoveEmployeeRoleOverrideResponse>(Error.NotFound("Override was not found."));
 
-        // Same role-administration boundary as creating an override — removing a Grant/Deny for a
-        // role the actor is not authorised to administer is just as much a boundary violation as
-        // creating one (e.g. an HR Administrator silently clearing a Company-Administrator-scoped
-        // deny would circumvent the same protection from the other direction).
         var actorEffectiveRoles = actorUserId.HasValue
             ? await authorizationService.GetEffectiveRolesAsync(actorUserId.Value, cancellationToken)
             : new HashSet<Guid>();

@@ -83,10 +83,5 @@ public sealed class LeaveTypeEditModel : IHasVersion
     public string Behaviour { get; set; } = "Standard";
     public bool HasBalance { get; set; } = true;
 
-    /// <summary>
-    /// True for the platform-provisioned "Annual Leave" record — see LeaveType.IsSystem on the
-    /// backend. Read-only here: there is no way to set this via Create, and it drives the
-    /// Name-field-disabled / no-delete UI in LeaveTypeEdit.razor / LeaveTypeList.razor.
-    /// </summary>
     public bool IsSystem { get; set; }
 }

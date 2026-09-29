@@ -2,10 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for RecruitmentStageEdit.razor (/companies/{companyId}/recruitment-stages/new and
-/// /{id}, ticket #100). Mirrors EmploymentTypeEditPage's pattern.
-/// </summary>
 public sealed class RecruitmentStageEditPage(IPage page, string baseUrl)
 {
     public async Task GoToNewAsync(Guid companyId)
@@ -29,12 +25,8 @@ public sealed class RecruitmentStageEditPage(IPage page, string baseUrl)
     public Task<string> GetNameAsync() =>
         page.GetByPlaceholder("e.g. Screening, Interview, Offered").InputValueAsync();
 
-    /// <summary>The stage entity id parsed out of the current edit/view URL (/recruitment-stages/{id}[/view]).</summary>
     public Guid GetIdFromUrl() => UrlIdParser.LastGuid(page.Url);
 
-    // ── Name field — mutated field for concurrency tests ────────────────────────
-    // Click-focus / select-all / delete / type-for-real / Tab-to-commit, matching
-    // DocumentTypeEditPage.SetDescriptionAsync, so the typed value actually round-trips.
     public async Task SetNameAsync(string value)
     {
         var input = page.GetByPlaceholder("e.g. Screening, Interview, Offered");
@@ -55,7 +47,6 @@ public sealed class RecruitmentStageEditPage(IPage page, string baseUrl)
         return await input.InputValueAsync();
     }
 
-    // ── Optimistic-concurrency conflict banner (shared SaveConflictBanner via EditPageBase) ──
     private ILocator ConcurrencyWarningBanner =>
         page.Locator(".save-conflict-banner[role='alert']")
             .Filter(new() { Has = page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }) });
@@ -85,16 +76,8 @@ public sealed class RecruitmentStageEditPage(IPage page, string baseUrl)
         return DropDownSelector.SelectAsync(page, scope, outcome);
     }
 
-    /// <summary>
-    /// Selects the Purpose value ("None", "New application", "Interview" or "Offer") via the shared
-    /// DropDownSelector. The Purpose field only renders for a non-terminal stage
-    /// (RecruitmentStageEdit.razor's <c>@if (!Model.IsTerminal)</c>), so set Terminal Outcome to
-    /// "None" first if needed.
-    /// </summary>
     public Task SelectPurposeAsync(string purpose)
     {
-        // Scope to the Purpose field group specifically — .card-body holds the Terminal Outcome
-        // combobox too, and only this .mb-3 block mentions "Purpose".
         var scope = page.Locator(".card-body .mb-3").Filter(new() { HasText = "Purpose" });
         return DropDownSelector.SelectAsync(page, scope, purpose);
     }

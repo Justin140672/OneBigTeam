@@ -48,11 +48,6 @@ internal sealed class InviteAcceptanceReconciliationJob(
     ILogger<InviteAcceptanceReconciliationJob> logger,
     IExecutionContextAccessor? executionContextAccessor = null)
 {
-    /// <summary>
-    /// An operation younger than this is assumed to still be a normal in-flight AcceptInvite call
-    /// (which completes in well under a second under healthy conditions, including its Supabase
-    /// round-trip), not abandoned.
-    /// </summary>
     private static readonly TimeSpan StaleThreshold = TimeSpan.FromMinutes(15);
 
     [DisableConcurrentExecution(timeoutInSeconds: 300)]
@@ -124,8 +119,6 @@ internal sealed class InviteAcceptanceReconciliationJob(
 
         if (invite.IsClaimed)
         {
-            // A completed AcceptInvite call (this exact retry, or a concurrent one) already
-            // resolved this normally — just behind on reflecting it here.
             operation.MarkCompleted(now);
             await db.SaveChangesAsync();
 
@@ -141,8 +134,6 @@ internal sealed class InviteAcceptanceReconciliationJob(
 
         if (invite is not null && invite.IsClaimed)
         {
-            // A completed AcceptInvite call already resolved this normally — just behind on
-            // reflecting it here (mirrors the SupabaseConfirmed branch).
             operation.MarkCompleted(now);
             await db.SaveChangesAsync();
 
@@ -154,9 +145,6 @@ internal sealed class InviteAcceptanceReconciliationJob(
 
         if (invite is not null && !invite.IsCancelled)
         {
-            // Neither cancelled nor claimed yet — still a legitimate candidate for AcceptInvite's
-            // own retry/resume path (or a genuinely fresh attempt still in flight, just past the
-            // stale-threshold under unusually slow conditions). Not this job's concern.
             return;
         }
 

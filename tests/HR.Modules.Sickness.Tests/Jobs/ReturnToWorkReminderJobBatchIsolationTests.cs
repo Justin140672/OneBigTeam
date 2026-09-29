@@ -9,11 +9,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Sickness.Tests.Jobs;
 
-/// <summary>
-/// OBT-REM-10: same batch-isolation fix as <see cref="SicknessEvidenceReminderJobBatchIsolationTests"/>,
-/// applied to <see cref="ReturnToWorkReminderJob"/>'s Pending → Overdue transition step. A
-/// <c>SaveChangesAsync</c> failure for one review must only detach that review, not the whole batch.
-/// </summary>
 public class ReturnToWorkReminderJobBatchIsolationTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 15, 2, 0, 0, DateTimeKind.Utc);

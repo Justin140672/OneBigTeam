@@ -7,12 +7,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Support.Jobs;
 
-/// <summary>
-/// Reliability review issue 4 (P1): durable retry/reconciliation for support-attachment storage
-/// blobs that failed immediate best-effort deletion during cleanup-on-failure (see
-/// UploadedAttachmentCleanupScope). Mirrors the existing retry-until-resolved shape of
-/// SupportNotificationRetryJob in this same module.
-/// </summary>
 internal sealed class SupportAttachmentPendingDeletionRetryJob(
     SupportDbContext db,
     ISupportAttachmentStorageService attachmentStorage,

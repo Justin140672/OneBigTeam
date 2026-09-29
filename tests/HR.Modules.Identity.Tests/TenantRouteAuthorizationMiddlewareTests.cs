@@ -5,12 +5,6 @@ using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Identity.Tests;
 
-/// <summary>
-/// SEC-001 / TEST-002 unit coverage for <see cref="TenantRouteAuthorizationMiddleware"/> in
-/// isolation (no HTTP pipeline, no database): a <see cref="DefaultHttpContext"/> is built by hand
-/// with the route value, <c>context.Items</c> entry and endpoint metadata the middleware inspects,
-/// and <c>next</c> is a fake delegate that records whether it ran.
-/// </summary>
 public class TenantRouteAuthorizationMiddlewareUnitTests
 {
     private static (HttpContext context, Func<bool> nextCalled, TenantRouteAuthorizationMiddleware middleware)
@@ -121,7 +115,7 @@ public class TenantRouteAuthorizationMiddlewareUnitTests
         {
             Authenticate(ctx);
             SetResolvedTenant(ctx, Guid.NewGuid());
-            ctx.Request.RouteValues["companyId"] = Guid.NewGuid().ToString(); // different customer
+            ctx.Request.RouteValues["companyId"] = Guid.NewGuid().ToString();
             SetPlatformAdminEndpoint(ctx);
         });
 

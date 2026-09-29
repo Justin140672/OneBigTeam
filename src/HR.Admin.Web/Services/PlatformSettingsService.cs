@@ -3,13 +3,6 @@ using HR.Admin.Web.Models;
 
 namespace HR.Admin.Web.Services;
 
-/// <summary>
-/// Wraps the Platform Settings endpoints (final Admin Portal story). Modeled on AdminUsersService:
-/// HttpClientFactory "hrapi" client, GetXxxOrNullAsync returning null on any failure. The PUT call
-/// additionally surfaces FastEndpoints/FluentValidation 422 field errors (shape:
-/// {"Errors": {"Field": ["message"]}}, mirrored from HR.Web's EmployeeService pattern) rather than
-/// swallowing them, per the story's acceptance criteria.
-/// </summary>
 public sealed class PlatformSettingsService(HrApiHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient();

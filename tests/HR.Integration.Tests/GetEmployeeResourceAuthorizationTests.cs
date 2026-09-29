@@ -10,18 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Resource-level (self / manager-hierarchy / HR-admin) authorization for GetEmployee and its
-/// manager-facing counterpart GetEmployeeTeamView, guarded by
-/// HR.Modules.Employees.Services.EmployeesResourceAuthorizer. Endpoint-level
-/// Policies("role:employee") only proves tenant/role membership; it never proves the caller has a
-/// relationship to the specific employeeId in the route, so these tests exercise that
-/// resource-ownership check end-to-end over real HTTP — mirroring
-/// LeaveResourceAuthorizationTests's pattern for the same class of bug.
-///
-/// GetEmployee (the full HR record) is self/HR-admin only. GetEmployeeTeamView (operational-only
-/// fields) is manager-hierarchy only. See 26-permissions-access-ux.md's field-level access matrix.
-/// </summary>
 [Collection("Integration")]
 public class GetEmployeeResourceAuthorizationTests(ApiWebApplicationFactory factory)
 {
@@ -31,7 +19,6 @@ public class GetEmployeeResourceAuthorizationTests(ApiWebApplicationFactory fact
     private static readonly Guid PositionProfileId = Guid.Parse("20000000-0000-0000-0000-000000000002");
     private static readonly Guid SeededCompanyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    // ── GetEmployee (full HR record: self / HR-admin only) ─────────────────────
 
     [Fact]
     public async Task GetEmployee_Allows_Employee_Viewing_Own_Record()
@@ -59,8 +46,6 @@ public class GetEmployeeResourceAuthorizationTests(ApiWebApplicationFactory fact
     [Fact]
     public async Task GetEmployee_Returns_Forbidden_For_Direct_Manager()
     {
-        // Manager hierarchy alone is no longer enough to reach the full HR record — managers use
-        // GetEmployeeTeamView instead (see below).
         var manager = await CreateEmployeeAsync();
         var report = await CreateEmployeeAsync();
 
@@ -123,7 +108,6 @@ public class GetEmployeeResourceAuthorizationTests(ApiWebApplicationFactory fact
         Assert.True(json.TryGetProperty("notes", out _));
     }
 
-    // ── GetEmployeeTeamView (operational-only fields: manager hierarchy only) ──
 
     [Fact]
     public async Task TeamView_Allows_Direct_Manager_Viewing_Report()
@@ -143,9 +127,9 @@ public class GetEmployeeResourceAuthorizationTests(ApiWebApplicationFactory fact
     [Fact]
     public async Task TeamView_Allows_Skip_Level_Manager_In_Three_Level_Hierarchy()
     {
-        var seniorManager = await CreateEmployeeAsync(); // C
-        var manager = await CreateEmployeeAsync();       // B
-        var employee = await CreateEmployeeAsync();      // A
+        var seniorManager = await CreateEmployeeAsync();
+        var manager = await CreateEmployeeAsync();
+        var employee = await CreateEmployeeAsync();
 
         using (var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true))
         {
@@ -180,8 +164,6 @@ public class GetEmployeeResourceAuthorizationTests(ApiWebApplicationFactory fact
     [Fact]
     public async Task TeamView_Returns_Forbidden_For_Own_Manager_Viewed_Bottom_Up()
     {
-        // Denial case: being someone's report does not grant you view rights over your manager's
-        // record — the hierarchy check is one-directional (manager -> report only).
         var manager = await CreateEmployeeAsync();
         var report = await CreateEmployeeAsync();
 
@@ -220,11 +202,6 @@ public class GetEmployeeResourceAuthorizationTests(ApiWebApplicationFactory fact
     [Fact]
     public async Task TeamView_Response_Contains_Only_Operational_Fields_Over_The_Wire()
     {
-        // Assert on the actual JSON payload a manager receives, not just the HTTP status code —
-        // permitted operational fields must be present, and every sensitive field the ticket
-        // calls out (personal email, DOB, nationality/gender, home phone, home address,
-        // leaving-process detail, notice period, HR notes, system-access state, concurrency
-        // token) must be structurally absent from the response, not merely null.
         var employee = await CreateEmployeeAsync();
         var manager = await CreateEmployeeAsync();
 
@@ -273,8 +250,6 @@ public class GetEmployeeResourceAuthorizationTests(ApiWebApplicationFactory fact
     [Fact]
     public async Task TeamView_Returns_Forbidden_For_Former_Employee_Report()
     {
-        // Agreed status scope: FormerEmployee reports are excluded from manager team-view access
-        // entirely, not merely hidden from the roster list.
         var manager = await CreateEmployeeAsync();
         var report = await CreateEmployeeAsync();
 
@@ -289,7 +264,6 @@ public class GetEmployeeResourceAuthorizationTests(ApiWebApplicationFactory fact
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // ── helpers ─────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(
         Guid userId,
@@ -318,12 +292,6 @@ public class GetEmployeeResourceAuthorizationTests(ApiWebApplicationFactory fact
         return client;
     }
 
-    /// <summary>
-    /// Creates a real employee via the employees API and returns its id. An employee's id doubles
-    /// as the identity user id for the linked account (see GetMyEmployeeHandler's `e.Id == userId`
-    /// lookup), so this id is used both as the target employeeId and as the
-    /// TestAuthHandler.UserHeader value when acting "as" that employee.
-    /// </summary>
     private async Task<Guid> CreateEmployeeAsync()
     {
         using var setupClient = await AuthenticatedClient(Guid.NewGuid(), hrAdministrator: true);

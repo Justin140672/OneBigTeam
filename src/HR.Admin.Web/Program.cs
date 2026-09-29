@@ -13,13 +13,7 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.TryAddSingleton(TimeProvider.System);
-// Single-use, in-memory exchange store so a freshly established session is handed to the
-// cookie-setting hop via an opaque code, never a token in a URL (security parity with HR.Web).
 builder.Services.AddSingleton<AuthHandoffStore>();
-// CircuitSessionState is the real, per-circuit source of truth for the current Supabase access
-// token (see its remarks). SupabaseSessionAccessor keeps it in sync with the session cookie;
-// HrApiHttpClientFactory reads it directly (in the caller's own scope) to attach the bearer token —
-// no pooled DelegatingHandler is involved in carrying user identity anymore.
 builder.Services.AddScoped<CircuitSessionState>();
 builder.Services.AddScoped<SupabaseSessionAccessor>();
 builder.Services.AddScoped<HrApiHttpClientFactory>();
@@ -32,25 +26,8 @@ builder.Services.AddHttpClient("hrapi", c =>
         throw new InvalidOperationException("API base URL is missing. Expected services:api:https:0 or services:api:http:0.");
 
     c.BaseAddress = new Uri(apiBaseUrl);
-    // Keep above the standard resilience handler's 120s total budget (ServiceDefaults) so the
-    // client timeout never truncates a legitimate retry sequence on a slow host.
     c.Timeout = TimeSpan.FromSeconds(130);
 })
-// The bearer token is no longer attached by a pooled DelegatingHandler — see HrApiHttpClientFactory,
-// which attaches it directly on the HttpClient it returns, resolved from the caller's own real DI
-// scope.
-// SocketsHttpHandler's default PooledConnectionLifetime is infinite, so a connection idle long
-// enough can be silently closed server-side by Kestrel's own keep-alive timeout while the pool
-// still considers it valid — the next request reused from the pool then fails mid-flight with an
-// OperationCanceledException while the server is reading the request body. Bounding the lifetime
-// well under Kestrel's default 130s keep-alive timeout forces proactive recycling instead.
-//
-// CertificateRevocationCheckMode = NoCheck: every new connection (including the periodic
-// recycling above) re-runs the TLS handshake, which by default performs an online CRL/OCSP
-// revocation check against Aspire's local HTTPS dev certificate. That check can't complete
-// against a dev cert and stalls for ~15s before SocketsHttpHandler gives up and proceeds anyway
-// — this is purely internal service-to-service traffic on localhost, so skipping the check is
-// safe and removes that stall entirely.
 .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
 {
     PooledConnectionLifetime = TimeSpan.FromSeconds(60),
@@ -98,7 +75,6 @@ if (!app.Environment.IsDevelopment())
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
-// P1 support-conversation stored-XSS fix: CSP as secondary mitigation (see AdminContentSecurityPolicy).
 app.UseAdminContentSecurityPolicy(app.Environment.IsDevelopment());
 
 app.UseAuthentication();
@@ -137,16 +113,10 @@ app.MapGet("/logout", async (
             .LogWarning(ex, "Server-side sign-out call failed; clearing the cookie anyway.");
     }
 
-    // Clears both the browser cookie AND this request's CircuitSessionState so a later call racing
-    // on this same scope with no live HttpContext cannot resume sending the old bearer token.
     SupabaseSessionAccessor.ClearSessionCookie(context, environment, sessionState);
     return Results.Redirect("/login");
 }).AllowAnonymous();
 
-// Development-only: establishes the Admin Portal's own session cookie for the dev persona
-// switcher / dev sign-in, mirroring HR.Web's /dev/persona-cookie endpoint. The session is handed
-// over via an opaque single-use code (AuthHandoffStore), never a token in the URL, and the final
-// redirect is a clean "/".
 if (app.Environment.IsDevelopment())
 {
     app.MapGet("/dev/persona-cookie", (HttpContext context, AuthHandoffStore handoffStore, IHostEnvironment environment, CircuitSessionState sessionState, string? code) =>

@@ -88,8 +88,6 @@
             _selectedRoleIds.Add(SystemRoleOptions.EmployeeRoleId);
     }
 
-    // The Employee row's checkbox is rendered disabled (see the table above), so this only ever
-    // runs for the other, genuinely toggleable roles.
     private void OnRoleCheckedChanged(Guid roleId, bool isChecked)
     {
         if (isChecked)

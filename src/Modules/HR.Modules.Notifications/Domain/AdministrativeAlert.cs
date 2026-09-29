@@ -2,12 +2,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Notifications.Domain;
 
-/// <summary>
-/// ADM-03: a single de-duplicated administrative alert / incident in the shared admin inbox.
-/// One live (non-resolved) row per (company, dedup key) — repeated occurrences of the same
-/// underlying failure fold into <see cref="OccurrenceCount"/> / <see cref="LastOccurredAt"/>
-/// rather than creating new rows. EF-materialized: private ctor, all private setters.
-/// </summary>
 internal sealed class AdministrativeAlert
 {
     private AdministrativeAlert() { }
@@ -17,7 +11,6 @@ internal sealed class AdministrativeAlert
     public AdministrativeAlertSeverity Severity { get; private set; }
     public AdministrativeAlertCategory Category { get; private set; }
 
-    /// <summary>Follow-up F: explicit persisted discriminator for the underlying failure; drives the operations-email decision.</summary>
     public AdministrativeAlertReason? Reason { get; private set; }
 
     public string Summary { get; private set; } = string.Empty;
@@ -31,7 +24,6 @@ internal sealed class AdministrativeAlert
     public string? RecommendedAction { get; private set; }
     public string? ActionUrl { get; private set; }
 
-    /// <summary>Follow-up C: non-sensitive count of affected items (e.g. missing documents) for the operations email.</summary>
     public int? AffectedItemCount { get; private set; }
     public bool IsRead { get; private set; }
     public AdministrativeAlertStatus Status { get; private set; }
@@ -81,8 +73,6 @@ internal sealed class AdministrativeAlert
             AffectedItemCount = affectedItemCount;
         IsRead = false;
 
-        // A repeated failure re-opens an acknowledged alert. Resolved alerts are never recurred
-        // here (the writer filters them out of the dedup lookup), so their status is left alone.
         if (Status == AdministrativeAlertStatus.Acknowledged)
             Status = AdministrativeAlertStatus.Open;
     }

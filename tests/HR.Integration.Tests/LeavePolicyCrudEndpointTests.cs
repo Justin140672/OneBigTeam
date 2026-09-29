@@ -9,9 +9,6 @@ namespace HR.Integration.Tests;
 public class LeavePolicyCrudEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
-    // leave:approve = Manager, HrAdministrator
-    // leave:manage  = HrAdministrator only (CompanyAdministrator is scoped to
-    //                  company profile/settings and does not hold it)
     private static readonly Guid HrAdminUser     = Guid.Parse("11100008-0000-0000-0000-000000000001");
     private static readonly Guid ManagerUser      = Guid.Parse("11100008-0000-0000-0000-000000000002");
     private static readonly Guid SeededCompanyId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -26,7 +23,6 @@ public class LeavePolicyCrudEndpointTests
         }).GetAwaiter().GetResult();
     }
 
-    // ── ListLeavePolicies ────────────────────────────────────────────────────────
 
     [Fact]
     public async Task ListPolicies_Returns_Unauthorized_Without_Auth()
@@ -50,7 +46,6 @@ public class LeavePolicyCrudEndpointTests
     [Fact]
     public async Task ListPolicies_Returns_OK_For_Manager_Role()
     {
-        // Manager has leave:approve — should be able to list
         using var client = await ManagerClient();
         var response     = await client.GetAsync($"/api/companies/{SeededCompanyId}/leave-policies");
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -71,7 +66,6 @@ public class LeavePolicyCrudEndpointTests
         Assert.Contains(payload!.Items, p => p.Name == policyName);
     }
 
-    // ── GetLeavePolicy ───────────────────────────────────────────────────────────
 
     [Fact]
     public async Task GetPolicy_Returns_Unauthorized_Without_Auth()
@@ -126,7 +120,6 @@ public class LeavePolicyCrudEndpointTests
         Assert.True(              payload.AllowNegativeBalance);
     }
 
-    // ── UpdateLeavePolicy ────────────────────────────────────────────────────────
 
     [Fact]
     public async Task UpdatePolicy_Returns_Unauthorized_Without_Auth()
@@ -141,7 +134,6 @@ public class LeavePolicyCrudEndpointTests
     [Fact]
     public async Task UpdatePolicy_Returns_Forbidden_Without_Leave_Manage_Role()
     {
-        // Manager has leave:approve but NOT leave:manage
         using var client = await ManagerClient();
         var response     = await client.PutAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/leave-policies/{Guid.NewGuid()}",
@@ -198,18 +190,15 @@ public class LeavePolicyCrudEndpointTests
         using var client = HrAdminClient();
         var existingName = $"Conflict Policy {Guid.NewGuid():N}";
 
-        // Create the "existing" policy
         await client.PostAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/leave-policies",
             new { companyId = SeededCompanyId, name = existingName, carryOverDays = 0, allowNegativeBalance = false });
 
-        // Create a second policy to rename
         var secondResp = await client.PostAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/leave-policies",
             new { companyId = SeededCompanyId, name = $"Second Policy {Guid.NewGuid():N}", carryOverDays = 0, allowNegativeBalance = false });
         var second = await secondResp.Content.ReadFromJsonAsync<PolicyPayload>();
 
-        // Try to rename it to the existing name
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{SeededCompanyId}/leave-policies/{second!.Id}",
             new { companyId = SeededCompanyId, policyId = second.Id, name = existingName, carryOverDays = 0, allowNegativeBalance = false, expectedVersion = 1 });
@@ -217,7 +206,6 @@ public class LeavePolicyCrudEndpointTests
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
 
-    // ── IsDefault behavior ──────────────────────────────────────────────────────
 
     [Fact]
     public async Task CreatePolicy_First_Policy_For_New_Company_Is_Forced_Default()
@@ -289,7 +277,6 @@ public class LeavePolicyCrudEndpointTests
         Assert.Equal(HttpStatusCode.BadRequest, updateResp.StatusCode);
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────────────
 
     private HttpClient HrAdminClient(Guid? companyId = null)
     {

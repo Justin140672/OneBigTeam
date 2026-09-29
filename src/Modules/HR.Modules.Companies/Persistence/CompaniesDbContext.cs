@@ -28,7 +28,6 @@ internal sealed class CompaniesDbContext : DbContext
     {
         modelBuilder.HasDefaultSchema("companies");
 
-        // Apply Companies-owned entity configurations explicitly
         modelBuilder.ApplyConfiguration(new CompanyConfiguration());
         modelBuilder.ApplyConfiguration(new CompanyAddressConfiguration());
         modelBuilder.ApplyConfiguration(new CompanySettingsConfiguration());

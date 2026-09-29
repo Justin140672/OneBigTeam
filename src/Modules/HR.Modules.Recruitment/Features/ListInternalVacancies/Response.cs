@@ -7,7 +7,6 @@ internal sealed record InternalVacancyListItem(
     string Title,
     string? DepartmentName,
     string? Location,
-    // No closing-date field exists on Vacancy yet — always null, kept on the DTO for forward-compat.
     DateOnly? ClosingDate,
     // Internal recruitment Ticket 4: whether the signed-in employee has already applied (any
     // application state), so the employee UI can replace "Apply" with an "Applied" indicator.

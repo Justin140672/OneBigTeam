@@ -227,9 +227,6 @@
     [Parameter] public Guid? AssetId { get; set; }
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public EventCallback OnClosed { get; set; }
-    // Hides Specifications/Purchase Information/Assignments — an employee viewing their own
-    // assigned assets from My Profile only needs to know what they have, not its admin-facing
-    // procurement/assignment history.
     [Parameter] public bool SelfServiceView { get; set; }
 
     private bool Visible;

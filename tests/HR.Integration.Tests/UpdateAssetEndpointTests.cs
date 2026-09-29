@@ -180,7 +180,6 @@ public class UpdateAssetEndpointTests
         var asset1 = await CreateAssetAsync(client, companyId, category.Id, "ASSET-001", "Laptop");
         await CreateAssetAsync(client, companyId, category.Id, "ASSET-002", "Monitor");
 
-        // Try to update asset1 to use ASSET-002's number
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/assets/{asset1.Id}",
             new
@@ -209,7 +208,6 @@ public class UpdateAssetEndpointTests
 
         var otherCategory = await CreateCategoryAsync(otherClient, otherCompanyId);
 
-        // Try to update asset from other company's context
         var response = await otherClient.PutAsJsonAsync(
             $"/api/companies/{otherCompanyId}/assets/{asset.Id}",
             new

@@ -2,10 +2,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Identity.Tests.Infrastructure;
 
-/// <summary>
-/// Captures every rendered log message (plus any exception text) so a test can assert that
-/// sensitive values never reach the log output.
-/// </summary>
 internal sealed class ListLogger<T> : ILogger<T>
 {
     public List<string> Messages { get; } = [];

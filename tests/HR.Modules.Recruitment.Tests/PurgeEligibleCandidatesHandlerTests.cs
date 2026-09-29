@@ -16,8 +16,6 @@ public class PurgeEligibleCandidatesHandlerTests
     private static Candidate CreateCandidateUpdatedAt(Guid companyId, DateTimeOffset updatedAt)
     {
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, updatedAt);
-        // UpdatedAt on Candidate is set by Create(now) — CreateCandidate's "now" arg becomes both
-        // CreatedAt and UpdatedAt, which is sufficient for eligibility calculations here.
         return candidate;
     }
 
@@ -104,8 +102,6 @@ public class PurgeEligibleCandidatesHandlerTests
     [Fact]
     public async Task HandleAsync_Purges_Candidate_Whose_Only_Application_Is_Withdrawn()
     {
-        // Withdrawn applications don't count against eligibility — a withdrawn application on a
-        // non-terminal stage should not block purging.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var oldEnough = Now.AddDays(-731);
@@ -176,7 +172,6 @@ public class PurgeEligibleCandidatesHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        // 100 days old: not eligible under the default 730-day window, but eligible under a 90-day window.
         var candidate = CreateCandidateUpdatedAt(companyId, Now.AddDays(-100));
         db.Candidates.Add(candidate);
         await db.SaveChangesAsync();
@@ -237,8 +232,6 @@ public class PurgeEligibleCandidatesHandlerTests
         application.RecordRejection(stages.Interview.Id, "Not a culture fit", oldEnough);
         application.RecordCvReview("Strong CV", Guid.NewGuid(), oldEnough);
         application.RecordOfferTerms(50000m, OfferSalaryFrequency.Annual, null, DateOnly.FromDateTime(oldEnough.Date), "Confidential offer notes", oldEnough);
-        // No open (non-terminal-stage, non-withdrawn) application should exist for the candidate to
-        // remain eligible — withdraw so it doesn't block eligibility while still carrying data to redact.
         application.Withdraw(oldEnough);
         db.Candidates.Add(candidate);
         db.Vacancies.Add(vacancy);
@@ -259,7 +252,6 @@ public class PurgeEligibleCandidatesHandlerTests
         Assert.Null(savedApplication.CvReviewNotes);
         Assert.Null(savedApplication.OfferNotes);
 
-        // Structural/history fields must be left untouched.
         Assert.Equal(stages.Interview.Id, savedApplication.CurrentStageId);
         Assert.Equal(oldEnough, savedApplication.AppliedAt);
         Assert.Equal(50000m, savedApplication.OfferedSalary);

@@ -7,12 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Follow-up H: recovery of a stalled organisation data export must claim ownership atomically before
-/// deleting any files, so a resurrected original worker (or a second concurrent recovery sweep) can
-/// never race it. Proven here against the real database and the real
-/// <see cref="IOrganisationDataExportJobStore"/> / optimistic-concurrency token.
-/// </summary>
 [Collection("Integration")]
 public class OrganisationDataExportRecoveryClaimTests
 {
@@ -36,15 +30,12 @@ public class OrganisationDataExportRecoveryClaimTests
             var recovery = Guid.NewGuid();
             Assert.True(await store.ClaimForRecoveryAsync(exportId, recovery, CancellationToken.None));
 
-            // Original worker A wakes up: it no longer owns the lease.
             Assert.False(await store.RenewLeaseAsync(exportId, tokenA, CancellationToken.None));
             Assert.False(await store.MarkCompletedAsync(
                 exportId, tokenA, $"organisation-exports/{companyId}/{exportId}/{tokenA}.zip", 10, CancellationToken.None));
 
-            // A second recovery sweep sees a now-live lease and abandons.
             Assert.False(await store.ClaimForRecoveryAsync(exportId, Guid.NewGuid(), CancellationToken.None));
 
-            // The claiming sweep may reset it for another attempt.
             Assert.True(await store.ResetForRetryAsync(exportId, recovery, CancellationToken.None));
 
             await AssertRowAsync(exportId, row =>
@@ -72,7 +63,6 @@ public class OrganisationDataExportRecoveryClaimTests
             using var scope = _factory.Services.CreateScope();
             var store = scope.ServiceProvider.GetRequiredService<IOrganisationDataExportJobStore>();
 
-            // Worker A comes back to life just before the sweep and renews its lease.
             Assert.True(await store.RenewLeaseAsync(exportId, tokenA, CancellationToken.None));
 
             Assert.False(await store.ClaimForRecoveryAsync(exportId, Guid.NewGuid(), CancellationToken.None));

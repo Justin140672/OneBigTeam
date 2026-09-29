@@ -7,10 +7,6 @@ public sealed record DevPersonaDto(string UserId, string Name, string JobTitle, 
 
 public sealed record DevSupabaseSessionDto(string AccessToken, string RefreshToken, int ExpiresIn);
 
-// Mirrors HR.Web.Services.DevAuthService — reuses the same HR.Api dev-persona-switch endpoints
-// (/api/dev/personas, /api/dev/persona/{userId}), which perform a real Supabase password-grant
-// login. Development-only; production Admin Portal sign-in is out of scope for this story (real
-// Supabase email/password sign-in, matching HR.Web's Login.razor flow, is a follow-up item).
 public sealed class DevAuthService(HrApiHttpClientFactory httpClientFactory, ILogger<DevAuthService> logger)
 {
     private HttpClient Http => httpClientFactory.CreateClient();

@@ -58,7 +58,6 @@ internal sealed class PurgeEligibleCandidatesHandler(
             }
         }
 
-        // NFR-07: a company under legal hold is exempt from all retention deletion until lifted.
         if (await legalHoldStatusReader.IsUnderLegalHoldAsync(request.CompanyId, cancellationToken))
         {
             return Result.Failure<PurgeEligibleCandidatesResponse>(Error.Conflict(
@@ -150,9 +149,6 @@ internal sealed class PurgeEligibleCandidatesHandler(
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        // Latency optimisation only — correctness comes from the persisted operations above plus
-        // PurgeCandidateDocumentStorageReconciliationJob's recurring sweep, not from this enqueue
-        // succeeding.
         foreach (var operation in deletionOperations)
         {
             backgroundJobClient.Enqueue<PurgeCandidateDocumentStorageJob>(job => job.ProcessAsync(operation.Id));

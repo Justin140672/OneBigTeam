@@ -107,8 +107,6 @@ internal sealed class EmployeeLeavingProcessConfiguration : IEntityTypeConfigura
         builder.HasIndex(p => new { p.CompanyId, p.EmployeeId });
         builder.HasIndex(p => new { p.CompanyId, p.EmployeeId, p.Status });
 
-        // Supports ProcessLeavingEmployeesJob's reconciliation scan for stranded departures
-        // (Status == Completed but FinalisationCompletedAt still null).
         builder.HasIndex(p => new { p.Status, p.FinalisationCompletedAt });
     }
 }

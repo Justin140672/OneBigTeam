@@ -1,6 +1,5 @@
 namespace HR.Web.Components.Pages.Dashboards;
 
-/// <summary>Load state of a single dashboard widget data source.</summary>
 public enum WidgetLoadStatus
 {
     Loading,

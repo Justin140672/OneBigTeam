@@ -11,7 +11,6 @@ internal sealed class EmployeeInviteCandidateReader(EmployeesDbContext dbContext
         Guid companyId,
         CancellationToken cancellationToken)
     {
-        // Current employees only — a former employee should never be re-invited as a user.
         var employees = await dbContext.Employees
             .AsNoTracking()
             .Where(e => e.CompanyId == companyId && e.Status != EmploymentStatus.FormerEmployee)

@@ -72,8 +72,6 @@
         return Task.CompletedTask;
     }
 
-    // The grid pages client-side (PageSize=20), so it needs the complete set — a single
-    // pageSize=100 request silently hid every candidate sorted past the 100th.
     protected override Task<IReadOnlyList<CandidateListItemModel>?> FetchItemsAsync(string? search) =>
         CandidateService.ListAllCandidatesAsync(CompanyId, search, includeInactive: ShowInactive);
 

@@ -5,14 +5,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Recruitment.Services;
 
-/// <summary>
-/// Reliability review issue 2 (P1): durable, production-grade candidate document storage backed by
-/// Supabase Storage — mirrors HR.Modules.Documents.Services.SupabaseDocumentStorageService and
-/// HR.Infrastructure.Storage.SupabaseSupportAttachmentStorageService. Replaces the local temp-directory
-/// fallback (LocalCandidateDocumentStorageService) in every environment where Supabase storage is
-/// configured; see RecruitmentModule.AddCandidateDocumentStorage for the environment-gating rule that
-/// requires this in Staging/Production.
-/// </summary>
 internal sealed class SupabaseCandidateDocumentStorageService : ICandidateDocumentStorageService
 {
     private readonly HttpClient _httpClient;
@@ -25,9 +17,6 @@ internal sealed class SupabaseCandidateDocumentStorageService : ICandidateDocume
         _options    = options.Value;
     }
 
-    // The caller-supplied file name is untrusted and never embedded in the storage key (path
-    // traversal / header-injection surface); only a random id and the file's own extension are
-    // used, matching the Documents/Support-Attachments Supabase storage services.
     public string GenerateStorageKey(string storageFolder, string fileName)
     {
         var extension = Path.GetExtension(fileName);
@@ -71,9 +60,6 @@ internal sealed class SupabaseCandidateDocumentStorageService : ICandidateDocume
         string storageKey,
         CancellationToken cancellationToken)
     {
-        // Authenticated (service-role) server-side read of the private object — no signed URL is
-        // created. Buffered so the HTTP response can be disposed before the scanner consumes it;
-        // candidate documents are size-capped at upload (CandidateDocumentUploadOptions).
         using var request = new HttpRequestMessage(
             HttpMethod.Get,
             $"{_options.SupabaseUrl}/storage/v1/object/authenticated/{_options.BucketName}/{storageKey}");

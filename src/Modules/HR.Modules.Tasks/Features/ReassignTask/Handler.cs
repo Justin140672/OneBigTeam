@@ -54,16 +54,6 @@ internal sealed class ReassignTaskHandler(
             return Result.Failure<ReassignTaskResponse>(
                 Error.NotFound($"Task with id '{request.Id}' was not found."));
 
-        // DSH-01: reassignment is a task-resource operation and must apply the same self /
-        // manager-hierarchy / HR-administrator rule as viewing and completing a task (see
-        // GetTaskHandler / CompleteTaskHandler). The endpoint's "employee:manage" policy only
-        // proves the caller may manage employees in general — not that they have any relationship
-        // to *this* task's current assignee, whose identity is only known after the lookup above.
-        // The check runs against the current assignee, before any mutation. Unassigned tasks have
-        // no self/hierarchy path, so only the HR-administrator override applies.
-        // request.ActorUserId is always populated by the endpoint from ICurrentUser; the fallback
-        // keeps pre-DSH-01 handler unit tests compiling and denies (Guid.Empty is nobody's
-        // manager) in every real path where it is somehow absent.
         var actorUserId = request.ActorUserId ?? Guid.Empty;
         var effectiveAssigneeId = task.AssignedEmployeeId ?? task.AssignedUserId;
 
@@ -82,8 +72,6 @@ internal sealed class ReassignTaskHandler(
         var now = clock.UtcNowOffset();
         task.Reassign(request.AssignedEmployeeId, request.AssignedUserId, now);
 
-        // Built from in-memory values ahead of the save, so it can double as both the response and
-        // the payload persisted for an idempotency replay.
         var response = new ReassignTaskResponse(
             task.Id,
             task.CompanyId,
@@ -108,9 +96,6 @@ internal sealed class ReassignTaskHandler(
 
             if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
             {
-                // Lost a race against a concurrent duplicate under the same key - this attempt's
-                // reassignment was rolled back along with it, so skip our own
-                // notification/audit publish and hand back the winner's result untouched.
                 return Result.Success(outcome.Response!);
             }
         }

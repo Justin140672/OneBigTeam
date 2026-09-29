@@ -23,9 +23,6 @@ public class GetImportSessionColumnsHandlerTests
 
     private const string XlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-    // Builds a minimal XLSX workbook (via ClosedXML) from comma-delimited "csv-shaped" header/data
-    // lines, so existing test fixtures (written as csv-style strings for readability) can still be
-    // used against the now xlsx-only parser.
     private static byte[] BuildXlsxBytes(string csvShapedContent)
     {
         var lines = csvShapedContent
@@ -103,8 +100,8 @@ public class GetImportSessionColumnsHandlerTests
     }
 
     [Theory]
-    [InlineData("First  Name")] // extra internal space
-    [InlineData("first_name")] // underscore, different casing
+    [InlineData("First  Name")]
+    [InlineData("first_name")]
     public async Task HandleAsync_Nonexact_Header_Still_Gets_Suggested_Via_Normalized_Match(string actualHeader)
     {
         await using var db = BuildContext();
@@ -132,7 +129,6 @@ public class GetImportSessionColumnsHandlerTests
         var storage = new FakeImportFileStorageService();
         var companyId = Guid.NewGuid();
 
-        // "Work Email" is not present anywhere in the file.
         var csv = "First Name,Last Name,Start Date,Employee Number\n";
         var session = await SeedSessionAsync(db, storage, companyId, csv);
 

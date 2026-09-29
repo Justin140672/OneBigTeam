@@ -3,20 +3,6 @@ using HR.Modules.DataImport.Services;
 
 namespace HR.Modules.DataImport.Features.DownloadImportTemplate;
 
-/// <summary>
-/// Generates a blank employee import XLSX template directly from
-/// <see cref="StandardEmployeeColumnMapping.Default"/>, so the downloadable template can never
-/// drift out of sync with the headers the parser/validator actually expect.
-///
-/// The workbook contains:
-///  - An "Employee Import" sheet with the header row only (row 1), matching
-///    <see cref="EmployeeImportFileParser"/>'s expectation that row 1 is always the header and
-///    every subsequent row is data — so the template can be filled in and re-uploaded unchanged.
-///  - A cell comment on each header explaining whether the field is required and its expected
-///    format, so the instructions travel with the file itself.
-///  - Native data validation (dropdown) lists on enum-like columns (currently Salary Type).
-///  - An "Instructions" sheet with the full field reference table.
-/// </summary>
 internal sealed class DownloadImportTemplateHandler
 {
     private static readonly (string Field, bool Required, string Format)[] FieldReference =
@@ -49,7 +35,6 @@ internal sealed class DownloadImportTemplateHandler
         ("Hours Per Day", false, "Positive number"),
     ];
 
-    // Field -> allowed values, for columns that should get a native Excel dropdown.
     private static readonly Dictionary<string, string[]> EnumValuesByHeader = new(StringComparer.OrdinalIgnoreCase)
     {
         ["Salary Type"] = ["Annual", "Hourly", "Daily"],
@@ -80,10 +65,6 @@ internal sealed class DownloadImportTemplateHandler
             {
                 var validationRange = sheet.Range(2, col + 1, 1000, col + 1);
                 var validation = validationRange.CreateDataValidation();
-                // The explicit-list form of Excel's formula1 must be a quoted string literal
-                // ("A,B,C") — without the quotes it's parsed as an (invalid) range reference,
-                // which is what was triggering Excel's "Removed Feature: Data validation" repair
-                // prompt on open.
                 validation.List($"\"{string.Join(',', allowedValues)}\"", true);
                 validation.InputMessage = $"Choose one of: {string.Join(", ", allowedValues)}";
                 validation.ErrorMessage = $"Value must be one of: {string.Join(", ", allowedValues)}";

@@ -9,10 +9,6 @@ internal sealed class Endpoint(MarkAllNotificationsReadHandler handler, ICurrent
 {
     public override void Configure()
     {
-        // The {employeeId} route segment is retained for URL-shape compatibility only. NOT-01:
-        // it is never trusted — the recipient is always the authenticated caller, resolved
-        // server-side via ICurrentUser. There is no HR/admin bypass here: notifications are
-        // private per-employee data, unlike Documents/Leave/etc.
         Put("/api/companies/{companyId:guid}/employees/{employeeId:guid}/notifications/read-all");
         Policies("role:employee");
     }

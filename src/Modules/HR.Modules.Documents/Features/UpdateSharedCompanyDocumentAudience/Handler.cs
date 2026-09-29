@@ -97,8 +97,6 @@ internal sealed class UpdateSharedCompanyDocumentAudienceHandler(
                 document.Version));
         }
 
-        // No audience change to persist, but still honour the optimistic-concurrency contract: a
-        // caller working from a stale version must be told to reload rather than silently no-op.
         if (request.ExpectedVersion is { } expectedVersion && expectedVersion != document.Version)
         {
             return Result.Failure<UpdateSharedCompanyDocumentAudienceResponse>(

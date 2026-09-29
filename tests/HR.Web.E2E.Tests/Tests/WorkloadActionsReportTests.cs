@@ -4,25 +4,12 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the Workload &amp; HR Actions report page
-/// (/companies/{companyId}/reporting/workload-actions — WorkloadActionsReportPage.razor): loading
-/// (summary cards and grid) from the Report Catalog, the Urgency/Action Type filters, Clear,
-/// Group By, the empty state, per-row "Go" navigation, and access control for a persona with no
-/// baseline reporting role. This is a read-only report — there is no create/edit/delete flow to
-/// cover, unlike CRUD list+edit page pairs (see EmploymentTypeManagementTests). Catalog-page card
-/// navigation coverage for every report (including this one's slug) lives in
-/// <see cref="ReportCatalogTests"/>; this file focuses on the report page's own behavior.
-/// </summary>
 public sealed class WorkloadActionsReportTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    private const string LauraEmail = "laura.bennett@acme.example"; // HR Administrator
+    private const string LauraEmail = "laura.bennett@acme.example";
 
-    // Plain Employee role — no reporting:view (or any reporting sub-)policy at all, used elsewhere
-    // in the suite (UnauthorizedAccessTests.Employee_CannotAccess_HrInbox) as the "no baseline
-    // reporting/HR role" persona.
     private const string TomEmail = "tom.williams@acme.example";
 
     [Fact]
@@ -48,8 +35,6 @@ public sealed class WorkloadActionsReportTests(HrAdminPersonaFixture fixture) : 
 
         Assert.False(await report.HasLoadErrorAsync());
 
-        // Summary stat cards should each render a non-negative integer (never the -1
-        // parse-failure sentinel), proving the report's aggregate counts loaded successfully.
         Assert.True(await report.GetStatValueAsync("Total Outstanding") >= 0);
         Assert.True(await report.GetStatValueAsync("Overdue") >= 0);
         Assert.True(await report.GetStatValueAsync("Due Today") >= 0);
@@ -69,9 +54,6 @@ public sealed class WorkloadActionsReportTests(HrAdminPersonaFixture fixture) : 
 
         Assert.False(await report.HasLoadErrorAsync());
 
-        // Column headers only exist when at least one grid has rendered — if the seeded E2E
-        // environment has zero outstanding actions for Laura's scope, the empty-state alert is
-        // shown instead and there is nothing to assert column headers against.
         if (!await report.IsEmptyStateVisibleAsync())
         {
             var headers = await report.GetColumnHeadersAsync();
@@ -103,8 +85,6 @@ public sealed class WorkloadActionsReportTests(HrAdminPersonaFixture fixture) : 
         Assert.False(await report.HasLoadErrorAsync(),
             "Expected the grid to reload without an error banner after applying the Urgency filter");
 
-        // Filtering to a single urgency can only narrow (or leave unchanged) the set of rows shown,
-        // never grow it.
         var rowCountAfter = await report.GetRowCountAsync();
         Assert.True(rowCountAfter <= rowCountBefore,
             "Expected the Urgency filter to narrow (or leave unchanged) the row count");
@@ -152,10 +132,6 @@ public sealed class WorkloadActionsReportTests(HrAdminPersonaFixture fixture) : 
         Assert.False(await report.HasLoadErrorAsync(),
             "Expected the grid to reload without an error banner after applying Group By");
 
-        // When there is at least one outstanding action, grouping by Action Type must render at
-        // least one "<ActionType> (<count>)" heading above its own grid; when there are none, the
-        // empty-state alert takes over instead and there are no group headings at all — either
-        // way, the total row count across groups must match the flat (ungrouped) total.
         if (!await report.IsEmptyStateVisibleAsync())
         {
             var headings = await report.GetGroupHeadingsAsync();
@@ -174,13 +150,6 @@ public sealed class WorkloadActionsReportTests(HrAdminPersonaFixture fixture) : 
 
         await report.GoToAsync(AcmeId);
 
-        // The Action Type dropdown is populated only from real loaded row data (there's no
-        // dedicated lookup endpoint — see WorkloadActionsReportPage.razor.LoadAsync), so there is
-        // no way to select a guaranteed-nonexistent Action Type via the dropdown's filterable list
-        // itself. Filtering by a specific real Employee whose deep-linked action set is empty isn't
-        // reliable either without known seed data, so instead narrow via the Due Date range to a
-        // window far in the past, which the seeded E2E environment's outstanding (not-yet-resolved)
-        // actions cannot fall inside.
         await report.SetDueDateRangeAsync(
             new DateOnly(1900, 1, 1),
             new DateOnly(1900, 1, 2));
@@ -207,13 +176,6 @@ public sealed class WorkloadActionsReportTests(HrAdminPersonaFixture fixture) : 
 
         await report.GoToAsync(AcmeId);
 
-        // Whether the "Go" deep link navigates to an employee profile, a task, a leave request,
-        // etc. depends entirely on which IWorkloadActionProvider produced the first row in the
-        // seeded E2E environment, so this only asserts that at least one exists and that clicking
-        // it performs a real action — not the exact destination. WorkloadActionsReportPage.razor's
-        // GoToAction shows task-type deep links (/companies/{companyId}/tasks/{taskId}) in-place
-        // via TaskViewDialog rather than navigating away from the report, so a Go click can
-        // legitimately open that dialog instead of changing the URL.
         if (!await report.IsEmptyStateVisibleAsync())
         {
             Assert.True(await report.GetGoButtonCountAsync() > 0,
@@ -222,12 +184,6 @@ public sealed class WorkloadActionsReportTests(HrAdminPersonaFixture fixture) : 
             var startingUrl = _page.Url;
             await report.ClickFirstRowGoButtonAsync();
 
-            // Whichever action this row's Go button triggers (an in-place TaskViewDialog for a
-            // task-type action, or a real navigation for anything else) takes a moment — a Blazor
-            // NavigateTo redirect or the dialog's own open animation aren't guaranteed to have
-            // landed the instant ClickFirstRowGoButtonAsync returns. Poll for either signal instead
-            // of reading _page.Url/IsVisibleAsync as a single instant snapshot, which raced ahead of
-            // a genuine (non-task) navigation and saw neither condition true yet.
             var taskDialog = _page.GetByRole(AriaRole.Dialog).Filter(new() { Has = _page.Locator("[data-testid='task-title']") });
             var deadline = DateTime.UtcNow.AddSeconds(10);
             while (!await taskDialog.IsVisibleAsync() && _page.Url == startingUrl && DateTime.UtcNow < deadline)
@@ -237,8 +193,6 @@ public sealed class WorkloadActionsReportTests(HrAdminPersonaFixture fixture) : 
 
             if (await taskDialog.IsVisibleAsync())
             {
-                // Task-type action: the report stays on the same URL and instead opens the task
-                // in-place — that in itself proves the click performed a real action.
                 await Assertions.Expect(taskDialog).ToBeVisibleAsync();
             }
             else
@@ -257,17 +211,7 @@ public sealed class WorkloadActionsReportTests(HrAdminPersonaFixture fixture) : 
         await login.GoToAsync();
         await login.LoginAsync(TomEmail);
 
-        // Tom (plain Employee, no reporting:view or any reporting sub-policy at all) cannot open
-        // the report catalog page at all — the catalog endpoint requires baseline reporting:view
-        // access and denies him outright (403), so ReportCatalogPage.razor redirects to his
-        // default location (Session.MyProfileUrl) instead of rendering the catalog (with or
-        // without the Workload & HR Actions Report card) or an error banner — mirroring the
-        // Session.MyProfileUrl redirect-on-unauthorized convention used by every other
-        // permission-gated list page (see DepartmentList.razor, LocationList.razor, etc.).
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/reporting");
-        // See E2ETestBase.WaitForUrlToStopContainingAsync's doc comment: the redirect is a
-        // client-side Blazor NavigateTo, not a full navigation, so NetworkIdle is not a reliable
-        // completion signal.
         await WaitForUrlToStopContainingAsync("/reporting");
 
         Assert.False(_page.Url.Contains("/reporting"),
@@ -283,10 +227,6 @@ public sealed class WorkloadActionsReportTests(HrAdminPersonaFixture fixture) : 
         await login.GoToAsync();
         await login.LoginAsync(TomEmail);
 
-        // ADM-05 (commit e67ba6ff): WorkloadActionsReportPage guards on Session.CanViewReporting
-        // via AppSession.GuardAccess, redirecting a persona that lacks it to /access-denied
-        // (replace) rather than rendering and letting the data call 403. Tom is a plain Employee
-        // with no reporting role at all.
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/reporting/workload-actions");
 
         await accessDenied.WaitForLoadedAsync();

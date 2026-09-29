@@ -27,7 +27,7 @@ namespace HR.Integration.Tests;
 public class OrganisationDataExportAuditPaginationTests
 {
     private const int PageSize = 1_000;
-    private const int SummaryColumn = 7; // OccurredAt,EventType,EntityType,EntityId,EmployeeId,ActorUserId,ActorEmployeeId,Summary
+    private const int SummaryColumn = 7;
 
     private readonly ApiWebApplicationFactory _factory;
 
@@ -58,14 +58,8 @@ public class OrganisationDataExportAuditPaginationTests
         var target = Guid.NewGuid();
         var other = Guid.NewGuid();
 
-        // The instant the tied group shares.
         var t = new DateTimeOffset(2026, 6, 1, 12, 0, 0, TimeSpan.Zero);
 
-        // --- Build the target company's 2,500 events BY FINAL (descending) SORT POSITION ---
-        //   positions    1..990   : strictly NEWER than T   (990 rows)   -> "tgt#0001".."tgt#0990"
-        //   positions  991..1020  : exactly AT T            (30 rows)    -> "tie#00".."tie#29"
-        //   positions 1021..2500  : strictly OLDER than T   (1,480 rows) -> "tgt#1021".."tgt#2500"
-        // 0-based, the tied group lands at export indexes 990..1019, straddling the index-1000 boundary.
         var targetSeed = new List<SeedAuditEvent>(2_500);
         var tiedMarkers = new List<string>(30);
         for (var pos = 1; pos <= 2_500; pos++)
@@ -74,7 +68,7 @@ public class OrganisationDataExportAuditPaginationTests
             string marker;
             if (pos <= 990)
             {
-                occurredAt = t.AddSeconds(991 - pos); // +990s .. +1s, all strictly after T, all distinct
+                occurredAt = t.AddSeconds(991 - pos);
                 marker = $"tgt#{pos:0000}";
             }
             else if (pos <= 1_020)
@@ -85,7 +79,7 @@ public class OrganisationDataExportAuditPaginationTests
             }
             else
             {
-                occurredAt = t.AddSeconds(-(pos - 1_020)); // -1s .. -1480s, all strictly before T, all distinct
+                occurredAt = t.AddSeconds(-(pos - 1_020));
                 marker = $"tgt#{pos:0000}";
             }
 
@@ -96,17 +90,15 @@ public class OrganisationDataExportAuditPaginationTests
         Assert.Equal(2_500, targetMarkers.Count);
         Assert.Equal(30, tiedMarkers.Count);
 
-        // A separate other-company block spread around T — none of these may leak into the export.
         var otherSeed = Enumerable.Range(0, 60)
             .Select(k => new SeedAuditEvent
             {
                 CompanyId = other,
-                OccurredAt = t.AddSeconds(30 - k), // T+30s .. T-29s
+                OccurredAt = t.AddSeconds(30 - k),
                 Summary = $"oth#{k:00}",
             })
             .ToList();
 
-        // Insert everything SHUFFLED so nothing about the result can depend on insertion order.
         var toInsert = targetSeed.Concat(otherSeed).ToList();
         var rng = new Random(20_260_910);
         for (var i = toInsert.Count - 1; i > 0; i--)
@@ -125,7 +117,6 @@ public class OrganisationDataExportAuditPaginationTests
                 await db.SaveChangesAsync();
             }
 
-            // --- Drain the streamed audit_log table over real Postgres ---
             List<IReadOnlyList<string?>> rows;
             using (var scope = _factory.Services.CreateScope())
             {
@@ -141,32 +132,25 @@ public class OrganisationDataExportAuditPaginationTests
 
             var exportedMarkers = rows.Select(r => r[SummaryColumn]).ToList();
 
-            // 1. Every target row exactly once — set-equal to what was seeded.
             Assert.Equal(2_500, exportedMarkers.Count);
             Assert.Equal(2_500, exportedMarkers.Distinct().Count());
             Assert.Equal(
                 targetMarkers.OrderBy(x => x, StringComparer.Ordinal),
                 exportedMarkers.Select(m => m!).OrderBy(x => x, StringComparer.Ordinal));
 
-            // 2. All 30 tied rows present exactly once.
             var exportedTie = exportedMarkers.Where(m => m is not null && m.StartsWith("tie#", StringComparison.Ordinal))
                 .Select(m => m!)
                 .ToList();
             Assert.Equal(30, exportedTie.Count);
             Assert.Equal(tiedMarkers.OrderBy(x => x, StringComparer.Ordinal), exportedTie.OrderBy(x => x, StringComparer.Ordinal));
 
-            // 3. Zero other-company markers.
             Assert.DoesNotContain(exportedMarkers, m => m is not null && m.StartsWith("oth#", StringComparison.Ordinal));
 
-            // 4. Descending (OccurredAt, Id). OccurredAt must be non-increasing across the whole export...
             var occurredAt = rows
                 .Select(r => DateTimeOffset.Parse(r[0]!, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind))
                 .ToList();
             Assert.Equal(occurredAt.OrderByDescending(x => x).ToList(), occurredAt);
 
-            // ...and within the tied block (all OccurredAt == T) the Id tie-break must be strictly
-            // descending in Postgres' uuid ordering. Re-read the tied rows straight from the DB ordered
-            // by "id DESC" (Postgres semantics, not Guid.CompareTo) and require the export to match.
             List<string> dbTieOrderById;
             Dictionary<string, Guid> tieMarkerToId;
             using (var scope = _factory.Services.CreateScope())
@@ -184,11 +168,9 @@ public class OrganisationDataExportAuditPaginationTests
 
             Assert.Equal(dbTieOrderById, exportedTie);
 
-            // The mapped Ids are therefore strictly descending across the page-1000 boundary.
             var exportedTieIds = exportedTie.Select(m => tieMarkerToId[m]).ToList();
             Assert.Equal(30, exportedTieIds.Distinct().Count());
 
-            // 5. Explicit: the tied group's exported positions span across index 1000.
             var tieIndexes = exportedMarkers
                 .Select((m, idx) => (m, idx))
                 .Where(x => x.m is not null && x.m.StartsWith("tie#", StringComparison.Ordinal))
@@ -209,7 +191,6 @@ public class OrganisationDataExportAuditPaginationTests
             }
             catch
             {
-                // best-effort cleanup — seeded rows are scoped to two throwaway company ids
             }
         }
     }

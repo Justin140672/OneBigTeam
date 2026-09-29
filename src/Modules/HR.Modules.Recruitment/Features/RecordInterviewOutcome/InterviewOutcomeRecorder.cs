@@ -56,12 +56,6 @@ internal sealed class InterviewOutcomeRecorder(
 
         var now = clock.UtcNowOffset();
 
-        // Ticket #99 judgement call: recording an interview outcome is metadata only (mirrored onto
-        // Application.InterviewOutcome for cheap list/kanban display) — it never itself moves
-        // CurrentStageId, since "Interview" is just one configurable stage among however many the
-        // company defines. No stage-history entry or ApplicationStageChangedIntegrationEvent is
-        // published here, since the stage does not change; advancing the pipeline (e.g. to an
-        // "Offer" stage) remains a separate, explicit action via MoveApplicationStage/OfferCandidate.
         interview.RecordOutcome(request.Outcome, request.Notes, now);
         application.SetInterviewOutcome(request.Outcome, now);
         await db.SaveChangesAsync(cancellationToken);

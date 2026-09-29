@@ -25,13 +25,11 @@ public class EmployeeDetailsCorrectedHandlerTests
             AccrualMethod.Monthly, LeaveTypeBehaviour.Standard, now);
         context.LeaveTypes.Add(leaveType);
 
-        // Originally created assuming a Jan 1 start (full entitlement).
         var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id,
             Guid.NewGuid(), policyYear, 25m, new DateOnly(2026, 1, 1), now);
         context.LeaveBalances.Add(balance);
         await context.SaveChangesAsync();
 
-        // Start date corrected to mid-year.
         var handler = new EmployeeDetailsCorrectedHandler(
             context,
             new FakeClock(FixedUtcNow),
@@ -44,8 +42,6 @@ public class EmployeeDetailsCorrectedHandlerTests
 
         var updated = await context.LeaveBalances.SingleAsync();
         Assert.Equal(14.5m, updated.EntitlementDays);
-        // Accrual start date must move to the corrected (later) start date, since it is now the
-        // employee's true eligible-from date for periodic accrual pacing (LEAVE-04).
         Assert.Equal(new DateOnly(2026, 6, 1), updated.AccrualStartDate);
     }
 

@@ -69,8 +69,6 @@ public class ImportCompensationChangesHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_ValidationFailed_When_Employee_Has_No_Existing_Compensation_Record()
     {
-        // Salary Frequency is reference-only and is never validated as user input — instead, the
-        // handler requires an existing open compensation record to source the frequency from.
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
         var companyId = Guid.NewGuid();
@@ -79,7 +77,6 @@ public class ImportCompensationChangesHandlerTests
         await context.SaveChangesAsync();
 
         var handler = BuildHandler(context, new FakeAuditPublisher());
-        // Whatever text is in the Salary Frequency cell (even nonsense) is irrelevant now.
         var stream = BuildWorkbook(("EMP-001", "50000", "NotAFrequency", "2027-01-01", "NewHire", null));
 
         var outcome = await handler.HandleAsync(companyId, stream, ActorId, CancellationToken.None);
@@ -105,7 +102,6 @@ public class ImportCompensationChangesHandlerTests
         await context.SaveChangesAsync();
 
         var handler = BuildHandler(context, new FakeAuditPublisher());
-        // Row says "Annual" but the employee's existing open record is Hourly — the row value must be ignored.
         var stream = BuildWorkbook(("EMP-001", "50000", "Annual", "2027-01-01", "AnnualReview", null));
 
         var outcome = await handler.HandleAsync(companyId, stream, ActorId, CancellationToken.None);
@@ -126,7 +122,6 @@ public class ImportCompensationChangesHandlerTests
         await context.SaveChangesAsync();
 
         var handler = BuildHandler(context, new FakeAuditPublisher());
-        // No effective date column value → row parses with a Reason set so it's not treated as blank.
         var stream = BuildWorkbookRaw(("EMP-001", "50000", "Annual", null, "NewHire", null));
 
         var outcome = await handler.HandleAsync(companyId, stream, ActorId, CancellationToken.None);
@@ -176,7 +171,6 @@ public class ImportCompensationChangesHandlerTests
 
         Assert.Equal(ImportCompensationOutcomeType.ValidationFailed, outcome.Type);
         Assert.Contains(outcome.RowErrors, e => e.Message.Contains("Duplicate row"));
-        // No new rows were written — only the pre-existing seeded record remains.
         Assert.Equal([existing.Id], (await context.Compensations.ToListAsync()).Select(c => c.Id));
     }
 
@@ -201,7 +195,6 @@ public class ImportCompensationChangesHandlerTests
         Assert.Equal(ImportCompensationOutcomeType.ValidationFailed, outcome.Type);
         Assert.Single(outcome.RowErrors);
 
-        // Existing record is untouched — the overlap conflict is caught before any writes occur.
         var unchanged = await context.Compensations.SingleAsync(c => c.Id == existing.Id);
         Assert.Null(unchanged.EffectiveTo);
     }
@@ -259,13 +252,11 @@ public class ImportCompensationChangesHandlerTests
         var importBatchId = outcome.Response.ImportBatchId;
         Assert.NotEqual(Guid.Empty, importBatchId);
 
-        // Employee1's existing record's currency/hours/fte should be carried over into its new record.
         var newRecordForEmployee1 = await context.Compensations.SingleAsync(c => c.EmployeeId == employee1.Id && c.EffectiveFrom == new DateOnly(2027, 1, 1));
         Assert.Equal("EUR", newRecordForEmployee1.Currency);
         Assert.Equal(35m, newRecordForEmployee1.HoursPerWeek);
         Assert.Equal(0.9m, newRecordForEmployee1.FTE);
 
-        // Employee2's existing record's currency/hours/fte (GBP, null hours/fte) should be carried over.
         var newRecordForEmployee2 = await context.Compensations.SingleAsync(c => c.EmployeeId == employee2.Id && c.EffectiveFrom == new DateOnly(2027, 1, 1));
         Assert.Equal("GBP", newRecordForEmployee2.Currency);
         Assert.Null(newRecordForEmployee2.HoursPerWeek);

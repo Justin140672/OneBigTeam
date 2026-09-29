@@ -191,13 +191,6 @@ public class ActivatePlatformAdministratorHandlerTests(IdentityDatabaseFixture f
         await db.DisposeAsync();
     }
 
-    /// <summary>
-    /// Concurrent/replayed activation for the SAME row: two contexts each load the still-Pending
-    /// row before either handler saves (mirrors RedeemSupportSessionHandlerTests's concurrency
-    /// regression pattern), then both attempt CompleteProvisioning + SaveChangesWithConcurrencyAsync.
-    /// Only the first save wins; the second's pinned Version OriginalValue no longer matches, so EF
-    /// raises DbUpdateConcurrencyException, translated to Error.Concurrency.
-    /// </summary>
     [Fact]
     public async Task HandleAsync_Only_One_Of_Two_Concurrent_Activation_Attempts_For_Same_Row_Succeeds()
     {
@@ -215,8 +208,6 @@ public class ActivatePlatformAdministratorHandlerTests(IdentityDatabaseFixture f
         await using var db1 = fixture.BuildContext();
         await using var db2 = fixture.BuildContext();
 
-        // Force each context to independently load (and track) the still-pending row before either
-        // handler writes anything, so this is a genuine race rather than sequential reads.
         await db1.PlatformAdministrators.SingleAsync(a => a.Id == administratorId);
         await db2.PlatformAdministrators.SingleAsync(a => a.Id == administratorId);
 

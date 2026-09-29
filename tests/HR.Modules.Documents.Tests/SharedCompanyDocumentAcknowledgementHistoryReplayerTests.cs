@@ -7,11 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Tests;
 
-/// <summary>
-/// TEST-005. Deterministic-replay coverage for
-/// <see cref="SharedCompanyDocumentAcknowledgementHistoryReplayer"/> used by the Employees
-/// timeline backfill.
-/// </summary>
 public class SharedCompanyDocumentAcknowledgementHistoryReplayerTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 13, 9, 0, 0, TimeSpan.Zero);
@@ -139,7 +134,6 @@ public class SharedCompanyDocumentAcknowledgementHistoryReplayerTests
 
         await using (var seed = BuildContext(dbName))
         {
-            // Acknowledgement rows with no matching SharedCompanyDocument (inner join drops them).
             await SeedAckAsync(seed, companyId, Guid.NewGuid(), Guid.NewGuid(), Now);
         }
 

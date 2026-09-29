@@ -7,9 +7,6 @@ namespace HR.Modules.Onboarding.Services;
 
 internal sealed class OnboardingReportReader(OnboardingDbContext dbContext) : IOnboardingReportReader
 {
-    // Row cap (OBT-720 perf pass) — see HR.Modules.Sickness.Services.SicknessReportReader.MaxRows
-    // for rationale. Applied to the raw plan rows, well above the report's final one-row-per-employee
-    // output size.
     private const int MaxPlanRows = 50_000;
 
     public async Task<IReadOnlyList<OnboardingReportItem>> GetOnboardingReportAsync(
@@ -29,7 +26,6 @@ internal sealed class OnboardingReportReader(OnboardingDbContext dbContext) : IO
             .Take(MaxPlanRows)
             .ToListAsync(cancellationToken);
 
-        // One row per employee — most-recently-created plan only, matching OnboardingStatusReader.
         var latestPlans = plans
             .GroupBy(p => p.EmployeeId)
             .Select(g => g.OrderByDescending(p => p.CreatedAt).First())

@@ -38,8 +38,6 @@ public class OffboardingTaskSynchronisationOnLeavingProcessCancelledTests
         return (await response.Content.ReadFromJsonAsync<IdPayload>())!.Id;
     }
 
-    // Relative to "today" — see other leaving-process tests for why a hardcoded near-term literal
-    // eventually becomes "backdated".
     private static readonly DateOnly LeavingDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
     private static readonly DateOnly LastWorkingDay = LeavingDate.AddDays(-1);
 
@@ -71,9 +69,6 @@ public class OffboardingTaskSynchronisationOnLeavingProcessCancelledTests
         var employeeId = await CreateEmployeeAsync(client, companyId);
         await StartLeavingProcessAsync(client, companyId, employeeId);
 
-        // Starting the leaving process auto-starts offboarding (StartOffboardingHandler), which
-        // creates a "Review outstanding documents for employee exit" OffboardingTask + a matching
-        // unassigned Tasks-module TaskItem (sourceEntityId == the OffboardingTask's own id).
         var overviewBeforeResponse = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/offboarding-overview");
         overviewBeforeResponse.EnsureSuccessStatusCode();
@@ -95,8 +90,6 @@ public class OffboardingTaskSynchronisationOnLeavingProcessCancelledTests
         Assert.Equal("Open", matchingTaskItemBefore.Status);
         Assert.Equal("Offboarding", matchingTaskItemBefore.Source);
 
-        // Cancel the leaving process — this must cancel both the local OffboardingTask rows AND
-        // the corresponding Tasks-module TaskItems.
         var cancelResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leaving-process/cancel",
             new { companyId, employeeId, cancellationReason = "Employee retracted resignation." });
@@ -111,15 +104,8 @@ public class OffboardingTaskSynchronisationOnLeavingProcessCancelledTests
 
         var documentReviewTaskAfter = Assert.Single(
             overviewAfter.Tasks, t => t.Id == documentReviewTask.Id);
-        // OffboardingTask.CancelBecauseLeavingProcessCancelled (see "Unify Leaving and Offboarding
-        // into one employee workspace") reports a distinct "Cancelled" status for tasks resolved by
-        // a withdrawn leaving process, separate from "Skipped".
         Assert.Equal("Cancelled", documentReviewTaskAfter.Status);
 
-        // The core regression check: the Tasks-module TaskItem must no longer be Open — it must
-        // have actually been cancelled, not just left dangling while the local plan/task rows
-        // moved on. GetUnassignedTasks excludes Completed/Cancelled items, so its absence here
-        // (rather than still showing "Open") is exactly the signal that OFF-01 exists to guarantee.
         var unassignedAfterResponse = await client.GetAsync($"/api/companies/{companyId}/tasks/unassigned");
         unassignedAfterResponse.EnsureSuccessStatusCode();
         var unassignedAfter = await unassignedAfterResponse.Content.ReadFromJsonAsync<UnassignedTasksPayload>();

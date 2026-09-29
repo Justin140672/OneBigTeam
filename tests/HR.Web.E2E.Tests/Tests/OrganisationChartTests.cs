@@ -5,17 +5,10 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the Organisation Chart page: HR sees the nav link and the rendered chart contains a
-/// seeded employee's card (Name/Job Title/Department), a plain Employee is redirected away,
-/// clicking a card opens that employee's profile, and the Employee page's "More actions" &gt;
-/// "View Organisation Chart" menu item opens the chart centred on and highlighting that employee.
-/// </summary>
 public sealed class OrganisationChartTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    // Laura Bennett — seeded HR Manager, People & HR department (EmployeesModule.SeedEmployeesAsync).
     private static readonly Guid LauraId = Guid.Parse("30000000-0000-0000-0000-000000000005");
 
     private const string LauraEmail = "laura.bennett@acme.example";
@@ -29,10 +22,6 @@ public sealed class OrganisationChartTests(HrAdminPersonaFixture fixture) : Role
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // "Organisation Chart" lives inside the "People and users" submenu group (MainLayout.razor
-        // / AdminNavigation.Sections). Syncfusion's SfMenu doesn't render a group's children at all
-        // until it is expanded, and then as a popup (role="menuitem" nodes) that may be portaled
-        // outside ".app-nav-menu" — so click the group, then search the whole page for the child.
         await _page.Locator(".app-nav-menu").GetByText("People and users", new() { Exact = true }).ClickAsync();
 
         var orgChartLink = _page.GetByText("Organisation Chart", new() { Exact = true });
@@ -53,8 +42,6 @@ public sealed class OrganisationChartTests(HrAdminPersonaFixture fixture) : Role
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/organisation-chart");
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
 
-        // Sarah Chen (CTO, Engineering) is seeded as Active with no manager — the root of the
-        // chart — so her card should render once the diagram has laid itself out.
         var sarahCard = _page.Locator(".org-chart-card").Filter(new() { HasText = "Sarah Chen" });
         await sarahCard.First.WaitForAsync(new() { Timeout = 15_000 });
 
@@ -99,10 +86,6 @@ public sealed class OrganisationChartTests(HrAdminPersonaFixture fixture) : Role
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees/{LauraId}");
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
 
-        // "View Org Chart" moved into the "More actions" overflow menu and was renamed
-        // "View Organisation Chart" — see EmployeeEdit.razor's BuildMoreActionsItems. Id-based
-        // ("#org-chart"), not role+name — see SharedDocumentDetailPage.ClickMoreActionsItemAsync's
-        // remarks for why.
         await _page.GetByRole(AriaRole.Button, new() { Name = "More actions" }).ClickAsync();
         await _page.Locator("#org-chart").ClickAsync();
         await _page.WaitForURLAsync(
@@ -138,9 +121,6 @@ public sealed class OrganisationChartTests(HrAdminPersonaFixture fixture) : Role
 
         var zoomedText = await zoomLevel.InnerTextAsync();
 
-        // Reloading re-establishes a brand-new Blazor circuit, so the zoom level surviving the
-        // reload can only be explained by the localStorage-backed restore in OnAfterRenderAsync,
-        // not any in-memory state.
         await _page.ReloadAsync();
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
 
@@ -153,8 +133,6 @@ public sealed class OrganisationChartTests(HrAdminPersonaFixture fixture) : Role
     [Fact]
     public async Task OrganisationChart_Does_Not_Have_Export_Button()
     {
-        // The Export/Download toolbar button was removed — it never actually worked (see
-        // backlog item on removing dead Org Chart Download button).
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
@@ -213,7 +191,6 @@ public sealed class OrganisationChartTests(HrAdminPersonaFixture fixture) : Role
 
         var search = _page.GetByPlaceholder("Search by name or employee number");
         await search.FillAsync("Laura Bennett");
-        // HrTextBox (SfTextBox) only raises ValueChanged on blur/change, not on "input".
         await search.PressAsync("Enter");
 
         var lauraCard = _page.Locator(".org-chart-card").Filter(new() { HasText = "Laura Bennett" });
@@ -224,10 +201,6 @@ public sealed class OrganisationChartTests(HrAdminPersonaFixture fixture) : Role
             "Expected no 'no match' message when the search term matches a seeded employee");
     }
 
-    /// <summary>
-    /// A search term that matches no employee must surface OrganisationChart.razor's
-    /// _searchNotFound message and leave no card highlighted — the empty-result state.
-    /// </summary>
     [Fact]
     public async Task Search_WithNoMatch_ShowsNotFoundMessage_AndHighlightsNothing()
     {
@@ -250,10 +223,6 @@ public sealed class OrganisationChartTests(HrAdminPersonaFixture fixture) : Role
         Assert.Equal(0, await _page.Locator(".org-chart-card-highlighted").CountAsync());
     }
 
-    /// <summary>
-    /// Clearing the search box after a no-match must clear the _searchNotFound message
-    /// (OnSearchChanged's whitespace/empty branch) — no stale error text left behind.
-    /// </summary>
     [Fact]
     public async Task Search_Cleared_RemovesNotFoundMessage()
     {
@@ -288,8 +257,6 @@ public sealed class OrganisationChartTests(HrAdminPersonaFixture fixture) : Role
         await login.LoginAsync(TomEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/organisation-chart");
-        // See WaitForUrlToStopContainingAsync's doc comment: the redirect is a client-side Blazor
-        // NavigateTo, not a full navigation, so NetworkIdle is not a reliable completion signal.
         await WaitForUrlToStopContainingAsync("/organisation-chart");
 
         var finalUrl = _page.Url;

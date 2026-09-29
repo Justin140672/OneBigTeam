@@ -2,11 +2,6 @@ using HR.Modules.Sickness.Domain;
 
 namespace HR.Modules.Sickness.Tests;
 
-/// <summary>
-/// SICK-03: SicknessRecord.ReopenFollowingUnfitReview domain tests. See the method's XML
-/// remarks for the design rationale (a "not fit" return-to-work outcome reopens the existing
-/// record rather than requiring a brand-new one).
-/// </summary>
 public class SicknessRecordTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 1, 9, 0, 0, TimeSpan.Zero);

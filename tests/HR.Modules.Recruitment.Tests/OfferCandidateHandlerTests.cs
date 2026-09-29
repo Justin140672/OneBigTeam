@@ -273,7 +273,6 @@ public class OfferCandidateHandlerTests
         Assert.Equal(stages.Interview.Id, savedApplication.CurrentStageId);
     }
 
-    // SET-05: OfferApprovalRequired gating.
 
     [Fact]
     public async Task HandleAsync_Fails_When_OfferApprovalRequired_And_Application_Not_Approved()
@@ -530,7 +529,6 @@ public class OfferCandidateHandlerTests
         Assert.Equal(application.Id, ((IAuditEvent)offerAudit).EntityId);
         Assert.Equal(performedBy, ((IAuditEvent)offerAudit).ActorUserId);
 
-        // Salary must never appear anywhere in the serialised audit payload.
         var json = System.Text.Json.JsonSerializer.Serialize(offerAudit);
         Assert.DoesNotContain("99000", json);
         Assert.DoesNotContain("alary", json);

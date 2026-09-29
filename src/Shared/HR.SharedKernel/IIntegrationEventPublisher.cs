@@ -4,14 +4,6 @@ public interface IIntegrationEventPublisher
     Task PublishAsync<TEvent>(TEvent integrationEvent, CancellationToken cancellationToken)
         where TEvent : IIntegrationEvent;
 
-    // Same best-effort dispatch to every registered IIntegrationEventHandler<TEvent> as
-    // PublishAsync (a failing handler still never blocks another handler or the caller), but
-    // additionally reports whether every handler that opted in as "required" (by implementing
-    // IRequiredIntegrationEventHandler<TEvent> rather than plain IIntegrationEventHandler<TEvent>)
-    // actually succeeded. Callers that need to durably know "did delivery to my required
-    // consumer(s) actually happen" (as opposed to "did the publish call merely return") should use
-    // this instead of PublishAsync, and only mark their own delivery state complete when this
-    // returns true. See IntegrationEventPublisher for the swallow-and-log behaviour this builds on.
     Task<bool> PublishAndConfirmAsync<TEvent>(TEvent integrationEvent, CancellationToken cancellationToken)
         where TEvent : IIntegrationEvent;
 }

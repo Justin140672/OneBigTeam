@@ -4,10 +4,6 @@ using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Recruitment.Features.PurgeEligibleCandidates;
 
-/// <summary>SET-05: "role:company-administrator" — a distinctly stronger/narrower boundary than
-/// "recruitment:manage" (which Recruiters hold), mirroring DOC-04's
-/// PurgeEligibleArchivedEmployeeDocuments — this is real, unrecoverable data redaction, not a
-/// silently scheduled recurring job.</summary>
 internal sealed class Endpoint(PurgeEligibleCandidatesHandler handler, ICurrentUser currentUser)
     : Endpoint<PurgeEligibleCandidatesRequest, PurgeEligibleCandidatesResponse>
 {

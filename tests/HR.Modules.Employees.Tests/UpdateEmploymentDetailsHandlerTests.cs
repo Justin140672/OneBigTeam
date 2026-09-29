@@ -33,19 +33,16 @@ public class UpdateEmploymentDetailsHandlerTests
             // it, the inline dispatch is skipped and the event only exists as an outbox row.
             NullLogger<UpdateEmploymentDetailsHandler>.Instance);
 
-    // ── probation date — employee override ────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Sets_ProbationEndDate_When_Explicitly_Provided()
     {
-        // HR can override the calculated probation end date for a specific employee
-        // by supplying an explicit date via UpdateEmploymentDetails.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         var employee = CreateEmployee(companyId, now);
-        employee.SetProbationEndDate(StartDate.AddMonths(6), now); // set from company default at creation
+        employee.SetProbationEndDate(StartDate.AddMonths(6), now);
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
@@ -98,7 +95,6 @@ public class UpdateEmploymentDetailsHandlerTests
         Assert.Null(saved.ProbationEndDate);
     }
 
-    // ── notice period override ───────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Persists_NoticePeriodOverride_When_Both_Fields_Provided()
@@ -168,7 +164,6 @@ public class UpdateEmploymentDetailsHandlerTests
         Assert.Null(saved.NoticePeriodLengthOverride);
     }
 
-    // ── baseline handler behaviour ────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Employee_Does_Not_Exist()
@@ -349,7 +344,7 @@ public class UpdateEmploymentDetailsHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var employee = CreateEmployee(companyId, now); // starts Draft, never Activated
+        var employee = CreateEmployee(companyId, now);
         var manager = CreateEmployee(companyId, now);
         context.Employees.AddRange(employee, manager);
         await context.SaveChangesAsync();
@@ -401,9 +396,7 @@ public class UpdateEmploymentDetailsHandlerTests
         Assert.Equal(EmploymentStatus.Active, saved.Status);
     }
 
-    // ── helpers ───────────────────────────────────────────────────────────────
 
-    // ── granular integration events ────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Publishes_PositionChanged_LocationChanged_And_ManagerChanged_When_All_Change()
@@ -425,7 +418,6 @@ public class UpdateEmploymentDetailsHandlerTests
         var newPositionId = Guid.NewGuid();
         var newLocationId = Guid.NewGuid();
 
-        // Ensure new position/location/department pass their "exists and active" checks.
         var newDept = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
         context.Departments.Add(newDept);
         var locationType = LocationType.Create(Guid.NewGuid(), companyId, "Office", null, now);
@@ -638,7 +630,6 @@ public class UpdateEmploymentDetailsHandlerTests
         Assert.Equal("EMP-8888", after.EmployeeNumber);
     }
 
-    // ── ManagerId audit tracking (Task C) ────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Publishes_EmploymentDetailsUpdatedAuditEvent_With_Before_And_After_ManagerId()
@@ -676,7 +667,6 @@ public class UpdateEmploymentDetailsHandlerTests
         Assert.Equal(newManager.Id, after.ManagerId);
     }
 
-    // ── CorrelationId propagation (Task D) ───────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Passes_Request_CorrelationId_Onto_Published_AuditEvent()

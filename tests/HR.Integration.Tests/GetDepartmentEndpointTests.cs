@@ -5,10 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Integration coverage for the GetDepartment read slice
-/// (GET /api/companies/{companyId}/departments/{id}).
-/// </summary>
 [Collection("Integration")]
 public class GetDepartmentEndpointTests
 {
@@ -110,7 +106,6 @@ public class GetDepartmentEndpointTests
         using var client = await AdminClient(companyA);
         var departmentId = await CreateDepartmentAsync(client, companyA, $"A-{Guid.NewGuid():N}");
 
-        // Authenticated against company A but asking for it under a different company id.
         var response = await client.GetAsync($"/api/companies/{Guid.NewGuid()}/departments/{departmentId}");
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
@@ -119,8 +114,6 @@ public class GetDepartmentEndpointTests
     [Fact]
     public async Task Get_Department_Returns_NotFound_For_Department_Owned_By_Another_Company()
     {
-        // Department belongs to company B; caller is authorized for company B's own tenant but the
-        // handler still scopes by CompanyId, so a company-A department id is invisible.
         var companyA = Guid.NewGuid();
         using var clientA = await AdminClient(companyA);
         var companyADepartmentId = await CreateDepartmentAsync(clientA, companyA, $"A-{Guid.NewGuid():N}");

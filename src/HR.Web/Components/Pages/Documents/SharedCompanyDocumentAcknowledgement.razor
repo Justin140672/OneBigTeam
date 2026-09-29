@@ -108,8 +108,6 @@
     private bool _acknowledging;
     private string? _error;
 
-    // Set only when this page was reached from a task (via ?taskId=), so acknowledging can also
-    // complete that task — reached directly from My Documents, there's no task to complete.
     private Guid? _taskId;
 
     protected override async Task OnInitializedAsync()

@@ -4,10 +4,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.ListRecruitmentStages;
 
-// Returns every stage (active and inactive) ordered by DisplayOrder — this is the admin settings
-// screen for ticket #97, so inactive stages must remain visible/editable (just not selectable for new
-// application placement/moves), unlike GetRecruitmentKanban/GetPipelineSummary which only show active
-// stages.
 internal sealed class ListRecruitmentStagesHandler(RecruitmentDbContext db)
 {
     public async Task<Result<ListRecruitmentStagesResponse>> HandleAsync(

@@ -68,8 +68,6 @@ internal sealed class AccountDisablementReconciliationJob(
 
             if (request.Status == AccountDisablement.StatusFailed)
             {
-                // Domain guard: refuses unless still Failed (matches what was just queried) — makes
-                // the intent explicit even though Claim() below would work from any status.
                 request.ResetForRetry();
             }
 

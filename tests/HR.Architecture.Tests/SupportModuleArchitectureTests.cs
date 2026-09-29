@@ -48,7 +48,6 @@ public class SupportModuleArchitectureTests
         Assert.Equal("support", context.Model.GetDefaultSchema());
     }
 
-    // ── SupportRequest ───────────────────────────────────────────────────────────
 
     [Fact]
     public void SupportRequest_Entity_Is_Not_Public()
@@ -83,7 +82,6 @@ public class SupportModuleArchitectureTests
         AssertSnakeCase(context.Model.FindEntityType(typeof(SupportRequest))!);
     }
 
-    // ── SupportAttachment ────────────────────────────────────────────────────────
 
     [Fact]
     public void SupportAttachment_Entity_Is_Not_Public()
@@ -118,7 +116,6 @@ public class SupportModuleArchitectureTests
         AssertSnakeCase(context.Model.FindEntityType(typeof(SupportAttachment))!);
     }
 
-    // ── SupportResponse ──────────────────────────────────────────────────────────
 
     [Fact]
     public void SupportResponse_Entity_Is_Not_Public()
@@ -153,7 +150,6 @@ public class SupportModuleArchitectureTests
         AssertSnakeCase(context.Model.FindEntityType(typeof(SupportResponse))!);
     }
 
-    // ── SupportResponseAttachment ────────────────────────────────────────────────
 
     [Fact]
     public void SupportResponseAttachment_Entity_Is_Not_Public()
@@ -188,7 +184,6 @@ public class SupportModuleArchitectureTests
         AssertSnakeCase(context.Model.FindEntityType(typeof(SupportResponseAttachment))!);
     }
 
-    // ── SupportNotificationAttempt ───────────────────────────────────────────────
 
     [Fact]
     public void SupportNotificationAttempt_Entity_Is_Not_Public()
@@ -223,7 +218,6 @@ public class SupportModuleArchitectureTests
         AssertSnakeCase(context.Model.FindEntityType(typeof(SupportNotificationAttempt))!);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private static void AssertSnakeCase(Microsoft.EntityFrameworkCore.Metadata.IEntityType entityType)
     {

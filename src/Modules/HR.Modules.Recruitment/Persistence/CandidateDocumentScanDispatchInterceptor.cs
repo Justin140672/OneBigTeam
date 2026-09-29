@@ -8,25 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Recruitment.Persistence;
 
-/// <summary>
-/// [P1] Dispatches <see cref="ScanCandidateDocumentJob"/> for every newly inserted
-/// <see cref="CandidateDocument"/> once — and only once — the insert has actually committed.
-///
-/// Candidate documents are created by several slices (UploadCandidateDocument, the coordinated
-/// CreateCandidateApplication intake, the employee ApplyForInternalVacancy flow) — some inside an
-/// explicit transaction. Hooking the module DbContext rather than each handler means no present or
-/// future creation path can forget to request a scan, and the job is never enqueued for a row whose
-/// transaction later rolls back:
-/// <list type="bullet">
-/// <item><description>Added documents are captured in SavingChanges (they are Unchanged afterwards).</description></item>
-/// <item><description>Without an ambient transaction, SaveChanges is the commit, so dispatch happens in SavedChanges.</description></item>
-/// <item><description>With one, dispatch waits for TransactionCommitted; a rollback or failed save discards them.</description></item>
-/// </list>
-/// Dispatch is best-effort by design: new rows are persisted as Pending, and
-/// <see cref="ReconcileCandidateDocumentScansJob"/> re-dispatches any Pending row whose enqueue was
-/// lost, so an unavailable job store can never fail the upload or leave a document permanently
-/// unscanned. Registered per scope, so one instance tracks one DbContext's unit of work.
-/// </summary>
 internal sealed class CandidateDocumentScanDispatchInterceptor(
     IBackgroundJobClient backgroundJobClient,
     ILogger<CandidateDocumentScanDispatchInterceptor> logger)
@@ -35,7 +16,6 @@ internal sealed class CandidateDocumentScanDispatchInterceptor(
     private readonly List<Guid> _capturedForCurrentSave = [];
     private readonly List<Guid> _awaitingCommit = [];
 
-    // ── SaveChanges ───────────────────────────────────────────────────────────────────────────
 
     public override InterceptionResult<int> SavingChanges(DbContextEventData eventData, InterceptionResult<int> result)
     {
@@ -71,7 +51,6 @@ internal sealed class CandidateDocumentScanDispatchInterceptor(
         return Task.CompletedTask;
     }
 
-    // ── Transactions ──────────────────────────────────────────────────────────────────────────
 
     public void TransactionCommitted(DbTransaction transaction, TransactionEndEventData eventData) => DispatchAwaitingCommit();
 
@@ -100,7 +79,6 @@ internal sealed class CandidateDocumentScanDispatchInterceptor(
         return Task.CompletedTask;
     }
 
-    // ── Internals ─────────────────────────────────────────────────────────────────────────────
 
     private void Capture(DbContext? context)
     {

@@ -16,27 +16,18 @@ internal sealed class Endpoint(SubmitSupportRequestHandler handler, ICurrentUser
 
     public override async Task HandleAsync(SubmitSupportRequestRequest request, CancellationToken cancellationToken)
     {
-        // Reads the DB-resolved user id via ICurrentUser, not a raw ClaimTypes.NameIdentifier claim
-        // — the JWT bearer handler is configured with MapInboundClaims = false (see HR.Api's
-        // ConfigureSupabaseJwtBearer), so real Supabase-issued tokens never populate that mapped
-        // claim type; relying on it directly would Unauthorized every request unconditionally.
         if (currentUser.UserId is not Guid userId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());
             return;
         }
 
-        // Verify the caller belongs to the company in the route — never trust the route value
-        // alone. Reads the DB-resolved tenant via ICurrentUser, not a raw "company_id" JWT claim —
-        // real Supabase-issued tokens never carry one, so relying on the claim directly would
-        // Forbid every request unconditionally (see TenantRouteAuthorizationMiddleware).
         if (!Guid.TryParse(currentUser.TenantId, out var callerCompanyId) || callerCompanyId != request.CompanyId)
         {
             await Send.ResultAsync(TypedResults.Forbid());
             return;
         }
 
-        // ApplicationUser.Id == EmployeeId by convention elsewhere in the platform (see Identity module).
         var result = await handler.HandleAsync(request, userId, userId, cancellationToken);
 
         if (result.IsFailure)

@@ -6,10 +6,6 @@ using Microsoft.Extensions.Configuration;
 
 namespace HR.Modules.Companies.Features.GetDeletionQueue;
 
-/// <summary>
-/// Same defense-in-depth allow-list gate as GetCustomerDashboardHandler (see its remarks).
-/// Platform-wide, not scoped to a single customer — backs the /deletion-queue page.
-/// </summary>
 internal sealed class GetDeletionQueueHandler(
     CompaniesDbContext dbContext,
     ICurrentUser currentUser,

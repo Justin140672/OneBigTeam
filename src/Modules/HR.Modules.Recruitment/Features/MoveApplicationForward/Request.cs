@@ -6,8 +6,6 @@ internal sealed record MoveApplicationForwardRequest
     public Guid VacancyId { get; init; }
     public Guid ApplicationId { get; init; }
 
-    // Optional: CV review notes to persist against the application before advancing the stage
-    // (the "Move Forward" action on the Review CV screen saves notes and progresses in one step).
     public string? CvReviewNotes { get; init; }
 
     // Populated by the endpoint from the optional "Idempotency-Key" request header (ticket 3, P1

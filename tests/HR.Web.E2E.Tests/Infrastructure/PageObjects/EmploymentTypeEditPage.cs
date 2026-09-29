@@ -22,12 +22,6 @@ public sealed class EmploymentTypeEditPage(IPage page, string baseUrl)
     public Task FillDescriptionAsync(string description) =>
         FillTextBoxAsync("Optional description", description);
 
-    // This page is @rendermode InteractiveServer: straight after ClickNewAsync the SignalR circuit
-    // may not have wired up the SfTextBox's oninput handler yet, so a one-shot FillAsync sets the
-    // DOM value but Blazor never binds it — Save then posts an empty Name, validation blocks the
-    // navigation, and the caller's WaitForURL times out. Wait for the field, type character by
-    // character (each keystroke raises its own input event once the circuit is live), then verify
-    // the value actually committed and retype once if it didn't.
     private async Task FillTextBoxAsync(string placeholder, string value)
     {
         var input = page.GetByPlaceholder(placeholder);
@@ -48,12 +42,6 @@ public sealed class EmploymentTypeEditPage(IPage page, string baseUrl)
         }
     }
 
-    // The post-save navigation back to the list is a forceLoad (EditPageBase.NavigateToList) — a
-    // real browser navigation whose "load" event waits on every Syncfusion CSS/font/script
-    // resource, which under maxParallelThreads=15 routinely outlasts a plain WaitForURLAsync
-    // (default waitUntil: "Load"). Wait on "Commit" (URL changed, response started) instead and
-    // let the subsequent grid-row wait be the real readiness gate — same fix applied to the
-    // Group A login flow and OnboardingTemplate list navigation.
     private static readonly PageWaitForURLOptions CommitNav = new()
     {
         Timeout = 30_000,
@@ -89,8 +77,6 @@ public sealed class EmploymentTypeEditPage(IPage page, string baseUrl)
 
     public Guid GetIdFromUrl() => UrlIdParser.LastGuid(page.Url);
 
-    // ── Description field (optional HrTextBox) — robust type-for-real technique, see
-    // DocumentTypeEditPage.SetDescriptionAsync for the full rationale. ─────────────
     public async Task SetDescriptionAsync(string value)
     {
         var input = page.GetByPlaceholder("Optional description");

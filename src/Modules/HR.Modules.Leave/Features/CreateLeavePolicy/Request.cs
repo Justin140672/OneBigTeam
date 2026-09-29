@@ -9,11 +9,8 @@ internal sealed record CreateLeavePolicyRequest
     public bool AllowNegativeBalance { get; init; }
     public bool IsDefault { get; init; }
 
-    // LEAVE-07: defaults to true (the safer choice) when a caller does not specify it.
     public bool RequiresApproval { get; init; } = true;
 
-    // Populated by the endpoint from the authenticated user's "sub" claim — never bound from the
-    // client body (internal properties are not touched by FastEndpoints' JSON model binding).
     internal Guid? ActorEmployeeId { get; init; }
 
     // Populated by the endpoint from the optional "Idempotency-Key" request header (ticket 3, P1

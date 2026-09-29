@@ -27,7 +27,6 @@ internal sealed class FakeOpenTaskBySourceEntityReader : IOpenTaskBySourceEntity
         var matches = _openTasks
             .Where(t => ids.Contains(t.SourceEntityId))
             .Where(t => actionType == null || t.ActionType == actionType.Value)
-            // Mirror "most relevant single open task per source entity" — first match wins.
             .GroupBy(t => t.SourceEntityId)
             .ToDictionary(g => g.Key, g => g.First().TaskId);
 

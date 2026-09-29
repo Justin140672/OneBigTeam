@@ -129,7 +129,7 @@ public class UpdateDocumentTypeHandlerTests
         var result = await Handler(db).HandleAsync(
             new UpdateDocumentTypeRequest
             {
-                CompanyId      = Guid.NewGuid(), // different company
+                CompanyId      = Guid.NewGuid(),
                 DocumentTypeId = typeId,
                 Name           = "Contract"
             },

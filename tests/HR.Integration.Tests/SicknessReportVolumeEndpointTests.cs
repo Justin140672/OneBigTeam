@@ -9,13 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// REP-05: exercises the Sickness report's bounded-result behaviour at real data volumes exceeding
-/// ReportLimits.DisplayRowLimit (20,000) for the live Get* endpoint. GetSicknessReportHandler groups
-/// by employee by default, so distinct employees (one sickness record each) are seeded — one record
-/// per employee — to exceed the cap via group count, not raw record count. Records are seeded via a
-/// single bulk AddRange + SaveChangesAsync to keep this within a reasonable test runtime.
-/// </summary>
 [Collection("Integration")]
 public class SicknessReportVolumeEndpointTests
 {
@@ -81,9 +74,6 @@ public class SicknessReportVolumeEndpointTests
     [Fact]
     public async Task Get_SicknessReport_Returns_Deterministic_Order_Across_Repeated_Calls()
     {
-        // Proves SicknessReportReader's `OrderBy(r => r.Id)` produces a stable, repeatable row
-        // order end-to-end — each employee here has exactly one record, so group order equals
-        // record order.
         var companyId = Guid.NewGuid();
         await SeedRecordsAsync(companyId, 200);
         using var client = await HrAdminClientFor(companyId);
@@ -102,10 +92,6 @@ public class SicknessReportVolumeEndpointTests
     [Fact]
     public async Task Export_SicknessReport_Above_DisplayRowLimit_Caps_Csv_Rows()
     {
-        // ExportSicknessReportHandler delegates to GetSicknessReportHandler, so the export is
-        // bounded by DisplayRowLimit (20,000) here too, not ExportRowLimit (50,000). The export
-        // endpoint streams a CSV file rather than a JSON DTO, so this asserts the row cap
-        // indirectly via CSV line count.
         var companyId = Guid.NewGuid();
         await SeedRecordsAsync(companyId, DisplayRowLimit + 500);
         using var client = await HrAdminClientFor(companyId);

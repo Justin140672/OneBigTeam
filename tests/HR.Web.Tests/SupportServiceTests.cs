@@ -12,7 +12,6 @@ public class SupportServiceTests
     private static SupportService BuildService(HttpMessageHandler handler) =>
         new(BuildFactory(handler), NullLogger<SupportService>.Instance);
 
-    // ── ListSupportRequestsAsync (representative read) ───────────────────────────
 
     [Fact]
     public async Task ListSupportRequestsAsync_Returns_Value_When_Api_Returns_Ok()
@@ -56,7 +55,6 @@ public class SupportServiceTests
             () => service.ListSupportRequestsAsync(Guid.NewGuid(), cancellationToken: cts.Token));
     }
 
-    // ── GetSupportRequestAsync ────────────────────────────────────────────────────
 
     [Fact]
     public async Task GetSupportRequestAsync_Returns_Null_When_Api_Returns_NotFound()
@@ -68,7 +66,6 @@ public class SupportServiceTests
         Assert.Null(result);
     }
 
-    // ── SubmitSupportRequestAsync (write) ────────────────────────────────────────
 
     [Fact]
     public async Task SubmitSupportRequestAsync_Returns_Result_When_Api_Returns_Created()
@@ -123,7 +120,6 @@ public class SupportServiceTests
         Assert.NotNull(error);
     }
 
-    // ── AddResponseAsync (write) ──────────────────────────────────────────────────
 
     [Fact]
     public async Task AddResponseAsync_Returns_Result_When_Api_Returns_Created()

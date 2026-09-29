@@ -12,7 +12,6 @@ namespace HR.Admin.Web.Tests;
 // rather than mocking HttpClient directly.
 public class SupportRequestAdminServiceTests
 {
-    // Responds based on the requested path/method so a single handler can serve every scenario.
     private sealed class ScriptedHandler : HttpMessageHandler
     {
         public Func<HttpRequestMessage, Task<HttpResponseMessage>>? OnSend { get; set; }

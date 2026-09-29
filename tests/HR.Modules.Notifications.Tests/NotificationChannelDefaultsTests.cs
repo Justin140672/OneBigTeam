@@ -35,7 +35,6 @@ public class NotificationChannelDefaultsTests
         Assert.False(channel.HasFlag(NotificationChannel.Email));
     }
 
-    // SET-06 -------------------------------------------------------------------------------------
 
     [Theory]
     [InlineData(NotificationType.DocumentExpired)]

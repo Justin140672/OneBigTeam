@@ -10,9 +10,6 @@ namespace HR.Modules.Reporting.Features.SaveReportView;
 
 internal sealed class SaveReportViewHandler(ReportingDbContext dbContext, IClock clock)
 {
-    // Reserved for the built-in "Standard View" sentinel shown in the Saved Views dropdown
-    // (ReportFilterPanel.razor) — a real saved view with this name would be indistinguishable
-    // from it, so it can never be created or renamed to.
     internal const string ReservedStandardViewName = "Standard View";
 
     public async Task<Result<SaveReportViewResponse>> HandleAsync(

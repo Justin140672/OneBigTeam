@@ -124,7 +124,6 @@ public class ListVacanciesHandlerTests
         db.Vacancies.Add(vacancy);
         await db.SaveChangesAsync();
 
-        // No summaries dictionary supplied — simulates the linked profile no longer being resolvable.
         var result = await new ListVacanciesHandler(db, new FakePositionProfileReader()).HandleAsync(
             new ListVacanciesRequest { CompanyId = companyId },
             CancellationToken.None);
@@ -165,21 +164,15 @@ public class ListVacanciesHandlerTests
     [Fact]
     public async Task HandleAsync_Resolves_EffectiveTitle_From_Vacancy_And_EffectiveLocation_Purely_From_PositionProfile_Per_Item()
     {
-        // Location is no longer a vacancy-level concept — EffectiveLocation is resolved exclusively
-        // from each item's linked Position Profile's PositionProfileSummary.LocationName, with no
-        // vacancy-level override or fallback logic. EffectiveTitle, by contrast, still honours a
-        // vacancy-level AdvertTitle override when set.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var profileWithAdvertOverrideId = Guid.NewGuid();
         var profileWithoutAdvertOverrideId = Guid.NewGuid();
 
-        // Item A: has its own AdvertTitle override — should win over the Position Profile's title.
         var vacancyA = Vacancy.Create(
             Guid.NewGuid(), companyId, profileWithAdvertOverrideId,
             "Advert Title Override", null, Guid.NewGuid(), Now);
 
-        // Item B: no AdvertTitle override — falls back to the Position Profile's title.
         var vacancyB = Vacancy.Create(
             Guid.NewGuid(), companyId, profileWithoutAdvertOverrideId,
             null, null, Guid.NewGuid(), Now);
@@ -267,7 +260,6 @@ public class ListVacanciesHandlerTests
         db.Vacancies.Add(Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Some Role", null, Guid.NewGuid(), Now));
         await db.SaveChangesAsync();
 
-        // No idsByDepartment supplied — the department has no matching position profiles.
         var result = await new ListVacanciesHandler(db, new FakePositionProfileReader()).HandleAsync(
             new ListVacanciesRequest { CompanyId = companyId, DepartmentId = Guid.NewGuid() },
             CancellationToken.None);

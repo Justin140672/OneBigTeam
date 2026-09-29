@@ -37,7 +37,6 @@ internal sealed class EmployeeApplicantReader(EmployeesDbContext dbContext) : IE
         EmploymentStatus.Suspended => EmployeeApplicantEmploymentState.Suspended,
         EmploymentStatus.Leaving => EmployeeApplicantEmploymentState.Leaving,
         EmploymentStatus.FormerEmployee => EmployeeApplicantEmploymentState.Former,
-        // Draft, and any retired/unknown stored value, fail closed as "not started".
         _ => EmployeeApplicantEmploymentState.Draft,
     };
 }

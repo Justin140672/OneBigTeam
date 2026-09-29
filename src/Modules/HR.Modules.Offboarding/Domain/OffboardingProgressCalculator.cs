@@ -1,12 +1,5 @@
 namespace HR.Modules.Offboarding.Domain;
 
-// OFF-07: single source of truth for "how complete is this plan" — previously computed separately
-// (and inconsistently) in GetOffboardingOverviewHandler/EmployeeOffboardingTab.razor (Completed +
-// Skipped counted as done) and in OffboardingReportReader (only Completed counted as done, Skipped
-// tasks silently excluded from both the numerator and any "outstanding" list). Every reader
-// (GetOffboardingOverview's response, the Reporting module's cross-module IOffboardingReportReader,
-// and the Blazor UI, which now just displays the server-computed numbers instead of recomputing
-// them) calls this so the reported progress can never drift between them again.
 internal readonly record struct OffboardingProgressSummary(
     int TotalTasks,
     int CompletedTasks,
@@ -14,9 +7,6 @@ internal readonly record struct OffboardingProgressSummary(
     int ResolvedTasks,
     int ProgressPercent,
     bool CanComplete,
-    // SPEC-OFF-01: "X of Y required obligations resolved" / "X of Y total obligations resolved".
-    // Cancelled obligations (parent leaving process cancelled) are excluded from both counts —
-    // they are never treated as completed/waived. Resolved means Completed or Waived.
     int RequiredTotal,
     int RequiredResolved,
     int TotalResolved,

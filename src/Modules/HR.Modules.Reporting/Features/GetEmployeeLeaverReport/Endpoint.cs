@@ -9,7 +9,6 @@ internal sealed class Endpoint(GetEmployeeLeaverReportHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/reporting/employee-leavers");
-        // Sensitive HR data (leaving details) — HR Administrator scope only, per product decision.
         Policies("reporting:view-hr");
     }
 

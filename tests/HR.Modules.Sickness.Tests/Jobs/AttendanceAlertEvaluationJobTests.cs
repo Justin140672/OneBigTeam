@@ -7,12 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Tests.Jobs;
 
-/// <summary>
-/// SICK-04: AttendanceAlertEvaluationJob persists candidates from the deterministic
-/// AttendanceAlertEvaluationService and must be safe to re-run (Hangfire retry / repeated daily
-/// execution) without ever creating duplicate AttendanceAlert rows for the same employee+rule+
-/// evidence window. Mirrors FitNoteRequestJobTests' in-memory-DB pattern.
-/// </summary>
 public class AttendanceAlertEvaluationJobTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 15, 2, 0, 0, DateTimeKind.Utc);
@@ -99,9 +93,6 @@ public class AttendanceAlertEvaluationJobTests
     [Fact]
     public async Task ExecuteAsync_DoesNotCreateDuplicate_WhenAlertAlreadyExistsForSameEvidenceWindow()
     {
-        // Simulates a job run on a previous day that already raised the alert for this exact
-        // employee+rule+evidence-window key; a fresh run against the same underlying data must
-        // not add a second row.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -129,10 +120,6 @@ public class AttendanceAlertEvaluationJobTests
     [Fact]
     public async Task ExecuteAsync_DoesNotCreateAlert_WhenNoRuleFires()
     {
-        // Company sickness settings default ReturnToWorkRequiredAfterDays to 1, so a bare closed
-        // record with no review would itself trip MissingReturnToWorkReview — a completed review
-        // is attached here so this scenario genuinely exercises "no rule fires" rather than
-        // accidentally proving the missing-review catch-all instead.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -172,9 +159,6 @@ public class AttendanceAlertEvaluationJobTests
             CreateClosedRecord(companyA, employeeId, categoryA, new DateOnly(2026, 4, 5), new DateOnly(2026, 4, 6)),
             companyBRecord);
 
-        // Company B's lone record would itself trip MissingReturnToWorkReview (default
-        // ReturnToWorkRequiredAfterDays = 1) — attach a completed review so the only alert this
-        // test proves is FrequentAbsences, scoped correctly to company A.
         var companyBReview = ReturnToWorkReview.Create(
             Guid.NewGuid(), companyB, companyBRecord.Id, employeeId, new DateOnly(2026, 6, 3), Now);
         companyBReview.Complete(Guid.NewGuid(), FitToReturnOutcome.Fit, adjustmentsRequired: false, adjustmentDetails: null, notes: null, Now);
@@ -185,10 +169,6 @@ public class AttendanceAlertEvaluationJobTests
         var job = BuildJob(db);
         await job.ExecuteAsync();
 
-        // Company A's closed records (each without a review of their own) also individually trip
-        // MissingReturnToWorkReview in addition to FrequentAbsences — the assertion that matters
-        // for this test is company scoping, so every alert produced must belong to company A and
-        // none to company B (whose only record has a completed review attached above).
         var alerts = await db.AttendanceAlerts.ToListAsync();
         Assert.NotEmpty(alerts);
         Assert.All(alerts, a => Assert.Equal(companyA, a.CompanyId));

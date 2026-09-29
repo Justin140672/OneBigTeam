@@ -23,7 +23,6 @@ public class CreateLeaveRequestDraftHandlerTests
         new(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(),
             new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader());
 
-    // 2026-08-03 = Monday, 2026-08-07 = Friday
     private static CreateLeaveRequestDraftRequest ValidRequest(Guid companyId, Guid employeeId, Guid leaveTypeId) => new()
     {
         CompanyId = companyId,
@@ -97,7 +96,6 @@ public class CreateLeaveRequestDraftHandlerTests
     [Fact]
     public async Task HandleAsync_Succeeds_Without_Employee_Having_Policy_Assignment()
     {
-        // Drafts can be created before a policy assignment exists — no cross-year/balance checks.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();

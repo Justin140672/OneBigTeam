@@ -2,12 +2,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Notifications.Features.SendProductUpdate;
 
-/// <summary>
-/// Customer Release Notifications: audit trail for a manual platform-admin product/release
-/// announcement send. Actor is the sending platform administrator. Spans every active customer
-/// company, so — unlike most audit events — there is no single owning CompanyId; BatchId (shared as
-/// SourceEntityId across every Notification row this send created) is the correlating identifier.
-/// </summary>
 internal sealed record ProductUpdateSentAuditEvent(
     Guid BatchId,
     Guid? ActorUserId,

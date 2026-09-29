@@ -29,9 +29,6 @@ internal sealed class PurgeEligibleArchivedEmployeeDocumentsHandler(
     ILegalHoldStatusReader legalHoldStatusReader,
     ILogger<PurgeEligibleArchivedEmployeeDocumentsHandler> logger)
 {
-    // DOC-04: no existing company-settings mechanism in this module covers document retention, so
-    // a fixed default is used, matching the ticket's suggested fallback. Documented here rather
-    // than hidden in a magic number at the call site.
     public const int MinimumRetentionDays = 90;
 
     public async Task<Result<PurgeEligibleArchivedEmployeeDocumentsResponse>> HandleAsync(
@@ -39,8 +36,6 @@ internal sealed class PurgeEligibleArchivedEmployeeDocumentsHandler(
         Guid purgedBy,
         CancellationToken cancellationToken)
     {
-        // NFR-07: a company under legal hold is exempt from all retention deletion until the hold
-        // is lifted. Fail closed — never destroy data for a held company.
         if (await legalHoldStatusReader.IsUnderLegalHoldAsync(request.CompanyId, cancellationToken))
         {
             return Result.Failure<PurgeEligibleArchivedEmployeeDocumentsResponse>(Error.Conflict(

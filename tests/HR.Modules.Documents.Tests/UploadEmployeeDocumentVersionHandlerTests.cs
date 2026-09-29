@@ -34,7 +34,6 @@ public class UploadEmployeeDocumentVersionHandlerTests
             integrationEventPublisher ?? new NoOpIntegrationEventPublisher(),
             backgroundJobClient ?? new NoOpBackgroundJobClient());
 
-    // %PDF- followed by padding
     private static byte[] PdfBytes(int extraSize = 1020)
     {
         var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };
@@ -118,7 +117,6 @@ public class UploadEmployeeDocumentVersionHandlerTests
         var reloadedPrevious = await db.EmployeeDocuments.SingleAsync(ed => ed.Id == previous.Id);
         Assert.False(reloadedPrevious.IsLatestVersion);
 
-        // Title/description carried forward from the previous version's Document.
         var newDocument = await db.Documents.SingleAsync(d => d.Id == newVersion.DocumentId);
         Assert.Equal("Passport", newDocument.Title);
         Assert.Equal("Some description", newDocument.Description);
@@ -245,7 +243,6 @@ public class UploadEmployeeDocumentVersionHandlerTests
         var employeeId     = Guid.NewGuid();
         var (_, _, previous) = await Seed(db, companyId, employeeId);
 
-        // Prove the previous version having reminders already sent does NOT carry over.
         previous.MarkExpiryReminderSent(ExpiryReminderStage.NinetyDays, DateTimeOffset.UtcNow);
         previous.MarkExpiryReminderSent(ExpiryReminderStage.ThirtyDays, DateTimeOffset.UtcNow);
         previous.MarkExpiryReminderSent(ExpiryReminderStage.SevenDays, DateTimeOffset.UtcNow);

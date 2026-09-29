@@ -4,23 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// ADM-05 — "Enforce administrative role separation throughout the UI".
-///
-/// Every admin page now guards on permission-derived capability flags on AppSession and, when the
-/// capability is missing, issues a client-side NavigateTo(replace: true) to the shared
-/// "/access-denied" page (Components/Pages/AccessDenied.razor). MainLayout's sidebar hides whole
-/// categories the persona lacks capability for.
-///
-/// These tests direct-navigate (_page.GotoAsync) to each admin route as each persona and assert the
-/// deny-vs-allow outcome end-to-end — proving the separation is enforced by the guards themselves,
-/// not merely hidden from the sidebar. Grouped one test class per persona so each can bind its own
-/// cached-storageState fixture (see RolePersonaFixtureBase / OutlierPersonaFixtures).
-///
-/// Redirect waits follow CompanyAdministratorAccessTests exactly: the guard redirect is a
-/// client-side Blazor NavigateTo, not a full page navigation, so NetworkIdle after the initial GET
-/// is not a reliable completion signal — poll the URL instead.
-/// </summary>
 internal static class AdminRoutes
 {
     public static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -36,7 +19,6 @@ internal static class AdminRoutes
     public const string CompanyEdit        = "/edit";
 }
 
-/// <summary>Shared deny/allow assertion helpers for the per-persona classes below.</summary>
 internal static class AdminAccessAssertions
 {
     private static string Target(string webBaseUrl, string routeSuffix) =>
@@ -44,22 +26,11 @@ internal static class AdminAccessAssertions
 
     private static string CurrentPath(IPage page) => page.Url.Split('?')[0].TrimEnd('/');
 
-    /// <summary>
-    /// Navigates to the route and asserts the persona is denied: the URL ends up on "/access-denied"
-    /// (the new capability-guard target) or, at minimum, no longer on the requested admin route.
-    /// </summary>
     public static async Task AssertDeniedAsync(IPage page, string webBaseUrl, string routeSuffix)
     {
         var target = Target(webBaseUrl, routeSuffix);
         await page.GotoAsync(target);
 
-        // The deny redirect only fires once AppSession.InitialiseAsync's api/me round trip has
-        // resolved on the freshly-established circuit (see AppSession's own remarks on the
-        // fast/slow init split) — under headless Chromium that circuit/SignalR handshake plus the
-        // permission fetch can genuinely take longer than a headed run's timing happened to allow
-        // for, particularly under parallel test load. Widen the wait rather than trusting a budget
-        // calibrated against headed timing; this affects only how long the test waits before
-        // asserting, not the guard/permission logic itself.
         try
         {
             await page.WaitForURLAsync(u => u.Split('?')[0].TrimEnd('/') != target, new() { Timeout = 25_000 });
@@ -71,18 +42,11 @@ internal static class AdminAccessAssertions
             $"Expected this persona to be DENIED '{routeSuffix}' (redirect to /access-denied), but stayed on: {final}");
     }
 
-    /// <summary>
-    /// Navigates to the route and asserts the persona is allowed: after giving any client-side
-    /// redirect a chance to fire, the URL is still exactly the requested admin route and is not
-    /// "/access-denied".
-    /// </summary>
     public static async Task AssertAllowedAsync(IPage page, string webBaseUrl, string routeSuffix)
     {
         var target = Target(webBaseUrl, routeSuffix);
         await page.GotoAsync(target);
 
-        // No redirect is expected on the allow path; wait briefly to catch a wrongful one rather
-        // than asserting the instant the initial GET resolves.
         await Task.Delay(2_500);
 
         var final = CurrentPath(page);
@@ -92,9 +56,6 @@ internal static class AdminAccessAssertions
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// Company-Administrator-only — Priya Shah. DENY everything except the company config screen.
-// ─────────────────────────────────────────────────────────────────────────────────────────────
 public sealed class AdministrativeRoleSeparationCompanyAdminTests(PriyaShahPersonaFixture fixture)
     : RoleE2ETestBase<PriyaShahPersonaFixture>(fixture)
 {
@@ -138,8 +99,6 @@ public sealed class AdministrativeRoleSeparationCompanyAdminTests(PriyaShahPerso
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AdminRoutes.AcmeId}/edit");
         await _page.WaitForSelectorAsync(".app-shell", new() { Timeout = 15_000 });
 
-        // ShowSidebar now includes CanManageCompany (so she can reach Subscription & Billing), but
-        // AdminNavigation filters her sidebar down to the single "Company administration" group.
         Assert.True(await sidebar.IsSidebarVisibleAsync());
         Assert.True(await sidebar.HasGroupedMenuItemAsync("Company administration", "Subscription & Billing"));
         Assert.False(await sidebar.HasTopLevelMenuItemAsync("People and users"));
@@ -166,9 +125,6 @@ public sealed class AdministrativeRoleSeparationCompanyAdminTests(PriyaShahPerso
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// HR Administrator — Laura Bennett. ALLOW the HR surface; DENY recruitment and company config.
-// ─────────────────────────────────────────────────────────────────────────────────────────────
 public sealed class AdministrativeRoleSeparationHrAdminTests(HrAdminPersonaFixture fixture)
     : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
@@ -216,11 +172,6 @@ public sealed class AdministrativeRoleSeparationHrAdminTests(HrAdminPersonaFixtu
         var navText = (await navMenu.TextContentAsync())?.Trim() ?? "";
         Assert.Contains("People", navText);
 
-        // "User Administration" lives inside the "People and users" submenu (MainLayout.razor).
-        // Syncfusion's SfMenu doesn't just CSS-hide submenu items — it doesn't render them into the
-        // DOM at all until the parent item is expanded, and the popup may portal elsewhere in the
-        // DOM rather than staying nested inside ".app-nav-menu" (see OrganisationChartTests for the
-        // same pattern) — so expand it first and search the whole page for the result.
         await navMenu.GetByText("People and users", new() { Exact = true }).ClickAsync();
 
         var userAdministrationLink = _page.GetByText("User Administration", new() { Exact = true });
@@ -230,10 +181,6 @@ public sealed class AdministrativeRoleSeparationHrAdminTests(HrAdminPersonaFixtu
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// Recruiter — Marcus Diallo. ALLOW recruitment + reporting + employee list (holds employee:read);
-// DENY the rest of the HR surface and company config.
-// ─────────────────────────────────────────────────────────────────────────────────────────────
 public sealed class AdministrativeRoleSeparationRecruiterTests(RecruiterPersonaFixture fixture)
     : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
@@ -250,7 +197,7 @@ public sealed class AdministrativeRoleSeparationRecruiterTests(RecruiterPersonaF
     [InlineData(AdminRoutes.Candidates)]
     [InlineData(AdminRoutes.Vacancies)]
     [InlineData(AdminRoutes.Reporting)]
-    [InlineData(AdminRoutes.Employees)] // recruiter holds employee:read, so the list loads
+    [InlineData(AdminRoutes.Employees)]
     public async Task Recruiter_IsAllowed(string route)
     {
         await LoginAsync();
@@ -283,9 +230,6 @@ public sealed class AdministrativeRoleSeparationRecruiterTests(RecruiterPersonaF
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// Manager — James Okafor. ALLOW employee list (employee:read) + reporting; DENY the rest.
-// ─────────────────────────────────────────────────────────────────────────────────────────────
 public sealed class AdministrativeRoleSeparationManagerTests(ManagerPersonaFixture fixture)
     : RoleE2ETestBase<ManagerPersonaFixture>(fixture)
 {
@@ -321,9 +265,6 @@ public sealed class AdministrativeRoleSeparationManagerTests(ManagerPersonaFixtu
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// Plain Employee — Tom Williams. DENY every admin route.
-// ─────────────────────────────────────────────────────────────────────────────────────────────
 public sealed class AdministrativeRoleSeparationEmployeeTests(EmployeePersonaFixture fixture)
     : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
@@ -353,10 +294,6 @@ public sealed class AdministrativeRoleSeparationEmployeeTests(EmployeePersonaFix
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────────────────────
-// Combined CompanyAdmin + Manager — Sarah Chen. ALLOW company config AND the manager surface;
-// still DENY the HR-Administrator-only pages.
-// ─────────────────────────────────────────────────────────────────────────────────────────────
 public sealed class AdministrativeRoleSeparationCompanyAdminPlusManagerTests(SarahChenPersonaFixture fixture)
     : RoleE2ETestBase<SarahChenPersonaFixture>(fixture)
 {

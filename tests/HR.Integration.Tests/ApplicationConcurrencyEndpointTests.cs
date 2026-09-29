@@ -163,7 +163,6 @@ public class ApplicationConcurrencyEndpointTests
             Assert.Null(savedCandidate.EmployeeId);
         }
 
-        // History reflects exactly one committed stage change — the winner's — never both.
         var historyCount = await db.ApplicationStageHistoryEntries.CountAsync(h => h.ApplicationId == application.Id);
         Assert.Equal(1, historyCount);
     }

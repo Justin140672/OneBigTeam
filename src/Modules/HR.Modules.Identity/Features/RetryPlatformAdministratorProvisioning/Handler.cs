@@ -7,12 +7,6 @@ using Microsoft.Extensions.Configuration;
 
 namespace HR.Modules.Identity.Features.RetryPlatformAdministratorProvisioning;
 
-/// <summary>
-/// P1: re-attempts the identity-provider side of provisioning for a Failed (or still-Pending, e.g.
-/// the original email simply never arrived) platform-administrator row, without ever creating a
-/// duplicate local record or a duplicate identity-provider account — reuses the row's own
-/// persisted ProvisioningCorrelationId exactly as the original attempt would have.
-/// </summary>
 internal sealed class RetryPlatformAdministratorProvisioningHandler(
     IdentityDbContext db,
     CreatePlatformAdministratorHandler provisioningDelivery,
@@ -41,10 +35,6 @@ internal sealed class RetryPlatformAdministratorProvisioningHandler(
             return Result.Failure<RetryPlatformAdministratorProvisioningResponse>(
                 Error.Conflict("This administrator invitation has been cancelled. Re-enable the account before retrying."));
 
-        // Defensive only — unreachable via the public PlatformAdministrator domain API (Create()
-        // only ever produces Active rows with a null correlation id; BeginProvisioning() always
-        // sets the correlation id together with a Pending* status), so this branch has no
-        // corresponding unit test.
         if (administrator.ProvisioningCorrelationId is not { } correlationId)
             return Result.Failure<RetryPlatformAdministratorProvisioningResponse>(
                 Error.Conflict("This administrator record predates the provisioning workflow and cannot be retried automatically."));

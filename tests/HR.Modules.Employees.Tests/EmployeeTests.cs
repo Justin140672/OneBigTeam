@@ -78,8 +78,6 @@ public class EmployeeTests
     [Fact]
     public void CompleteInitialSetup_Is_Idempotent_When_Called_Without_Prior_MarkRequiresInitialSetup()
     {
-        // Guards against a caller invoking CompleteInitialSetup on an employee that never required
-        // it — the flag is already false, and the method still no-ops safely rather than throwing.
         var employee = CreateEmployee("EMP-103");
 
         employee.CompleteInitialSetup(Now);

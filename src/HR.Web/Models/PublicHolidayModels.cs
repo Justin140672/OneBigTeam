@@ -3,7 +3,6 @@ using HR.Web.Services;
 
 namespace HR.Web.Models;
 
-// ── LIST ──────────────────────────────────────────────────────────────────────
 
 public record ListPublicHolidaysResponse(List<PublicHolidayListItemModel> Items);
 
@@ -20,7 +19,6 @@ public record PublicHolidayListItemModel(
     public int Year => Date.Year;
 }
 
-// ── CREATE ────────────────────────────────────────────────────────────────────
 
 public record CreatePublicHolidayRequest(
     Guid CompanyId,
@@ -36,7 +34,6 @@ public record CreatePublicHolidayResponse(
     string CountryCode,
     DateTimeOffset CreatedAt);
 
-// ── UPDATE ────────────────────────────────────────────────────────────────────
 
 public record UpdatePublicHolidayRequest(
     Guid CompanyId,
@@ -56,7 +53,6 @@ public record UpdatePublicHolidayResponse(
     DateTimeOffset CreatedAt,
     int Version = 0);
 
-// ── EDIT MODEL ────────────────────────────────────────────────────────────────
 
 public sealed class PublicHolidayEditModel : IHasVersion
 {

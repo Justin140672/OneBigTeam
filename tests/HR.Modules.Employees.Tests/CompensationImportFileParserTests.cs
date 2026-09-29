@@ -61,7 +61,6 @@ public class CompensationImportFileParserTests
         sheet.Cell(2, 4).Value = new DateTime(2027, 1, 1);
         sheet.Cell(2, 5).Value = "AnnualReview";
 
-        // Row 3 is entirely blank (a stray formatted row, common in exported spreadsheets).
 
         sheet.Cell(4, 1).Value = "EMP-002";
         sheet.Cell(4, 2).Value = "38000";

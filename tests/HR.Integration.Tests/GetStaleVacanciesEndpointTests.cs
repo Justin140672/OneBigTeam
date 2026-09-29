@@ -59,10 +59,6 @@ public class GetStaleVacanciesEndpointTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
-    // recruitment:manage is Recruiter-only by design (see IdentityModule.AddRolePolicies) —
-    // an HR Administrator does not automatically get recruitment access, the same non-overlap
-    // principle applied to company:manage/shared-document management. HrAdminUser here holds
-    // only the HrAdministrator role, so Forbidden is the correct, intended result.
     [Fact]
     public async Task Get_StaleVacancies_Returns_Forbidden_For_HrAdministrator_Without_Recruiter_Role()
     {
@@ -130,7 +126,6 @@ public class GetStaleVacanciesEndpointTests
             vacancy.Open(openedAt, DateOnly.FromDateTime(openedAt.Date));
             var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, Now);
             var stages = HR.Modules.Recruitment.Services.RecruitmentStageSeeder.BuildDefaultStages(companyId, Now);
-            // Recent activity (2 days ago) — well within the default 14-day window.
             var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages[0].Id, null, Now.AddDays(-2));
 
             db.RecruitmentStages.AddRange(stages);
@@ -157,7 +152,6 @@ public class GetStaleVacanciesEndpointTests
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
-            // Never opened — stays in Draft status.
             var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Data Analyst", null, Guid.NewGuid(), Now.AddDays(-60));
             db.Vacancies.Add(vacancy);
             await db.SaveChangesAsync();

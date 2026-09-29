@@ -225,7 +225,6 @@ internal sealed class StripeGateway(IOptions<StripeOptions> options) : IStripeGa
             .Select(invoice => new StripeInvoiceSummary(
                 invoice.Id,
                 new DateTimeOffset(invoice.Created, TimeSpan.Zero),
-                // Stripe amounts are in the smallest currency unit (e.g. pence for GBP).
                 invoice.AmountPaid > 0 ? invoice.AmountPaid / 100m : invoice.AmountDue / 100m,
                 invoice.Currency,
                 invoice.Status ?? "unknown",
@@ -243,10 +242,6 @@ internal sealed class StripeGateway(IOptions<StripeOptions> options) : IStripeGa
 
         var results = new List<FailedInvoiceSummary>();
 
-        // Two account-wide queries (open, uncollectible) rather than per-customer iteration — see
-        // IStripeGateway.ListFailedInvoicesAsync remarks. StreamAutoPagingAsync transparently
-        // follows Stripe's cursor pagination so this stays correct beyond a single page (Limit is
-        // just the page size, not a cap).
         foreach (var status in new[] { "open", "uncollectible" })
         {
             var listOptions = new InvoiceListOptions

@@ -5,20 +5,18 @@ namespace HR.Modules.Documents.Services;
 
 internal sealed class ImageUploadValidator : IImageUploadValidator
 {
-    // Maps a declared content type to the magic byte sequences that identify it.
-    // Reuses the same signature knowledge as FileUploadValidator, scoped to image types.
     private static readonly Dictionary<string, byte[][]> MagicBytes = new(StringComparer.OrdinalIgnoreCase)
     {
         ["image/jpeg"] =
         [
-            [0xFF, 0xD8, 0xFF, 0xE0], // JFIF
-            [0xFF, 0xD8, 0xFF, 0xE1], // EXIF
-            [0xFF, 0xD8, 0xFF, 0xE8], // SPIFF
-            [0xFF, 0xD8, 0xFF, 0xDB], // raw JPEG
+            [0xFF, 0xD8, 0xFF, 0xE0],
+            [0xFF, 0xD8, 0xFF, 0xE1],
+            [0xFF, 0xD8, 0xFF, 0xE8],
+            [0xFF, 0xD8, 0xFF, 0xDB],
         ],
         ["image/png"] =
         [
-            [0x89, 0x50, 0x4E, 0x47], // ‰PNG
+            [0x89, 0x50, 0x4E, 0x47],
         ],
     };
 
@@ -109,8 +107,6 @@ internal sealed class ImageUploadValidator : IImageUploadValidator
         return Result.Success();
     }
 
-    // PNG layout: 8-byte signature, 4-byte IHDR chunk length, 4-byte chunk type ("IHDR"),
-    // then a big-endian uint32 width followed by a big-endian uint32 height.
     private static (int Width, int Height)? TryGetPngDimensions(byte[] bytes)
     {
         if (bytes.Length < 24)
@@ -125,10 +121,6 @@ internal sealed class ImageUploadValidator : IImageUploadValidator
         return (width, height);
     }
 
-    // JPEG layout: walk the marker stream from the SOI (0xFFD8) looking for a baseline (0xFFC0)
-    // or progressive (0xFFC2) Start-Of-Frame marker. Each intermediate marker segment is skipped
-    // using its own declared 2-byte length. The SOF segment holds a 1-byte precision followed by
-    // a big-endian uint16 height and a big-endian uint16 width.
     private static (int Width, int Height)? TryGetJpegDimensions(byte[] bytes)
     {
         if (bytes.Length < 4 || bytes[0] != 0xFF || bytes[1] != 0xD8)
@@ -150,10 +142,9 @@ internal sealed class ImageUploadValidator : IImageUploadValidator
             var marker = bytes[pos];
             pos++;
 
-            if (marker == 0xD9) // EOI reached without finding SOF
+            if (marker == 0xD9)
                 return null;
 
-            // Markers with no payload/length field.
             if (marker == 0x01 || (marker >= 0xD0 && marker <= 0xD7))
                 continue;
 

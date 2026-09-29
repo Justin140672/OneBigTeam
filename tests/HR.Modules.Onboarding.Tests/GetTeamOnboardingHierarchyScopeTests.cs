@@ -9,12 +9,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Onboarding.Tests;
 
-/// <summary>
-/// DSH-02: the team-onboarding widget and the Outstanding Onboarding Tasks workload provider scope
-/// to the manager's entire reporting sub-tree (direct and indirect reports) via
-/// <c>GetAllDescendantIdsAsync</c>. A peer / unrelated manager's reports are excluded. See
-/// specifications/architecture/11-manager-hierarchy-scope.md.
-/// </summary>
 public class GetTeamOnboardingHierarchyScopeTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 10, 10, 0, 0, TimeSpan.Zero);

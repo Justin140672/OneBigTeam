@@ -8,12 +8,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Onboarding.Tests;
 
-/// <summary>
-/// OBT-721 workload action provider tests for outstanding onboarding tasks. Row-scoping mirrors
-/// GetOnboardingProgressReport/Handler.cs: HR sees every outstanding task company-wide, a Manager
-/// (reporting:view-onboarding) sees only their own direct reports' tasks via IDirectReportsReader,
-/// and a caller with neither policy gets an empty list.
-/// </summary>
 public class OutstandingOnboardingTasksWorkloadActionProviderTests
 {
     private static ClaimsPrincipal CallerWithSub(Guid employeeId) =>
@@ -148,7 +142,6 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
         Assert.Equal("Outstanding", action.Status);
         Assert.Equal(dueDate, action.DueDate);
         Assert.Equal(linkedTaskId, action.TaskId);
-        // No employee-profile fallback: this category is entirely task-backed.
         Assert.Equal("", action.DeepLinkUrl);
     }
 
@@ -176,9 +169,6 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
     [Fact]
     public async Task Multiple_Outstanding_Tasks_With_The_Same_Title_Each_Resolve_Their_Own_Distinct_TaskId()
     {
-        // Two onboarding tasks with the same title (e.g. two employees each have "Set up laptop")
-        // must have their linked task resolved by the OnboardingTask id, never by title/employee
-        // matching — each source task id must be keyed independently.
         var employeeA = Guid.NewGuid();
         var employeeB = Guid.NewGuid();
         var callerId = Guid.NewGuid();
@@ -236,9 +226,6 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
     [Fact]
     public async Task DualHrAndManagerCaller_Requesting_ManagerScope_Sees_Only_TeamScoped_Results_Not_CompanyWide()
     {
-        // Regression test for the role-bleed bug: a caller holding BOTH reporting:view-hr and
-        // reporting:view-onboarding must still only see their own reporting sub-tree when the
-        // Manager workspace is explicitly requested — HR access must never widen the Manager view.
         var directReportId = Guid.NewGuid();
         var otherEmployeeId = Guid.NewGuid();
         var callerId = Guid.NewGuid();
@@ -290,7 +277,6 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
             BuildItem(Guid.NewGuid(), new OnboardingReportTaskItem("Task A", null, "Manager", false)),
         ]);
 
-        // Caller only holds the Manager-tier policy, not reporting:view-hr.
         var provider = new OutstandingOnboardingTasksWorkloadActionProvider(
             reader, new FakeDirectReportsReader([Guid.NewGuid()]), new FakeEmployeeDepartmentReader(),
             new FakeAuthorizationService("reporting:view-onboarding"), new FakeOpenTaskBySourceEntityReader(), new FakeCurrentUser(callerId));
@@ -356,8 +342,8 @@ public class OutstandingOnboardingTasksWorkloadActionProviderTests
     }
 
     [Theory]
-    [InlineData(true)]  // assigned to the manager themself
-    [InlineData(false)] // assigned to the report (in the manager's reporting sub-tree)
+    [InlineData(true)]
+    [InlineData(false)]
     public async Task ManagerScope_TaskAssignedToManagerOrReport_IsOwnerActionable(bool assignedToManager)
     {
         var callerId = Guid.NewGuid();

@@ -51,7 +51,6 @@ public class CompanyOnboardingModuleArchitectureTests
         Assert.Equal("company_onboarding", context.Model.GetDefaultSchema());
     }
 
-    // ── CompanyOnboardingProgress ───────────────────────────────────────────────
 
     [Fact]
     public void CompanyOnboardingProgress_Entity_Is_Not_Public()
@@ -86,7 +85,6 @@ public class CompanyOnboardingModuleArchitectureTests
         AssertSnakeCase(context.Model.FindEntityType(typeof(CompanyOnboardingProgress))!);
     }
 
-    // ── CompanyOnboardingTaskCompletion ─────────────────────────────────────────
 
     [Fact]
     public void CompanyOnboardingTaskCompletion_Entity_Is_Not_Public()
@@ -121,7 +119,6 @@ public class CompanyOnboardingModuleArchitectureTests
         AssertSnakeCase(context.Model.FindEntityType(typeof(CompanyOnboardingTaskCompletion))!);
     }
 
-    // ── Module isolation ─────────────────────────────────────────────────────────
 
     [Fact]
     public void CompanyOnboarding_Module_References_No_Other_HR_Module()
@@ -138,7 +135,6 @@ public class CompanyOnboardingModuleArchitectureTests
             $"CompanyOnboarding module must not reference other HR.Modules.* assemblies directly. Found: {string.Join(", ", referencedModuleAssemblies!)}");
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private static void AssertSnakeCase(Microsoft.EntityFrameworkCore.Metadata.IEntityType entityType)
     {

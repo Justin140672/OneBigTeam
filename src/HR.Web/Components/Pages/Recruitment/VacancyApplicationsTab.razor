@@ -817,8 +817,6 @@
     private List<ApplicationListItemModel> _applications = [];
     private HrGrid<ApplicationListItemModel>? _grid;
     private ApplicationListItemModel? _selectedRow;
-    // Ticket #99: the company's own configured pipeline, used to resolve CurrentStageId -> display
-    // name/IsTerminal/TerminalOutcome for the Status column and to drive action-button visibility.
     private List<RecruitmentStageListItem> _stages = [];
     private string? _actionError;
     private string? _actionSuccess;
@@ -831,12 +829,8 @@
     private EditContext _addEditContext = default!;
     private int _candidateFilterRequestId;
 
-    // True while an Add request is in flight — disables the footer/mode buttons (no double submits).
     private bool _adding;
 
-    // Existing mode: the selected candidate's current CV (IsCurrentCv), looked up on selection.
-    // _currentCvCandidateId records which candidate the lookup was for, so a stale result can never
-    // attach another candidate's CV; _cvLookupRequestId discards out-of-order lookup responses.
     private CandidateDocumentListItemModel? _currentCv;
     private Guid? _currentCvCandidateId;
     private bool _attachCurrentCv = true;
@@ -847,17 +841,13 @@
             ? _currentCv
             : null;
 
-    // New mode: optional CV file (validated client-side for type/size before it is accepted).
     private IBrowserFile? _newCvFile;
     private string? _newCvError;
     private int _newCvInputKey;
     private static readonly string[] _allowedCvExtensions = [".pdf", ".doc", ".docx"];
 
-    // New mode: set when the API reports a candidate with the entered email already exists (409).
     private DuplicateCandidateModel? _duplicateCandidate;
 
-    // Ticket #78 — application source. Options mirror Domain.ApplicationSource with display-friendly
-    // labels; "Unspecified" is treated the same as "not selected" (Source sent as null either way).
     private sealed record SourceOption(string Value, string Label);
     private static readonly List<SourceOption> _sourceOptions =
     [
@@ -869,22 +859,13 @@
         new("CareersSite", "Careers Site"),
     ];
     private List<ExternalRecruiterListItemModel> _activeRecruitersForSource = [];
-    // Ticket #81: the removed VacancyRecruiterAssignment table (many-to-many with history) is
-    // replaced by this single optional field mirroring Vacancy.AssignedRecruiterId.
     private Guid? _vacancyAssignedRecruiterId;
 
-    // Computed rather than a field updated imperatively in OnSourceRecruiterChanged — that
-    // relied on Syncfusion's ValueChange event, which duplicates (and depends on firing in step
-    // with) the two-way @bind-Value on the Recruiter dropdown, which is what actually, reliably
-    // keeps _selectedSourceRecruiterId current. Deriving straight from that avoids depending on a
-    // second event mechanism at all.
     private bool _recruiterNotAssignedWarning =>
         _addModel.Source == "ExternalRecruiter" &&
         _addModel.SourceRecruiterId is Guid id &&
         id != _vacancyAssignedRecruiterId;
 
-    // Per-application Source detail, looked up lazily since ListApplicationsForVacancy's own
-    // response doesn't include Source (only GetApplication does) — see LoadAsync.
     private readonly Dictionary<Guid, GetApplicationResponse> _sourceDetails = [];
 
     private static string SourceLabel(string? source) =>
@@ -906,7 +887,6 @@
         _offerResponseEditContext = new EditContext(_offerResponseModel);
     }
 
-    // ── Ticket #2: Offer details & response ───────────────────────────────────
     private bool _showOfferDialog;
     private readonly OfferFormModel _offerModel = new();
     private EditContext _offerEditContext = default!;
@@ -921,7 +901,6 @@
     private EditContext _offerResponseEditContext = default!;
     private static readonly string[] _offerResponseOptions = ["Accepted", "Declined", "Withdrawn"];
 
-    // Hire dialog offer context
     private bool _hireOfferAccepted;
     private bool _hireStartDateOptional;
     private string? _hireOfferBlockedMessage;
@@ -986,7 +965,6 @@
         _offerSalaryMin = _offerSalaryMax = null;
         _offerSalaryType = null;
 
-        // Position Profile salary context comes from the vacancy's linked profile.
         var vacancy = await VacancyService.GetVacancyAsync(CompanyId, VacancyId);
         _offerProfileTitle = vacancy?.PositionProfileTitle ?? vacancy?.EffectiveTitle;
         if (vacancy is not null)
@@ -997,7 +975,6 @@
             _offerSalaryType = profile?.SalaryType;
         }
 
-        // Pre-populate offered salary from SalaryMin (overridable).
         _offerModel.OfferedSalary = _offerSalaryMin;
 
         _offerEditContext = new EditContext(_offerModel);
@@ -1058,14 +1035,10 @@
 
     public enum AddCandidateMode { Existing, New }
 
-    // One model for both modes so Source/Recruiter/Notes (and their validation) are shared. The
-    // mode-specific required rules live in Validate() rather than [Required] attributes, since
-    // which fields are required depends on Mode. Length limits mirror the API validators.
     public sealed class AddApplicationFormModel : IValidatableObject
     {
         public AddCandidateMode Mode { get; set; } = AddCandidateMode.Existing;
 
-        // Existing mode.
         public Guid? CandidateId { get; set; }
 
         // New mode (internal recruitment Ticket 3).
@@ -1084,7 +1057,6 @@
         [MaxLength(500, ErrorMessage = "Resume URL cannot exceed 500 characters.")]
         public string? ResumeUrl { get; set; }
 
-        // Both modes.
         public string Source { get; set; } = "Unspecified";
 
         public Guid? SourceRecruiterId { get; set; }
@@ -1124,7 +1096,6 @@
     {
         public DateOnly? StartDate { get; set; }
 
-        // Ticket #2: false when an accepted offer supplies a proposed start date the server can fall back to.
         public bool StartDateRequired { get; set; } = true;
 
         [Required(ErrorMessage = "Please select a date of birth.")]
@@ -1153,8 +1124,6 @@
         [MaxLength(100)] public string? County { get; set; }
         [MaxLength(20)] public string? PostCode { get; set; }
 
-        // Set from the company's Employee Number Mode when the dialog opens — drives whether the
-        // manual Employee Number field is required.
         public bool EmployeeNumberRequired { get; set; }
 
         public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
@@ -1181,19 +1150,14 @@
     private EditContext _appointEditContext = default!;
     private SfDropDownList<Guid?, ManagerOption> _appointManagerDropdown = default!;
     private List<ManagerOption> _appointManagerOptions = [];
-    // The appointee — excluded from their own manager options (the server rejects self-management).
     private Guid? _appointEmployeeId;
     private AppointSuccessInfo? _appointSuccess;
     private static readonly string[] _appointSalaryTypeOptions = ["Annual", "Hourly", "Daily"];
 
-    // Guid.Empty is the explicit "No manager" item (mapped to NoManager=true); null = nothing chosen yet.
     private static readonly ManagerOption NoManagerOption = new(Guid.Empty, "No manager");
 
     private sealed record AppointSuccessInfo(Guid EmployeeId, string EmployeeName, bool IsApplied, DateOnly EffectiveDate);
 
-    // Appoint requires "recruitment:manage" only (AppointInternalCandidate endpoint), so the toolbar
-    // action is shown only to holders of it. Linking to the appointee's full employee record needs
-    // HR-administrator access (employee:manage), which a Recruiter does not have.
     private bool _canAppoint;
     private bool _canViewEmployeeProfile;
 
@@ -1207,7 +1171,6 @@
 
         public bool ConfirmBackdated { get; set; }
 
-        // Guid.Empty = "No manager"; null = not yet selected (required).
         [Required(ErrorMessage = "Please select a manager, or choose \"No manager\".")]
         public Guid? ManagerId { get; set; }
 
@@ -1271,10 +1234,6 @@
     private readonly HireCandidateFormModel _hireModel = new();
     private EditContext _hireEditContext = default!;
     private EmployeeNumberMode _hireEmployeeNumberMode = EmployeeNumberMode.Manual;
-    // Derived read-only display fields — populated from the Vacancy's linked Position Profile
-    // (GetVacancyResponse) when the Hire dialog opens. The employee is always assigned to this
-    // Position Profile (and its Department/Location) automatically by HireCandidateHandler; these are
-    // shown to HR only for confirmation, they are not submitted as independent request fields.
     private string _derivedLocationName = string.Empty;
     private string _derivedPositionProfileName = string.Empty;
     private SfDropDownList<Guid?, ManagerOption> _hireManagerDropdown = default!;
@@ -1284,7 +1243,6 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // Resolved before the first LoadAsync so the grid toolbar is built with the right items.
         _canAppoint = await UserService.HasPermissionAsync(SystemPermissions.RecruitmentManage);
         _canViewEmployeeProfile = await UserService.HasPermissionAsync(SystemPermissions.EmployeeEdit);
     }
@@ -1298,9 +1256,6 @@
     {
         _loading = true;
 
-        // Reloading re-binds (and, while _loading, re-creates) the grid, which drops Syncfusion's
-        // row selection without raising RowDeselected. Clear the server-side selection with it so
-        // the toolbar state / selection marker never describe a row that is no longer selected.
         _selectedRow = null;
         _selectionMarker?.Set(null);
 
@@ -1314,9 +1269,6 @@
             CompanyId, VacancyId, isInternal: _applicationType.ToIsInternal());
         _applications = result?.Items ?? [];
 
-        // Source isn't in ListApplicationsForVacancy's response — fetch each application's detail
-        // in parallel to populate the "Source" column. Application lists per vacancy are small, so
-        // an N+1 here is an acceptable trade-off against extending the list endpoint's contract.
         _sourceDetails.Clear();
         var detailTasks = _applications.Select(a => ApplicationService.GetApplicationAsync(CompanyId, VacancyId, a.Id)).ToList();
         var details = await Task.WhenAll(detailTasks);
@@ -1342,13 +1294,10 @@
     {
         if (value == _applicationType) return;
         _applicationType = value;
-        // The previous selection may not be in the filtered list any more.
         _selectedRow = null;
         await LoadAsync();
     }
 
-    // Stable row hooks for E2E: data-testid="application-row" plus the application/candidate ids and
-    // the IsInternal flag on each grid <tr>.
     private void OnApplicationRowDataBound(RowDataBoundEventArgs<ApplicationListItemModel> args)
     {
         args.Row.SetAttribute(new Dictionary<string, object>
@@ -1371,7 +1320,7 @@
         "Passed" => StatusBadgeVariant.Success,
         "Failed" or "NoShow" => StatusBadgeVariant.Danger,
         "Cancelled" => StatusBadgeVariant.Secondary,
-        _ => StatusBadgeVariant.Warning, // "Pending"
+        _ => StatusBadgeVariant.Warning,
     };
 
     private StatusBadgeVariant StatusVariant(ApplicationListItemModel row)
@@ -1457,17 +1406,9 @@
         ClearNewCv();
         _duplicateCandidate = null;
 
-        // ListCandidatesValidator caps PageSize at 100 (InclusiveBetween(1, 100)) — requesting
-        // more than that fails FluentValidation validation, and CandidateService.ListCandidatesAsync
-        // swallows that failure (catch (HttpRequestException) { return null; }), so this silently
-        // returned zero candidates on every single open regardless of how many actually exist.
         var result = await CandidateService.ListCandidatesAsync(CompanyId, pageSize: 100);
         _candidates = result?.Items ?? [];
 
-        // Only active recruiters are selectable, per ticket #78. This vacancy's currently-assigned
-        // agency (Vacancy.AssignedRecruiterId, ticket #81 — replaces the removed
-        // VacancyRecruiterAssignment table) is cross-referenced (not filtered to) so the full active
-        // list stays selectable — see the ItemTemplate's "(assigned to this vacancy)" hint above.
         var activeRecruitersTask = ExternalRecruiterService.ListExternalRecruitersAsync(CompanyId, isActive: true, pageSize: 200);
         var vacancyTask = VacancyService.GetVacancyAsync(CompanyId, VacancyId);
         await Task.WhenAll(activeRecruitersTask, vacancyTask);
@@ -1487,17 +1428,6 @@
         }
     }
 
-    // Candidates are searched server-side as the user types rather than filtered against the
-    // initial 100-row page above — otherwise a candidate outside that first page (e.g. sorted
-    // later alphabetically once the table grows) could never be found no matter what's typed.
-    //
-    // Requests aren't guaranteed to resolve in the order they were fired — a slower earlier
-    // keystroke's response can land after a faster later one (or after the user has already
-    // clicked a result from that later response and picked a candidate). Applying every response
-    // unconditionally means that late arrival calls FilterAsync with a stale, narrower/different
-    // item list, which can visibly clear the selection the user just made a moment after they made
-    // it. Only the most recently *issued* request's response is applied; anything that resolves
-    // after a newer request has started is discarded.
     private async Task OnCandidateFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
     {
         args.PreventDefaultAction = true;
@@ -1508,8 +1438,6 @@
         await _candidateDropdown.FilterAsync(_candidates, new Query());
     }
 
-    // Existing mode: look up the selected candidate's current CV so it can be attached. Responses are
-    // applied only if they belong to the latest lookup AND the selection hasn't moved on since.
     private async Task OnCandidateSelectedAsync()
     {
         var requestId = ++_cvLookupRequestId;
@@ -1537,13 +1465,9 @@
         _dialogError = null;
         _duplicateCandidate = null;
 
-        // The CV file can only be streamed from its (new-mode) InputFile while that input is still
-        // rendered, so a selection doesn't survive leaving new mode.
         if (mode == AddCandidateMode.Existing)
             ClearNewCv();
 
-        // Clear the other mode's stale "required" messages: the validator re-validates a notified
-        // field against its attributes only, and the mode-dependent required rules aren't attributes.
         foreach (var field in new[] { nameof(AddApplicationFormModel.CandidateId), nameof(AddApplicationFormModel.FirstName),
                                       nameof(AddApplicationFormModel.LastName), nameof(AddApplicationFormModel.Email) })
         {
@@ -1577,7 +1501,6 @@
 
     private void RemoveNewCv() => ClearNewCv();
 
-    // Re-keys the InputFile so it is emptied (and the same file can be chosen again).
     private void ClearNewCv()
     {
         _newCvFile = null;
@@ -1590,8 +1513,6 @@
         : bytes < 1024 * 1024 ? $"{bytes / 1024.0:0.#} KB"
         : $"{bytes / (1024.0 * 1024.0):0.#} MB";
 
-    // Duplicate-email follow-up: switch to existing mode with the existing (active) candidate
-    // pre-selected. It's added to the picker's data source first in case it wasn't in the loaded page.
     private async Task SelectDuplicateCandidateAsync()
     {
         if (_adding || _duplicateCandidate is not { IsActive: true } duplicate)
@@ -1726,12 +1647,6 @@
             CompanyId, VacancyId, _activeApplication!.Id,
             new ScheduleInterviewRequest(
                 CompanyId, VacancyId, _activeApplication.Id, _scheduleModel.InterviewerId!.Value,
-                // _scheduleModel.ScheduledAt is Kind=Unspecified (bound straight from the picker), so
-                // `new DateTimeOffset(...)` resolves its offset from the server's local
-                // time zone — +01:00 for any date in BST. Postgres's timestamptz columns only
-                // accept offset-zero DateTimeOffsets (Npgsql rejects anything else outright), so
-                // normalize to UTC here. ToUniversalTime() keeps the same absolute instant — it
-                // only changes the offset, not the wall-clock moment being saved.
                 new DateTimeOffset(_scheduleModel.ScheduledAt!.Value).ToUniversalTime(), _scheduleModel.DurationMinutes,
                 FormText.Optional(_scheduleModel.Location)));
 
@@ -1779,11 +1694,8 @@
         _dialogError = null;
         _activeApplication = row;
 
-        // Ticket #2: reflect the offer response into the Hire dialog.
         _hireOfferAccepted = row.OfferResponseStatus == "Accepted";
         _hireOfferedSalary = row.OfferedSalary;
-        // The vacancy list row doesn't carry the offered frequency; annual is the common case and
-        // matches how the compensation record is seeded server-side.
         _hireOfferedSalaryFrequency = "Annual";
         _hireOfferBlockedMessage = row.OfferResponseStatus switch
         {
@@ -1791,8 +1703,6 @@
             "Withdrawn" => "The offer was withdrawn — record a new offer before hiring.",
             _ => null,
         };
-        // When an accepted offer carries a proposed start date, the server can fall back to it,
-        // so the Start Date field becomes optional.
         _hireStartDateOptional = _hireOfferAccepted && row.OfferedStartDate is not null;
         _hireModel.StartDateRequired = !_hireStartDateOptional;
 
@@ -1818,9 +1728,6 @@
             _nationalities = result?.Items.ToList() ?? [];
         }
 
-        // Same rule as Employee Edit (see EmployeeEdit.razor): when the company's Employee Number
-        // Mode is Automatic, the field isn't shown at all — a number is generated when the
-        // employee is created (here: hired), so there's nothing for the recruiter to enter.
         var hrSettings = await CompanyService.GetHrSettingsAsync(CompanyId);
         _hireEmployeeNumberMode = hrSettings?.EmployeeNumberMode ?? EmployeeNumberMode.Manual;
         _hireModel.EmployeeNumberRequired = _hireEmployeeNumberMode != EmployeeNumberMode.Automatic;
@@ -1832,9 +1739,6 @@
 
         await Task.WhenAll(vacancyTask, employmentTypeTask, managerTask);
 
-        // Position Profile/Department/Location are no longer entered manually — they are derived
-        // server-side by HireCandidateHandler from the Vacancy's own linked Position Profile. These
-        // two fields are shown read-only here purely so HR can confirm what will be assigned.
         var vacancy = await vacancyTask;
         _derivedPositionProfileName = vacancy?.PositionProfileTitle ?? vacancy?.EffectiveTitle ?? "(unknown)";
         _derivedLocationName = vacancy?.EffectiveLocation ?? "(none set)";
@@ -1893,8 +1797,6 @@
 
         _appointManagerOptions = BuildAppointManagerOptions((await managerTask)?.Items);
 
-        // Prefill with the vacancy's hiring manager when they're a valid choice (not the appointee,
-        // and an active employee); otherwise default to the explicit "No manager" item.
         _appointModel.ManagerId = NoManagerOption.Id;
         if (vacancy is not null && vacancy.HiringManagerId != Guid.Empty && vacancy.HiringManagerId != _appointEmployeeId)
         {
@@ -1904,9 +1806,6 @@
             }
             else
             {
-                // Outside the first page of selectable employees — resolve the name so it can be shown.
-                // Uses the directory lookup (any authenticated employee; Active employees only) rather
-                // than the full HR record, which a Recruiter-only appointer is not allowed to read.
                 var hiringManager = await EmployeeDirectoryService.GetAsync(CompanyId, vacancy.HiringManagerId);
                 if (hiringManager is not null)
                 {
@@ -2017,8 +1916,6 @@
                 new ItemModel { Id = "app-withdraw",  Text = "Withdraw",           PrefixIcon = "fa-solid fa-arrow-rotate-left", Disabled = _selectedRow is null, TooltipText = "Withdraw the selected application" },
             };
 
-            // Only offered to users who can call the appoint endpoint (recruitment:manage); inserted
-            // straight after Hire to keep the existing toolbar order.
             if (_canAppoint)
             {
                 items.Insert(4, new ItemModel { Id = "app-appoint", Text = "Appoint", PrefixIcon = "fa-solid fa-user-tie", Disabled = !CanAppoint(_selectedRow), TooltipText = "Complete internal appointment" });
@@ -2039,9 +1936,6 @@
         _canAppoint && row is not null && row.IsInternal && row.InternalAppointmentStatus != "Completed" && !row.IsWithdrawn &&
         (row.InternalAppointmentStatus == "Pending" || (IsActive(row) && !HasPendingInterview(row)));
 
-    // Hidden marker (see SelectedApplicationMarker.razor) mirroring _selectedRow into the DOM once
-    // RefreshToolbarStateAsync has run for it — updated via the child's own repaint, not by
-    // re-rendering this component (which would re-assign the grid's Toolbar parameter).
     private SelectedApplicationMarker? _selectionMarker;
 
     private async Task OnRowSelected(RowSelectEventArgs<ApplicationListItemModel> args)
@@ -2058,9 +1952,6 @@
         _selectionMarker?.Set(null);
     }
 
-    // Same rationale as SearchPageBase.OnRowSelected/OnRowDeselected: re-assigning the Toolbar
-    // parameter only sets the *initial* Disabled state, so selection changes after first render
-    // need this explicit interop call per button to actually update the DOM.
     private async Task RefreshToolbarStateAsync()
     {
         if (_grid is null) return;
@@ -2095,7 +1986,6 @@
                 OpenOfferResponseDialog(row);
                 break;
             case "app-hire":
-                // Internal applications can't be hired (the API rejects it) — they are appointed.
                 if (CanHire(row)) await OpenHireDialog(row);
                 break;
             case "app-appoint":
@@ -2110,8 +2000,6 @@
         }
     }
 
-    // Same pattern as OnCandidateFilteringAsync above / EmployeeEmploymentTab.OnManagerFilteringAsync
-    // — the manager list can't be preloaded in one bounded page, so search server-side as typed.
     private async Task OnHireManagerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
     {
         args.PreventDefaultAction = true;
@@ -2153,7 +2041,6 @@
             FormText.Optional(_hireModel.GenderOther),
             employeeNumberRequired ? FormText.Required(_hireModel.EmployeeNumber!) : string.Empty, _hireModel.EmploymentTypeId!.Value,
             _hireModel.ManagerId == Guid.Empty ? null : _hireModel.ManagerId,
-            // Not yet consumed server-side — see HireCandidateRequest's remarks above.
             FormText.Optional(_hireModel.AddressLine1),
             FormText.Optional(_hireModel.AddressLine2),
             FormText.Optional(_hireModel.City),

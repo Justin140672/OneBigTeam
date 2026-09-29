@@ -9,11 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Proves GetMyOnboardingStatus is reachable by a plain, authenticated Employee — resolving the
-/// employee purely from the caller's own "sub" claim — backing the "Onboarding Progress" card on
-/// MyProfileOverviewTab.razor.
-/// </summary>
 [Collection("Integration")]
 public class GetMyOnboardingStatusEndpointTests
 {

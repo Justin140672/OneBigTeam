@@ -44,10 +44,6 @@ public class ExportLeaveCalendarReportHandlerTests
     [Fact]
     public async Task HandleAsync_Above_ExportRowLimit_Is_Truncated_But_Reports_Full_Total()
     {
-        // Export handler caps at ExportRowLimit (50,000), distinct from the Get handler's
-        // DisplayRowLimit (20,000) — this seeds well above DisplayRowLimit but still below
-        // ExportRowLimit to prove the export cap, not the display cap, governs here, then a
-        // second case above ExportRowLimit to prove truncation kicks in at the right threshold.
         const int overLimitBy = 500;
         var totalItems = ReportLimits.ExportRowLimit + overLimitBy;
         var items = Enumerable.Range(0, totalItems).Select(_ => BuildItem(Guid.NewGuid())).ToList();

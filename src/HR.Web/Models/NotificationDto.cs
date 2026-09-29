@@ -11,9 +11,6 @@ public sealed record NotificationDto(
     DateTimeOffset CreatedAt,
     string? ActionUrl);
 
-// NOT-06: TotalCount/PageNumber/PageSize/TotalPages support progressive "load more" loading in the
-// notification dropdown. UnreadCount is independent of pagination/filters — always the employee's
-// full unread total.
 public sealed record NotificationsResponse(
     int UnreadCount,
     List<NotificationDto> Items,

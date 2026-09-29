@@ -29,10 +29,6 @@ public class AmendLeavingProcessHandlerTests
             LeavingReason.MutualAgreement,
             confirmBackdatedLeavingDate) { ExpectedVersion = 1 };
 
-    // Builds a real EmployeeDepartureFinalizer from the same Fakes passed to the handler so
-    // assertions on auditPublisher state after a confirmed-backdated HandleAsync call cover both
-    // LeavingProcessAmendedAuditEvent and EmployeeDepartureFinalisedAuditEvent published through
-    // the same instance.
     private static AmendLeavingProcessHandler BuildHandler(
         EmployeesDbContext context,
         FakeAuditPublisher? auditPublisher = null,

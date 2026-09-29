@@ -37,8 +37,6 @@ public class GetReportCatalogEndpointTests
     [Fact]
     public async Task Get_Catalog_Returns_Forbidden_For_Persona_With_No_Reporting_Policy()
     {
-        // Plain Employee — not Manager/Recruiter/HrAdministrator — fails the baseline
-        // "reporting:view" policy gate outright.
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee);
@@ -68,11 +66,6 @@ public class GetReportCatalogEndpointTests
     [Fact]
     public async Task Get_Catalog_Returns_Only_LeaveSummary_For_Manager_With_No_Other_Category_Access()
     {
-        // Manager has baseline "reporting:view" access and "reporting:view-leave-summary" +
-        // "reporting:view-probation" (both Manager OR HrAdministrator per the Reporting
-        // Dashboard epic phase 2/3), but neither "reporting:view-recruitment",
-        // "reporting:view-hr" nor "reporting:view-employee-starter" — proves per-category
-        // filtering, not just a baseline 403/200 split.
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Manager);
@@ -83,9 +76,6 @@ public class GetReportCatalogEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<CatalogPayload>();
         Assert.NotNull(payload);
-        // reporting:view-leave-summary, reporting:view-probation and reporting:view-onboarding are
-        // all Manager-OR-HrAdministrator policies, plus workload-actions which is always visible to
-        // any baseline reporting:view caller (see OBT-721 tests below).
         Assert.Equal(4, payload!.Items.Count);
         Assert.Contains(payload.Items, i => i.Id == "leave-summary");
         Assert.Contains(payload.Items, i => i.Id == "probation-report");
@@ -93,10 +83,6 @@ public class GetReportCatalogEndpointTests
         Assert.Contains(payload.Items, i => i.Id == "workload-actions");
     }
 
-    // OBT-721: workload-actions is relevant to all three baseline reporting:view roles at once
-    // (Manager, Recruiter, HrAdministrator) — see the RequiresWorkloadActionsAccess xmldoc in
-    // GetReportCatalog/Handler.cs. Every caller who reaches this endpoint at all (i.e. passes the
-    // baseline "reporting:view" policy) should see this entry.
     [Fact]
     public async Task Get_Catalog_Includes_WorkloadActions_For_Manager()
     {
@@ -151,9 +137,6 @@ public class GetReportCatalogEndpointTests
     [Fact]
     public async Task Get_Catalog_Returns_Recruitment_And_EmployeeStarter_For_Recruiter()
     {
-        // Recruiter has "reporting:view" + "reporting:view-recruitment" +
-        // "reporting:view-employee-starter" (HrAdministrator OR Recruiter) but not
-        // "reporting:view-hr" or "reporting:view-leave-summary".
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Recruiter);
@@ -177,11 +160,6 @@ public class GetReportCatalogEndpointTests
     [Fact]
     public async Task Get_Catalog_Returns_All_Hr_Related_Categories_For_HrAdministrator()
     {
-        // HrAdministrator (without Recruiter) has "reporting:view" + "reporting:view-hr" +
-        // "reporting:view-employee-starter" + "reporting:view-leave-summary" +
-        // "reporting:view-probation" (all include HrAdministrator) but not
-        // "reporting:view-recruitment" — so every entry except the Recruitment-only ones is
-        // visible.
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
@@ -192,8 +170,6 @@ public class GetReportCatalogEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<CatalogPayload>();
         Assert.NotNull(payload);
-        // Full Hr-category catalog (phases 1-4) plus workload-actions and equality-diversity
-        // (15 entries), once the 3 Recruitment-only entries are excluded from the full catalog.
         Assert.Equal(15, payload!.Items.Count);
         Assert.Contains(payload.Items, i => i.Id == "hr-headcount-summary" && i.Category == "Hr");
         Assert.Contains(payload.Items, i => i.Id == "equality-diversity" && i.Category == "Hr");
@@ -229,8 +205,6 @@ public class GetReportCatalogEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<CatalogPayload>();
         Assert.NotNull(payload);
-        // Recruiter + HrAdministrator together satisfy every category flag: the full 18-entry
-        // catalog (all Recruitment + all Hr, including workload-actions and equality-diversity).
         Assert.Equal(18, payload!.Items.Count);
         Assert.Contains(payload.Items, i => i.Id == "workload-actions");
         Assert.Contains(payload.Items, i => i.Id == "equality-diversity");
@@ -249,8 +223,6 @@ public class GetReportCatalogEndpointTests
         Assert.Contains(payload.Items, i => i.Id == "document-compliance");
         Assert.Contains(payload.Items, i => i.Id == "document-acknowledgement");
         Assert.Contains(payload.Items, i => i.Id == "asset-assignment");
-        // reporting:view-probation is Manager OR HrAdministrator — HrAdministrator is present
-        // on this persona, so probation-report is visible too (full catalog, 17 items).
         Assert.Contains(payload.Items, i => i.Id == "probation-report");
     }
 

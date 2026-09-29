@@ -5,19 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests.Infrastructure;
 
-/// <summary>
-/// Seeds the reference data (Department, Location, PositionProfile, EmploymentType) that
-/// CreateEmployee/EmployeeImportWriter have required as mandatory foreign keys since
-/// "Make employee fields mandatory and remove manual tasks" (24189ed). Employee creation
-/// (via the API or direct EF seeding) is otherwise impossible without real values for these.
-///
-/// Two seeding strategies are provided:
-///  - <see cref="SeedAsync(EmployeesDbContext, Guid)"/> / <see cref="SeedAsync(ApiWebApplicationFactory, Guid)"/>
-///    write directly via <see cref="EmployeesDbContext"/> — fastest, for tests that also seed
-///    Employees directly via EF.
-///  - <see cref="SeedViaApiAsync"/> creates the reference data through the real HTTP endpoints —
-///    for tests that create Employees through the CreateEmployee endpoint itself.
-/// </summary>
 internal static class EmployeeReferenceDataSeeder
 {
     public sealed record ReferenceData(Guid DepartmentId, Guid LocationId, Guid PositionProfileId, Guid EmploymentTypeId);
@@ -112,12 +99,6 @@ internal static class EmployeeReferenceDataSeeder
         return new ReferenceData(departmentId, locationId, positionProfileId, employmentTypeId);
     }
 
-    /// <summary>
-    /// Builds the anonymous request body for POST .../employees with every now-mandatory field
-    /// (DepartmentId/LocationId/PositionProfileId/EmploymentTypeId/EmployeeNumber) populated from
-    /// <paramref name="referenceData"/>, plus sensible defaults for the other required personal
-    /// fields (DateOfBirth/Nationality/Gender/StartDate). Every parameter can be overridden.
-    /// </summary>
     public static object BuildCreateEmployeeRequest(
         Guid companyId,
         ReferenceData referenceData,
@@ -148,17 +129,8 @@ internal static class EmployeeReferenceDataSeeder
             managerId,
         };
 
-    /// <summary>
-    /// Puts the company into Manual employee-number mode via the real HR settings endpoint.
-    /// The employee-number mode defaults to Automatic (see CompanyEmployeeNumberSettingsReader),
-    /// under which PUT .../employment rejects any change to an employee's system-generated number.
-    /// Tests that set or correct an explicit employee number must opt into Manual mode first.
-    /// </summary>
     public static async Task SetEmployeeNumberModeManualAsync(HttpClient client, Guid companyId)
     {
-        // HR settings carry an optimistic-concurrency Version. This helper may be called more than
-        // once per company (e.g. once per seeded employee), so walk the version forward until the
-        // PUT is accepted. A persistent 409 means the mode is already Manual from an earlier call.
         for (var version = 0; version < 10; version++)
         {
             var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new

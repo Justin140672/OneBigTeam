@@ -3,14 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the asset detail page at /companies/{companyId}/assets/{id}/view.
-///
-/// Uses seeded data from AssetsModule.SeedAssetsAsync:
-///   - ASSET-0001 (MacBook Pro 14") — Tom Williams — ID c0000000-0000-0000-0000-000000000002
-///   - ASSET-0002 (Dell UltraSharp 27") — Sarah Chen — ID c0000000-0000-0000-0000-000000000004
-///   Both belong to company 00000000-0000-0000-0000-000000000001 (Acme Corp).
-/// </summary>
 public sealed class AssetDetailPageTests(EmployeePersonaFixture fixture) : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId      = Guid.Parse("00000000-0000-0000-0000-000000000001");

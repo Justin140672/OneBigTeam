@@ -28,7 +28,6 @@ public class OnboardingTaskRegistryTests
     [Fact]
     public void Tasks_With_Duplicate_Order_Preserves_Original_Registration_Order()
     {
-        // OrderBy is a stable sort, so equal keys must retain their input order.
         var first = new FakeOnboardingTaskDefinition("first", order: 1, isCompleted: false);
         var second = new FakeOnboardingTaskDefinition("second", order: 1, isCompleted: false);
 

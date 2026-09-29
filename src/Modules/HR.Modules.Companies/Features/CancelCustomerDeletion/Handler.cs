@@ -9,9 +9,6 @@ using Microsoft.Extensions.Configuration;
 
 namespace HR.Modules.Companies.Features.CancelCustomerDeletion;
 
-/// <summary>
-/// Same defense-in-depth allow-list gate as ExtendCustomerTrialHandler (see its remarks).
-/// </summary>
 internal sealed class CancelCustomerDeletionHandler(
     CompaniesDbContext dbContext,
     ICurrentUser currentUser,

@@ -74,12 +74,6 @@ public class RecordSicknessEndpointTests
 
     private sealed record EmployeePayload(Guid Id);
 
-    // RecordSickness authorizes a non-HR manager by comparing the authenticated "sub" claim
-    // against the target employee's manager id (IManagerReader) — the acting user's id must
-    // therefore equal an actual Employee.Id, not just an arbitrary role-assigned identity GUID.
-    // These two tests create the manager as a real employee (server-generated id) and both
-    // authenticate as and assign-manager using that id, matching how ManagerId comparisons work
-    // for real users in this system.
     [Fact]
     public async Task Post_SicknessRecords_Manager_Can_Record_For_Own_Direct_Report()
     {
@@ -197,7 +191,7 @@ public class RecordSicknessEndpointTests
                 employeeId,
                 categoryId,
                 startDate = "2026-07-01",
-                startDayPart = 0, // FullDay
+                startDayPart = 0,
                 notes = "Feeling unwell"
             });
 
@@ -211,8 +205,6 @@ public class RecordSicknessEndpointTests
         Assert.Equal(employeeId, payload.EmployeeId);
         Assert.Equal(categoryId, payload.CategoryId);
         Assert.Equal("Active", payload.Status);
-        // FitNoteRequiredAfterDays is now a mandatory setting (default 7) — an open record (no end
-        // date yet) can't be ruled out as needing evidence, so it's Pending, not NotRequired.
         Assert.Equal("Pending", payload.EvidenceStatus);
         Assert.Equal("Feeling unwell", payload.Notes);
     }
@@ -270,7 +262,6 @@ public class RecordSicknessEndpointTests
                 companyId,
                 employeeId = Guid.NewGuid(),
                 categoryId = Guid.NewGuid()
-                // startDate omitted — will deserialize as default(DateOnly)
             });
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
@@ -284,7 +275,6 @@ public class RecordSicknessEndpointTests
         using var client = await AdminClient(companyId);
         var categoryId = await CreateCategory(client, companyId);
 
-        // Create the first open record
         var firstResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/sickness-records",
             new
@@ -297,7 +287,6 @@ public class RecordSicknessEndpointTests
             });
         Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
 
-        // Attempt a second open record for the same employee
         var secondResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/sickness-records",
             new

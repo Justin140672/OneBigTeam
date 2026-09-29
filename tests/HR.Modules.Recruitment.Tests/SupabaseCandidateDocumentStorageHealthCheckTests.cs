@@ -10,11 +10,6 @@ using Xunit;
 
 namespace HR.Modules.Recruitment.Tests;
 
-/// <summary>
-/// Security review finding 6: <see cref="SupabaseCandidateDocumentStorageHealthCheck"/> must report
-/// Unhealthy when the configured bucket is missing from the "list buckets" response, not just when
-/// the HTTP call itself fails.
-/// </summary>
 public class SupabaseCandidateDocumentStorageHealthCheckTests
 {
     private static SupabaseCandidateDocumentStorageOptions Options() => new()

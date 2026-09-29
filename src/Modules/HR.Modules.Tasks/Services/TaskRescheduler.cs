@@ -7,7 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Tasks.Services;
 
-// OFF-02: bulk reschedule-by-source, sibling of TaskCanceller.CancelManyBySourceEntitiesAsync.
 internal sealed class TaskRescheduler(
     TasksDbContext dbContext, INotificationWriter notificationWriter, IClock clock) : ITaskRescheduler
 {
@@ -37,10 +36,6 @@ internal sealed class TaskRescheduler(
 
         var now = clock.UtcNowOffset();
 
-        // Reschedule returns false (and leaves UpdatedAt untouched) when newDueDate already
-        // matches — this is what makes repeated calls with the same date a genuine no-op rather
-        // than just skipping the write: no stale notifications get cleared and no "date changed"
-        // notification gets sent a second time for an unchanged date.
         var changedTasks = tasks.Where(t => t.Reschedule(newDueDate, now)).ToList();
 
         if (changedTasks.Count == 0)
@@ -54,11 +49,6 @@ internal sealed class TaskRescheduler(
         return changedTasks.Count;
     }
 
-    // A task's due date moving in either direction can make an already-sent TaskDueSoon/
-    // TaskOverdue notification stale (e.g. moving later means an "overdue" notice no longer
-    // applies; moving earlier means a "due soon" notice understates the urgency). Clearing both
-    // lets DueSoonNotifier's next hourly pass recompute accurately from the new date rather than
-    // leaving a wrong notification sitting in someone's inbox.
     private async Task RemovePendingNotificationsAsync(
         Guid companyId, IEnumerable<Guid> taskIds, CancellationToken cancellationToken)
     {
@@ -69,8 +59,6 @@ internal sealed class TaskRescheduler(
         }
     }
 
-    // One notification per assignee per reschedule call, regardless of how many of their tasks
-    // moved — dedupe by AssignedEmployeeId rather than firing once per task.
     private async Task NotifyAssigneesAsync(
         IReadOnlyCollection<TaskItem> changedTasks,
         DateOnly newDueDate,

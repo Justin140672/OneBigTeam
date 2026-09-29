@@ -10,31 +10,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Modules.DataImport.Jobs;
 
-/// <summary>
-/// Follow-up review finding: this sweep now has two responsibilities, both driven by the same
-/// <see cref="OrphanedImportFileUpload"/> table:
-///
-///  1. <see cref="ResolveUnconfirmedIntentsAsync"/> — resolves durable pre-upload "upload intent"
-///     rows (<c>ConfirmedAt</c> still null) that have sat unresolved past the configured grace
-///     period. These rows are written BEFORE the storage upload call in
-///     Features/UploadImportFile/Handler.cs — see that type's remarks — so this sweep is the
-///     authoritative backstop for every failure mode: an upload that never completed, a session
-///     save that failed after a successful upload, or a process crash at any point in between,
-///     including a persistent database outage that prevented every write after the initial intent.
-///     It checks whether the object actually exists in storage: if it does, the row is treated
-///     exactly like a confirmed orphan (falls through to the deletion loop below); if it does not
-///     (the process crashed before the upload itself completed), the intent is simply cleared —
-///     there was never anything to delete.
-///  2. The pre-existing deletion loop — idempotent deletion, per-company legal-hold skip, retry
-///     grace window and an exhausted-attempts alert — for rows already known to need a delete
-///     (either a resolved intent found to have an object in storage, or a legacy compensation
-///     write from before this change).
-///
-/// Both reuse <see cref="DataImportFileRetentionOptions"/> so no new configuration surface is
-/// introduced beyond <see cref="DataImportFileRetentionOptions.UploadIntentGracePeriodMinutes"/>.
-/// "Log an unrecoverable orphan and give up" is no longer a terminal outcome anywhere in this
-/// flow — every failure path leaves a durable, reconciliable row that this sweep keeps retrying.
-/// </summary>
 internal sealed class PurgeOrphanedImportFileUploadsJob(
     DataImportDbContext db,
     IImportFileStorageService storage,
@@ -53,13 +28,6 @@ internal sealed class PurgeOrphanedImportFileUploadsJob(
         await DeleteConfirmedOrphansAsync(cancellationToken);
     }
 
-    /// <summary>
-    /// Resolves durable pre-upload intents that were never confirmed within the grace period —
-    /// see class remarks. Never deletes anything directly: an intent found to have an object in
-    /// storage is left for <see cref="DeleteConfirmedOrphansAsync"/> to actually delete (on this
-    /// same sweep, since it runs immediately afterward), keeping exactly one code path responsible
-    /// for the destructive delete + retry/alert logic.
-    /// </summary>
     private async Task ResolveUnconfirmedIntentsAsync(CancellationToken cancellationToken)
     {
         var retention = options.Value;
@@ -102,10 +70,6 @@ internal sealed class PurgeOrphanedImportFileUploadsJob(
 
             if (exists)
             {
-                // Explicit state transition: only this grace-gated branch may mark a row eligible
-                // for deletion. Falling through to the deletion loop below (same sweep) picks it up
-                // via that new DeletionEligibleAt gate, not by re-deriving eligibility from
-                // ConfirmedAt/DeletedAt/ClearedAt alone.
                 intent.MarkDeletionEligible(now);
                 logger.LogWarning(
                     "PurgeOrphanedImportFileUploadsJob: unresolved upload intent {IntentId} (company {CompanyId}) has a blob in storage with no confirming session — will be deleted this sweep.",
@@ -113,7 +77,6 @@ internal sealed class PurgeOrphanedImportFileUploadsJob(
                 continue;
             }
 
-            // The process crashed before the upload itself completed — there is nothing to delete.
             intent.MarkClearedNeverUploaded(now);
             logger.LogInformation(
                 "PurgeOrphanedImportFileUploadsJob: cleared unresolved upload intent {IntentId} (company {CompanyId}) — no object was ever uploaded to storage.",
@@ -154,11 +117,6 @@ internal sealed class PurgeOrphanedImportFileUploadsJob(
                     continue;
                 }
 
-                // Claim the row under its optimistic-concurrency token immediately before the
-                // destructive storage call. If a request confirmed this intent after we loaded it
-                // above (e.g. a slow upload finishing during this sweep), the confirming save already
-                // advanced Version and this update affects zero rows — EF throws, and we never call
-                // storage.DeleteAsync for a file a now-confirmed session depends on.
                 orphan.BeginDeletionAttempt(now);
                 try
                 {

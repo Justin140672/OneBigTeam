@@ -8,23 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Employees.Features.BackfillEmployeeTimeline;
 
-// Populates the employee timeline (see EmployeeTimelineEntry/IEmployeeTimelineWriter) for
-// historical records that pre-date the timeline feature. Covers 7 sources total:
-//
-//   3 in-module (queried directly against EmployeesDbContext, written via IEmployeeTimelineWriter):
-//     - EmployeeCreated          — every Employee row
-//     - EmployeePromoted         — every completed EmployeePromotion row
-//     - CompensationChanged      — every Compensation row
-//
-//   4 cross-module (replayed via Infrastructure.Abstractions interfaces implemented in the owning
-//   module, which publish the same integration events the live handlers publish):
-//     - ProbationPassed                     — IProbationHistoryReplayer
-//     - OnboardingCompleted                 — IOnboardingHistoryReplayer
-//     - SharedCompanyDocumentAcknowledged   — ISharedCompanyDocumentAcknowledgementHistoryReplayer
-//     - OffboardingStarted                  — IOffboardingHistoryReplayer
-//
-// Each of the 7 sources is wrapped in its own try/catch so one source's failure never prevents the
-// others from running.
 internal sealed class BackfillEmployeeTimelineHandler(
     EmployeesDbContext dbContext,
     IEmployeeTimelineWriter timelineWriter,
@@ -110,15 +93,6 @@ internal sealed class BackfillEmployeeTimelineHandler(
         }
     }
 
-    // Cross-module sources are replayed by publishing the same integration events the live
-    // handlers publish (see the 4 Infrastructure.Abstractions replayer interfaces); the actual
-    // write happens inside the existing, unmodified CreateTimelineEntryOn* handler for that event
-    // type via IEmployeeTimelineWriter. This handler has no direct visibility into that write's
-    // outcome, so Created is derived from the before/after delta in matching
-    // EmployeeTimelineEntries rows (same EmployeesDbContext instance, same DI scope) — accurate
-    // for Created. The replayer additionally returns the number of source records it processed
-    // (Processed), so Skipped can now be derived as Processed - Created rather than being hardcoded
-    // to 0 — accurate for records that already had a timeline entry (e.g. a re-run of the backfill).
     private async Task<BackfillSourceResult> RunCrossModuleSourceAsync(
         string source,
         Guid companyId,
@@ -255,8 +229,6 @@ internal sealed class BackfillEmployeeTimelineHandler(
 
         foreach (var compensation in compensations)
         {
-            // No salary/amount figure is read into the Summary here — same redaction rule as the
-            // live CompensationChangedHandler.
             var added = await timelineWriter.TryAddAsync(
                 EmployeeTimelineEntry.Create(
                     Guid.NewGuid(),

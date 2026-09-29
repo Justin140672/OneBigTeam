@@ -51,9 +51,6 @@ public class EmployeePromotedHandlerTests
         Assert.Equal(EmployeeTimelineVisibility.AuthorisedInternal, entry.Visibility);
         Assert.Contains("Engineer", entry.Summary);
         Assert.Contains("Senior Engineer", entry.Summary);
-        // sourceRecordId ties this entry to the promotion record, so a pending entry written
-        // eagerly at submission time (see PromoteEmployeeHandler) dedupes against this one rather
-        // than a second "Promoted" entry appearing once the promotion is actually finalized.
         Assert.Equal(promotionId, entry.SourceRecordId);
     }
 

@@ -14,7 +14,6 @@ internal sealed class UpdateEmployeeProfileAndEmploymentValidator
         RuleFor(r => r.CompanyId).NotEmpty();
         RuleFor(r => r.Id).NotEmpty();
 
-        // Profile
         RuleFor(r => r.FirstName).NotEmpty().MaximumLength(100);
         RuleFor(r => r.LastName).NotEmpty().MaximumLength(100);
         RuleFor(r => r.WorkEmail).NotEmpty().MaximumLength(320).EmailAddress();
@@ -22,7 +21,6 @@ internal sealed class UpdateEmployeeProfileAndEmploymentValidator
             .MaximumLength(320).EmailAddress()
             .When(r => !string.IsNullOrWhiteSpace(r.PersonalEmail));
 
-        // Employment
         RuleFor(r => r.StartDate).NotEmpty();
         RuleFor(r => r.EmployeeNumber)
             .NotEmpty().WithMessage("Employee number is required.")

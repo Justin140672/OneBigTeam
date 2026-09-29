@@ -8,9 +8,6 @@ using Microsoft.Extensions.Configuration;
 
 namespace HR.Modules.Companies.Features.ResumeCustomerService;
 
-/// <summary>
-/// Same defense-in-depth allow-list gate as ExtendCustomerTrialHandler (see its remarks).
-/// </summary>
 internal sealed class ResumeCustomerServiceHandler(
     CompaniesDbContext dbContext,
     ICurrentUser currentUser,

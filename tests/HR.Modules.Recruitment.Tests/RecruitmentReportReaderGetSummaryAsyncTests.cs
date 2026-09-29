@@ -8,12 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Tests;
 
-/// <summary>
-/// Covers RecruitmentReportReader.GetSummaryAsync (the IRecruitmentPipelineSummaryReader
-/// implementation). Other members of RecruitmentReportReader (GetByRecruiterAsync,
-/// GetByVacancyAsync, GetVacancyPerformanceAsync) are exercised via their handler tests
-/// elsewhere.
-/// </summary>
 public class RecruitmentReportReaderGetSummaryAsyncTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 6, 10, 0, 0, TimeSpan.Zero);
@@ -197,9 +191,6 @@ public class RecruitmentReportReaderGetSummaryAsyncTests
 
     private sealed record InternalFilterSeed(Guid CompanyId, RecruitmentStageTestData.SeededStages Stages);
 
-    // One open vacancy: 2 internal applications (ApplicationReceived, Interview), plus 3 external —
-    // Direct (ApplicationReceived), legacy null-Source (Interview) and a hired external candidate whose
-    // Candidate.EmployeeId is set (Hired, Source Direct).
     private static async Task<InternalFilterSeed> SeedInternalAndExternalAsync(RecruitmentDbContext db)
     {
         var companyId = Guid.NewGuid();
@@ -245,7 +236,6 @@ public class RecruitmentReportReaderGetSummaryAsyncTests
         Assert.Equal(2, row.CandidateCount);
         Assert.Equal(1, row.CandidatesByStage[seed.Stages.ApplicationReceived.Id]);
         Assert.Equal(1, row.CandidatesByStage[seed.Stages.Interview.Id]);
-        // The hired external candidate (Candidate.EmployeeId set) is not counted as internal.
         Assert.False(row.CandidatesByStage.ContainsKey(seed.Stages.Hired.Id));
     }
 

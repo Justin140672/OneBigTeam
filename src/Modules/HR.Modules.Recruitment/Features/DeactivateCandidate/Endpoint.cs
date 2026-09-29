@@ -17,9 +17,6 @@ internal sealed class Endpoint(DeactivateCandidateHandler handler, ICurrentUser 
         DeactivateCandidateRequest request,
         CancellationToken cancellationToken)
     {
-        // Reads the DB-resolved tenant via ICurrentUser, not a raw "company_id" JWT claim — real
-        // Supabase-issued tokens never carry one, so relying on the claim directly would Forbid every
-        // request unconditionally (see TenantRouteAuthorizationMiddleware).
         if (!Guid.TryParse(currentUser.TenantId, out var callerCompanyId) || callerCompanyId != request.CompanyId)
         {
             await Send.ResultAsync(TypedResults.Forbid());

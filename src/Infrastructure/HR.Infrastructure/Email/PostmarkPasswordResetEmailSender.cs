@@ -6,10 +6,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Infrastructure.Email;
 
-/// <summary>
-/// Sends password-reset emails via the Postmark <c>/email/withTemplate</c> endpoint using the
-/// configured <c>password-reset</c> template alias. Mirrors <see cref="PostmarkInvitationEmailSender"/>.
-/// </summary>
 internal sealed class PostmarkPasswordResetEmailSender : IPasswordResetEmailSender
 {
     private readonly HttpClient _httpClient;
@@ -79,8 +75,6 @@ internal sealed class PostmarkPasswordResetEmailSender : IPasswordResetEmailSend
 
             if (!response.IsSuccessStatusCode)
             {
-                // Stable diagnostics only — never the action URL (single-use recovery token), the
-                // recipient email/name, or Postmark's free-form Message (it can echo the recipient).
                 var failure = await PostmarkFailure.FromResponseAsync(response, ct);
                 _logger.LogWarning(
                     "Postmark password-reset email send failed. StatusCode={StatusCode} PostmarkErrorCode={PostmarkErrorCode} FailureCategory={FailureCategory}",
@@ -99,10 +93,6 @@ internal sealed class PostmarkPasswordResetEmailSender : IPasswordResetEmailSend
         }
     }
 
-    /// <summary>
-    /// Builds the Postmark <c>password-reset</c> template model. Extracted for unit testing —
-    /// the field set and naming is part of the template contract.
-    /// </summary>
     internal static Dictionary<string, string> BuildTemplateModel(
         EmailBrandingOptions branding,
         string productUrl,

@@ -21,7 +21,6 @@ public class ProcessLeavingEmployeesJobTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
 
-    // Creates an employee already in the Leaving status (the only status this job selects on).
     private static Employee CreateLeavingEmployee(
         Guid companyId, DateTimeOffset now, bool hasSystemAccess = true, Guid? managerId = null)
     {
@@ -37,8 +36,6 @@ public class ProcessLeavingEmployeesJobTests
         return employee;
     }
 
-    // Creates a manager (an ordinary active employee, not themselves leaving) purely to act as
-    // the target of a notification.
     private static Employee CreateManager(Guid companyId, DateTimeOffset now)
     {
         var manager = Employee.Create(
@@ -229,7 +226,7 @@ public class ProcessLeavingEmployeesJobTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var employee = CreateLeavingEmployee(companyId, Now); // no manager assigned
+        var employee = CreateLeavingEmployee(companyId, Now);
         context.Employees.Add(employee);
 
         var process = CreateLeavingProcess(companyId, employee.Id, Today.AddDays(-1), Now);
@@ -320,11 +317,9 @@ public class ProcessLeavingEmployeesJobTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        // Inconsistent state: status Leaving but no matching InProgress leaving process.
         var inconsistentEmployee = CreateLeavingEmployee(companyId, Now);
         context.Employees.Add(inconsistentEmployee);
 
-        // A normal, correctly-due employee in the same run to prove it is unaffected.
         var okEmployee = CreateLeavingEmployee(companyId, Now);
         context.Employees.Add(okEmployee);
         var okProcess = CreateLeavingProcess(companyId, okEmployee.Id, Today.AddDays(-1), Now);
@@ -355,9 +350,6 @@ public class ProcessLeavingEmployeesJobTests
     [Fact]
     public async Task ExecuteAsync_Uses_Company_Local_Day_Not_UTC_Day_When_Determining_LeavingDate_Is_Due()
     {
-        // 2026-07-25T23:30:00Z is still 2026-07-25 in UTC, but already 2026-07-26 00:30 in
-        // Europe/London (BST, UTC+1). A leaving date of 2026-07-26 must be treated as "today" (due)
-        // once the company's local timezone is applied, even though the UTC day is still the 25th.
         var fixedUtcNow = new DateTime(2026, 7, 25, 23, 30, 0, DateTimeKind.Utc);
         var localNow = new DateTimeOffset(fixedUtcNow, TimeSpan.Zero);
 
@@ -385,15 +377,10 @@ public class ProcessLeavingEmployeesJobTests
         Assert.Equal(LeavingProcessStatus.Completed, savedProcess.Status);
     }
 
-    // -- Stranded-departure reconciliation scan ----------------------------------------------
 
     [Fact]
     public async Task ExecuteAsync_Reconciles_A_Stranded_Departure_That_ProcessDueLeavers_Would_Never_Pick_Up()
     {
-        // A process left Completed with FinalisationCompletedAt still null (as if an earlier
-        // FinalizeAsync attempt persisted the terminal state but crashed before the downstream
-        // steps), whose employee is no longer Status == Leaving — ProcessDueLeaversAsync's query
-        // would never select it, so only the reconciliation scan can pick it up.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
@@ -432,7 +419,6 @@ public class ProcessLeavingEmployeesJobTests
         Assert.Equal(manager.Id, notification.EmployeeId);
     }
 
-    // -- Per-employee failure isolation (reliability fix) ------------------------------------
 
     private static EmployeeDepartureFinalizer BuildRealFinalizer(
         EmployeesDbContext dbContext,
@@ -480,7 +466,7 @@ public class ProcessLeavingEmployeesJobTests
         Assert.Contains(healthyEmployee.Id, finalizer.InvokedFor);
 
         var savedThrowing = await context.Employees.SingleAsync(e => e.Id == throwingEmployee.Id);
-        Assert.Equal(EmploymentStatus.Leaving, savedThrowing.Status); // untouched by the failed attempt
+        Assert.Equal(EmploymentStatus.Leaving, savedThrowing.Status);
 
         var savedHealthy = await context.Employees.SingleAsync(e => e.Id == healthyEmployee.Id);
         Assert.Equal(EmploymentStatus.FormerEmployee, savedHealthy.Status);
@@ -497,7 +483,6 @@ public class ProcessLeavingEmployeesJobTests
         var throwingProcess = CreateLeavingProcess(companyId, throwingEmployee.Id, Today.AddDays(-1), Now);
         context.EmployeeLeavingProcesses.Add(throwingProcess);
 
-        // A stranded departure that only the reconciliation scan (not ProcessDueLeaversAsync) can pick up.
         var strandedEmployee = CreateLeavingEmployee(companyId, Now);
         var strandedProcess = CreateLeavingProcess(companyId, strandedEmployee.Id, Today.AddDays(-1), Now);
         strandedEmployee.SetFormerEmployee(Now);
@@ -589,7 +574,6 @@ public class ProcessLeavingEmployeesJobTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        // A stranded leaving process referencing an employee that no longer exists in the DB.
         var orphanEmployeeId = Guid.NewGuid();
         var process = CreateLeavingProcess(companyId, orphanEmployeeId, Today.AddDays(-1), Now);
         process.Complete(Now);

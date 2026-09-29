@@ -5,23 +5,12 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// The top-bar HR-only Employee Search palette (Ctrl+K), which replaced the old admin quick-nav:
-/// - An HR admin (Laura Bennett) can search seeded Acme employees by name, employee number or work
-///   email, and selecting a result lands on that employee's admin record (EmployeeEdit.razor, not
-///   the self-service "/profile" route, which only ever shows the signed-in user's own record).
-/// - A leaver is hidden by default and only shown once "Include leavers / archived employees" is ticked.
-/// - The trigger is absent for every non-HR role, and Ctrl+K is inert for them.
-/// - Esc closes the palette and returns focus to the trigger.
-/// </summary>
 public sealed class AdminQuickNavTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private const string LauraEmail = "laura.bennett@acme.example";
 
-    // Seeded Acme employee used purely as a stable search target (never mutated):
-    // "Sophie Laurent", ACME-007, sophie.laurent@acme.example — see EmployeesModule.SeedEmployeesAsync.
     private const string TargetFullName = "Sophie Laurent";
     private const string TargetEmployeeNumber = "ACME-007";
     private const string TargetWorkEmail = "sophie.laurent@acme.example";
@@ -51,8 +40,6 @@ public sealed class AdminQuickNavTests(HrAdminPersonaFixture fixture) : RoleE2ET
 
         await palette.ClickResultAsync(TargetFullName);
 
-        // Lands on the admin employee record (EmployeeEdit.razor: "/companies/{c}/employees/{id}",
-        // which may then swap to its "…/view" variant), never the self-service "/profile" route.
         await _page.WaitForURLAsync(
             new Regex(@$"/companies/{AcmeId}/employees/[0-9a-fA-F-]{{36}}(/view)?(\?|#|$)"),
             new() { Timeout = 30_000 });
@@ -94,13 +81,6 @@ public sealed class AdminQuickNavTests(HrAdminPersonaFixture fixture) : RoleE2ET
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Turn this test's OWN fresh, active employee into a leaver by driving the real Start
-        // Leaving Process wizard — there is no seed data or API shortcut for this, mirroring
-        // EmployeeLeavingProcessTests. It previously used the seeded pool member
-        // SeededE2eEmployees.LeavingProcess[7] on the assumption EmployeeLeavingProcessTests only
-        // took slots 0-6 — but its CancelLeavingProcess test takes slot 7, so whichever of the two
-        // ran second found the employee already had a leaving process and "Start offboarding" was
-        // no longer offered (#start-offboarding never appeared).
         var leaver = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "QuickNavLeaver", activate: true);
         await empEdit.GoToAsync(AcmeId, leaver.Id);
         await MakeLeaverViaWizardAsync(dialog);
@@ -118,10 +98,10 @@ public sealed class AdminQuickNavTests(HrAdminPersonaFixture fixture) : RoleE2ET
     }
 
     [Theory]
-    [InlineData("tom.williams@acme.example")]   // plain Employee
-    [InlineData("james.okafor@acme.example")]   // Employee Manager
-    [InlineData("marcus.diallo@acme.example")]  // Recruiter
-    [InlineData("priya.shah@acme.example")]     // Company-Administrator only
+    [InlineData("tom.williams@acme.example")]
+    [InlineData("james.okafor@acme.example")]
+    [InlineData("marcus.diallo@acme.example")]
+    [InlineData("priya.shah@acme.example")]
     public async Task NonHrRole_HasNoTrigger_AndCtrlKIsInert(string email)
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
@@ -155,12 +135,6 @@ public sealed class AdminQuickNavTests(HrAdminPersonaFixture fixture) : RoleE2ET
         await Assertions.Expect(palette.Trigger).ToBeFocusedAsync();
     }
 
-    /// <summary>
-    /// Drives the (opened-from-the-employee-edit-page) Start Leaving Process wizard end to end so
-    /// the employee's status becomes "Leaving" (excluded from the directory search by default).
-    /// Same flow as EmployeeLeavingProcessTests.StartLeavingProcessViaWizardAsync, trimmed to the
-    /// steps needed here.
-    /// </summary>
     private async Task MakeLeaverViaWizardAsync(StartLeavingProcessDialog dialog)
     {
         await dialog.OpenAsync();

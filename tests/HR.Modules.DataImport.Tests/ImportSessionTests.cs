@@ -289,7 +289,6 @@ public class ImportSessionTests
         Assert.Equal(2, session.FailedRows);
     }
 
-    // --- OBT-REM-08: ClaimForConfirmation always refreshes StartedAt ---
 
     [Fact]
     public void ClaimForConfirmation_Sets_Status_To_Processing()
@@ -317,10 +316,6 @@ public class ImportSessionTests
     [Fact]
     public void ClaimForConfirmation_Always_Refreshes_StartedAt_Even_When_Already_Set()
     {
-        // This is the OBT-REM-08 fix: previously StartedAt ??= now meant a second claim would never
-        // move StartedAt forward, so a staleness check comparing "now" to StartedAt would keep
-        // comparing against the ORIGINAL claim time forever, even while a brand-new attempt is
-        // actively running.
         var session = CreateSession(FixedNow);
         session.Validate(successfulRows: 1, failedRows: 0, FixedNow.AddMinutes(1));
 
@@ -363,7 +358,6 @@ public class ImportSessionTests
         Assert.Equal(initialVersion + 2, session.Version);
     }
 
-    // --- Security review finding #2: raw-file deletion tracking ---
 
     [Fact]
     public void MarkFileDeleted_Sets_FileDeletedAt_And_FileDeletionLastAttemptedAt()

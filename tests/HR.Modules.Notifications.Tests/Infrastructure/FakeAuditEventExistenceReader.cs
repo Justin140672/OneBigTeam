@@ -2,8 +2,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Notifications.Tests.Infrastructure;
 
-/// <summary>OBT-REM-12: lets ReconcileMissingNotificationAuditsJobTests control which notification
-/// ids are treated as already-audited without depending on a real AuditDbContext.</summary>
 internal sealed class FakeAuditEventExistenceReader : IAuditEventExistenceReader
 {
     private readonly HashSet<Guid> _existingEventIds;

@@ -69,11 +69,8 @@ public class SubscriptionPricingCalculatorTests
             },
             100.00m);
 
-        // 10 * 5 = 50 -> floored to 100
         Assert.Equal(100.00m, SubscriptionPricingCalculator.Calculate(10, config).FinalMonthlyCharge);
-        // 10 * 5 + 10 * 3 = 80 -> floored to 100
         Assert.Equal(100.00m, SubscriptionPricingCalculator.Calculate(20, config).FinalMonthlyCharge);
-        // 10 * 5 + 40 * 3 = 170 -> above floor
         Assert.Equal(170.00m, SubscriptionPricingCalculator.Calculate(50, config).FinalMonthlyCharge);
     }
 

@@ -92,7 +92,7 @@ public class GetSicknessRecordHandlerTests
         var handler = new GetSicknessRecordHandler(db);
         var result = await handler.HandleAsync(new GetSicknessRecordRequest
         {
-            CompanyId = Guid.NewGuid(), // different company
+            CompanyId = Guid.NewGuid(),
             EmployeeId = employeeId,
             Id = record.Id
         }, CancellationToken.None);
@@ -113,7 +113,7 @@ public class GetSicknessRecordHandlerTests
         var result = await handler.HandleAsync(new GetSicknessRecordRequest
         {
             CompanyId = companyId,
-            EmployeeId = Guid.NewGuid(), // different employee
+            EmployeeId = Guid.NewGuid(),
             Id = record.Id
         }, CancellationToken.None);
 

@@ -23,7 +23,6 @@ public class ListAssetCategoriesHandlerTests
         db.AssetCategories.Add(AssetCategory.Create(Guid.NewGuid(), otherCompanyId, "Vehicles", null, FixedOffset));
         await db.SaveChangesAsync();
 
-        // Deactivate one
         var inactive = AssetCategory.Create(Guid.NewGuid(), companyId, "Inactive", null, FixedOffset);
         inactive.Deactivate(FixedOffset);
         db.AssetCategories.Add(inactive);

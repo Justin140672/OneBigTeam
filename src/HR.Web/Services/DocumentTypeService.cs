@@ -23,7 +23,6 @@ public class DocumentTypeService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    // No dedicated backend GetById endpoint — the list already returns full item detail.
     async Task<DocumentTypeEditModel?> IEditService<DocumentTypeEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
     {
         var list = await ListDocumentTypesAsync(companyId, includeInactive: true);

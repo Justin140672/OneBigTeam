@@ -70,8 +70,6 @@ public class NotificationChannelSettingsIntegrationTests
                 DateTimeOffset.UtcNow);
         }
 
-        // In-app notification continues per the documented channel policy, regardless of the
-        // EmailNotificationsEnabled setting.
         using (var scope = _factory.Services.CreateScope())
         {
             var notificationsDb = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
@@ -79,8 +77,6 @@ public class NotificationChannelSettingsIntegrationTests
             var notification = await notificationsDb.Notifications.SingleOrDefaultAsync(n => n.Id == notificationId);
             Assert.NotNull(notification);
 
-            // No EmailDelivery row (and therefore no enqueued send) was created for this
-            // non-mandatory, email-eligible type while the company had email disabled.
             var delivery = await notificationsDb.EmailDeliveries.SingleOrDefaultAsync(d => d.NotificationId == notificationId);
             Assert.Null(delivery);
         }

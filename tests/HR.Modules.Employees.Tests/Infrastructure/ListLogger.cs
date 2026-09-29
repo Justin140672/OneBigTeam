@@ -2,11 +2,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Employees.Tests.Infrastructure;
 
-/// <summary>
-/// Captures every rendered log message (plus any exception text) so a test can assert on the
-/// content of a job's ILogger calls (e.g. that a failure log includes the relevant entity ids).
-/// Mirrors HR.Modules.Identity.Tests.Infrastructure.ListLogger.
-/// </summary>
 internal sealed class ListLogger<T> : ILogger<T>
 {
     public List<string> Messages { get; } = [];

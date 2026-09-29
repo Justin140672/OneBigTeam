@@ -73,8 +73,6 @@ public class EmailSenderRegistrationTests
         new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                // Server token present, but the sender identity/message stream/template aliases
-                // that make up the rest of "fully configured" are missing.
                 ["Infrastructure:Postmark:ServerToken"] = "test-server-token",
             })
             .Build());
@@ -132,13 +130,8 @@ public class EmailSenderRegistrationTests
         var configuration = FullPostmarkConfiguration();
 
         services.AddInfrastructure(ConnectionString, configuration, environment);
-        // PostmarkInvitationEmailSender/PostmarkPasswordResetEmailSender resolve IConfiguration
-        // directly (to read WebApp:BaseUrl) — AddInfrastructure doesn't register IConfiguration
-        // itself (that's normally done by the host builder), so register it here.
         services.AddSingleton(configuration);
 
-        // AddHttpClient<TInterface, TImplementation> registers a factory-backed ServiceDescriptor
-        // (ImplementationType is null for these), so resolve the real instance type instead.
         using var provider = services.BuildServiceProvider();
         Assert.IsType<PostmarkEmailSender>(provider.GetRequiredService<IEmailSender>());
         Assert.IsType<PostmarkInvitationEmailSender>(provider.GetRequiredService<IInvitationEmailSender>());

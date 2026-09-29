@@ -10,11 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Integration coverage for the BackfillEmployeeTimeline slice
-/// (POST /api/companies/{companyId}/employees/timeline/backfill), which replays historical
-/// records into the employee timeline across 7 sources.
-/// </summary>
 [Collection("Integration")]
 public class BackfillEmployeeTimelineEndpointTests
 {
@@ -122,8 +117,6 @@ public class BackfillEmployeeTimelineEndpointTests
         Assert.Equal(0, payload.TotalFailed);
         Assert.All(payload.Sources, s => Assert.Equal(0, s.Failed));
 
-        // Regardless of whether the live CreateEmployee handler already wrote the "joined" entry,
-        // exactly one must exist for the employee after the backfill.
         Assert.Equal(1, await CountJoinedEntriesAsync(companyId));
     }
 

@@ -3,13 +3,6 @@ using HR.Modules.Employees.Contracts;
 
 namespace HR.Modules.Employees.Services;
 
-/// <summary>
-/// Derives an employee's Hours Per Week and FTE purely from their working pattern (working days +
-/// hours per day, falling back to the company's standard/default working pattern when the employee
-/// has no override) — never from a directly-supplied/imported number. Shared by every path that
-/// creates or updates opening compensation for an employee (manual creation, import) so the
-/// calculation can never drift between the two.
-/// </summary>
 internal sealed class WorkingPatternCompensationCalculator(ICompanyWorkingPatternSettingsReader workingPatternReader)
 {
     public async Task<(decimal HoursPerWeek, decimal Fte)> CalculateAsync(

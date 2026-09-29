@@ -69,15 +69,8 @@ internal sealed class GetLeaveBalanceHistoryHandler(
                      && a.LeaveTypeId == request.LeaveTypeId)
             .ToListAsync(cancellationToken);
 
-        // Raw, unsorted events with a signed hours "Change" and the actor responsible for it.
-        // Sign convention: negative consumes balance (leave taken), positive adds to it
-        // (cancellation reversal, TOIL award, or the adjustment's own signed amount).
         var raw = new List<(string Category, DateTimeOffset Date, decimal Change, string Reason, string Description, Guid ActorId)>();
 
-        // For TOIL, usage/reversal is represented entirely by the ToilTransaction ledger (Used /
-        // Adjusted-reversal entries below) - including the generic leave-request-approved/
-        // cancelled entries here as well would double-count the same change. Every other leave
-        // type has no ledger and is represented purely by its approved/cancelled requests.
         if (leaveType.Behaviour != LeaveTypeBehaviour.Toil)
         {
             raw.AddRange(leaveRequests.Select(r => (
@@ -88,8 +81,6 @@ internal sealed class GetLeaveBalanceHistoryHandler(
                     : r.TotalDays * workingPattern.HoursPerDay,
                 Reason: r.Status == LeaveRequestStatus.Approved ? LeaveTakenReason : LeaveCancelledReason,
                 Description: $"{(r.Status == LeaveRequestStatus.Approved ? "Leave approved" : "Leave cancelled")}: {r.StartDate:d MMM yyyy} - {r.EndDate:d MMM yyyy}" + (r.Reason is null ? "" : $" ({r.Reason})"),
-                // Approved leave is actioned by the reviewer; cancellation has no separate actor
-                // tracked on LeaveRequest (self-service action), so the employee is used.
                 ActorId: r.Status == LeaveRequestStatus.Approved ? (r.ReviewedByEmployeeId ?? r.EmployeeId) : r.EmployeeId)));
         }
 
@@ -146,13 +137,6 @@ internal sealed class GetLeaveBalanceHistoryHandler(
         var actorIds = raw.Select(x => x.ActorId).Distinct().ToList();
         var names = await employeeNameReader.GetNamesAsync(request.CompanyId, actorIds, cancellationToken);
 
-        // BalanceAfter is a running total. There is no stored "starting balance" record, so we
-        // anchor to the one fact we do know for certain — the current policy year's remaining
-        // balance — and derive the implied starting point by subtracting the sum of all known
-        // changes from it. Walking forward through the chronological list from that starting
-        // point guarantees the most recent event's BalanceAfter exactly matches the current
-        // known remaining balance. This is only as accurate as the full set of events considered
-        // here (e.g. it does not know about balance history predating any of these tables).
         var leaveSettings = await leaveSettingsReader.GetLeaveSettingsAsync(request.CompanyId, cancellationToken);
         var currentPolicyYear = LeaveYearCalculator.GetPolicyYear(clock.UtcNowOffset(), leaveSettings.LeaveYearStartMonth);
 

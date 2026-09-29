@@ -8,17 +8,6 @@ namespace HR.Modules.Identity.Authorization;
 
 using AppAuthorizationService = HR.SharedKernel.IAuthorizationService;
 
-/// <summary>
-/// IAM-06: resolves <see cref="PermissionRequirement"/> against the caller's effective permission
-/// set. This is the mechanism every named capability policy now runs through, replacing the
-/// previous pattern of each policy hard-coding its own allowed-role list — see
-/// IdentityModule.AddRolePolicies and Authorization/PolicyCatalog.cs.
-///
-/// IAM-08: also records a denial audit entry on failure (subject to
-/// <see cref="PermissionDenialAuditThrottle"/>'s volume control) so repeated/security-relevant
-/// access denials are visible to administrators without every routine denial flooding the audit
-/// trail. Never logs the request/response payload — only the permission id and denial count.
-/// </summary>
 internal sealed class PermissionAuthorizationHandler(
     ICurrentUser currentUser,
     AppAuthorizationService authorizationService,
@@ -70,7 +59,7 @@ internal sealed class PermissionAuthorizationHandler(
         }
 
         if (!Guid.TryParse(currentUser.TenantId, out var companyId))
-            return; // No resolvable tenant — nothing meaningful to attribute the denial to.
+            return;
 
         if (denialThrottle.ShouldAudit(currentUser.UserId.Value, requirement.PermissionId, out var isEscalation, out var count))
         {
@@ -79,10 +68,6 @@ internal sealed class PermissionAuthorizationHandler(
                     companyId, currentUser.UserId.Value, requirement.PermissionId, count, isEscalation, clock.UtcNowOffset()),
                 CancellationToken.None);
 
-            // ADM-03: a repeated-denial escalation is a security-relevant event — surface it in the
-            // administrative alerts inbox (grouped per user). Best-effort: never let alert-raising
-            // affect the authorization outcome. Only on the throttle's escalation signal, so routine
-            // one-off denials never create alerts.
             if (isEscalation)
             {
                 try

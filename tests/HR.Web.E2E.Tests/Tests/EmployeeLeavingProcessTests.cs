@@ -5,45 +5,17 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the Employee Leaving Process feature (Slice 5): the "Leaving" tab and header "Start
-/// Leaving Process" button on the employee edit page, the StartLeavingProcessDialog wizard (five
-/// linear steps: resignation date, auto-computed-but-editable leaving date, last working day,
-/// leaving reason, confirm), and the resulting read-only Leaving tab.
-///
-/// Like Offboarding, a leaving process only ever exists once "Start Leaving Process" has been
-/// submitted successfully — there is no seed data or auto-provisioning path, and the tab itself
-/// is hidden entirely until then (see EmployeeEdit.razor's _showLeavingTab /
-/// GetEmployeeResponse.ShowLeavingTab). Unlike Offboarding, the dialog is reached directly from
-/// the Employee Overview header (not via the tab's own empty state), and this slice has no
-/// cancel/edit action yet — the tab is read-only (Slice 6 will add editing), so there is no
-/// delete/deactivate coverage here.
-///
-/// Every test creates a fresh employee through the standard New Employee form (mirroring
-/// EmployeeOffboardingTabTests.cs's CreateEmployeeAsync), which reliably has no leaving process
-/// yet and a resolvable effective notice period (falling back to the company default).
-/// </summary>
 public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private const string LauraEmail = "laura.bennett@acme.example";
 
-    // Relative to today, never hard-coded: StartLeavingProcess treats any leaving date before today
-    // as BACKDATED (confirmation step + immediate finalisation to FormerEmployee), so a fixed
-    // resignation date like "01/09/2026" silently turned every "in-progress leaving process" test
-    // (amend/cancel/persist) into a backdated one once the calendar passed it plus the notice
-    // period. The deliberate backdating test below keeps its own fixed 2023/2024 dates.
     private static string DaysFromToday(int days) =>
         DateTime.Today.AddDays(days).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
 
     private static string ResignationReceivedToday => DaysFromToday(0);
 
-    // Uses a dedicated pre-seeded pool employee (SeededE2eEmployees.LeavingProcess[slot]) — a
-    // "QA Engineer" with no leaving process and a company-default effective notice period, exactly
-    // as the old New Employee form flow produced. Tests that actually start/amend/cancel a leaving
-    // process take a distinct slot; the read-only / validation-only tests (which never confirm the
-    // wizard) share slot 0. Leaves the caller on the employee's edit page.
     private async Task<Guid> CreateEmployeeAsync(
         EmployeeListPage empList, EmployeeEditPage empEdit, int slot)
     {
@@ -55,15 +27,6 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
 
     private readonly record struct LeavingWizardResult(string ResignationSummary, string LeavingSummary, string ReasonLabel);
 
-    /// <summary>
-    /// Drives the (already-open-via-OpenAsync) Start Leaving Process wizard end to end: fills
-    /// the resignation date, reads back the auto-computed leaving date (reusing it verbatim as
-    /// the last working day, since it must be on or before the leaving date regardless of this
-    /// employee's actual effective notice period length), picks <paramref name="reasonLabel"/>,
-    /// asserts the confirmation summary reflects everything entered, then confirms. Returns the
-    /// "dd MMM yyyy"-formatted values expected on the resulting read-only Leaving tab, so callers
-    /// can assert against them without duplicating date-format conversions.
-    /// </summary>
     private async Task<LeavingWizardResult> StartLeavingProcessViaWizardAsync(
         StartLeavingProcessDialog dialog, string resignationDdMMyyyy, string reasonLabel)
     {
@@ -84,8 +47,6 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
 
         await dialog.ClickNextAsync();
 
-        // Last working day must be on or before the leaving date — reuse the same date so this
-        // stays valid regardless of the employee's actual effective notice period length.
         await dialog.FillLastWorkingDayAsync(leavingDateRaw!);
         await dialog.ClickNextAsync();
 
@@ -101,9 +62,6 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         Assert.False(await dialog.IsVisibleAsync(),
             "Expected the Start Leaving Process dialog to close after a successful submission");
 
-        // StartLeavingProcessDialog's OnCompleted callback force-navigates the parent page to
-        // "?tab=leaving" — wait for the resulting full page reload to reconnect before the
-        // caller reads anything else off the page.
         await _page.WaitForSelectorAsync("[role='tablist']", new() { Timeout = 20_000 });
 
         return new LeavingWizardResult(expectedResignationSummary, expectedLeavingSummary, reasonLabel);
@@ -150,9 +108,6 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         Assert.False(await leavingTab.HasStartLeavingProcessButtonAsync(),
             "Expected the header 'Start Leaving Process' button to disappear once a leaving process is active");
 
-        // SPEC-OFF-01: confirming the wizard also creates the offboarding checklist automatically
-        // — there is no separate "start offboarding" step, so the checklist section should just
-        // appear embedded in the same unified workspace right away.
         Assert.True(await leavingTab.Checklist.HasChecklistCardAsync(),
             "Expected the offboarding checklist to appear automatically once the leaving process was confirmed");
     }
@@ -173,8 +128,6 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
 
         var result = await StartLeavingProcessViaWizardAsync(dialog, DaysFromToday(14), "End of Contract");
 
-        // Revisit the employee's profile fresh (no query string) — the tab should render on its
-        // own now that a process is active, showing the same details entered above.
         await empEdit.GoToAsync(AcmeId, employeeId);
         await leavingTab.OpenAsync();
 
@@ -292,7 +245,6 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
             "Expected an inline validation error inside the Start Leaving Process dialog");
         Assert.Contains("resignation", error, StringComparison.OrdinalIgnoreCase);
 
-        // Filling the field now lets the wizard advance.
         await dialog.FillResignationReceivedDateAsync(ResignationReceivedToday);
         await dialog.ClickNextAsync();
         Assert.Equal("2. Leaving Date", await dialog.GetActiveStepLabelAsync());
@@ -316,7 +268,6 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         await dialog.ClickNextAsync();
         Assert.Equal("2. Leaving Date", await dialog.GetActiveStepLabelAsync());
 
-        // Step 2 arrives pre-populated with an auto-computed leaving date — clear it, then try to advance.
         await dialog.ClearLeavingDateAsync();
         await dialog.ClickNextAsync();
 
@@ -329,7 +280,6 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
             "Expected an inline validation error inside the Start Leaving Process dialog");
         Assert.Contains("leaving date", error, StringComparison.OrdinalIgnoreCase);
 
-        // Re-entering a valid leaving date lets the wizard advance.
         await dialog.FillLeavingDateAsync(DaysFromToday(30));
         await dialog.ClickNextAsync();
         Assert.Equal("3. Last Working Day", await dialog.GetActiveStepLabelAsync());
@@ -367,8 +317,6 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         Assert.True(await leavingTab.HasCancelButtonAsync(),
             "Expected a 'Cancel Leaving Process' button while the leaving process is InProgress");
 
-        // StartLeavingProcessViaWizardAsync reused the auto-computed leaving date verbatim as
-        // the last working day, so both should be pre-populated with that same date here.
         var expectedCurrentDdMMyyyy = DateOnly
             .ParseExact(started.LeavingSummary, "dd MMM yyyy", CultureInfo.InvariantCulture)
             .ToString("dd/MM/yyyy");
@@ -392,8 +340,6 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         Assert.False(await amendDialog.IsVisibleAsync(),
             "Expected the Amend Leaving Process dialog to close after a successful save");
 
-        // OnLeavingProcessAmended force-navigates the parent page to "?tab=leaving" (plus
-        // "&offboardingAlreadyStarted=true" here) — wait for the resulting full page reload.
         await _page.WaitForSelectorAsync("[role='tablist']", new() { Timeout = 20_000 });
 
         Assert.Equal(expectedNewSummary, await leavingTab.GetLeavingDateTextAsync());
@@ -471,8 +417,6 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         Assert.False(await cancelDialog.IsVisibleAsync(),
             "Expected the Cancel Leaving Process dialog to close after a successful cancellation");
 
-        // OnLeavingProcessCancelled force-navigates to the plain employee URL (no ?tab=, since
-        // the Leaving tab disappears once the process is Cancelled) — wait for the reload.
         await _page.WaitForSelectorAsync("[role='tablist']", new() { Timeout = 20_000 });
 
         Assert.False(await leavingTab.IsTabVisibleAsync(),
@@ -482,13 +426,6 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
             "Expected the header 'Start Leaving Process' button to reappear once the employee is Active again");
     }
 
-    /// <summary>
-    /// Definition-of-done item 6: cancelling an in-progress leaving process shows it as Cancelled
-    /// with no Amend/Cancel actions available and a read-only checklist (no Waive action left on
-    /// any obligation). Revisits the employee's plain profile URL directly (rather than relying on
-    /// the tab strip having disappeared, which the previous test already covers) so the workspace
-    /// content itself — not just the tab's visibility — can be asserted against.
-    /// </summary>
     [Fact]
     public async Task CancelLeavingProcess_ShowsCancelledStatus_NoAmendOrCancelActions_AndReadOnlyChecklist()
     {
@@ -513,9 +450,6 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
 
         await _page.WaitForSelectorAsync("[role='tablist']", new() { Timeout = 20_000 });
 
-        // The Leaving section itself disappears from the strip once the tab is hidden, but the
-        // underlying leaving process still exists in a Cancelled state — deep-link straight to it
-        // to assert the read-only workspace content directly, rather than only its non-visibility.
         await empEdit.GoToAsync(AcmeId, employeeId, "tab=leaving");
         await leavingTab.OpenAsync();
 
@@ -525,18 +459,11 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         Assert.False(await leavingTab.HasCancelButtonAsync(),
             "Expected no 'Cancel Leaving Process' action once the leaving process is already Cancelled");
 
-        // Checklist is read-only once the leaving process is no longer InProgress — no obligation
-        // should still offer a "Waive" action (EmployeeOffboardingTab's `LeavingInProgress` gate).
         Assert.False(
             await leavingTab.Checklist.HasWaiveButtonAsync("Review outstanding documents for employee exit"),
             "Expected the checklist to be read-only (no Waive action) once the leaving process is Cancelled");
     }
 
-    /// <summary>
-    /// Definition-of-done item 3: selecting Leaving Reason "Other" without Notes shows a
-    /// client-side validation error and blocks advancing past step 4; filling Notes then lets the
-    /// wizard proceed to confirmation and complete successfully.
-    /// </summary>
     [Fact]
     public async Task StartLeavingProcess_WithReasonOther_RequiresNotes_ThenAllowsSubmission()
     {
@@ -577,7 +504,6 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
             "Expected an inline validation error requiring Notes when the reason is 'Other'");
         Assert.Contains("notes", error, StringComparison.OrdinalIgnoreCase);
 
-        // Filling Notes now lets the wizard advance and complete.
         await dialog.FillNotesAsync("Employee is relocating overseas for personal reasons.");
         await dialog.ClickNextAsync();
         Assert.Equal("5. Confirm", await dialog.GetActiveStepLabelAsync());
@@ -593,12 +519,6 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         Assert.Equal("Employee is relocating overseas for personal reasons.", await leavingTab.GetNotesTextAsync());
     }
 
-    /// <summary>
-    /// Definition-of-done item 1: loading the unified workspace via both the current "?tab=leaving"
-    /// query value and the legacy "?tab=offboarding" bookmark lands on the same "Leaving &amp;
-    /// Offboarding" workspace, showing the same leaving-details and checklist content either way
-    /// (EmployeeProfileNavigation.ParseTab aliases "offboarding" onto the same Leaving section).
-    /// </summary>
     [Fact]
     public async Task UnifiedWorkspace_IsReachable_ViaBothLeavingAndLegacyOffboardingTabQueryValues()
     {
@@ -618,14 +538,12 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
 
         await StartLeavingProcessViaWizardAsync(startDialog, ResignationReceivedToday, "Resignation");
 
-        // Current bookmark value.
         await empEdit.GoToAsync(AcmeId, employeeId, "tab=leaving");
         await leavingTab.OpenAsync();
         Assert.Equal("Leaving & Offboarding", await employee.GetActiveTabNameAsync());
         var detailsViaLeaving = await leavingTab.GetLeavingDateTextAsync();
         Assert.True(await leavingTab.Checklist.HasChecklistCardAsync());
 
-        // Legacy bookmark value — should resolve to the exact same unified workspace/content.
         await empEdit.GoToAsync(AcmeId, employeeId, "tab=offboarding");
         await leavingTab.OpenAsync();
         Assert.Equal("Leaving & Offboarding", await employee.GetActiveTabNameAsync());
@@ -664,12 +582,6 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         Assert.Equal("Details", await employee.GetActiveTabNameAsync());
     }
 
-    /// <summary>
-    /// Edge-case coverage for the negated/inverted backdating guard added alongside the unified
-    /// workspace (StartLeavingProcessFormModel.Validate): entering a leaving date in the past shows
-    /// the backdating-confirmation checkbox and blocks advancing until it's checked; a future date
-    /// never shows the checkbox at all (the other branch of the same condition).
-    /// </summary>
     [Fact]
     public async Task StartLeavingProcess_WithBackdatedLeavingDate_RequiresConfirmationCheckbox()
     {
@@ -684,33 +596,21 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         var seeded = SeededE2eEmployees.OffboardingConfirmation[3];
         await empEdit.GoToAsync(AcmeId, seeded.EmployeeId);
 
-        // A resignation received date of "today" plus any positive effective notice period always
-        // resolves to a future calculated leaving date, regardless of when this suite actually runs
-        // — unlike a fixed historical literal, which drifts into "backdated" as real time passes.
         var receivedToday = DateOnly.FromDateTime(DateTime.Today).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
 
         await dialog.OpenAsync();
         await dialog.FillResignationReceivedDateAsync(receivedToday);
         await dialog.ClickNextAsync();
 
-        // Future-dated leaving date: the backdating checkbox should NOT appear (the "not backdated"
-        // branch), and Next should advance immediately.
         var autoDate = await dialog.GetLeavingDateTextAsync();
         Assert.False(string.IsNullOrWhiteSpace(autoDate));
         Assert.False(await dialog.IsBackdatedConfirmationVisibleAsync(),
             "Expected no backdating checkbox for a future-dated leaving date");
 
-        // Overwrite with a clearly past date to exercise the "backdated" branch instead.
         await dialog.FillLeavingDateAsync("01/01/2024");
         Assert.True(await dialog.IsBackdatedConfirmationVisibleAsync(),
             "Expected the backdating checkbox to appear once the leaving date is in the past");
 
-        // The resignation received date is still "today" from step 1, which is after this
-        // backdated leaving date and would itself trip the (separate, unrelated) "leaving date
-        // must be on or after the resignation received date" rule — masking the backdating error
-        // this test actually wants to exercise. Go back and move the received date earlier than
-        // the leaving date too, so only the backdating rule is in play. Going back and forward
-        // doesn't recompute Leaving Date, since it's already been manually edited above.
         await dialog.ClickBackAsync();
         await dialog.FillResignationReceivedDateAsync("01/12/2023");
         await dialog.ClickNextAsync();

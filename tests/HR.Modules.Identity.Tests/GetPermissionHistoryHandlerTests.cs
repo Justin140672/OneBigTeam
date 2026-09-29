@@ -4,10 +4,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Identity.Tests;
 
-/// <summary>
-/// IAM-08: unit tests for <see cref="GetPermissionHistoryHandler"/> — filtering, paging, and
-/// event-type inclusion against the platform audit log via <see cref="IAuditHistoryReader"/>.
-/// </summary>
 public class GetPermissionHistoryHandlerTests
 {
     private static readonly Guid CompanyId = Guid.NewGuid();

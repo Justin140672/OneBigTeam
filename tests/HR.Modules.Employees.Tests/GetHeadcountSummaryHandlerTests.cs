@@ -105,10 +105,6 @@ public class GetHeadcountSummaryHandlerTests
     [Fact]
     public async Task HandleAsync_Buckets_Unresolvable_Department_As_Unassigned()
     {
-        // Department is a mandatory Employee field, so a null department is no longer possible.
-        // This exercises the remaining "Unassigned" fallback: a department_id that does not
-        // resolve to any existing department row (e.g. NewEmployee's randomly generated,
-        // never-seeded department id).
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 

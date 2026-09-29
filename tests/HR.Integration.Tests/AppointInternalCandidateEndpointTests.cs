@@ -36,7 +36,6 @@ public class AppointInternalCandidateEndpointTests
         _factory = factory;
     }
 
-    // ---- Happy path --------------------------------------------------------------------------------
 
     [Fact]
     public async Task Post_Appoint_Changes_Existing_Employee_Role_Without_Creating_An_Employee()
@@ -62,20 +61,17 @@ public class AppointInternalCandidateEndpointTests
         Assert.Null(body.CompensationId);
         Assert.Equal("Completed", body.AppointmentStatus);
 
-        // The existing employee moved into the vacancy's role…
         var employee = await GetEmployeeAsync(_factory, s.EmployeeId);
         Assert.Equal(s.World.Target.PositionProfileId, employee.PositionProfileId);
         Assert.Equal(s.World.Target.DepartmentId, employee.DepartmentId);
         Assert.Equal(s.World.Target.LocationId, employee.LocationId);
         Assert.Equal(s.World.NewManagerId, employee.ManagerId);
 
-        // …keeping their employment identity…
         Assert.Equal(s.World.EmployeeNumber, employee.EmployeeNumber);
         Assert.Equal(StartDate, employee.StartDate);
         Assert.Equal(ContinuousServiceDate, employee.ContinuousServiceDate);
         Assert.Equal(s.World.WorkEmail, employee.WorkEmail);
 
-        // …and no Employee row was created.
         Assert.Equal(employeesBefore, await CountEmployeesAsync(_factory, companyId));
 
         var promotion = Assert.Single(await GetPromotionsAsync(_factory, s.EmployeeId));
@@ -105,11 +101,9 @@ public class AppointInternalCandidateEndpointTests
         Assert.Equal(ApplicationSource.Internal, application.Source);
         Assert.Null(application.WithdrawnAt);
 
-        // Offer retained.
         Assert.Equal(OfferResponseStatus.Accepted, application.OfferResponseStatus);
         Assert.Equal(72000m, application.OfferedSalary);
 
-        // Interview retained.
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
@@ -118,14 +112,12 @@ public class AppointInternalCandidateEndpointTests
             Assert.Equal(InterviewOutcome.Passed, interview.Outcome);
         }
 
-        // Earlier history retained, one new Offer → Hired entry added.
         var history = await GetStageHistoryAsync(_factory, s.ApplicationId);
         Assert.Equal(2, history.Count);
         Assert.Contains(history, h => h.PreviousStageId == s.CvReviewStageId && h.NewStageId == s.OfferStageId);
         var hiredEntry = Assert.Single(history, h => h.NewStageId == s.HiredStageId);
         Assert.Equal(s.OfferStageId, hiredEntry.PreviousStageId);
 
-        // The read models expose the completed appointment.
         var detail = await client.GetFromJsonAsync<JsonElement>(
             $"/api/companies/{companyId}/vacancies/{s.VacancyId}/applications/{s.ApplicationId}");
         Assert.Equal("Completed", detail.GetProperty("internalAppointmentStatus").GetString());
@@ -142,7 +134,6 @@ public class AppointInternalCandidateEndpointTests
         var (vacancyId, stages) = await SeedVacancyAsync(_factory, world);
         var employeesBefore = await CountEmployeesAsync(_factory, companyId);
 
-        // 1. The employee applies internally with a CV (UserId == EmployeeId convention).
         Guid applicationId;
         using (var employeeClient = _factory.CreateClient())
         {
@@ -150,7 +141,7 @@ public class AppointInternalCandidateEndpointTests
             employeeClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
             using var form = new MultipartFormDataContent();
             var bytes = new byte[2048];
-            bytes[0] = 0x25; bytes[1] = 0x50; bytes[2] = 0x44; bytes[3] = 0x46; // %PDF
+            bytes[0] = 0x25; bytes[1] = 0x50; bytes[2] = 0x44; bytes[3] = 0x46;
             var file = new ByteArrayContent(bytes);
             file.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");
             form.Add(file, "CvFile", "priya-cv.pdf");
@@ -161,7 +152,6 @@ public class AppointInternalCandidateEndpointTests
             applicationId = (await apply.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("applicationId").GetGuid();
         }
 
-        // 2. HR/recruiter appoints them.
         using var client = await RecruiterHrClientAsync(_factory, companyId);
         var response = await client.PostAsJsonAsync(
             AppointUrl(companyId, vacancyId, applicationId),
@@ -230,7 +220,6 @@ public class AppointInternalCandidateEndpointTests
         Assert.Equal(compensation.Id, Assert.Single(await GetPromotionsAsync(_factory, s.EmployeeId)).CompensationId);
     }
 
-    // ---- Manager / scheduling ------------------------------------------------------------------------
 
     [Fact]
     public async Task Post_Appoint_With_NoManager_Clears_The_Employee_Manager()
@@ -273,7 +262,6 @@ public class AppointInternalCandidateEndpointTests
         Assert.Null(promotion.CompletedAt);
         Assert.Equal(effective, promotion.EffectiveDate);
 
-        // Recruitment side is complete: the application is a hire, effective on the scheduled date.
         var application = await GetApplicationAsync(_factory, s.ApplicationId);
         Assert.Equal(InternalAppointmentStatus.Completed, application.AppointmentStatus);
         Assert.Equal(s.HiredStageId, application.CurrentStageId);
@@ -297,7 +285,6 @@ public class AppointInternalCandidateEndpointTests
         Assert.Null(application.AppointmentStatus);
         Assert.Equal(s.OfferStageId, application.CurrentStageId);
 
-        // Confirming the backdate then succeeds and applies immediately.
         var confirmed = await client.PostAsJsonAsync(AppointUrl(s), new
         {
             effectiveDate = Today.AddDays(-7).ToString("yyyy-MM-dd"),
@@ -309,7 +296,6 @@ public class AppointInternalCandidateEndpointTests
         Assert.True((await ReadAppointResponseAsync(confirmed)).IsApplied);
     }
 
-    // ---- Promotion history and timeline --------------------------------------------------------------
 
     [Fact]
     public async Task Promotion_History_Shows_The_Internal_Appointment()
@@ -371,7 +357,6 @@ public class AppointInternalCandidateEndpointTests
         Assert.Contains(items, i => i.GetProperty("title").GetString() == "Internal appointment");
     }
 
-    // ---- Authentication / authorisation ------------------------------------------------------------
 
     [Fact]
     public async Task Post_Appoint_Returns_Unauthorized_For_Anonymous()
@@ -385,8 +370,6 @@ public class AppointInternalCandidateEndpointTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // Only "recruitment:manage" is required to appoint — "employee:manage" is neither required nor
-    // sufficient. The Recruiter role holds recruitment:manage but not employee:manage.
     [Fact]
     public async Task Post_Appoint_Succeeds_For_Recruiter_Without_Employee_Manage()
     {
@@ -451,7 +434,6 @@ public class AppointInternalCandidateEndpointTests
         await AssertUntouchedAsync(s);
     }
 
-    // ---- Refusals ------------------------------------------------------------------------------------
 
     [Fact]
     public async Task Post_Appoint_Returns_NotFound_For_Unknown_Application()
@@ -560,23 +542,15 @@ public class AppointInternalCandidateEndpointTests
         await AssertUntouchedAsync(s);
     }
 
-    // ---- Request validation (422) -------------------------------------------------------------------
 
     public static TheoryData<string> InvalidBodies => new()
     {
-        // Neither a manager nor "no manager".
         """{ "effectiveDate": "2026-10-01", "noManager": false }""",
-        // Both a manager and "no manager".
         """{ "effectiveDate": "2026-10-01", "managerId": "3f2b8c1e-9d4a-4c55-8e1f-0a6b7c8d9e10", "noManager": true }""",
-        // Compensation requested without its required fields.
         """{ "effectiveDate": "2026-10-01", "noManager": true, "createCompensationChange": true }""",
-        // Unsupported salary type.
         """{ "effectiveDate": "2026-10-01", "noManager": true, "createCompensationChange": true, "compensationSalaryType": "Weekly", "compensationSalary": 50000, "compensationCurrency": "GBP" }""",
-        // Non-positive salary.
         """{ "effectiveDate": "2026-10-01", "noManager": true, "createCompensationChange": true, "compensationSalaryType": "Annual", "compensationSalary": 0, "compensationCurrency": "GBP" }""",
-        // Currency not 3 letters.
         """{ "effectiveDate": "2026-10-01", "noManager": true, "createCompensationChange": true, "compensationSalaryType": "Annual", "compensationSalary": 50000, "compensationCurrency": "POUNDS" }""",
-        // FTE above 1.
         """{ "effectiveDate": "2026-10-01", "noManager": true, "createCompensationChange": true, "compensationSalaryType": "Annual", "compensationSalary": 50000, "compensationCurrency": "GBP", "compensationFte": 1.5 }""",
     };
 
@@ -595,9 +569,7 @@ public class AppointInternalCandidateEndpointTests
         await AssertUntouchedAsync(s);
     }
 
-    // ---- Helpers -------------------------------------------------------------------------------------
 
-    /// <summary>The refused request changed nothing: employee, promotions and application untouched.</summary>
     private async Task AssertUntouchedAsync(Scenario s)
     {
         var employee = await GetEmployeeAsync(_factory, s.EmployeeId);

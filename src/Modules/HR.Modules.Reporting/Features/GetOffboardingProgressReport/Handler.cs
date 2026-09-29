@@ -27,9 +27,6 @@ internal sealed class GetOffboardingProgressReportHandler(
         var accountStatuses = await employeeUserAccountStatusReader.GetStatusesAsync(
             request.CompanyId, employeeIds, cancellationToken);
 
-        // Bulk call (OBT-720 perf pass) — replaces a former per-employee loop over
-        // IAssignedAssetReader.GetAssignedAssetsAsync(companyId, employeeId, ...), which issued one
-        // query per row in this report.
         var assignedAssetsByEmployee = await assignedAssetReader.GetAssignedAssetsAsync(
             request.CompanyId, employeeIds, cancellationToken);
 
@@ -42,8 +39,6 @@ internal sealed class GetOffboardingProgressReportHandler(
 
             var accessDisabled = accountStatuses.TryGetValue(item.EmployeeId, out var summary)
                 && summary.Status != EmployeeUserAccountStatus.Active;
-            // Employees absent from the returned dictionary have no account at all, i.e. access is
-            // already disabled/never existed.
             if (!accountStatuses.ContainsKey(item.EmployeeId))
                 accessDisabled = true;
 

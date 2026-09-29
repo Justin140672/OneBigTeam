@@ -51,7 +51,6 @@ public class AssetsModuleArchitectureTests
         Assert.Equal("assets", context.Model.GetDefaultSchema());
     }
 
-    // ── Asset ────────────────────────────────────────────────────────────────────
 
     [Fact]
     public void Asset_Entity_Is_Not_Public()
@@ -86,7 +85,6 @@ public class AssetsModuleArchitectureTests
         AssertSnakeCase(context.Model.FindEntityType(typeof(Asset))!);
     }
 
-    // ── AssetCategory ────────────────────────────────────────────────────────────
 
     [Fact]
     public void AssetCategory_Entity_Is_Not_Public()
@@ -121,7 +119,6 @@ public class AssetsModuleArchitectureTests
         AssertSnakeCase(context.Model.FindEntityType(typeof(AssetCategory))!);
     }
 
-    // ── AssetAssignment ──────────────────────────────────────────────────────────
 
     [Fact]
     public void AssetAssignment_Entity_Is_Not_Public()
@@ -156,7 +153,6 @@ public class AssetsModuleArchitectureTests
         AssertSnakeCase(context.Model.FindEntityType(typeof(AssetAssignment))!);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private static void AssertSnakeCase(Microsoft.EntityFrameworkCore.Metadata.IEntityType entityType)
     {

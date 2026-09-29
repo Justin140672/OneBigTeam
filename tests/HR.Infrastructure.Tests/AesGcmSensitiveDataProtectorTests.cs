@@ -24,7 +24,6 @@ public class AesGcmSensitiveDataProtectorTests
     private static AesGcmSensitiveDataProtector BuildDefault(string activeKeyId = "k1")
         => Build(activeKeyId, (activeKeyId, NewKey()));
 
-    // 1. Round-trip
     [Theory]
     [InlineData("hello world")]
     [InlineData("")]
@@ -49,7 +48,6 @@ public class AesGcmSensitiveDataProtectorTests
         Assert.Equal(plaintext, protector.Unprotect(token));
     }
 
-    // 2. Token shape + plaintext never present
     [Fact]
     public void Protect_output_is_prefixed_and_does_not_contain_plaintext()
     {
@@ -62,7 +60,6 @@ public class AesGcmSensitiveDataProtectorTests
         Assert.DoesNotContain(plaintext, token, StringComparison.Ordinal);
     }
 
-    // 3. Random nonce -> different tokens, both decrypt
     [Fact]
     public void Two_Protect_calls_produce_different_tokens_that_both_Unprotect()
     {
@@ -77,7 +74,6 @@ public class AesGcmSensitiveDataProtectorTests
         Assert.Equal(plaintext, protector.Unprotect(second));
     }
 
-    // 4. Tampered ciphertext
     [Fact]
     public void Unprotect_throws_when_payload_bytes_are_tampered()
     {
@@ -86,7 +82,7 @@ public class AesGcmSensitiveDataProtectorTests
 
         var parts = token.Split(':', 3);
         var blob = Convert.FromBase64String(parts[2]);
-        blob[blob.Length / 2] ^= 0xFF; // flip a middle byte (inside the ciphertext region)
+        blob[blob.Length / 2] ^= 0xFF;
         var tampered = $"{parts[0]}:{parts[1]}:{Convert.ToBase64String(blob)}";
 
         Assert.Throws<SensitiveDataProtectionException>(() => protector.Unprotect(tampered));
@@ -107,7 +103,6 @@ public class AesGcmSensitiveDataProtectorTests
         Assert.Throws<SensitiveDataProtectionException>(() => protector.Unprotect(tampered));
     }
 
-    // 5. Wrong key under the same key id
     [Fact]
     public void Unprotect_throws_when_key_bytes_differ_for_same_key_id()
     {
@@ -119,7 +114,6 @@ public class AesGcmSensitiveDataProtectorTests
         Assert.Throws<SensitiveDataProtectionException>(() => protectorB.Unprotect(token));
     }
 
-    // 6. Key rotation / versioning
     [Fact]
     public void Rotated_protector_still_decrypts_old_token_and_tags_new_values_with_active_key()
     {
@@ -139,7 +133,6 @@ public class AesGcmSensitiveDataProtectorTests
         Assert.Equal(plaintext, rotated.Unprotect(freshToken));
     }
 
-    // 7. Old key removed after rotation
     [Fact]
     public void Unprotect_throws_when_the_tokens_key_id_is_no_longer_configured()
     {
@@ -154,7 +147,6 @@ public class AesGcmSensitiveDataProtectorTests
         Assert.Throws<SensitiveDataProtectionException>(() => newOnly.Unprotect(oldToken));
     }
 
-    // 8. Missing / invalid key configuration
     [Fact]
     public void Create_throws_when_no_keys_configured()
     {
@@ -185,7 +177,7 @@ public class AesGcmSensitiveDataProtectorTests
     public void Create_throws_when_a_key_decodes_to_wrong_length()
     {
         var options = new SensitiveDataProtectionOptions { ActiveKeyId = "k1" };
-        options.Keys["k1"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(16)); // AES-128 sized
+        options.Keys["k1"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(16));
 
         Assert.Throws<SensitiveDataProtectionException>(() => AesGcmSensitiveDataProtector.Create(options));
     }
@@ -202,7 +194,6 @@ public class AesGcmSensitiveDataProtectorTests
         Assert.Empty(options.Keys);
     }
 
-    // 9. IsProtected
     [Fact]
     public void IsProtected_true_for_real_token()
     {
@@ -223,7 +214,6 @@ public class AesGcmSensitiveDataProtectorTests
         Assert.False(protector.IsProtected(value));
     }
 
-    // 10. TryUnprotect
     [Fact]
     public void TryUnprotect_returns_true_and_plaintext_for_valid_token()
     {
@@ -263,7 +253,6 @@ public class AesGcmSensitiveDataProtectorTests
         Assert.Null(plaintext);
     }
 
-    // 11. Malformed tokens
     [Theory]
     [InlineData("not-a-token")]
     [InlineData("OBTENC1:k1:not-base64!!")]

@@ -17,9 +17,6 @@ public class ValidateImportSessionHandlerTests
     private const string StandardHeader =
         "First Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount";
 
-    // Appended to a data row (after Employee Number) to satisfy the mandatory
-    // DateOfBirth/Nationality/Gender/Department/Location/EmploymentType/PositionProfile/
-    // SalaryAmount fields.
     private const string MandatoryFieldSuffix = "1990-01-01,British,Female,Engineering,London,Permanent,Developer,50000";
 
     private static DataImportDbContext BuildContext() =>
@@ -43,9 +40,6 @@ public class ValidateImportSessionHandlerTests
             new FakeClock(FixedUtcNow),
             NullLogger<ValidateImportSessionHandler>.Instance);
 
-    // Pre-seeds a lookup resolver with the Department/EmploymentType/Location/PositionProfile
-    // names used by MandatoryFieldSuffix, so validating rows with those mandatory lookup fields
-    // resolves quietly instead of generating "did not exist and was created" warnings.
     private static FakeImportLookupResolver SeededResolver(Guid companyId)
     {
         var resolver = new FakeImportLookupResolver();
@@ -58,9 +52,6 @@ public class ValidateImportSessionHandlerTests
 
     private const string XlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-    // Builds a minimal XLSX workbook (via ClosedXML) from comma-delimited "csv-shaped" header/data
-    // lines, so existing test fixtures (written as csv-style strings for readability) can still be
-    // used against the now xlsx-only parser.
     private static byte[] BuildXlsxBytes(string csvShapedContent)
     {
         var lines = csvShapedContent
@@ -164,7 +155,7 @@ public class ValidateImportSessionHandlerTests
         var csv =
             StandardHeader + "\n" +
             $"John,Doe,john.doe@example.com,2026-01-01,EMP001,{MandatoryFieldSuffix}\n" +
-            $"Jane,,jane.doe@example.com,2026-01-02,EMP002,{MandatoryFieldSuffix}\n"; // row 3: missing Last Name
+            $"Jane,,jane.doe@example.com,2026-01-02,EMP002,{MandatoryFieldSuffix}\n";
 
         var session = await SeedPendingSessionAsync(db, storage, companyId, csv, totalRows: 2);
         var handler = BuildHandler(db, storage, lookupResolver: SeededResolver(companyId));
@@ -211,7 +202,6 @@ public class ValidateImportSessionHandlerTests
         var csv = StandardHeader + "\n" + "John,Doe,john.doe@example.com,2026-01-01,EMP001\n";
         var session = await SeedPendingSessionAsync(db, storage, companyId, csv, totalRows: 1);
 
-        // Move the session past Pending before calling validate.
         session.Start(FixedNowOffset);
         session.Complete(successfulRows: 1, failedRows: 0, FixedNowOffset);
         await db.SaveChangesAsync();
@@ -258,8 +248,6 @@ public class ValidateImportSessionHandlerTests
         var storage = new FakeImportFileStorageService();
         var companyId = Guid.NewGuid();
 
-        // File uses "Given Name" instead of the standard "First Name" header, and no
-        // ColumnMapping is supplied, so FirstName is never mapped from this file.
         var csv =
             $"Given Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount\n" +
             $"John,Doe,john.doe@example.com,2026-01-01,EMP001,{MandatoryFieldSuffix}\n";
@@ -287,8 +275,6 @@ public class ValidateImportSessionHandlerTests
         var storage = new FakeImportFileStorageService();
         var companyId = Guid.NewGuid();
 
-        // Same nonstandard "Given Name" header as above, but this time a ColumnMapping override
-        // redirects FirstName to read from that header instead of the default "First Name".
         var csv =
             $"Given Name,Last Name,Work Email,Start Date,Employee Number,Date Of Birth,Nationality,Gender,Department,Location,Employment Type,Position Profile,Salary Amount\n" +
             $"John,Doe,john.doe@example.com,2026-01-01,EMP001,{MandatoryFieldSuffix}\n";

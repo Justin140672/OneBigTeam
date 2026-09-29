@@ -46,7 +46,6 @@ public sealed class CustomerSupportViewTests(EmployeePersonaFixture fixture) : R
 
         Assert.True(await support.BackToCustomerDetailsLink.IsVisibleAsync());
 
-        // Recent invoices panel must resolve to exactly one of its states, never both.
         var empty = await support.IsRecentInvoicesEmptyStateVisibleAsync();
         var table = await support.IsRecentInvoicesTableVisibleAsync();
         Assert.True(empty ^ table, "Recent invoices panel should show either the empty state or the snapshot table");

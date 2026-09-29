@@ -6,16 +6,6 @@ using Xunit;
 
 namespace HR.Modules.DataImport.Tests;
 
-/// <summary>
-/// Reliability review issue 2 (P1): proves an import file uploaded through one
-/// <see cref="SupabaseImportFileStorageService"/> instance (standing in for one API service
-/// instance/process) remains fully readable and deletable through a second, independently
-/// constructed instance (standing in for a different service instance after a restart/redeploy).
-/// This is the specific scenario the issue calls out: import validation and confirmation happen in
-/// separate requests after the initial upload, so a restart between stages must never orphan an
-/// otherwise-valid import — unlike <see cref="LocalImportFileStorageService"/>, no state lives in
-/// this process's local temp directory.
-/// </summary>
 public class SupabaseImportFileStorageRestartSafetyTests
 {
     private static IOptions<SupabaseImportFileStorageOptions> Options() =>
@@ -64,7 +54,6 @@ public class SupabaseImportFileStorageRestartSafetyTests
     {
         var bytes = new byte[] { 10, 20, 30, 40, 50 };
 
-        // Instance A: simulates the process that received the original upload.
         var handlerA = new RecordingHandler { StoredBytes = bytes };
         var serviceA = new SupabaseImportFileStorageService(new HttpClient(handlerA), Options());
 
@@ -75,9 +64,6 @@ public class SupabaseImportFileStorageRestartSafetyTests
         Assert.False(string.IsNullOrWhiteSpace(storageKey));
         Assert.DoesNotContain(Path.GetTempPath().Replace('\\', '/'), storageKey, StringComparison.OrdinalIgnoreCase);
 
-        // Instance B: a brand-new instance built only from the same durable config — models a
-        // restarted/redeployed process resuming the validate/confirm stages of the import after
-        // instance A (which received the upload) is gone.
         var handlerB = new RecordingHandler { StoredBytes = bytes };
         var serviceB = new SupabaseImportFileStorageService(new HttpClient(handlerB), Options());
 

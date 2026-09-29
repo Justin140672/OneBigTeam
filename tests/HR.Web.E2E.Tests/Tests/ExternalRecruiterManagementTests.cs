@@ -3,19 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies Recruiter CRUD workflows for the External Recruiter admin list/detail pages
-/// (ExternalRecruiterList.razor / ExternalRecruiterDetail.razor):
-/// - Create a new external recruiter and verify it appears in the list.
-/// - Edit an external recruiter and verify the change persists.
-/// - Deactivate then reactivate an external recruiter.
-/// - The soft, non-blocking duplicate-agency-name warning surfaces on blur without blocking save.
-///
-/// Uses Marcus Diallo (Recruiter role) — ExternalRecruiterList/Detail both redirect away
-/// non-Recruiters via Session.IsRecruiter (see ExternalRecruiterList.razor's OnBeforeLoadAsync and
-/// ExternalRecruiterDetail.razor's OnLoadedAsync), mirroring VacancyManagementTests' reasoning for
-/// using Marcus rather than Laura Bennett (HR Administrator).
-/// </summary>
 public sealed class ExternalRecruiterManagementTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -89,7 +76,6 @@ public sealed class ExternalRecruiterManagementTests(RecruiterPersonaFixture fix
         await recruiterList.GoToAsync(AcmeId);
         await recruiterList.ClickRecruiterAsync(updatedName);
 
-        // Reload the page directly to confirm the change persisted server-side, not just in local state.
         await _page.ReloadAsync();
         await _page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
 
@@ -138,13 +124,11 @@ public sealed class ExternalRecruiterManagementTests(RecruiterPersonaFixture fix
         await login.GoToAsync();
         await login.LoginAsync(MarcusEmail);
 
-        // Create the first recruiter with this agency name.
         await recruiterList.GoToAsync(AcmeId);
         await recruiterList.ClickNewAsync();
         await recruiterEdit.FillAgencyNameAsync(agencyName);
         await recruiterEdit.SaveAsync();
 
-        // Attempt to create a second recruiter with the same (exact) agency name.
         await recruiterList.GoToAsync(AcmeId);
         await recruiterList.ClickNewAsync();
         await recruiterEdit.FillAgencyNameAsync(agencyName);
@@ -153,7 +137,6 @@ public sealed class ExternalRecruiterManagementTests(RecruiterPersonaFixture fix
         Assert.True(await recruiterEdit.IsDuplicateWarningVisibleAsync(),
             "Expected a soft duplicate-agency-name warning after blurring an exact-match agency name");
 
-        // The warning is advisory only — saving must still succeed.
         await recruiterEdit.SaveAsync();
 
         Assert.True(await recruiterList.HasItemAsync(agencyName),

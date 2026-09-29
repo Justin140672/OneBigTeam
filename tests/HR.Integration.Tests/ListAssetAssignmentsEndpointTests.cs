@@ -154,12 +154,9 @@ public class ListAssetAssignmentsEndpointTests
 
         var categoryId = await CreateCategoryAsync(client, companyId);
 
-        // Create two separate assets so we can assign the same asset twice in sequence
-        // (after returning the first assignment, reassigning requires Available status)
         var assetId = await CreateAssetAsync(client, companyId, categoryId, $"LAR-{Guid.NewGuid():N}");
         var assignmentId = await AssignAssetAsync(client, companyId, assetId, employeeId1);
 
-        // Request return and complete it to restore Available status
         var requestReturnResp = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/asset-assignments/{assignmentId}/request-return",
             new { companyId, id = assignmentId, requestedBy = AdminUserId });
@@ -175,7 +172,6 @@ public class ListAssetAssignmentsEndpointTests
             new System.Net.Http.StringContent("{}", System.Text.Encoding.UTF8, "application/json"));
         completeResp.EnsureSuccessStatusCode();
 
-        // Reassign the now-available asset to a second employee
         await AssignAssetAsync(client, companyId, assetId, employeeId2);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/assets/{assetId}/assignments");
@@ -183,7 +179,6 @@ public class ListAssetAssignmentsEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<List<AssignmentPayload>>();
         Assert.NotNull(payload);
-        // Both assignments (returned + active) should be present
         Assert.Equal(2, payload!.Count);
 
         var returned = payload.FirstOrDefault(a => a.EmployeeId == employeeId1);

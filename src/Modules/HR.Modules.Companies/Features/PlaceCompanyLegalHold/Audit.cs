@@ -2,12 +2,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Companies.Features.PlaceCompanyLegalHold;
 
-/// <summary>
-/// NFR-07: records a platform administrator placing a company-wide legal hold. Uses the same
-/// cross-cutting IAuditEventPublisher as every other audited admin action in this module. The
-/// reason is operational metadata (why the hold exists), not customer sensitive content, so it is
-/// safe to record — no HR record contents are included.
-/// </summary>
 internal sealed record CompanyLegalHoldPlacedAuditEvent(
     Guid CompanyId,
     Guid? ActorUserId,

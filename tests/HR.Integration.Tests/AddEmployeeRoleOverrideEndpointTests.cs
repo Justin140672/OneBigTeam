@@ -90,7 +90,6 @@ public class AddEmployeeRoleOverrideEndpointTests
     [Fact]
     public async Task Post_AddEmployeeRoleOverride_Returns_Forbidden_When_Role_Outside_Actors_Administrable_Set()
     {
-        // HR Administrator (the seeded actor) may never grant/deny Company Administrator.
         var companyId = Guid.NewGuid();
         using var client = await AuthenticatedClient(companyId);
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);

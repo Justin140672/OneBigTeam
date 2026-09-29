@@ -32,10 +32,6 @@ internal sealed class GetEmployeeTimelineHandler(
         var isSelf = callerId == target.Id;
         var isManager = target.ManagerId is not null && target.ManagerId == callerId;
 
-        // Caller has no relationship at all to the target employee (not HR, not self, not their
-        // manager). This is a visibility SCOPE gap rather than an authentication/authorization
-        // boundary breach — different legitimate callers simply see different subsets of the same
-        // timeline — so we return an empty (but successful) result instead of failing the request.
         if (!callerIsHr && !isSelf && !isManager)
             return Result.Success(Empty with { PageNumber = request.PageNumber, PageSize = request.PageSize });
 
@@ -46,9 +42,6 @@ internal sealed class GetEmployeeTimelineHandler(
             // Filter before pagination so historical entries do not leave gaps in the results.
             .Where(e => e.EventType != EmployeeTimelineEventType.EmployeeDetailsCorrected);
 
-        // Push the three-tier visibility check into the query itself rather than materialising
-        // rows the caller isn't allowed to see. Equivalent to
-        // EmployeeTimelineVisibilityResolver.CanView but expressed so EF can translate it to SQL.
         query = query.Where(e =>
             (callerIsHr) ||
             (e.Visibility == EmployeeTimelineVisibility.EmployeeAndHr && isSelf) ||

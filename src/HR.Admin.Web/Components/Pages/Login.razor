@@ -83,7 +83,6 @@
             return;
         }
 
-        // The session is stashed server-side; only an opaque, single-use code travels in the URL.
         var code = HandoffStore.Issue(new AuthHandoffStore.Session(
             session.AccessToken, session.RefreshToken, session.ExpiresIn));
         await JS.InvokeVoidAsync("eval", $"window.location.href='/dev/persona-cookie?code={Uri.EscapeDataString(code)}'");

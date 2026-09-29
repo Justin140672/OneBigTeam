@@ -3,11 +3,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.DataImport.Tests.Infrastructure;
 
-/// <summary>
-/// Test double for <see cref="IEmployeeImportLookupReader"/>: lets tests seed which employee
-/// numbers/work emails "already exist" and which references resolve to a real employee id,
-/// without needing a live EmployeesDbContext.
-/// </summary>
 internal sealed class FakeEmployeeImportLookupReader : IEmployeeImportLookupReader
 {
     private readonly HashSet<string> _existingEmployeeNumbers = new(StringComparer.OrdinalIgnoreCase);

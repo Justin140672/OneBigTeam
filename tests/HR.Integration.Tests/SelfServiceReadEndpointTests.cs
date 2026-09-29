@@ -5,11 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Tests the self-service read endpoints: GetMyEmployee, GetMyPersonalDetails,
-/// GetMyContactDetails. All three use the 'sub' claim (X-Test-User) as the
-/// employee identity and look up by employee.Id == userId.
-/// </summary>
 [Collection("Integration")]
 public class SelfServiceReadEndpointTests
 {
@@ -25,7 +20,6 @@ public class SelfServiceReadEndpointTests
             .GetAwaiter().GetResult();
     }
 
-    // ── GetMyEmployee ────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task GetMyEmployee_Returns_Unauthorized_Without_Auth()
@@ -38,7 +32,7 @@ public class SelfServiceReadEndpointTests
     [Fact]
     public async Task GetMyEmployee_Returns_NotFound_When_No_Employee_Linked_To_User()
     {
-        using var client = await SelfClient(Guid.NewGuid()); // user with no employee record
+        using var client = await SelfClient(Guid.NewGuid());
         var response     = await client.GetAsync($"/api/companies/{SeededCompanyId}/employees/me");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -49,7 +43,6 @@ public class SelfServiceReadEndpointTests
         using var adminClient = await AdminClient();
         var employee          = await CreateEmployeeAsync(adminClient, "Self", "Service");
 
-        // employee.Id is the sub claim — GetMyEmployee looks up by e.Id == userId
         using var selfClient  = await SelfClient(employee.Id);
         var response          = await selfClient.GetAsync(
             $"/api/companies/{SeededCompanyId}/employees/me");
@@ -61,7 +54,6 @@ public class SelfServiceReadEndpointTests
         Assert.Equal("Service",   payload.LastName);
     }
 
-    // ── GetMyPersonalDetails ─────────────────────────────────────────────────────
 
     [Fact]
     public async Task GetMyPersonalDetails_Returns_Unauthorized_Without_Auth()
@@ -102,7 +94,6 @@ public class SelfServiceReadEndpointTests
         Assert.Equal(new DateOnly(1992, 3, 15), payload.DateOfBirth);
     }
 
-    // ── GetMyContactDetails ──────────────────────────────────────────────────────
 
     [Fact]
     public async Task GetMyContactDetails_Returns_Unauthorized_Without_Auth()
@@ -139,7 +130,6 @@ public class SelfServiceReadEndpointTests
         Assert.Equal(workEmail, payload!.WorkEmail);
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AdminClient()
     {

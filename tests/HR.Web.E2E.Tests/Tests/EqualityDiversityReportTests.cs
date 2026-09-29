@@ -4,27 +4,13 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the anonymous, workforce-wide Equality &amp; Diversity aggregate report
-/// (/companies/{companyId}/reporting/equality-diversity — EqualityDiversityReportPage.razor),
-/// reachable from the report catalog as the "Equality &amp; Diversity Report" card and gated by
-/// the "reporting:view-equality" permission (HR Administrator).
-///
-/// This is NOT the per-employee self-service tab — that is covered by EqualityDiversityTabTests
-/// and is left untouched here.
-///
-/// The load-bearing behaviour under test is that the report exposes aggregates ONLY: no
-/// drill-through, no links out to individuals, and clicking a table row / dimension card never
-/// navigates away from the report route. That is what stops individual monitoring answers being
-/// reconstructed from the report.
-/// </summary>
 public sealed class EqualityDiversityReportTests(HrAdminPersonaFixture fixture)
     : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    private const string LauraEmail = "laura.bennett@acme.example"; // HR Administrator
-    private const string MarcusEmail = "marcus.diallo@acme.example"; // Recruiter — no HrAdministrator role
+    private const string LauraEmail = "laura.bennett@acme.example";
+    private const string MarcusEmail = "marcus.diallo@acme.example";
 
     [Fact]
     public async Task Page_Loads_ForHrAdmin_WithSummaryCardsAndAtLeastOneDimensionChart()
@@ -70,7 +56,6 @@ public sealed class EqualityDiversityReportTests(HrAdminPersonaFixture fixture)
 
         var dateText = await report.GetReportingDateTextAsync();
 
-        // The page formats ReportingDate as "d MMM yyyy" (e.g. "4 Sep 2026").
         Assert.Matches(new Regex(@"\d{1,2}\s+[A-Za-z]{3,}\s+\d{4}"), dateText);
     }
 
@@ -149,9 +134,6 @@ public sealed class EqualityDiversityReportTests(HrAdminPersonaFixture fixture)
 
         await catalog.GoToAsync(AcmeId);
 
-        // Marcus (Recruiter) does not hold "reporting:view-equality"; the catalog endpoint filters
-        // the "Hr"-category entry out server-side — same pattern as
-        // HrHeadcountSummaryReportTests.NonHrPersona_DoesNotSeeCard_InCatalog.
         Assert.False(await catalog.HasCardAsync("Equality & Diversity Report"),
             "Expected a non-HR-admin persona to not see the Equality & Diversity Report catalog card");
     }
@@ -166,9 +148,6 @@ public sealed class EqualityDiversityReportTests(HrAdminPersonaFixture fixture)
         await login.GoToAsync();
         await login.LoginAsync(MarcusEmail);
 
-        // EqualityDiversityReportPage guards on Session.CanViewEqualityReports via
-        // AppSession.GuardAccess, which redirects a persona lacking it to /access-denied (replace)
-        // rather than rendering the page. Same guard pattern as HrHeadcountSummaryReportPage.
         await _page.GotoAsync(report.RouteFor(AcmeId));
 
         await accessDenied.WaitForLoadedAsync();

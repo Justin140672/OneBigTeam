@@ -245,7 +245,6 @@ public class GetRecruitmentKanbanHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        // No separate "Internal" column — same six configured stages.
         Assert.Equal(6, result.Value!.Columns.Count);
         var cvReviewColumn = result.Value.Columns.Single(c => c.StageId == stages.CvReview.Id);
         Assert.Equal(2, cvReviewColumn.Count);

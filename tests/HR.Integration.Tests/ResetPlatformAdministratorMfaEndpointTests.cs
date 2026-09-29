@@ -6,12 +6,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// See CreatePlatformAdministratorEndpointTests for notes on the "platform:admin" policy /
-/// handler-level PlatformOwner gate and the 401-anonymous / 403-non-owner behavior. ADM-06 made this
-/// a real MFA reset: the handler calls ISupabaseAuthGateway.RemoveAllMfaFactorsAsync, which
-/// ApiWebApplicationFactory replaces with FakeSupabaseAuthGateway so no live Supabase call is made.
-/// </summary>
 [Collection("Integration")]
 public class ResetPlatformAdministratorMfaEndpointTests
 {
@@ -106,10 +100,6 @@ public class ResetPlatformAdministratorMfaEndpointTests
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
 
-    // The last-enabled-PlatformOwner safeguard is covered exhaustively at the handler unit-test
-    // level (ResetPlatformAdministratorMfaHandlerTests). It is not reproduced here: the shared
-    // integration fixture DB always carries other bootstrap-seeded enabled PlatformOwner rows, and
-    // disabling them to force the scenario would corrupt state relied on by sibling test classes.
 
     [Fact]
     public async Task Post_ResetPlatformAdministratorMfa_Resets_Mfa_On_Happy_Path()

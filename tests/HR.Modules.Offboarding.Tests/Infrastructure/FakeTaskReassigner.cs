@@ -8,7 +8,6 @@ internal sealed class FakeTaskReassigner : ITaskReassigner
 
     public List<ReassignCall> Calls { get; } = [];
 
-    /// <summary>Number of tasks ReassignAllByAssigneeAsync should report as reassigned — configure per test.</summary>
     public int ReassignReturnCount { get; set; }
 
     public Task<int> ReassignAllByAssigneeAsync(

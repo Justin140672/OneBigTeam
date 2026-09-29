@@ -29,10 +29,8 @@ public sealed class VacancyCreateCandidateTests(RecruiterPersonaFixture fixture)
     private const string MarcusEmail = "marcus.diallo@acme.example";
     private const string LauraEmail  = "laura.bennett@acme.example";
 
-    // RecruitmentStageSeeder.BuildDefaultStages — a freshly created Application starts here.
     private const string InitialStage = "Application Received";
 
-    // ── 1. New candidate, no CV ───────────────────────────────────────────────────
 
     [Fact]
     public async Task NewCandidate_WithoutCv_IsAddedAndAppearsInGridOnInitialStage_WithoutLeavingVacancy()
@@ -54,7 +52,6 @@ public sealed class VacancyCreateCandidateTests(RecruiterPersonaFixture fixture)
         await vacancyDetail.ExpectApplicationRowCountAsync(lastName, 1);
         await vacancyDetail.ExpectApplicationStatusAsync(lastName, InitialStage);
 
-        // Stayed on the same vacancy page — no navigation to the candidate record.
         Assert.Equal(new Uri(urlBefore).AbsolutePath, new Uri(_page.Url).AbsolutePath);
         Assert.Contains(vacancyId.ToString(), _page.Url, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("/candidates/", _page.Url, StringComparison.OrdinalIgnoreCase);
@@ -70,7 +67,6 @@ public sealed class VacancyCreateCandidateTests(RecruiterPersonaFixture fixture)
         Assert.Null(snapshot.CurrentCandidateCvDocumentId);
     }
 
-    // ── 2. New candidate with a PDF CV ────────────────────────────────────────────
 
     [Fact]
     public async Task NewCandidate_WithPdfCv_AttachesCvToApplicationAndAsCandidatesCurrentCv()
@@ -101,7 +97,6 @@ public sealed class VacancyCreateCandidateTests(RecruiterPersonaFixture fixture)
         Assert.Equal(fileName, snapshot.CurrentCandidateCvFileName);
     }
 
-    // ── 3. New candidate via External Recruiter ───────────────────────────────────
 
     [Fact]
     public async Task NewCandidate_WithExternalRecruiterSource_ShowsSourceWithAgencyInGrid()
@@ -111,7 +106,6 @@ public sealed class VacancyCreateCandidateTests(RecruiterPersonaFixture fixture)
 
         using (var seedApi = await CreateRecruiterApiClientAsync())
         {
-            // Created before the dialog opens — OpenAddDialog loads the active recruiters list once.
             await CandidateCvApi.CreateExternalRecruiterAsync(seedApi, AcmeId, agencyName);
         }
 
@@ -131,7 +125,6 @@ public sealed class VacancyCreateCandidateTests(RecruiterPersonaFixture fixture)
         await vacancyDetail.ExpectApplicationSourceAsync(lastName, $"External Recruiter ({agencyName})");
     }
 
-    // ── 4. Duplicate email (active candidate) ─────────────────────────────────────
 
     [Fact]
     public async Task NewCandidate_DuplicateEmailDifferentCase_OffersSelectExisting_AndAddsExistingCandidateOnce()
@@ -151,7 +144,6 @@ public sealed class VacancyCreateCandidateTests(RecruiterPersonaFixture fixture)
 
         var dialog = await OpenAddCandidateDialogAsync(vacancyDetail);
         await dialog.SwitchToNewModeAsync();
-        // Different name, same email in different casing — the duplicate check is case-insensitive.
         await dialog.FillNewCandidateAsync("Someone", $"Else{unique}", existingEmail.ToUpperInvariant());
         await dialog.ClickSubmitAsync();
 
@@ -178,7 +170,6 @@ public sealed class VacancyCreateCandidateTests(RecruiterPersonaFixture fixture)
         Assert.Equal(existingId, app.CandidateId);
     }
 
-    // ── 5. Duplicate email (inactive candidate) ───────────────────────────────────
 
     [Fact]
     public async Task NewCandidate_DuplicateEmailOfInactiveCandidate_ShowsInactiveMessage_WithoutSelectButton()
@@ -210,7 +201,6 @@ public sealed class VacancyCreateCandidateTests(RecruiterPersonaFixture fixture)
         Assert.Empty(await CandidateCvApi.ListApplicationsForVacancyAsync(api, AcmeId, vacancyId));
     }
 
-    // ── 6. Existing candidate with a current CV ───────────────────────────────────
 
     [Fact]
     public async Task ExistingCandidate_WithCurrentCv_AttachCheckboxDefaultsChecked_AndApplicationGetsThatCv()
@@ -246,7 +236,6 @@ public sealed class VacancyCreateCandidateTests(RecruiterPersonaFixture fixture)
         Assert.Equal(fileName, snapshot.CvFileName);
     }
 
-    // ── 7. Client-side validation ─────────────────────────────────────────────────
 
     [Fact]
     public async Task NewCandidate_ClientValidation_RequiredFieldsWhitespaceInvalidEmailAndCvFileType()
@@ -256,15 +245,12 @@ public sealed class VacancyCreateCandidateTests(RecruiterPersonaFixture fixture)
         var dialog = await OpenAddCandidateDialogAsync(vacancyDetail);
         await dialog.SwitchToNewModeAsync();
 
-        // Empty submit → all three required messages, dialog stays open.
         await dialog.ClickSubmitAsync();
         await dialog.ExpectValidationMessageAsync("First name is required.");
         await dialog.ExpectValidationMessageAsync("Last name is required.");
         await dialog.ExpectValidationMessageAsync("Email is required.");
         await dialog.ExpectOpenAsync();
 
-        // Whitespace-only first name is still "required"; a filled last name clears its message; a
-        // malformed email switches to the format message.
         await dialog.FillFirstNameAsync("   ");
         await dialog.FillLastNameAsync($"Valid{Unique()}");
         await dialog.FillEmailAsync("not-an-email");
@@ -280,7 +266,6 @@ public sealed class VacancyCreateCandidateTests(RecruiterPersonaFixture fixture)
         await dialog.ExpectCvErrorAsync("PDF, DOC or DOCX");
         await dialog.ExpectNoCvSelectedAsync();
 
-        // A valid PDF replaces the error with the selected-file summary; Remove clears it again.
         var pdfName = $"e2e-valid-cv-{Guid.NewGuid():N}.pdf";
         await dialog.SelectCvAsync(pdfName, CandidateCvApi.BuildTestPdf());
         await dialog.ExpectNoCvErrorAsync();
@@ -293,7 +278,6 @@ public sealed class VacancyCreateCandidateTests(RecruiterPersonaFixture fixture)
         Assert.Empty(await CandidateCvApi.ListApplicationsForVacancyAsync(api, AcmeId, vacancyId));
     }
 
-    // ── 8. Existing candidate already applied ─────────────────────────────────────
 
     [Fact]
     public async Task ExistingCandidate_AlreadyAppliedToVacancy_ShowsAlreadyAppliedError()
@@ -308,7 +292,6 @@ public sealed class VacancyCreateCandidateTests(RecruiterPersonaFixture fixture)
             api, AcmeId, "E2E", candidateLast, $"e2e.twice{unique}@example.com");
         await CandidateCvApi.CreateApplicationAsync(api, AcmeId, vacancyId, candidateId);
 
-        // Reload so the grid reflects the API-created application.
         await vacancyDetail.GoToAsync(AcmeId, vacancyId);
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ExpectApplicationRowCountAsync(candidateLast, 1);
@@ -325,7 +308,6 @@ public sealed class VacancyCreateCandidateTests(RecruiterPersonaFixture fixture)
         Assert.Single(await CandidateCvApi.ListApplicationsForVacancyAsync(api, AcmeId, vacancyId));
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────────────
 
     private static string Unique() => Guid.NewGuid().ToString("N")[..8];
 
@@ -337,15 +319,10 @@ public sealed class VacancyCreateCandidateTests(RecruiterPersonaFixture fixture)
         await vacancyDetail.ClickAddCandidateAsync();
         var dialog = new AddCandidateDialog(_page);
         await dialog.ExpectOpenAsync();
-        // "Select existing candidate" is the default mode.
         await dialog.ExpectExistingModeAsync();
         return dialog;
     }
 
-    /// <summary>
-    /// Fresh unique Position Profile (Laura) + Vacancy (Marcus), published so the Applications tab
-    /// renders, leaving the browser (as Marcus) on that vacancy's Applications tab.
-    /// </summary>
     private async Task<(Guid VacancyId, VacancyDetailPage VacancyDetail)> ArrangePublishedVacancyOnApplicationsTabAsync()
     {
         var vacancyTitle = $"E2E New Candidate Role {Unique()}";

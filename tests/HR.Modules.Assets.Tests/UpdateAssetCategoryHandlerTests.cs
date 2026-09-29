@@ -93,7 +93,7 @@ public class UpdateAssetCategoryHandlerTests
 
         var result = await handler.HandleAsync(new UpdateAssetCategoryRequest
         {
-            CompanyId = Guid.NewGuid(), // different company
+            CompanyId = Guid.NewGuid(),
             Id = categoryId,
             Name = "Updated",
             Description = null

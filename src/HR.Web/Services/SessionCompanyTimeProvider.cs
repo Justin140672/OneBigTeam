@@ -2,12 +2,6 @@ using HR.SharedKernel;
 
 namespace HR.Web.Services;
 
-/// <summary>
-/// HR.Web implementation of <see cref="ICompanyTimeProvider"/>. The server-side implementation lives
-/// in HR.Infrastructure (needs the Companies DB) and is not available in the web host, so this one
-/// derives the company-local date from the time zone already loaded into <see cref="AppSession"/>
-/// (company settings). Falls back to UTC when the session has no/unknown time zone.
-/// </summary>
 public sealed class SessionCompanyTimeProvider(AppSession session) : ICompanyTimeProvider
 {
     public TimeZoneInfo TimeZone

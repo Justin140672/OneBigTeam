@@ -5,14 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Features.SearchEmployeeDocuments;
 
-/// <summary>
-/// DOC-06: company-wide document search/filter across employees, paginated and consistently
-/// ordered. Callers never reach this handler without first passing
-/// <see cref="Services.DocumentResourceAuthorizer"/>-driven scope resolution in the endpoint —
-/// <paramref name="allowedEmployeeIds"/> below is the resolved, authoritative access scope
-/// (self-only, manager hierarchy, or unrestricted company-wide for HR), computed by the endpoint
-/// and passed straight through so the handler never has to re-derive authorization itself.
-/// </summary>
 internal sealed class SearchEmployeeDocumentsHandler(DocumentsDbContext db, IEmployeeNameReader employeeNameReader)
 {
     public async Task<Result<SearchEmployeeDocumentsResponse>> HandleAsync(
@@ -29,13 +21,9 @@ internal sealed class SearchEmployeeDocumentsHandler(DocumentsDbContext db, IEmp
                && ed.IsLatestVersion
             select new { ed, d, dt };
 
-        // Access scope: null allowedEmployeeIds means "unrestricted within the company" (only
-        // ever passed by the endpoint for an HR Administrator caller).
         if (allowedEmployeeIds is not null)
             query = query.Where(x => allowedEmployeeIds.Contains(x.ed.EmployeeId));
 
-        // Archived exclusion by default (mirrors ListEmployeeDocuments/DOC-04); IncludeArchived
-        // only takes effect when the endpoint has confirmed the caller is an HR Administrator.
         var includeArchived = request.IncludeArchived && callerIsHrAdministrator;
         if (!includeArchived)
             query = query.Where(x => !x.ed.IsArchived);

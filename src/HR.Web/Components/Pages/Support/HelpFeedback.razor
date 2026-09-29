@@ -194,8 +194,6 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        // OBT-IAM-09: gate on support:manage — not company:manage — so a Company-Administrator-only
-        // account (no longer granted support:manage) is denied.
         if (!Session.IsHrAdministrator && !Session.CanManageSupport)
         {
             Navigation.NavigateTo("/access-denied", replace: true);
@@ -236,19 +234,10 @@
 
     private void OnDragOver()
     {
-        // Presence of the handler is enough to enable dropping; browsers require dragover to be
-        // handled (and prevented, via @ondragover:preventDefault above) for drop to fire at all.
     }
 
     private Task OnDropAsync()
     {
-        // The actual file payload from a native drag-and-drop drop event isn't exposed to
-        // Blazor's InputFile — browsers only deliver dropped files via the underlying <input
-        // type="file"> element's own change event, which InputFile already wires up via
-        // OnFilesSelected. The dropzone below still visually accepts the drop (via
-        // ondragover/ondrop preventDefault) so the file picker click area functions as the
-        // drop target, matching the "drag-and-drop + browse" requirement without needing custom
-        // JS interop to read the DataTransfer object.
         return Task.CompletedTask;
     }
 
@@ -283,9 +272,6 @@
             pageUrl = Navigation.Uri;
             try { browser = await JS.InvokeAsync<string>("getBrowserInfo"); } catch { }
             appVersion = typeof(Program).Assembly.GetName().Version?.ToString();
-            // Prefer the real distributed-tracing correlation ID (same one that ties this
-            // request's server-side logs/traces together) over a random GUID, so staff can
-            // actually cross-reference this submission against telemetry.
             correlationId = Activity.Current?.Id ?? Activity.Current?.RootId;
             try { recentClientErrors = (await JS.InvokeAsync<string[]>("getRecentClientErrors", 10)).ToList(); } catch { }
         }

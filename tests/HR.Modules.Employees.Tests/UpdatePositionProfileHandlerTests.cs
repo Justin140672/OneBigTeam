@@ -137,7 +137,6 @@ public class UpdatePositionProfileHandlerTests
         var auditPublisher = new FakeAuditPublisher();
         var handler = new UpdatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), auditPublisher, new NoOpIntegrationEventPublisher());
 
-        // Try to rename profile1 to the same title as profile2
         var result = await handler.HandleAsync(
             new UpdatePositionProfileRequest
             {

@@ -2,17 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Story 2: page object for the customer-facing organisation data export panel
-/// (OrganisationDataExportPanel.razor), embedded on the Subscription page (/subscription) since
-/// HR.Web has no dedicated customer account-closure page. Company Administrator only (the
-/// Subscription page itself is company-admin scoped).
-///
-/// Layout: a card headed "Export organisation data" with an explanatory paragraph, a "Request
-/// export" primary button (disabled while an export is Pending/InProgress), a "Refresh" button, a
-/// status &lt;dl&gt; ("Status" / "Requested" / when completed "Available until" + a "Download
-/// export" button), and — when there is history — an "Export history" HrGrid.
-/// </summary>
 public sealed class OrganisationDataExportPanelPage(IPage page, string baseUrl)
 {
     private ILocator Panel => page.Locator("section[aria-labelledby='org-data-export-heading']");
@@ -49,13 +38,6 @@ public sealed class OrganisationDataExportPanelPage(IPage page, string baseUrl)
         await WaitForReloadAsync();
     }
 
-    /// <summary>
-    /// Waits for OrganisationDataExportPanel.razor's own re-render after a click, not a fixed
-    /// delay: RequestAsync/RefreshAsync each chain a SignalR round trip into up to three
-    /// sequential HTTP calls (POST + two GETs in ReloadAsync) before the DOM updates, which can
-    /// comfortably exceed a flat 1s wait under any load. The status block (dl.row) and the "no
-    /// export yet" paragraph are mutually exclusive and cover every reachable post-reload state.
-    /// </summary>
     private async Task WaitForReloadAsync() =>
         await Panel.Locator("dl.row")
             .Or(Panel.GetByText("No export has been requested yet."))

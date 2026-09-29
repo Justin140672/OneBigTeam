@@ -12,11 +12,8 @@ namespace HR.Web.Tests;
 
 public class AppSessionTests
 {
-    // Matches the permission ID hard-coded in AppSession.CanManageEmployees.
     private static readonly Guid ManageEmployeesPermission = new("00000000-0000-0000-0001-000000000004");
 
-    // Matches the permission IDs hard-coded in AppSession.CanViewOnboarding / CanManageSupport
-    // (OBT-IAM-09).
     private static readonly Guid OnboardingViewPermission = new("00000000-0000-0000-0001-000000000019");
     private static readonly Guid SupportManagePermission = new("00000000-0000-0000-0001-000000000042");
 
@@ -152,7 +149,6 @@ public class AppSessionTests
     [Fact]
     public void CanManageEmployees_Is_False_Without_The_Permission()
     {
-        // Constructed via reflection-free path: rely on default state (no permissions loaded).
         var session = BuildSession(BuildFactory(new StaticResponseHandler(HttpStatusCode.Unauthorized)));
 
         Assert.False(session.CanManageEmployees);
@@ -171,7 +167,6 @@ public class AppSessionTests
     {
         var session = BuildSession(BuildFactory(new StaticResponseHandler(HttpStatusCode.Unauthorized)));
 
-        // Neither FirstName/LastName nor Email are set yet — falls back to "Unknown".
         Assert.Equal("Unknown", session.DisplayName);
     }
 
@@ -238,7 +233,6 @@ public class AppSessionTests
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        // CanManageCompany=true is baked into BuildHappyPathHandler's MeResponse; no dashboard roles set.
         var factory = BuildFactory(BuildHappyPathHandler(userId, companyId, employeeId));
         var session = BuildSession(factory);
 
@@ -287,7 +281,6 @@ public class AppSessionTests
         Assert.Equal(expected, AppSession.DashboardUrl(dashboardKey));
     }
 
-    // ── OBT-IAM-09: CanViewOnboarding / CanManageSupport permission-derived flags ──────────────
 
     private static RoutingHandler BuildHandlerWithPermissions(
         Guid userId, Guid companyId, Guid employeeId, IReadOnlyList<Guid> permissionIds,
@@ -401,10 +394,6 @@ public class AppSessionTests
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        // CanManageCompany=true is baked into BuildHandlerWithPermissions' MeResponse
-        // (hard-coded `true` for the CanManageCompany positional argument); no onboarding:view
-        // permission granted, so the checklist fetch is skipped and ShowGettingStarted stays false
-        // even though a checklist response is supplied here (it must never be requested).
         var checklist = new GetCompanyOnboardingChecklistResponse([], 0, IsHidden: false, IsDismissedEarly: false);
         var handler = BuildHandlerWithPermissions(
             userId, companyId, employeeId, [], isHrAdministrator: false, checklist: checklist);
@@ -419,9 +408,6 @@ public class AppSessionTests
         Assert.Equal($"/companies/{companyId}/edit", session.LandingUrl);
     }
 
-    // OBT-IAM-09: once the account also holds onboarding:view (e.g. Company Administrator + HR
-    // Administrator, or any future permission grant carrying it) the checklist is fetched and, if
-    // not hidden/dismissed, LandingUrl routes to "/getting-started".
     [Fact]
     public async Task LandingUrl_Routes_To_GettingStarted_When_CanViewOnboarding_And_Checklist_Not_Hidden()
     {
@@ -461,10 +447,6 @@ public class AppSessionTests
         var sessionState = new CircuitSessionState();
         sessionState.SetToken("token-a");
 
-        // A handler whose response identity flips after the first api/me call, standing in for "the
-        // backend now represents a different signed-in identity" — the same shared AppSession
-        // instance below is asked to InitialiseAsync twice against this one factory, so a genuine
-        // reload after invalidation is the only way userIdB's data could ever be observed.
         var handler = new SwitchingIdentityHandler(
             BuildHappyPathHandler(userIdA, companyId, employeeId),
             BuildHappyPathHandler(userIdB, companyId, employeeId));
@@ -477,9 +459,6 @@ public class AppSessionTests
 
         var requestCountAfterFirstLoad = handler.RequestCount;
 
-        // Same SAME AppSession instance: if InitialiseAsync still (incorrectly) trusted a stale
-        // IsLoaded==true with no live-state check, this would be a pure no-op and userIdA's cached
-        // fields would remain forever, even though the circuit has since been invalidated.
         await session.InitialiseAsync();
         Assert.Equal(requestCountAfterFirstLoad, handler.RequestCount);
         Assert.Equal(userIdA, session.UserId);
@@ -500,14 +479,11 @@ public class AppSessionTests
         Assert.Equal(userIdB, session.UserId);
     }
 
-    // ── Fake handlers ────────────────────────────────────────────────────────────
 
     private sealed class RoutingHandler(Dictionary<string, object> responsesByPathSuffix) : HttpMessageHandler
     {
         public int RequestCount { get; private set; }
 
-        // Exposes the protected HttpMessageHandler.SendAsync so SwitchingIdentityHandler can delegate
-        // to an inner RoutingHandler instance directly instead of duplicating its routing logic.
         public Task<HttpResponseMessage> PublicSendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
             SendAsync(request, cancellationToken);
 
@@ -537,11 +513,6 @@ public class AppSessionTests
             Task.FromResult(new HttpResponseMessage(statusCode));
     }
 
-    // Routes every request to firstHandler until api/me has been requested once, then routes every
-    // subsequent request to secondHandler — used by
-    // InitialiseAsync_Reloads_When_SessionState_Was_Invalidated_After_The_Initial_Load to simulate
-    // "the backend now represents a different identity" across two InitialiseAsync calls made
-    // against the very same AppSession/HttpMessageHandler.
     private sealed class SwitchingIdentityHandler(RoutingHandler firstHandler, RoutingHandler secondHandler) : HttpMessageHandler
     {
         private int _meRequestCount;

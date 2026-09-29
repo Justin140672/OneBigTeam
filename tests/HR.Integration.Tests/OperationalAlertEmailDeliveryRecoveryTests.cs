@@ -12,19 +12,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Follow-up E regression coverage that needs a real PostgreSQL backend — only Postgres enforces the
-/// (alert_id) unique index and surfaces the <c>xmin</c> optimistic-concurrency token that
-/// <see cref="OperationalAlertEmailDelivery.Claim"/> relies on to make delivery exclusive. The EF Core
-/// InMemory provider used by the module unit tests (SendOperationalAlertEmailJobTests,
-/// ReconcileStalledOperationalAlertEmailDeliveriesJobTests) cannot raise
-/// <see cref="DbUpdateConcurrencyException"/>, so the "two workers race the same alert" and
-/// "save-after-send loses the row" paths are proven here.
-///
-/// <para>The integration <see cref="FakeEmailSender"/> cannot simulate a provider failure, so the
-/// "fails transiently then succeeds" sequence (regression #4) lives in the module unit test
-/// SendOperationalAlertEmailJobTests.Send_Fails_Once_Then_Succeeds_On_Retry_Delivers_Exactly_One_Email.</para>
-/// </summary>
 [Collection("Integration")]
 public class OperationalAlertEmailDeliveryRecoveryTests
 {
@@ -57,7 +44,6 @@ public class OperationalAlertEmailDeliveryRecoveryTests
             2,
             AdministrativeAlertReason.MissingDocumentExport);
 
-    /// <summary>Seeds an alert + delivery row directly (bypassing the writer's enqueue path).</summary>
     private async Task<Guid> SeedAsync(
         Guid companyId, DateTimeOffset createdAt, Action<OperationalAlertEmailDelivery>? shape = null)
     {
@@ -113,7 +99,6 @@ public class OperationalAlertEmailDeliveryRecoveryTests
             .OfType<Guid>()
             .ToList();
 
-    // #1 — duplicate jobs after the first claim committed -----------------------------------------
 
     [Fact]
     public async Task Second_SendAsync_After_First_Has_Committed_Is_A_No_Op()
@@ -131,21 +116,19 @@ public class OperationalAlertEmailDeliveryRecoveryTests
         Assert.Null(stored.LeaseExpiresAt);
     }
 
-    // #2 — delivery row saved but the enqueue never happened --------------------------------------
 
     [Fact]
     public async Task Reconcile_ReEnqueues_A_Pending_Row_That_Was_Never_Queued()
     {
         var companyId = Guid.NewGuid();
         var stale = DateTimeOffset.UtcNow.AddMinutes(-(ReconcileStalledOperationalAlertEmailDeliveriesJob.PendingGraceMinutes + 10));
-        var alertId = await SeedAsync(companyId, stale); // no enqueue performed
+        var alertId = await SeedAsync(companyId, stale);
 
         await RunReconcileAsync();
 
         Assert.Contains(alertId, ReconcileEnqueuedAlertIds());
     }
 
-    // #3 — sender crashed before contacting Postmark: row stuck Sending with an expired lease ------
 
     [Fact]
     public async Task Reconcile_ReEnqueues_A_Sending_Row_With_An_Expired_Lease()
@@ -159,18 +142,13 @@ public class OperationalAlertEmailDeliveryRecoveryTests
 
         Assert.Contains(alertId, ReconcileEnqueuedAlertIds());
         var stored = await LoadAsync(alertId);
-        Assert.Equal(EmailDeliveryStatus.Sending, stored.Status); // reconcile re-enqueues, does not mutate
+        Assert.Equal(EmailDeliveryStatus.Sending, stored.Status);
     }
 
-    // #5 — send succeeds but persisting Sent fails: at-least-once, no lost alert -------------------
 
     [Fact]
     public async Task Send_Succeeds_But_Row_ReClaimed_Before_Sent_Persisted_Is_Swallowed_And_Resendable()
     {
-        // Force the race: a first worker loads the row and claims it, but before it can persist the
-        // Sent status a second worker (simulated here by a direct DB update from another context that
-        // bumps xmin) mutates the row. The first worker's final SaveChangesAsync then throws
-        // DbUpdateConcurrencyException, which the job must swallow (the email is already out).
         var companyId = Guid.NewGuid();
         var alertId = await SeedAsync(companyId, DateTimeOffset.UtcNow);
 
@@ -182,7 +160,6 @@ public class OperationalAlertEmailDeliveryRecoveryTests
         Assert.True(delivery.Claim(Guid.NewGuid(), DateTimeOffset.UtcNow).IsSuccess);
         await db.SaveChangesAsync();
 
-        // Another worker re-claims (bumps xmin) while "we" are sending.
         using (var otherScope = _factory.Services.CreateScope())
         {
             var otherDb = otherScope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
@@ -191,13 +168,9 @@ public class OperationalAlertEmailDeliveryRecoveryTests
             await otherDb.SaveChangesAsync();
         }
 
-        // Our worker now marks Sent and tries to persist -> concurrency exception, which the domain
-        // method + caller path here reproduces via a direct save. The production job swallows the
-        // equivalent DbUpdateConcurrencyException on its own final save; assert our row is not lost.
         delivery.MarkSent(DateTimeOffset.UtcNow);
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => db.SaveChangesAsync());
 
-        // Recovery: a later send can still deliver (duplicate email is acceptable — at-least-once).
         await RunSendAsync(alertId);
 
         Assert.True(EmailCountFor(companyId) >= 1);
@@ -205,7 +178,6 @@ public class OperationalAlertEmailDeliveryRecoveryTests
         Assert.Equal(EmailDeliveryStatus.Sent, finalState.Status);
     }
 
-    // #6 — retry limit exhausted: no endless loop ------------------------------------------------
 
     [Fact]
     public async Task Exhausted_Delivery_Is_Failed_By_Send_And_Never_ReEnqueued_By_Reconcile()
@@ -236,7 +208,6 @@ public class OperationalAlertEmailDeliveryRecoveryTests
         Assert.DoesNotContain(alertId, ReconcileEnqueuedAlertIds());
     }
 
-    // #7 — two workers race the same alert id: exactly one email ---------------------------------
 
     [Fact]
     public async Task Two_Parallel_SendAsync_For_The_Same_Alert_Deliver_Exactly_One_Email()
@@ -260,9 +231,6 @@ public class OperationalAlertEmailDeliveryRecoveryTests
             }
             catch (DbUpdateConcurrencyException)
             {
-                // Acceptable: the losing racer may surface the concurrency exception rather than
-                // swallowing it depending on exactly where the two saves interleave. The invariant
-                // under test is "exactly one email", asserted above.
             }
         }
     }
@@ -275,11 +243,6 @@ public class OperationalAlertEmailDeliveryRecoveryTests
     // above, seed rows directly and clean them up in a finally block.
     // =========================================================================================
 
-    /// <summary>
-    /// Seeds a row paused mid-final-attempt: MaxAttempts - 1 interrupted attempts already burned, then
-    /// a fresh claim taken "now" so the row is <see cref="EmailDeliveryStatus.Sending"/> with
-    /// AttemptCount == MaxAttempts and a live ownership lease.
-    /// </summary>
     private async Task<Guid> SeedFinalAttemptInFlightAsync(Guid companyId)
     {
         var alertId = await SeedAsync(companyId, DateTimeOffset.UtcNow.AddHours(-1), d =>
@@ -292,7 +255,7 @@ public class OperationalAlertEmailDeliveryRecoveryTests
                 t = t.AddMinutes(OperationalAlertEmailDelivery.LeaseMinutes + 1);
             }
 
-            Assert.True(d.Claim(Guid.NewGuid(), DateTimeOffset.UtcNow).IsSuccess); // live final lease
+            Assert.True(d.Claim(Guid.NewGuid(), DateTimeOffset.UtcNow).IsSuccess);
             Assert.Equal(OperationalAlertEmailDelivery.MaxAttempts, d.AttemptCount);
         });
         return alertId;
@@ -311,7 +274,6 @@ public class OperationalAlertEmailDeliveryRecoveryTests
         await db.SaveChangesAsync();
     }
 
-    // #1-#3 — duplicate job against a live final attempt, then the real owner finishes ------------
 
     [Fact]
     public async Task Duplicate_Job_Against_A_Live_Final_Attempt_Is_A_No_Op_Then_The_Owner_Completes_With_One_Send()
@@ -322,7 +284,6 @@ public class OperationalAlertEmailDeliveryRecoveryTests
         {
             var before = await LoadAsync(alertId);
 
-            // A duplicate SendOperationalAlertEmailJob runs in its own context/scope against the row.
             await RunSendAsync(alertId);
 
             Assert.Equal(0, EmailCountFor(companyId));
@@ -334,9 +295,6 @@ public class OperationalAlertEmailDeliveryRecoveryTests
             Assert.Equal(before.LeaseOwnerToken, afterDuplicate.LeaseOwnerToken);
             Assert.Equal(before.LeaseExpiresAt, afterDuplicate.LeaseExpiresAt);
 
-            // The original owner (still holding the lease) now completes its send. Production does this
-            // inline inside the same SendAsync call; here we drive the same effect against a fresh
-            // context to prove the row was left in a completable state.
             using var scope = _factory.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
             var emailSender = scope.ServiceProvider.GetRequiredService<IEmailSender>();
@@ -357,7 +315,6 @@ public class OperationalAlertEmailDeliveryRecoveryTests
         }
     }
 
-    // #4 — same, but the owner's provider call fails: the owner fails the row itself ---------------
 
     [Fact]
     public async Task Owner_Whose_Final_Send_Fails_Records_The_Failure_Itself_And_A_Duplicate_Never_Preempted_It()
@@ -366,13 +323,10 @@ public class OperationalAlertEmailDeliveryRecoveryTests
         var alertId = await SeedFinalAttemptInFlightAsync(companyId);
         try
         {
-            await RunSendAsync(alertId); // duplicate: no-op while the lease is live
+            await RunSendAsync(alertId);
             Assert.Equal(0, EmailCountFor(companyId));
             Assert.Equal(EmailDeliveryStatus.Sending, (await LoadAsync(alertId)).Status);
 
-            // The integration FakeEmailSender cannot simulate a provider failure, so drive the owner's
-            // own final-attempt failure outcome (MarkFailed with a sanitized reason) directly — the
-            // point under test is that the duplicate above did not retire the row first.
             using var scope = _factory.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<NotificationsDbContext>();
             var owned = await db.OperationalAlertEmailDeliveries.SingleAsync(d => d.AlertId == alertId);
@@ -391,14 +345,11 @@ public class OperationalAlertEmailDeliveryRecoveryTests
         }
     }
 
-    // #5 — interrupted final attempt, lease then expires, reconcile retires it, no extra send ------
 
     [Fact]
     public async Task Reconcile_Fails_An_Interrupted_Final_Attempt_Once_Its_Lease_Has_Expired_Without_Sending()
     {
         var companyId = Guid.NewGuid();
-        // Final attempt claimed long ago and never completed — Sending, AttemptCount == MaxAttempts,
-        // lease already expired.
         var alertId = await SeedAsync(companyId, DateTimeOffset.UtcNow.AddHours(-2), d =>
         {
             var t = DateTimeOffset.UtcNow.AddDays(-1);
@@ -431,7 +382,6 @@ public class OperationalAlertEmailDeliveryRecoveryTests
         }
     }
 
-    // #6 — duplicate send job racing the reconcile sweep against a live final attempt -------------
 
     [Fact]
     public async Task Duplicate_Send_And_Reconcile_Racing_A_Live_Final_Attempt_Respect_Ownership()
@@ -463,17 +413,14 @@ public class OperationalAlertEmailDeliveryRecoveryTests
         }
         catch (DbUpdateConcurrencyException)
         {
-            // A losing racer may surface rather than swallow depending on save interleaving.
         }
     }
 
-    // #7 — unchanged behaviour: bounded retry for earlier attempts, no-op for terminal rows -------
 
     [Fact]
     public async Task Reconcile_Still_ReEnqueues_An_Interrupted_Earlier_Attempt_Without_Failing_It()
     {
         var companyId = Guid.NewGuid();
-        // One interrupted attempt (AttemptCount == 1 < MaxAttempts), lease expired.
         var claimedAt = DateTimeOffset.UtcNow.AddMinutes(-(OperationalAlertEmailDelivery.LeaseMinutes + 30));
         var alertId = await SeedAsync(companyId, DateTimeOffset.UtcNow.AddHours(-1), d =>
             Assert.True(d.Claim(Guid.NewGuid(), claimedAt).IsSuccess));
@@ -483,7 +430,7 @@ public class OperationalAlertEmailDeliveryRecoveryTests
 
             Assert.Contains(alertId, ReconcileEnqueuedAlertIds());
             var stored = await LoadAsync(alertId);
-            Assert.Equal(EmailDeliveryStatus.Sending, stored.Status); // re-enqueued, not mutated / failed
+            Assert.Equal(EmailDeliveryStatus.Sending, stored.Status);
             Assert.Null(stored.FailureReason);
         }
         finally

@@ -8,11 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Tests;
 
-/// <summary>
-/// OBT-721 workload action provider tests for employee accounts awaiting invitation. HR-only.
-/// Identity owns UserInvite directly (see provider xmldoc), so this queries IdentityDbContext
-/// in-memory rather than a fake reader.
-/// </summary>
 public class EmployeeAccountsAwaitingInvitationWorkloadActionProviderTests
 {
     private static ClaimsPrincipal AnyCaller() => new(new ClaimsIdentity());
@@ -94,7 +89,6 @@ public class EmployeeAccountsAwaitingInvitationWorkloadActionProviderTests
         var expiredEmployeeId = Guid.NewGuid();
         var pendingEmployeeId = Guid.NewGuid();
 
-        // Created 10 days ago -> ExpiresAt (now + 7 days) is 3 days in the past.
         var expired = UserInvite.Create(
             expiredEmployeeId, companyId, "expired@example.com", DateTimeOffset.UtcNow.AddDays(-10));
         var pending = UserInvite.Create(

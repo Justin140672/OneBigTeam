@@ -133,8 +133,6 @@ public class DownloadSharedCompanyDocumentVersionHandlerTests
         Assert.Equal("not_found", result.Error.Code);
     }
 
-    // Theory parameters must be a publicly accessible type (xUnit requires public test methods),
-    // but FileScanStatus is internal — pass the enum's underlying int value instead and cast.
     [Theory]
     [InlineData((int)FileScanStatus.Pending, "This document is currently being security checked.")]
     [InlineData((int)FileScanStatus.Scanning, "This document is currently being security checked.")]
@@ -159,7 +157,7 @@ public class DownloadSharedCompanyDocumentVersionHandlerTests
             versionNote: null, requiresAcknowledgement: false, effectiveDate: null);
         switch (status)
         {
-            case FileScanStatus.Pending: break; // Create() defaults to Pending
+            case FileScanStatus.Pending: break;
             case FileScanStatus.Scanning: version.MarkScanning(Now); break;
             case FileScanStatus.Infected: version.MarkScanInfected("EICAR.Test.File", Now); break;
             case FileScanStatus.Failed: version.MarkScanFailed("scanner unreachable", Now); break;
@@ -201,7 +199,6 @@ public class DownloadSharedCompanyDocumentVersionHandlerTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options);
 
-    // Default download-success fixtures assume a clean scan.
     private static SharedCompanyDocumentVersion CleanVersion(SharedCompanyDocumentVersion version)
     {
         version.MarkScanClean(Now);

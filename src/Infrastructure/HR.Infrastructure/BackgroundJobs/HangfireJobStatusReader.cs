@@ -30,8 +30,6 @@ internal sealed class HangfireJobStatusReader(JobStorage jobStorage, IBackground
         }
         catch
         {
-            // Same defensive shape as InfrastructureModule's /health/background-jobs endpoint —
-            // storage being unreachable should degrade this panel, not break the whole support view.
             return new BackgroundJobStatusSummary(
                 Available: false,
                 ServerCount: 0, Enqueued: 0, Processing: 0, Scheduled: 0, Failed: 0, Succeeded: 0, Recurring: 0);
@@ -107,11 +105,6 @@ internal sealed class HangfireJobStatusReader(JobStorage jobStorage, IBackground
         }
     }
 
-    /// <summary>
-    /// Requeues via the same Failed -&gt; Enqueued state transition Hangfire's own dashboard "Retry"
-    /// button performs (Hangfire.BackgroundJobClientExtensions.Requeue). Safe to call on a job that
-    /// is no longer Failed — Hangfire simply reports the state transition as unsuccessful.
-    /// </summary>
     public BackgroundJobRetryResult RetryJob(string jobId)
     {
         try
@@ -135,10 +128,6 @@ internal sealed class HangfireJobStatusReader(JobStorage jobStorage, IBackground
         return $"{job.Type.Name}.{job.Method.Name}";
     }
 
-    /// <summary>
-    /// Hangfire's AutomaticRetryAttribute persists the attempt count as a job parameter named
-    /// "RetryCount" — reading it directly avoids re-fetching each job's full state history.
-    /// </summary>
     private int GetRetryCount(string jobId)
     {
         try

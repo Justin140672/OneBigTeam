@@ -2,7 +2,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.CompanyOnboarding.Tests.Infrastructure;
 
-/// <summary>Simple test double for <see cref="IOnboardingTaskDefinition"/> — completion state is fixed at construction.</summary>
 internal sealed class FakeOnboardingTaskDefinition : IOnboardingTaskDefinition
 {
     private readonly bool _isCompleted;

@@ -2,28 +2,12 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure;
 
-/// <summary>
-/// NFR-05: reusable assertions for modal-dialog keyboard accessibility — focus containment while a
-/// dialog is open, and focus restoration to the triggering control after it closes. Used by
-/// <c>DialogFocusManagementTests</c> against the Syncfusion dialogs in the app (Request Leave,
-/// HrConfirmDialog, document/note upload).
-/// </summary>
 public static class DialogAccessibility
 {
-    /// <summary>
-    /// Asserts the keyboard focus is currently inside <paramref name="dialog"/>, that Tabbing from
-    /// the last focusable descendant wraps back to the first (and Shift+Tab from the first wraps to
-    /// the last), and that focus never lands on <c>&lt;body&gt;</c> or page chrome outside the dialog.
-    /// </summary>
     public static async Task AssertFocusTrappedAsync(IPage page, ILocator dialog)
     {
         await dialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
-        // Syncfusion's Dialog moves initial focus onto its first focusable element from a
-        // post-open/animation-end callback, not synchronously with the dialog becoming visible.
-        // Headless Chromium has no real OS window focus and can schedule/paint that callback a beat
-        // later than a headed run does, so a single immediate check here is a headless-specific
-        // race rather than a real focus-trap gap. Poll briefly before asserting.
         var focusInsideOnOpen = false;
         var openFocusDeadline = DateTime.UtcNow.AddSeconds(3);
         while (DateTime.UtcNow < openFocusDeadline)
@@ -35,7 +19,6 @@ public static class DialogAccessibility
         Assert.True(focusInsideOnOpen,
             "Expected keyboard focus to be inside the dialog when it opened.");
 
-        // Walk forward through the dialog's focusable controls; focus must never escape to <body>.
         for (var i = 0; i < 25; i++)
         {
             await page.Keyboard.PressAsync("Tab");
@@ -46,7 +29,6 @@ public static class DialogAccessibility
                 "Tab moved keyboard focus outside the dialog — focus is not trapped.");
         }
 
-        // Shift+Tab a few times — still contained.
         for (var i = 0; i < 5; i++)
         {
             await page.Keyboard.PressAsync("Shift+Tab");
@@ -55,11 +37,6 @@ public static class DialogAccessibility
         }
     }
 
-    /// <summary>
-    /// Records the currently-focused trigger, runs <paramref name="openDialog"/>, asserts focus left
-    /// <paramref name="triggerButton"/>, runs <paramref name="closeDialog"/>, then asserts focus has
-    /// returned to <paramref name="triggerButton"/>.
-    /// </summary>
     public static async Task AssertFocusRestoredAsync(
         IPage page,
         Func<Task> openDialog,
@@ -77,7 +54,6 @@ public static class DialogAccessibility
 
         await closeDialog();
 
-        // Focus restoration can lag the close animation by a frame or two.
         var deadline = DateTime.UtcNow.AddSeconds(5);
         var restored = false;
         while (DateTime.UtcNow < deadline)

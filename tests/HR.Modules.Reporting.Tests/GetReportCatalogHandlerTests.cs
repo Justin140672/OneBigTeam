@@ -54,9 +54,6 @@ public class GetReportCatalogHandlerTests
     [Fact]
     public async Task HandleAsync_Recruiter_Without_WorkloadActionsAccess_Does_Not_See_WorkloadActions()
     {
-        // Bug fix (OBT-721): canViewWorkloadActions was previously hardcoded to true for every
-        // caller, so a pure Recruiter (recruitment + employee-starter access, but no HR/Manager
-        // role) incorrectly saw the HR-category "Workload & HR Actions Report" in their catalog.
         var request = new GetReportCatalogRequest(Guid.NewGuid());
 
         var result = await _handler.HandleAsync(

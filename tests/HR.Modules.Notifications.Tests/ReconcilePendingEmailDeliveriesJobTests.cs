@@ -7,12 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Notifications.Tests;
 
-/// <summary>
-/// OBT-REM-12: <see cref="ReconcilePendingEmailDeliveriesJob"/> — periodic recovery for EmailDelivery
-/// rows stuck Pending because their originating Hangfire enqueue never happened. See
-/// EmailDeliveryJobTests for the send-path itself and NotificationWriterRepairTests for the
-/// crashed-writer repair path this job's grace period backstops.
-/// </summary>
 public class ReconcilePendingEmailDeliveriesJobTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 4, 12, 0, 0, TimeSpan.Zero);
@@ -112,8 +106,6 @@ public class ReconcilePendingEmailDeliveriesJobTests
         Assert.Contains(pastId, enqueuedIds);
     }
 
-    // Theory parameters must be a publicly accessible type (xUnit requires public test methods),
-    // but EmailDeliveryStatus is internal — pass the enum's underlying int value instead and cast.
     [Theory]
     [InlineData((int)EmailDeliveryStatus.Sent)]
     [InlineData((int)EmailDeliveryStatus.Failed)]
@@ -186,12 +178,11 @@ public class ReconcilePendingEmailDeliveriesJobTests
         var backgroundJobClient = new RecordingBackgroundJobClient();
         var job = BuildJob(db, backgroundJobClient);
 
-        await job.ExecuteAsync(); // no rows at all
+        await job.ExecuteAsync();
 
         Assert.Empty(backgroundJobClient.CreatedJobs);
     }
 
-    // Cancellation ---------------------------------------------------------------------------------
 
     [Fact]
     public async Task ExecuteAsync_Already_Cancelled_Token_Throws_Before_Enqueuing()

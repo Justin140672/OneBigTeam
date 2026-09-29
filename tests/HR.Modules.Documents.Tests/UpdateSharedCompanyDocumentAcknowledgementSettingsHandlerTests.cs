@@ -153,7 +153,7 @@ public class UpdateSharedCompanyDocumentAcknowledgementSettingsHandlerTests
             {
                 CompanyId               = companyId,
                 DocumentId              = doc.Id,
-                RequiresAcknowledgement = false, // same as CreateDoc's default
+                RequiresAcknowledgement = false,
             },
             Guid.NewGuid(), CancellationToken.None);
 
@@ -206,9 +206,6 @@ public class UpdateSharedCompanyDocumentAcknowledgementSettingsHandlerTests
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 
-        // Only the RequiresAcknowledgement flag changes; the statement text supplied is the same as
-        // what's already stored, so normalizedStatement equals document.AcknowledgementStatement and
-        // the post-publish guard does not trip.
         var result = await Handler(db).HandleAsync(
             new UpdateSharedCompanyDocumentAcknowledgementSettingsRequest
             {
@@ -266,7 +263,6 @@ public class UpdateSharedCompanyDocumentAcknowledgementSettingsHandlerTests
             Guid.NewGuid(), companyId, "Doc", null, category.Id, "key/p.pdf", "p.pdf", 100, "application/pdf",
             null, null, SharedCompanyDocumentReviewFrequency.None, null, null, requiresAcknowledgement: true, acknowledgementDueDate: new DateOnly(2027, 1, 1),
             acknowledgementStatement: "Original statement", createdBy: Guid.NewGuid(), now: Now);
-        // Never published — stays Draft.
         db.SharedCompanyDocuments.Add(doc);
         await db.SaveChangesAsync();
 

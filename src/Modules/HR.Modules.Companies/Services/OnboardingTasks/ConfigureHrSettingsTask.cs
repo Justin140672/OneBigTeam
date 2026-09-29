@@ -12,8 +12,6 @@ internal sealed class ConfigureHrSettingsTask(CompaniesDbContext dbContext) : IO
     public bool IsMandatory => true;
     public int Order => 2;
 
-    // HR.Web's HR settings route is company-scoped ("/companies/{Id:guid}/hr-settings") — the
-    // "{companyId}" placeholder is substituted by HR.Web with the current company id.
     public Task<string> GetLinkUrlAsync(Guid companyId, CancellationToken cancellationToken) =>
         Task.FromResult("/companies/{companyId}/hr-settings");
 
@@ -23,9 +21,6 @@ internal sealed class ConfigureHrSettingsTask(CompaniesDbContext dbContext) : IO
             .AsNoTracking()
             .SingleOrDefaultAsync(s => s.CompanyId == companyId, cancellationToken);
 
-        // "Configured" means someone has saved changes since the default row was created by
-        // CompanySettings.CreateDefault — same "reviewed since creation" heuristic used by
-        // ReviewDefaultLeavePolicyTask in HR.Modules.Leave.
         return settings is not null && settings.UpdatedAt > settings.CreatedAt;
     }
 }

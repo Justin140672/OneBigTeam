@@ -7,10 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Tasks.Services;
 
-// OFF-06: bulk by-assignee reassignment, distinct from ITaskCanceller/ITaskRescheduler's
-// source-entity-scoped bulk operations. Used when an employee departs and every task currently
-// assigned to them (across every Source/ActionType) needs to move to a replacement, or be
-// unassigned pending HR escalation.
 internal sealed class TaskReassigner(
     TasksDbContext dbContext,
     INotificationWriter notificationWriter,

@@ -165,8 +165,6 @@ public class DueSoonNotifierTests
     [Fact]
     public async Task CheckTaskAlertsAsync_Notifies_When_Due_Exactly_At_DueSoon_Cutoff()
     {
-        // DueSoonDays is 2 — the cutoff comparison is "<=", so a task due exactly on
-        // Today+2 must still be treated as due-soon (off-by-one boundary check).
         var companyId = Guid.NewGuid();
         var assignedEmployeeId = Guid.NewGuid();
 
@@ -219,8 +217,6 @@ public class DueSoonNotifierTests
     [Fact]
     public async Task CheckTaskAlertsAsync_Treats_Due_Today_As_Due_Soon_Not_Overdue()
     {
-        // DueDate == today must go down the "due soon / due today" branch, not the
-        // strictly-less-than "overdue" branch, and the message should say "today".
         var companyId = Guid.NewGuid();
         var assignedEmployeeId = Guid.NewGuid();
 

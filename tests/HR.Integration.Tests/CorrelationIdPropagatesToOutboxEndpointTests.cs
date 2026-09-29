@@ -53,7 +53,6 @@ public class CorrelationIdPropagatesToOutboxEndpointTests
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
 
-        // Response itself must echo the same id back — the first hop of the chain.
         Assert.Equal(
             suppliedCorrelationId.ToString(),
             response.Headers.GetValues(CorrelationIdMiddleware.HeaderName).Single(),

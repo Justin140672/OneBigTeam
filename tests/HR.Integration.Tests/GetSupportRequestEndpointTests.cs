@@ -21,7 +21,6 @@ public class GetSupportRequestEndpointTests
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, EmployeeUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
-        // Submit/Get are both gated behind "support:manage", not just role:employee.
         await TestRoleSeeder.AssignRoleAsync(_factory, EmployeeUserId, SystemRoles.Employee, companyId);
         await TestRoleSeeder.AssignRoleAsync(_factory, EmployeeUserId, SystemRoles.HrAdministrator, companyId);
         return client;

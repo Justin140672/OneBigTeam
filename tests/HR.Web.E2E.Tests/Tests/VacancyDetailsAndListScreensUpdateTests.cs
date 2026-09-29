@@ -52,7 +52,6 @@ public sealed class VacancyDetailsAndListScreensUpdateTests(CrossUserFixture fix
         var profileTitle = await PositionProfileTestHelpers.CreateUniquePositionProfileAsync(
             _page, _fixture.WebBaseUrl, AcmeId, login, LauraEmail, MarcusEmail);
 
-        // Vacancy with an explicit AdvertTitle override — no fallback indicator expected.
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickNewVacancyAsync();
         await vacancyDetail.FillTitleAsync(withOverrideTitle);
@@ -99,7 +98,6 @@ public sealed class VacancyDetailsAndListScreensUpdateTests(CrossUserFixture fix
         await ppList.GoToAsync(AcmeId);
         await ppList.ClickNewPositionProfileAsync();
         await ppEdit.FillTitleAsync(profileTitle);
-        // Department, Location and Default Leave Policy are now mandatory on Position Profile.
         await ppEdit.SelectDepartmentAsync("Engineering");
         await ppEdit.SelectLocationAsync("London Office");
         await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
@@ -125,10 +123,6 @@ public sealed class VacancyDetailsAndListScreensUpdateTests(CrossUserFixture fix
         Assert.Contains($"/companies/{AcmeId}/position-profiles/", _page.Url);
         Assert.EndsWith("/view", _page.Url);
 
-        // The URL changes as soon as client-side routing kicks in — well before the page's own
-        // async load (fetching the Position Profile and populating Model.Title) has finished, so
-        // reading the title input immediately after the URL wait can race an empty/default value
-        // (same reasoning as VacancyListPage.ClickVacancyAsync's post-navigation wait).
         await _page.WaitForSelectorAsync(".content-area span[role='combobox']", new() { Timeout = 20_000 });
         await Assertions.Expect(_page.GetByPlaceholder("e.g. Senior Software Engineer").First)
             .ToHaveValueAsync(profileTitle, new() { Timeout = 15_000 });
@@ -155,7 +149,6 @@ public sealed class VacancyDetailsAndListScreensUpdateTests(CrossUserFixture fix
         await ppList.GoToAsync(AcmeId);
         await ppList.ClickNewPositionProfileAsync();
         await ppEdit.FillTitleAsync(initialProfileTitle);
-        // Department, Location and Default Leave Policy are now mandatory on Position Profile.
         await ppEdit.SelectDepartmentAsync("Engineering");
         await ppEdit.SelectLocationAsync("London Office");
         await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
@@ -171,8 +164,6 @@ public sealed class VacancyDetailsAndListScreensUpdateTests(CrossUserFixture fix
 
         await login.SwitchAccountAsync(MarcusEmail);
 
-        // New vacancies start life as Draft with zero applications, so this vacancy is eligible
-        // for a Position Profile change immediately after creation — no extra setup needed.
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickNewVacancyAsync();
         await vacancyDetail.FillTitleAsync(vacancyTitle);
@@ -233,13 +224,6 @@ public sealed class VacancyDetailsAndListScreensUpdateTests(CrossUserFixture fix
         await vacancyDetail.SelectHiringManagerAsync("James");
         await vacancyDetail.SaveNewVacancyAsync();
 
-        // Adding an application (even while the vacancy stays Draft) is enough to make
-        // UpdateVacancyHandler.CanChangePositionProfile false — the eligibility rule is
-        // "status == Draft && applicationCount == 0", not status alone. The Applications tab only
-        // renders once Open (Draft hides it entirely), so this publishes first — the field stays
-        // locked afterwards regardless (status alone is now sufficient), so the assertion below
-        // still holds even though the "Draft-with-application" combination itself is no longer
-        // being exercised specifically.
         await vacancyList.ClickVacancyAsync(vacancyTitle);
         await vacancyDetail.PublishVacancyAsync();
         await vacancyDetail.OpenApplicationsTabAsync();
@@ -263,10 +247,6 @@ public sealed class VacancyDetailsAndListScreensUpdateTests(CrossUserFixture fix
 
     private async Task<Guid> GetVacancyIdFromUrlAsync()
     {
-        // After adding an application, the Applications tab keeps the same route
-        // (/vacancies/{id}) — extract the id straight from the current URL rather than
-        // navigating away and back through the list, since the vacancy's list-row title now
-        // resolves via EffectiveTitle and could theoretically collide with search behavior.
         var uri = new Uri(_page.Url);
         var segments = uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
         var vacanciesIndex = Array.IndexOf(segments, "vacancies");

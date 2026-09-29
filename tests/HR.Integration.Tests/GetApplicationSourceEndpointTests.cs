@@ -9,10 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Covers the ticket #78 Source/SourceExternalRecruiterId/SourceExternalRecruiterAgencyName fields
-/// now surfaced on GetApplication's response.
-/// </summary>
 [Collection("Integration")]
 public class GetApplicationSourceEndpointTests
 {

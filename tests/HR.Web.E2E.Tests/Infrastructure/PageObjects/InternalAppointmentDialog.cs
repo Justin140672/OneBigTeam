@@ -31,7 +31,6 @@ public sealed class InternalAppointmentDialog(IPage page)
 
     private ILocator ApplicationsTab => page.Locator("[data-testid='vacancy-applications-tab']");
 
-    /// <summary>The column (".col-*") inside the dialog whose form label reads exactly <paramref name="label"/> (optionally followed by the required "*").</summary>
     private ILocator Field(string label) =>
         Content.Locator(".col-md-4, .col-md-6, .col-12").Filter(new()
         {
@@ -66,13 +65,7 @@ public sealed class InternalAppointmentDialog(IPage page)
 
     public static string FormatUkDate(DateOnly date) => date.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
 
-    // ── Open / close ──────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Waits for the dialog to be open with its vacancy-derived fields populated. OpenAppointDialog
-    /// only flips the dialog visible after the vacancy/department/manager lookups complete, so a
-    /// non-empty derived Position Profile proves the whole dialog state has landed.
-    /// </summary>
     public async Task WaitForOpenAsync()
     {
         await Dialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
@@ -93,7 +86,6 @@ public sealed class InternalAppointmentDialog(IPage page)
     public Task ExpectOpenAsync() =>
         Assertions.Expect(Dialog).ToBeVisibleAsync(new() { Timeout = 10_000 });
 
-    // ── Read-only context ─────────────────────────────────────────────────────────
 
     public async Task ExpectExistingEmployeeNoticeAsync(string employeeFullName)
     {
@@ -109,20 +101,13 @@ public sealed class InternalAppointmentDialog(IPage page)
         await Assertions.Expect(DerivedLocation).ToHaveTextAsync(location, new() { Timeout = 10_000 });
     }
 
-    /// <summary>
-    /// The derived values are read-only display blocks, not editable inputs: while compensation is
-    /// off the dialog renders exactly one SfDropDownList (Manager) — no Position Profile /
-    /// Department / Location pickers.
-    /// </summary>
     public Task ExpectOnlyManagerComboboxAsync() =>
         Assertions.Expect(Content.Locator("span[role='combobox']")).ToHaveCountAsync(1, new() { Timeout = 10_000 });
 
-    // ── Effective date ────────────────────────────────────────────────────────────
 
     public Task ExpectEffectiveDateAsync(DateOnly date) =>
         Assertions.Expect(EffectiveDateInput).ToHaveValueAsync(FormatUkDate(date), new() { Timeout = 10_000 });
 
-    /// <summary>Types a dd/MM/yyyy date into the Effective Date picker and commits it with Tab.</summary>
     public async Task SetEffectiveDateAsync(DateOnly date)
     {
         await EffectiveDateInput.ClickAsync();
@@ -141,7 +126,6 @@ public sealed class InternalAppointmentDialog(IPage page)
             ? Assertions.Expect(ConfirmBackdatedWrapper).ToBeVisibleAsync(new() { Timeout = 10_000 })
             : Assertions.Expect(ConfirmBackdatedWrapper).ToHaveCountAsync(0, new() { Timeout = 10_000 });
 
-    /// <summary>Ticks "I confirm this backdated appointment should apply immediately".</summary>
     public async Task ConfirmBackdatedAsync()
     {
         var checkbox = ConfirmBackdatedWrapper.Locator("input[type='checkbox']").First;
@@ -150,16 +134,13 @@ public sealed class InternalAppointmentDialog(IPage page)
         await Assertions.Expect(checkbox).ToBeCheckedAsync(new() { Timeout = 5_000 });
     }
 
-    // ── Manager ───────────────────────────────────────────────────────────────────
 
     public Task ExpectManagerAsync(string text) =>
         Assertions.Expect(ManagerInput).ToHaveValueAsync(text, new() { Timeout = 10_000 });
 
-    /// <summary>Selects a Manager option ("No manager" or a name fragment) via the shared DropDownSelector.</summary>
     public Task SelectManagerAsync(string text) =>
         DropDownSelector.SelectAsync(page, ManagerField, text);
 
-    // ── Compensation ──────────────────────────────────────────────────────────────
 
     public async Task SetChangeCompensationAsync(bool value)
     {
@@ -177,7 +158,6 @@ public sealed class InternalAppointmentDialog(IPage page)
         }
     }
 
-    /// <summary>Asserts every compensation field is revealed, with the dialog's defaults (Annual / GBP).</summary>
     public async Task ExpectCompensationFieldsVisibleAsync()
     {
         await Assertions.Expect(SalaryTypeField.Locator("span[role='combobox']").First).ToBeVisibleAsync(new() { Timeout = 10_000 });
@@ -196,7 +176,6 @@ public sealed class InternalAppointmentDialog(IPage page)
     public Task SelectSalaryTypeAsync(string salaryType) =>
         DropDownSelector.SelectAsync(page, SalaryTypeField, salaryType);
 
-    /// <summary>SfNumericTextBox needs a real click/select-all/type/Tab — a bare Fill bypasses its interop.</summary>
     public Task FillSalaryAsync(string value) => FillNumericAsync(SalaryInput, value);
 
     public Task FillHoursPerWeekAsync(string value) => FillNumericAsync(HoursPerWeekInput, value);
@@ -219,16 +198,13 @@ public sealed class InternalAppointmentDialog(IPage page)
         await Assertions.Expect(input).Not.ToHaveValueAsync("", new() { Timeout = 10_000 });
     }
 
-    // ── Submit ────────────────────────────────────────────────────────────────────
 
-    /// <summary>Clicks "Appoint" and waits for the dialog to close (the appointment succeeded).</summary>
     public async Task SubmitExpectingSuccessAsync()
     {
         await ConfirmButton.ClickAsync();
         await ExpectClosedAsync();
     }
 
-    /// <summary>Clicks "Appoint" and waits for the in-dialog error (data-testid="appoint-error") to contain <paramref name="expectedText"/>; the dialog stays open.</summary>
     public async Task SubmitExpectingErrorAsync(string expectedText)
     {
         await ConfirmButton.ClickAsync();
@@ -236,12 +212,10 @@ public sealed class InternalAppointmentDialog(IPage page)
         await ExpectOpenAsync();
     }
 
-    // ── Success banner (on the Applications tab) ─────────────────────────────────
 
     private ILocator SuccessBanner => ApplicationsTab.Locator("[data-testid='appoint-success']");
     private ILocator EmployeeLink => SuccessBanner.Locator("[data-testid='appoint-employee-link']");
 
-    /// <summary>Banner for an appointment applied now: "Internal appointment completed." with no effective-date clause.</summary>
     public async Task ExpectAppliedSuccessBannerAsync()
     {
         await Assertions.Expect(SuccessBanner).ToBeVisibleAsync(new() { Timeout = 20_000 });
@@ -249,7 +223,6 @@ public sealed class InternalAppointmentDialog(IPage page)
         await Assertions.Expect(SuccessBanner).Not.ToContainTextAsync("takes effect");
     }
 
-    /// <summary>Banner for a future-dated appointment: "Internal appointment completed — the change takes effect on dd/MM/yyyy."</summary>
     public async Task ExpectScheduledSuccessBannerAsync(DateOnly effectiveDate)
     {
         await Assertions.Expect(SuccessBanner).ToBeVisibleAsync(new() { Timeout = 20_000 });
@@ -260,10 +233,6 @@ public sealed class InternalAppointmentDialog(IPage page)
     public Task ExpectNoSuccessBannerAsync() =>
         Assertions.Expect(SuccessBanner).ToHaveCountAsync(0, new() { Timeout = 10_000 });
 
-    /// <summary>
-    /// For an appointer who cannot open the full employee record (e.g. a Recruiter without
-    /// employee:manage): the banner names the employee instead of linking to their profile.
-    /// </summary>
     public async Task ExpectEmployeeNameWithoutLinkAsync(string employeeFullName)
     {
         await Assertions.Expect(SuccessBanner.Locator("[data-testid='appoint-employee-name']"))
@@ -275,7 +244,6 @@ public sealed class InternalAppointmentDialog(IPage page)
         Assertions.Expect(EmployeeLink).ToHaveAttributeAsync(
             "href", $"/companies/{companyId}/employees/{employeeId}", new() { Timeout = 10_000 });
 
-    /// <summary>Follows the banner's "View employee profile" link and waits for the employee route to commit.</summary>
     public async Task FollowEmployeeLinkAsync(Guid employeeId)
     {
         await EmployeeLink.ClickAsync();

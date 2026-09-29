@@ -157,9 +157,6 @@ public class ListAssetsHandlerTests
     [Fact]
     public async Task HandleAsync_Uses_Fallback_CategoryName_When_Category_Cannot_Be_Resolved()
     {
-        // An asset must never silently disappear from the list just because its category can't
-        // be resolved (e.g. a stale/orphaned CategoryId) — this asserts the left-join fallback,
-        // not just "some assets are returned".
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var orphanedCategoryId = Guid.NewGuid();

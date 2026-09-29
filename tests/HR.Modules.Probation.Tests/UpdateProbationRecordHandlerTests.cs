@@ -492,7 +492,7 @@ public class UpdateProbationRecordHandlerTests
             CompanyId = companyId,
             Id = record.Id,
             ManagerEmployeeId = managerId,
-            ExpectedEndDate = new DateOnly(2026, 9, 1), // unchanged
+            ExpectedEndDate = new DateOnly(2026, 9, 1),
             Notes = "No date change.",
             ExpectedVersion = 1
         }, CancellationToken.None);
@@ -593,9 +593,9 @@ public class UpdateProbationRecordHandlerTests
                 CompanyId = companyId,
                 Id = recordId,
                 ManagerEmployeeId = Guid.NewGuid(),
-                ExpectedEndDate = new DateOnly(2026, 12, 1), // also changes the date, to prove recalculation is skipped
+                ExpectedEndDate = new DateOnly(2026, 12, 1),
                 Notes = "Stale attempt.",
-                ExpectedVersion = 99 // stale — the persisted record is at version 1
+                ExpectedVersion = 99
             }, CancellationToken.None);
 
             Assert.True(result.IsFailure);
@@ -646,8 +646,6 @@ public class UpdateProbationRecordHandlerTests
                 new FakeCompanyProbationSettingsReader(),
                 publisher);
 
-            // The FluentValidation layer normally rejects a null ExpectedVersion (422) before the
-            // handler is ever reached; this exercises the handler's own defence-in-depth guard.
             var result = await handler.HandleAsync(new UpdateProbationRecordRequest
             {
                 CompanyId = companyId,

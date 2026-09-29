@@ -16,14 +16,6 @@ internal sealed class TestAuthHandler : AuthenticationHandler<AuthenticationSche
     public const string TenantHeader = "X-Test-Tenant";
     public const string EmailHeader = "X-Test-Email";
 
-    // P1 "Login as Customer" support-session integration tests: setting this header simulates the
-    // resolved identity a real support-session JWT would produce (see
-    // SupabaseCurrentUserResolutionMiddleware's support_session_id branch), without needing this
-    // test harness to mint/validate a real signed JWT for the separate "SupportSession" auth scheme
-    // — TestAuthHandler entirely replaces the app's authentication schemes for these tests, and
-    // SupabaseCurrentUserResolutionMiddleware only ever inspects ClaimsPrincipal claims, not which
-    // scheme produced them. The claim type value ("support_session_id") is duplicated here rather
-    // than referencing HR.Modules.Identity.CurrentUserClaims.SupportSessionId, which is internal.
     public const string SupportSessionHeader = "X-Test-SupportSessionId";
 
     public TestAuthHandler(
@@ -61,18 +53,6 @@ internal sealed class TestAuthHandler : AuthenticationHandler<AuthenticationSche
         {
             claims.Add(new Claim("company_id", tenantIdValues.ToString()));
 
-            // Keep the seeded UserProfile.CompanyId in sync with the tenant a given request is
-            // actually targeting. SupabaseCurrentUserResolutionMiddleware (production code) resolves
-            // the tenant from the persisted UserProfile.CompanyId, not from any client-supplied claim,
-            // once a profile exists for the authenticated user — this mirrors real behaviour where a
-            // client can never spoof its own tenant. Many tests reuse a single seeded caller (e.g. a
-            // fixture-level "admin" persona) across several fresh per-test company ids via this
-            // X-Test-Tenant header, so without this sync every such request would resolve against
-            // whatever company happened to be seeded first for that user, producing a false 403 from
-            // RequireTenantMiddleware/RoleAuthorizationHandler instead of exercising the endpoint
-            // under test. Syncing here — once, centrally, on every authenticated test request —
-            // removes the need for each test class to remember to call
-            // TestRoleSeeder.SyncCompanyAsync itself.
             if (Guid.TryParse(userIdValues.ToString(), out var userId) &&
                 Guid.TryParse(tenantIdValues.ToString(), out var tenantId))
             {

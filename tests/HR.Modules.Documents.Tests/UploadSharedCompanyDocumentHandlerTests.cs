@@ -29,9 +29,6 @@ public class UploadSharedCompanyDocumentHandlerTests
         FakeAuditPublisher? auditPublisher = null,
         Hangfire.IBackgroundJobClient? backgroundJobClient = null)
     {
-        // Same fake instance backs both the audience rule builder and the direct
-        // ReviewOwnerEmployeeId existence check, so a test that registers an employee id in one
-        // place sees it recognised in both.
         var reader = audienceReader ?? new FakeEmployeeAudienceReader();
         return new(db,
             storage ?? new FakeDocumentStorageService(),
@@ -52,7 +49,6 @@ public class UploadSharedCompanyDocumentHandlerTests
         return category;
     }
 
-    // Produces a PDF file with valid magic bytes so magic-byte validation passes.
     private static IFormFile FakePdfFile(string fileName = "policy.pdf", int extraSize = 1020) =>
         FakeFile(fileName, "application/pdf", PdfBytes(extraSize));
 
@@ -63,10 +59,9 @@ public class UploadSharedCompanyDocumentHandlerTests
             ContentType = contentType,
         };
 
-    // %PDF- followed by padding
     private static byte[] PdfBytes(int extraSize = 1020)
     {
-        var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D }; // %PDF-
+        var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };
         var bytes = new byte[magic.Length + extraSize];
         magic.CopyTo(bytes, 0);
         return bytes;
@@ -183,15 +178,13 @@ public class UploadSharedCompanyDocumentHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Category_Belongs_To_Different_Company_Even_If_Caller_Has_Manage_Rights()
     {
-        // This is the "company ownership" tenant-isolation check: a category from company A
-        // must never be usable for a document being created under company B.
         await using var db = BuildContext();
         var companyA        = Guid.NewGuid();
         var category         = await SeedCategory(db, companyA);
         var handler          = BuildHandler(db);
 
         var result = await handler.HandleAsync(
-            BuildRequest(Guid.NewGuid(), category.Id), // different company in the request
+            BuildRequest(Guid.NewGuid(), category.Id),
             Guid.NewGuid(),
             CancellationToken.None);
 
@@ -239,8 +232,6 @@ public class UploadSharedCompanyDocumentHandlerTests
     [Fact]
     public async Task HandleAsync_Stores_Document_With_Pending_ScanStatus()
     {
-        // Virus scanning now happens asynchronously (ScanUploadedFileJob, enqueued after
-        // persistence) rather than inline during upload.
         await using var db = BuildContext();
         var companyId      = Guid.NewGuid();
         var category       = await SeedCategory(db, companyId);
@@ -271,8 +262,6 @@ public class UploadSharedCompanyDocumentHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        // Uploading a new shared company document enqueues a scan job for both the document
-        // itself and its first version row.
         Assert.Equal(2, backgroundJobs.CreatedJobs.Count);
     }
 
@@ -307,8 +296,6 @@ public class UploadSharedCompanyDocumentHandlerTests
         var category        = await SeedCategory(db, companyId);
         var handler         = BuildHandler(db, storage);
 
-        // The declared extension must still be a valid, allowed one (".pdf") for validation
-        // to reach the filename-safety check at all.
         var file = FakeFile(maliciousName, "application/pdf", PdfBytes());
 
         var result = await handler.HandleAsync(
@@ -361,7 +348,7 @@ public class UploadSharedCompanyDocumentHandlerTests
         await using var db = new ThrowingDocumentsDbContext(options);
         var category       = CompanyDocumentCategory.Create(Guid.NewGuid(), companyId, "Policy", DateTimeOffset.UtcNow);
         db.CompanyDocumentCategories.Add(category);
-        await db.BaseSaveChangesAsync(); // seed without throwing
+        await db.BaseSaveChangesAsync();
 
         var handler = BuildHandler(db, storage);
 
@@ -676,7 +663,6 @@ public class UploadSharedCompanyDocumentHandlerTests
     [Fact]
     public async Task HandleAsync_Accepts_Multiple_Departments_Locations_Positions_And_Employees_Together()
     {
-        // The audience is OR'd, not exclusive — combining every rule type at once is valid.
         await using var db = BuildContext();
         var companyId      = Guid.NewGuid();
         var category       = await SeedCategory(db, companyId);
@@ -800,9 +786,6 @@ public class UploadSharedCompanyDocumentHandlerTests
         Assert.Equal(1,                       fileUploaded.VersionNumber);
         Assert.Equal(uploadedBy,              fileUploaded.UploadedBy);
 
-        // Safety: the raw storage key (which can be used to derive a signed download URL) must
-        // never appear in any audit event's field values — only FileName, FileSize,
-        // VersionNumber and identifiers are recorded.
         var storageKey = storage.Uploads[0].StorageKey;
         Assert.NotEqual(storageKey, created.Title);
         Assert.NotEqual(storageKey, fileUploaded.FileName);
@@ -813,7 +796,6 @@ public class UploadSharedCompanyDocumentHandlerTests
         });
     }
 
-    // Subclass used only in the orphan-cleanup test to simulate a DB save failure.
     private sealed class ThrowingDocumentsDbContext(DbContextOptions<DocumentsDbContext> options)
         : DocumentsDbContext(options)
     {

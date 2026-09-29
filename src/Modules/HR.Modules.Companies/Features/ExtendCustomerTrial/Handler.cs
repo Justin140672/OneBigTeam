@@ -9,10 +9,6 @@ using Microsoft.Extensions.Configuration;
 
 namespace HR.Modules.Companies.Features.ExtendCustomerTrial;
 
-/// <summary>
-/// Same defense-in-depth allow-list gate as GetCustomerDetailsHandler/GetCustomerDashboardHandler
-/// (see their remarks) — no first-class platform-administrator identity model exists yet.
-/// </summary>
 internal sealed class ExtendCustomerTrialHandler(
     CompaniesDbContext dbContext,
     ICurrentUser currentUser,

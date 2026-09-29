@@ -56,7 +56,6 @@ public class DeleteCandidateDocumentHandlerTests
         Assert.Single(storage.Deletions);
         Assert.Equal(document.StorageKey, storage.Deletions[0]);
 
-        // Happy path: the operation row ends Completed, not left dangling as Pending.
         var operation = await db.CandidateDocumentDeletionOperations.SingleAsync();
         Assert.Equal(CandidateDocumentDeletionOperation.StatusCompleted, operation.Status);
         Assert.NotNull(operation.CompletedAt);
@@ -118,12 +117,9 @@ public class DeleteCandidateDocumentHandlerTests
 
         Assert.True(result.IsSuccess);
 
-        // The document row is gone (it was removed in the same transaction as the operation row).
         Assert.Empty(await db.CandidateDocuments.ToListAsync());
         Assert.Empty(storage.Deletions);
 
-        // The operation row remains Pending (never claimed/completed here) so the reconciliation
-        // sweep can retry it — the storage key is still recoverable from it, not lost.
         var operation = await db.CandidateDocumentDeletionOperations.SingleAsync();
         Assert.Equal(CandidateDocumentDeletionOperation.StatusPending, operation.Status);
         Assert.Equal(document.StorageKey, operation.StorageKey);
@@ -136,10 +132,6 @@ public class DeleteCandidateDocumentHandlerTests
     [Fact]
     public async Task HandleAsync_Persists_The_Operation_Row_With_Document_Removal_Even_If_The_Inline_Delete_Is_Never_Attempted()
     {
-        // Invariant check: the mark-for-deletion-first pattern means the storage key survives on
-        // the durable operation row the moment the document row is removed — even simulating a
-        // "crash" immediately after that commit (by never invoking storage at all here) still
-        // leaves the storage key fully recoverable.
         await using var db = BuildContext();
         var storage = new FakeCandidateDocumentStorageService();
         var companyId = Guid.NewGuid();
@@ -149,8 +141,6 @@ public class DeleteCandidateDocumentHandlerTests
             new DeleteCandidateDocumentRequest { CompanyId = companyId, CandidateId = candidate.Id, DocumentId = document.Id },
             CancellationToken.None);
 
-        // The storage key was never only "in memory" between the document removal and the delete —
-        // it is durably readable back from the operation row after the handler returns.
         var operation = await db.CandidateDocumentDeletionOperations.SingleAsync();
         Assert.Equal(document.StorageKey, operation.StorageKey);
         Assert.Equal(companyId, operation.CompanyId);
@@ -289,7 +279,6 @@ public class DeleteCandidateDocumentHandlerTests
         Assert.True(second.IsFailure);
         Assert.Equal("not_found", second.Error.Code);
 
-        // No second (duplicate) deletion attempt was made against storage.
         Assert.Single(storage.Deletions);
     }
 }

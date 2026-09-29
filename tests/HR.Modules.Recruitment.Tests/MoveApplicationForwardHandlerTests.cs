@@ -160,7 +160,6 @@ public class MoveApplicationForwardHandlerTests
         await using var db = BuildContext();
         var events = new FakeIntegrationEventPublisher();
         var audit = new FakeAuditPublisher();
-        // Offer is the last non-terminal stage — there is nothing active/non-terminal after it.
         var seed = await SeedAsync(db, s => s.Offer);
 
         var result = await Handler(db, events, audit).HandleAsync(Request(seed, "notes"), Guid.NewGuid(), CancellationToken.None);

@@ -4,9 +4,6 @@ using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Support.Features.UpdateSupportRequestStatus;
 
-// Assumption: this codebase has no dedicated "internal/staff" role concept yet (see ICurrentUser /
-// role policies) — gated behind the "support:manage" permission string following the existing
-// "resource:action" convention used throughout (e.g. "employee:manage", "asset:view").
 internal sealed class Endpoint(UpdateSupportRequestStatusHandler handler)
     : Endpoint<UpdateSupportRequestStatusRequest, UpdateSupportRequestStatusResponse>
 {

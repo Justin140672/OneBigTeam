@@ -19,7 +19,6 @@ public class UpdatePositionProfileConcurrencyEndpointTests
         _factory = factory;
         Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.HrAdministrator))
             .GetAwaiter().GetResult();
-        // GetPositionProfile (used to read the pre-edit Version) is gated on role:employee.
         Task.Run(async () => await TestRoleSeeder.AssignRoleAsync(factory, UserId, SystemRoles.Employee))
             .GetAwaiter().GetResult();
     }

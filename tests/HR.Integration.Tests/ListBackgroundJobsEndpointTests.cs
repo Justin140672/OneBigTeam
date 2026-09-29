@@ -5,12 +5,6 @@ using HR.Integration.Tests.Infrastructure;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// See ForceCustomerReadOnlyEndpointTests for the shared platform-admin allow-list test pattern
-/// this class follows. Exercises the real HangfireJobStatusReader against the test harness's real
-/// (test) Hangfire storage — no fake IBackgroundJobStatusReader is registered, mirroring
-/// BackgroundJobDiagnosticsTests.
-/// </summary>
 [Collection("Integration")]
 public class ListBackgroundJobsEndpointTests
 {
@@ -53,8 +47,6 @@ public class ListBackgroundJobsEndpointTests
 
         var response = await client.GetAsync(Url);
 
-        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
-        // is Forbidden (403), not Unauthorized (401).
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 

@@ -1,10 +1,6 @@
 using HR.Modules.Employees.Contracts;
 namespace HR.Modules.DataImport.Services;
 
-/// <summary>
-/// Wraps a mapping of target field name -> expected source column header name.
-/// Header lookups are case-insensitive.
-/// </summary>
 internal sealed class ColumnMappingProfile
 {
     private readonly Dictionary<string, string> _targetToHeader;
@@ -16,12 +12,6 @@ internal sealed class ColumnMappingProfile
 
     public IReadOnlyDictionary<string, string> TargetFieldToHeaderName => _targetToHeader;
 
-    /// <summary>
-    /// Returns a new profile with the given target-field -> header-name overrides applied on
-    /// top of this profile's mapping. Target fields not present in <paramref name="overrides"/>
-    /// keep their existing header. A null or empty override collection returns this profile
-    /// unchanged (as a new instance).
-    /// </summary>
     public ColumnMappingProfile WithOverrides(IReadOnlyDictionary<string, string>? overrides)
     {
         var merged = new Dictionary<string, string>(_targetToHeader, StringComparer.OrdinalIgnoreCase);
@@ -39,9 +29,6 @@ internal sealed class ColumnMappingProfile
     }
 }
 
-/// <summary>
-/// The default column mapping for the standard employee import template.
-/// </summary>
 internal static class StandardEmployeeColumnMapping
 {
     public static ColumnMappingProfile Default { get; } = new(new Dictionary<string, string>

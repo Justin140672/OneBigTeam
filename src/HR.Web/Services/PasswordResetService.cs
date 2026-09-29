@@ -3,13 +3,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Web.Services;
 
-/// <summary>
-/// Calls HR.Api's POST /api/forgot-password (HR.Modules.Identity's RequestPasswordReset feature),
-/// which sends a real Supabase password-recovery email to a matching account. Always reports
-/// success from the caller's point of view — the endpoint itself never reveals whether the email
-/// matched an account (see RequestPasswordResetHandler's own comment) — so this only surfaces a
-/// failure for a genuine request error (network/5xx), not "email not found".
-/// </summary>
 public sealed class PasswordResetService(HrApiHttpClientFactory httpClientFactory, ILogger<PasswordResetService> logger)
 {
     private HttpClient Http => httpClientFactory.CreateClient();
@@ -30,12 +23,6 @@ public sealed class PasswordResetService(HrApiHttpClientFactory httpClientFactor
         }
     }
 
-    /// <summary>
-    /// Submits a new password using the short-lived access token from a password-recovery
-    /// redirect (see ResetPasswordComplete.razor). Unlike RequestResetAsync, a failure here IS
-    /// meaningful and surfaced to the caller — most likely the recovery link has expired or was
-    /// already used (see ResetPasswordHandler's own comment).
-    /// </summary>
     public async Task<(bool Success, string? Error)> ResetPasswordAsync(string accessToken, string newPassword)
     {
         try

@@ -4,10 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies that the admin employee Documents tab shows the seeded documents
-/// and that HR can see document titles in the grid.
-/// </summary>
 public sealed class EmployeeDocumentsTabTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -21,17 +17,13 @@ public sealed class EmployeeDocumentsTabTests(HrAdminPersonaFixture fixture) : R
         var login    = new LoginPage(_page, _fixture.WebBaseUrl);
         var empAdmin = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
 
-        // ── Step 1: Login as Laura (HR Manager with employee:manage access) ───
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // ── Step 2: Navigate to Tom's admin profile ───────────────────────────
         await empAdmin.GoToAsync(AcmeId, TomId);
 
-        // ── Step 3: Open the Documents tab ───────────────────────────────────
         await empAdmin.OpenDocumentsTabAsync();
 
-        // ── Step 4: Verify seeded documents are in the grid ──────────────────
         Assert.True(await empAdmin.HasDocumentAsync("Employment Contract"),
             "Expected 'Employment Contract – Tom Williams' to appear in the Documents grid");
 
@@ -98,10 +90,8 @@ public sealed class EmployeeDocumentsTabTests(HrAdminPersonaFixture fixture) : R
         await empAdmin.GoToAsync(AcmeId, TomId);
         await empAdmin.OpenDocumentsTabAsync();
 
-        // Request a document type that doesn't already have an open request for Tom
         await empAdmin.RequestDocumentAsync("Driving Licence");
 
-        // After the dialog closes the tab reloads — the new request should appear
         Assert.True(await empAdmin.HasDocumentRequestAsync("Driving Licence"),
             "Expected the newly requested 'Driving Licence' to appear in the Document Requests section");
     }
@@ -123,16 +113,6 @@ public sealed class EmployeeDocumentsTabTests(HrAdminPersonaFixture fixture) : R
         // to avoid a false pass/fail if these tests run against the same shared Tom Williams row.
         await empAdmin.OpenRequestDocumentDialogSelectTypeThenCancelAsync("Right To Work");
 
-        // ".request-document-dialog" matches multiple elements (the SfDialog container, the
-        // role="dialog" element itself, and its close-icon button all carry this CssClass), so an
-        // unscoped locator throws a Playwright strict-mode violation rather than resolving. .First
-        // mirrors EmployeeAdminPage's own scoping convention for this selector.
-        //
-        // A bare IsVisibleAsync() snapshot here races the SfDialog close animation: the helper's
-        // own JS wait (offsetParent-based) can resolve as soon as the close transition starts,
-        // before it's visually finished — an immediate follow-up check can still catch it
-        // mid-animation. Wait for Playwright's own Hidden state instead, which accounts for the
-        // full transition rather than a single point-in-time read.
         try
         {
             await _page.Locator(".request-document-dialog").First
@@ -143,7 +123,6 @@ public sealed class EmployeeDocumentsTabTests(HrAdminPersonaFixture fixture) : R
             Assert.Fail("Expected the Request Document dialog to actually close after Cancel + Discard Changes");
         }
 
-        // No request should have been created for the cancelled attempt.
         Assert.False(await empAdmin.HasDocumentRequestAsync("Right To Work"),
             "Expected cancelling the dialog to not create a 'Right To Work' document request");
     }
@@ -154,21 +133,16 @@ public sealed class EmployeeDocumentsTabTests(HrAdminPersonaFixture fixture) : R
         var login    = new LoginPage(_page, _fixture.WebBaseUrl);
         var empAdmin = new EmployeeAdminPage(_page, _fixture.WebBaseUrl);
 
-        // ── Step 1: Login as Laura ────────────────────────────────────────────
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // ── Step 2: Navigate to Tom's admin profile ───────────────────────────
         await empAdmin.GoToAsync(AcmeId, TomId);
 
-        // ── Step 3: Open the Employment tab and enable the working pattern override ──
         await empAdmin.OpenEmploymentTabAsync();
         await empAdmin.EnableWorkingPatternOverrideAsync();
 
-        // ── Step 4: Set hours per day ─────────────────────────────────────────
         await empAdmin.SetHoursPerDayAsync(7m);
 
-        // ── Step 5: Save — page navigates to employee list on success ─────────
         await empAdmin.SaveAsync();
 
         var content = await _page.ContentAsync();

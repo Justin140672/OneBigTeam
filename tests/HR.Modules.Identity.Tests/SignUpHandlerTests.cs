@@ -78,14 +78,11 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
 
         Assert.True(result.IsSuccess);
 
-        // Company provisioned first.
         Assert.Equal(1, deps.Provisioner.CallCount);
 
-        // Default data seeded for the newly provisioned company.
         Assert.Equal(1, deps.DefaultDataSeeder.CallCount);
         Assert.Equal(result.Value!.CompanyId, deps.DefaultDataSeeder.SeededCompanyIds.Single());
 
-        // Admin employee created using the seeded default ids.
         Assert.Equal(1, deps.EmployeeProvisioningService.CallCount);
         var employeeRequest = deps.EmployeeProvisioningService.Requests.Single();
         Assert.Equal(result.Value.CompanyId, employeeRequest.CompanyId);
@@ -94,20 +91,15 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
         Assert.Equal(deps.DefaultDataSeeder.ResultToReturn.PositionProfileId, employeeRequest.PositionProfileId);
         Assert.Equal(deps.DefaultDataSeeder.ResultToReturn.EmploymentTypeId, employeeRequest.EmploymentTypeId);
 
-        // Supabase Auth user created after the admin employee record.
         var createdUser = Assert.Single(deps.SupabaseAuthGateway.CreatedUsers);
         Assert.Equal(request.AdminEmail, createdUser.Email);
         Assert.EndsWith("/verify-email/", createdUser.RedirectTo);
 
-        // The password the admin chose on the signup form must reach Supabase — otherwise it's
-        // silently discarded and password-grant Login can never work for this account.
         var createdUserWithPassword = Assert.Single(deps.SupabaseAuthGateway.CreatedUsersWithPassword);
         Assert.Equal(request.Password, createdUserWithPassword.Password);
 
-        // No compensation triggered.
         Assert.Empty(deps.Provisioner.DeactivatedCompanyIds);
 
-        // Success audit event published.
         var auditEvent = Assert.Single(deps.AuditEventPublisher.PublishedEvents);
         var registrationEvent = Assert.IsType<RegistrationCreatedAuditEvent>(auditEvent);
         Assert.True(registrationEvent.Succeeded);
@@ -137,18 +129,6 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
         Assert.Equal(request.AdminFirstName, profile.FirstName);
         Assert.Equal(request.AdminLastName, profile.LastName);
 
-        // The self-service admin gets both CompanyAdministrator and HrAdministrator — they're the
-        // company's only user at this point, so CompanyAdministrator alone would lock them out of
-        // Employees/HR Settings/User Administration (and leave the Getting Started checklist
-        // pointing at pages that redirect them straight back out — see SignUpHandler's remarks).
-        // Every seeded persona also carries SystemRoles.Employee alongside their specific role(s) —
-        // it's the floor role required by "role:employee", which gates core session endpoints
-        // (GetMe, GetCompany, etc.) that AppSession depends on for every page.
-        //
-        // UserRole.UserId must key off the local UserProfile.Id, NOT the raw Supabase auth user
-        // id — SupabaseCurrentUserResolutionMiddleware resolves ResolvedCurrentUser.UserId to
-        // profile.Id, and every downstream authorization check keys off that. Asserting against
-        // the raw Supabase user id explicitly guards against wiring the wrong id here.
         var roles = await db.UserRoles.Where(r => r.UserId == profile.Id).Select(r => r.RoleId).ToListAsync();
         Assert.Contains(SystemRoles.CompanyAdministrator, roles);
         Assert.Contains(SystemRoles.HrAdministrator, roles);
@@ -287,8 +267,6 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
         Assert.False(string.IsNullOrWhiteSpace(registrationEvent.FailureReason));
         Assert.Null(registrationEvent.AdminUserId);
 
-        // No admin identity record should have been created since the orchestration failed
-        // before reaching the identity-record step.
         Assert.Empty(deps.SupabaseAuthGateway.CreatedUsers);
         await using var db = fixture.BuildContext();
         var userExists = await db.Users.AnyAsync(u => u.Email == request.AdminEmail);
@@ -379,7 +357,6 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
         Assert.Equal(AccountCreationEmailGuard.WorkEmailRequiredCode, result.Error.Code);
         Assert.Equal(AccountCreationEmailGuard.WorkEmailRequiredMessage, result.Error.Message);
 
-        // No provisioning side effects at all.
         Assert.Equal(0, deps.Provisioner.CallCount);
         Assert.Empty(deps.Provisioner.ProvisionedCompanyNames);
         Assert.Empty(deps.Provisioner.DeactivatedCompanyIds);
@@ -397,7 +374,6 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
         Assert.Equal(usersBefore, await db.Users.CountAsync());
         Assert.False(await db.UserProfiles.AnyAsync(p => p.Email.ToLower() == request.AdminEmail.ToLower()));
 
-        // Only the rejection audit — never a RegistrationCreated event.
         var rejection = Assert.IsType<AccountCreationEmailRejectedAuditEvent>(Assert.Single(deps.AuditEventPublisher.PublishedEvents));
         Assert.Equal("public-signup", rejection.Path);
         Assert.Equal(new[] { domain.ToLowerInvariant() }, rejection.Domains);
@@ -407,9 +383,6 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
     [Fact]
     public async Task HandleAsync_Rejects_Public_Email_Before_The_Account_Exists_Check()
     {
-        // The policy runs BEFORE the "email already in use" lookup, so the response for a public
-        // address never reveals whether an account already exists for it (existing accounts on
-        // public domains are unaffected — they just can't sign up again).
         var existingEmail = $"existing-{Guid.NewGuid():N}@gmail.com";
         await using (var seed = fixture.BuildContext())
         {
@@ -441,9 +414,9 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
     }
 
     [Theory]
-    [InlineData("brightsparks-consulting.co.uk")] // Google Workspace / Microsoft 365 hosted organisation domain
-    [InlineData("olive.com")]                     // not caught by "live.com"
-    [InlineData("acme.com")]                      // not caught by "me.com"
+    [InlineData("brightsparks-consulting.co.uk")]
+    [InlineData("olive.com")]
+    [InlineData("acme.com")]
     public async Task HandleAsync_Allows_Organisation_Domain(string domain)
     {
         var deps = BuildDependencies();

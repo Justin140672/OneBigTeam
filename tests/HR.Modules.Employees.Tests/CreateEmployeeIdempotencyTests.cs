@@ -38,7 +38,6 @@ public class CreateEmployeeIdempotencyTests
                 "emma.clarke@example.com", "EMP-0001", sourceRef),
             CancellationToken.None);
 
-        // Simulates the retry: a fresh request id / employee number, same logical source.
         var second = await handler.HandleAsync(
             RequestFor(companyId, departmentId, locationId, employmentTypeId, positionProfileId,
                 "emma.clarke.retry@example.com", "EMP-0002", sourceRef),

@@ -43,7 +43,7 @@ public class GetCompanySettingsHandlerTests
     {
         await using var context = BuildContext();
         var now = DateTimeOffset.UtcNow;
-        var company = Company.Create(Guid.NewGuid(), "Acme", now); // no SetSettings call
+        var company = Company.Create(Guid.NewGuid(), "Acme", now);
         context.Companies.Add(company);
         await context.SaveChangesAsync();
 

@@ -2,7 +2,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace HR.Web.Models;
 
-// ── LIST ──────────────────────────────────────────────────────────────────────
 
 public record ListOnboardingTemplatesResponse(IReadOnlyList<OnboardingTemplateListItemModel> Items);
 
@@ -14,7 +13,6 @@ public record OnboardingTemplateListItemModel(
     int TaskCount,
     int Version = 0);
 
-// ── GET ───────────────────────────────────────────────────────────────────────
 
 public record GetOnboardingTemplateResponse(
     Guid Id,
@@ -36,7 +34,6 @@ public record OnboardingTemplateTaskModel(
     int DueDaysAfterStart,
     int DisplayOrder);
 
-// ── CREATE ────────────────────────────────────────────────────────────────────
 
 public record CreateOnboardingTemplateRequest(Guid CompanyId, string Name, string? Description);
 
@@ -48,7 +45,6 @@ public record CreateOnboardingTemplateResponse(
     bool IsActive,
     DateTimeOffset CreatedAt);
 
-// ── UPDATE ────────────────────────────────────────────────────────────────────
 
 public record UpdateOnboardingTemplateRequest(
     Guid CompanyId,
@@ -78,7 +74,6 @@ public record UpdateOnboardingTemplateResponse(
     IReadOnlyList<OnboardingTemplateTaskModel> Tasks,
     int Version = 0);
 
-// ── EDIT MODEL ────────────────────────────────────────────────────────────────
 
 public sealed class OnboardingTemplateEditModel
 {

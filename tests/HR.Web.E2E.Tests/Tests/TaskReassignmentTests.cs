@@ -33,7 +33,6 @@ public sealed class TaskReassignmentTests(CrossUserFixture fixture) : RoleE2ETes
     private static readonly Guid LauraId = Guid.Parse("30000000-0000-0000-0000-000000000005");
     private static readonly Guid JamesId = Guid.Parse("30000000-0000-0000-0000-000000000002");
 
-    // Laura's seeded task — "Prepare board meeting agenda" (TaskSource.Workflow).
     private static readonly Guid BoardAgendaTaskId = Guid.Parse("a0000000-0000-0000-0000-000000000029");
 
     private const string LauraEmail = "laura.bennett@acme.example";
@@ -47,16 +46,9 @@ public sealed class TaskReassignmentTests(CrossUserFixture fixture) : RoleE2ETes
         var empEdit  = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
         var profile  = new MyProfilePage(_page, _fixture.WebBaseUrl);
 
-        // ── Step 1: Login as Laura (HR Admin) ─────────────────────────────────
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // ── Step 2: Navigate to Laura's admin Tasks tab and open the board agenda task ──
-        // TaskViewPage.GoToAsync is a self-service route restricted to the logged-in
-        // employee, so reassigning via the admin UI must go through the admin employee edit
-        // page's Tasks tab instead (EmployeeTasksTab.razor), which opens the same
-        // TaskViewDialog. Laura views her own record here through the admin route so the
-        // "Reassign" control (an HR-admin-only affordance) is available.
         await empEdit.GoToAsync(AcmeId, LauraId);
         await empEdit.OpenTasksTabAsync();
         await empEdit.ClickTaskAsync(BoardAgendaTaskId);
@@ -65,8 +57,6 @@ public sealed class TaskReassignmentTests(CrossUserFixture fixture) : RoleE2ETes
         var taskTitle = await taskView.GetTitleAsync();
         Assert.Contains("board meeting", taskTitle, StringComparison.OrdinalIgnoreCase);
 
-        // ── Step 3: Find the reassign control and assign to James Okafor ──────
-        // The task view page may show a "Reassign" button or an assignee dropdown for HR.
         var reassignBtn = _page.GetByRole(AriaRole.Button, new() { Name = "Reassign" });
 
         if (await reassignBtn.IsVisibleAsync())
@@ -74,7 +64,6 @@ public sealed class TaskReassignmentTests(CrossUserFixture fixture) : RoleE2ETes
             await reassignBtn.ClickAsync();
             await _page.WaitForSelectorAsync(".e-dialog, .e-popup", new() { Timeout = 10_000 });
 
-            // Select James from the dropdown/input.
             var input = _page.Locator(".e-dialog input.e-input, .e-popup input.e-input").First;
             await input.FillAsync("James");
             await _page.WaitForSelectorAsync(".e-list-item:has-text('James Okafor')",
@@ -94,11 +83,9 @@ public sealed class TaskReassignmentTests(CrossUserFixture fixture) : RoleE2ETes
         }
         else
         {
-            // Skip — the reassign UI is not yet implemented for this task type.
             return;
         }
 
-        // ── Step 4: Switch to James and verify the task is in his own task list ───
         await login.SwitchAccountAsync(JamesEmail);
         await profile.GoToAsync(AcmeId, JamesId);
         await profile.OpenTasksTabAsync();
@@ -107,7 +94,6 @@ public sealed class TaskReassignmentTests(CrossUserFixture fixture) : RoleE2ETes
         Assert.Contains(jamesTasks, t =>
             t.Contains("board meeting", StringComparison.OrdinalIgnoreCase));
 
-        // ── Step 5: Laura's own task list should no longer show the task ──────
         await login.SwitchAccountAsync(LauraEmail);
         await profile.GoToAsync(AcmeId, LauraId);
         await profile.OpenTasksTabAsync();

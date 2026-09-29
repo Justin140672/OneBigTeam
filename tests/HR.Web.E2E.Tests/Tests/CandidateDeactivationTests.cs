@@ -31,7 +31,6 @@ public sealed class CandidateDeactivationTests(RecruiterPersonaFixture fixture) 
         Assert.True(await candidateEdit.IsDeactivateDialogVisibleAsync(),
             "Expected the deactivate-reason dialog to open");
 
-        // Attempt to confirm with no reason entered.
         await candidateEdit.ClickConfirmDeactivateAsync();
 
         Assert.True(await candidateEdit.HasDeactivateReasonErrorAsync(),
@@ -65,8 +64,6 @@ public sealed class CandidateDeactivationTests(RecruiterPersonaFixture fixture) 
         var bannerText = await candidateEdit.GetInactiveBannerTextAsync();
         Assert.Contains(reason, bannerText ?? string.Empty);
 
-        // List view (after navigating back): excluded from the default active-only view, but
-        // visible — and shown as Inactive — once "Show Inactive" is toggled on.
         await candidateList.GoToAsync(AcmeId);
         Assert.False(await candidateList.HasCandidateAsync(candidateLast),
             "Expected a deactivated candidate to be excluded from the default (active-only) list view");
@@ -109,11 +106,6 @@ public sealed class CandidateDeactivationTests(RecruiterPersonaFixture fixture) 
             "Expected a reactivated candidate's Status column to show Active");
     }
 
-    /// <summary>
-    /// A candidate with an unresolved (non-withdrawn, non-terminal-stage) active application
-    /// cannot be deactivated — the server rejects with 422 and CandidateDetail.razor surfaces the
-    /// API's error message in the action-error alert rather than silently failing.
-    /// </summary>
     [Fact]
     public async Task DeactivateCandidate_WithUnresolvedActiveApplication_ShowsServerError()
     {
@@ -161,8 +153,6 @@ public sealed class CandidateDeactivationTests(RecruiterPersonaFixture fixture) 
         await vacancyDetail.SelectCandidateInAddDialogAsync(candidateName);
         await vacancyDetail.SubmitAddApplicationAsync();
 
-        // The application now sits on the seeded initial (non-terminal) stage — this is the
-        // "unresolved active application" that should block deactivation.
         await candidateList.GoToAsync(AcmeId);
         await candidateList.ClickCandidateAsync(candidateLast);
 
@@ -174,7 +164,6 @@ public sealed class CandidateDeactivationTests(RecruiterPersonaFixture fixture) 
         Assert.False(string.IsNullOrWhiteSpace(errorText),
             "Expected the server's rejection error to be shown in the action-error alert, not silently swallowed");
 
-        // The candidate must remain active — the block was effective, not merely displayed.
         Assert.False(await candidateEdit.HasInactiveBannerAsync(),
             "Expected the candidate to remain active after a blocked deactivation attempt");
     }
@@ -199,8 +188,6 @@ public sealed class CandidateDeactivationTests(RecruiterPersonaFixture fixture) 
         await candidateEdit.FillEmailAsync(email);
         await candidateEdit.SaveNewCandidateAsync();
 
-        // Id isn't surfaced through the list page object; callers that need it can extend this
-        // later if a test requires it directly (none currently do — navigation is by name).
         return (Guid.Empty, lastName, candidateList, candidateEdit);
     }
 }

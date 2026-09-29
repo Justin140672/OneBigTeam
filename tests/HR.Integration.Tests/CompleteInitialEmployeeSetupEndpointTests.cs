@@ -7,11 +7,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-// The "requires initial setup" flag is only ever set by the self-service signup flow, on the
-// initial company admin's own Employee record (see EmployeeProvisioningService.
-// MarkAsInitialCompanyAdminAsync). Rather than reaching into the domain via reflection, these
-// tests drive /api/signup to get a real employee with RequiresInitialSetup == true and a seeded
-// placeholder Compensation record, matching how this state actually arises in production.
 [Collection("Integration")]
 public class CompleteInitialEmployeeSetupEndpointTests
 {
@@ -205,9 +200,6 @@ public class CompleteInitialEmployeeSetupEndpointTests
     {
         var (client, companyId, employeeId) = await SignUpAsync();
 
-        // Signup seeds a placeholder Compensation record alongside RequiresInitialSetup — remove it
-        // to exercise the handler's explicit "at least one compensation record" guard, which never
-        // arises through the production signup flow itself.
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();

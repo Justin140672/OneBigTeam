@@ -37,7 +37,6 @@ public class GetAssetAssignmentReportEndpointTests
     [Fact]
     public async Task Get_AssetAssignmentReport_Returns_Forbidden_For_Manager()
     {
-        // reporting:view-hr only — sensitive company-wide asset data, no manager scoping.
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Manager);

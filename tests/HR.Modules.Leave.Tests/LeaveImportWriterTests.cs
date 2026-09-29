@@ -10,7 +10,7 @@ public class LeaveImportWriterTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 15, 9, 0, 0, DateTimeKind.Utc);
     private static readonly DateTimeOffset Now = new(FixedUtcNow, TimeSpan.Zero);
-    private const int PolicyYear = 2026; // FixedUtcNow.Year, with default LeaveYearStartMonth = 1
+    private const int PolicyYear = 2026;
 
     private static LeaveDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<LeaveDbContext>()
@@ -83,7 +83,6 @@ public class LeaveImportWriterTests
         context.LeaveTypes.Add(leaveType);
         await context.SaveChangesAsync();
 
-        // No LeaveBalance row seeded for this employee/leave type/policy year.
         var writer = BuildWriter(context);
 
         var result = await writer.TryLayOpeningBalanceAsync(
@@ -102,7 +101,6 @@ public class LeaveImportWriterTests
 
         var leaveType = CreateBalanceTrackedLeaveType(companyId);
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, false, Now);
-        // Baseline entitlement of 25 days, no adjustment yet.
         var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, PolicyYear, 25m, new DateOnly(2026, 1, 1), Now);
 
         context.LeaveTypes.Add(leaveType);
@@ -118,7 +116,6 @@ public class LeaveImportWriterTests
         Assert.True(result);
 
         var updatedBalance = await context.LeaveBalances.SingleAsync();
-        // 25 (entitlement) + adjustment = 18 => adjustment of -7.
         Assert.Equal(-7m, updatedBalance.AdjustmentDays);
         Assert.Equal(18m, updatedBalance.EntitlementDays + updatedBalance.AdjustmentDays);
 
@@ -167,8 +164,6 @@ public class LeaveImportWriterTests
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        // LeaveType.Create upper-cases the stored code; the writer's lookup is an exact (not
-        // case-insensitive) match, so a lowercase request code will not resolve it.
         var leaveType = CreateBalanceTrackedLeaveType(companyId, code: "annual");
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard", null, 5, false, false, Now);
         var balance = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id, PolicyYear, 25m, new DateOnly(2026, 1, 1), Now);

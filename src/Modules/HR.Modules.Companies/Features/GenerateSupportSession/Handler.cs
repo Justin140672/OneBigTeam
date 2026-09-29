@@ -11,10 +11,6 @@ using Microsoft.Extensions.Configuration;
 
 namespace HR.Modules.Companies.Features.GenerateSupportSession;
 
-/// <summary>
-/// Same defense-in-depth allow-list gate as ExtendCustomerTrialHandler/GetCustomerDetailsHandler
-/// (see their remarks) — no first-class platform-administrator identity model exists yet.
-/// </summary>
 internal sealed class GenerateSupportSessionHandler(
     CompaniesDbContext dbContext,
     ICurrentUser currentUser,

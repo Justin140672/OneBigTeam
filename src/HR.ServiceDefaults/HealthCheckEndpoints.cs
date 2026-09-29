@@ -9,29 +9,6 @@ using Microsoft.Extensions.Hosting;
 
 namespace Microsoft.Extensions.Hosting;
 
-/// <summary>
-/// NFR-03: production-safe liveness and readiness endpoints, shared by every service that calls
-/// <c>AddServiceDefaults()</c>/<c>MapDefaultEndpoints()</c> (HR.Api, HR.Web, HR.Marketing,
-/// HR.Admin.Web).
-///
-/// <para>
-/// Design:
-/// <list type="bullet">
-/// <item><c>/alive</c> — liveness. Anonymous, always mapped (all environments). Evaluates ONLY
-/// checks tagged <c>live</c> (the built-in "self" check) — never touches a database, HTTP
-/// dependency, or credential. Answers "is this process responsive?" and nothing else.</item>
-/// <item><c>/health/ready</c> — readiness. Anonymous, always mapped. Evaluates every dependency
-/// check. Returns <c>503</c> only when a check tagged <c>critical</c> is Unhealthy; a failing
-/// non-critical ("degraded"-tagged) dependency yields <c>200</c> with an overall status of
-/// <c>Degraded</c> so the platform keeps serving traffic. The public body is minimal
-/// (<c>{"status":"..."}</c>) and discloses no per-check names, descriptions, exceptions, or
-/// infrastructure detail. Full per-check detail is returned only when the caller presents the
-/// configured <c>HealthChecks:ReadinessDetailToken</c> via the <c>X-Health-Token</c> header, or in
-/// the Development environment.</item>
-/// <item><c>/health</c> — the original Aspire aggregate endpoint. Still Development-only.</item>
-/// </list>
-/// </para>
-/// </summary>
 public static class HealthCheckEndpoints
 {
     public const string LivenessPath = "/alive";
@@ -39,16 +16,6 @@ public static class HealthCheckEndpoints
     public const string DetailTokenHeader = "X-Health-Token";
     public const string DetailTokenConfigKey = "HealthChecks:ReadinessDetailToken";
 
-    /// <summary>
-    /// Deployment-pipeline runbook section 5 (rotation protocol): an optional second config key
-    /// naming the token that was valid before the most recent rotation. When set, a caller
-    /// presenting EITHER the current or the previous token gets full detail access — a bounded
-    /// overlap window that lets a fresh deploy (new GitHub secret) and a rollback to the
-    /// immediately-prior known-good deployment (still holding the old GitHub secret, per the
-    /// deploy pipeline's dual-token overlap window) both authenticate without a forced-failure
-    /// rollback. Operators clear this key once the rotation is confirmed stable, ending the
-    /// overlap window and revoking the previous token.
-    /// </summary>
     public const string DetailTokenPreviousConfigKey = "HealthChecks:ReadinessDetailTokenPrevious";
 
     public const string LiveTag = "live";
@@ -58,7 +25,6 @@ public static class HealthCheckEndpoints
 
     public static void MapLivenessAndReadiness(WebApplication app)
     {
-        // Liveness: process responsiveness only. No dependency probing.
         app.MapHealthChecks(LivenessPath, new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
         {
             Predicate = registration => registration.Tags.Contains(LiveTag),
@@ -69,8 +35,6 @@ public static class HealthCheckEndpoints
             },
         }).AllowAnonymous();
 
-        // Readiness: evaluate all dependency checks, but only a failing *critical* dependency
-        // makes the service "not ready".
         app.MapHealthChecks(ReadinessPath, new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
         {
             Predicate = registration => !registration.Tags.Contains(LiveTag),

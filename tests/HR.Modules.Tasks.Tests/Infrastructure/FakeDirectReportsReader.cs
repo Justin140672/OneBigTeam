@@ -4,21 +4,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Tasks.Tests.Infrastructure;
 
-/// <summary>
-/// Fake <see cref="IDirectReportsReader"/> with two modes.
-///
-/// <para><b>Flat mode</b> (<c>new FakeDirectReportsReader(a, b, c)</c>): every manager id resolves
-/// to exactly the given set for both the direct-reports and full-descendant queries. Call-sites
-/// that model an "indirect report" simply by listing it here keep working unchanged.</para>
-///
-/// <para><b>Hierarchy mode</b> (<see cref="WithHierarchy"/>): builds a real
-/// <c>(manager -&gt; direct reports)</c> adjacency map. <see cref="GetAllDescendantIdsAsync"/> walks
-/// it with a breadth-first traversal guarded by a visited-set, so a reporting cycle
-/// (A -&gt; B -&gt; A) or a self-referential manager terminates and no id is yielded twice. The map
-/// is read fresh on every call, so <see cref="Reparent"/> moves an employee between managers'
-/// sub-trees immediately, with nothing to invalidate. See
-/// specifications/architecture/11-manager-hierarchy-scope.md (DSH-02).</para>
-/// </summary>
 internal sealed class FakeDirectReportsReader : IDirectReportsReader
 {
     private readonly IReadOnlyList<Guid>? _flat;
@@ -49,8 +34,6 @@ internal sealed class FakeDirectReportsReader : IDirectReportsReader
         return new FakeDirectReportsReader(tree);
     }
 
-    /// <summary>Moves <paramref name="employeeId"/> so their only manager is now
-    /// <paramref name="newManagerId"/>. Hierarchy mode only.</summary>
     public void Reparent(Guid employeeId, Guid newManagerId)
     {
         foreach (var reports in _tree.Values)

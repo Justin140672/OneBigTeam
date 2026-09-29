@@ -2,12 +2,6 @@ using HR.Modules.Notifications.Domain;
 
 namespace HR.Modules.Notifications.Tests.Domain;
 
-/// <summary>
-/// Follow-up E: exclusive, recoverable operational-alert email delivery. <see cref="OperationalAlertEmailDelivery.RecordAttempt"/>
-/// was removed and replaced by the lease-taking <see cref="OperationalAlertEmailDelivery.Claim"/> /
-/// <see cref="OperationalAlertEmailDelivery.ReleaseForRetry"/> state machine — these tests pin its
-/// boundaries (lease expiry, attempt budget, terminal guards).
-/// </summary>
 public class OperationalAlertEmailDeliveryTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 9, 10, 0, 0, TimeSpan.Zero);
@@ -61,7 +55,6 @@ public class OperationalAlertEmailDeliveryTests
         var delivery = Create();
         Assert.True(delivery.Claim(Guid.NewGuid(), Now).IsSuccess);
 
-        // 1 minute later — well inside the 10 minute lease.
         var result = delivery.Claim(Guid.NewGuid(), Now.AddMinutes(1));
 
         Assert.True(result.IsFailure);
@@ -74,7 +67,6 @@ public class OperationalAlertEmailDeliveryTests
         var delivery = Create();
         Assert.True(delivery.Claim(Guid.NewGuid(), Now).IsSuccess);
 
-        // Exactly at expiry: LeaseExpiresAt <= now => expired.
         var atExpiry = Now.AddMinutes(OperationalAlertEmailDelivery.LeaseMinutes);
         Assert.True(delivery.IsLeaseExpired(atExpiry));
 
@@ -148,7 +140,6 @@ public class OperationalAlertEmailDeliveryTests
         var delivery = Create();
         var now = Now;
 
-        // Exhaust the budget across expired leases.
         for (var i = 0; i < OperationalAlertEmailDelivery.MaxAttempts; i++)
         {
             Assert.True(delivery.Claim(Guid.NewGuid(), now).IsSuccess);
@@ -192,13 +183,13 @@ public class OperationalAlertEmailDeliveryTests
         Assert.Null(delivery.LeaseOwnerToken);
         Assert.Null(delivery.LeaseAcquiredAt);
         Assert.Null(delivery.LeaseExpiresAt);
-        Assert.Equal(1, delivery.AttemptCount); // attempt already consumed by the Claim
+        Assert.Equal(1, delivery.AttemptCount);
     }
 
     [Fact]
     public void ReleaseForRetry_Is_A_NoOp_When_Not_Sending()
     {
-        var delivery = Create(); // Pending
+        var delivery = Create();
         delivery.ReleaseForRetry(Now);
         Assert.Equal(EmailDeliveryStatus.Pending, delivery.Status);
 
@@ -292,7 +283,6 @@ public class OperationalAlertEmailDeliveryTests
         var delivery = Create();
         Assert.True(delivery.Claim(Guid.NewGuid(), Now).IsSuccess);
 
-        // Exactly at expiry the lease counts as expired (LeaseExpiresAt <= now).
         var atExpiry = Now.AddMinutes(OperationalAlertEmailDelivery.LeaseMinutes);
         Assert.Equal(EmailDeliveryStatus.Sending, delivery.Status);
         Assert.False(delivery.HasLiveOwner(atExpiry));

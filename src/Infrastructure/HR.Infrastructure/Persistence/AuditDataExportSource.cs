@@ -18,12 +18,6 @@ namespace HR.Infrastructure.Persistence;
 /// </summary>
 internal sealed class AuditDataExportSource(AuditDbContext context) : IAuditDataExportSource
 {
-    /// <summary>
-    /// Keyset page size. Audit rows are narrow (eight short string columns, a few hundred bytes
-    /// formatted), so a page of 1,000 buffers well under 1 MiB while keeping the round-trip count for
-    /// the ~1.5M-row worst case to ~1,500 — comfortably within the export's multi-minute budget.
-    /// Sits in the middle of the 500–2,000 band called for by the ticket.
-    /// </summary>
     private const int PageSize = 1_000;
 
     private static readonly string[] Columns =
@@ -35,12 +29,6 @@ internal sealed class AuditDataExportSource(AuditDbContext context) : IAuditData
         return Task.FromResult<IReadOnlyList<DataExportTable>>([table]);
     }
 
-    /// <summary>
-    /// Yields every committed audit row for the company, newest first (preserving the existing export
-    /// order), paged by a stable <c>(OccurredAt, Id)</c> keyset cursor. The <c>Id</c> tie-breaker
-    /// guarantees that events sharing an <c>OccurredAt</c> are never skipped or duplicated across a
-    /// page boundary. Cancellation is honoured before each page fetch and while enumerating.
-    /// </summary>
     private async IAsyncEnumerable<IReadOnlyList<string?>> StreamRowsAsync(
         Guid companyId,
         [EnumeratorCancellation] CancellationToken cancellationToken)

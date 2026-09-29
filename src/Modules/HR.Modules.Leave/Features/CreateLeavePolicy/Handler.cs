@@ -62,7 +62,6 @@ internal sealed class CreateLeavePolicyHandler
         var hasAnyPolicy = await _dbContext.LeavePolicies
             .AnyAsync(p => p.CompanyId == request.CompanyId, cancellationToken);
 
-        // A company can never have zero default policies, so the very first policy is always default.
         var isDefault = !hasAnyPolicy || request.IsDefault;
 
         if (hasAnyPolicy && request.IsDefault)

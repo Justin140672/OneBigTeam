@@ -246,14 +246,6 @@
     private List<ReviewOwnerOption> _reviewOwnerOptions = [];
     private IBrowserFile? _selectedFile;
 
-    // OnOpenedAsync below awaits five HTTP calls sequentially with no intermediate
-    // StateHasChanged, so Blazor renders this dialog once as soon as it becomes visible, while
-    // every one of these lists is still its empty default, and only re-renders with real data
-    // once the whole method finishes. Gating Category and the SfMultiSelect audience fields
-    // behind this flag avoids two problems from that empty first render: Category would look
-    // interactive but have nothing to show in its popup, and SfMultiSelect (unlike
-    // SfDropDownList) can hit a JS interop "tracked object disposed" error if its DataSource is
-    // reassigned from an empty list to a populated one shortly after its first render.
     private bool _dataLoaded;
 
     private static readonly List<ReviewFrequencyOption> _reviewFrequencyOptions =
@@ -272,10 +264,6 @@
         _selectedFile = null;
         _dataLoaded = false;
 
-        // These five calls are independent of each other, so they're fired concurrently rather
-        // than awaited one at a time — halves the time _dataLoaded stays false versus the
-        // previous sequential-await version, shrinking the window where Category and the
-        // audience SfMultiSelect fields are stuck showing their loading placeholder.
         var categoriesTask       = DocumentService.ListCompanyDocumentCategoriesAsync(CompanyId);
         var departmentsTask      = DepartmentService.ListDepartmentsAsync(CompanyId);
         var locationsTask        = LocationService.ListLocationsAsync(CompanyId);
@@ -305,14 +293,8 @@
         _dataLoaded = true;
     }
 
-    // The review owner list can't be preloaded exhaustively — search server-side as the user
-    // types instead, same pattern as EmployeeEmploymentTab's manager picker.
     private int _reviewOwnerFilterRequestId;
 
-    // Requests aren't guaranteed to resolve in the order they were fired — applying every response
-    // unconditionally means a late-arriving response for an earlier keystroke can land after the
-    // user already picked a review owner from a later, faster response, visibly clearing their
-    // selection. Only the most recently issued request's response is applied.
     private async Task OnReviewOwnerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
     {
         args.PreventDefaultAction = true;
@@ -347,9 +329,6 @@
         }
     }
 
-    // A due date isn't required here — acknowledgement settings only need to be complete by the
-    // time the document is published (enforced server-side by PublishSharedCompanyDocument), so
-    // HR can upload first and fill in the due date later via the Acknowledgement edit dialog.
     protected override string? ValidateExtra()
     {
         if (_selectedFile is null) return "Please select a file.";

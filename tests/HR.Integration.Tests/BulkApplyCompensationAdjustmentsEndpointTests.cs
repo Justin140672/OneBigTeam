@@ -159,10 +159,6 @@ public class BulkApplyCompensationAdjustmentsEndpointTests
             }
         });
 
-        // A JSON string that doesn't map to any CompensationChangeReason member fails during model
-        // binding/deserialization before FluentValidation even runs, so this is expected to surface as
-        // a 400 (deserialization failure) rather than FluentValidation's usual 422 — either way it must
-        // not succeed.
         Assert.True(
             response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity,
             $"Expected a client error status but got {response.StatusCode}.");

@@ -55,8 +55,6 @@ public class GetReportFavouritesHandlerTests
 
         var handler = new GetReportFavouritesHandler(db);
 
-        // Simulates a permission revoked after the favourite was saved: "employee-directory"
-        // requires reporting:view-hr, which NoAccessGates does not grant.
         var result = await handler.HandleAsync(
             new GetReportFavouritesRequest(companyId), userId, NoAccessGates, CancellationToken.None);
 
@@ -76,8 +74,6 @@ public class GetReportFavouritesHandlerTests
 
         var handler = new GetReportFavouritesHandler(db);
 
-        // Even with every gate granted, a favourite for a report id that isn't in the catalogue at
-        // all must still be silently omitted rather than erroring.
         var fullAccessGates = new ReportAccessGates(true, true, true, true, true, true, true, true);
 
         var result = await handler.HandleAsync(

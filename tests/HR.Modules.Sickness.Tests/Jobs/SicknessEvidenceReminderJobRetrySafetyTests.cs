@@ -9,13 +9,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Sickness.Tests.Jobs;
 
-/// <summary>
-/// OBT-REM-04: the reminder job must be safe to retry. The Pending→Overdue transition is committed
-/// per request before any notification/event, and the notify step is guarded by the durable
-/// <see cref="INotificationWriter.ExistsAsync"/> key so a retry only fills gaps. A failure for one
-/// employee (notification writer or event publisher) is logged and skipped without blocking the
-/// rest of the batch; cancellation is never swallowed by the per-item catch.
-/// </summary>
 public class SicknessEvidenceReminderJobRetrySafetyTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 15, 2, 0, 0, DateTimeKind.Utc);
@@ -32,7 +25,6 @@ public class SicknessEvidenceReminderJobRetrySafetyTests
         new(db, writer, publisher, new FakeClock(FixedUtcNow),
             NullLogger<SicknessEvidenceReminderJob>.Instance);
 
-    // ── failure-injecting decorators ──────────────────────────────────────
 
     private sealed class ThrowingNotificationWriter(
         FakeNotificationWriter inner, Func<Guid, bool> failForEmployee, int failTimes = int.MaxValue)
@@ -100,7 +92,6 @@ public class SicknessEvidenceReminderJobRetrySafetyTests
         }
     }
 
-    // ── seeding ──────────────────────────────────────────────────────────
 
     private static async Task<(Guid recordId, Guid employeeId, Guid companyId)> SeedRecordAsync(
         SicknessDbContext db, Guid? companyId = null)
@@ -128,7 +119,6 @@ public class SicknessEvidenceReminderJobRetrySafetyTests
         return request;
     }
 
-    // ── tests ────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Status_transition_persists_even_when_the_overdue_notification_fails()
@@ -146,7 +136,6 @@ public class SicknessEvidenceReminderJobRetrySafetyTests
         Assert.Equal(SicknessEvidenceRequestStatus.Overdue, updated.Status);
         Assert.DoesNotContain(fake.Written, n => n.Type == NotificationType.SicknessEvidenceOverdue);
 
-        // Retry: transition already done, notification now succeeds — sent exactly once.
         await BuildJob(db, writer, new FakeIntegrationEventPublisher()).ExecuteAsync();
         Assert.Single(fake.Written, n => n.Type == NotificationType.SicknessEvidenceOverdue);
 
@@ -169,7 +158,6 @@ public class SicknessEvidenceReminderJobRetrySafetyTests
 
         await BuildJob(db, writer, new FakeIntegrationEventPublisher()).ExecuteAsync();
 
-        // Both transitioned; only B got its notification.
         var all = await db.SicknessEvidenceRequests.ToListAsync();
         Assert.All(all, r => Assert.Equal(SicknessEvidenceRequestStatus.Overdue, r.Status));
         var overdue = Assert.Single(fake.Written, n => n.Type == NotificationType.SicknessEvidenceOverdue);
@@ -236,13 +224,10 @@ public class SicknessEvidenceReminderJobRetrySafetyTests
         await using var db = BuildContext();
         var (recordId, _, companyId) = await SeedRecordAsync(db);
 
-        // due soon (reminder)
         db.SicknessEvidenceRequests.Add(SicknessEvidenceRequest.Create(
             Guid.NewGuid(), companyId, recordId, Guid.Empty, Today.AddDays(1), null, Now));
-        // newly overdue
         db.SicknessEvidenceRequests.Add(SicknessEvidenceRequest.Create(
             Guid.NewGuid(), companyId, recordId, Guid.Empty, Today.AddDays(-1), null, Now));
-        // already overdue (within reconciliation window)
         var already = SicknessEvidenceRequest.Create(
             Guid.NewGuid(), companyId, recordId, Guid.Empty, Today.AddDays(-4), null, Now);
         already.MarkOverdue(Now);
@@ -253,7 +238,6 @@ public class SicknessEvidenceReminderJobRetrySafetyTests
         await BuildJob(db, fake, new FakeIntegrationEventPublisher()).ExecuteAsync();
 
         Assert.Single(fake.Written, n => n.Type == NotificationType.SicknessEvidenceReminder);
-        // both the newly-overdue and the already-overdue (previously un-notified) get an overdue note
         Assert.Equal(2, fake.Written.Count(n => n.Type == NotificationType.SicknessEvidenceOverdue));
         Assert.Equal(2, await db.SicknessEvidenceRequests
             .CountAsync(r => r.Status == SicknessEvidenceRequestStatus.Overdue));

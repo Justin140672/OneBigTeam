@@ -5,9 +5,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Features.ListEmployeeRoleOverrides;
 
-// IAM-04: lists every currently-stored override (active and expired-but-not-yet-swept) for a
-// target user, only returned when the caller has role-administration permission (users:manage,
-// declared at the endpoint) — access to another user's overrides is never available without it.
 internal sealed class ListEmployeeRoleOverridesHandler(
     IdentityDbContext db,
     ITargetUserCompanyGuard targetUserCompanyGuard)
@@ -15,7 +12,6 @@ internal sealed class ListEmployeeRoleOverridesHandler(
     public async Task<Result<ListEmployeeRoleOverridesResponse>> HandleAsync(
         ListEmployeeRoleOverridesRequest request, CancellationToken cancellationToken)
     {
-        // IAM-01-style guard: the target user id must belong to the route company.
         var isMember = await targetUserCompanyGuard.IsMemberAsync(request.CompanyId, request.UserId, cancellationToken);
         if (!isMember)
             return Result.Failure<ListEmployeeRoleOverridesResponse>(Error.NotFound("User was not found."));

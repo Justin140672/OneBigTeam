@@ -12,7 +12,6 @@ internal sealed class CreateCandidateApplicationValidator : AbstractValidator<Cr
         RuleFor(r => r.VacancyId)
             .NotEmpty();
 
-        // Candidate fields: same rules as CreateCandidate.
         RuleFor(r => r.FirstName)
             .NotEmpty()
             .MaximumLength(100);
@@ -34,7 +33,6 @@ internal sealed class CreateCandidateApplicationValidator : AbstractValidator<Cr
             .MaximumLength(500)
             .When(r => !string.IsNullOrWhiteSpace(r.ResumeUrl));
 
-        // Application fields: same rules as CreateApplication.
         RuleFor(r => r.Notes)
             .MaximumLength(2000)
             .When(r => !string.IsNullOrWhiteSpace(r.Notes));
@@ -45,7 +43,6 @@ internal sealed class CreateCandidateApplicationValidator : AbstractValidator<Cr
             .NotEqual(Domain.ApplicationSource.Internal)
             .WithMessage("Source 'Internal' is recorded automatically when an employee applies for an internal vacancy and cannot be set manually.");
 
-        // NotEmpty() on Guid? only rejects null (default of Guid? is null), so Guid.Empty is checked explicitly.
         RuleFor(r => r.SourceExternalRecruiterId)
             .Must(id => id.HasValue && id.Value != Guid.Empty)
             .WithMessage("SourceExternalRecruiterId is required when Source is ExternalRecruiter.")
@@ -56,7 +53,5 @@ internal sealed class CreateCandidateApplicationValidator : AbstractValidator<Cr
             .WithMessage("SourceExternalRecruiterId must not be supplied unless Source is ExternalRecruiter.")
             .When(r => r.Source != Domain.ApplicationSource.ExternalRecruiter);
 
-        // The CV is optional. Its size/type rules are the configured candidate-document limits, enforced
-        // by the shared upload staging rules (identical to UploadCandidateDocument).
     }
 }

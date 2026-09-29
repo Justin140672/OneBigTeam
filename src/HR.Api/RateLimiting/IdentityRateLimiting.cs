@@ -45,15 +45,6 @@ internal static class IdentityRateLimiting
     public const string AcceptInvitePolicy = "identity-accept-invite";
     public const string ResetPasswordPolicy = "identity-reset-password";
 
-    /// <summary>
-    /// Buffers and parses the request body once (from behind <see cref="app.UseRateLimiter"/>, i.e.
-    /// before FastEndpoints ever sees it) purely to extract a normalized email/token for the keyed
-    /// partition above — never for any other purpose, and the raw value is never itself retained
-    /// past this middleware; only its salted hash survives into the limiter key. Scoped to exactly
-    /// the six identity POST routes so no other request pays for the body buffering. Fails open to
-    /// "no secondary key" (the request is still admitted/denied purely on the IP component) on any
-    /// parse failure — a malformed body is FluentValidation's problem, not this middleware's.
-    /// </summary>
     private static readonly IReadOnlyDictionary<PathString, string> RouteToBodyField = new Dictionary<PathString, string>
     {
         ["/api/login"] = "email",
@@ -96,20 +87,12 @@ internal static class IdentityRateLimiting
             }
             catch (JsonException)
             {
-                // Fails open — see method remarks.
             }
         }
 
         await next(context);
     }
 
-    /// <summary>
-    /// Salted (never a bare/reversible hash of the value alone) SHA-256 digest used as a rate-limit
-    /// partition key component. The salt is a fixed, non-secret, process-local value — its only
-    /// purpose is to stop a limiter key being trivially recomputable/correlatable from a leaked hash
-    /// list against a plain email dictionary; it is not a security boundary in itself (this is a
-    /// rate limit, not an authentication credential).
-    /// </summary>
     private static string KeyedHash(string value)
     {
         var bytes = Encoding.UTF8.GetBytes("identity-rate-limit-salt:" + value);
@@ -138,10 +121,6 @@ internal static class IdentityRateLimiting
         AddPolicy(options, configuration, AcceptInvitePolicy, windowMinutes: 15, permitLimit: 10);
         AddPolicy(options, configuration, ResetPasswordPolicy, windowMinutes: 15, permitLimit: 10);
 
-        // Safe error contract + Retry-After on 429: never leaks the identity/policy internals a
-        // caller could use to fingerprint which specific dimension (IP vs identity) tripped.
-        // Metrics/log line reports policy name and outcome only — never the request's identity value
-        // and never the raw request path/query (CodeQL #60, see RateLimitRejectionLogging).
         options.OnRejected = async (context, cancellationToken) =>
         {
             context.HttpContext.Response.Headers.RetryAfter =
@@ -167,12 +146,6 @@ internal static class IdentityRateLimiting
         int windowMinutes,
         int permitLimit)
     {
-        // Configurable per policy/environment (dev/test can raise limits without disabling the
-        // production policy — see acceptance criteria) via
-        // Identity:RateLimits:<PolicyName>:{WindowMinutes,PermitLimit}. WindowSeconds is an
-        // additional, optional override (test-motivated: minutes-only granularity makes a
-        // deterministic window-recovery integration test impractically slow) — when present it wins
-        // over WindowMinutes; production config continues to use WindowMinutes only.
         var section = configuration.GetSection($"Identity:RateLimits:{policyName}");
         var resolvedWindow = section.GetValue("WindowMinutes", windowMinutes);
         var resolvedWindowSeconds = section.GetValue<int?>("WindowSeconds", null);
@@ -191,15 +164,6 @@ internal static class IdentityRateLimiting
                 }));
     }
 
-    /// <summary>
-    /// Forwarded-header trust: <see cref="ForwardedHeadersOptions"/> only honours X-Forwarded-For
-    /// from a request whose immediate remote address is itself in <c>KnownProxies</c>/<c>KnownIPNetworks</c>
-    /// — an untrusted client cannot spoof its own IP (and therefore cannot pick its own rate-limit
-    /// partition) merely by sending the header. Configured via Identity:TrustedProxies (comma-
-    /// separated IP list) and Identity:TrustedProxyNetworks (comma-separated CIDR list); empty by
-    /// default, meaning forwarded headers are ignored entirely (fail-closed to the raw connection
-    /// IP, which is always correct for a direct-to-app deployment).
-    /// </summary>
     public static void ConfigureTrustedProxies(this IServiceCollection services, IConfiguration configuration)
     {
         services.Configure<ForwardedHeadersOptions>(options =>
@@ -227,15 +191,6 @@ internal static class IdentityRateLimiting
                 }
             }
 
-            // CRITICAL: ForwardedHeadersMiddleware's own documented behaviour is the OPPOSITE of
-            // what "empty allow-list" would naturally suggest — when KnownProxies AND
-            // KnownIPNetworks are BOTH empty, it treats that as "no restriction configured" and
-            // honours X-Forwarded-For from ANY caller, not from none. Left as the two empty lists
-            // above, an unconfigured deployment would let any anonymous caller spoof its own
-            // rate-limit IP partition merely by sending the header — silently defeating this
-            // entire feature's IP-based defence. Explicitly disabling header processing when
-            // nothing is configured is what actually gives the documented "empty = ignored,
-            // fail-closed to the raw connection IP" behaviour.
             if (options.KnownProxies.Count == 0 && options.KnownIPNetworks.Count == 0)
             {
                 options.ForwardedHeaders = ForwardedHeaders.None;

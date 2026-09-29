@@ -33,11 +33,6 @@ internal sealed record UpdateEmployeeProfileRequest
     public WorkingDays? WorkingDaysOverride { get; init; }
     public decimal? HoursPerDayOverride { get; init; }
 
-    // Ticket: "merge Employee + Employment tab audit entries when saved together". Optional —
-    // defaults to null so existing callers of this request (e.g. any other page that only edits
-    // the Employee Profile tab in isolation) are unaffected. EmployeeEdit.razor's combined save
-    // generates one Guid and passes it into both this request and UpdateEmploymentDetailsRequest
-    // so GetEmployeeAuditHistoryHandler can merge the two resulting audit rows into a single item.
     public Guid? CorrelationId { get; init; }
 
     // Ticket 2 (optimistic concurrency): the Employee.Version the client loaded before editing.

@@ -42,11 +42,6 @@ internal sealed class Handler(
 
         if (currentProfile?.PositionProfileId != integrationEvent.NewPositionProfileId)
         {
-            // Stale/out-of-order delivery, or the employee's current state can't be confirmed right
-            // now — do not touch either the previous or the new assignment. Applying only half of a
-            // stale event (e.g. expiring a still-current previous assignment) would be worse than
-            // doing nothing; the recurring reconciliation pass converges on the true current state
-            // regardless of event ordering.
             logger.LogInformation(
                 "Skipped stale/out-of-order EmployeePositionChangedIntegrationEvent for employee {EmployeeId} " +
                 "in company {CompanyId}: event's new position {EventNewPositionId} does not match the " +
@@ -61,22 +56,12 @@ internal sealed class Handler(
                   up.PositionId == integrationEvent.PreviousPositionProfileId,
             cancellationToken);
 
-        // Historical/expired position assignments must cease granting access — expiring here
-        // (rather than deleting) keeps the row as an auditable record of when the employee held
-        // that position. Idempotent: a row already expired at or before `now` is left untouched.
         if (previousAssignment is not null && previousAssignment.IsActive(now))
             previousAssignment.SetExpiry(now);
 
         var newPosition = await positionSync.EnsureExistsAsync(
             integrationEvent.CompanyId, integrationEvent.NewPositionProfileId, now, cancellationToken);
 
-        // If the new position profile cannot be resolved for this company right now (e.g. a
-        // delivery race against the profile's own lifecycle), there is no Position row to satisfy
-        // the UserPosition -> Position foreign key — skip creating/reopening the new assignment
-        // rather than let the whole SaveChangesAsync below fail, which would otherwise also roll
-        // back the previous assignment's expiry set above. The previous assignment is still
-        // expired and persisted; the new assignment will be picked up by the reconciliation pass
-        // (IdentityModule.ReconcilePositionRoleAssignmentsAsync) or a later, resolvable event.
         if (newPosition is not null)
         {
             var newAssignment = await db.UserPositions.FirstOrDefaultAsync(
@@ -90,8 +75,6 @@ internal sealed class Handler(
             }
             else if (!newAssignment.IsActive(now))
             {
-                // Re-assigned back to a position previously held and since expired — reopen it rather
-                // than inserting a duplicate composite-key row.
                 newAssignment.ClearExpiry();
             }
         }

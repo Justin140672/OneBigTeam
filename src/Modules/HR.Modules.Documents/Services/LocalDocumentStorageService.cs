@@ -3,10 +3,6 @@ using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Documents.Services;
 
-/// <summary>
-/// Development implementation that stores files on the local file system.
-/// Replace with a cloud implementation (Azure Blob, S3, etc.) for production.
-/// </summary>
 internal sealed class LocalDocumentStorageService(
     IHttpContextAccessor httpContextAccessor,
     ILocalStorageUrlSigner urlSigner)
@@ -21,9 +17,6 @@ internal sealed class LocalDocumentStorageService(
         string storageFolder,
         CancellationToken cancellationToken)
     {
-        // The original file name is untrusted and is recorded separately as display metadata; the
-        // physical storage key never incorporates it, so it cannot be used to escape the storage
-        // root via ".." or rooted path segments.
         var extension  = Path.GetExtension(fileName);
         var safeFolder = string.Join('/', storageFolder.Split('/', StringSplitOptions.RemoveEmptyEntries)
             .Select(Uri.EscapeDataString));
@@ -38,9 +31,6 @@ internal sealed class LocalDocumentStorageService(
         return storageKey;
     }
 
-    // A raw file:// path here isn't followable by DownloadEmployeeDocument's browser redirect
-    // once served from an http(s):// page — route through the dev-only streaming endpoint in
-    // Program.cs instead, which serves the same local file over HTTP.
     public Task<Uri> GetDownloadUrlAsync(
         string storageKey,
         CancellationToken cancellationToken)
@@ -50,8 +40,6 @@ internal sealed class LocalDocumentStorageService(
             ? $"{request.Scheme}://{request.Host}"
             : "http://localhost";
 
-        // Short-lived HMAC-signed URL; the route re-checks the record is live and Clean via
-        // DocumentsLocalStorageObjectResolver. Only authorised download handlers reach this method.
         return Task.FromResult(urlSigner.CreateSignedUrl(baseUrl, LocalStorageBuckets.Documents, storageKey));
     }
 

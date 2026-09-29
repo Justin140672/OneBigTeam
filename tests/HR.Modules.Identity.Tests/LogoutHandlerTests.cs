@@ -65,8 +65,6 @@ public class LogoutHandlerTests
     [Fact]
     public async Task Does_Not_Record_Revocation_When_Caller_Identity_Is_Unknown()
     {
-        // e.g. the presented bearer failed HR.Api's own JWT validation, so no "sub" claim was
-        // available to the endpoint — nothing reliably-identified to revoke.
         await _handler.HandleAsync("access-token-value", supabaseAuthUserId: null, CancellationToken.None);
 
         Assert.Empty(_revocationStore.RevokeCalls);
@@ -90,9 +88,6 @@ public class LogoutHandlerTests
     [Fact]
     public async Task Records_Revocation_Even_When_There_Is_No_Bearer_Token_To_Forward_To_Supabase()
     {
-        // The revocation record only needs the validated identity, not a token to hand to Supabase —
-        // e.g. a cookie that already expired by the time the browser hit /logout, but whose earlier
-        // requests are still what must be invalidated.
         var userId = Guid.NewGuid();
 
         await _handler.HandleAsync(accessToken: null, userId, CancellationToken.None);

@@ -69,7 +69,6 @@ internal sealed class LeavePolicyConfiguration : IEntityTypeConfiguration<LeaveP
 
         builder.HasIndex(p => p.CompanyId);
 
-        // Enforces "at most one default leave policy per company" at the database level.
         builder.HasIndex(p => p.CompanyId)
             .IsUnique()
             .HasFilter("is_default")

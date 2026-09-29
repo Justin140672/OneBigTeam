@@ -92,9 +92,6 @@ internal sealed class CustomerSubscriptionConfiguration : IEntityTypeConfigurati
             .HasColumnName("updated_at")
             .IsRequired();
 
-        // OBT-REM-09: optimistic concurrency token — protects the subscription projection update
-        // against two concurrent Stripe webhook deliveries for different events racing each other.
-        // A plain persisted int (not Postgres xmin), matching CompanySettings.Version convention.
         builder.Property(s => s.Version)
             .HasColumnName("version")
             .IsRequired()

@@ -3,22 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Happy-path coverage for HR.Admin.Web's Marketing Content page (/marketing-content), linked from
-/// MainLayout as "Marketing Content". It manages the public marketing site's product features and
-/// roadmap items through MarketingContentAdminService (endpoints /api/marketing/admin/* in the
-/// HR.Modules.Marketing module, policy "platform:admin").
-///
-/// Modelled on AdminUsersManagementTests / PlatformSettingsManagementTests: admin login via
-/// AdminLoginPage against _fixture.AdminWebBaseUrl, RoleE2ETestBase&lt;ParallelBlankPersonaFixture&gt;,
-/// and "priya.shah@acme.example" as the allow-listed platform admin (in "PlatformAdmin:AllowedEmails"
-/// and bootstrap-seeded as an enabled PlatformOwner).
-///
-/// One test walks the full feature lifecycle (create -> edit -> publish toggle -> reorder), and a
-/// second covers the roadmap create + publish toggle, to keep the two tables' flows isolated.
-/// Each created row uses a timestamp-suffixed slug/title so repeated runs against the same fixture
-/// don't collide on the slug/title uniqueness the seeder relies on.
-/// </summary>
 public sealed class MarketingContentManagementTests(ParallelBlankPersonaFixture fixture)
     : RoleE2ETestBase<ParallelBlankPersonaFixture>(fixture)
 {
@@ -47,7 +31,6 @@ public sealed class MarketingContentManagementTests(ParallelBlankPersonaFixture 
         var slug = $"e2e-{stamp}";
         var title = $"E2E Feature {stamp}";
 
-        // Create
         await marketing.ClickAddFeatureAsync();
         await marketing.FillFeatureFormAsync(
             slug: slug,
@@ -60,10 +43,8 @@ public sealed class MarketingContentManagementTests(ParallelBlankPersonaFixture 
         Assert.True(await marketing.IsSuccessBannerVisibleAsync(),
             $"Expected the 'Saved.' banner after creating the feature. Error: {await SafeErrorAsync(marketing)}");
         Assert.True(await marketing.HasFeatureAsync(title), "Expected the newly-created feature row to appear");
-        // New features are created unpublished (MarketingFeature.Create sets IsPublished = false).
         Assert.Equal("No", (await marketing.GetFeaturePublishedTextAsync(title))?.Trim());
 
-        // Edit the title
         var updatedTitle = $"{title} (edited)";
         await marketing.ClickEditFeatureAsync(title);
         await marketing.FillFeatureFormAsync(title: updatedTitle);
@@ -74,17 +55,14 @@ public sealed class MarketingContentManagementTests(ParallelBlankPersonaFixture 
         Assert.True(await marketing.HasFeatureAsync(updatedTitle),
             "Expected the edited feature title to show in the Features table");
 
-        // Publish then Unpublish -> the Published cell flips both ways (starts "No" after create)
         await marketing.ToggleFeaturePublicationAsync(updatedTitle);
         Assert.Equal("Yes", (await marketing.GetFeaturePublishedTextAsync(updatedTitle))?.Trim());
 
         await marketing.ToggleFeaturePublicationAsync(updatedTitle);
         Assert.Equal("No", (await marketing.GetFeaturePublishedTextAsync(updatedTitle))?.Trim());
 
-        // Re-publish so the reorder assertions below operate on a published row.
         await marketing.ToggleFeaturePublicationAsync(updatedTitle);
 
-        // Reorder: the newly-created feature is appended last; move it up one and assert order changed.
         var before = await marketing.GetFeatureTitlesInOrderAsync();
         var startIndex = before.FindIndex(t => t == updatedTitle);
         Assert.True(startIndex > 0, "Expected the created feature to be below the first row before reordering");

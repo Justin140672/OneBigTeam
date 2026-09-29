@@ -34,10 +34,6 @@ internal sealed class UploadMyProfilePhotoHandler(
 
         await using var fileStream = file.OpenReadStream();
 
-        // Virus scanning happens asynchronously via ScanUploadedFileJob (enqueued below) rather
-        // than inline — the row is stored with ScanStatus = Pending.
-        // Verify file content matches the declared content type and that its pixel dimensions
-        // fall within the configured bounds (prevents extension/MIME spoofing).
         var contentResult = imageValidator.ValidateImageContent(fileStream, file.ContentType);
         if (contentResult.IsFailure)
             return Result.Failure<UploadMyProfilePhotoResponse>(contentResult.Error);
@@ -89,27 +85,18 @@ internal sealed class UploadMyProfilePhotoHandler(
         }
         catch
         {
-            // Best-effort: remove the already-uploaded file so it doesn't become an orphan.
             try { await storage.DeleteAsync(storageKey, cancellationToken); } catch { }
             throw;
         }
 
         if (oldStorageKey is not null)
         {
-            // Only remove the old blob once the new one is safely persisted.
             try { await storage.DeleteAsync(oldStorageKey, cancellationToken); } catch { }
         }
 
         var names = await employeeNameReader.GetNamesAsync(request.CompanyId, [employeeId], cancellationToken);
         var employeeName = names.TryGetValue(employeeId, out var name) ? name : "an employee";
 
-        // The pending submission keeps a stable Id across re-uploads (see PendingProfilePhoto.Replace
-        // above) — without a deterministic idempotency key, re-uploading while a review is already
-        // outstanding would create a second open task pointing at the same submission, since
-        // ITaskCreator.CreateAsync has no other way to know this "new" task is really the same
-        // review being refreshed. Keying on the pending photo's Id guarantees exactly one active
-        // task per submission (req #2/#6/#12), and ITaskCompleter.CompleteBySourceEntityAsync only
-        // ever needs to resolve a single open task for that sourceEntityId as a result.
         await taskCreator.CreateAsync(
             request.CompanyId,
             createdBy:          employeeId,

@@ -2,16 +2,8 @@ using HR.Web.Services;
 
 namespace HR.Web.Tests;
 
-/// <summary>
-/// Unit coverage for the server-side auth handoff exchange introduced by the security ticket
-/// "Remove authentication tokens from browser-visible URLs". The store must be single-use,
-/// time-limited, and must never hand back a session for an unknown/blank/tampered code.
-/// </summary>
 public class AuthHandoffStoreTests
 {
-    // A minimal settable TimeProvider stand-in. A dedicated FakeTimeProvider package
-    // (Microsoft.Extensions.TimeProvider.Testing) is not currently referenced anywhere in the
-    // solution; this local double keeps the test dependency-free while giving the same control.
     private sealed class TestTimeProvider : TimeProvider
     {
         private DateTimeOffset _now = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);

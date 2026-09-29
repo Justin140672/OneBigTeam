@@ -53,8 +53,6 @@ internal sealed class PublishVacancyHandler(
             return Result.Failure<PublishVacancyResponse>(
                 Error.Validation($"Cannot publish a vacancy with status '{vacancy.Status}'."));
 
-        // SET-05: when the company requires vacancy approval, a vacancy cannot be published until
-        // it has been explicitly approved via the ApproveVacancy endpoint.
         var recruitmentSettings = await recruitmentSettingsReader.GetRecruitmentSettingsAsync(request.CompanyId, cancellationToken);
         if (recruitmentSettings.VacancyApprovalRequired && vacancy.ApprovedAt is null)
             return Result.Failure<PublishVacancyResponse>(
@@ -92,8 +90,6 @@ internal sealed class PublishVacancyHandler(
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        // Cross-module read purely for a readable audit Summary line — see VacancyClosedAuditEvent's
-        // remarks and the identical pattern in CloseVacancyHandler/UpdateVacancyHandler.
         var effectiveTitle = vacancy.AdvertTitle
             ?? (await positionProfileReader.GetSummaryAsync(request.CompanyId, vacancy.PositionProfileId, cancellationToken))?.Title
             ?? "(untitled)";

@@ -10,11 +10,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Companies.Features.ListCustomers;
 
-/// <summary>
-/// Same defense-in-depth allow-list gate as GetCustomerDashboardHandler (see its remarks) — no
-/// first-class platform-administrator identity model exists yet, so the caller's email must
-/// additionally appear in the "PlatformAdmin:AllowedEmails" configuration allow-list.
-/// </summary>
 internal sealed class ListCustomersHandler(
     CompaniesDbContext dbContext,
     HR.SharedKernel.ICurrentUser currentUser,
@@ -69,12 +64,6 @@ internal sealed class ListCustomersHandler(
             }
         }
 
-        // Sequential, not one concurrent GetEmployeeDirectoryAsync call per company via
-        // Task.WhenAll — see GetCustomerDetailsHandler's matching fix/remarks. Every company here
-        // shares the same scoped IEmployeeDirectoryReader (one EmployeesDbContext for the whole
-        // request), so running more than one of these calls concurrently throws "A second
-        // operation was started on this context instance before a previous operation completed"
-        // as soon as there are 2+ companies — i.e. on every real call to this endpoint.
         var employeeCountByCompanyId = new Dictionary<Guid, int>();
         foreach (var company in companies)
         {

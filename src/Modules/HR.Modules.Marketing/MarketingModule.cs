@@ -92,12 +92,6 @@ public static class MarketingModule
         await db.Database.MigrateAsync();
     }
 
-    /// <summary>
-    /// Idempotent seed of the marketing content set. Upserts the <see cref="MarketingProduct"/>
-    /// singleton, then inserts any of the seed features (matched by slug) / roadmap items (matched
-    /// by stable seed id or title) that are not already present. Upgrades untouched legacy
-    /// roadmap seeds once, preserving administrator edits and completion/publication choices.
-    /// </summary>
     public static async Task SeedMarketingAsync(this IServiceProvider services)
     {
         using var scope = services.CreateScope();
@@ -147,8 +141,6 @@ public static class MarketingModule
 
             if (existing is not null)
             {
-                // Upgrade only untouched legacy seed content once. Preserve admin changes,
-                // publication choices and completed statuses on every subsequent startup.
                 if (seed.LegacyTitle is not null && existing.Title == seed.LegacyTitle
                     && existing.CreatedByUserId is null && existing.UpdatedByUserId is null
                     && existing.DeliveryStatus != MarketingDeliveryStatus.Available)

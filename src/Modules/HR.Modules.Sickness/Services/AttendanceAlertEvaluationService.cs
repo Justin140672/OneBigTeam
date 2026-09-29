@@ -3,14 +3,6 @@ using HR.Modules.Sickness.Domain;
 
 namespace HR.Modules.Sickness.Services;
 
-/// <summary>
-/// SICK-04: deterministic, pure evaluation of attendance-pattern rules for a single employee.
-/// Takes the employee's sickness history plus configured thresholds and an evaluation date, and
-/// returns which rules fire. Never touches the database, never mutates SicknessRecord/
-/// ReturnToWorkReview, and produces no clinical detail — descriptions are built only from dates
-/// and counts. Callers (AttendanceAlertEvaluationJob) are responsible for persistence and
-/// duplicate-prevention.
-/// </summary>
 internal sealed class AttendanceAlertEvaluationService
 {
     public IReadOnlyList<AttendanceAlertCandidate> Evaluate(
@@ -34,8 +26,6 @@ internal sealed class AttendanceAlertEvaluationService
         return candidates;
     }
 
-    /// <summary>Rule: N or more separate absence spells starting within a rolling window ending on the
-    /// evaluation date.</summary>
     private static AttendanceAlertCandidate? EvaluateFrequentAbsences(
         IReadOnlyList<SicknessRecord> sicknessRecords,
         CompanySicknessSettings settings,
@@ -61,8 +51,6 @@ internal sealed class AttendanceAlertEvaluationService
             $"{spellsInWindow.Count} separate absence spells between {periodStart:yyyy-MM-dd} and {evaluationDate:yyyy-MM-dd}.");
     }
 
-    /// <summary>Rule: a single weekday recurring as the absence start day N or more times within a
-    /// rolling window.</summary>
     private static AttendanceAlertCandidate? EvaluateWeekdayPattern(
         IReadOnlyList<SicknessRecord> sicknessRecords,
         CompanySicknessSettings settings,
@@ -95,8 +83,6 @@ internal sealed class AttendanceAlertEvaluationService
             $"{byWeekday.Dates.Count} absences starting on a {byWeekday.Weekday} between {periodStart:yyyy-MM-dd} and {evaluationDate:yyyy-MM-dd}.");
     }
 
-    /// <summary>Rule: a single absence spell whose duration meets/exceeds the long-absence threshold.
-    /// Fires per qualifying spell (a person may have more than one long spell in their history).</summary>
     private static IEnumerable<AttendanceAlertCandidate> EvaluateLongAbsences(
         IReadOnlyList<SicknessRecord> sicknessRecords,
         CompanySicknessSettings settings,
@@ -104,8 +90,6 @@ internal sealed class AttendanceAlertEvaluationService
     {
         foreach (var record in sicknessRecords)
         {
-            // An open (ongoing) spell is measured up to the evaluation date; a closed spell up to
-            // its own EndDate. Either way this never looks beyond the evaluation date.
             var effectiveEnd = record.EndDate ?? evaluationDate;
             if (effectiveEnd > evaluationDate)
                 continue;
@@ -123,9 +107,6 @@ internal sealed class AttendanceAlertEvaluationService
         }
     }
 
-    /// <summary>Rule: a return-to-work review that is overdue as of the evaluation date, or a closed
-    /// sickness record whose duration required a review but no review record exists at all (a data
-    /// gap — every other write path raises one, so this is a defensive catch-all).</summary>
     private static IEnumerable<AttendanceAlertCandidate> EvaluateMissingReturnToWorkReviews(
         IReadOnlyList<SicknessRecord> sicknessRecords,
         IReadOnlyList<ReturnToWorkReview> returnToWorkReviews,

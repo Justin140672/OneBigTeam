@@ -3,9 +3,6 @@ using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Identity.Features.GetPermissionHistory;
 
-// IAM-08: consolidated, company-scoped permission-change history — direct role changes,
-// position/inherited-role changes and override changes all surface through the same view (unlike
-// GetUserAuditHistory, which is scoped to a single employee).
 internal sealed class Endpoint(GetPermissionHistoryHandler handler) : Endpoint<GetPermissionHistoryRequest, GetPermissionHistoryResponse>
 {
     public override void Configure()

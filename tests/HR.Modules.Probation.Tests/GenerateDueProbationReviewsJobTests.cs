@@ -12,10 +12,6 @@ namespace HR.Modules.Probation.Tests;
 
 public class GenerateDueProbationReviewsJobTests
 {
-    // 3-month probation: 2026-01-01 → 2026-04-01 (90 days)
-    // ManagerCheckIn at day 30 = 2026-01-31
-    // HrReview       at day 60 = 2026-03-02
-    // FinalDecision  at        = 2026-04-01
     private static readonly DateOnly StartDate = new(2026, 1, 1);
     private static readonly DateOnly ExpectedEndDate = new(2026, 4, 1);
     private static readonly DateTimeOffset SeedNow = new(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
@@ -40,7 +36,6 @@ public class GenerateDueProbationReviewsJobTests
         await using var context = BuildContext();
         await SeedActiveRecord(context);
 
-        // Mar 15: ManagerCheckIn (Jan 31) and HrReview (Mar 2) both due
         await BuildJob(context, today: new DateTime(2026, 3, 15, 0, 0, 0, DateTimeKind.Utc)).ExecuteAsync();
 
         var reviews = await context.ProbationReviews.OrderBy(r => r.DueDate).ToListAsync();
@@ -55,7 +50,6 @@ public class GenerateDueProbationReviewsJobTests
         await using var context = BuildContext();
         await SeedActiveRecord(context);
 
-        // Jan 15: ManagerCheckIn (Jan 31) not yet due
         await BuildJob(context, today: new DateTime(2026, 1, 15, 0, 0, 0, DateTimeKind.Utc)).ExecuteAsync();
 
         Assert.Empty(await context.ProbationReviews.ToListAsync());
@@ -291,9 +285,6 @@ public class GenerateDueProbationReviewsJobTests
     [Fact]
     public async Task ExecuteAsync_Uses_Company_Local_Day_Not_UTC_Day_When_Determining_Review_Is_Due()
     {
-        // ManagerCheckIn is due 2026-01-31. At 2026-01-30T23:30:00Z it's still Jan 30 in UTC, but
-        // already Jan 31 11:30 in "Etc/GMT-12" (a fixed UTC+12 zone, no DST) — the review must be
-        // created based on the company's local day, not the UTC day.
         await using var context = BuildContext();
         await SeedActiveRecord(context);
 
@@ -311,7 +302,6 @@ public class GenerateDueProbationReviewsJobTests
     [Fact]
     public async Task ExecuteAsync_Uses_Company_Custom_Checkpoint_Days_When_Configured()
     {
-        // Custom [14, 45] checkpoints instead of default [30, 60, 90]: ManagerCheckIn due 2026-01-15.
         await using var context = BuildContext();
         await SeedActiveRecord(context);
 
@@ -339,7 +329,7 @@ public class GenerateDueProbationReviewsJobTests
             companyProbationSettingsReader: new FakeCompanyProbationSettingsReader([14, 45])).ExecuteAsync();
 
         var reviews = await context.ProbationReviews.ToListAsync();
-        Assert.Single(reviews); // only the day-14 ManagerCheckIn, already due by Jan 31
+        Assert.Single(reviews);
         Assert.Equal(new DateOnly(2026, 1, 15), reviews[0].DueDate);
     }
 
@@ -355,7 +345,6 @@ public class GenerateDueProbationReviewsJobTests
         hrAdministratorDirectory.Seed(record.CompanyId, hrAdminId);
 
         var taskCreator = new FakeTaskCreator();
-        // Mar 15: ManagerCheckIn (Jan 31) and HrReview (Mar 2) both due.
         await BuildJob(
             context,
             today: new DateTime(2026, 3, 15, 0, 0, 0, DateTimeKind.Utc),
@@ -435,7 +424,6 @@ public class GenerateDueProbationReviewsJobTests
 
         var taskCreator = new FakeTaskCreator();
         var notificationWriter = new FakeNotificationWriter();
-        // Mar 15: ManagerCheckIn and HrReview both due; no HR admins configured (default empty).
         var exception = await Record.ExceptionAsync(() => BuildJob(
             context,
             today: new DateTime(2026, 3, 15, 0, 0, 0, DateTimeKind.Utc),
@@ -449,7 +437,6 @@ public class GenerateDueProbationReviewsJobTests
         Assert.Null(hrReviewTask.AssignedEmployeeId);
         Assert.DoesNotContain(notificationWriter.Written, n => n.SourceEntityId == hrReview.Id);
 
-        // The ManagerCheckIn review for the same record is still created and notified normally.
         var managerCheckInReview = await context.ProbationReviews
             .SingleAsync(r => r.ReviewType == ProbationReviewType.ManagerCheckIn);
         Assert.Contains(taskCreator.Created, t => t.SourceEntityId == managerCheckInReview.Id);
@@ -472,8 +459,6 @@ public class GenerateDueProbationReviewsJobTests
         var notificationCountAfterFirst = notificationWriter.Written.Count;
         Assert.Equal(1, notificationCountAfterFirst);
 
-        // Second run over the same day: no new reviews are due (guarded by the "duplicate pending
-        // review" check), so re-running should not add any further notifications either.
         await BuildJob(
             context,
             today: new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc),
@@ -489,7 +474,6 @@ public class GenerateDueProbationReviewsJobTests
         var record = await SeedActiveRecord(context);
 
         var auditPublisher = new FakeAuditPublisher();
-        // Mar 15: ManagerCheckIn (Jan 31) and HrReview (Mar 2) both due.
         await BuildJob(context, today: new DateTime(2026, 3, 15, 0, 0, 0, DateTimeKind.Utc), auditPublisher: auditPublisher).ExecuteAsync();
 
         Assert.Equal(2, auditPublisher.Published.Count);
@@ -550,7 +534,6 @@ public class GenerateDueProbationReviewsJobTests
             auditPublisher ?? new FakeAuditPublisher(),
             NullLogger<GenerateDueProbationReviewsJob>.Instance);
 
-    // -------- PROB-06: NotStarted activation and NotApplicable exclusion --------
 
     [Fact]
     public async Task ExecuteAsync_Activates_NotStarted_Record_Whose_StartDate_Has_Been_Reached_And_Schedules_Reviews()
@@ -564,8 +547,6 @@ public class GenerateDueProbationReviewsJobTests
         context.ProbationRecords.Add(record);
         await context.SaveChangesAsync();
 
-        // "today" (Feb 1) is after StartDate (Jan 1), so the record should activate, and
-        // ManagerCheckIn (due Jan 31) is picked up in the very same job run.
         await BuildJob(context, today: new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc)).ExecuteAsync();
 
         var reloaded = await context.ProbationRecords.SingleAsync();
@@ -632,9 +613,6 @@ public class GenerateDueProbationReviewsJobTests
     {
         var builder = new DbContextOptionsBuilder<ProbationDbContext>()
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"));
-        // UseVersionedAggregates() returns the non-generic DbContextOptionsBuilder base type, so it
-        // is called as a statement (mutating the same builder instance) rather than chained, to keep
-        // builder.Options typed as DbContextOptions<ProbationDbContext> below.
         builder.UseVersionedAggregates();
         return new ProbationDbContext(builder.Options);
     }
@@ -657,12 +635,6 @@ public class GenerateDueProbationReviewsJobTests
         var reloaded = await context.ProbationRecords.SingleAsync();
         Assert.Equal(ProbationStatus.ReviewDue, reloaded.Status);
 
-        // The job legitimately performs more than one persisted mutation to this record in a single
-        // run (activation, then immediately becoming review-due), each its own SaveChangesAsync
-        // call — the interceptor advances Version by one per save, so the exact delta is an
-        // implementation detail of the job, not part of this test's contract. What matters here is
-        // proving the automatic-advancement mechanism actually fired with no ExpectedVersion
-        // supplied by any caller.
         Assert.True(reloaded.Version > 1, "Version should have advanced automatically via the interceptor.");
     }
 }

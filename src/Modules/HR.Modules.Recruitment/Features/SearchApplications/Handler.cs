@@ -66,8 +66,6 @@ internal sealed class SearchApplicationsHandler(
         if (request.CandidateId is not null)
             query = query.Where(r => r.CandidateId == request.CandidateId);
 
-        // Filter on Source directly (not the projected flag) so legacy null-Source rows are
-        // unambiguously treated as external under SQL three-valued logic.
         if (request.IsInternal == true)
             query = query.Where(r => r.Source == Domain.ApplicationSource.Internal);
         else if (request.IsInternal == false)
@@ -87,7 +85,6 @@ internal sealed class SearchApplicationsHandler(
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
-        // Resolve position profile titles for vacancies without an advert title.
         var positionProfileIds = rows
             .Select(r => r.PositionProfileId)
             .Distinct()

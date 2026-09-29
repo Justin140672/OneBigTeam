@@ -29,8 +29,6 @@ public sealed class InternalApplicationIdentificationTests(RecruiterPersonaFixtu
 
     private const string MarcusEmail = "marcus.diallo@acme.example";
 
-    // RecruitmentStageSeeder.BuildDefaultStages — both the internal apply and the recruiter's
-    // CreateApplication start an application on the first active non-terminal stage.
     private const string InitialStage = "Application Received";
 
     private sealed record Arranged(
@@ -43,10 +41,6 @@ public sealed class InternalApplicationIdentificationTests(RecruiterPersonaFixtu
         Guid ExternalCandidateId,
         string ExternalLastName);
 
-    /// <summary>
-    /// Creates this test's own vacancy with one internal and one external application (see class
-    /// remarks), then signs the browser in as Marcus (Recruiter).
-    /// </summary>
     private async Task<Arranged> ArrangeAsync()
     {
         using var hrAdminApi = await InternalVacancyApplyApi.CreateHrAdminApiClientAsync(_fixture.ApiBaseUrl);
@@ -91,7 +85,6 @@ public sealed class InternalApplicationIdentificationTests(RecruiterPersonaFixtu
         return vacancyDetail;
     }
 
-    // ── 1. Applications tab badge ─────────────────────────────────────────────────
 
     [Fact]
     public async Task ApplicationsTab_ShowsInternalBadgeOnInternalRowOnly_BothInSamePipeline()
@@ -105,12 +98,10 @@ public sealed class InternalApplicationIdentificationTests(RecruiterPersonaFixtu
         await vacancyDetail.ExpectApplicationRowInternalAsync(arranged.InternalApplicationId, isInternal: true);
         await vacancyDetail.ExpectApplicationRowInternalAsync(arranged.ExternalApplicationId, isInternal: false);
 
-        // Same pipeline: both applications sit on the vacancy's initial stage.
         await vacancyDetail.ExpectApplicationStatusAsync(arranged.InternalLastName, InitialStage);
         await vacancyDetail.ExpectApplicationStatusAsync(arranged.ExternalLastName, InitialStage);
     }
 
-    // ── 2. Applications tab filter ────────────────────────────────────────────────
 
     [Fact]
     public async Task ApplicationsTab_ApplicationTypeFilter_InternalExternalAndAllShowTheMatchingRows()
@@ -121,8 +112,6 @@ public sealed class InternalApplicationIdentificationTests(RecruiterPersonaFixtu
         await vacancyDetail.ExpectApplicationTypeFilterValueAsync("All");
         await vacancyDetail.ExpectApplicationRowTotalAsync(2);
 
-        // Each transition changes the visible row set, so every expectation below can only be met by
-        // the post-reload grid, never by the one it replaced.
         await vacancyDetail.SelectApplicationTypeFilterAsync("Internal");
         await vacancyDetail.ExpectApplicationTypeFilterValueAsync("Internal");
         await vacancyDetail.ExpectApplicationRowAbsentAsync(arranged.ExternalApplicationId);
@@ -142,7 +131,6 @@ public sealed class InternalApplicationIdentificationTests(RecruiterPersonaFixtu
         await vacancyDetail.ExpectApplicationRowInternalAsync(arranged.ExternalApplicationId, isInternal: false);
     }
 
-    // ── 3. Kanban card badge ──────────────────────────────────────────────────────
 
     [Fact]
     public async Task Kanban_InternalCardShowsBadge_ExternalCardDoesNot_BothInSameStageColumn()
@@ -161,7 +149,6 @@ public sealed class InternalApplicationIdentificationTests(RecruiterPersonaFixtu
         await kanban.ExpectCardInStageColumnAsync(arranged.ExternalApplicationId, stageId);
     }
 
-    // ── 4. Review CV badge ────────────────────────────────────────────────────────
 
     [Fact]
     public async Task ReviewCv_InternalApplicationShowsBadgeBesideName_ExternalDoesNot()
@@ -180,7 +167,6 @@ public sealed class InternalApplicationIdentificationTests(RecruiterPersonaFixtu
         await review.ExpectCandidateInternalBadgeAsync(isInternal: false);
     }
 
-    // ── 5. Candidate detail ───────────────────────────────────────────────────────
 
     [Fact]
     public async Task CandidateDetail_InternalCandidate_ListsApplicationWithBadge_AndShowsInternalApplicantAlert()
@@ -194,8 +180,6 @@ public sealed class InternalApplicationIdentificationTests(RecruiterPersonaFixtu
         await candidate.ExpectApplicationRowCountAsync(1);
         await candidate.ExpectApplicationRowStageAsync(arranged.InternalApplicationId, InitialStage);
 
-        // The internal applicant is linked to their employee record at apply time, but must be shown
-        // as a current employee — not as "hired and linked".
         await candidate.ExpectInternalApplicantAlertAsync(visible: true);
         await candidate.ExpectNoHiredAlertAsync();
     }
@@ -208,7 +192,6 @@ public sealed class InternalApplicationIdentificationTests(RecruiterPersonaFixtu
 
         await candidate.GoToAsync(AcmeId, arranged.ExternalCandidateId);
 
-        // Row first: proves the applications list has loaded before asserting the alert is absent.
         await candidate.ExpectApplicationRowAsync(arranged.ExternalApplicationId, arranged.VacancyTitle, isInternal: false);
         await candidate.ExpectApplicationRowCountAsync(1);
         await candidate.ExpectApplicationRowStageAsync(arranged.ExternalApplicationId, InitialStage);
@@ -217,7 +200,6 @@ public sealed class InternalApplicationIdentificationTests(RecruiterPersonaFixtu
         await candidate.ExpectNoHiredAlertAsync();
     }
 
-    // ── 6. Recruitment Pipeline report — own vacancy row ──────────────────────────
 
     [Fact]
     public async Task RecruitmentPipelineReport_GroupedByVacancy_ApplicationFilterChangesOwnVacancyCandidateCount()
@@ -228,10 +210,6 @@ public sealed class InternalApplicationIdentificationTests(RecruiterPersonaFixtu
         await report.GoToAsync(AcmeId);
         await report.ExpectApplicationTypeAsync(ReportApplicationTypeFilter.AllApplications);
 
-        // Group by Vacancy: the row for this test's uniquely titled vacancy only ever counts this
-        // test's two applications, so its Candidates value is deterministic even though every other
-        // row (and the company-wide totals) is shared with parallel tests. Values alternate
-        // 2 → 1 → 2 → 1 so each expectation can only be met after the filter's reload.
         await report.SelectGroupByAsync("Vacancy");
         await report.ExpectVacancyRowCandidatesAsync(arranged.VacancyTitle, "2");
 

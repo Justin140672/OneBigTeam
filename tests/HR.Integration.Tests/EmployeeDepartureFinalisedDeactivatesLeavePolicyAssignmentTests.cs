@@ -10,16 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Verifies the cross-module side effect closing the LEAVE-03 rollover gap: finalising an
-/// employee's departure (via a backdated, confirmed leaving process — which
-/// StartLeavingProcessHandler finalises synchronously, see EmployeeDepartureFinalizer) publishes
-/// EmployeeDepartureFinalisedIntegrationEvent, which EmployeeDepartureFinalisedHandler in the Leave
-/// module consumes to record a durable LeavePolicyDeactivationOnDeparture request and enqueue
-/// LeavePolicyDeactivationJob to perform the actual deactivation. Real Hangfire job execution is
-/// disabled for this suite (see FakeBackgroundJobClient), so the test runs the captured job body
-/// directly, mirroring DepartureFinalisationDisablesAccountIntegrationTests.
-/// </summary>
 [Collection("Integration")]
 public class EmployeeDepartureFinalisedDeactivatesLeavePolicyAssignmentTests
 {
@@ -72,8 +62,6 @@ public class EmployeeDepartureFinalisedDeactivatesLeavePolicyAssignmentTests
             Assert.True(assignmentBeforeFinalisation.IsActive);
         }
 
-        // Backdated + confirmed LeavingDate finalises the employee's departure synchronously
-        // within the request (see StartLeavingProcessHandler).
         var leavingResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leaving-process",
             new
@@ -102,8 +90,6 @@ public class EmployeeDepartureFinalisedDeactivatesLeavePolicyAssignmentTests
             j.Type == typeof(LeavePolicyDeactivationJob)
             && (Guid?)j.Args.ElementAtOrDefault(0) == deactivationId);
 
-        // Real Hangfire job execution is disabled for this suite (see FakeBackgroundJobClient) — run
-        // the captured job body directly, mirroring DepartureFinalisationDisablesAccountIntegrationTests.
         using (var scope = _factory.Services.CreateScope())
         {
             var job = ActivatorUtilities.CreateInstance<LeavePolicyDeactivationJob>(scope.ServiceProvider);

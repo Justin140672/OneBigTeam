@@ -93,14 +93,9 @@ internal sealed class OffboardingTaskConfiguration : IEntityTypeConfiguration<Of
         builder.HasIndex(t => t.OffboardingPlanId);
         builder.HasIndex(t => new { t.CompanyId, t.OffboardingPlanId });
 
-        // OFF-03: lets OffboardingTaskSynchronizer / OffboardingPlanCreationReconciliationJob
-        // cheaply find every task still awaiting its Tasks-module TaskItem, without a full table
-        // scan, across every plan/company.
         builder.HasIndex(t => t.TaskItemCreatedAt)
             .HasDatabaseName("ix_offboarding_tasks_task_item_created_at");
 
-        // OFF-04: lets the reconciliation job cheaply check which of a plan's currently-assigned
-        // assets already have an OffboardingTask, without a full table scan.
         builder.HasIndex(t => t.AssetAssignmentId)
             .HasDatabaseName("ix_offboarding_tasks_asset_assignment_id");
     }

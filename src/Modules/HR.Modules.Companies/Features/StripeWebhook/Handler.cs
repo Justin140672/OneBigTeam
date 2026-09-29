@@ -16,22 +16,13 @@ internal sealed class StripeWebhookHandler(
     IClock clock,
     ILogger<StripeWebhookHandler> logger)
 {
-    // OBT-REM-09: bounded retry for the optimistic-concurrency race between two different Stripe
-    // events for the same subscription. A handful of attempts is enough to ride out a genuine race
-    // between two concurrent deliveries without risking an unbounded retry storm; Stripe itself will
-    // redeliver on a webhook timeout/5xx, so exhausting retries here is not a lost event.
     private const int MaxConcurrencyAttempts = 5;
 
     public async Task HandleAsync(string payload, string signatureHeader, CancellationToken cancellationToken)
     {
-        // Signature verification happens inside the gateway; a bad signature throws before this line,
-        // so no ProcessedStripeEvent/subscription row is ever written for an invalid signature.
         var webhookEvent = stripeGateway.ConstructAndParseWebhookEvent(payload, signatureHeader);
         var now = clock.UtcNowOffset();
 
-        // OBT-REM-07: idempotency — a redelivery of an event we have already processed is a
-        // successful no-op. (Stripe retries deliveries aggressively; without this an "updated"
-        // event replayed after a later one would clobber newer state.)
         if (!string.IsNullOrWhiteSpace(webhookEvent.EventId))
         {
             var alreadyProcessed = await dbContext.ProcessedStripeEvents
@@ -46,8 +37,6 @@ internal sealed class StripeWebhookHandler(
             }
         }
 
-        // Unknown/unhandled event types have no subscription side effects and are not tracked for
-        // idempotency at all — nothing to project, nothing worth an ordering marker.
         if (webhookEvent.EventType is not (
             "checkout.session.completed" or
             "customer.subscription.updated" or
@@ -102,13 +91,9 @@ internal sealed class StripeWebhookHandler(
                 if (await TrySaveAsync(cancellationToken, attempt))
                     return;
 
-                continue; // Concurrency conflict — reload and re-evaluate.
+                continue;
             }
 
-            // OBT-REM-09: ordering guard evaluated against the durable marker on the subscription row
-            // itself (not a separate table query) so the "is this event newer" decision and the
-            // projection write are protected by the SAME optimistic-concurrency token, in the SAME
-            // transaction. An older event is recorded as processed but not applied.
             if (subscription.IsStaleStripeEvent(webhookEvent.EventId, webhookEvent.EventCreatedAt))
             {
                 logger.LogWarning(
@@ -120,7 +105,7 @@ internal sealed class StripeWebhookHandler(
                 if (await TrySaveAsync(cancellationToken, attempt))
                     return;
 
-                continue; // Concurrency conflict — reload and re-evaluate.
+                continue;
             }
 
             // Ticket 25 (P1): a dedicated "resumed" event must not blindly trust its own payload as
@@ -144,20 +129,11 @@ internal sealed class StripeWebhookHandler(
                 ApplyProjection(webhookEvent, subscription, now);
             }
 
-            // The processed-event row is written in the SAME SaveChanges as the projection: the event
-            // is "processed" only if and when the local state change commits. A concurrent duplicate
-            // delivery of the SAME event id loses the race on the unique stripe_event_id index —
-            // treated as a successful no-op. A concurrent delivery of a DIFFERENT event for the same
-            // subscription loses the race on the Version concurrency token instead, and retries.
             MarkProcessed(webhookEvent, subscription, applied: true, now);
 
             if (await TrySaveAsync(cancellationToken, attempt))
                 return;
 
-            // Lost the optimistic-concurrency race to another event for this subscription — reload
-            // current state and re-evaluate from scratch. The winner's write is now visible, so this
-            // event may turn out to be stale (correctly skipped) or may still need to be applied
-            // (e.g. two different, non-conflicting fields) depending on what actually committed.
         }
 
         logger.LogError(
@@ -188,15 +164,9 @@ internal sealed class StripeWebhookHandler(
         {
             if (isResumedReconciliation)
             {
-                // No subscription id to reconcile a "resumed" event against — refuse to guess and
-                // let the caller treat this as retryable, rather than applying the raw payload as
-                // an ambiguous tie would.
                 return false;
             }
 
-            // A bare checkout.session.completed tie with no subscription id to reconcile against —
-            // fall back to applying the webhook payload directly; there is nothing more authoritative
-            // to fetch.
             ApplyProjection(webhookEvent, subscription, now);
             return true;
         }
@@ -230,9 +200,6 @@ internal sealed class StripeWebhookHandler(
         }
         else if (subscription.StripeCustomerId is null || subscription.StripeSubscriptionId is null)
         {
-            // No paid subscription linked yet — reconciling a tie can only mean the very first
-            // activation (checkout.session.completed racing something else), so go through
-            // ActivateSubscription to set the customer/subscription/price linkage too.
             subscription.ActivateSubscription(
                 snapshot.StripeCustomerId, snapshot.StripeSubscriptionId,
                 snapshot.PriceId ?? subscription.PriceId ?? string.Empty,
@@ -298,11 +265,6 @@ internal sealed class StripeWebhookHandler(
         }
     }
 
-    /// <summary>
-    /// Attempts to commit. Returns true if the commit succeeded (or lost a same-event-id duplicate
-    /// race, which is also a terminal success). Returns false when the caller should reload and
-    /// retry (lost the Version concurrency race against a different event for the same subscription).
-    /// </summary>
     private async Task<bool> TrySaveAsync(CancellationToken cancellationToken, int attempt)
     {
         try
@@ -322,9 +284,6 @@ internal sealed class StripeWebhookHandler(
             ex.InnerException?.Message.Contains("ix_processed_stripe_events_stripe_event_id", StringComparison.OrdinalIgnoreCase) == true
             || ex.InnerException?.Message.Contains("duplicate key value violates unique constraint", StringComparison.OrdinalIgnoreCase) == true)
         {
-            // Concurrent duplicate delivery of the SAME event id — the winner applied the projection
-            // and recorded the event. Discard this caller's tracked changes and treat as a successful
-            // no-op; this is terminal, not a retry.
             dbContext.ChangeTracker.Clear();
             logger.LogInformation("Stripe webhook duplicate resolved by unique constraint — no-op");
             return true;

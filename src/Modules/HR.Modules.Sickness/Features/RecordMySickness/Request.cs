@@ -13,9 +13,6 @@ internal sealed record RecordMySicknessRequest
     public SicknessDayPart? EndDayPart { get; init; }
     public string? Notes { get; init; }
 
-    // SICK-06: populated by the endpoint from the authenticated user's resolved identity — never
-    // bound from the client body. Self-service: actor and subject (EmployeeId) are the same
-    // person by design.
     internal Guid? ActorEmployeeId { get; init; }
 
     // Populated by the endpoint from the optional "Idempotency-Key" request header (ticket 3, P1

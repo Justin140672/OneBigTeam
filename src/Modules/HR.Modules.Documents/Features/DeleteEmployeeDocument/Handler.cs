@@ -6,11 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Features.DeleteEmployeeDocument;
 
-// DOC-04: "delete" now archives (soft-delete) the employee-document record instead of hard
-// deleting the row and the underlying stored file. No DB row is removed here and no
-// IDocumentStorageService.DeleteAsync call is made — physical file removal only ever happens via
-// the separately authorised PurgeEligibleArchivedEmployeeDocuments retention process, once a
-// document has been archived for the configured minimum retention period.
 internal sealed class DeleteEmployeeDocumentHandler(
     DocumentsDbContext db,
     IClock clock,

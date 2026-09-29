@@ -2,19 +2,6 @@ using HR.Web.Navigation;
 
 namespace HR.Web.Tests;
 
-/// <summary>
-/// ADM-07 / ADM (nav simplification) — <see cref="AdminNavigation"/> is the single
-/// permission-scoped source of truth for administrative sidebar destinations. These tests pin the
-/// visibility filtering per persona without bUnit. Persona capability sets mirror the ADM-05
-/// role-separation matrix (specifications/product-specifications/30-administrative-role-separation-matrix.md).
-///
-/// Post-simplification expectations:
-///  - No "Compliance Centre" destination for any persona (page stays reachable by direct URL only).
-///  - No "Administration Home" hub destination for any persona.
-///  - No generic "Company" group — Company-Administrator items live in "Company administration".
-///  - "Subscription &amp; Billing" is Company-Administrator-only (CanManageCompany); an HR-Admin-only
-///    persona never sees it; a combined HR + Company Admin persona does.
-/// </summary>
 public class AdminNavigationTests
 {
     private static readonly Guid CompanyId = Guid.Parse("00000000-0000-0000-0000-000000000042");
@@ -181,9 +168,6 @@ public class AdminNavigationTests
         Assert.All(sections, s => Assert.Equal(AdminNavGroupInfo.Label(s.Group), s.Label));
     }
 
-    // IAM-08 — a Company-Administrator-only capability set (company.read/edit, onboarding,
-    // subscription, support; NO employee.read / employee.edit) must never surface any employee-,
-    // leave-, sickness-, recruitment-, HR-reporting- or HR-settings-oriented destination.
     [Fact]
     public void CompanyAdministratorOnly_Nav_HasNoEmployeeOrHrDestinations()
     {
@@ -201,12 +185,9 @@ public class AdminNavigationTests
         Assert.DoesNotContain("hr-settings", keys);
         Assert.DoesNotContain("user-administration", keys);
 
-        // Only company-administration destinations remain.
         Assert.All(destinations, d => Assert.Equal(AdminNavGroup.CompanyAdministration, d.Group));
     }
 
-    // IAM-08 — once employee.read is granted (Company Administrator + HR Administrator) the
-    // Employees destination appears.
     [Fact]
     public void CompanyAdministratorPlusHrAdministrator_Nav_HasEmployeesDestination()
     {

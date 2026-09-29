@@ -6,11 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Reporting.Services;
 
-/// <summary>
-/// Story 2: Reporting-owned implementation of <see cref="IOrganisationDataExportJobStore"/> used by
-/// the Infrastructure background jobs to advance a single export row through its lifecycle without
-/// referencing <see cref="ReportingDbContext"/> directly.
-/// </summary>
 internal sealed class OrganisationDataExportJobStore(ReportingDbContext db, IClock clock)
     : IOrganisationDataExportJobStore
 {
@@ -306,8 +301,6 @@ internal sealed class OrganisationDataExportJobStore(ReportingDbContext db, IClo
             if (save.IsSuccess)
                 return true;
 
-            // Concurrency conflict — a heartbeat (or other write) landed first. Drop the failed
-            // tracked changes so they cannot poison the retry, then reload and re-evaluate ownership.
             db.ChangeTracker.Clear();
         }
 

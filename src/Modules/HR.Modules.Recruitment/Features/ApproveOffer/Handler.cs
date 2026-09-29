@@ -6,11 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.ApproveOffer;
 
-/// <summary>
-/// SET-05: explicit per-application approval step, required before OfferCandidateHandler will allow
-/// the application to move to the offer stage when the company's OfferApprovalRequired setting is
-/// on. Uses "recruitment:manage", the same policy the offer action itself requires.
-/// </summary>
 internal sealed class ApproveOfferHandler(
     RecruitmentDbContext db,
     IClock clock,

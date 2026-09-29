@@ -71,7 +71,6 @@ public class EmployeeServiceTests
         WorkingDaysOverride: null,
         HoursPerDayOverride: null);
 
-    // ── CreateEmployeeAsync ──────────────────────────────────────────────────────
 
     [Fact]
     public async Task CreateEmployeeAsync_Returns_Employee_When_Api_Returns_Created()
@@ -104,8 +103,6 @@ public class EmployeeServiceTests
     [Fact]
     public async Task CreateEmployeeAsync_Returns_ValidationMessage_When_Api_Returns_BadRequest()
     {
-        // This is the new Handler-level regex validation failure path (postcode/mobile/telephone),
-        // which surfaces as 400 BadRequest with a { error } body rather than 422.
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.BadRequest, new { error = "'12345' is not a valid mobile number." }));
         var service = new EmployeeService(factory);
 
@@ -124,12 +121,9 @@ public class EmployeeServiceTests
         var (created, error) = await service.CreateEmployeeAsync(Guid.NewGuid(), SampleCreateRequest());
 
         Assert.Null(created);
-        // Now surfaced via the shared ApiResponseReader's server-error message rather than the
-        // old bespoke "Failed to create employee." fallback.
         Assert.Equal("The server encountered an error (500).", error);
     }
 
-    // ── UpdateEmployeeProfileAsync ───────────────────────────────────────────────
 
     [Fact]
     public async Task UpdateEmployeeProfileAsync_Returns_Success_When_Api_Returns_Ok()
@@ -193,7 +187,6 @@ public class EmployeeServiceTests
         Assert.Equal("An employee with this work email already exists.", result.ErrorMessage);
     }
 
-    // ── UpdateMyContactDetailsAsync ──────────────────────────────────────────────
 
     [Fact]
     public async Task UpdateMyContactDetailsAsync_Returns_Success_When_Api_Returns_Ok()
@@ -238,12 +231,6 @@ public class EmployeeServiceTests
         Assert.Equal("'12345' is not a valid mobile number.", result.ErrorMessage);
     }
 
-    // A network failure is no longer silently swallowed into a generic "An unexpected error
-    // occurred." result — per the shared response-reader migration, only ApiResponseReader's own
-    // ExecuteAsync wrapper (not used by this call site) classifies HttpRequestException as
-    // ApiFailureKind.Network. A caller that issues the HttpClient call directly (as this method
-    // does) lets a genuine transport failure propagate so it is visibly distinguishable from an
-    // API-returned error, rather than being converted into the same shape as a business failure.
     [Fact]
     public async Task UpdateMyContactDetailsAsync_Propagates_HttpRequestException_When_Network_Fails()
     {
@@ -255,7 +242,6 @@ public class EmployeeServiceTests
             new UpdateMyContactDetailsRequest(Guid.NewGuid(), null, null, null, "1 Test Street", null, "London", null, "SW1A 1AA", "United Kingdom")));
     }
 
-    // ── AddMyEmergencyContactAsync ───────────────────────────────────────────────
 
     [Fact]
     public async Task AddMyEmergencyContactAsync_Returns_Contact_When_Api_Returns_Created()
@@ -276,7 +262,6 @@ public class EmployeeServiceTests
     [Fact]
     public async Task AddMyEmergencyContactAsync_Returns_ValidationMessage_When_Api_Returns_BadRequest()
     {
-        // The new mobile-OR-telephone regex validation failure surfaces this way.
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.BadRequest, new { error = "'not-a-phone' is not a valid phone number." }));
         var service = new EmployeeService(factory);
 
@@ -288,7 +273,6 @@ public class EmployeeServiceTests
         Assert.Equal("'not-a-phone' is not a valid phone number.", error);
     }
 
-    // ── GetEmployeeAsync ─────────────────────────────────────────────────────────
 
     [Fact]
     public async Task GetEmployeeAsync_Returns_Null_When_Network_Fails()
@@ -301,7 +285,6 @@ public class EmployeeServiceTests
         Assert.Null(result);
     }
 
-    // ── Fake handlers ────────────────────────────────────────────────────────────
 
     private sealed class JsonResponseHandler(HttpStatusCode statusCode, object payload) : HttpMessageHandler
     {

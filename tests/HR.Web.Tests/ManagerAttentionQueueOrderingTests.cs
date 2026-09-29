@@ -67,17 +67,11 @@ public class ManagerAttentionQueueOrderingTests
     [Fact]
     public void Order_Mixed_Realistic_Scenario_Produces_Fully_Expected_Order()
     {
-        // Overdue return-to-work review, most overdue-relevant category, urgency rank 1, undated.
         var overdueReturnToWork = Item("ReturnToWorkReview", isOverdue: true, urgencyRank: 1, dueDate: null);
-        // Overdue task, urgency rank 2.
         var overdueTask = Item("Task", isOverdue: true, urgencyRank: 2, dueDate: new DateOnly(2026, 8, 1));
-        // Overdue task, urgency rank 2, but due later than the one above -> sorts after it.
         var overdueTaskLater = Item("Task", isOverdue: true, urgencyRank: 2, dueDate: new DateOnly(2026, 8, 10));
-        // Not overdue: missing fit note, urgency rank 1, due soon.
         var missingFitNote = Item("MissingFitNote", isOverdue: false, urgencyRank: 1, dueDate: new DateOnly(2026, 9, 1));
-        // Not overdue: probation review, urgency rank 1, due later than fit note.
         var probationReview = Item("ProbationReview", isOverdue: false, urgencyRank: 1, dueDate: new DateOnly(2026, 9, 15));
-        // Not overdue: pending leave request, urgency rank 2, undated.
         var pendingLeaveRequest = Item("LeaveRequest", isOverdue: false, urgencyRank: 2, dueDate: null);
 
         var input = new[]

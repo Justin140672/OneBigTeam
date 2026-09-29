@@ -8,7 +8,6 @@ namespace HR.Modules.Employees.Tests;
 
 public class GetNewHiresTrendHandlerTests
 {
-    // Window covers [2026-02-01, 2026-08-01) -> Feb, Mar, Apr, May, Jun, Jul 2026 (6 months).
     private static readonly DateTime FixedUtcNow = new(2026, 7, 9, 10, 0, 0, DateTimeKind.Utc);
     private static readonly DateTimeOffset Now = new(FixedUtcNow, TimeSpan.Zero);
 
@@ -63,8 +62,8 @@ public class GetNewHiresTrendHandlerTests
         var companyId = Guid.NewGuid();
 
         context.Employees.AddRange(
-            NewEmployee(companyId, new DateOnly(2026, 1, 31)), // just before window start
-            NewEmployee(companyId, new DateOnly(2026, 8, 1))); // just after window end
+            NewEmployee(companyId, new DateOnly(2026, 1, 31)),
+            NewEmployee(companyId, new DateOnly(2026, 8, 1)));
         await context.SaveChangesAsync();
 
         var handler = BuildHandler(context);
@@ -80,8 +79,8 @@ public class GetNewHiresTrendHandlerTests
         var companyId = Guid.NewGuid();
 
         context.Employees.AddRange(
-            NewEmployee(companyId, new DateOnly(2026, 2, 1)),  // window start (inclusive)
-            NewEmployee(companyId, new DateOnly(2026, 7, 31))); // window end (inclusive, last day of current month)
+            NewEmployee(companyId, new DateOnly(2026, 2, 1)),
+            NewEmployee(companyId, new DateOnly(2026, 7, 31)));
         await context.SaveChangesAsync();
 
         var handler = BuildHandler(context);

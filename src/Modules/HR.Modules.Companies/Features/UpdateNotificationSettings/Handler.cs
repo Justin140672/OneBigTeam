@@ -6,10 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Companies.Features.UpdateNotificationSettings;
 
-/// <summary>
-/// SET-06: updates the company's notification-channel settings. Requires "hr-settings:manage" —
-/// the same policy UpdateHrSettings/UpdateRecruitmentSettings require.
-/// </summary>
 internal sealed class UpdateNotificationSettingsHandler(
     CompaniesDbContext dbContext,
     IClock clock,

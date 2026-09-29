@@ -23,7 +23,6 @@ internal sealed class GetDirectoryEmployeeHandler
         GetDirectoryEmployeeRequest request,
         CancellationToken cancellationToken)
     {
-        // A non-active or cross-company employee is simply "not found" for the directory.
         var result = await _dbContext.Employees
             .AsNoTracking()
             .Where(e => e.Id == request.Id

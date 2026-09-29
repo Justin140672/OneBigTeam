@@ -39,11 +39,6 @@ internal sealed class ListUsersHandler(
             .ToListAsync(cancellationToken);
         var usersById = users.ToDictionary(u => u.Id);
 
-        // Real Supabase-backed accounts (self-service SignUp, AcceptInvite) live in UserProfiles,
-        // never in Users (ApplicationUser) — without this, an admin who signed themselves up, or
-        // any employee who accepted a real invite, never appeared in this list at all (no
-        // ApplicationUser row to find, and — for SignUp specifically — no UserInvite row either,
-        // so the "invite is null && user is null" skip below dropped them silently).
         var profiles = await db.UserProfiles
             .AsNoTracking()
             .Where(p => employeeIds.Contains(p.Id))
@@ -60,7 +55,6 @@ internal sealed class ListUsersHandler(
 
         var names = await employeeNameReader.GetNamesAsync(request.CompanyId, employeeIds, cancellationToken);
 
-        // ADM-01: surface each linked employee's current position on the list.
         var audienceProfiles = await employeeAudienceReader.GetEmployeeAudienceProfilesAsync(
             request.CompanyId, employeeIds, cancellationToken);
         var positionProfileIdByEmployee = audienceProfiles
@@ -80,7 +74,6 @@ internal sealed class ListUsersHandler(
             usersById.TryGetValue(employeeId, out var user);
             profilesById.TryGetValue(employeeId, out var profile);
 
-            // No invite and no account for this employee — nothing to show them for yet.
             if (invite is null && user is null && profile is null)
                 continue;
 
@@ -93,9 +86,6 @@ internal sealed class ListUsersHandler(
                 : profile is not null ? $"{profile.FirstName} {profile.LastName}".Trim()
                 : invite?.Email ?? string.Empty;
 
-            // Same convention as GetUserDetailsHandler: a user with no tracked invite record (e.g. a
-            // dev-seeded persona created directly as an ApplicationUser) is treated as Claimed rather
-            // than falling through to an invite-only status.
             string invitationStatus;
             if (invite is null)
                 invitationStatus = "Claimed";

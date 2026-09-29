@@ -116,7 +116,6 @@ public class CompleteProfilePhotoReviewFromTaskActionTests
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
 
-        // Neither handler ran — the pending submission is untouched.
         Assert.Single(await db.PendingProfilePhotos.ToListAsync());
         Assert.Empty(await db.EmployeeProfilePhotos.ToListAsync());
     }

@@ -8,12 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Notifications.Tests.Jobs;
 
-/// <summary>
-/// Follow-up E: <see cref="ReconcileStalledOperationalAlertEmailDeliveriesJob"/> — the periodic
-/// backstop that re-enqueues <see cref="SendOperationalAlertEmailJob"/> for deliveries saved but
-/// never queued (Pending past the grace period) or interrupted mid-send (Sending with an expired
-/// lease), and permanently fails a delivery once its attempt budget is spent.
-/// </summary>
 public class ReconcileStalledOperationalAlertEmailDeliveriesJobTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 9, 12, 0, 0, TimeSpan.Zero);
@@ -44,7 +38,6 @@ public class ReconcileStalledOperationalAlertEmailDeliveriesJobTests
             null,
             4);
 
-    /// <summary>Seeds an alert plus a delivery row and lets the caller shape the delivery's state.</summary>
     private static async Task<Guid> SeedAsync(
         NotificationsDbContext db,
         DateTimeOffset createdAt,
@@ -95,7 +88,6 @@ public class ReconcileStalledOperationalAlertEmailDeliveriesJobTests
     [Fact]
     public async Task Pending_Exactly_At_Grace_Cutoff_Is_Not_Yet_Eligible()
     {
-        // Job uses a strict "CreatedAt < now - Grace" comparison — pin the exclusive boundary.
         await using var db = BuildContext();
         await SeedAsync(db, Now.AddMinutes(-Grace), NoChange);
 
@@ -109,7 +101,6 @@ public class ReconcileStalledOperationalAlertEmailDeliveriesJobTests
     public async Task Sending_With_Expired_Lease_Is_ReEnqueued()
     {
         await using var db = BuildContext();
-        // Claimed a while ago; the 10 minute lease is long gone.
         var claimedAt = Now.AddMinutes(-(OperationalAlertEmailDelivery.LeaseMinutes + 30));
         var alertId = await SeedAsync(db, Now.AddMinutes(-60), d =>
             Assert.True(d.Claim(Guid.NewGuid(), claimedAt).IsSuccess));
@@ -125,7 +116,7 @@ public class ReconcileStalledOperationalAlertEmailDeliveriesJobTests
     {
         await using var db = BuildContext();
         var alertId = await SeedAsync(db, Now.AddMinutes(-60), d =>
-            Assert.True(d.Claim(Guid.NewGuid(), Now.AddMinutes(-1)).IsSuccess)); // lease still live
+            Assert.True(d.Claim(Guid.NewGuid(), Now.AddMinutes(-1)).IsSuccess));
 
         var client = new RecordingBackgroundJobClient();
         await BuildJob(db, client).ExecuteAsync();
@@ -206,7 +197,6 @@ public class ReconcileStalledOperationalAlertEmailDeliveriesJobTests
                 t = t.AddMinutes(OperationalAlertEmailDelivery.LeaseMinutes + 1);
             }
 
-            // Final attempt claimed just now — lease is live, budget is spent.
             Assert.True(d.Claim(Guid.NewGuid(), Now.AddMinutes(-1)).IsSuccess);
             Assert.Equal(OperationalAlertEmailDelivery.MaxAttempts, d.AttemptCount);
         });
@@ -234,7 +224,6 @@ public class ReconcileStalledOperationalAlertEmailDeliveriesJobTests
                 t = t.AddMinutes(OperationalAlertEmailDelivery.LeaseMinutes + 1);
             }
 
-            // Final attempt claimed a day ago and never completed — lease long expired, still Sending.
             Assert.True(d.Claim(Guid.NewGuid(), t).IsSuccess);
             Assert.Equal(OperationalAlertEmailDelivery.MaxAttempts, d.AttemptCount);
             Assert.Equal(EmailDeliveryStatus.Sending, d.Status);
@@ -285,7 +274,6 @@ public class ReconcileStalledOperationalAlertEmailDeliveriesJobTests
         await job.ExecuteAsync();
         await job.ExecuteAsync(); // row is still Pending — must not throw
 
-        // Still eligible each run, so it is re-enqueued each time (idempotent at the send job).
         Assert.All(EnqueuedAlertIds(client), id => Assert.NotEqual(Guid.Empty, id));
     }
 }

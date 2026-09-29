@@ -4,16 +4,12 @@ internal sealed record UpdateVacancyRequest
 {
     public Guid CompanyId { get; init; }
     public Guid VacancyId { get; init; }
-    // Optional: when supplied and different from the vacancy's current PositionProfileId, the handler
-    // attempts to change it — allowed only while the vacancy is Draft and has zero applications (see
-    // UpdateVacancyHandler.CanChangePositionProfile). Null/unchanged means "leave as-is".
     public Guid? PositionProfileId { get; init; }
     public string? AdvertTitle { get; init; }
     public string? AdvertDescription { get; init; }
     public Guid HiringManagerId { get; init; }
     public Guid? AssignedRecruiterId { get; init; }
 
-    // Whether the vacancy is advertised to the company's own employees (internal vacancy list).
     public bool IsAdvertisedInternally { get; init; }
 
     // Authorised correction escape hatch: when the baseline change-control check

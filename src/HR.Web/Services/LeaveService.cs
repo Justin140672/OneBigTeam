@@ -43,7 +43,6 @@ public sealed class LeaveService(HrApiHttpClientFactory httpClientFactory)
         return result.Success ? result.Value : null;
     }
 
-    // DSH-03: non-swallowing sibling of GetRecentLeaveRequestsAsync.
     public Task<GetRecentLeaveRequestsResponse?> GetRecentLeaveRequestsOrThrowAsync(
         Guid companyId, int take = 10, CancellationToken cancellationToken = default) =>
         Http.GetFromJsonAsync<GetRecentLeaveRequestsResponse>(
@@ -129,15 +128,11 @@ public sealed class LeaveService(HrApiHttpClientFactory httpClientFactory)
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            // Client-side request timeout — the request was already dispatched, so the server may
-            // have received and committed it.
             return MutationOutcome<AdjustLeaveBalanceResponse>.Ambiguous(
                 "The request timed out. It's safe to try again — the balance will not be adjusted twice.");
         }
         catch (OperationCanceledException)
         {
-            // Cancellation requested by the caller after the request may already be in flight — we
-            // cannot prove it was never sent, so this stays ambiguous rather than assumed abandoned.
             return MutationOutcome<AdjustLeaveBalanceResponse>.Ambiguous(
                 "The request was cancelled before a response was received.");
         }
@@ -172,9 +167,6 @@ public sealed class LeaveService(HrApiHttpClientFactory httpClientFactory)
             catch (Exception ex) when (ex is JsonException or IOException
                 or OperationCanceledException or HttpRequestException)
             {
-                // Invalid/truncated success response, cancellation, or a transport failure while
-                // reading the body — the mutation may well have committed, but this client cannot
-                // confirm it from this response body.
                 return MutationOutcome<AdjustLeaveBalanceResponse>.Ambiguous(
                     "The server's response could not be read. It's safe to try again.");
             }

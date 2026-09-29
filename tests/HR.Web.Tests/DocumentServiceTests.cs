@@ -15,7 +15,6 @@ public class DocumentServiceTests
         return new HrApiHttpClientFactory(services.BuildServiceProvider().GetRequiredService<IHttpClientFactory>(), new CircuitSessionState());
     }
 
-    // ── ArchiveSharedCompanyDocumentAsync ────────────────────────────────────────
 
     [Fact]
     public async Task ArchiveSharedCompanyDocumentAsync_Returns_Null_When_Api_Returns_NoContent()
@@ -61,7 +60,6 @@ public class DocumentServiceTests
         Assert.NotNull(error);
     }
 
-    // ── PublishSharedCompanyDocumentAsync ────────────────────────────────────────
 
     [Fact]
     public async Task PublishSharedCompanyDocumentAsync_Returns_Null_When_Api_Returns_NoContent()
@@ -97,7 +95,6 @@ public class DocumentServiceTests
         Assert.Equal("This document has already been published.", error);
     }
 
-    // ── Fake handlers ────────────────────────────────────────────────────────────
 
     private sealed class JsonResponseHandler(HttpStatusCode statusCode, object? payload) : HttpMessageHandler
     {

@@ -30,14 +30,12 @@ internal sealed class AuditPendingItem
 
     internal static AuditPendingItem From(IAuditEvent evt)
     {
-        // AUD-04: validate actor attribution before persistence.
         AuditActorAttributionGuard.Assert(evt);
 
         var beforeJson  = evt.Before   is null ? null : JsonSerializer.Serialize(evt.Before);
         var afterJson   = evt.After    is null ? null : JsonSerializer.Serialize(evt.After);
         var metadataJson = evt.Metadata is null ? null : JsonSerializer.Serialize(evt.Metadata);
 
-        // AUD-03: validate payloads for prohibited sensitive fields before persistence.
         AuditPayloadRedactionGuard.AssertPayloadIsSafe(beforeJson,   "Before");
         AuditPayloadRedactionGuard.AssertPayloadIsSafe(afterJson,    "After");
         AuditPayloadRedactionGuard.AssertPayloadIsSafe(metadataJson, "Metadata");
@@ -88,7 +86,6 @@ internal sealed class AuditPendingItem
         ErrorMessage = reason.Length > 2000 ? reason[..2000] : reason;
     }
 
-    /// <summary>Resets a Failed item back to Pending so the background job will retry it.</summary>
     public void ResetForRetry()
     {
         if (Status != StatusFailed)
@@ -98,7 +95,6 @@ internal sealed class AuditPendingItem
     }
 }
 
-/// <summary>Serialised snapshot of an <see cref="IAuditEvent"/> used as the pending-item payload.</summary>
 internal sealed record PendingAuditPayload(
     Guid           EventId,
     Guid           CompanyId,
@@ -108,7 +104,6 @@ internal sealed record PendingAuditPayload(
     Guid?          EmployeeId,
     Guid?          ActorUserId,
     Guid?          ActorEmployeeId,
-    /// <summary>AUD-04: actor origin classification stored so the promoter can reproduce the column.</summary>
     AuditActorType ActorType,
     DateTimeOffset OccurredAt,
     Guid?          CorrelationId,

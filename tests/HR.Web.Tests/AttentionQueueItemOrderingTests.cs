@@ -2,14 +2,6 @@ using HR.Web.Components.Pages.Dashboards;
 
 namespace HR.Web.Tests;
 
-/// <summary>
-/// Regression coverage proving that <see cref="ManagerAttentionQueueOrdering.Order{T}"/>, called with
-/// the exact same selectors the HR widget uses
-/// (<c>i => i.IsOverdue, i => i.UrgencyRank, i => i.DueDate</c>), sorts <see cref="AttentionQueueItem"/>
-/// rows correctly. This pins AttentionQueueWidget.razor's ordering call — the manager widget's
-/// equivalent call is already covered via <see cref="ManagerAttentionQueueOrdering.Item"/> in
-/// ManagerAttentionQueueOrderingTests.cs.
-/// </summary>
 public class AttentionQueueItemOrderingTests
 {
     private static AttentionQueueItem Item(

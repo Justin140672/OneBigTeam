@@ -3,7 +3,6 @@ using HR.Web.Services;
 
 namespace HR.Web.Models;
 
-// ── LIST ──────────────────────────────────────────────────────────────────────
 
 public record ListVacanciesResponse(List<VacancyListItemModel> Items);
 
@@ -20,12 +19,9 @@ public record VacancyListItemModel(
     string? PositionProfileTitle,
     Guid? PositionProfileDepartmentId,
     string EffectiveTitle,
-    // Resolved exclusively from the linked Position Profile — a vacancy no longer has a location of
-    // its own to override.
     string? EffectiveLocation,
     int ApplicationCount);
 
-// ── DASHBOARD: STALE VACANCIES ──────────────────────────────────────────────────
 
 public record GetStaleVacanciesResponse(IReadOnlyList<StaleVacancyItem> Items);
 
@@ -36,7 +32,6 @@ public record StaleVacancyItem(
     DateTimeOffset? LastActivityAt,
     int DaysSinceActivity);
 
-// ── GET ───────────────────────────────────────────────────────────────────────
 
 public record GetVacancyResponse(
     Guid Id,
@@ -63,7 +58,6 @@ public record GetVacancyResponse(
     // Ticket 2: optimistic-concurrency token.
     int Version = 0);
 
-// ── CREATE ────────────────────────────────────────────────────────────────────
 
 public record CreateVacancyRequest(
     Guid CompanyId,
@@ -88,7 +82,6 @@ public record CreateVacancyResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
-// ── UPDATE ────────────────────────────────────────────────────────────────────
 
 public record UpdateVacancyRequest(
     Guid CompanyId,
@@ -119,7 +112,6 @@ public record UpdateVacancyResponse(
     DateTimeOffset UpdatedAt,
     int Version = 0);
 
-// ── CLOSE ─────────────────────────────────────────────────────────────────────
 
 public record CloseVacancyRequest(Guid CompanyId, Guid VacancyId, DateOnly? ClosedAt);
 
@@ -136,7 +128,6 @@ public record CloseVacancyResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
-// ── PUBLISH ───────────────────────────────────────────────────────────────────
 
 public record PublishVacancyRequest(Guid CompanyId, Guid VacancyId, DateOnly? OpenedAt);
 
@@ -153,7 +144,6 @@ public record PublishVacancyResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
-// ── EDIT MODEL ────────────────────────────────────────────────────────────────
 
 public sealed class VacancyEditModel : IHasVersion
 {
@@ -180,12 +170,9 @@ public sealed class VacancyEditModel : IHasVersion
     public bool IsAuthorisedCorrection { get; set; }
     public string? CorrectionReason { get; set; }
 
-    // VAC: when set, the vacancy is surfaced in the employee-facing Internal Vacancies list on My
-    // Profile while it is open.
     public bool IsAdvertisedInternally { get; set; }
 }
 
-// ── DASHBOARD: HIRING PIPELINE SUMMARY ──────────────────────────────────────────
 
 public sealed record GetPipelineSummaryResponse(IReadOnlyList<PipelineSummaryItem> Items);
 

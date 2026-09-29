@@ -4,11 +4,6 @@ using Xunit;
 
 namespace HR.Infrastructure.Tests;
 
-/// <summary>
-/// Reliability review issue 3 (P1): startup validation for profile photo / support attachment /
-/// organisation export storage must catch every missing/malformed required field, not just a blank
-/// SupabaseUrl, and must never print the secret value itself in an error message.
-/// </summary>
 public class SupabaseStorageOptionsValidatorsTests
 {
     private static IHostEnvironment ProductionEnvironment() => new FakeHostEnvironment("Production");
@@ -281,10 +276,6 @@ public class SupabaseStorageOptionsValidatorsTests
     }
 }
 
-/// <summary>
-/// Minimal IHostEnvironment test double used to exercise the Development/Test-only HTTP allowance
-/// added for security review finding 6, without pulling in a full WebApplicationFactory host.
-/// </summary>
 internal sealed class FakeHostEnvironment(string environmentName) : IHostEnvironment
 {
     public string EnvironmentName { get; set; } = environmentName;

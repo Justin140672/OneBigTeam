@@ -55,14 +55,10 @@
 <SiteFooter />
 
 @code {
-    /// <summary>Documents/{slug}.md filename (without extension) to load and render.</summary>
     [Parameter, EditorRequired] public string DocumentSlug { get; set; } = string.Empty;
 
     private MarkdownDocument Document { get; set; } = null!;
 
-    // Cross-links between related legal/trust pages, keyed by document slug. Kept as a small
-    // static map here rather than parsing it out of markdown, since the relationships are a
-    // handful of fixed pairs rather than derived content.
     private static readonly Dictionary<string, (string Href, string Label)[]> RelatedPagesBySlug = new()
     {
         ["privacy-policy"] =

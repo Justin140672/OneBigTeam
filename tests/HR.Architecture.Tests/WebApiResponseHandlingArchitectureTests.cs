@@ -16,12 +16,6 @@ namespace HR.Architecture.Tests;
 /// </summary>
 public class WebApiResponseHandlingArchitectureTests
 {
-    /// <summary>
-    /// Pre-existing service files (as of the shared-response-reader migration) that still define a
-    /// local error/validation envelope record or a local TryDeserialize helper instead of the shared
-    /// HR.SharedKernel.Http types. Entries should be removed as each file is migrated. Do not add new
-    /// entries — a new or newly-touched service should use the shared contracts from the start.
-    /// </summary>
     private static readonly string[] BaselineLocalEnvelopeFiles =
     [
         "src/HR.Web/Services/ApplicationService.cs",
@@ -89,18 +83,10 @@ public class WebApiResponseHandlingArchitectureTests
             "bespoke local envelope:" + Environment.NewLine + string.Join(Environment.NewLine, newViolations));
     }
 
-    /// <summary>
-    /// Pre-existing service files that still swallow a failed read into null/false/an empty collection
-    /// via a broad "catch { return ...; }" (or "catch (Exception ...) { return ...; }") with no
-    /// distinction for network failure vs. a genuine empty result. Entries should be removed as each
-    /// file migrates its read paths to ApiResponseReader. Do not add new entries.
-    /// </summary>
     private static readonly string[] BaselineBroadCatchFiles =
     [
         "src/HR.Admin.Web/Services/SupportRequestAdminService.cs",
         "src/HR.Web/Services/DataImportService.cs",
-        // Write paths migrated to ApiResponseReader; several read (GET) methods still swallow into
-        // null via a bare catch — tracked as follow-up work, not yet migrated.
         "src/HR.Web/Services/DocumentService.cs",
         "src/HR.Web/Services/EmployeeService.cs",
         "src/HR.Web/Services/NotificationService.cs",
@@ -187,10 +173,6 @@ public class WebApiResponseHandlingArchitectureTests
         return results;
     }
 
-    /// <summary>
-    /// Walks up from the test assembly's location until it finds a directory containing both
-    /// <c>src/HR.Web</c> and a <c>.sln</c>/<c>.slnx</c> file, which identifies the repository root.
-    /// </summary>
     private static string FindRepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

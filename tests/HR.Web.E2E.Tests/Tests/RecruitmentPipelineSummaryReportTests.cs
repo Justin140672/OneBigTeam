@@ -3,24 +3,13 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the Recruitment Pipeline Summary report page
-/// (/companies/{companyId}/reporting/recruitment-pipeline-summary —
-/// RecruitmentPipelineSummaryReportPage.razor): loading, the standalone "Include closed vacancies"
-/// checkbox, the per-vacancy "Pipeline Stages" badge column, export, and access control for the
-/// "reporting:view-recruitment"-gated data/export endpoints. Catalog-page card visibility/navigation
-/// coverage lives in <see cref="ReportCatalogTests"/>.
-/// </summary>
 public sealed class RecruitmentPipelineSummaryReportTests(RecruiterPersonaFixture fixture)
     : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    // The endpoint behind this page is gated by the "reporting:view-recruitment" policy, which is
-    // Recruiter-only (see IdentityModule.AddPolicy("reporting:view-recruitment", ...)) — same
-    // reasoning/precedent as RecruitmentPipelineReportTests and VacancyPerformanceReportTests.
-    private const string MarcusEmail = "marcus.diallo@acme.example"; // Recruiter
-    private const string LauraEmail = "laura.bennett@acme.example"; // HR Administrator — no Recruiter role
+    private const string MarcusEmail = "marcus.diallo@acme.example";
+    private const string LauraEmail = "laura.bennett@acme.example";
 
     [Fact]
     public async Task Page_Loads_WithExpectedColumns()
@@ -45,14 +34,6 @@ public sealed class RecruitmentPipelineSummaryReportTests(RecruiterPersonaFixtur
         Assert.Contains(headers, h => h.Contains("Pipeline Stages"));
     }
 
-    /// <summary>
-    /// Exercises the report's aggregation logic against the seeded dev data's recruitment pipeline
-    /// (candidates distributed across the company's configured Recruitment Settings stages for at
-    /// least one open vacancy) — not just an empty-state render. If any row has candidates, its
-    /// "Pipeline Stages" column must render at least one non-zero "&lt;stage&gt;: &lt;count&gt;" badge
-    /// (or the "No stages configured" fallback if the company has none configured), proving the
-    /// per-stage counts are actually being computed rather than the column being blank.
-    /// </summary>
     [Fact]
     public async Task PipelineStagesColumn_RendersPerStageCandidateCounts()
     {
@@ -66,7 +47,7 @@ public sealed class RecruitmentPipelineSummaryReportTests(RecruiterPersonaFixtur
 
         var rowCount = await report.GetRowCountAsync();
         if (rowCount == 0)
-            return; // Nothing seeded to assert against — Page_Loads_WithExpectedColumns already covers the empty-state grid shell.
+            return;
 
         var badgeTexts = await report.GetPipelineStageBadgeTextsAsync();
         Assert.NotEmpty(badgeTexts);
@@ -84,8 +65,6 @@ public sealed class RecruitmentPipelineSummaryReportTests(RecruiterPersonaFixtur
 
         await report.GoToAsync(AcmeId);
 
-        // Default is unchecked (open vacancies only) — see RecruitmentPipelineSummaryReportPage.razor's
-        // _includeClosed field default.
         Assert.False(await report.IsIncludeClosedCheckedAsync());
 
         var openOnlyRowCount = await report.GetRowCountAsync();
@@ -136,9 +115,6 @@ public sealed class RecruitmentPipelineSummaryReportTests(RecruiterPersonaFixtur
 
         await catalog.GoToAsync(AcmeId);
 
-        // Laura (HR Administrator, no Recruiter role) passes "reporting:view-hr" but not
-        // "reporting:view-recruitment" — the catalog endpoint filters out Recruitment-category
-        // entries server-side, matching the recruitment-pipeline/vacancy-performance precedent.
         Assert.False(await catalog.HasCardAsync("Recruitment Pipeline Summary"),
             "Expected a non-Recruiter persona to not see the Recruitment Pipeline Summary catalog card at all");
     }
@@ -152,10 +128,6 @@ public sealed class RecruitmentPipelineSummaryReportTests(RecruiterPersonaFixtur
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // ADM-05 (commit e67ba6ff): RecruitmentPipelineSummaryReportPage guards on
-        // Session.CanViewRecruitmentReports via AppSession.GuardAccess, redirecting a persona that
-        // lacks it to /access-denied (replace) rather than rendering and letting the data call
-        // 403. Laura is an HR Administrator, not a Recruiter.
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/reporting/recruitment-pipeline-summary");
 
         await accessDenied.WaitForLoadedAsync();

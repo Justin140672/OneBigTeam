@@ -7,7 +7,6 @@ internal sealed record CompleteTaskRequest
     public string? OutcomeDecision { get; init; }
     public string? OutcomeReason { get; init; }
 
-    // Populated by the endpoint from the authenticated user's sub claim.
     internal Guid CompletedBy { get; init; }
 
     // Populated by the endpoint from the optional "Idempotency-Key" request header (ticket 3, P1

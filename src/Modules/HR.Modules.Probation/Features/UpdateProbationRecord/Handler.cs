@@ -5,7 +5,6 @@ using HR.Modules.Companies.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
-// SaveChangesWithConcurrencyAsync is declared in HR.SharedKernel (already imported above).
 
 namespace HR.Modules.Probation.Features.UpdateProbationRecord;
 
@@ -87,11 +86,6 @@ internal sealed class UpdateProbationRecordHandler
             HasNotes: !string.IsNullOrWhiteSpace(record.Notes),
             now), cancellationToken);
 
-        // PROB-03: the expected end date directly drives the checkpoint/final-decision review
-        // schedule, so any still-pending (not yet completed) reviews must be recalculated against
-        // the new date. Gated on an actual change so a no-op update (e.g. only Notes changed)
-        // never triggers redundant cancel-and-recreate churn — this is also what keeps repeated/
-        // retried calls with an unchanged date idempotent.
         if (request.ExpectedEndDate != previousExpectedEndDate)
         {
             var checkpointDays = await _probationSettingsReader.GetCheckpointDaysAsync(request.CompanyId, cancellationToken);

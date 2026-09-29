@@ -64,10 +64,6 @@ internal sealed class EmployeeProvisioningService(
         var now = clock.UtcNowOffset();
         employee.MarkAsInitialCompanyAdmin(now);
 
-        // The initial admin's employee record is created with placeholder personal details (see
-        // SignUpHandler.CreateAdminEmployeeAsync) — flag it as requiring the first-login "Complete
-        // your employee profile" flow so HR.Web can block normal access until the real details (and
-        // at least one compensation record) are entered. Only ever set for this specific record.
         employee.MarkRequiresInitialSetup(now);
 
         // CompleteInitialEmployeeSetupHandler requires at least one compensation record to exist

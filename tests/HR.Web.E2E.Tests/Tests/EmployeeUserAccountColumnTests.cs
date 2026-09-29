@@ -4,33 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the "User Account" status column and row-level "Invite User" Quick Invite action added
-/// to the Employee List (tickets #90/#91) — closing the E2E coverage gap tracked by ticket #96.
-///
-/// The redesigned column (commit a80960cc) renders three-state display labels — "Active",
-/// "Disabled", "No account" (was "No User"), "Invited" (was "Pending Invitation"), "Invite
-/// expired" (was "Invitation Expired") — and the old inline "Invite User" row link is now an
-/// "Invite" item in a per-row ⋮ actions menu. The column stays sortable and Excel-filterable
-/// (the filter lists the raw UserAccountStatus values, e.g. "No User").
-///
-/// Personas/employees used (all seeded Acme data, same convention as
-/// UserAdministrationManagementTests):
-/// - "Laura Bennett" — HR Administrator, seeded active dev-persona account -> "Active".
-/// - "Carlos Rivera" — seeded active dev-persona account, used (and restored) as the "Disabled"
-///   arrangement so as not to permanently disable a persona another test might rely on.
-/// - "Sophie Laurent" — seeded Acme employee with no corresponding dev-persona user account (see
-///   EmployeesModule's MakeAcme seed list vs. IdentityModule.SeedDevUserAsync's persona list) ->
-///   "No account". Only ever READ here (never invited) — the invite-mutation test below
-///   (QuickInvite_ForNoUserEmployee...) creates its own fresh employee instead; see
-///   CreateFreshUninvitedEmployeeAsync's doc comment for why.
-///
-/// "Invite expired" is not covered here: reaching that state requires a genuinely expired
-/// invitation (time-based), which can't be arranged through the UI within a single test run
-/// without directly manipulating the database — doing so would violate this suite's "don't fake
-/// what can't genuinely be verified" convention. The icon/label mapping for it lives in
-/// EmployeeList.AccountStateDisplay alongside the other four covered here.
-/// </summary>
 public sealed class EmployeeUserAccountColumnTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -102,9 +75,6 @@ public sealed class EmployeeUserAccountColumnTests(HrAdminPersonaFixture fixture
         await login.GoToAsync();
         await login.LoginAsync(HrAdminEmail);
 
-        // Arrange: disable Carlos Rivera's account via User Administration (same action covered
-        // by UserAdministrationManagementTests.DisableThenEnableAccount_UpdatesAccountStatus),
-        // then restore it in the finally block so no other test/persona is left locked out.
         await userAdminList.GoToAsync(AcmeId);
         await userAdminList.OpenUserDetailAsync(DisableTargetEmployeeName);
         var detail = new UserDetailPage(_page, _fixture.WebBaseUrl);
@@ -148,20 +118,13 @@ public sealed class EmployeeUserAccountColumnTests(HrAdminPersonaFixture fixture
         await login.LoginAsync(HrAdminEmail);
         await list.GoToAsync(AcmeId);
 
-        // The "User Account" column must actually be part of the grid the export button targets.
         Assert.True(await _page.Locator(".e-headercell").Filter(new() { HasText = "User Account" }).IsVisibleAsync());
 
-        // EmployeeList.razor's EmployeeToolbar now folds the base toolbar's separate Print/
-        // Export/Columns buttons into a single "More" overflow menu (OverflowActionsMenu,
-        // rendered via OverflowMenuTemplate) — there is no longer a standalone "Export" button to
-        // find directly. "Export to Excel/CSV/PDF" are items inside that dropdown instead.
         var moreButton = _page.GetByRole(AriaRole.Button, new() { Name = "More actions" });
         Assert.True(await moreButton.IsVisibleAsync());
         Assert.False(await moreButton.IsDisabledAsync());
 
         await moreButton.ClickAsync();
-        // Id-based ("#hr-excel", OverflowActionsMenu.razor's static _items list), not role+name —
-        // see SharedDocumentDetailPage.ClickMoreActionsItemAsync's remarks for why.
         var exportToExcelItem = _page.Locator("#hr-excel");
         await exportToExcelItem.WaitForAsync(new() { Timeout = 10_000 });
         Assert.True(await exportToExcelItem.IsVisibleAsync());
@@ -173,20 +136,6 @@ public sealed class EmployeeUserAccountColumnTests(HrAdminPersonaFixture fixture
         // itself is part of the grid it operates on.
     }
 
-    /// <summary>
-    /// Creates a fresh, uniquely-named Acme employee with no linked user account, to use as the
-    /// invite target for QuickInvite_ForNoUserEmployee_OpensPreselectedDialog_AndCompletesToPendingInvitation.
-    ///
-    /// That test used to invite the shared seeded "Sophie Laurent" (NoUserEmployeeName) directly,
-    /// which is also read (as an expected "No User" row) by
-    /// UserAccountColumn_ShowsNoUserIconLabelAndInviteLink_ForEmployeeWithoutAccount in this same
-    /// class, and was invited by UserAdministrationManagementTests' Resend/Cancel toolbar test too
-    /// — under real parallel execution those tests race to invite/resend/cancel her, leaving her
-    /// status unpredictable depending on run order. A freshly created employee has no linked user
-    /// account (employee creation does not provision one), so it satisfies the same "eligible
-    /// NoUser invite target" precondition without mutating shared seed data. The read-only tests
-    /// above still use Sophie Laurent directly since they never mutate her.
-    /// </summary>
     private async Task<string> CreateFreshUninvitedEmployeeAsync()
     {
         var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
@@ -231,12 +180,8 @@ public sealed class EmployeeUserAccountColumnTests(HrAdminPersonaFixture fixture
 
         await list.ClickInviteUserLinkAsync(targetName);
 
-        // "Employee" is always applied automatically (fixed badge, not a selectable role) — no
-        // additional roles are needed for this happy-path invite.
         await list.CompleteQuickInviteAsync([]);
 
-        // Completing the invite calls EmployeeList.HandleInviteUserDialogCompleted, which reloads
-        // via LoadAsync() rather than navigating — the URL should stay on the employee list.
         Assert.Contains("/employees", _page.Url);
         Assert.DoesNotContain("/user-administration", _page.Url);
 

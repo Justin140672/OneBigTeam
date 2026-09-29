@@ -83,14 +83,13 @@ public class UpdateMyEmergencyContactHandlerTests
         Assert.True(result.IsFailure);
         Assert.Equal("validation", result.Error.Code);
 
-        // The original contact should be untouched since validation ran before Update().
         var saved = await context.EmergencyContacts.SingleAsync();
         Assert.Equal("Original Name", saved.Name);
     }
 
     [Theory]
-    [InlineData("07700 900000")] // mobile format
-    [InlineData("01234 567890")] // landline format
+    [InlineData("07700 900000")]
+    [InlineData("01234 567890")]
     public async Task HandleAsync_Succeeds_When_Phone_Matches_Mobile_Or_Telephone_Regex(string phone)
     {
         var (context, companyId, employeeId, contactId) = await SeedAsync();

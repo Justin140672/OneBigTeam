@@ -106,8 +106,6 @@ internal sealed class AcknowledgeSharedCompanyDocumentHandler(
 
         db.SharedCompanyDocumentAcknowledgements.Add(acknowledgement);
 
-        // Built from in-memory values ahead of the save, so it can double as both the response and
-        // the payload persisted for an idempotency replay.
         var response = new AcknowledgeSharedCompanyDocumentResponse(
             document.Id, document.VersionNumber, acknowledgement.AcknowledgedAt);
 
@@ -116,9 +114,6 @@ internal sealed class AcknowledgeSharedCompanyDocumentHandler(
             var outcome = await db.SaveIdempotentAsync(db.IdempotencyRecords,
             scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
 
-            // Lost a race against a concurrent duplicate under the same key — this attempt's
-            // acknowledgement row was rolled back along with it, so skip the task-complete/audit/
-            // integration-event publishing below and hand back the winner's result untouched.
             if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
                 return Result.Success(outcome.Response!);
         }
@@ -127,11 +122,6 @@ internal sealed class AcknowledgeSharedCompanyDocumentHandler(
             await db.SaveChangesAsync(cancellationToken);
         }
 
-        // Complete the acknowledging employee's own open Acknowledge task for this document, if
-        // one exists — scoped to this employee specifically (not just "the first open task for
-        // this document") since a published document fans out to one task per eligible employee.
-        // Covers both entry paths: acknowledging via the task itself, and browsing directly to
-        // the document (e.g. via My Documents) while a task is still outstanding.
         await taskCompleter.CompleteBySourceEntityForEmployeeAsync(
             request.CompanyId,
             document.Id,

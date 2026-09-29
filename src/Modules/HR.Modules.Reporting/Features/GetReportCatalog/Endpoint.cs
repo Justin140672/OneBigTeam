@@ -12,11 +12,6 @@ internal sealed class Endpoint(
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/reporting/catalog");
-        // Baseline access to the reporting area. Users without this fail outright with 403.
-        // Category-level visibility (recruitment vs hr vs the combined employee-starter/
-        // leave-summary policies) is filtered inside the handler for users who do have baseline
-        // access but only some category sub-policies — mirrors GetEmployeeTimeline's callerIsHr
-        // pattern.
         Policies("reporting:view");
     }
 
@@ -24,9 +19,6 @@ internal sealed class Endpoint(
         GetReportCatalogRequest request,
         CancellationToken cancellationToken)
     {
-        // Bug fix retained: workload-actions is gated on a dedicated Manager/HrAdministrator-only
-        // policy (reporting:view-workload-actions) rather than the plain Category-based split — see
-        // IdentityModule.cs — so a Recruiter with no HR/Manager role never sees it.
         var gates = await ReportAccessGateEvaluator.EvaluateAsync(authorizationService, User);
 
         var result = await handler.HandleAsync(

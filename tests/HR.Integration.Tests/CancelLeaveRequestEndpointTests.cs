@@ -9,12 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// LEAVE-01/LEAVE-07: DELETE .../employees/{employeeId}/leave-requests/{leaveRequestId}.
-/// Endpoint-level auth (self / HR-admin) is exhaustively covered by
-/// <see cref="LeaveResourceAuthorizationTests"/>; this class pins the handler's business-rule
-/// branches, 404 behaviour and tenant scoping end-to-end against Postgres.
-/// </summary>
 [Collection("Integration")]
 public class CancelLeaveRequestEndpointTests
 {
@@ -98,8 +92,6 @@ public class CancelLeaveRequestEndpointTests
 
         using var client = await AuthenticatedClient(caller);
 
-        // Route employeeId == caller (passes the self authorizer) but the request row is owned by
-        // someone else, so the handler's EmployeeId predicate misses it -> 404, not 403.
         var response = await client.DeleteAsync(
             $"/api/companies/{SeededCompanyId}/employees/{caller}/leave-requests/{leaveRequestId}");
 
@@ -126,7 +118,6 @@ public class CancelLeaveRequestEndpointTests
     [Fact]
     public async Task Returns_BadRequest_When_Cancelling_A_Draft()
     {
-        // LEAVE-07: a draft was never submitted, so "cancel" is not meaningful - delete instead.
         var employee = await CreateEmployeeAsync();
         var leaveRequestId = await SeedLeaveRequestAsync(employee, LeaveRequestStatus.Draft);
 
@@ -154,7 +145,6 @@ public class CancelLeaveRequestEndpointTests
         Assert.Equal(HttpStatusCode.BadRequest, second.StatusCode);
     }
 
-    // ── helpers ──────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId, bool hrAdministrator = false)
     {

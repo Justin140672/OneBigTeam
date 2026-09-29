@@ -40,16 +40,10 @@ internal sealed class UploadSharedCompanyDocumentVersionHandler(
 
         var file = request.File;
 
-        // Supported file type + maximum file size.
         var validationResult = fileValidator.Validate(file.FileName, file.ContentType, file.Length);
         if (validationResult.IsFailure)
             return Result.Failure<UploadSharedCompanyDocumentVersionResponse>(validationResult.Error);
 
-        // Safe storage filename — strip any directory component a crafted FileName (e.g.
-        // "../../evil.pdf" or "..\..\evil.pdf") might carry, so it can never escape the storage
-        // folder the same way the file-name segment of the storage key otherwise would. Split on
-        // both separators explicitly rather than relying on Path.GetFileName, whose separator
-        // handling is platform-dependent (it only treats '\' as a separator on Windows).
         var safeFileName = file.FileName.Split(['/', '\\']).Last();
         if (string.IsNullOrWhiteSpace(safeFileName) ||
             safeFileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
@@ -60,9 +54,6 @@ internal sealed class UploadSharedCompanyDocumentVersionHandler(
 
         await using var fileStream = file.OpenReadStream();
 
-        // Virus scanning happens asynchronously via ScanUploadedFileJob (enqueued below) rather
-        // than inline — the row is stored with ScanStatus = Pending.
-        // Verify file content matches the declared content type (prevents extension/MIME spoofing).
         var contentResult = fileValidator.ValidateContent(fileStream, file.ContentType);
         if (contentResult.IsFailure)
             return Result.Failure<UploadSharedCompanyDocumentVersionResponse>(contentResult.Error);
@@ -79,10 +70,6 @@ internal sealed class UploadSharedCompanyDocumentVersionHandler(
         var now = clock.UtcNowOffset();
         document.ReplaceFile(storageKey, safeFileName, file.Length, file.ContentType, uploadedBy, now);
 
-        // Only route left to change the acknowledgement wording once a document is Published (see
-        // UpdateSharedCompanyDocumentAcknowledgementSettingsHandler's post-publish lock) — applied
-        // only when this version also requires re-acknowledgement, matching how re-triggering
-        // acknowledgement tasks already only happens in that case.
         if (document.RequiresAcknowledgement && request.RequiresReacknowledgement &&
             !string.IsNullOrWhiteSpace(request.AcknowledgementStatement))
         {
@@ -96,11 +83,6 @@ internal sealed class UploadSharedCompanyDocumentVersionHandler(
 
         var versionNote = request.VersionNote.Trim();
 
-        // Copy-forward: the version about to become "previous" is document.VersionNumber - 1,
-        // since document.ReplaceFile() above already incremented VersionNumber for the new
-        // version being created here. HR may explicitly override the wording for the new version
-        // (request.AcknowledgementStatement); otherwise the previous version's own statement is
-        // carried forward unchanged so every version always holds its own independent copy.
         var previousVersionStatement = await db.SharedCompanyDocumentVersions
             .Where(v => v.SharedCompanyDocumentId == document.Id && v.VersionNumber == document.VersionNumber - 1)
             .Select(v => v.AcknowledgementStatement)
@@ -135,12 +117,6 @@ internal sealed class UploadSharedCompanyDocumentVersionHandler(
                 var eligibleEmployeeIds = await audienceMatcher.GetEligibleEmployeeIdsAsync(
                     request.CompanyId, document.Id, cancellationToken);
 
-                // Cancel any still-open Acknowledge task from a previous version before creating
-                // this version's tasks below — otherwise an employee who hadn't yet acknowledged
-                // the prior version ends up with two open tasks for the same document. Completing
-                // either task would still have correctly recorded acknowledgement of the current
-                // version (AcknowledgeSharedCompanyDocumentHandler reads VersionNumber fresh at
-                // acknowledge-time), but leaving the stale one open is confusing task-list clutter.
                 await taskCanceller.CancelAllBySourceEntityAsync(
                     request.CompanyId, document.Id, TaskSource.Document, TaskActionType.Acknowledge, cancellationToken);
 
@@ -202,7 +178,6 @@ internal sealed class UploadSharedCompanyDocumentVersionHandler(
         }
         catch
         {
-            // Best-effort: remove the already-uploaded file so it doesn't become an orphan.
             try { await storage.DeleteAsync(storageKey, cancellationToken); } catch { }
             throw;
         }

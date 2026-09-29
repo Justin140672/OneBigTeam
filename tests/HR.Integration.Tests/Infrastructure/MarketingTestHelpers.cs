@@ -2,12 +2,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests.Infrastructure;
 
-/// <summary>
-/// Shared setup for the Marketing platform-admin endpoint tests. The "/api/marketing/admin/*"
-/// endpoints use the same "platform:admin" policy as PlatformSettings, so authentication is wired
-/// exactly like PlatformSettingsAuthorizationTests: an enabled identity.platform_administrators row
-/// matched by SupabaseAuthUserId.
-/// </summary>
 internal static class MarketingTestHelpers
 {
     public static async Task<HttpClient> PlatformAdminClientAsync(ApiWebApplicationFactory factory)

@@ -6,13 +6,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Covers POST /api/login for the security ticket "Remove authentication tokens from
-/// browser-visible URLs": the API hands the freshly minted Supabase tokens back in the JSON
-/// response body (HR.Web then stashes them server-side via AuthHandoffStore and only ever puts an
-/// opaque handoff code in a URL). This asserts the endpoint's shape — a JSON 200 with tokens, no
-/// redirect, no token in any URL — plus the generic-failure and validation behaviour.
-/// </summary>
 [Collection("Integration")]
 public class LoginEndpointTests
 {
@@ -54,8 +47,6 @@ public class LoginEndpointTests
         Assert.Equal("refresh-token", payload.RefreshToken);
         Assert.True(payload.ExpiresIn > 0);
 
-        // Sanity: the caller (HR.Web) receives these as data, never as something already embedded
-        // in a browser-visible URL.
         var raw = await response.Content.ReadAsStringAsync();
         Assert.DoesNotContain("://", raw);
     }

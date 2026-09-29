@@ -129,7 +129,6 @@ else
         public int StartEmployee { get; set; }
         public int? EndEmployee { get; set; }
 
-        // Syncfusion SfNumericTextBox<int> can't bind a nullable; this shim maps 0 <-> null.
         public int EndEmployeeValue
         {
             get => EndEmployee ?? 0;
@@ -155,7 +154,6 @@ else
             .Select(b => new BandRow { StartEmployee = b.StartEmployee, EndEmployee = b.EndEmployee, PricePerEmployee = b.PricePerEmployee })
             .ToList();
         _minimumMonthlyChargeGbp = config.MinimumMonthlyChargeGbp;
-        // Enforce that only the final band is unlimited for the editor's shape.
         for (var i = 0; i < _bands.Count - 1; i++)
         {
             _bands[i].EndEmployee ??= _bands[i].StartEmployee;
@@ -169,7 +167,6 @@ else
     private void AddBand()
     {
         var previousEnd = _bands.Count >= 2 ? _bands[^2].EndEmployee ?? _bands[^2].StartEmployee : _bands.Count == 1 ? _bands[0].StartEmployee : 0;
-        // Insert a bounded band just before the final unlimited band.
         var newStart = previousEnd + 1;
         var newBand = new BandRow { StartEmployee = newStart, EndEmployee = newStart + 49, PricePerEmployee = 1.50m };
         if (_bands.Count == 0)

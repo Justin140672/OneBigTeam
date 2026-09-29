@@ -14,10 +14,6 @@ public class EmployeeUserAccountStatusReaderTests(IdentityDatabaseFixture fixtur
     [Fact]
     public async Task GetStatusesAsync_Returns_Active_For_A_UserProfile_Based_Account()
     {
-        // A real Supabase-backed account (AcceptInvite, self-service SignUp) — has a UserProfile
-        // row, never an ApplicationUser one. Before this reader also checked UserProfiles, an
-        // employee who'd accepted their invite disappeared from the status column entirely: not
-        // found in Users, and excluded from the invite fallback because the invite is now Claimed.
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
@@ -94,10 +90,6 @@ public class EmployeeUserAccountStatusReaderTests(IdentityDatabaseFixture fixtur
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        // UserInvite.IsExpired compares against the real wall clock (DateTimeOffset.UtcNow), not
-        // the fixed `Now` used elsewhere in this file, so the invite must be created "now" (not a
-        // hardcoded past date) to stay within its 7-day expiry window and exercise the
-        // PendingInvitation (not InvitationExpired) branch.
         await using (var db = fixture.BuildContext())
         {
             db.UserInvites.Add(UserInvite.Create(employeeId, companyId, "employee@example.com", DateTimeOffset.UtcNow));

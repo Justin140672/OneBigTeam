@@ -7,7 +7,6 @@ namespace HR.Web.Tests;
 
 public class ProbationServiceTests
 {
-    // ── GetProbationRecordByEmployeeAsync — 404 is a legitimate "no record" outcome ──
 
     [Fact]
     public async Task GetProbationRecordByEmployeeAsync_Returns_Value_When_Api_Returns_Ok()
@@ -60,7 +59,6 @@ public class ProbationServiceTests
             () => service.GetProbationRecordByEmployeeAsync(Guid.NewGuid(), Guid.NewGuid(), cts.Token));
     }
 
-    // ── UpdateProbationRecordAsync(ApiSaveResult) ────────────────────────────────
 
     [Fact]
     public async Task UpdateProbationRecordAsync_Returns_Ok_When_Api_Returns_Success()
@@ -128,7 +126,6 @@ public class ProbationServiceTests
         Assert.NotNull(result.ErrorMessage);
     }
 
-    // ── CompleteReviewAsync (idempotency-style guard indirectly exercised via API result) ──
 
     [Fact]
     public async Task CompleteReviewAsync_Returns_True_When_Api_Returns_Ok()

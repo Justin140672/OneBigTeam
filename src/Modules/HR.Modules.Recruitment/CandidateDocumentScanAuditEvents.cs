@@ -2,17 +2,7 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Recruitment;
 
-// [P1] Candidate CV malware scanning — audit trail for every scan state transition, every retry and
-// every quarantine. Published by ScanCandidateDocumentJob / ReconcileCandidateDocumentScansJob
-// (background jobs: no human actor). Payloads carry identifiers, statuses, attempt numbers and a
-// closed-set/sanitised reason only — never the file name, file content, storage key or raw exception
-// text.
-//
-// EventId is derived deterministically from (document, attempt, outcome) so a job that re-publishes
-// the same logical transition after a crash is deduplicated by the audit store's unique event_id.
 
-/// <summary>A scan attempt finished (Clean, Infected or terminally Failed) or a lost attempt was
-/// released by reconciliation.</summary>
 internal sealed record CandidateDocumentScanStatusChangedAuditEvent(
     Guid CompanyId,
     Guid DocumentId,
@@ -37,8 +27,6 @@ internal sealed record CandidateDocumentScanStatusChangedAuditEvent(
     object? IAuditEvent.Metadata => new { CandidateId };
 }
 
-/// <summary>A scan attempt failed (scanner or storage outage) and another bounded attempt has been
-/// scheduled. The document stays Pending — i.e. not downloadable — in the meantime.</summary>
 internal sealed record CandidateDocumentScanRetryScheduledAuditEvent(
     Guid CompanyId,
     Guid DocumentId,
@@ -63,8 +51,6 @@ internal sealed record CandidateDocumentScanRetryScheduledAuditEvent(
     object? IAuditEvent.Metadata => new { CandidateId, FailedAttempt, MaxAttempts, Reason };
 }
 
-/// <summary>An infected document's blob was handed to the durable deletion pipeline
-/// (CandidateDocumentDeletionOperation). The document row is retained, marked Infected, as evidence.</summary>
 internal sealed record CandidateDocumentQuarantinedAuditEvent(
     Guid CompanyId,
     Guid DocumentId,
@@ -90,14 +76,13 @@ internal sealed record CandidateDocumentQuarantinedAuditEvent(
 
 internal static class CandidateDocumentScanAuditEventIds
 {
-    /// <summary>Deterministic, name-based id (RFC 4122 v5-style SHA-1 over the inputs).</summary>
     public static Guid For(Guid documentId, int attempt, string discriminator)
     {
         var input = System.Text.Encoding.UTF8.GetBytes($"candidate-document-scan:{documentId:N}:{attempt}:{discriminator}");
         var hash = System.Security.Cryptography.SHA1.HashData(input);
         var bytes = hash.AsSpan(0, 16).ToArray();
-        bytes[7] = (byte)((bytes[7] & 0x0F) | 0x50); // version 5 (in .NET's little-endian Guid layout)
-        bytes[8] = (byte)((bytes[8] & 0x3F) | 0x80); // RFC 4122 variant
+        bytes[7] = (byte)((bytes[7] & 0x0F) | 0x50);
+        bytes[8] = (byte)((bytes[8] & 0x3F) | 0x80);
         return new Guid(bytes);
     }
 }

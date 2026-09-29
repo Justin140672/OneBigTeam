@@ -8,12 +8,6 @@ using Microsoft.Extensions.Configuration;
 
 namespace HR.Modules.Companies.Services;
 
-/// <summary>
-/// Implements the sanctioned cross-module contract consumed by HR.Modules.Identity's self-service
-/// SignUp feature (Phase B of the Getting Started + Subscription/Billing epic) — provisions a
-/// brand-new Company + default CompanySettings + a started trial CustomerSubscription in one
-/// transaction, keeping Identity free of any direct reference to HR.Modules.Companies.
-/// </summary>
 internal sealed class CompanyProvisioner(
     CompaniesDbContext companiesDbContext,
     PlatformDbContext platformDbContext,
@@ -29,10 +23,6 @@ internal sealed class CompanyProvisioner(
         var settings = CompanySettings.CreateDefault(company.Id, now);
         company.SetSettings(settings, now);
 
-        // A blank RegisteredOffice address so the admin lands on an editable form (Company
-        // Edit's Profile tab) instead of "No addresses found" with no row to fill in at all.
-        // CountryCode defaults to "GB" — UK-only customers for now, and it's no longer
-        // user-editable in the UI (see CompanyProfileTab.razor's remarks).
         var address = CompanyAddress.Create(
             Guid.NewGuid(), company.Id, CompanyAddressType.RegisteredOffice,
             line1: string.Empty, line2: null, city: string.Empty, region: null,
@@ -63,14 +53,6 @@ internal sealed class CompanyProvisioner(
         await companiesDbContext.SaveChangesAsync(cancellationToken);
     }
 
-    /// <summary>
-    /// The platform-wide PlatformSettings singleton row (see PlatformSettings.SingletonId remarks)
-    /// is now the source of truth for trial length — platform administrators change it via the
-    /// Admin Portal without a redeploy. Lazy-seeds the row if it doesn't exist yet, same as
-    /// GetPlatformSettings/UpdatePlatformSettings' handlers. The appsettings
-    /// "Subscription:TrialLengthDays" value is kept only as a defensive fallback in case the row
-    /// can't be read for some reason.
-    /// </summary>
     private async Task<int> GetTrialLengthDaysAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
         try
@@ -91,8 +73,6 @@ internal sealed class CompanyProvisioner(
         }
         catch (Exception)
         {
-            // Defensive fallback only — the DB row is the source of truth. Falls back to
-            // appsettings if the PlatformSettings row genuinely cannot be read/seeded.
             return configuration.GetValue<int?>("Subscription:TrialLengthDays") ?? 14;
         }
     }

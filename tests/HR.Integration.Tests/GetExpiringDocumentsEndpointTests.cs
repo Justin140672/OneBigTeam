@@ -157,12 +157,10 @@ public class GetExpiringDocumentsEndpointTests
         Assert.Equal(3, payload!.Items.Count);
         Assert.Equal(2, payload.Items.Count(i => i.ExpiryStatus == "ExpiringSoon"));
         Assert.Equal(1, payload.Items.Count(i => i.ExpiryStatus == "Expired"));
-        // Ordered ascending by ExpiryDate: expired first, then soonest
         Assert.True(payload.Items[0].ExpiryDate <= payload.Items[1].ExpiryDate);
         Assert.True(payload.Items[1].ExpiryDate <= payload.Items[2].ExpiryDate);
     }
 
-    // ── helpers ─────────────────────────────────────────────────────────────────
 
     private async Task<(Guid CompanyId, Guid DocTypeId, HttpClient Client)> SetupAsync()
     {
@@ -200,7 +198,7 @@ public class GetExpiringDocumentsEndpointTests
     private static MultipartFormDataContent BuildPdfUpload(Guid docTypeId, DateOnly? expiryDate = null)
     {
         var pdfBytes = new byte[1024];
-        pdfBytes[0] = 0x25; pdfBytes[1] = 0x50; pdfBytes[2] = 0x44; pdfBytes[3] = 0x46; // %PDF
+        pdfBytes[0] = 0x25; pdfBytes[1] = 0x50; pdfBytes[2] = 0x44; pdfBytes[3] = 0x46;
 
         var content = new MultipartFormDataContent();
         content.Add(new StringContent("Test Document"),         "Title");

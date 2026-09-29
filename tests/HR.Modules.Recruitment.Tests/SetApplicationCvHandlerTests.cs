@@ -87,7 +87,6 @@ public class SetApplicationCvHandlerTests
         return await verify.Applications.AsNoTracking().SingleAsync(a => a.Id == seed.ApplicationId);
     }
 
-    // ---- Attach / replace / remove ---------------------------------------------------------------
 
     [Fact]
     public async Task HandleAsync_Attaches_Cv_To_Application_Without_A_Reference()
@@ -142,7 +141,6 @@ public class SetApplicationCvHandlerTests
         var saved = await ReloadAsync(seed);
         Assert.Null(saved.CvDocumentId);
 
-        // Removing the reference never deletes the document itself.
         await using var verify = new RecruitmentDbContext(Options(seed.DbName));
         Assert.True(await verify.CandidateDocuments.AnyAsync(d => d.Id == seed.Cv1.Id));
     }
@@ -170,7 +168,6 @@ public class SetApplicationCvHandlerTests
         Assert.Equal(4, saved.Version);
     }
 
-    // ---- Audit -----------------------------------------------------------------------------------
 
     [Fact]
     public async Task HandleAsync_Attach_Publishes_Audit_Event_With_Null_Previous_And_Actor()
@@ -234,7 +231,6 @@ public class SetApplicationCvHandlerTests
         Assert.Equal("Submitted CV removed from application", ((IAuditEvent)evt).Summary);
     }
 
-    // ---- No-op -----------------------------------------------------------------------------------
 
     [Fact]
     public async Task HandleAsync_Attaching_The_Already_Referenced_Cv_Is_A_NoOp()
@@ -291,7 +287,6 @@ public class SetApplicationCvHandlerTests
         Assert.Empty(audit.Published);
     }
 
-    // ---- Not found -------------------------------------------------------------------------------
 
     [Fact]
     public async Task HandleAsync_Returns_NotFound_For_Unknown_Application()
@@ -334,7 +329,6 @@ public class SetApplicationCvHandlerTests
         Assert.Null((await ReloadAsync(seed)).CvDocumentId);
     }
 
-    // ---- Invalid document associations -----------------------------------------------------------
 
     [Fact]
     public async Task HandleAsync_Rejects_Unknown_Document()
@@ -413,7 +407,6 @@ public class SetApplicationCvHandlerTests
         await AssertUnchangedAsync(seed, expectedCvDocumentId: seed.Cv1.Id);
     }
 
-    // ---- Concurrency -----------------------------------------------------------------------------
 
     [Fact]
     public async Task HandleAsync_Returns_Concurrency_When_ExpectedVersion_Is_Stale()
@@ -445,8 +438,6 @@ public class SetApplicationCvHandlerTests
     [Fact]
     public async Task HandleAsync_Without_ExpectedVersion_Is_Rejected_As_Concurrency_And_Saves_Nothing()
     {
-        // Defence in depth behind the validator: SaveChangesWithConcurrencyAsync refuses an omitted
-        // version rather than letting it silently overwrite a concurrent edit.
         var seed = await SeedAsync();
         var audit = new FakeAuditPublisher();
         await using var db = new RecruitmentDbContext(Options(seed.DbName));
@@ -462,8 +453,6 @@ public class SetApplicationCvHandlerTests
     [Fact]
     public async Task HandleAsync_Losing_A_Concurrent_Save_Returns_Concurrency_And_Commits_Only_The_Winner()
     {
-        // Mirrors ApplicationConcurrencyHandlerTests: context A has already loaded the application
-        // (so the handler resolves the tracked, now-stale instance) before context B's change commits.
         var seed = await SeedAsync();
 
         await using var ctxA = new RecruitmentDbContext(Options(seed.DbName));
@@ -487,7 +476,6 @@ public class SetApplicationCvHandlerTests
         Assert.Equal(2, saved.Version);
     }
 
-    // ---- Helpers ---------------------------------------------------------------------------------
 
     private static void AssertValidationFailure(Result<SetApplicationCvResponse> result, string expectedMessage)
     {

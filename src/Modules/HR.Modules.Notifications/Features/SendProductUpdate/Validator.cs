@@ -14,9 +14,6 @@ internal sealed class SendProductUpdateValidator : AbstractValidator<SendProduct
             .NotEmpty()
             .MaximumLength(4000);
 
-        // Same "application-relative only" invariant NotificationActionRouteBuilder enforces for
-        // every other notification type's ActionUrl (NOT-04) — an admin-supplied external/absolute
-        // URL must never be stored or followed.
         RuleFor(r => r.Url)
             .Must(url => url!.StartsWith('/') && !url.StartsWith("//"))
             .When(r => !string.IsNullOrWhiteSpace(r.Url))

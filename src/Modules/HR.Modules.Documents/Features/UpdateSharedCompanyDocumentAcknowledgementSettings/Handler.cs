@@ -41,15 +41,6 @@ internal sealed class UpdateSharedCompanyDocumentAcknowledgementSettingsHandler(
             : null;
         var normalizedDueDate = request.RequiresAcknowledgement ? request.AcknowledgementDueDate : null;
 
-        // The statement text itself is locked once a document leaves Draft — existing
-        // acknowledgements captured the wording as it read at the time, so changing it afterwards
-        // would silently redefine what those past acknowledgements meant. RequiresAcknowledgement
-        // and AcknowledgementDueDate are NOT locked here — e.g. extending a due date post-publish,
-        // or turning acknowledgement off entirely, are legitimate operations with no such
-        // retroactive-meaning problem. Scoped to request.RequiresAcknowledgement being true so that
-        // turning the flag off (which always normalizes the statement to null) is never itself
-        // treated as a wording change — only an actual edit to the stored text, while acknowledgement
-        // stays required, trips this guard.
         if (document.Status != SharedCompanyDocumentStatus.Draft &&
             request.RequiresAcknowledgement &&
             document.AcknowledgementStatement != normalizedStatement)
@@ -65,10 +56,6 @@ internal sealed class UpdateSharedCompanyDocumentAcknowledgementSettingsHandler(
 
         var now = clock.UtcNowOffset();
 
-        // Turning acknowledgement off on a document that currently requires it is a "withdraw the
-        // active campaign" action — outstanding tasks/notifications for anyone who hasn't yet
-        // acknowledged must be cleaned up. Completed acknowledgements are untouched: nothing below
-        // ever reads or writes SharedCompanyDocumentAcknowledgements.
         var isWithdrawal = document.RequiresAcknowledgement && !request.RequiresAcknowledgement;
         var tasksCancelledCount = 0;
         var notificationsRemovedCount = 0;

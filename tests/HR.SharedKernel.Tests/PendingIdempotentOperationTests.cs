@@ -40,7 +40,6 @@ public class PendingIdempotentOperationTests
         var request = new AdjustLeaveBalanceModel(leaveTypeId, 1m, LeaveBalanceAdjustmentReason.Correction, "note", false);
 
         var first = operation.PrepareKey(BuildTupleSnapshot(companyId, employeeId, request));
-        // Unchanged retry: a brand-new tuple/record instance with identical values.
         var second = operation.PrepareKey(BuildTupleSnapshot(
             companyId, employeeId,
             new AdjustLeaveBalanceModel(leaveTypeId, 1m, LeaveBalanceAdjustmentReason.Correction, "note", false)));
@@ -171,10 +170,6 @@ public class PendingIdempotentOperationTests
         Assert.NotEqual(keyA, keyB);
     }
 
-    // Mirrors EditPageBase.cs's create-operation call site: `_createOperation.PrepareKey((GetCompanyId(), Model))`
-    // - a 2-tuple whose second element is a mutable class/record with public PROPERTIES (not the
-    // tuple's own fields). Exercised separately from the 3-tuple case above because the fix must
-    // cover both "properties nested inside a tuple field" and "the tuple's own fields" changing.
     private sealed class AssetEditModel
     {
         public string? AssetNumber { get; set; }
@@ -191,7 +186,7 @@ public class PendingIdempotentOperationTests
 
         var first = operation.PrepareKey((companyId, model));
 
-        model.PurchasePrice = 1200m; // user edited the form before retrying after an ambiguous failure
+        model.PurchasePrice = 1200m;
         var second = operation.PrepareKey((companyId, model));
 
         Assert.NotEqual(first, second);
@@ -217,8 +212,6 @@ public class PendingIdempotentOperationTests
         var payload = new Payload("same");
 
         var first = operation.PrepareKey(payload);
-        // Simulates a lost response: no Complete() call, then the user clicks "Try again" with the
-        // exact same (unchanged) request.
         var second = operation.PrepareKey(new Payload("same"));
 
         Assert.Equal(first, second);
@@ -244,7 +237,7 @@ public class PendingIdempotentOperationTests
         var payload = new Payload("same");
 
         var first = operation.PrepareKey(payload);
-        operation.Complete(); // definitive outcome: success, or a rejection the user acted on
+        operation.Complete();
 
         var second = operation.PrepareKey(payload);
 
@@ -254,9 +247,6 @@ public class PendingIdempotentOperationTests
     [Fact]
     public void Two_Concurrent_Independent_Operations_Never_Share_A_Key()
     {
-        // Simulates two independent dialogs/pages open at once (e.g. two asset-creation forms) -
-        // each owns its OWN PendingIdempotentOperation instance, exactly as EditPageBase/the Leave
-        // dialog do per component instance.
         var operationA = new PendingIdempotentOperation();
         var operationB = new PendingIdempotentOperation();
 
@@ -275,7 +265,6 @@ public class PendingIdempotentOperationTests
         var keyA1 = operationA.PrepareKey(new Payload("a"));
         var keyB1 = operationB.PrepareKey(new Payload("b"));
 
-        // A retries (its own ambiguous failure) - must still equal only its OWN prior key.
         var keyA2 = operationA.PrepareKey(new Payload("a"));
 
         Assert.Equal(keyA1, keyA2);
@@ -285,8 +274,6 @@ public class PendingIdempotentOperationTests
     [Fact]
     public void Double_Clicking_Submit_Before_Any_Outcome_Uses_One_Logical_Operation()
     {
-        // A double-click fires two PrepareKey calls for the exact same in-flight (not yet
-        // Complete()d) submission before either has resolved - both must resolve to the same key.
         var operation = new PendingIdempotentOperation();
         var payload = new Payload("submitted-once");
 

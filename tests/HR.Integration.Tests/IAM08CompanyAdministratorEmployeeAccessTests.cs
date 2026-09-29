@@ -8,12 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// IAM-08 — a "Company Administrator only" account must never inherit employee visibility, at the
-/// authoritative enforcement boundary (the API). Also proves api/me exposes the effective role-id
-/// set (RoleIds) with no stale state after a role is removed, and that the initial signup persona
-/// (Employee + CompanyAdministrator + HrAdministrator) is unaffected.
-/// </summary>
 [Collection("Integration")]
 public class IAM08CompanyAdministratorEmployeeAccessTests
 {
@@ -90,9 +84,6 @@ public class IAM08CompanyAdministratorEmployeeAccessTests
             response.StatusCode is not (HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized),
             $"Expected the request to pass authorization (not 401/403) but got {(int)response.StatusCode} {response.StatusCode}");
 
-    // ---------------------------------------------------------------------
-    // api/me — Company-Administrator-only account
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task CompanyAdministratorOnly_Me_HasOnlyEmployeeAndCompanyAdministratorRoles_AndNoEmployeePermissions()
@@ -126,9 +117,6 @@ public class IAM08CompanyAdministratorEmployeeAccessTests
             $"/api/companies/{companyId}/employees/{Guid.NewGuid()}/leaving-process"));
     }
 
-    // ---------------------------------------------------------------------
-    // Combined personas
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task CompanyAdministratorPlusHrAdministrator_CanReach_EmployeeList_AndMeHasEmployeeRead()
@@ -148,16 +136,11 @@ public class IAM08CompanyAdministratorEmployeeAccessTests
         var companyId = Guid.NewGuid();
         using var client = await ClientFor(CompanyAdminPlusManager, companyId);
 
-        // Manager holds employee:read -> workforce analytics reaches the handler.
         AssertReachedHandler(await client.GetAsync($"/api/companies/{companyId}/employees/headcount-summary"));
 
-        // But not employee:manage -> the employee administration list stays forbidden.
         AssertForbidden(await client.GetAsync($"/api/companies/{companyId}/employees"));
     }
 
-    // ---------------------------------------------------------------------
-    // Role removal — no stale permissions on the next api/me
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task RemovingHrAdministrator_DropsEmployeeRead_AndHrAdministratorRoleId_FromMe()
@@ -177,7 +160,6 @@ public class IAM08CompanyAdministratorEmployeeAccessTests
             await db.SaveChangesAsync();
         }
 
-        // Fresh client — there is no server-side permission/role cache.
         var after = await GetMe(RoleRemovalPersona, companyId);
         Assert.DoesNotContain(SystemRoles.HrAdministrator, after.RoleIds);
         Assert.DoesNotContain(EmployeeReadPerm, after.PermissionIds);
@@ -185,9 +167,6 @@ public class IAM08CompanyAdministratorEmployeeAccessTests
         Assert.Contains(SystemRoles.CompanyAdministrator, after.RoleIds);
     }
 
-    // ---------------------------------------------------------------------
-    // Initial creator regression — signup assigns all three roles
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task InitialCreatorPersona_KeepsAllThreeRoleIds_AndCanReachEmployeeList()

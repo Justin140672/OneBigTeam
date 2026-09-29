@@ -2,24 +2,12 @@ using ClosedXML.Excel;
 
 namespace HR.Modules.DataImport.Services;
 
-/// <summary>
-/// A single mapped data row from an import file. RowNumber matches the row as it appears
-/// in the source file (the header is row 1, so the first data row is row 2).
-/// </summary>
 internal sealed record ParsedImportRow(int RowNumber, IReadOnlyDictionary<string, string?> Fields);
 
-/// <summary>
-/// The result of parsing an import file: the set of target fields that were actually found
-/// (mapped) in the file's header row, plus every parsed data row.
-/// </summary>
 internal sealed record EmployeeImportParseResult(
     IReadOnlySet<string> MappedFields,
     IReadOnlyList<ParsedImportRow> Rows);
 
-/// <summary>
-/// Parses an employee import XLSX workbook into mapped rows using a column mapping profile.
-/// A target field whose header isn't found in the file is simply absent from every row's field set.
-/// </summary>
 internal sealed class EmployeeImportFileParser
 {
     public EmployeeImportParseResult Parse(Stream content, ColumnMappingProfile mapping)
@@ -64,9 +52,6 @@ internal sealed class EmployeeImportFileParser
         return new EmployeeImportParseResult(columnIndexByTargetField.Keys.ToHashSet(), rows);
     }
 
-    /// <summary>
-    /// Reads just the header row of an import workbook, for column-mapping purposes.
-    /// </summary>
     public IReadOnlyList<string> ParseHeaders(Stream content)
     {
         using var workbook = new XLWorkbook(content);

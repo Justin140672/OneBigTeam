@@ -14,7 +14,5 @@ internal sealed record CandidateDocumentListItem(
     bool IsCurrentCv = false,
     // Internal recruitment Ticket 2: number of applications that reference this document as their submitted CV.
     int ReferencingApplicationCount = 0,
-    // [P1] Malware scan state: Pending | Scanning | Clean | Infected | Failed. Only Clean documents
-    // are downloadable (IsDownloadable); the download endpoint enforces this server-side regardless.
     string ScanStatus = "Pending",
     bool IsDownloadable = false);

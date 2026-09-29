@@ -13,15 +13,8 @@ public class GetEmployeeHandlerTests
     private static readonly DateTime FixedUtcNow = new(2026, 6, 8, 10, 0, 0, DateTimeKind.Utc);
     private static readonly DateOnly StartDate = new(2026, 7, 1);
 
-    // Mirrors HR.Modules.Identity.Domain.SystemRoles.HrAdministrator — Employees cannot
-    // reference Identity's internal SystemRoles directly (see EmployeesResourceAuthorizer).
     private static readonly Guid HrAdministratorRoleId = new("00000000-0000-0000-0000-000000000004");
 
-    // Authorization is not the subject of most of these tests, so BuildHandler defaults to an
-    // HR-Administrator-role authorizer (company-wide access, regardless of caller/target ids) —
-    // callers exercising the resource-authorization behaviour itself pass their own
-    // EmployeesResourceAuthorizer built from FakeRoleAuthorizationService/FakeDirectReportsReader
-    // instead (see the "Resource authorization" tests below).
     private static EmployeesResourceAuthorizer AlwaysAuthorizedAuthorizer() =>
         new(new FakeRoleAuthorizationService(HrAdministratorRoleId), new FakeDirectReportsReader());
 
@@ -67,10 +60,6 @@ public class GetEmployeeHandlerTests
         Assert.Equal(EmploymentStatus.Draft, value.Status);
     }
 
-    // ── Resource authorization ───────────────────────────────────────────────────
-    // The employee data query/response-building above is only reached once
-    // EmployeesResourceAuthorizer.CanViewAsync has authorized the caller — these tests prove
-    // that check runs first and actually gates the result, rather than merely existing.
 
     [Fact]
     public async Task HandleAsync_Returns_Forbidden_For_Unauthorized_Caller_Without_Reading_Employee_Data()
@@ -83,7 +72,6 @@ public class GetEmployeeHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        // Caller has no roles and manages nobody — an unrelated peer, not the target, not HR.
         var resourceAuthorizer = new EmployeesResourceAuthorizer(
             new FakeRoleAuthorizationService(), new FakeDirectReportsReader());
 
@@ -139,7 +127,6 @@ public class GetEmployeeHandlerTests
         context.Employees.Add(employee);
         await context.SaveChangesAsync();
 
-        // Caller holds no HR role and manages nobody, but is the target employee themself.
         var resourceAuthorizer = new EmployeesResourceAuthorizer(
             new FakeRoleAuthorizationService(), new FakeDirectReportsReader());
 
@@ -180,7 +167,6 @@ public class GetEmployeeHandlerTests
 
         var handler = BuildHandler(context);
 
-        // Request uses a different companyId — should not find the employee
         var result = await handler.HandleAsync(
             new GetEmployeeRequest { CompanyId = Guid.NewGuid(), Id = employee.Id },
             CancellationToken.None);
@@ -435,11 +421,6 @@ public class GetEmployeeHandlerTests
         Assert.Equal("Amy A", value.ReportingChain[1].Name);
     }
 
-    // ── Lifecycle tab visibility ─────────────────────────────────────────────────
-    // ShowOnboardingTab/ShowProbationTab/ShowOffboardingTab are derived entirely from the
-    // fakes' summaries here — the readers' own query/ordering correctness is covered by each
-    // module's own Get*StatusReader tests (GetOnboardingStatusHandlerTests etc.); this class only
-    // needs to prove GetEmployeeHandler applies the right predicate to whatever a reader returns.
 
     [Fact]
     public async Task HandleAsync_LifecycleTabs_AllHidden_ForEmployeeWithNoLifecycleProcesses()
@@ -571,10 +552,6 @@ public class GetEmployeeHandlerTests
         Assert.False(value.ShowOffboardingTab);
     }
 
-    // ── ShowLeavingTab ────────────────────────────────────────────────────────
-    // Unlike the other lifecycle tabs, EmployeeLeavingProcess lives in this same module/DbContext
-    // (see GetEmployeeHandler.HandleAsync), so these tests seed the entity directly rather than
-    // going through a fake reader.
 
     [Fact]
     public async Task HandleAsync_ShowLeavingTab_False_When_No_LeavingProcess_Exists()
@@ -643,10 +620,6 @@ public class GetEmployeeHandlerTests
         Assert.False(value.ShowLeavingTab);
     }
 
-    // ── effective notice period ──────────────────────────────────────────────
-    // The resolver's own resolution-order logic is covered by EffectiveNoticePeriodResolverTests —
-    // this class only needs to prove GetEmployeeHandler surfaces whatever the injected
-    // IEffectiveNoticePeriodResolver returns in the response.
 
     [Fact]
     public async Task HandleAsync_Returns_EffectiveNoticePeriod_From_Resolver()

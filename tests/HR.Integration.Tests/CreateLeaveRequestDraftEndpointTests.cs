@@ -12,7 +12,6 @@ public class CreateLeaveRequestDraftEndpointTests
 
     private static readonly Guid User1 = new("cccccccc-0000-0000-0000-000000000001");
 
-    // Pre-seeded leave type for the seeded company (see LeaveModule.SeedLeaveAsync)
     private static readonly Guid SeededCompanyId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid AnnualLeaveTypeId = Guid.Parse("A0000000-0000-0000-0000-000000000001");
 
@@ -127,9 +126,6 @@ public class CreateLeaveRequestDraftEndpointTests
                 endPart = "FullDay"
             });
 
-        // FluentValidation failures are intercepted by the FastEndpoints pipeline before the
-        // handler runs and return 422, not 400 - matches this codebase's other validator-failure
-        // integration tests for the Leave module's request-body validators.
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 

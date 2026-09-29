@@ -21,12 +21,6 @@ internal sealed class GetTaskHandler(TasksDbContext dbContext, TasksResourceAuth
             return Result.Failure<GetTaskResponse>(
                 Error.NotFound($"Task '{request.Id}' was not found."));
 
-        // IAM-07: only the assignee, a manager anywhere in the assignee's reporting hierarchy,
-        // or an HR Administrator may view this task. The specific assignee is only known after
-        // the DB lookup above, so this check must live here rather than at the endpoint (mirrors
-        // CompleteTaskHandler's identical resolution — see TasksResourceAuthorizer remarks).
-        // Unassigned tasks have no self/hierarchy path; only the HR-administrator override
-        // applies.
         var effectiveAssigneeId = task.AssignedEmployeeId ?? task.AssignedUserId;
 
         var isAuthorized = effectiveAssigneeId.HasValue

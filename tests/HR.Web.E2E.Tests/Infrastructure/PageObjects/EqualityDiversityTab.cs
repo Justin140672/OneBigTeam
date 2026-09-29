@@ -3,16 +3,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the self-service "Equality &amp; Diversity" tab on the My Profile page
-/// (src/HR.Web/Components/Pages/Employees/MyProfileEqualityDiversityTab.razor).
-///
-/// Field groups each carry a data-testid: my-profile-equality-{gender|marital|ethnicgroup|
-/// disability|orientation|religion|caring}. Save button data-testid=my-profile-equality-save; success
-/// banner data-testid=my-profile-equality-success. "Clear my answers" goes through a native
-/// window.confirm — register a page Dialog handler (see AcceptConfirmDialogs) before calling
-/// <see cref="ClearAnswersAsync"/>.
-/// </summary>
 public sealed class EqualityDiversityTab(IPage page)
 {
     public const string GenderField      = "my-profile-equality-gender";
@@ -33,28 +23,20 @@ public sealed class EqualityDiversityTab(IPage page)
     public async Task<bool> IsSectionVisibleAsync() =>
         await page.Locator("[data-testid='my-profile-equality-section']").IsVisibleAsync();
 
-    /// <summary>The full trimmed text of the explanatory intro block.</summary>
     public async Task<string> GetIntroTextAsync() =>
         (await page.Locator(".ed-intro").InnerTextAsync()).Trim();
 
     private ILocator FieldGroup(string testId) =>
         page.Locator($"[data-testid='{testId}']");
 
-    /// <summary>Selects an option in one of the questionnaire dropdowns via the shared selector.</summary>
     public Task SelectAsync(string fieldTestId, string optionText) =>
         DropDownSelector.SelectAsync(page, FieldGroup(fieldTestId), optionText);
 
-    /// <summary>Reads the currently-selected label from a questionnaire dropdown's combobox input.</summary>
     public async Task<string> GetSelectedValueAsync(string fieldTestId) =>
         (await FieldGroup(fieldTestId).Locator("span[role='combobox'] input").First.InputValueAsync())?.Trim() ?? "";
 
     public async Task SaveAsync()
     {
-        // The success banner is one shared element for both "saved" and "cleared" outcomes. If one
-        // is already showing (e.g. straight after ClearAnswersAsync), a bare wait for the banner
-        // resolved instantly against that STALE banner, so callers moved on (navigated tabs, read
-        // values back) before this save's round-trip had landed. Dismiss any existing banner and
-        // wait for it to go, then wait specifically for this save's "…saved" banner.
         var banner = page.Locator("[data-testid='my-profile-equality-success']");
         if (await banner.CountAsync() > 0)
         {
@@ -73,31 +55,14 @@ public sealed class EqualityDiversityTab(IPage page)
     public async Task<string> GetSuccessBannerTextAsync() =>
         (await page.Locator("[data-testid='my-profile-equality-success'] .ed-success-title").InnerTextAsync()).Trim();
 
-    /// <summary>
-    /// Clicks "Clear my answers" and waits for the success banner. The native confirm dialog must
-    /// already be auto-accepted by a registered page Dialog handler
-    /// (see <see cref="AcceptConfirmDialogs"/>).
-    /// </summary>
     public async Task ClearAnswersAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Clear my answers" }).ClickAsync();
 
-        // The success banner's data-testid is the same element used for both the "saved" and
-        // "cleared" outcomes (MyProfileEqualityDiversityTab.razor's single _successMsg-gated div),
-        // so if a prior SaveAsync already left the banner present in the DOM, a bare
-        // WaitForSelectorAsync here resolves immediately against the STALE "…saved" banner rather
-        // than waiting for the clear round-trip's own re-render — the caller can then read
-        // "Equality and diversity information saved" instead of "…answers cleared". Wait for the
-        // banner's own text to actually contain "cleared" (case-insensitive) instead of merely
-        // waiting for the container element to exist.
         await Assertions.Expect(page.Locator("[data-testid='my-profile-equality-success'] .ed-success-title"))
             .ToContainTextAsync("cleared", new() { IgnoreCase = true, Timeout = 15_000 });
     }
 
-    /// <summary>
-    /// Registers a page Dialog handler that accepts every native dialog (window.confirm). Playwright
-    /// auto-dismisses dialogs unless a handler is attached, which would cancel the clear.
-    /// </summary>
     public void AcceptConfirmDialogs() =>
         page.Dialog += async (_, dialog) => await dialog.AcceptAsync();
 }

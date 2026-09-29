@@ -2,11 +2,6 @@ using HR.Modules.DataImport.Domain;
 
 namespace HR.Modules.DataImport.Tests;
 
-/// <summary>
-/// Security/code review finding #3: OrphanedImportFileUpload is the durable compensation record
-/// for an import workbook blob that was uploaded to storage but whose owning ImportSession row
-/// then failed to save (see Features/UploadImportFile/Handler.cs).
-/// </summary>
 public class OrphanedImportFileUploadTests
 {
     private static readonly DateTimeOffset Now = new(2026, 9, 22, 9, 0, 0, TimeSpan.Zero);

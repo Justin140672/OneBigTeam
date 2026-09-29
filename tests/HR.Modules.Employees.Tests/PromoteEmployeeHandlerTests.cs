@@ -248,10 +248,6 @@ public class PromoteEmployeeHandlerTests
 
         Assert.Empty(integrationEventPublisher.Published);
 
-        // Not finalized yet, but the "Promoted" timeline entry is still written eagerly (dated
-        // with the future EffectiveDate, tagged with sourceRecordId=promotion.Id) so it's visible
-        // on the timeline — with the "Upcoming" badge — ahead of ProcessPromotionsJob actually
-        // completing it.
         var pendingEntry = Assert.Single(timelineWriter.Added);
         Assert.Equal(EmployeeTimelineEventType.EmployeePromoted, pendingEntry.EventType);
         Assert.Equal(effectiveDate, pendingEntry.EventDate);
@@ -266,7 +262,6 @@ public class PromoteEmployeeHandlerTests
         var employee = CreateEmployee(companyId, Now);
         context.Employees.Add(employee);
 
-        // Seed an existing overlapping compensation record so CompensationRecordWriter.WriteAsync fails.
         var existingCompensation = Compensation.Create(
             Guid.NewGuid(), companyId, employee.Id, Today, SalaryType.Annual, 50000m, "GBP",
             hoursPerWeek: null, fte: null, notes: null, CompensationChangeReason.NewHire, Guid.NewGuid(), Now);
@@ -572,11 +567,6 @@ public class PromoteEmployeeHandlerTests
     [Fact]
     public async Task HandleAsync_With_IdempotencyKey_And_Backdated_EffectiveDate_Returns_PostFinalization_CompletedAt()
     {
-        // Regression guard: PromoteEmployeeHandler snapshots the response for the
-        // idempotency-replay payload BEFORE calling FinalizeAsync, since a replayed request must
-        // never re-run finalization. The value actually returned to THIS (first, non-replayed)
-        // caller must still reflect the post-finalization state (CompletedAt populated), not the
-        // pre-finalization snapshot that was persisted for replay purposes.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employee = CreateEmployee(companyId, Now);
@@ -686,7 +676,6 @@ public class PromoteEmployeeHandlerTests
     [Fact]
     public async Task HandleAsync_Ordinary_Promotion_Timeline_Entry_Is_Still_Titled_Promoted()
     {
-        // The "Internal appointment" wording must only apply to promotions recorded by recruitment.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employee = CreateEmployee(companyId, Now);

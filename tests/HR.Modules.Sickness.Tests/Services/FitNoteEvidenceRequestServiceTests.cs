@@ -7,12 +7,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Sickness.Tests.Services;
 
-/// <summary>
-/// Direct unit tests for FitNoteEvidenceRequestService.RequestIfEligibleAsync in isolation, covering
-/// the eligibility/idempotency guards described in the SICK-01 fix. FitNoteRequestJobTests and the
-/// handler tests exercise this service indirectly through their respective callers; these tests
-/// pin down the service's own contract.
-/// </summary>
 public class FitNoteEvidenceRequestServiceTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 15, 2, 0, 0, DateTimeKind.Utc);
@@ -58,7 +52,6 @@ public class FitNoteEvidenceRequestServiceTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        // Started 6 days before EvaluationDate → 7 calendar days elapsed (inclusive) = threshold met
         var record = CreateRecord(companyId, EvaluationDate.AddDays(-6));
         db.SicknessRecords.Add(record);
         await db.SaveChangesAsync();
@@ -92,7 +85,6 @@ public class FitNoteEvidenceRequestServiceTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        // Started 5 days before EvaluationDate → only 6 calendar days elapsed, threshold 7 not met
         var record = CreateRecord(companyId, EvaluationDate.AddDays(-5));
         db.SicknessRecords.Add(record);
         await db.SaveChangesAsync();
@@ -192,7 +184,6 @@ public class FitNoteEvidenceRequestServiceTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        // NotRequired e.g. a legacy/imported record being re-evaluated by the daily job.
         var record = CreateRecord(companyId, EvaluationDate.AddDays(-6), SicknessEvidenceStatus.NotRequired);
         db.SicknessRecords.Add(record);
         await db.SaveChangesAsync();
@@ -228,7 +219,6 @@ public class FitNoteEvidenceRequestServiceTests
     [Fact]
     public async Task RequestIfEligibleAsync_CalledTwice_OnlyEverCreatesOneRequest()
     {
-        // Retry safety at the service level, not just via the job's own guard.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var record = CreateRecord(companyId, EvaluationDate.AddDays(-6));
@@ -245,9 +235,6 @@ public class FitNoteEvidenceRequestServiceTests
         Assert.Single(await db.SicknessEvidenceRequests.ToListAsync());
     }
 
-    // SICK-06: evidence requests are always system/policy-triggered (never something an
-    // affected employee or manager "did"), so the actor is always the fixed SystemActorId
-    // (Guid.Empty) — regardless of caller/context.
     [Fact]
     public async Task RequestIfEligibleAsync_AuditEvent_ActorId_Is_SystemActorId()
     {
@@ -268,8 +255,6 @@ public class FitNoteEvidenceRequestServiceTests
         Assert.Equal(Guid.Empty, ((HR.SharedKernel.IAuditEvent)auditEvent).ActorEmployeeId);
     }
 
-    // SICK-06: no free-text content (Notes/EvidenceNotes) is ever carried on this event — the
-    // payload is limited to structured ids/dates.
     [Fact]
     public async Task RequestIfEligibleAsync_AuditEvent_Does_Not_Contain_Free_Text()
     {
@@ -286,7 +271,6 @@ public class FitNoteEvidenceRequestServiceTests
 
         var auditEvent = Assert.Single(auditPublisher.PublishedEvents.OfType<SicknessEvidenceRequestedAuditEvent>());
         var serialized = System.Text.Json.JsonSerializer.Serialize(auditEvent);
-        // Nothing beyond ids/dates should be present — spot-check no free-text-shaped property exists.
         Assert.DoesNotContain("EvidenceNotes", serialized);
         Assert.DoesNotContain("Notes\":", serialized);
     }

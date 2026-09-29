@@ -20,8 +20,6 @@ internal sealed class EmployeeLeavingProcess : IVersionedAggregate
     public NoticePeriodSource NoticeSource { get; private set; }
     public LeavingReason LeavingReason { get; private set; }
 
-    // Spec SPEC-OFF-01: explanatory notes. Mandatory when LeavingReason is Other (enforced by
-    // StartLeavingProcessValidator/AmendLeavingProcessValidator); optional for every other reason.
     public string? Notes { get; private set; }
     public LeavingProcessStatus Status { get; private set; }
     public DateTimeOffset StartedAt { get; private set; }
@@ -29,12 +27,6 @@ internal sealed class EmployeeLeavingProcess : IVersionedAggregate
     public DateTimeOffset? CancelledAt { get; private set; }
     public string? CancellationReason { get; private set; }
 
-    // OFF-06: the manager HR has nominated to take over this employee's direct reports (and any
-    // pending manager-scoped approvals/reviews assigned to this employee) once their departure is
-    // finalised. Optional — when null, direct reports are left without a manager and the
-    // departure is routed to an HR exception queue instead (see
-    // EmployeeDepartureFinalizer/StartOffboardingHandler). Only meaningful when this employee
-    // actually has direct reports; otherwise it is simply unused.
     public Guid? ReplacementManagerEmployeeId { get; private set; }
 
     // Set only once every downstream finalisation step (offboarding-completeness check, manager
@@ -134,8 +126,6 @@ internal sealed class EmployeeLeavingProcess : IVersionedAggregate
         UpdatedAt = now;
     }
 
-    // Called by ProcessLeavingEmployeesJob once the employee's leaving date has passed and the
-    // departure has been finalised (status change, access disabling, offboarding check all done).
     public void Complete(DateTimeOffset now)
     {
         if (Status != LeavingProcessStatus.InProgress)
@@ -145,9 +135,6 @@ internal sealed class EmployeeLeavingProcess : IVersionedAggregate
         UpdatedAt = now;
     }
 
-    // Called by EmployeeDepartureFinalizer once every downstream finalisation step has actually
-    // succeeded. Guarded so a defensive/reconciliation re-invocation for a process that already
-    // finished downstream work is a safe no-op rather than an error.
     public void MarkFinalisationCompleted(DateTimeOffset now)
     {
         if (Status != LeavingProcessStatus.Completed)

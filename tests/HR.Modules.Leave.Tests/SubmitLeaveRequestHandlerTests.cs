@@ -23,7 +23,6 @@ public class SubmitLeaveRequestHandlerTests
         return new LeaveDbContext(options);
     }
 
-    // 2026-08-03 = Monday, 2026-08-07 = Friday
     private static SubmitLeaveRequestRequest ValidRequest(Guid companyId, Guid employeeId, Guid leaveTypeId) => new()
     {
         CompanyId = companyId,
@@ -41,10 +40,6 @@ public class SubmitLeaveRequestHandlerTests
     {
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        // AccrualMethod.None: this shared fixture is reused by tests covering conflicts, working
-        // days, policy years etc — none of which are exercising accrual pacing itself (that is
-        // covered directly by dedicated Monthly/Fortnightly accrual-gating tests below and by
-        // LeaveAccrualCalculatorTests), so the full entitlement is available immediately (LEAVE-04).
         var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", (int)entitlementDays,
             AccrualMethod.None, LeaveTypeBehaviour.Standard, now);
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 5, allowNegativeBalance: false, false, now);
@@ -150,7 +145,6 @@ public class SubmitLeaveRequestHandlerTests
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        // 2 days entitlement, requesting Mon–Fri (5 days)
         var (leaveType, _, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId, entitlementDays: 2);
 
         var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
@@ -196,7 +190,6 @@ public class SubmitLeaveRequestHandlerTests
 
         var (leaveType, _, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId);
 
-        // 2026-08-08 = Saturday, 2026-08-09 = Sunday
         var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
         var result = await handler.HandleAsync(
             ValidRequest(companyId, employeeId, leaveType.Id) with
@@ -232,7 +225,6 @@ public class SubmitLeaveRequestHandlerTests
             new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(),
             new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
 
-        // 2026-08-08 = Saturday — a working day in this pattern
         var result = await handler.HandleAsync(
             ValidRequest(companyId, employeeId, leaveType.Id) with
             {
@@ -271,7 +263,6 @@ public class SubmitLeaveRequestHandlerTests
 
         var (leaveType, policy, assignment, _) = await SeedStandardSetupAsync(context, companyId, employeeId, entitlementDays: 25);
 
-        // Existing pending request: Wed–Thu (overlaps with Mon–Fri new request)
         var existing = LeaveRequest.Create(
             Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
             new DateOnly(2026, 8, 5), LeaveDayPart.FullDay,
@@ -299,7 +290,6 @@ public class SubmitLeaveRequestHandlerTests
 
         var (leaveType, policy, assignment, _) = await SeedStandardSetupAsync(context, companyId, employeeId, entitlementDays: 25);
 
-        // Existing request ends the day before new request starts
         var existing = LeaveRequest.Create(
             Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
             new DateOnly(2026, 7, 27), LeaveDayPart.FullDay,
@@ -358,7 +348,6 @@ public class SubmitLeaveRequestHandlerTests
 
         var (leaveType, _, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId);
 
-        // With exclusion OFF the holiday counts as a working day — still 5 days (reader not consulted)
         var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow),
             new FakeWorkingPatternProvider(),
             new FakeCompanyLeaveSettingsReader(CompanyLeaveSettings.Default with { ExcludePublicHolidaysFromLeave = false }),
@@ -381,7 +370,6 @@ public class SubmitLeaveRequestHandlerTests
 
         var (leaveType, _, _, _) = await SeedStandardSetupAsync(context, companyId, employeeId);
 
-        // With exclusion ON the holiday is skipped — 4 days instead of 5
         var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow),
             new FakeWorkingPatternProvider(),
             new FakeCompanyLeaveSettingsReader(CompanyLeaveSettings.Default with { ExcludePublicHolidaysFromLeave = true }),
@@ -398,8 +386,6 @@ public class SubmitLeaveRequestHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_ExcludedPublicHolidays_Consistent_With_PreviewLeaveRequestHandler()
     {
-        // LEAVE-08: SubmitLeaveRequestHandler must surface the same public-holiday-in-range
-        // warning PreviewLeaveRequestHandler returns, using the same shared LeaveWarningCalculator.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -543,7 +529,6 @@ public class SubmitLeaveRequestHandlerTests
 
         var (leaveType, _, _, _) = await SeedStandardSetupAsync(context, companyB, employeeId);
 
-        // Company B has no public holidays — reader returns empty
         var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow),
             new FakeWorkingPatternProvider(),
             new FakeCompanyLeaveSettingsReader(CompanyLeaveSettings.Default with { ExcludePublicHolidaysFromLeave = true }),
@@ -616,26 +601,16 @@ public class SubmitLeaveRequestHandlerTests
     [Fact]
     public async Task HandleAsync_Checks_Balance_For_Requests_StartDate_Policy_Year_Not_Todays()
     {
-        // Today (FixedUtcNow) is in policy year 2026, but the request's StartDate falls in 2027.
-        // Only a 2027 balance row exists with sufficient days — submission must succeed because the
-        // policy year is derived from the request's StartDate, not from "today".
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        // AccrualMethod.None: "today" (clock) is in policy year 2026, before this 2027 balance's
-        // own accrual start date - Monthly accrual would (correctly) report zero accrued here,
-        // which is not what this test is verifying (year resolution, not accrual pacing).
         var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
             AccrualMethod.None, LeaveTypeBehaviour.Standard, now);
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 5, allowNegativeBalance: false, false, now);
         var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
             DateOnly.FromDateTime(FixedUtcNow), now);
-        // AccrualStartDate set before "today" (FixedUtcNow, still in 2026), not the balance's own
-        // 2027 policy year start, since AccrualMethod.None still requires asOfDate >= accrualStartDate
-        // to clear the gate (see LeaveAccrualCalculator) - not what this test is verifying (policy
-        // year resolution, not accrual pacing).
         var balance2027 = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
             2027, 25m, new DateOnly(2026, 1, 1), now);
 
@@ -649,7 +624,6 @@ public class SubmitLeaveRequestHandlerTests
         var result = await handler.HandleAsync(
             ValidRequest(companyId, employeeId, leaveType.Id) with
             {
-                // 2027-01-04 = Monday, 2027-01-08 = Friday
                 StartDate = new DateOnly(2027, 1, 4),
                 EndDate = new DateOnly(2027, 1, 8)
             },
@@ -661,26 +635,20 @@ public class SubmitLeaveRequestHandlerTests
     [Fact]
     public async Task HandleAsync_Checks_Future_Years_Balance_Even_When_Current_Years_Balance_Is_Insufficient()
     {
-        // Proves the policy year is derived from StartDate, not the clock: the *current* policy
-        // year (2026) balance is insufficient, but the *future* year (2027, matching StartDate)
-        // has enough days. With the fix this must succeed — the old buggy code checked the 2026
-        // balance regardless of the request's actual policy year and would have failed here.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        // AccrualMethod.None: pacing is not the point of this test (see comment above); the full
-        // stored entitlement must be available immediately in both policy years.
         var leaveType = LeaveType.Create(Guid.NewGuid(), companyId, "Annual Leave", "ANNUAL", 25,
             AccrualMethod.None, LeaveTypeBehaviour.Standard, now);
         var policy = LeavePolicy.Create(Guid.NewGuid(), companyId, "Standard Policy", null, 5, allowNegativeBalance: false, false, now);
         var assignment = EmployeeLeavePolicyAssignment.Create(Guid.NewGuid(), companyId, employeeId, policy.Id,
             DateOnly.FromDateTime(FixedUtcNow), now);
         var balance2026 = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
-            2026, 1m, new DateOnly(2026, 1, 1), now); // insufficient for the 5-day request
+            2026, 1m, new DateOnly(2026, 1, 1), now);
         var balance2027 = LeaveBalance.Create(Guid.NewGuid(), companyId, employeeId, leaveType.Id, policy.Id,
-            2027, 25m, new DateOnly(2026, 1, 1), now); // sufficient, and matches the request's StartDate policy year
+            2027, 25m, new DateOnly(2026, 1, 1), now);
 
         context.LeaveTypes.Add(leaveType);
         context.LeavePolicies.Add(policy);
@@ -812,7 +780,6 @@ public class SubmitLeaveRequestHandlerTests
 
         var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
 
-        // 2026-08-03 (Mon) - 2026-08-14 (Fri, next week) = 10 working days > 9.5 accrued.
         var result = await handler.HandleAsync(
             ValidRequest(companyId, employeeId, leaveType.Id) with
             {
@@ -829,8 +796,6 @@ public class SubmitLeaveRequestHandlerTests
     [Fact]
     public async Task HandleAsync_Succeeds_When_Request_Is_Within_Accrued_Balance_Though_Below_Raw_Entitlement()
     {
-        // Same accrual setup as above (9.60 accrued of a 24-day raw entitlement) but the request
-        // (5 days) fits within what has actually accrued.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -947,7 +912,7 @@ public class SubmitLeaveRequestHandlerTests
 
         var handler = new SubmitLeaveRequestHandler(context, new FakeClock(FixedUtcNow), new FakeWorkingPatternProvider(), new FakeCompanyLeaveSettingsReader(), new FakePublicHolidayReader(), new NoOpIntegrationEventPublisher(), new NoOpAuditEventPublisher(), new LeaveApprovalEffectsService(context, new NoOpNotificationWriter(), new NoOpIntegrationEventPublisher(), new FakeCompanyLeaveSettingsReader(), new NoOpAuditEventPublisher(), new ToilLedgerService(context)), new LeaveWarningCalculator(new FakePublicHolidayReader()));
 
-        var firstRequest = ValidRequest(companyId, employeeId, leaveType.Id); // 2026-08-03..07, 5 days
+        var firstRequest = ValidRequest(companyId, employeeId, leaveType.Id);
         var firstResult = await handler.HandleAsync(firstRequest, CancellationToken.None);
         Assert.True(firstResult.IsSuccess);
         Assert.Equal("Approved", firstResult.Value!.Status);

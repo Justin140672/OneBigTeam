@@ -10,17 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// The "platform:admin" endpoint policy only requires RequireAuthenticatedUser (no
-/// tenant/company header needed to satisfy it), so these tests never send
-/// TestAuthHandler.TenantHeader. The handler's own allow-list check requires the caller's
-/// email to match "PlatformAdmin:AllowedEmails" in configuration; appsettings.Development.json
-/// (loaded automatically because ApiWebApplicationFactory/WebApplicationFactory defaults to the
-/// Development environment) already seeds "priya.shah@acme.example" into that list, so tests use
-/// that address for the allow-listed caller and rely on TestAuthHandler.EmailHeader to put the
-/// email onto the authenticated principal's "email" claim. See GetCustomerDetailsEndpointTests
-/// for the sibling platform-admin feature this pattern is shared with.
-/// </summary>
 [Collection("Integration")]
 public class GetCustomerBillingBreakdownEndpointTests
 {
@@ -76,8 +65,6 @@ public class GetCustomerBillingBreakdownEndpointTests
         var response = await client.GetAsync(
             $"/api/companies/admin/customers/{Guid.NewGuid()}/billing-breakdown");
 
-        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
-        // is Forbidden (403), not Unauthorized (401).
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -113,8 +100,6 @@ public class GetCustomerBillingBreakdownEndpointTests
         Assert.True(payload.Leavers >= 0);
         Assert.Equal(payload.ActiveEmployees + payload.Leavers, payload.ChargeableEmployees);
         Assert.Equal(0m, payload.Discounts);
-        // Story 4 — progressive pricing: the monthly total is at least the configured minimum
-        // monthly charge (£20 default), and pricePerEmployee is the effective (blended) rate.
         Assert.True(payload.MonthlyTotal >= 20m);
         if (payload.ChargeableEmployees > 0)
         {

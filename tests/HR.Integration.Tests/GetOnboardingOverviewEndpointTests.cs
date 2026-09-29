@@ -142,7 +142,6 @@ public class GetOnboardingOverviewEndpointTests
         Assert.Equal(pendingTask.CreatedAt, pendingTask.UpdatedAt);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid companyId)
     {
@@ -153,10 +152,6 @@ public class GetOnboardingOverviewEndpointTests
         return client;
     }
 
-    // Department/Location/EmploymentType/EmployeeNumber are all mandatory on employee creation —
-    // seed fresh reference data per call. A null positionProfileId means "use a fresh, bare
-    // position profile with no onboarding template/required documents of its own" (no employee
-    // can be created without a real PositionProfileId any more).
     private async Task<Guid> CreateEmployeeAsync(HttpClient client, Guid companyId, Guid? positionProfileId = null)
     {
         var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);

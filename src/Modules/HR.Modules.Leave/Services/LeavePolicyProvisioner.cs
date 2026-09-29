@@ -6,11 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Services;
 
-/// <summary>
-/// Implements ILeavePolicyProvisioner — see the interface doc comment in
-/// HR.Infrastructure.Abstractions for why this exists. Mirrors CreateLeavePolicyHandler's own
-/// "first policy is always default" convention.
-/// </summary>
 internal sealed class LeavePolicyProvisioner(LeaveDbContext dbContext, IClock clock) : ILeavePolicyProvisioner
 {
     public async Task<Guid> EnsureDefaultLeavePolicyAsync(Guid companyId, CancellationToken cancellationToken)

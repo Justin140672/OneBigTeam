@@ -39,9 +39,6 @@ internal sealed class GetEmployeeLeaveBalanceHandler
             .Select(g => new { LeaveTypeId = g.Key, PendingDays = g.Sum(r => r.TotalDays) })
             .ToDictionaryAsync(x => x.LeaveTypeId, x => x.PendingDays, cancellationToken);
 
-        // All active leave types for the company are returned (left-join against any existing
-        // balance row) so types with no balance for this policy year still appear in the list
-        // as "n/a" rows.
         var leaveTypes = await _dbContext.LeaveTypes
             .AsNoTracking()
             .Where(lt => lt.CompanyId == request.CompanyId && lt.IsActive)
@@ -68,17 +65,8 @@ internal sealed class GetEmployeeLeaveBalanceHandler
                 var pendingDays = pendingByType.GetValueOrDefault(lt.Id);
                 var pendingHours = pendingDays * workingPattern.HoursPerDay;
 
-                // The leave type's own HasBalance configuration is the authoritative gate: a
-                // type configured as not balance-tracked (e.g. Unpaid Leave) always renders as
-                // "n/a", even if a stray LeaveBalance row somehow exists for it. Only when the
-                // type is balance-tracked do we then check whether a balance row exists for the
-                // requested policy year.
                 if (lt.HasBalance && balancesByType.TryGetValue(lt.Id, out var balance))
                 {
-                    // Accrued (not raw) entitlement is what's actually available - identical
-                    // calculation to SubmitLeaveRequestHandler/PreviewLeaveRequestHandler so the
-                    // figure shown here can never diverge from what request validation enforces
-                    // (LEAVE-04).
                     var accruedDays = lt.Behaviour == LeaveTypeBehaviour.Toil
                         ? balance.EntitlementDays
                         : LeaveAccrualCalculator.CalculateAccruedDays(

@@ -4,10 +4,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Assets.Tests.Infrastructure;
 
-/// <summary>
-/// Builds a real <see cref="AssetResourceAuthorizer"/> over hand-rolled fakes so handler tests can
-/// exercise the self / direct-manager / HR administrator rules without booting Identity.
-/// </summary>
 internal static class TestAssetResourceAuthorizer
 {
     public static readonly Guid HrAdministratorRoleId = new("00000000-0000-0000-0000-000000000004");

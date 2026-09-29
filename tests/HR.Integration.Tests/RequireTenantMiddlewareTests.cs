@@ -24,7 +24,6 @@ public class RequireTenantMiddlewareTests
     public async Task Authenticated_Request_Without_Tenant_Returns_403()
     {
         using var client = _factory.CreateClient();
-        // Authenticated (X-Test-User present) but no X-Test-Tenant header
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, "user-without-tenant");
 
         // POST /api/companies (CreateCompany) was removed in 78a43344. These tests are
@@ -41,7 +40,6 @@ public class RequireTenantMiddlewareTests
     public async Task Unauthenticated_Request_Is_Not_Blocked_By_Tenant_Guard()
     {
         using var client = _factory.CreateClient();
-        // No auth headers at all — should get 401 from auth, not 403 from tenant guard
 
         // POST /api/companies (CreateCompany) was removed in 78a43344. These tests are
         // deliberately provider-agnostic about which endpoint they hit — they only care that it
@@ -57,8 +55,6 @@ public class RequireTenantMiddlewareTests
     public async Task Authenticated_Request_With_Tenant_Passes_Guard()
     {
         var userId = new Guid("aa000005-0000-0000-0000-000000000001");
-        // onboarding:manage (guarding the dismiss-checklist endpoint below) requires
-        // HrAdministrator or CompanyAdministrator, not plain Employee.
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
 
         using var client = _factory.CreateClient();
@@ -84,7 +80,6 @@ public class RequireTenantMiddlewareUnitTests
     public async Task Middleware_Passes_Through_Unauthenticated_Request()
     {
         var context = new DefaultHttpContext();
-        // No authentication — IsAuthenticated defaults to false
 
         var nextCalled = false;
         var middleware = new RequireTenantMiddleware(_ =>
@@ -104,7 +99,6 @@ public class RequireTenantMiddlewareUnitTests
         var context = new DefaultHttpContext();
         context.Response.Body = new MemoryStream();
         context.User = new ClaimsPrincipal(new ClaimsIdentity([], authenticationType: "test"));
-        // No ResolvedCurrentUser in Items → tenant is null
 
         var nextCalled = false;
         var middleware = new RequireTenantMiddleware(_ =>
@@ -163,7 +157,6 @@ public class TenantRouteAuthorizationMiddlewareTests
         var context = new DefaultHttpContext();
         context.Response.Body = new MemoryStream();
         context.User = AuthenticatedUserWithCompany(Guid.NewGuid());
-        // No companyId route value
 
         var nextCalled = false;
         var middleware = new TenantRouteAuthorizationMiddleware(_ => { nextCalled = true; return Task.CompletedTask; });
@@ -196,9 +189,9 @@ public class TenantRouteAuthorizationMiddlewareTests
     {
         var context = new DefaultHttpContext();
         context.Response.Body = new MemoryStream();
-        context.User = AuthenticatedUserWithCompany(Guid.NewGuid()); // companyA
-        SetResolvedTenant(context, Guid.NewGuid()); // companyA, resolved server-side
-        context.Request.RouteValues["companyId"] = Guid.NewGuid().ToString(); // companyB — mismatch
+        context.User = AuthenticatedUserWithCompany(Guid.NewGuid());
+        SetResolvedTenant(context, Guid.NewGuid());
+        context.Request.RouteValues["companyId"] = Guid.NewGuid().ToString();
 
         var nextCalled = false;
         var middleware = new TenantRouteAuthorizationMiddleware(_ => { nextCalled = true; return Task.CompletedTask; });
@@ -215,12 +208,6 @@ public class TenantRouteAuthorizationMiddlewareTests
         return new ClaimsPrincipal(new ClaimsIdentity(claims, authenticationType: "test"));
     }
 
-    // TenantRouteAuthorizationMiddleware reads the DB-resolved tenant from
-    // context.Items[SupabaseCurrentUserResolutionMiddleware.CurrentUserItemKey] (set by
-    // SupabaseCurrentUserResolutionMiddleware earlier in the real pipeline), not from the raw
-    // "company_id" claim — real Supabase tokens never carry that claim. These unit tests exercise
-    // TenantRouteAuthorizationMiddleware in isolation, so they must populate context.Items
-    // themselves to simulate what the upstream middleware would already have resolved.
     private static void SetResolvedTenant(HttpContext context, Guid tenantId)
     {
         context.Items[SupabaseCurrentUserResolutionMiddleware.CurrentUserItemKey] =

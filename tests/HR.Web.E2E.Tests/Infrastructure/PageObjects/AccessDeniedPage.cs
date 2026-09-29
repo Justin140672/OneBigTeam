@@ -2,15 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// The shared "/access-denied" page (Components/Pages/AccessDenied.razor) that every admin-page
-/// capability guard redirects to (replace) when the current persona lacks the required
-/// permission-derived capability flag on AppSession.
-/// </summary>
-// CS9113 (baseUrl unread): kept for constructor-signature consistency with the other ~90 page
-// objects in this suite, all of which take (IPage page, string baseUrl) even where — as here —
-// the page has no direct-navigation helper yet. Removing it would make this one page object's
-// constructor diverge from the established convention for a cosmetic gain.
 #pragma warning disable CS9113
 public sealed class AccessDeniedPage(IPage page, string baseUrl)
 #pragma warning restore CS9113

@@ -38,7 +38,7 @@ public class LeavingDateChangeHandlerTests
             CancellationToken.None);
 
         var updated = await context.LeaveBalances.SingleAsync();
-        Assert.Equal(12.5m, updated.EntitlementDays); // 25 * 181 / 365 = 12.397... rounded to nearest half day = 12.5
+        Assert.Equal(12.5m, updated.EntitlementDays);
     }
 
     [Fact]
@@ -72,7 +72,7 @@ public class LeavingDateChangeHandlerTests
             CancellationToken.None);
 
         var updated = await context.LeaveBalances.SingleAsync();
-        Assert.Equal(18.5m, updated.EntitlementDays); // 25 * 273 / 365 = 18.6986... rounded to nearest half day = 18.5
+        Assert.Equal(18.5m, updated.EntitlementDays);
     }
 
     [Fact]
@@ -103,14 +103,12 @@ public class LeavingDateChangeHandlerTests
         var reduced = await context.LeaveBalances.SingleAsync();
         Assert.Equal(12.5m, reduced.EntitlementDays);
 
-        // Cancellation targets the *current* policy year (which, with FixedUtcNow of 2026-06-11,
-        // is the same policy year the leaving date fell in).
         await handler.HandleAsync(
             new EmployeeLeavingProcessCancelledIntegrationEvent(companyId, employeeId, now),
             CancellationToken.None);
 
         var restored = await context.LeaveBalances.SingleAsync();
-        Assert.Equal(25m, restored.EntitlementDays); // started well before the year -> full entitlement
+        Assert.Equal(25m, restored.EntitlementDays);
     }
 
     [Fact]
@@ -173,9 +171,9 @@ public class LeavingDateChangeHandlerTests
             CancellationToken.None);
 
         var updated = await context.LeaveBalances.SingleAsync();
-        Assert.Equal(0.5m, updated.EntitlementDays); // 25 * 10 / 365 = 0.6849... rounded to nearest half day = 0.5
+        Assert.Equal(0.5m, updated.EntitlementDays);
         Assert.Equal(10m, updated.UsedDays);
-        Assert.Equal(-9.5m, updated.RemainingDays); // 0.5 + 0 - 10
+        Assert.Equal(-9.5m, updated.RemainingDays);
     }
 
     [Fact]
@@ -265,8 +263,8 @@ public class LeavingDateChangeHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero); // "today" is 2026-06-11
-        var futureLeavingDate = new DateOnly(2027, 6, 30); // next policy year
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var futureLeavingDate = new DateOnly(2027, 6, 30);
         var currentPolicyYear = LeaveYearCalculator.GetPolicyYear(now, startMonth: 1);
         var futurePolicyYear = LeaveYearCalculator.GetPolicyYear(futureLeavingDate, startMonth: 1);
 
@@ -291,7 +289,7 @@ public class LeavingDateChangeHandlerTests
         var recalculatedFutureYear = await context.LeaveBalances.SingleAsync(b => b.PolicyYear == futurePolicyYear);
 
         Assert.Equal(25m, untouchedCurrentYear.EntitlementDays);
-        Assert.Equal(12.5m, recalculatedFutureYear.EntitlementDays); // 25 * 181 / 365 = 12.397... rounded to nearest half day = 12.5
+        Assert.Equal(12.5m, recalculatedFutureYear.EntitlementDays);
     }
 
     [Fact]
@@ -334,7 +332,6 @@ public class LeavingDateChangeHandlerTests
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
-        // April-to-March leave year. Leaves 2026-10-31.
         var leavingDate = new DateOnly(2026, 10, 31);
         var leaveSettings = new HR.Infrastructure.Abstractions.CompanyLeaveSettings(
             ExcludePublicHolidaysFromLeave: true,
@@ -363,7 +360,7 @@ public class LeavingDateChangeHandlerTests
             CancellationToken.None);
 
         var updated = await context.LeaveBalances.SingleAsync();
-        Assert.Equal(14.5m, updated.EntitlementDays); // 25 * 214 / 365 = 14.657... rounded to nearest half day = 14.5
+        Assert.Equal(14.5m, updated.EntitlementDays);
     }
 
     private static LeavingDateChangeHandler BuildHandler(LeaveDbContext context, DateOnly? startDate) =>

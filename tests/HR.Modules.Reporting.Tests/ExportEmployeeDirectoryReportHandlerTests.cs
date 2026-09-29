@@ -8,7 +8,6 @@ namespace HR.Modules.Reporting.Tests;
 
 public class ExportEmployeeDirectoryReportHandlerTests
 {
-    /// <summary>Throws from the reader call so the handler's catch block is exercised (REP-06).</summary>
     private sealed class ThrowingEmployeeDirectoryReader : IEmployeeDirectoryReader
     {
         public Task<PagedResult<EmployeeDirectoryReportItem>> GetEmployeeDirectoryAsync(

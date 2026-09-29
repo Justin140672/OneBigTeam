@@ -10,14 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// SICK-04: end-to-end coverage of GET /api/companies/{companyId}/attendance-alerts — the
-/// HR-administrator-vs-manager reduced view, reporting-hierarchy scoping (mirrors
-/// SicknessResourceAuthorizationTests' pattern for the other "sickness:review" endpoints),
-/// anonymous 401, and cross-company isolation. Alerts are seeded by creating four closed sickness
-/// records (>= FrequentAbsenceCountThreshold, default 4) for an employee within the default
-/// 365-day rolling window and then running AttendanceAlertEvaluationJob directly.
-/// </summary>
 [Collection("Integration")]
 public class ListAttendanceAlertsEndpointTests
 {
@@ -86,7 +78,6 @@ public class ListAttendanceAlertsEndpointTests
         var item = Assert.Single(payload!.Items, i => i.EmployeeId == report);
         Assert.Equal("FrequentAbsences", item.Rule);
         Assert.Equal(4, item.OccurrenceCount);
-        // SICK-04 manager-reduced-view decision: dates and description are withheld from managers.
         Assert.Null(item.EvidencePeriodStart);
         Assert.Null(item.EvidencePeriodEnd);
         Assert.Null(item.Description);
@@ -156,9 +147,6 @@ public class ListAttendanceAlertsEndpointTests
         Assert.DoesNotContain(payload!.Items, i => i.EmployeeId == employee);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Helpers
-    // ─────────────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> HrAdminClientAsync(Guid companyId)
     {
@@ -223,12 +211,6 @@ public class ListAttendanceAlertsEndpointTests
         return payload!.Id;
     }
 
-    /// <summary>
-    /// Creates four closed sickness records for the employee, each starting on a distinct month
-    /// within the last year, so the default FrequentAbsences rule (threshold 4, 365-day window)
-    /// fires deterministically once AttendanceAlertEvaluationJob runs, irrespective of "today"'s
-    /// actual calendar date at test-run time.
-    /// </summary>
     private async Task SeedFrequentAbsencesAsync(HttpClient hrClient, Guid companyId, Guid employeeId)
     {
         var categoryId = await CreateCategoryAsync(hrClient, companyId);
@@ -274,14 +256,6 @@ public class ListAttendanceAlertsEndpointTests
         await job.ExecuteAsync();
     }
 
-    /// <summary>
-    /// Closing a sickness record raises a return-to-work review (SICK-03, default
-    /// ReturnToWorkRequiredAfterDays = 1), which — left Pending with a long-past due date —
-    /// would itself trip MissingReturnToWorkReview and pollute these FrequentAbsences-focused
-    /// assertions. Completing every review for the employee isolates the scenario to the rule
-    /// under test, mirroring how AttendanceAlertEvaluationJobTests attaches completed reviews for
-    /// the same reason.
-    /// </summary>
     private async Task CompleteAllReturnToWorkReviewsAsync(Guid employeeId)
     {
         using var scope = _factory.Services.CreateScope();
@@ -297,14 +271,6 @@ public class ListAttendanceAlertsEndpointTests
             review.Complete(Guid.NewGuid(), FitToReturnOutcome.Fit, adjustmentsRequired: false, adjustmentDetails: null, notes: null, now);
         }
 
-        // CloseSicknessRecordHandler only raises a review when its own (working-day) TotalDays
-        // meets ReturnToWorkRequiredAfterDays — a short spell landing on a weekend may close
-        // without ever getting a review row at all. MissingReturnToWorkReview's defensive
-        // catch-all measures duration in calendar days instead (see
-        // AttendanceAlertEvaluationService), so such a record would still trip it. Backfill a
-        // completed review for any closed record that doesn't have one, so this test's seeded
-        // data is guaranteed to exercise only FrequentAbsences regardless of which weekday the
-        // seeded absences happen to fall on.
         var closedRecordIds = await db.SicknessRecords
             .Where(r => r.EmployeeId == employeeId && r.Status == SicknessStatus.Closed)
             .Select(r => r.Id)

@@ -33,8 +33,6 @@ public class CompensationChangedHandlerTests
         Assert.Equal(EmployeeTimelineVisibility.HrOnly, entry.Visibility);
         Assert.Equal(compensationId, entry.SourceRecordId);
 
-        // Redaction rule: no salary/amount figure may ever be persisted into Title/Summary,
-        // regardless of visibility tier.
         Assert.DoesNotContain("Annual", entry.Summary);
         Assert.DoesNotContain("AnnualReview", entry.Summary);
         Assert.Matches("^[^0-9]*$", entry.Summary);

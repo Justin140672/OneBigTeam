@@ -11,19 +11,11 @@ namespace HR.Modules.Identity.Tests;
 
 using AppAuthorizationService = HR.SharedKernel.IAuthorizationService;
 
-/// <summary>
-/// Unit tests for <see cref="RoleAuthorizationHandler"/>, in particular the P1 "Login as Customer"
-/// support-session branch: a support session must satisfy only the "role:employee" floor policy
-/// (the generic "is this an authenticated in-app session" gate, e.g. GetMe) and never any of the
-/// real role assertions (manager/recruiter/hr-administrator/company-administrator).
-/// </summary>
 public class RoleAuthorizationHandlerTests
 {
     private static readonly Guid UserId = Guid.NewGuid();
     private static readonly Guid CompanyId = Guid.NewGuid();
 
-    /// <summary>Reports the given roles as the caller's effective roles — used to prove the
-    /// support-session branch never consults this service at all.</summary>
     private sealed class FakeAppAuthorizationService(IReadOnlySet<Guid> effectiveRoles) : AppAuthorizationService
     {
         public Task<bool> HasPermissionAsync(Guid userId, Guid permissionId, CancellationToken ct = default) =>
@@ -47,9 +39,6 @@ public class RoleAuthorizationHandlerTests
     [Fact]
     public async Task SupportSession_Succeeds_For_Role_Employee_Requirement()
     {
-        // Even though the underlying admin's "real" effective roles (as reported by the
-        // authorization service) would include everything — the support-session branch must never
-        // consult that service at all.
         var handler = new RoleAuthorizationHandler(
             FakeCurrentUser.SupportSession(UserId, tenantId: CompanyId.ToString()),
             new FakeAppAuthorizationService(new HashSet<Guid>

@@ -3,12 +3,6 @@ using HR.Modules.Employees.Contracts;
 
 namespace HR.Modules.Leave.Services;
 
-/// <summary>
-/// Public-holiday-within-range warning, shared verbatim across preview and both submission paths
-/// (LEAVE-08). Kept as a genuinely shared calculation - not a generic service - since
-/// PreviewLeaveRequestHandler, SubmitLeaveRequestHandler and SubmitLeaveRequestDraftHandler had
-/// each computed this identically and had drifted: only preview surfaced it in its response.
-/// </summary>
 internal sealed record ExcludedPublicHoliday(DateOnly Date, string Name);
 
 internal sealed class LeaveWarningCalculator(IPublicHolidayReader publicHolidayReader)

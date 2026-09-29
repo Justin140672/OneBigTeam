@@ -19,9 +19,6 @@ internal sealed record VacancyListItem(
     // (kept on GetVacancyResponse only) to keep the list payload light.
     string? PositionProfileTitle,
     Guid? PositionProfileDepartmentId,
-    // Resolved at the read layer — see GetVacancyResponse's EffectiveTitle remarks.
     string EffectiveTitle,
-    // Location comes exclusively from the linked Position Profile — see GetVacancyResponse's
-    // EffectiveLocation remarks.
     string? EffectiveLocation,
     int ApplicationCount);

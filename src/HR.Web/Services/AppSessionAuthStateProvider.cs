@@ -38,8 +38,6 @@ public sealed class AppSessionAuthStateProvider(
     private static readonly AuthenticationState Anonymous =
         new(new ClaimsPrincipal(new ClaimsIdentity()));
 
-    // Called by the Blazor Server framework at circuit creation AND on every reconnect (see class
-    // remarks above) with the ClaimsPrincipal from the connecting request's HttpContext.User.
     public void SetAuthenticationState(Task<AuthenticationState> authenticationStateTask)
     {
         if (authenticationStateTask.IsCompletedSuccessfully)
@@ -48,10 +46,6 @@ public sealed class AppSessionAuthStateProvider(
             return;
         }
 
-        // Framework-provided tasks are documented/observed to already be completed (the connecting
-        // request's HttpContext.User is available synchronously) — this is a defensive fallback
-        // only, executed synchronously on completion so it still runs before the circuit's first
-        // render if the task happens to still be pending.
         _ = authenticationStateTask.ContinueWith(
             t =>
             {
@@ -115,8 +109,6 @@ public sealed class AppSessionAuthStateProvider(
             return;
         }
 
-        // Sticky fail-closed: once this circuit has been invalidated, no later callback — not even
-        // one carrying a legitimately new token — may revive it.
         if (sessionState.Status == CircuitAuthStatus.Invalidated)
         {
             logger.LogInformation(
@@ -127,7 +119,6 @@ public sealed class AppSessionAuthStateProvider(
 
         if (token == sessionState.AccessToken)
         {
-            // Same-user (same-token) reconnect: state is already correct, nothing to do.
             logger.LogInformation("[e2e-diag] ApplyState: same token as current session, no-op");
             return;
         }
@@ -143,9 +134,6 @@ public sealed class AppSessionAuthStateProvider(
             return;
         }
 
-        // A live, already-Authenticated circuit just received a different token — treat as a
-        // different-identity reconnect and fail closed (see policy note above). Clear() transitions
-        // this circuit's Status to Invalidated, so it cannot be revived by any later callback.
         logger.LogInformation(
             "[e2e-diag] ApplyState: already-Authenticated circuit received a DIFFERENT token (oldPrefix={OldPrefix}, newPrefix={NewPrefix}) -> Clear()/Invalidate",
             sessionState.AccessToken is { Length: > 0 } old ? old[..Math.Min(8, old.Length)] : "(none)",

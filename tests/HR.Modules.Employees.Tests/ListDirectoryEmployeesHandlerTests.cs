@@ -66,11 +66,11 @@ public class ListDirectoryEmployeesHandlerTests
     }
 
     [Theory]
-    [InlineData("alice")]     // first name
-    [InlineData("smith")]     // last name
-    [InlineData("alice smith")] // full name
-    [InlineData("ally")]      // preferred name
-    [InlineData("acme")]      // work email
+    [InlineData("alice")]
+    [InlineData("smith")]
+    [InlineData("alice smith")]
+    [InlineData("ally")]
+    [InlineData("acme")]
     public async Task HandleAsync_Search_Matches_Name_PreferredName_And_Email(string term)
     {
         await using var context = BuildContext();

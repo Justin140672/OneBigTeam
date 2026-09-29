@@ -100,8 +100,6 @@ public class DeactivateLeaveTypeHandlerTests
         db.LeaveBalances.Add(balance);
         await db.SaveChangesAsync();
 
-        // FakeCurrentEmployeeReader returns an empty list by default, simulating that
-        // terminatedEmployeeId is not among the current (non-terminated) employees.
         var handler = new DeactivateLeaveTypeHandler(db, new FakeClock(FixedUtcNow), new FakeCurrentEmployeeReader(), new NoOpAuditEventPublisher());
 
         var result = await handler.HandleAsync(new DeactivateLeaveTypeRequest
@@ -119,8 +117,6 @@ public class DeactivateLeaveTypeHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_Conflict_When_LeaveType_Is_System()
     {
-        // Item 50: a system leave type (e.g. the platform-provisioned Annual Leave) can never be
-        // deactivated, regardless of whether it's currently assigned to any employees.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
@@ -149,8 +145,6 @@ public class DeactivateLeaveTypeHandlerTests
     [Fact]
     public async Task HandleAsync_Deactivates_NonSystem_LeaveType_Unaffected_By_IsSystem_Restriction()
     {
-        // Confirms the IsSystem guard is opt-in: an ordinary (non-system) leave type can still be
-        // deactivated exactly as before.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);

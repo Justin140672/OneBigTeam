@@ -316,28 +316,8 @@ else
     private bool SidebarOpen { get; set; } = true;
     private bool IsDark { get; set; }
 
-    // Shown whenever the signed-in user has a role with actual menu content below — a plain
-    // Employee gets no sidebar at all, same as pre-dashboards behavior. Individual menu
-    // sections inside the sidebar are independently role-gated so combined roles (e.g. an
-    // HR Administrator who is also a Manager or Recruiter) merge without duplicates.
-    //
-    // A Company Administrator gets a minimal sidebar too: the "Company administration" section
-    // (Company Profile & Addresses, Subscription & Billing) plus the Support Requests item below.
-    // Those two screens are the whole Company-Administrator job and both are role-gated on
-    // CanManageCompany, so a CompanyAdmin-only user still needs a way to reach Subscription &
-    // Billing after the generic "Company" nav bucket and Administration Home hub were removed.
-    //
-    // A plain Manager never gets a sidebar — their dashboard is "home", and Reports are reached
-    // via the Reports section on that dashboard (see ManagerDashboard.razor's TeamReportsWidget),
-    // not via sidebar navigation. A plain Recruiter still gets a sidebar since their workflow
-    // (Vacancies, Candidates, etc.) has no dashboard-embedded equivalent for those sections.
-    // The persistent sidebar belongs only to the two roles with multi-page administrative
-    // workflows. Company administrators, managers and employees use their landing page and
-    // contextual links instead of receiving an application-wide navigation rail.
     private bool ShowSidebar => Session.IsHrAdministrator || Session.IsRecruiter || Session.CanManageCompany;
 
-    // Recruiters have a compact task-based navigation. Administrative category menus are for
-    // users who also hold an HR, manager, or company-administration role.
     private bool IsRecruiterOnly =>
         Session.IsRecruiter && !Session.IsHrAdministrator && !Session.IsManager
         && !Session.CanManageCompany;
@@ -351,17 +331,11 @@ else
     private Guid? _selectedTaskId;
     private bool _taskDialogOpen;
 
-    // NOT-04/task-dialog-consistency: task-backed notification types resolve to a
-    // "/tasks/{id}" ActionUrl, but per the WorkloadAction.TaskId wiring pattern used on the
-    // dashboards, a task-backed row/notification opens the Task View dialog in place instead
-    // of navigating away — SourceEntityId is the task id for every one of these types (see
-    // NotificationActionRouteBuilder).
     private static readonly HashSet<string> TaskBackedNotificationTypes =
     [
         "TaskAssigned", "TaskDueSoon", "TaskOverdue", "TaskCompleted", "TaskDateChanged",
     ];
 
-    // NOT-06: progressive "load more" paging state for the notification dropdown.
     private const int NotifPageSize = 20;
     private int _notifPageNumber = 1;
     private bool _notifHasMore;
@@ -372,8 +346,6 @@ else
 
     private sealed record PersonaOption(string UserId, string DisplayName);
 
-    // ADM-07 — the canonical administrative sections, permission-filtered by the shared
-    // AdminNavigation helper. Replaces the old flat block of hand-maintained admin MenuItems.
     private IReadOnlyList<AdminNavSection> _adminSections = [];
 
     private static string SectionIcon(AdminNavGroup group) => group switch
@@ -419,11 +391,6 @@ else
     {
         NavigationManager.LocationChanged += OnLocationChanged;
 
-        // InitialiseAsync now only awaits identity (see its own remarks) and kicks off secondary
-        // enrichment (branding, settings, etc.) in the background — subscribe so this layout
-        // re-renders once that lands, the same pattern AdminQuickNav already uses for the same
-        // reason, since this component reads several enrichment-only fields (CompanyName,
-        // PrimaryLogoUrl/SmallLogoUrl) directly in its own markup.
         Session.Changed += OnSessionChanged;
 
         await Session.InitialiseAsync();
@@ -456,13 +423,6 @@ else
         _menuItems["UserAdministration"] = $"/companies/{companyId}/user-administration";
         _menuItems["SupportQueue"] = $"/companies/{companyId}/support/admin/queue";
 
-        // Both of the following are best-effort UI enrichment (the unread-count badge and the
-        // dev-only persona switcher). Neither must ever be able to fault OnInitializedAsync — a
-        // throw here is NOT caught by the ErrorBoundary around @Body (that only wraps page
-        // content, not this layout's own lifecycle), so an unguarded timeout under a loaded
-        // server takes down the whole circuit ("Something went wrong") on every page that uses
-        // this layout. Same best-effort pattern AppSession.InitialiseAsync already applies to its
-        // secondary enrichment calls.
         await LoadUnreadCountAsync();
 
         if (Env.IsDevelopment())
@@ -474,7 +434,6 @@ else
             }
             catch
             {
-                // Dev persona switcher is a convenience only — never fatal.
             }
         }
     }
@@ -512,9 +471,6 @@ else
         }
     }
 
-    // NOT-06: appends the next page to the existing list rather than replacing it, so the user can
-    // progressively load older notifications from the dropdown. UnreadCount is re-synced from each
-    // response too, since it's independent of which page was just fetched.
     private async Task LoadMoreNotificationsAsync()
     {
         if (!Session.EmployeeId.HasValue || _notifLoadingMore || !_notifHasMore) return;
@@ -547,9 +503,6 @@ else
 
     private CancellationTokenSource? _notifCloseCts;
 
-    // Standard hover-dropdown UX: a short debounce so briefly leaving and re-entering the
-    // bell/dropdown area (e.g. moving the mouse from the button down into the panel) doesn't
-    // cause a visible flicker-close. Cancelled by CancelNotifAutoClose on re-entry.
     private void ScheduleNotifAutoClose()
     {
         if (!_notifOpen) return;
@@ -590,14 +543,6 @@ else
             await OnNotificationClick(notification);
     }
 
-    // NOT-04: navigates using the ActionUrl computed server-side by
-    // NotificationActionRouteBuilder at write time, instead of always opening the task dialog
-    // regardless of the notification's actual type. A null ActionUrl (informational notifications,
-    // or a type with no destination screen — see NotificationActionRouteBuilder) marks the
-    // notification read and closes the dropdown but performs no navigation; the "No further detail
-    // available" title/aria-label on the item (see markup above) is the only feedback in that case,
-    // per NOT-04's "friendly message rather than opening an unrelated dialog" acceptance criterion.
-    // Reachable identically via mouse click and Enter/Space keyboard activation (OnNotificationKeyDown).
     private async Task OnNotificationClick(NotificationDto notification)
     {
         _notifOpen = false;
@@ -673,29 +618,11 @@ else
         var session = await DevAuth.SwitchAsync(userId);
         if (session is null) return;
 
-        // The session is stashed server-side; only an opaque, single-use code travels in the URL
-        // (matches Login.razor — /dev/persona-cookie takes ?code= and redeems it via
-        // AuthHandoffStore since the "no tokens in URLs" change). Must be a genuine hard browser
-        // navigation, not NavigationManager.NavigateTo(forceLoad: true) — Blazor Server's enhanced
-        // navigation can intercept that and keep the SAME circuit (and its SupabaseSessionAccessor,
-        // cached from before the new cookie existed) alive instead of tearing it down. hardNavigate
-        // (app.js) bypasses Blazor's navigation layer entirely via window.location.href.
         var code = HandoffStore.Issue(new HR.Web.Services.AuthHandoffStore.Session(
             session.AccessToken, session.RefreshToken, session.ExpiresIn));
         await JS.InvokeVoidAsync("hardNavigate", $"/dev/persona-cookie?code={Uri.EscapeDataString(code)}");
     }
 
-    // Tracks whether the toggle button's IsDark state has actually been synced with app.js's
-    // getTheme() (localStorage override, or the OS preference it falls back to) — separate from
-    // Blazor's own "firstRender" flag. A single firstRender-gated attempt was fragile: if that one
-    // JS interop call raced a reconnecting circuit (JSDisconnectedException) or fired before the
-    // theme-toggle button itself had even rendered (it's inside the "else" branch of the
-    // Session.IsLoaded gate above, not guaranteed present on the very first render), IsDark was
-    // left stuck at its C# default (false/light) for the rest of the session — the page itself
-    // still looked correctly dark (App.razor's inline script sets the html attribute synchronously,
-    // before Blazor even loads), but the button's icon silently never caught up. Retrying on every
-    // render until it succeeds makes this self-healing regardless of exactly when the circuit
-    // finishes connecting.
     private bool _themeSynced;
     private bool _sidebarSynced;
 
@@ -725,7 +652,6 @@ else
             }
             catch (JSDisconnectedException)
             {
-                // Circuit not ready yet — leave _sidebarSynced false so the next render retries.
             }
             catch (Exception)
             {
@@ -758,7 +684,6 @@ else
         }
         catch (JSDisconnectedException)
         {
-            // Circuit not ready yet — leave _themeSynced false so the next render retries.
         }
     }
 
@@ -768,9 +693,6 @@ else
         await JS.InvokeVoidAsync("setTheme", IsDark);
     }
 
-    // Top-bar title reacts to the current route rather than just the user's role, so it stays
-    // accurate as users move between their role dashboard(s) and the Company screen. Recomputed
-    // on every render; refreshed on client-side navigation via LocationChanged below.
     private string CurrentPageTitle => PageTitleResolver.Resolve(NavigationManager.Uri);
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)

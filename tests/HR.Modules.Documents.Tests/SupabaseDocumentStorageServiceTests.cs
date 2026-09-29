@@ -5,11 +5,6 @@ using Microsoft.Extensions.Options;
 
 namespace HR.Modules.Documents.Tests;
 
-/// <summary>
-/// TEST-004 — Supabase Storage adapter hardening. Upload / sign-url / download failures (non-2xx)
-/// must raise and never return a storage key or URL that a caller could persist as "stored OK".
-/// Malformed sign-url JSON must fail rather than crash.
-/// </summary>
 public class SupabaseDocumentStorageServiceTests
 {
     private sealed class RoutingHandler : HttpMessageHandler
@@ -37,7 +32,6 @@ public class SupabaseDocumentStorageServiceTests
 
     private static MemoryStream Content() => new(Encoding.UTF8.GetBytes("the file bytes"));
 
-    // ---- upload -----------------------------------------------------------------------
 
     [Fact]
     public async Task UploadAsync_Returns_StorageKey_On_Success()
@@ -75,7 +69,7 @@ public class SupabaseDocumentStorageServiceTests
         await Assert.ThrowsAsync<HttpRequestException>(async () =>
             key = await service.UploadAsync(Content(), "c.pdf", "application/pdf", "hr", CancellationToken.None));
 
-        Assert.Null(key); // caller never receives a key it could persist as a successful upload
+        Assert.Null(key);
     }
 
     [Fact]
@@ -93,7 +87,6 @@ public class SupabaseDocumentStorageServiceTests
             () => service.UploadAsync(Content(), "c.pdf", "application/pdf", "hr", cts.Token));
     }
 
-    // ---- signed download url --------------------------------------------------------
 
     [Fact]
     public async Task GetDownloadUrlAsync_Builds_Absolute_Url_From_Path_Only_SignedUrl()
@@ -150,12 +143,10 @@ public class SupabaseDocumentStorageServiceTests
         };
         var service = Build(handler);
 
-        // result! is non-null (empty object deserialises) but SignedUrl is null -> NRE, surfaced not swallowed.
         await Assert.ThrowsAnyAsync<Exception>(
             () => service.GetDownloadUrlAsync("documents/k", CancellationToken.None));
     }
 
-    // ---- open read stream --------------------------------------------------------
 
     [Fact]
     public async Task OpenReadStreamAsync_Returns_Null_On_404_Not_Throw()
@@ -197,7 +188,6 @@ public class SupabaseDocumentStorageServiceTests
         Assert.Equal("hello", await reader.ReadToEndAsync());
     }
 
-    // ---- delete -----------------------------------------------------------------
 
     [Fact]
     public async Task DeleteAsync_NonSuccess_Throws()

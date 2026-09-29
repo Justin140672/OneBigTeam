@@ -52,13 +52,9 @@ internal sealed class PurgeCandidateDocumentStorageJob(
 {
     public const int MaxAttempts = 5;
 
-    /// <summary>Live-dispatch entry point — claims the row itself (see class remarks).</summary>
     public Task ProcessAsync(Guid operationId) =>
         ProcessCoreAsync(operationId, alreadyClaimedBy: null);
 
-    /// <summary>Reconciliation entry point — <paramref name="claimedBy"/> is the id
-    /// PurgeCandidateDocumentStorageReconciliationJob already atomically claimed this row under;
-    /// verified (not re-claimed) before proceeding.</summary>
     public Task ProcessAsync(Guid operationId, Guid claimedBy) =>
         ProcessCoreAsync(operationId, alreadyClaimedBy: claimedBy);
 

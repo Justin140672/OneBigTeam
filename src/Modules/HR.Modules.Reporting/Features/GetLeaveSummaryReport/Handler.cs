@@ -18,12 +18,6 @@ internal sealed class GetLeaveSummaryReportHandler(
     {
         var policyYear = request.PolicyYear ?? DateTime.UtcNow.Year;
 
-        // Row-level manager scoping: a non-HR caller (Manager only, per reporting:view-leave-summary
-        // policy) is restricted to their complete reporting hierarchy — every employee beneath them
-        // at any depth, not just direct reports — and never to company-wide data, regardless of any
-        // filter supplied. GetAllDescendantIdsAsync walks the manager tree (BFS) so cycles/malformed
-        // manager relationships cannot cause infinite loops or unbounded results (see
-        // DirectReportsReader.GetAllDescendantIdsAsync).
         IReadOnlyCollection<Guid>? employeeIds = null;
         if (!callerIsHr)
         {
@@ -44,15 +38,6 @@ internal sealed class GetLeaveSummaryReportHandler(
         }
         else if (request.GroupBy is LeaveSummaryGroupBy.Employee or LeaveSummaryGroupBy.Department)
         {
-            // Bug fix: grouping by Employee/Department previously summed EntitlementDays (and
-            // BookedDays/ApprovedDays/RemainingDays) across EVERY leave type that employee has a
-            // balance for — Annual Leave + Sick Leave + Compassionate Leave + Parental Leave, etc.
-            // all added into one number. Those are different, non-additive buckets (a "92 days"
-            // combined figure was never a meaningful entitlement for anyone) — reported live as
-            // showing 92 instead of the correct 23. Without an explicit leave type filter, these
-            // two grouped views now reflect Annual Leave only, the one entitlement-bearing
-            // "headline" leave type in this system (same convention as the Default Days
-            // restriction on LeaveType — see LeaveTypeEdit.razor's IsAnnualLeave).
             rows = rows
                 .Where(r => string.Equals(r.LeaveTypeName, "Annual Leave", StringComparison.OrdinalIgnoreCase))
                 .ToList();

@@ -5,11 +5,6 @@ using HR.Modules.Assets.Tests.Infrastructure;
 
 namespace HR.Modules.Assets.Tests;
 
-/// <summary>
-/// OBT-721 workload action provider tests for assets awaiting return. HR-only, filters to
-/// unreturned ("Assigned") assignments only (see xmldoc on the provider for the interpretation
-/// note on why every unreturned assignment counts as "awaiting return").
-/// </summary>
 public class AssetsAwaitingReturnWorkloadActionProviderTests
 {
     private static ClaimsPrincipal AnyCaller() => new(new ClaimsIdentity());

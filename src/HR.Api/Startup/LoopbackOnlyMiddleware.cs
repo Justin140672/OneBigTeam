@@ -2,16 +2,6 @@ using System.Net;
 
 namespace HR.Api.Startup;
 
-/// <summary>
-/// Middleware that restricts access to development endpoints to loopback addresses only.
-///
-/// After any trusted proxy handling, this verifies the request originates from a genuinely
-/// local address (127.0.0.1, ::1, or similar). Rejects non-loopback requests with 403 Forbidden.
-///
-/// This is a defense-in-depth layer for /api/dev/* endpoints when DevTools is enabled:
-/// even if DevTools is accidentally exposed in a development-like environment accessible
-/// over a network, the endpoints remain unreachable except from localhost.
-/// </summary>
 public class LoopbackOnlyMiddleware
 {
 	private readonly RequestDelegate _next;
@@ -25,13 +15,20 @@ public class LoopbackOnlyMiddleware
 
 	public async Task InvokeAsync(HttpContext context)
 	{
-		// Check if this is a /api/dev/* request and if so, verify it's from loopback.
 		if (context.Request.Path.StartsWithSegments("/api/dev"))
 		{
 			var remoteIp = context.Connection.RemoteIpAddress;
 
-			// After trusted proxy middleware has run, RemoteIpAddress should reflect the
-			// real caller's IP. Check if it's a loopback address (127.0.0.1, ::1, etc.).
+			// Kestrel's dual-stack socket binding (the default on Linux, including CI runners)
+			// reports an IPv4 loopback client as the IPv4-mapped IPv6 address ::ffff:127.0.0.1
+			// rather than 127.0.0.1 itself — unmap it first so IsLoopback below actually
+			// recognizes it, instead of rejecting every /api/dev/* request unconditionally on
+			// platforms/environments where this mapping occurs.
+			if (remoteIp is { IsIPv4MappedToIPv6: true })
+			{
+				remoteIp = remoteIp.MapToIPv4();
+			}
+
 			if (remoteIp == null || !IPAddress.IsLoopback(remoteIp))
 			{
 				_logger.LogWarning(

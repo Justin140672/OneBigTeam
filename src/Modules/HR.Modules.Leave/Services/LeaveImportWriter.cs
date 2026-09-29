@@ -6,13 +6,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Leave.Services;
 
-/// <summary>
-/// Implements <see cref="ILeaveImportWriter"/> for the DataImport module's confirm step.
-/// Layers a non-default opening balance on top of the baseline LeaveBalance row already seeded
-/// by InitialiseEmployeeLeave's EmployeeCreatedHandler, mirroring AdjustLeaveBalanceHandler's
-/// hours/days conversion and negative-balance guard but expressed directly in days (the import
-/// file's LeaveBalanceDays column) and always tagged Reason = Import.
-/// </summary>
 internal sealed class LeaveImportWriter(
     LeaveDbContext dbContext,
     IClock clock,

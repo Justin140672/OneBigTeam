@@ -118,7 +118,7 @@ public class UpdateCompanyHandlerTests
         Assert.Equal("validation", result.Error.Code);
 
         var saved = await context.Companies.SingleAsync(c => c.Id == company.Id);
-        Assert.Equal("Acme", saved.Name); // unchanged — validation ran before any updates were applied
+        Assert.Equal("Acme", saved.Name);
     }
 
     [Fact]
@@ -126,7 +126,7 @@ public class UpdateCompanyHandlerTests
     {
         await using var context = BuildContext();
         var now = new DateTimeOffset(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc));
-        var company = Company.Create(Guid.NewGuid(), "Acme", now); // no SetSettings call
+        var company = Company.Create(Guid.NewGuid(), "Acme", now);
         context.Companies.Add(company);
         await context.SaveChangesAsync();
 

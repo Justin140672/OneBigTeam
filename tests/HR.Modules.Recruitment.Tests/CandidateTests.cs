@@ -116,7 +116,6 @@ public class CandidateTests
         Assert.Equal("No longer available", candidate.DeactivationReason);
     }
 
-    // SET-05: candidate purge (retention).
 
     [Fact]
     public void Purge_Redacts_Personal_Data_Fields()

@@ -5,16 +5,6 @@ using HR.Modules.Identity.Jobs;
 
 namespace HR.Modules.Identity.Tests;
 
-/// <summary>
-/// CodeQL #55, #56, #57, #62 (log forging flagged on the account-disablement job log statements):
-/// those statements interpolate only the job's entry-point parameters and
-/// <see cref="AccountDisablement"/> identifiers (plus ints and constant reasons). This typed
-/// invariant pins that every such value is a <see cref="Guid"/> — a type whose string form cannot
-/// carry a control character — and that the reconciliation job's <c>{Reason}</c> (which is
-/// <see cref="AccountDisablement.Status"/>) is drawn from a closed set of server-defined constants
-/// with no public setter, so no caller-supplied text can reach those log lines. If any of these
-/// becomes a string (or Status becomes externally settable), revisit the CodeQL dispositions.
-/// </summary>
 public class AccountDisablementLogIdentifierInvariantTests
 {
     private static readonly string[] ExpectedStatuses =

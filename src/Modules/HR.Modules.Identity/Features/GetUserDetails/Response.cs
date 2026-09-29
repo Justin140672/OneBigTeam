@@ -14,6 +14,5 @@ internal sealed record GetUserDetailsResponse(
     string? CreatedByName,
     DateTimeOffset? LastLoginAt,
     DateTimeOffset CreatedAt,
-    // The linked employee's current position (ADM-01).
     Guid? PositionProfileId = null,
     string? PositionTitle = null);

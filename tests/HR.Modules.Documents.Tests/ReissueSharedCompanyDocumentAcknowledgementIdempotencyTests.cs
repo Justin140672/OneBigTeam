@@ -10,11 +10,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Documents.Tests;
 
-/// <summary>
-/// TEST-005. Idempotency / tenant-isolation for the "reissue acknowledgement request" HR action
-/// and its interplay with <see cref="SharedCompanyDocumentAcknowledgementReminderJob"/>, which
-/// re-picks the outstanding acknowledgements it creates.
-/// </summary>
 public class ReissueSharedCompanyDocumentAcknowledgementIdempotencyTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 7, 13, 9, 0, 0, DateTimeKind.Utc);
@@ -156,12 +151,11 @@ public class ReissueSharedCompanyDocumentAcknowledgementIdempotencyTests
             .HandleAsync(new ReissueSharedCompanyDocumentAcknowledgementRequest(companyId, doc.Id), Guid.NewGuid(), CancellationToken.None);
 
         var reissueTask = tasks.Created.Single();
-        // The real DB-backed reader would now see that task; wire it into the fake.
         openTasks.AddOpenTaskForAssignee(doc.Id, employeeId, TaskActionType.Acknowledge, reissueTask.Id);
 
         await BuildJob(db, audience, writer, tasks, openTasks).ExecuteAsync();
 
-        Assert.Single(tasks.Created); // no duplicate task from the job
+        Assert.Single(tasks.Created);
     }
 
     [Fact]
@@ -183,7 +177,6 @@ public class ReissueSharedCompanyDocumentAcknowledgementIdempotencyTests
         openTasks.AddOpenTaskForAssignee(doc.Id, employeeId, TaskActionType.Acknowledge, tasks.Created.Single().Id);
         await handler.HandleAsync(request, Guid.NewGuid(), CancellationToken.None);
 
-        // Task not recreated; but the reissue is an explicit "nudge now" so a fresh notification each call is expected.
         Assert.Single(tasks.Created);
         Assert.Equal(2, writer.Written.Count);
     }

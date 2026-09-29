@@ -31,7 +31,6 @@ public class OffboardingTaskTests
         Assert.Equal(FixedNow, task.UpdatedAt);
     }
 
-    // OFF-03
     [Fact]
     public void Create_Defaults_AssignedEmployeeId_To_Null_When_Not_Supplied()
     {
@@ -42,7 +41,6 @@ public class OffboardingTaskTests
         Assert.Null(task.AssignedEmployeeId);
     }
 
-    // OFF-03
     [Fact]
     public void Create_Sets_AssignedEmployeeId_When_Supplied()
     {
@@ -55,7 +53,6 @@ public class OffboardingTaskTests
         Assert.Equal(assignedEmployeeId, task.AssignedEmployeeId);
     }
 
-    // OFF-03
     [Fact]
     public void MarkTaskItemCreated_Sets_TaskItemCreatedAt_And_UpdatedAt()
     {
@@ -111,7 +108,6 @@ public class OffboardingTaskTests
         Assert.Equal(later, task.UpdatedAt);
     }
 
-    // OFF-02
     [Fact]
     public void Reschedule_Updates_DueDate_And_UpdatedAt_When_Date_Changes()
     {
@@ -160,7 +156,6 @@ public class OffboardingTaskTests
         Assert.Equal(later, task.UpdatedAt);
     }
 
-    // ---- OFF-05 ----
 
     [Fact]
     public void Create_Defaults_RequiresHrConfirmation_False_When_Not_Supplied()
@@ -198,16 +193,12 @@ public class OffboardingTaskTests
         Assert.Equal(id, task.Id);
         Assert.Equal(companyId, task.CompanyId);
         Assert.Equal(planId, task.OffboardingPlanId);
-        // SPEC-OFF-01: CreateWaived now routes through Waive() rather than the legacy Skip() path,
-        // so system-auto-resolved tasks get Status=Waived, not Status=Skipped.
         Assert.Equal(OffboardingTaskStatus.Waived, task.Status);
-        // Waive() does not set CompletedAt (see Waive_Sets_Status_SkipReason_Actor_And_SkippedAt below).
         Assert.Null(task.CompletedAt);
         Assert.Equal(description, task.Description);
         Assert.Equal(FixedNow, task.UpdatedAt);
     }
 
-    // ---- OFF-07 ----
 
     [Fact]
     public void Create_Defaults_IsMandatory_True_When_Not_Supplied()
@@ -242,7 +233,6 @@ public class OffboardingTaskTests
         var ex = Assert.Throws<ArgumentException>(() => task.Skip(FixedNow.AddDays(1), reason!, Guid.NewGuid()));
         Assert.Equal("reason", ex.ParamName);
 
-        // The task must be left completely untouched — the exception is thrown before any state change.
         Assert.Equal(OffboardingTaskStatus.Pending, task.Status);
         Assert.Null(task.SkipReason);
         Assert.Null(task.SkippedByUserId);
@@ -280,11 +270,10 @@ public class OffboardingTaskTests
         Assert.False(task.IsMandatory);
         Assert.Equal(OffboardingTaskStatus.Waived, task.Status);
         Assert.Equal(description, task.SkipReason);
-        Assert.Equal(Guid.Empty, task.SkippedByUserId); // OffboardingSystemActor.Id
+        Assert.Equal(Guid.Empty, task.SkippedByUserId);
         Assert.Equal(FixedNow, task.SkippedAt);
     }
 
-    // ---- SPEC-OFF-01: Waive ----
 
     [Fact]
     public void Waive_Sets_Status_SkipReason_Actor_And_SkippedAt()
@@ -359,7 +348,6 @@ public class OffboardingTaskTests
         Assert.Equal(OffboardingTaskStatus.Waived, task.Status);
     }
 
-    // ---- SPEC-OFF-01: CancelBecauseLeavingProcessCancelled ----
 
     [Fact]
     public void CancelBecauseLeavingProcessCancelled_Sets_Status_Cancelled_With_Fixed_Reason_And_Actor()

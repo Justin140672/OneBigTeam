@@ -26,10 +26,6 @@ internal sealed class AuditPendingItemPromotionJob(
 {
     private const int BatchSize = 100;
 
-    /// <summary>
-    /// Processes up to <see cref="BatchSize"/> pending items per invocation.
-    /// Hangfire will re-queue the job if the batch was full (more rows may remain).
-    /// </summary>
     public async Task ExecuteAsync(CancellationToken cancellationToken)
     {
         var now = clock.UtcNowOffset();
@@ -82,7 +78,6 @@ internal sealed class AuditPendingItemPromotionJob(
                 return;
             }
 
-            // Check for existing committed event first (idempotency — no DB round-trip if already done).
             var alreadyCommitted = await context.AuditEvents
                 .AnyAsync(e => e.EventId == item.EventId, cancellationToken);
 
@@ -95,7 +90,6 @@ internal sealed class AuditPendingItemPromotionJob(
                 }
                 catch (DbUpdateException ex) when (IsUniqueConstraintViolation(ex))
                 {
-                    // Another job instance promoted this event concurrently — that's fine.
                     context.ChangeTracker.Clear();
                     logger.LogDebug(
                         "AUD-01: duplicate promotion detected (concurrent job). EventId={EventId}", item.EventId);

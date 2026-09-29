@@ -5,14 +5,6 @@ using HR.Integration.Tests.Infrastructure;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Same "platform:admin" policy + allow-list gate pattern as GetSystemHealthEndpointTests /
-/// ListBackgroundJobsEndpointTests — see their remarks. Runs against the test host's real
-/// IPlatformDocumentActivityReader (HR.Modules.Documents) and IPlatformUserActivityReader
-/// (HR.Modules.Identity) implementations, so this only asserts structural correctness (30-point
-/// zero-or-more series, non-negative current values) rather than specific counts, since the test
-/// database's seeded state isn't asserted here.
-/// </summary>
 [Collection("Integration")]
 public class GetApplicationMetricsEndpointTests
 {
@@ -55,8 +47,6 @@ public class GetApplicationMetricsEndpointTests
 
         var response = await client.GetAsync(Url);
 
-        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
-        // is Forbidden (403), not Unauthorized (401).
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 

@@ -206,7 +206,6 @@ public class ApplicationTests
         Assert.Null(application.SourceExternalRecruiterId);
     }
 
-    // SET-05: offer approval.
 
     [Fact]
     public void ApproveOffer_Sets_OfferApprovedAt_And_OfferApprovedByUserId()
@@ -281,7 +280,6 @@ public class ApplicationTests
         Assert.Equal(later, application.OfferMadeAt);
         Assert.Null(application.OfferRespondedAt);
         Assert.Equal(later, application.UpdatedAt);
-        // Does not touch the pipeline stage — the caller owns the stage move.
         Assert.Equal(stageId, application.CurrentStageId);
     }
 
@@ -342,7 +340,6 @@ public class ApplicationTests
         Assert.Equal(response, application.OfferResponseStatus);
         Assert.Equal(later, application.OfferRespondedAt);
         Assert.Equal(later, application.UpdatedAt);
-        // Response never moves the pipeline stage.
         Assert.Equal(stageId, application.CurrentStageId);
     }
 }

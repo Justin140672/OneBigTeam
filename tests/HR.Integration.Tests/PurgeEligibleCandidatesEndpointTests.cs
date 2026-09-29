@@ -11,10 +11,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// See PurgeEligibleCandidatesHandlerTests/CandidateTests in HR.Modules.Recruitment.Tests for the
-/// equivalent unit-level coverage of the same behaviour.
-/// </summary>
 [Collection("Integration")]
 public class PurgeEligibleCandidatesEndpointTests
 {
@@ -138,9 +134,6 @@ public class PurgeEligibleCandidatesEndpointTests
         var companyId = Guid.NewGuid();
         var candidateId = await SeedEligibleCandidateAsync(companyId);
 
-        // ClientAs -> SyncCompanyAsync -> EnsureActiveSubscriptionAsync creates the Company and its
-        // CustomerSubscription, so the legal hold is applied to that existing row afterwards (adding
-        // a second subscription would violate the customer_subscriptions PK / companies FK).
         using var client = await ClientAs(CompanyAdminUser, companyId);
 
         using (var scope = _factory.Services.CreateScope())
@@ -219,9 +212,6 @@ public class PurgeEligibleCandidatesEndpointTests
             Assert.Empty(await db.CandidateDocuments.Where(d => d.CandidateId == candidateId).ToListAsync());
         }
 
-        // DownloadCandidateDocument requires "candidate:view", which CompanyAdministrator alone does
-        // not hold in this app's role/permission catalogue — use the Recruiter role (which does)
-        // for this specific call, same as RecruiterOnlyUser is used elsewhere in this test class.
         using var downloadClient = _factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
         downloadClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, RecruiterOnlyUser.ToString());
         downloadClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());

@@ -6,11 +6,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Verifies ListSharedCompanyDocumentsDueForReview end-to-end: only documents whose ReviewDate
-/// is within the next 7 days (overdue, due today, or due this week) come back, Archived documents
-/// are always excluded regardless of ReviewDate, and results are scoped to the company in the route.
-/// </summary>
 [Collection("Integration")]
 public class ListSharedCompanyDocumentsDueForReviewEndpointTests
 {
@@ -129,7 +124,6 @@ public class ListSharedCompanyDocumentsDueForReviewEndpointTests
         Assert.DoesNotContain(payload!.Items, i => i.Title == "Company A Only Overdue Policy");
     }
 
-    // ── helpers ─────────────────────────────────────────────────────────────────
 
     private static string DueForReviewUrl(Guid companyId) =>
         $"/api/companies/{companyId}/shared-documents/due-for-review";
@@ -176,7 +170,6 @@ public class ListSharedCompanyDocumentsDueForReviewEndpointTests
         return form;
     }
 
-    // %PDF- followed by padding, so magic-byte content validation passes.
     private static byte[] PdfBytes()
     {
         var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };

@@ -461,8 +461,6 @@ public class CompleteProbationReviewHandlerTests
             }, completedBy, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        // PROB-07: a Fail outcome now publishes ProbationFailedIntegrationEvent (to drive the
-        // ProbationFailed employee timeline entry) — it must never publish ProbationPassedIntegrationEvent.
         Assert.DoesNotContain(integrationPublisher.Published, e => e is ProbationPassedIntegrationEvent);
         var evt = Assert.IsType<ProbationFailedIntegrationEvent>(Assert.Single(integrationPublisher.Published));
         Assert.Equal(companyId, evt.CompanyId);
@@ -661,9 +659,6 @@ public class CompleteProbationReviewHandlerTests
 
         var (record, reviewBeingCompleted) = await SeedRecordAndReview(context, companyId, ProbationReviewType.FinalDecision);
 
-        // Simulate the daily scheduling job already having created a second, distinct Pending
-        // FinalDecision review/task for the original expected end date (e.g. a re-scheduled
-        // review generated before the manager completed reviewBeingCompleted).
         var preExistingFinalReview = ProbationReview.Create(
             Guid.NewGuid(), companyId, record.Id, ProbationReviewType.FinalDecision,
             record.ExpectedEndDate, Now);
@@ -781,7 +776,7 @@ public class CompleteProbationReviewHandlerTests
                 ReviewId = review.Id,
                 Outcome = ProbationOutcome.Extend,
                 DecisionDate = new DateOnly(2026, 7, 15),
-                NewExpectedEndDate = record.ExpectedEndDate, // equal to current ExpectedEndDate — not strictly forward
+                NewExpectedEndDate = record.ExpectedEndDate,
                 ExtensionReason = "Needs more time."
             }, Guid.NewGuid(), CancellationToken.None);
 
@@ -837,7 +832,7 @@ public class CompleteProbationReviewHandlerTests
                 ReviewId = review.Id,
                 Outcome = ProbationOutcome.Extend,
                 DecisionDate = decisionDate,
-                NewExpectedEndDate = decisionDate, // equal to DecisionDate, and later than current ExpectedEndDate
+                NewExpectedEndDate = decisionDate,
                 ExtensionReason = "Needs more time."
             }, Guid.NewGuid(), CancellationToken.None);
 

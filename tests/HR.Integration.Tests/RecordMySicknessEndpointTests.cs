@@ -66,7 +66,6 @@ public class RecordMySicknessEndpointTests
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        // Use an HR admin client to create the category, then the employee client to record sickness
         using var adminClient = await AdminClient(companyId);
         var categoryId = await CreateCategory(adminClient, companyId);
 
@@ -79,7 +78,7 @@ public class RecordMySicknessEndpointTests
                 employeeId,
                 categoryId,
                 startDate = "2026-07-01",
-                startDayPart = 0, // FullDay
+                startDayPart = 0,
                 notes = "Self-reported illness"
             });
 
@@ -93,8 +92,6 @@ public class RecordMySicknessEndpointTests
         Assert.Equal(employeeId, payload.EmployeeId);
         Assert.Equal(categoryId, payload.CategoryId);
         Assert.Equal("Active", payload.Status);
-        // FitNoteRequiredAfterDays is now a mandatory setting (default 7) — an open record (no end
-        // date yet) can't be ruled out as needing evidence, so it's Pending, not NotRequired.
         Assert.Equal("Pending", payload.EvidenceStatus);
         Assert.Equal("Self-reported illness", payload.Notes);
     }
@@ -104,7 +101,7 @@ public class RecordMySicknessEndpointTests
     {
         var companyId = Guid.NewGuid();
         var authenticatedEmployeeId = Guid.NewGuid();
-        var targetEmployeeId = Guid.NewGuid(); // different employee
+        var targetEmployeeId = Guid.NewGuid();
 
         using var client = await EmployeeClient(companyId, authenticatedEmployeeId);
 
@@ -178,7 +175,6 @@ public class RecordMySicknessEndpointTests
                 companyId,
                 employeeId,
                 categoryId = Guid.NewGuid()
-                // startDate omitted — will deserialize as default(DateOnly)
             });
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
@@ -195,7 +191,6 @@ public class RecordMySicknessEndpointTests
 
         using var client = await EmployeeClient(companyId, employeeId);
 
-        // Create the first open record
         var firstResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/sickness-records/my",
             new
@@ -208,7 +203,6 @@ public class RecordMySicknessEndpointTests
             });
         Assert.Equal(HttpStatusCode.Created, firstResponse.StatusCode);
 
-        // Attempt a second open record for the same employee
         var secondResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/sickness-records/my",
             new

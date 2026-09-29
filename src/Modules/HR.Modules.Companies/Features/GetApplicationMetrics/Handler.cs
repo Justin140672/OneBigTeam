@@ -9,17 +9,6 @@ using Microsoft.Extensions.Configuration;
 
 namespace HR.Modules.Companies.Features.GetApplicationMetrics;
 
-/// <summary>
-/// Platform-wide (not scoped to one customer) Application Metrics dashboard (Platform Monitoring
-/// epic). Same defense-in-depth allow-list gate as GetSystemHealthHandler/ListBackgroundJobsHandler
-/// (see their remarks) — no first-class platform-administrator identity model exists yet.
-///
-/// Combines real historical data (signups, document uploads — grouped by day directly from source
-/// tables) with a daily append-only snapshot (PlatformMetricsSnapshot) for metrics that have no
-/// other historical record (active companies/users, storage, cumulative succeeded jobs). The
-/// snapshot is written at most once per calendar day, on-demand, the first time an admin views this
-/// dashboard that day.
-/// </summary>
 internal sealed class GetApplicationMetricsHandler(
     CompaniesDbContext companiesDbContext,
     PlatformDbContext platformDbContext,

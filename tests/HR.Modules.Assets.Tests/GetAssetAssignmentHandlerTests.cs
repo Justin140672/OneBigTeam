@@ -107,7 +107,7 @@ public class GetAssetAssignmentHandlerTests
 
         var result = await handler.HandleAsync(new GetAssetAssignmentRequest
         {
-            CompanyId = Guid.NewGuid(), // different company
+            CompanyId = Guid.NewGuid(),
             AssetId = assetId,
             Id = assignmentId
         }, CancellationToken.None);
@@ -126,7 +126,7 @@ public class GetAssetAssignmentHandlerTests
         var result = await handler.HandleAsync(new GetAssetAssignmentRequest
         {
             CompanyId = companyId,
-            AssetId = Guid.NewGuid(), // different asset
+            AssetId = Guid.NewGuid(),
             Id = assignmentId
         }, CancellationToken.None);
 

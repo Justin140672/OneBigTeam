@@ -21,7 +21,6 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
         }
         catch
         {
-            // best-effort test cleanup
         }
     }
 
@@ -67,7 +66,6 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
         Assert.False(Directory.Exists(archiveDir));
         Assert.Empty(Directory.GetDirectories(_root));
 
-        // Dispose is idempotent.
         workspace.Dispose();
     }
 
@@ -77,7 +75,6 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
         var factory = Factory(Tiny(maxArchive: 1000));
         using var workspace = factory.CreateWorkspace(Guid.NewGuid());
 
-        // Boundary: exactly at the ceiling is allowed; strictly greater is refused.
         workspace.EnsureWithinBudget(0);
         workspace.EnsureWithinBudget(999);
         workspace.EnsureWithinBudget(1000);
@@ -100,7 +97,6 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
             () => factory.CreateWorkspace(Guid.NewGuid()));
         Assert.Contains("working storage is full", ex.Message);
 
-        // Nothing new was created.
         Assert.Empty(Directory.GetDirectories(_root));
     }
 
@@ -110,7 +106,6 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
         Directory.CreateDirectory(_root);
         File.WriteAllBytes(Path.Combine(_root, "existing-archive.bin"), new byte[1000]);
 
-        // Reservation unit = Min(maxArchive, maxTotal) = 512, so used (1000) + unit (512) = 1512 <= 4096.
         var factory = Factory(Tiny(maxArchive: 512, maxTotal: 4096));
 
         using var workspace = factory.CreateWorkspace(Guid.NewGuid());
@@ -122,7 +117,6 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
     [Fact]
     public void A_second_concurrent_CreateWorkspace_Is_Refused_When_Two_Reservation_Units_Exceed_The_Total()
     {
-        // unit = 1000; maxTotal = 1500 -> one build fits, a second concurrent one does not.
         var factory = Factory(Tiny(maxArchive: 1000, maxTotal: 1500));
 
         using var first = factory.CreateWorkspace(Guid.NewGuid());
@@ -131,7 +125,6 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
             () => factory.CreateWorkspace(Guid.NewGuid()));
         Assert.Contains("cannot be reserved", ex.Message);
 
-        // Only the first build's directory exists; the refused call created nothing.
         Assert.Single(Directory.GetDirectories(_root));
     }
 
@@ -154,7 +147,6 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
     public void Pre_Existing_Orphan_Bytes_Count_Against_The_Reservation_Even_With_No_Outstanding_Reservations()
     {
         Directory.CreateDirectory(_root);
-        // 1200 orphan bytes on disk + a 1000-byte reservation unit > 1500 total, with _reservedBytes == 0.
         File.WriteAllBytes(Path.Combine(_root, "orphan.bin"), new byte[1200]);
 
         var factory = Factory(Tiny(maxArchive: 1000, maxTotal: 1500));
@@ -174,8 +166,6 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
         {
             var workspace = factory.CreateWorkspace(Guid.NewGuid());
 
-            // Delete the directory out from under the workspace so Dispose's delete is a no-op,
-            // then dispose twice — the reservation must still be released exactly once.
             using (var archive = workspace.OpenArchiveStream())
             {
                 archive.Write("x"u8);
@@ -188,7 +178,6 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
             workspace.Dispose();
         }
 
-        // If any of the 5 iterations leaked its reservation, this final acquire would be refused.
         using var final = factory.CreateWorkspace(Guid.NewGuid());
         Assert.NotNull(final);
     }
@@ -196,7 +185,6 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
     [Fact]
     public void Three_Reservations_Fit_And_The_Fourth_Is_Refused_When_Sized_For_Exactly_Three()
     {
-        // unit = 1000, total = 3500 -> exactly three concurrent builds fit (3000 <= 3500), a fourth does not.
         var factory = Factory(Tiny(maxArchive: 1000, maxTotal: 3500));
 
         var a = factory.CreateWorkspace(Guid.NewGuid());
@@ -233,7 +221,6 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
         Assert.False(Directory.Exists(staleDir));
         Assert.True(Directory.Exists(freshDir));
 
-        // Idempotent: a second sweep removes nothing more.
         Assert.Equal(0, factory.SweepOrphans(now));
     }
 
@@ -246,7 +233,6 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
         Directory.CreateDirectory(_root);
         var boundaryDir = Path.Combine(_root, "boundary-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(boundaryDir);
-        // cutoff == now - 6h; the implementation keeps dirs with LastWriteTimeUtc >= cutoff.
         Directory.SetLastWriteTimeUtc(boundaryDir, now.UtcDateTime.AddHours(-6));
 
         Assert.Equal(0, factory.SweepOrphans(now));
@@ -281,7 +267,6 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
     [Fact]
     public void Bytes_Inside_An_Active_Workspace_Are_Not_Double_Counted_Against_The_Next_Reservation()
     {
-        // total 2600, unit = Min(1200, 2600) = 1200.
         var factory = Factory(Tiny(maxArchive: 1200, maxTotal: 2600));
 
         var first = factory.CreateWorkspace(Guid.NewGuid());
@@ -291,9 +276,6 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
             archive.Flush();
         }
 
-        // Old (buggy) accounting: 300 bytes on disk + 1200 (first reservation) + 1200 = 2700 > 2600 -> threw.
-        // Corrected accounting: those 300 bytes live inside the still-active workspace dir, so orphan = 0;
-        //                       0 + 1200 + 1200 = 2400 <= 2600 -> the second build is admitted.
         var second = factory.CreateWorkspace(Guid.NewGuid());
         Assert.NotNull(second);
 
@@ -315,7 +297,6 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
 
         var second = factory.CreateWorkspace(Guid.NewGuid());
 
-        // 0 orphan + 2400 active reservations + 1200 requested = 3600 > 2600.
         var ex = Assert.Throws<OrganisationDataExportTempCapacityException>(
             () => factory.CreateWorkspace(Guid.NewGuid()));
         Assert.Contains("cannot be reserved", ex.Message);
@@ -336,7 +317,6 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
 
         var first = factory.CreateWorkspace(Guid.NewGuid());
 
-        // 300 orphan + 1200 active + 1200 requested = 2700 > 2600.
         var ex = Assert.Throws<OrganisationDataExportTempCapacityException>(
             () => factory.CreateWorkspace(Guid.NewGuid()));
         Assert.Contains("cannot be reserved", ex.Message);
@@ -354,7 +334,6 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
 
         var first = factory.CreateWorkspace(Guid.NewGuid());
 
-        // 100 orphan + 1200 active + 1200 requested = 2500 <= 2600 -> admitted.
         var second = factory.CreateWorkspace(Guid.NewGuid());
         Assert.NotNull(second);
 
@@ -365,7 +344,6 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
     [Fact]
     public void Concurrent_Admission_Never_Exceeds_The_Budget()
     {
-        // total 3500, unit 1000 -> exactly three of N concurrent callers may be admitted.
         var factory = Factory(Tiny(maxArchive: 1000, maxTotal: 3500));
         const int callers = 8;
         const int expectedWinners = 3;
@@ -399,18 +377,15 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
     [Fact]
     public void Success_Then_Dispose_Then_Reacquire_Cycles_Never_Leak_The_Single_Slot()
     {
-        // room for exactly one build (unit = total = 1000).
         var factory = Factory(Tiny(maxArchive: 1000, maxTotal: 1000));
 
         for (var i = 0; i < 6; i++)
         {
             var ws = factory.CreateWorkspace(Guid.NewGuid());
 
-            // While this one is live the budget is full.
             Assert.Throws<OrganisationDataExportTempCapacityException>(
                 () => factory.CreateWorkspace(Guid.NewGuid()));
 
-            // For the factory, "failure / cancellation" == the caller disposing without completing.
             ws.Dispose();
         }
 
@@ -421,7 +396,6 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
     [Fact]
     public void Repeated_Disposal_Frees_Exactly_One_Slot_Not_Two()
     {
-        // unit 1000, total 2000 -> exactly two concurrent builds.
         var factory = Factory(Tiny(maxArchive: 1000, maxTotal: 2000));
 
         var a = factory.CreateWorkspace(Guid.NewGuid());
@@ -430,11 +404,9 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
         a.Dispose();
         a.Dispose(); // a second disposal must NOT release a second reservation
 
-        // Exactly one slot was freed: one build fits...
         var c = factory.CreateWorkspace(Guid.NewGuid());
         Assert.NotNull(c);
 
-        // ...but a second does not — proving the double Dispose did not also free b's slot.
         Assert.Throws<OrganisationDataExportTempCapacityException>(
             () => factory.CreateWorkspace(Guid.NewGuid()));
 
@@ -448,22 +420,16 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
     [Fact]
     public void Files_A_Failed_Cleanup_Left_Behind_Revert_To_Counting_As_Orphan_Bytes()
     {
-        // unit 1000, total 1500 -> one build plus at most ~500 orphan bytes.
         var factory = Factory(Tiny(maxArchive: 1000, maxTotal: 1500));
 
         var ws = factory.CreateWorkspace(Guid.NewGuid());
 
-        // Hold the archive handle open (FileShare.None) so Dispose's Directory.Delete throws and is
-        // swallowed: the reservation is released but the 800 bytes stay on disk.
         var held = ws.OpenArchiveStream();
         held.Write(new byte[800]);
         held.Flush();
 
         ws.Dispose();
 
-        // On Windows the open handle makes Directory.Delete fail and the leftover survives. On Linux an
-        // open handle does not block deletion, so the scenario under test — "a failed cleanup left
-        // files behind" — has to be recreated explicitly to stay OS-independent.
         if (Directory.GetDirectories(_root).Length == 0)
         {
             var leftover = Directory.CreateDirectory(Path.Combine(_root, Guid.NewGuid().ToString("N")));
@@ -472,8 +438,6 @@ public sealed class OrganisationDataExportWorkspaceFactoryTests : IDisposable
 
         try
         {
-            // Dir is no longer active -> its 800 bytes now count as orphan.
-            // 800 orphan + 0 active + 1000 requested = 1800 > 1500.
             var ex = Assert.Throws<OrganisationDataExportTempCapacityException>(
                 () => factory.CreateWorkspace(Guid.NewGuid()));
             Assert.Contains("cannot be reserved", ex.Message);

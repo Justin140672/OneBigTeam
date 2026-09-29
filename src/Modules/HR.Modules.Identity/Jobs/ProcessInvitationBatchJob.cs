@@ -8,15 +8,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Identity.Jobs;
 
-/// <summary>
-/// Bulk employee invitations: processes one <see cref="InvitationBatch"/>'s recipients, sequentially
-/// (never in parallel — see remarks on respecting the underlying email provider's own rate limits).
-/// Resumable: on (re-)entry this loads every recipient still Waiting OR Processing, so a recipient
-/// left "Processing" by a crashed prior run (job process killed mid-loop) is picked up again rather
-/// than skipped. One recipient's failure never aborts the loop — each is wrapped in its own
-/// try/catch, with unexpected exceptions logged and the recipient marked Failed rather than letting
-/// the whole job blow up.
-/// </summary>
 internal sealed class ProcessInvitationBatchJob(
     IdentityDbContext db,
     IClock clock,
@@ -41,8 +32,6 @@ internal sealed class ProcessInvitationBatchJob(
         batch.MarkProcessing(now);
         await db.SaveChangesAsync(cancellationToken);
 
-        // Re-check eligibility once for the whole batch — cheaper than a per-recipient candidate
-        // lookup, and candidates don't change mid-loop for any single run.
         var candidates = await inviteCandidateReader.GetCandidatesAsync(batch.CompanyId, cancellationToken);
         var candidatesById = candidates.ToDictionary(c => c.EmployeeId);
 
@@ -85,10 +74,6 @@ internal sealed class ProcessInvitationBatchJob(
         recipient.MarkProcessing();
         await db.SaveChangesAsync(cancellationToken);
 
-        // Second eligibility recheck ("before processing" — the endpoint already performed the
-        // first, "before queuing" recheck). Current DB state may have changed since the batch was
-        // queued (e.g. the employee accepted a different invite, or an account was created another
-        // way in the meantime).
         if (!candidatesById.ContainsKey(recipient.EmployeeId))
         {
             recipient.MarkSkipped("NotEligible", clock.UtcNow);
@@ -143,8 +128,6 @@ internal sealed class ProcessInvitationBatchJob(
 
         if (recipient.InviteId is { } existingInviteId)
         {
-            // A previous run already created the UserInvite but crashed/failed before the email
-            // send was confirmed — reuse it rather than creating a second one for this recipient.
             var existing = await db.UserInvites.SingleOrDefaultAsync(i => i.Id == existingInviteId, cancellationToken);
             if (existing is null)
             {
@@ -159,9 +142,6 @@ internal sealed class ProcessInvitationBatchJob(
         else
         {
             var now = clock.UtcNow;
-            // Bulk invitations grant only the standard Employee role — an empty RoleIds list falls
-            // back to the base Employee role on acceptance (see UserInvite.PendingRoleIds remarks);
-            // no administrative roles are ever granted from this job.
             invite = UserInvite.Create(recipient.EmployeeId, batch.CompanyId, recipient.Email, now, roleIds: [], batch.RequestedByUserId);
             db.UserInvites.Add(invite);
 
@@ -185,8 +165,6 @@ internal sealed class ProcessInvitationBatchJob(
         if (emailSent)
         {
             recipient.MarkSent(processedAt);
-            // Drives CompanyOnboarding's "Invite your team" completion rule the same way the
-            // individual invite flow does — see UserInvite.MarkEmailSent remarks.
             invite.MarkEmailSent(processedAt);
             await db.SaveChangesAsync(cancellationToken);
 

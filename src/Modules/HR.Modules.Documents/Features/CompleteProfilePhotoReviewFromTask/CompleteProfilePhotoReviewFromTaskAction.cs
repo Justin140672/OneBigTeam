@@ -44,11 +44,6 @@ internal sealed class CompleteProfilePhotoReviewFromTaskAction(
             return Result.Failure(Error.Validation(
                 "A decision (Approve or Reject) is required to complete a profile photo review."));
 
-        // The task's SourceEntityId is the PendingProfilePhoto.Id captured when the task was
-        // created. Re-resolving the employee from it (rather than trusting an employee id supplied
-        // separately) both finds who the review is for and — combined with ProfilePhotoReviewer's
-        // own re-query by (CompanyId, EmployeeId) — ensures a stale/completed task can never be
-        // replayed into approving/rejecting a submission that has since moved on.
         var pendingPhoto = await db.PendingProfilePhotos
             .AsNoTracking()
             .FirstOrDefaultAsync(

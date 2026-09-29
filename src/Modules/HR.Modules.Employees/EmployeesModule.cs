@@ -149,15 +149,10 @@ public static class EmployeesModule
             "process-promotions",
             job => job.ExecuteAsync(),
             Cron.Daily(0));
-        // P1 fix: reconciliation sweep for former employees whose access disablement was never
-        // relayed to Identity before OnEmployeeDepartureFinalised existed — see job remarks.
         jobManager.AddOrUpdate<ReconcileFormerEmployeeAccessJob>(
             "reconcile-former-employee-access",
             job => job.ExecuteAsync(),
             Cron.Daily(1));
-        // Reliability follow-up: recovers EmployeeManagerChangedIntegrationEvent deliveries lost
-        // when the manager-departure cascade was interrupted between saving the reassignment and
-        // publishing the event — see PendingManagerChangedEvent and the job's own remarks.
         jobManager.AddOrUpdate<ReconcilePendingManagerChangedEventsJob>(
             "reconcile-pending-manager-changed-events",
             job => job.ExecuteAsync(),
@@ -216,9 +211,6 @@ public static class EmployeesModule
 
         services.AddScoped<CreateEmployeeHandler>();
         services.AddScoped<IValidator<CreateEmployeeRequest>, CreateEmployeeValidator>();
-        // ICompanyEmployeeNumberSettingsReader and IEmployeeNumberGenerator are registered by
-        // CompaniesModule (they are implemented in HR.Modules.Companies, the owning module for
-        // company settings); Employees only depends on the Infrastructure.Abstractions interfaces.
 
         services.AddScoped<IEmployeeRenumberingService, EmployeeRenumberingService>();
 
@@ -413,9 +405,6 @@ public static class EmployeesModule
         services.AddScoped<IValidator<GetEmployeeTimelineRequest>, GetEmployeeTimelineValidator>();
         services.AddScoped<IEmployeeTimelineWriter, EmployeeTimelineWriter>();
 
-        // Wave 2a: cross-module timeline-populating integration event handlers. All handlers live
-        // in Employees regardless of which module publishes the event (see architecture note in
-        // GetEmployeeTimeline/EmployeeTimelineWriter).
         services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, EmployeeCreatedHandler>();
         services.AddScoped<IIntegrationEventHandler<EmployeePromotedIntegrationEvent>, EmployeePromotedHandler>();
         services.AddScoped<IIntegrationEventHandler<EmployeeManagerChangedIntegrationEvent>, ManagerChangedHandler>();
@@ -470,7 +459,6 @@ public static class EmployeesModule
         services.AddScoped<IWorkloadActionProvider, UpcomingEmployeeStartDatesWorkloadActionProvider>();
         services.AddScoped<IWorkloadActionProvider, UpcomingEmployeeLeavingDatesWorkloadActionProvider>();
 
-        // Getting Started checklist task definitions (HR.Modules.CompanyOnboarding epic, Phase A).
         services.AddScoped<IOnboardingTaskDefinition, DownloadEmployeeImportTemplateTask>();
         services.AddScoped<IOnboardingTaskDefinition, ImportEmployeesTask>();
         services.AddScoped<IOnboardingTaskDefinition, CompleteEmployeeRecordTask>();
@@ -484,14 +472,6 @@ public static class EmployeesModule
         await db.Database.MigrateAsync();
     }
 
-    /// <summary>
-    /// The deterministic Acme "arrange-data" employees seeded only for the Playwright E2E run
-    /// (see <see cref="SeedEmployeesAsync"/>'s <c>includeE2eTestPool</c> path). Exposed so the
-    /// API host can also hand these ids/names to the Onboarding module's E2E plan seeder without
-    /// re-declaring the GUID scheme. Mirrored verbatim in
-    /// tests/HR.Web.E2E.Tests/Infrastructure/SeededE2eEmployees.cs — keep the two in sync.
-    /// GUID scheme: 3E2E0000-0000-0000-0000-0000000000NN (NN = two-digit index).
-    /// </summary>
     public static readonly IReadOnlyList<(int Index, Guid Id, string LastName, string Email, string EmployeeNumber, bool ManagedByDavidPark)> E2eTestPool =
         BuildE2eTestPool();
 
@@ -540,7 +520,6 @@ public static class EmployeesModule
 
         var now = DateTimeOffset.UtcNow;
 
-        // ── Nationalities (global reference data) ─────────────────────────────
         if (!await db.Nationalities.AnyAsync())
         {
             string[] names =
@@ -566,11 +545,9 @@ public static class EmployeesModule
             await db.SaveChangesAsync();
         }
 
-        // ── Acme Corporation ─────────────────────────────────────────────────
         var acmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
         if (!await db.Employees.AnyAsync(e => e.CompanyId == acmeId))
         {
-            // Seed employment types for Acme
             var etPermId      = Guid.Parse("40000000-0000-0000-0000-000000000001");
             var etFixedTermId = Guid.Parse("40000000-0000-0000-0000-000000000002");
             var etContractId  = Guid.Parse("40000000-0000-0000-0000-000000000003");
@@ -595,15 +572,9 @@ public static class EmployeesModule
                 Department.Create(deptFinanceId, acmeId, "Finance",       "Finance and accounting",         now),
                 Department.Create(deptSalesId,   acmeId, "Sales",         "Sales and account management",   now));
 
-            // A single seeded office location, referenced by one position profile below so
-            // the "position profile defaults" cascade (Department + Location) has real data
-            // to demonstrate in the UI and in E2E coverage.
             var locTypeOfficeId = Guid.Parse("60000000-0000-0000-0000-000000000001");
             var locLondonId     = Guid.Parse("70000000-0000-0000-0000-000000000001");
 
-            // A second Location Type ("Remote") with its own Location ("Home") — so location
-            // data isn't exclusively office-based, e.g. for filters/forms that need more than one
-            // Location Type to demonstrate against.
             var locTypeRemoteId = Guid.Parse("60000000-0000-0000-0000-000000000002");
             var locHomeId       = Guid.Parse("70000000-0000-0000-0000-000000000002");
 
@@ -614,10 +585,6 @@ public static class EmployeesModule
                 Location.Create(locLondonId, acmeId, locTypeOfficeId, "London Office", null, now),
                 Location.Create(locHomeId,   acmeId, locTypeRemoteId, "Home", null, now));
 
-            // Shared with HR.Modules.Leave's seed data (LeaveModule.SeedLeaveAsync) — Employees cannot
-            // reference Leave's DbContext/entities directly (no cross-module DB references), so both
-            // modules seed the same hardcoded LeavePolicy id constant, matching the existing pattern
-            // used for shared CompanyId constants across module seed methods.
             var acmeLeavePolicyId = Guid.Parse("C0000000-0000-0000-0000-000000000001");
 
             var posCtoId        = Guid.Parse("20000000-0000-0000-0000-000000000001");
@@ -628,8 +595,6 @@ public static class EmployeesModule
             var posFinanceMgrId = Guid.Parse("20000000-0000-0000-0000-000000000006");
             var posSalesMgrId   = Guid.Parse("20000000-0000-0000-0000-000000000007");
             var posAeId         = Guid.Parse("20000000-0000-0000-0000-000000000008");
-            // Priya Shah (see below) is a Company Administrator, not a line role in the org chart —
-            // she still needs a real position/department pair like any other employee.
             var posCfoId        = Guid.Parse("20000000-0000-0000-0000-000000000009");
             // Deliberately unoccupied — no MakeAcme(...) employee below is assigned this profile.
             // Used by VacancyDetail's "New Vacancy" Position Profile dropdown, which filters to
@@ -645,12 +610,6 @@ public static class EmployeesModule
             // permanently hide it from those unrelated tests for the rest of the run (see
             // CreateEmployeeTests and EmployeePromotionTabTests).
             var posQaEngId = Guid.Parse("20000000-0000-0000-0000-00000000000B");
-            // "Senior Software Engineer" (posSenDevId) MUST stay unoccupied at seed time — many
-            // Recruitment E2E tests select it in VacancyDetail's "New Vacancy" Position Profile
-            // dropdown, which excludes any profile with a currently-active holder (see
-            // VacancyDetail.OnLoadedAsync), and several other test files' comments rely on that.
-            // James Okafor and Priya Sharma (the two seeded senior engineers) sit on this dedicated
-            // profile instead so the seed matches that contract.
             var posPrincipalEngId = Guid.Parse("20000000-0000-0000-0000-00000000000C");
 
             db.PositionProfiles.AddRange(
@@ -677,10 +636,6 @@ public static class EmployeesModule
             var empSalesMgrId = Guid.Parse("30000000-0000-0000-0000-000000000008");
             var empAe1Id      = Guid.Parse("30000000-0000-0000-0000-000000000009");
             var empAe2Id      = Guid.Parse("30000000-0000-0000-0000-000000000010");
-            // Must equal the ApplicationUser id IdentityModule seeds for Priya Shah (Company
-            // Administrator) — GetMyEmployeeHandler resolves "my employee record" by matching the
-            // signed-in user's id directly against Employee.Id, so without a real Employee row at
-            // this exact id she'd have no employee record at all despite holding the Employee role.
             var empCfoId      = Guid.Parse("30000000-0000-0000-0000-000000000013");
 
             Employee MakeAcme(Guid id, string first, string last, string email, DateOnly start,
@@ -731,12 +686,6 @@ public static class EmployeesModule
 
             db.Compensations.AddRange(ctoStartingSalary, ctoCurrentSalary);
 
-            // Every employee needs at least one starting Compensation record and one "Employee
-            // joined" Timeline entry — CreateEmployeeHandler/EmployeeCreatedHandler produce both
-            // automatically for employees created through the app, but these employees are
-            // inserted directly via db.Employees.AddRange above and bypass that handler entirely,
-            // so both need to be seeded explicitly here. Sarah Chen (CTO) already has her own
-            // compensation history above and is included below only for her timeline entry.
             var newHireCompensation = new (Guid EmployeeId, DateOnly StartDate, decimal Salary)[]
             {
                 (empSenDev1Id,  new DateOnly(2021, 3, 15),  85000m),
@@ -783,11 +732,6 @@ public static class EmployeesModule
                     EmployeeTimelineVisibility.AuthorisedInternal, now));
             }
 
-            // Sarah Chen (empCtoId) gets a handful of additional realistic timeline entries beyond
-            // the plain "Employee joined" every seeded employee already has — she's the longest-
-            // tenured, most-promoted employee in the seed data (joined 2020, promoted to CTO 2023
-            // with her own compensation history above), so her timeline is the natural one for
-            // demoing/screenshotting a fuller history rather than a single-entry timeline.
             db.EmployeeTimelineEntries.AddRange(
                 EmployeeTimelineEntry.Create(
                     Guid.NewGuid(), acmeId, empCtoId, new DateOnly(2020, 4, 6),
@@ -828,13 +772,6 @@ public static class EmployeesModule
 
             await db.SaveChangesAsync();
 
-            // ── E2E test pool ────────────────────────────────────────────────
-            // Deterministic Acme employees consumed as *arrange* by E2E tests that need "an
-            // employee to act on" but aren't testing employee creation. Mirrored verbatim in
-            // tests/HR.Web.E2E.Tests/Infrastructure/SeededE2eEmployees.cs. Only seeded when the
-            // host runs in Development (E2E) — never in Test/Staging/Production. Each pool member
-            // gets the same starting Compensation + "Employee joined" timeline entry every other
-            // seeded employee gets (they bypass CreateEmployeeHandler/EmployeeCreatedHandler).
             if (includeE2eTestPool)
             {
                 var e2eDob = new DateOnly(1990, 6, 15);
@@ -863,11 +800,6 @@ public static class EmployeesModule
                         EmployeeTimelineVisibility.AuthorisedInternal, now));
                 }
 
-                // Nina Patel — the E2E-only dedicated manager persona (see HR.Api's DevPersonaStore
-                // and IdentityModule.SeedDevUserAsync, which give her the Employee + Manager roles
-                // under this same id). ManagerTeamProfileTests grows her team at runtime instead of
-                // James Okafor's, whose seeded single-report team (Tom Williams) other E2E classes
-                // assert on. Mirrored in tests/HR.Web.E2E.Tests/Infrastructure/SeededE2eEmployees.cs.
                 var ninaPatelId = Guid.Parse("30000000-0000-0000-0000-000000000017");
                 db.Employees.Add(MakeAcme(
                     ninaPatelId, "Nina", "Patel", "nina.patel@acme.example", new DateOnly(2022, 1, 10),
@@ -892,7 +824,6 @@ public static class EmployeesModule
 
         await SeedAcmeEqualityDataAsync(db, acmeId, now);
 
-        // ── Beta Corp ─────────────────────────────────────────────────────────
         var betaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
         if (!await db.Employees.AnyAsync(e => e.CompanyId == betaCorpId))
         {
@@ -915,7 +846,6 @@ public static class EmployeesModule
             db.LocationTypes.Add(LocationType.Create(betaLocTypeOfficeId, betaCorpId, "Office", null, now));
             db.Locations.Add(Location.Create(betaLocLeedsId, betaCorpId, betaLocTypeOfficeId, "Leeds Office", null, now));
 
-            // Shared with HR.Modules.Leave's seed data — see the acmeLeavePolicyId comment above.
             var betaLeavePolicyId = Guid.Parse("C0000000-0000-0000-0000-000000000002");
 
             db.PositionProfiles.AddRange(
@@ -943,17 +873,10 @@ public static class EmployeesModule
             db.Employees.AddRange(
                 MakeBeta(betaEmpMgrId, "Alice", "Morgan", "alice.morgan@betacorp.example", new DateOnly(2022, 3, 1), betaPosEngMgrId, null,         new DateOnly(1987, 5, 20),  "British", "Female", "alice.morgan@gmail.com", "07700 900021", "33 Headingley Lane", null,     "Leeds", "West Yorkshire", "LS6 1BL", "BETA-001", betaEtPermId),
                 MakeBeta(betaEmpDevId, "Bob",   "Taylor", "bob.taylor@betacorp.example",   new DateOnly(2023, 9, 4), betaPosDevId,    betaEmpMgrId, new DateOnly(1993, 10, 11), "British", "Male",   "bob.taylor@hotmail.com", "07700 900022", "7 Kirkstall Road",   "Flat 2", "Leeds", "West Yorkshire", "LS3 1LH", "BETA-002", betaEtPermId),
-                // HR Administrator for Beta Corp — gives HrSettingsPageTests (which mutates the
-                // shared CompanySettings row's Employee Numbering mode mid-test) a tenant fully
-                // isolated from every other role-fixed test's Acme-based employee creation, rather
-                // than racing them on Acme's own shared settings row.
                 MakeBeta(betaEmpHrId,  "Grace", "Kim",    "grace.kim@betacorp.example",     new DateOnly(2021, 6, 1), betaPosEngMgrId, null,         new DateOnly(1985, 2, 14),  "British", "Female", "grace.kim@gmail.com",   "07700 900023", "12 Kirkgate",        null,     "Leeds", "West Yorkshire", "LS1 6BY", "BETA-003", betaEtPermId));
 
             await db.SaveChangesAsync();
 
-            // Same rationale as the Acme block above — every employee needs a starting
-            // Compensation record and an "Employee joined" Timeline entry, and seeded employees
-            // bypass CreateEmployeeHandler entirely.
             var betaNewHireCompensation = new (Guid EmployeeId, DateOnly StartDate, decimal Salary)[]
             {
                 (betaEmpMgrId, new DateOnly(2022, 3, 1),  78000m),
@@ -1022,20 +945,19 @@ public static class EmployeesModule
 
         Guid Emp(string tail) => Guid.Parse($"30000000-0000-0000-0000-0000000000{tail}");
 
-        // (employeeId, gender, ethnicGroup, disability, sexualOrientation, religion, caring, marital)
         var permanentAnswers = new (Guid Id, string? Gender, string? Ethnic, string? Disability,
             string? Orientation, string? Religion, string? Caring, string? Marital)[]
         {
-            (Emp("01"), woman, asian, no,   hetero, noReligion, caringNo,  marriedYes), // Sarah Chen
-            (Emp("02"), man,   black, no,   hetero, christian,  caringNo,  marriedNo),  // James Okafor
-            (Emp("03"), woman, asian, no,   hetero, muslim,     caringYes, marriedNo),  // Priya Sharma
-            (Emp("04"), man,   white, null, hetero, noReligion, caringNo,  marriedNo),  // Tom Williams
-            (Emp("05"), woman, white, no,   hetero, noReligion, caringNo,  marriedYes), // Laura Bennett
-            (Emp("06"), man,   black, no,   hetero, christian,  caringNo,  marriedNo),  // Marcus Diallo
-            (Emp("07"), woman, white, no,   null,   noReligion, caringYes, marriedYes), // Sophie Laurent
-            (Emp("08"), man,   white, no,   hetero, christian,  caringYes, marriedYes), // David Park
-            (Emp("10"), man,   white, no,   null,   noReligion, caringYes, marriedNo),  // Carlos Rivera
-            (Emp("13"), woman, asian, null, hetero, christian,  caringYes, marriedYes), // Priya Shah
+            (Emp("01"), woman, asian, no,   hetero, noReligion, caringNo,  marriedYes),
+            (Emp("02"), man,   black, no,   hetero, christian,  caringNo,  marriedNo),
+            (Emp("03"), woman, asian, no,   hetero, muslim,     caringYes, marriedNo),
+            (Emp("04"), man,   white, null, hetero, noReligion, caringNo,  marriedNo),
+            (Emp("05"), woman, white, no,   hetero, noReligion, caringNo,  marriedYes),
+            (Emp("06"), man,   black, no,   hetero, christian,  caringNo,  marriedNo),
+            (Emp("07"), woman, white, no,   null,   noReligion, caringYes, marriedYes),
+            (Emp("08"), man,   white, no,   hetero, christian,  caringYes, marriedYes),
+            (Emp("10"), man,   white, no,   null,   noReligion, caringYes, marriedNo),
+            (Emp("13"), woman, asian, null, hetero, christian,  caringYes, marriedYes),
         };
 
         var permanentIds = permanentAnswers.Select(a => a.Id).ToHashSet();
@@ -1060,7 +982,6 @@ public static class EmployeesModule
                 continue;
             }
 
-            // Emma Jones (…09) and ~18% of the E2E pool volunteer no record at all.
             if (employeeId == Emp("09") || SeedRoll(employeeId, 0) >= 82)
                 continue;
 
@@ -1097,11 +1018,6 @@ public static class EmployeesModule
         await db.SaveChangesAsync();
     }
 
-    /// <summary>
-    /// Deterministic 0-99 roll from an employee id and a field salt (stable FNV-1a over the id
-    /// bytes — unlike <see cref="HashCode"/> it does not vary per process, so seed data is
-    /// identical on every run).
-    /// </summary>
     private static int SeedRoll(Guid id, int salt)
     {
         unchecked
@@ -1114,7 +1030,6 @@ public static class EmployeesModule
         }
     }
 
-    /// <summary>Picks one weighted option deterministically for the given employee id / field salt.</summary>
     private static string SeedPick(Guid id, int salt, params (string Value, int Weight)[] options)
     {
         var roll = SeedRoll(id, salt);

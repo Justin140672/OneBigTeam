@@ -8,11 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Tests;
 
-/// <summary>
-/// OBT-721 workload action provider tests for employee accounts awaiting disablement. HR-only.
-/// Composes IOffboardingReportReader (employees past their LastWorkingDay, plan not yet
-/// Completed) with IdentityDbContext.Users (still-active accounts for those employees).
-/// </summary>
 public class EmployeeAccountsAwaitingDisablementWorkloadActionProviderTests
 {
     private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow.Date);

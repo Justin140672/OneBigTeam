@@ -5,9 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-// LEAVE-07: direct (non-draft) SubmitLeaveRequest auto-approves immediately when the employee's
-// assigned leave policy has RequiresApproval = false, instead of leaving the request Pending for
-// manual review.
 [Collection("Integration")]
 public class LeaveRequestApprovalPolicyEndpointTests
 {

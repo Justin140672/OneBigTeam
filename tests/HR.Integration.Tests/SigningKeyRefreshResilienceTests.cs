@@ -34,9 +34,6 @@ public sealed class SigningKeyRefreshResilienceTests
     private const string Issuer = "https://test-project.supabase.co/auth/v1";
     private const string Audience = "authenticated";
 
-    // ---------------------------------------------------------------------
-    // 1. Happy path
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task Valid_rs256_token_signed_by_a_published_key_is_accepted()
@@ -62,9 +59,6 @@ public sealed class SigningKeyRefreshResilienceTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    // ---------------------------------------------------------------------
-    // 2. Anonymous
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task Secure_endpoint_without_a_token_is_401_while_anonymous_endpoint_is_200()
@@ -77,9 +71,6 @@ public sealed class SigningKeyRefreshResilienceTests
         Assert.Equal(HttpStatusCode.OK, (await host.Client.GetAsync("/anon")).StatusCode);
     }
 
-    // ---------------------------------------------------------------------
-    // 3-7. Token validation failures
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task Token_signed_with_a_key_that_is_not_published_is_rejected()
@@ -88,7 +79,6 @@ public sealed class SigningKeyRefreshResilienceTests
         await using var keyServer = await ControlledKeyServer.StartAsync(published);
         await using var host = await AuthTestHost.StartAsync(keyServer.JwksUrl);
 
-        // kid matches the published key, but the signing material does not.
         var forged = Mint(published, overrideCredentials: RsaCredentialsWithKid("rsa-1"));
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await host.GetSecureAsync(forged)).StatusCode);
@@ -137,15 +127,11 @@ public sealed class SigningKeyRefreshResilienceTests
         await using var keyServer = await ControlledKeyServer.StartAsync(key);
         await using var host = await AuthTestHost.StartAsync(keyServer.JwksUrl);
 
-        // HS256 is never in the real-path ValidAlgorithms (ES256/RS256 only).
         var token = Mint(key, overrideCredentials: Hs256CredentialsWithKid("rsa-1"));
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await host.GetSecureAsync(token)).StatusCode);
     }
 
-    // ---------------------------------------------------------------------
-    // 8. Unknown kid -> exactly one bounded refresh + retry, storm-capped
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task Unknown_kid_triggers_one_bounded_refresh_then_repeated_unknown_kids_are_throttled()
@@ -155,17 +141,13 @@ public sealed class SigningKeyRefreshResilienceTests
         await using var keyServer = await ControlledKeyServer.StartAsync(keyA);
         await using var host = await AuthTestHost.StartAsync(keyServer.JwksUrl);
 
-        // Cold fetch: exactly one upstream hit.
         Assert.Equal(HttpStatusCode.OK, (await host.GetSecureAsync(Mint(keyA))).StatusCode);
         Assert.Equal(1, keyServer.Hits);
 
-        // Rotate B in as the active key, present a B token: one refresh, then 200. The delay clears
-        // the inner manager's 1s real-time fetch floor so the single forced refresh actually runs.
         keyServer.Publish(keyB);
         await Task.Delay(TimeSpan.FromMilliseconds(1200));
         Assert.Equal(HttpStatusCode.OK, await EventuallyStatusAsync(host, keyB, HttpStatusCode.OK));
 
-        // Refresh storm: many distinct unknown kids inside the RefreshInterval window.
         var hitsBeforeStorm = keyServer.Hits;
         for (var i = 0; i < 10; i++)
         {
@@ -178,9 +160,6 @@ public sealed class SigningKeyRefreshResilienceTests
             $"refresh storm should add at most one upstream fetch, added {keyServer.Hits - hitsBeforeStorm}");
     }
 
-    // ---------------------------------------------------------------------
-    // 9. Cold start, upstream down -> fail closed, promptly
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task Cold_start_with_upstream_returning_503_fails_closed_without_hanging()
@@ -199,9 +178,6 @@ public sealed class SigningKeyRefreshResilienceTests
         Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(15), $"took {stopwatch.Elapsed}");
     }
 
-    // ---------------------------------------------------------------------
-    // 10. Key rotation with standby, no host restart
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task Key_rotation_with_a_standby_key_is_picked_up_without_restarting_the_host()
@@ -213,23 +189,15 @@ public sealed class SigningKeyRefreshResilienceTests
 
         Assert.Equal(HttpStatusCode.OK, (await host.GetSecureAsync(Mint(keyA))).StatusCode);
 
-        // Standby: both keys published, tokens still signed by A.
         keyServer.Publish(keyA, keyB);
         Assert.Equal(HttpStatusCode.OK, (await host.GetSecureAsync(Mint(keyA))).StatusCode);
 
-        // A retired, B now active; first B token is an unknown-kid -> one refresh -> accepted. The
-        // delay clears the inner manager's 1s real-time fetch floor.
         keyServer.Publish(keyB);
         await Task.Delay(TimeSpan.FromMilliseconds(1200));
 
-        // The unknown kid triggers a background refresh; IdentityModel does not guarantee it lands on
-        // the triggering request, so a subsequent request must succeed with no restart.
         Assert.Equal(HttpStatusCode.OK, await EventuallyStatusAsync(host, keyB, HttpStatusCode.OK));
     }
 
-    // ---------------------------------------------------------------------
-    // 11. Malformed JWKS -> keep serving last-known-good, warn
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task Malformed_jwks_document_keeps_last_known_good_keys_and_logs_a_warning()
@@ -241,15 +209,11 @@ public sealed class SigningKeyRefreshResilienceTests
         Assert.Equal(HttpStatusCode.OK, (await host.GetSecureAsync(Mint(keyA))).StatusCode);
 
         keyServer.GoMalformed();
-        // Inner ConfigurationManager keeps a 1s real-time floor between fetches.
         await Task.Delay(TimeSpan.FromMilliseconds(1200));
 
-        // Unknown kid forces the (first, un-throttled) refresh, which fails against the malformed
-        // document.
         var ghost = TestKey.NewRsa("ghost");
         Assert.Equal(HttpStatusCode.Unauthorized, (await host.GetSecureAsync(Mint(ghost))).StatusCode);
 
-        // The good key A still validates from the retained last-known-good configuration.
         Assert.Equal(HttpStatusCode.OK, (await host.GetSecureAsync(Mint(keyA))).StatusCode);
 
         Assert.Contains(
@@ -258,9 +222,6 @@ public sealed class SigningKeyRefreshResilienceTests
                  && m.Contains("Exception", StringComparison.OrdinalIgnoreCase));
     }
 
-    // ---------------------------------------------------------------------
-    // 12. Upstream slow -> requests not blocked, LKG used, pool not starved
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task Slow_upstream_does_not_block_concurrent_requests_that_can_use_cached_keys()
@@ -284,9 +245,6 @@ public sealed class SigningKeyRefreshResilienceTests
         Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(10), $"20 requests took {stopwatch.Elapsed}");
     }
 
-    // ---------------------------------------------------------------------
-    // 13. Outage beyond MaximumCachedKeyAge -> fail closed, promptly, no hang
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task Outage_past_maximum_cached_key_age_fails_closed_promptly()
@@ -301,10 +259,10 @@ public sealed class SigningKeyRefreshResilienceTests
             timeProvider: clock);
 
         Assert.Equal(HttpStatusCode.OK, (await host.GetSecureAsync(Mint(keyA))).StatusCode);
-        await Task.Delay(500); // anchor the freshness timestamp
+        await Task.Delay(500);
 
         keyServer.GoDown();
-        clock.Advance(TimeSpan.FromMinutes(61)); // past MaximumCachedKeyAge
+        clock.Advance(TimeSpan.FromMinutes(61));
 
         var stopwatch = Stopwatch.StartNew();
         var response = await host.GetSecureAsync(Mint(keyA));
@@ -313,7 +271,6 @@ public sealed class SigningKeyRefreshResilienceTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
         Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(8), $"took {stopwatch.Elapsed}");
 
-        // Repeat call also fails closed and does not hang.
         var second = Stopwatch.StartNew();
         var response2 = await host.GetSecureAsync(Mint(keyA));
         second.Stop();
@@ -321,9 +278,6 @@ public sealed class SigningKeyRefreshResilienceTests
         Assert.True(second.Elapsed < TimeSpan.FromSeconds(8), $"took {second.Elapsed}");
     }
 
-    // ---------------------------------------------------------------------
-    // 14. Concurrent first requests -> single upstream fetch (single-flight)
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task Concurrent_cold_requests_result_in_a_single_upstream_key_fetch()
@@ -340,9 +294,6 @@ public sealed class SigningKeyRefreshResilienceTests
         Assert.Equal(1, keyServer.Hits);
     }
 
-    // ---------------------------------------------------------------------
-    // 15. MaximumCachedKeyAge enforcement (injected clock, real bearer pipeline)
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task Just_before_the_max_age_boundary_the_cached_keys_still_authenticate()
@@ -354,7 +305,7 @@ public sealed class SigningKeyRefreshResilienceTests
             keyServer.JwksUrl, maximumCachedKeyAge: TimeSpan.FromHours(10), timeProvider: clock);
 
         Assert.Equal(HttpStatusCode.OK, (await host.GetSecureAsync(Mint(key))).StatusCode);
-        await Task.Delay(500); // anchor the freshness timestamp before advancing the simulated clock
+        await Task.Delay(500);
 
         keyServer.GoDown();
         clock.Advance(TimeSpan.FromHours(10) - TimeSpan.FromMinutes(1));
@@ -372,7 +323,7 @@ public sealed class SigningKeyRefreshResilienceTests
             keyServer.JwksUrl, maximumCachedKeyAge: TimeSpan.FromHours(10), timeProvider: clock);
 
         Assert.Equal(HttpStatusCode.OK, (await host.GetSecureAsync(Mint(key))).StatusCode);
-        await Task.Delay(500); // anchor the freshness timestamp before advancing the simulated clock
+        await Task.Delay(500);
 
         keyServer.GoDown();
         clock.Advance(TimeSpan.FromHours(10));
@@ -389,22 +340,18 @@ public sealed class SigningKeyRefreshResilienceTests
         await using var host = await AuthTestHost.StartAsync(
             keyServer.JwksUrl, maximumCachedKeyAge: TimeSpan.FromHours(10), timeProvider: clock);
 
-        // Warm the cache, then let any secondary cold-start fetch land before the simulated clock
-        // starts moving so the freshness timestamp is firmly anchored at "now".
         Assert.Equal(HttpStatusCode.OK, (await host.GetSecureAsync(Mint(key))).StatusCode);
         await Task.Delay(500);
         keyServer.GoDown();
 
-        // Nine hours of steady, successful traffic - one validation per simulated hour.
         for (var hour = 0; hour < 9; hour++)
         {
             Assert.Equal(HttpStatusCode.OK, (await host.GetSecureAsync(Mint(key))).StatusCode);
             clock.Advance(TimeSpan.FromHours(1));
         }
 
-        clock.Advance(TimeSpan.FromHours(1) + TimeSpan.FromMinutes(1)); // now 10h1m since the only fetch
+        clock.Advance(TimeSpan.FromHours(1) + TimeSpan.FromMinutes(1));
 
-        // If validations had renewed freshness this would still be 200.
         Assert.Equal(HttpStatusCode.Unauthorized, (await host.GetSecureAsync(Mint(key))).StatusCode);
     }
 
@@ -421,11 +368,10 @@ public sealed class SigningKeyRefreshResilienceTests
             timeProvider: clock);
 
         Assert.Equal(HttpStatusCode.OK, (await host.GetSecureAsync(Mint(key))).StatusCode);
-        await Task.Delay(500); // anchor the freshness timestamp
+        await Task.Delay(500);
 
         keyServer.GoDown();
 
-        // Drive a failed forced refresh each simulated hour for 9 hours.
         for (var hour = 0; hour < 9; hour++)
         {
             clock.Advance(TimeSpan.FromHours(1));
@@ -433,12 +379,10 @@ public sealed class SigningKeyRefreshResilienceTests
             Assert.Equal(HttpStatusCode.Unauthorized, (await host.GetSecureAsync(Mint(ghost))).StatusCode);
         }
 
-        // 9h in, still inside the 10h window: the original cached key authenticates.
         Assert.Equal(HttpStatusCode.OK, (await host.GetSecureAsync(Mint(key))).StatusCode);
 
         clock.Advance(TimeSpan.FromHours(1) + TimeSpan.FromMinutes(1));
 
-        // The failed refreshes did not move the freshness timestamp - now closed.
         Assert.Equal(HttpStatusCode.Unauthorized, (await host.GetSecureAsync(Mint(key))).StatusCode);
     }
 
@@ -452,18 +396,15 @@ public sealed class SigningKeyRefreshResilienceTests
             keyServer.JwksUrl, maximumCachedKeyAge: TimeSpan.FromHours(10), timeProvider: clock);
 
         Assert.Equal(HttpStatusCode.OK, (await host.GetSecureAsync(Mint(key))).StatusCode);
-        await Task.Delay(500); // anchor the freshness timestamp
+        await Task.Delay(500);
 
         keyServer.GoDown();
         clock.Advance(TimeSpan.FromHours(11));
         Assert.Equal(HttpStatusCode.Unauthorized, (await host.GetSecureAsync(Mint(key))).StatusCode);
 
-        // Upstream recovers. Allow the inner manager's 1s real-time fetch floor to pass.
         keyServer.Publish(key);
         await Task.Delay(TimeSpan.FromMilliseconds(1200));
 
-        // The refresh triggered here may or may not satisfy the same request; a subsequent request
-        // must succeed with no restart.
         await host.GetSecureAsync(Mint(key));
         var eventual = await host.GetSecureAsync(Mint(key));
         Assert.Equal(HttpStatusCode.OK, eventual.StatusCode);
@@ -481,7 +422,6 @@ public sealed class SigningKeyRefreshResilienceTests
         Assert.Equal(HttpStatusCode.OK, (await host.GetSecureAsync(Mint(key))).StatusCode);
         var hitsAfterColdStart = keyServer.Hits;
 
-        // 9h later, still serving the identical key set. An unknown kid forces a background refresh.
         clock.Advance(TimeSpan.FromHours(9));
         await Task.Delay(TimeSpan.FromMilliseconds(1200));
         var ghost = TestKey.NewRsa("ghost");
@@ -492,10 +432,8 @@ public sealed class SigningKeyRefreshResilienceTests
         }
 
         Assert.True(keyServer.Hits > hitsAfterColdStart, "the forced refresh should have re-fetched");
-        await Task.Delay(300); // let the re-fetch publish its freshness snapshot
+        await Task.Delay(300);
 
-        // 5h after that re-fetch (14h after cold start). Without renewal this would be past the 10h
-        // limit; because the re-fetch renewed freshness, the key still authenticates.
         clock.Advance(TimeSpan.FromHours(5));
         Assert.Equal(HttpStatusCode.OK, (await host.GetSecureAsync(Mint(key))).StatusCode);
     }
@@ -510,19 +448,15 @@ public sealed class SigningKeyRefreshResilienceTests
             keyServer.JwksUrl, maximumCachedKeyAge: TimeSpan.FromHours(10), timeProvider: clock);
 
         Assert.Equal(HttpStatusCode.OK, (await host.GetSecureAsync(Mint(key))).StatusCode);
-        await Task.Delay(500); // anchor the freshness timestamp
+        await Task.Delay(500);
         keyServer.GoDown();
         clock.Advance(TimeSpan.FromHours(5));
 
         var forged = Mint(key, overrideCredentials: RsaCredentialsWithKid("A"));
         Assert.Equal(HttpStatusCode.Unauthorized, (await host.GetSecureAsync(forged)).StatusCode);
-        // Genuine token from the same cache still works.
         Assert.Equal(HttpStatusCode.OK, (await host.GetSecureAsync(Mint(key))).StatusCode);
     }
 
-    // ---------------------------------------------------------------------
-    // 16. E2E local-key path never touches the JWKS network
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task E2E_local_key_path_authenticates_without_any_jwks_fetch()
@@ -546,11 +480,7 @@ public sealed class SigningKeyRefreshResilienceTests
         Assert.Equal(0, keyServer.Hits);
     }
 
-    // =====================================================================
-    // Helpers
-    // =====================================================================
 
-    /// <summary>Minimal manual fake clock - the gate only ever calls <see cref="GetUtcNow"/>.</summary>
     private sealed class FakeTimeProvider : TimeProvider
     {
         private long _ticks;
@@ -562,11 +492,6 @@ public sealed class SigningKeyRefreshResilienceTests
         public void Advance(TimeSpan by) => Interlocked.Add(ref _ticks, by.Ticks);
     }
 
-    /// <summary>
-    /// Polls the secure endpoint until it returns <paramref name="expected"/> or the attempts run out.
-    /// IdentityModel refreshes signing keys on a background task, so the request that triggers a
-    /// refresh is not guaranteed to see its result.
-    /// </summary>
     private static async Task<HttpStatusCode> EventuallyStatusAsync(
         AuthTestHost host, TestKey key, HttpStatusCode expected)
     {
@@ -614,7 +539,6 @@ public sealed class SigningKeyRefreshResilienceTests
             new SymmetricSecurityKey(RandomNumberGenerator.GetBytes(32)) { KeyId = kid },
             SecurityAlgorithms.HmacSha256);
 
-    /// <summary>An in-test signing key plus its public JWK representation.</summary>
     private sealed class TestKey
     {
         public required string Kid { get; init; }
@@ -669,10 +593,6 @@ public sealed class SigningKeyRefreshResilienceTests
         }
     }
 
-    /// <summary>
-    /// A controllable JWKS endpoint on its own dynamic port. Behaviour is switched between requests
-    /// via volatile fields; every hit is counted for single-flight / throttle assertions.
-    /// </summary>
     private sealed class ControlledKeyServer : IAsyncDisposable
     {
         private const int ModeNormal = 0;
@@ -751,10 +671,6 @@ public sealed class SigningKeyRefreshResilienceTests
         private string BuildJwks() => JsonSerializer.Serialize(new { keys = _keys.Select(k => k.Jwk) });
     }
 
-    /// <summary>
-    /// Self-contained Kestrel host running the production Supabase JWT bearer pipeline against a
-    /// caller-supplied JWKS URL.
-    /// </summary>
     private sealed class AuthTestHost : IAsyncDisposable
     {
         private readonly WebApplication _app;
@@ -786,8 +702,6 @@ public sealed class SigningKeyRefreshResilienceTests
                 ["SupabaseAuth:SigningKeyRefresh:RequireHttpsMetadata"] = "false",
                 ["SupabaseAuth:SigningKeyRefresh:KeyFetchTimeout"] =
                     (keyFetchTimeout ?? TimeSpan.FromSeconds(2)).ToString(),
-                // Kept at/above the enforced 30s minimum; timing-sensitive tests inject a fake clock
-                // rather than shortening this.
                 ["SupabaseAuth:SigningKeyRefresh:RefreshInterval"] =
                     (refreshInterval ?? TimeSpan.FromSeconds(30)).ToString(),
                 ["SupabaseAuth:SigningKeyRefresh:AutomaticRefreshInterval"] = "00:15:00",
@@ -846,7 +760,6 @@ public sealed class SigningKeyRefreshResilienceTests
         }
     }
 
-    /// <summary>Captures formatted log messages (message + exception type only) for assertions.</summary>
     private sealed class CapturingLoggerProvider : ILoggerProvider
     {
         public ConcurrentQueue<string> Messages { get; } = new();

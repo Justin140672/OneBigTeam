@@ -8,13 +8,10 @@ namespace HR.Modules.Recruitment.Features.DownloadCandidateDocument;
 
 internal sealed class DownloadCandidateDocumentHandler(RecruitmentDbContext db, ICandidateDocumentStorageService storage)
 {
-    /// <summary>Pending/Scanning: the file has not been proven safe yet — mapped to 409.</summary>
     internal const string ScanPendingCode = "document_scan_pending";
 
-    /// <summary>Infected: malware was detected and the file is quarantined — mapped to 403.</summary>
     internal const string QuarantinedCode = "document_quarantined";
 
-    /// <summary>Failed: every scan attempt failed — the file is blocked — mapped to 403.</summary>
     internal const string ScanFailedCode = "document_scan_failed";
 
     public async Task<Result<Uri>> HandleAsync(
@@ -32,9 +29,6 @@ internal sealed class DownloadCandidateDocumentHandler(RecruitmentDbContext db, 
         if (document is null)
             return Result.Failure<Uri>(Error.NotFound($"Candidate document '{request.DocumentId}' was not found."));
 
-        // [P1] A signed URL is only ever minted for a document whose malware scan is Clean. This is the
-        // single server-side download path for candidate documents; the web app's CV proxy and every
-        // UI link go through it.
         var blocked = CheckDownloadable(document.ScanStatus);
         if (blocked is not null)
             return Result.Failure<Uri>(blocked);

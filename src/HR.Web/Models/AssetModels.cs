@@ -3,7 +3,6 @@ using HR.Web.Services;
 
 namespace HR.Web.Models;
 
-// --- Asset list / CRUD models ---
 
 public record ListAssetsAdminResponse(List<AssetListItemModel> Items);
 
@@ -95,7 +94,6 @@ public sealed class AssetEditModel : IHasVersion
     public decimal? PurchasePrice { get; set; }
 }
 
-// --- Employee asset / assignment models ---
 
 public sealed record EmployeeAssetItem(
     Guid Id,

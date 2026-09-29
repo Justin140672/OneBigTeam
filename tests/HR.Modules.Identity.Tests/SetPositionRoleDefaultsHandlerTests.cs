@@ -220,6 +220,6 @@ public class SetPositionRoleDefaultsHandlerTests(IdentityDatabaseFixture fixture
             CancellationToken.None);
 
         Assert.True(secondResult.IsSuccess);
-        Assert.Empty(secondAuditPublisher.PublishedEvents); // re-applying the same set is a no-op
+        Assert.Empty(secondAuditPublisher.PublishedEvents);
     }
 }

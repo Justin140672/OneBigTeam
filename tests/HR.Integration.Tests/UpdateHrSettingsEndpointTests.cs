@@ -33,11 +33,6 @@ public class UpdateHrSettingsEndpointTests
         return client;
     }
 
-    // POST /api/companies (CreateCompany) was removed in 78a43344; this now provisions the
-    // company directly via CompaniesDbContext, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
-    // The route companyId must match the caller's resolved tenant (UserProfile.CompanyId), which
-    // TenantRouteAuthorizationMiddleware now enforces — so the company is seeded under the same
-    // tenantId the caller is synced to via ClientFor, not an unrelated random id.
     private async Task<Guid> CreateCompanyAsync(Guid tenantId)
     {
         return await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Hr Settings Test {Guid.NewGuid():N}", companyId: tenantId);
@@ -90,8 +85,6 @@ public class UpdateHrSettingsEndpointTests
     [Fact]
     public async Task Put_Hr_Settings_Returns_Forbidden_For_CompanyAdministrator_Only_Role()
     {
-        // Key authorization-gap fix: Company Administrator alone (without HrAdministrator)
-        // must no longer be able to change HR-policy settings.
         var tenantId = Guid.NewGuid();
         var companyId = await CreateCompanyAsync(tenantId);
         using var client = await ClientFor(CompanyAdminOnlyUserId, tenantId);
@@ -201,9 +194,6 @@ public class UpdateHrSettingsEndpointTests
         });
         Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
         var firstPayload = await firstResponse.Content.ReadFromJsonAsync<UpdateHrSettingsPayload>();
-        // UpdateHrSettingsHandler calls both UpdateHrPolicy and UpdateAssetNumberSettings, each of
-        // which increments Version once — a single successful HR-settings update therefore bumps
-        // Version by 2 (1 -> 3), not 1.
         Assert.Equal(5, firstPayload!.Version);
 
         var secondResponse = await client.PutAsJsonAsync($"/api/companies/{companyId}/hr-settings", new
@@ -335,9 +325,6 @@ public class UpdateHrSettingsEndpointTests
     [Fact]
     public async Task Put_Hr_Settings_Retains_Default_Checkpoints_And_Thresholds_When_Not_Explicitly_Sent()
     {
-        // SET-04 backward compatibility: a request that omits the new fields relies on the
-        // request DTO's own defaults (matching CompanySettings.CreateDefault), so existing
-        // companies retain their current values rather than being reset to null/zero.
         var tenantId = Guid.NewGuid();
         var companyId = await CreateCompanyAsync(tenantId);
         using var client = await ClientFor(HrAdminUserId, tenantId);
@@ -357,13 +344,6 @@ public class UpdateHrSettingsEndpointTests
     [Fact]
     public async Task Put_Hr_Settings_Returns_Forbidden_For_Unknown_Id()
     {
-        // Under the SEC-001 tenant-isolation fix, a route companyId must match the caller's
-        // resolved tenant, and CustomerSubscription has a hard FK to Company — so a subscription
-        // can never exist without a real Company row for the same id. There is therefore no
-        // reachable "own tenant, but company row is unexpectedly missing" 404 case for this
-        // mutation endpoint any more: syncing the caller to a fresh tenant id with no seeded
-        // Company/subscription now surfaces as ReadOnlyModeMiddleware's missing-subscription 403
-        // before the handler's own lookup would ever run.
         var tenantId = Guid.NewGuid();
         using var client = await ClientFor(HrAdminUserId, tenantId, ensureActiveSubscription: false);
 
@@ -380,7 +360,6 @@ public class UpdateHrSettingsEndpointTests
         using var client = await ClientFor(HrAdminUserId, tenantId);
         using var companyAdminClient = await ClientFor(CompanyAdminOnlyUserId, tenantId);
 
-        // Update company (profile) settings — company:manage is CompanyAdministrator-only.
         var settingsResponse = await companyAdminClient.PutAsJsonAsync($"/api/companies/{companyId}/settings", new
         {
             timeZone = "Europe/London",
@@ -415,7 +394,6 @@ public class UpdateHrSettingsEndpointTests
         Assert.Equal(4, hrPayload!.LeaveYearStartMonth);
         Assert.Equal(28, hrPayload.DefaultHolidayAllowance);
 
-        // Company (profile) settings must remain untouched by the HR settings update.
         var getSettingsAgain = await client.GetAsync($"/api/companies/{companyId}/settings");
         var settingsPayloadAgain = await getSettingsAgain.Content.ReadFromJsonAsync<GetCompanySettingsPayload>();
         Assert.Equal("Europe/London", settingsPayloadAgain!.TimeZone);

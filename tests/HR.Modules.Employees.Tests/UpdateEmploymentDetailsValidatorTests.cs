@@ -52,7 +52,6 @@ public class UpdateEmploymentDetailsValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateEmploymentDetailsRequest.EmployeeNumber));
     }
 
-    // ── employee number format — same regex CreateEmployee applies (Wave 1) ─────
 
     [Theory]
     [InlineData("EMP-001")]
@@ -149,7 +148,6 @@ public class UpdateEmploymentDetailsValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateEmploymentDetailsRequest.WorkingDaysOverride));
     }
 
-    // ── notice period override (both-or-neither) ────────────────────────────────
 
     [Fact]
     public void Validate_Passes_When_NoticePeriodOverride_Is_Entirely_Absent()

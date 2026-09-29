@@ -23,7 +23,6 @@ namespace HR.Integration.Tests;
 /// </summary>
 public class RequestTargetLogForgingTests
 {
-    /// <summary>U+2028 LINE SEPARATOR — rendered as a line break by many log viewers.</summary>
     private const char LineSeparatorChar = (char)0x2028;
 
     private static readonly string LineSeparator = LineSeparatorChar.ToString();
@@ -53,7 +52,6 @@ public class RequestTargetLogForgingTests
         { "NUL and ESC", new PathString("/api/login\u0000\u001bFORGED") },
     };
 
-    // ── CodeQL #60: rate-limit rejection ──────────────────────────────────────────
 
     [Theory]
     [MemberData(nameof(HostilePaths))]
@@ -145,7 +143,6 @@ public class RequestTargetLogForgingTests
         Assert.Equal(knownPolicy, RateLimitRejectionLogging.ResolvePolicyName(ctx));
     }
 
-    // ── CodeQL #68: revoked-session rejection ─────────────────────────────────────
 
     [Theory]
     [MemberData(nameof(HostilePaths))]
@@ -213,7 +210,6 @@ public class RequestTargetLogForgingTests
         AssertNoForbiddenContent(entry, "non-route endpoint");
     }
 
-    // ── helpers ───────────────────────────────────────────────────────────────────
 
     private static void AssertNoPathLikeStateKey(CapturedEntry entry)
     {
@@ -252,7 +248,6 @@ public class RequestTargetLogForgingTests
         }
     }
 
-    /// <summary>One captured log entry: formatted message, raw structured state and active scope states.</summary>
     private sealed record CapturedEntry(
         string Category,
         LogLevel Level,
@@ -262,7 +257,6 @@ public class RequestTargetLogForgingTests
     {
         public object? RawStateValue(string key) => State.FirstOrDefault(p => p.Key == key).Value;
 
-        /// <summary>Message + every state key/value + every scope (dictionary scopes flattened).</summary>
         public string CombinedText =>
             string.Join(" | ",
                 new[] { Message }

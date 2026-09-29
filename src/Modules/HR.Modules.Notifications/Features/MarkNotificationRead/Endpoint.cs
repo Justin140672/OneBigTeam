@@ -15,9 +15,6 @@ internal sealed class Endpoint(MarkNotificationReadHandler handler, ICurrentUser
 
     public override async Task HandleAsync(MarkNotificationReadRequest request, CancellationToken cancellationToken)
     {
-        // NOT-01: the recipient is always the authenticated caller, resolved server-side via
-        // ICurrentUser — never trust a route or body-supplied employee id. There is no HR/admin
-        // bypass here: notifications are private per-employee data, unlike Documents/Leave/etc.
         if (currentUser.UserId is not { } callerEmployeeId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());

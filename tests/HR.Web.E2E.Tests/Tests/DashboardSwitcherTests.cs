@@ -5,20 +5,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the dashboard switcher (DashboardSwitcher.razor / AppSession.LandingUrl):
-/// - It only appears for a user who qualifies for two or more of the three role dashboards
-///   (HR, Recruitment, Manager) — CanManageCompany does NOT count towards this, so a
-///   CompanyAdministrator + Manager combination (e.g. Sarah Chen) does not see it.
-/// - A single-role user (e.g. Laura Bennett, HrAdministrator only) does not see it either.
-/// - Switching dashboards navigates and persists the choice via localStorage ("lastDashboard"),
-///   so reloading "/" redirects back to the last-chosen dashboard instead of the default
-///   priority order (HR before Manager).
-///
-/// Uses David Park (david.park@acme.example), seeded with HrAdministrator + Manager roles
-/// specifically to exercise this scenario — he also manages real direct reports (Emma Jones,
-/// Carlos Rivera) so the Manager Dashboard he switches to isn't empty.
-/// </summary>
 public sealed class DashboardSwitcherTests(ManagerPersonaFixture fixture) : RoleE2ETestBase<ManagerPersonaFixture>(fixture)
 {
     private const string HrAndManagerEmail = "david.park@acme.example";
@@ -32,7 +18,6 @@ public sealed class DashboardSwitcherTests(ManagerPersonaFixture fixture) : Role
         await login.GoToAsync();
         await login.LoginAsync(HrAndManagerEmail);
 
-        // HR beats Manager in the landing priority order (AppSession.LandingUrl).
         await _page.WaitForURLAsync(new Regex("/dashboard/hr"), new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
 
         var switcher = _page.Locator(".dashboard-switcher");
@@ -54,14 +39,10 @@ public sealed class DashboardSwitcherTests(ManagerPersonaFixture fixture) : Role
         await login.LoginAsync(HrAndManagerEmail);
         await _page.WaitForURLAsync(new Regex("/dashboard/hr"), new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
 
-        // ── Step 1: Switch to "My Team" (Manager Dashboard) via the switcher ──────
         var myTeamButton = _page.Locator(".dashboard-switcher-item").Filter(new() { HasText = "My Team" });
         await myTeamButton.ClickAsync();
         await _page.WaitForURLAsync(new Regex("/dashboard/manager"), new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
 
-        // ── Step 2: Re-visiting "/" must redirect back to Manager, not the default
-        // HR landing — proving the choice was persisted to localStorage ("lastDashboard"),
-        // not just an in-memory navigation.
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/", new() { WaitUntil = WaitUntilState.Commit });
         await _page.WaitForURLAsync(new Regex("/dashboard/manager"), new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
 

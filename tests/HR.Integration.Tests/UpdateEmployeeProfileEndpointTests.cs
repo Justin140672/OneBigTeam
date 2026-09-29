@@ -93,7 +93,7 @@ public class UpdateEmployeeProfileEndpointTests
                 id = emp1.Id,
                 firstName = "Alice",
                 lastName = "Smith",
-                workEmail = emp2.WorkEmail,  // already taken by emp2
+                workEmail = emp2.WorkEmail,
                 startDate = "2026-07-01",
                 expectedVersion = await GetVersionAsync(client, companyId, emp1.Id)
             });

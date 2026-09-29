@@ -44,7 +44,6 @@ public class SubmitLeaveRequestDraftHandlerTests
         LeaveRequestId = leaveRequestId
     };
 
-    // 2026-08-03 = Monday, 2026-08-07 = Friday
     private static async Task<(LeaveType LeaveType, LeavePolicy Policy, LeaveRequest Draft)> SeedDraftWithPolicyAsync(
         LeaveDbContext context, Guid companyId, Guid employeeId, bool requiresApproval,
         decimal entitlementDays = 25, bool allowNegativeBalance = false)
@@ -79,16 +78,12 @@ public class SubmitLeaveRequestDraftHandlerTests
     [Fact]
     public async Task HandleAsync_Returns_ExcludedPublicHolidays_Consistent_With_PreviewAndSubmit()
     {
-        // LEAVE-08: submitting a draft must surface the same public-holiday-in-range warning
-        // PreviewLeaveRequestHandler/SubmitLeaveRequestHandler return, via the same shared
-        // LeaveWarningCalculator.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
         var (_, _, draft) = await SeedDraftWithPolicyAsync(context, companyId, employeeId, requiresApproval: true);
 
-        // 2026-08-05 (Wednesday) falls inside the draft's 2026-08-03..2026-08-07 range.
         var holidayReader = new FakePublicHolidayReader([new DateOnly(2026, 8, 5)], "Summer Bank Holiday");
 
         var handler = new SubmitLeaveRequestDraftHandler(context, new FakeClock(FixedUtcNow),
@@ -207,8 +202,6 @@ public class SubmitLeaveRequestDraftHandlerTests
 
         Assert.True(result.IsSuccess);
 
-        // LeaveSubmittedAuditEvent is always published (by the draft submit handler itself) plus
-        // LeaveApprovedAuditEvent from the approval-effects fan-out.
         Assert.Contains(auditPublisher.Published, e => e is LeaveApprovedAuditEvent);
 
         Assert.Single(integrationPublisher.Published);
@@ -344,7 +337,6 @@ public class SubmitLeaveRequestDraftHandlerTests
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        // 2 days entitlement, requesting Mon-Fri (5 days), no negative balance allowed
         var (_, _, draft) = await SeedDraftWithPolicyAsync(
             context, companyId, employeeId, requiresApproval: true, entitlementDays: 2, allowNegativeBalance: false);
 
@@ -441,7 +433,7 @@ public class SubmitLeaveRequestDraftHandlerTests
         Assert.Equal("validation", secondResult.Error.Code);
 
         var savedSecondDraft = await context.LeaveRequests.SingleAsync(r => r.Id == secondDraft.Id);
-        Assert.Equal(LeaveRequestStatus.Draft, savedSecondDraft.Status); // untouched by the failed submission
+        Assert.Equal(LeaveRequestStatus.Draft, savedSecondDraft.Status);
 
         var savedBalance = await context.LeaveBalances.SingleAsync();
         Assert.Equal(5m, savedBalance.UsedDays);

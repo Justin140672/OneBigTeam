@@ -4,23 +4,13 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the Probation tab on the employee edit page.
-///
-/// Uses the seeded "Carlos Rivera" employee (ID: 30000000-0000-0000-0000-000000000010)
-/// who has an active probation record with a pending ManagerCheckIn review.
-/// </summary>
 public sealed class EmployeeProbationTabTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId       = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid CarlosRivera = Guid.Parse("30000000-0000-0000-0000-000000000010");
 
-    // James Okafor: seeded with only a Passed probation record (ProbationModule.SeedProbationAsync's
-    // completed-records loop) — no active one, so the tab should be hidden for him.
     private static readonly Guid JamesOkafor  = Guid.Parse("30000000-0000-0000-0000-000000000002");
 
-    // Sarah Chen: CTO with no manager — EmployeeCreatedHandler skips auto-creating a probation
-    // record when ManagerId is null, so she never had one at all.
     private static readonly Guid SarahChen    = Guid.Parse("30000000-0000-0000-0000-000000000001");
 
     private const string LauraEmail = "laura.bennett@acme.example";
@@ -36,11 +26,6 @@ public sealed class EmployeeProbationTabTests(HrAdminPersonaFixture fixture) : R
 
         await empEdit.GoToAsync(AcmeId, CarlosRivera);
 
-        // The Probation tab item only renders once EmployeeEdit.razor's own LoadAsync sets
-        // _showProbationTab from the employee response — GoToAsync's own wait (the Details tab's
-        // combobox) can resolve on an earlier render pass than that, before the tab strip has
-        // picked it up. Use an auto-retrying assertion rather than a single IsVisibleAsync()
-        // snapshot, which has no built-in wait and can catch the page mid-render.
         await EmployeeEditPage.SelectOwningGroupAsync(_page, "Probation");
         await Assertions.Expect(EmployeeEditPage.SectionTab(_page, "Probation"))
             .ToBeVisibleAsync(new() { Timeout = 15_000 });

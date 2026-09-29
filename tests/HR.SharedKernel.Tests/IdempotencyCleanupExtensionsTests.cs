@@ -35,10 +35,6 @@ public class IdempotencyCleanupExtensionsTests
         {
             modelBuilder.ApplyConfiguration(new IdempotencyRecordConfiguration<Record>());
 
-            // SQLite's EF provider can't translate DateTimeOffset comparisons directly (a documented
-            // provider limitation, unrelated to the cleanup logic under test) - store as UTC ticks
-            // so `<=` comparisons translate to a plain integer comparison. Postgres/Npgsql, the real
-            // production provider, has no such limitation and needs no such conversion.
             modelBuilder.Entity<Record>().Property(r => r.ExpiresAt)
                 .HasConversion(v => v.UtcTicks, v => new DateTimeOffset(v, TimeSpan.Zero));
             modelBuilder.Entity<Record>().Property(r => r.CreatedAt)
@@ -91,8 +87,6 @@ public class IdempotencyCleanupExtensionsTests
             db.Records.Add(new Record { Key = $"expired-{i}", ExpiresAt = now.AddDays(-1) });
         await db.SaveChangesAsync();
 
-        // Force multiple batches with a tiny batch size to prove the "loop until a batch comes back
-        // short" logic actually drains a backlog spanning more than one batch, not just one page.
         var removed = await db.Records.CleanupExpiredIdempotencyRecordsWithLoggingAsync(
             now, NullLogger.Instance, "Test", CancellationToken.None, batchSize: 2);
 

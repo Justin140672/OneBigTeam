@@ -47,12 +47,12 @@ public class OrganisationDataExportJobStoreTests
         var freshToken = Guid.NewGuid();
         var fresh = OrganisationDataExport.Create(Guid.NewGuid(), null, null, new DateTimeOffset(Now.AddDays(-1)));
         fresh.BeginAttempt(freshToken, new DateTimeOffset(Now.AddDays(-1)));
-        fresh.MarkCompleted(freshToken, "k1", 1, new DateTimeOffset(Now.AddDays(-1))); // expires in 6 days
+        fresh.MarkCompleted(freshToken, "k1", 1, new DateTimeOffset(Now.AddDays(-1)));
 
         var staleToken = Guid.NewGuid();
         var stale = OrganisationDataExport.Create(Guid.NewGuid(), null, null, new DateTimeOffset(Now.AddDays(-30)));
         stale.BeginAttempt(staleToken, new DateTimeOffset(Now.AddDays(-30)));
-        stale.MarkCompleted(staleToken, "k2", 1, new DateTimeOffset(Now.AddDays(-30))); // expired 23 days ago
+        stale.MarkCompleted(staleToken, "k2", 1, new DateTimeOffset(Now.AddDays(-30)));
 
         db.OrganisationDataExports.AddRange(fresh, stale);
         await db.SaveChangesAsync();
@@ -149,7 +149,7 @@ public class OrganisationDataExportJobStoreTests
     {
         await using var db = BuildContext();
         var export = Seed(db, Guid.NewGuid(), new DateTimeOffset(Now.AddMinutes(-40)));
-        export.BeginAttempt(Guid.NewGuid(), new DateTimeOffset(Now.AddMinutes(-30))); // lease expired 15m ago
+        export.BeginAttempt(Guid.NewGuid(), new DateTimeOffset(Now.AddMinutes(-30)));
         await db.SaveChangesAsync();
         var store = StoreAt(db, Now);
         var replacement = Guid.NewGuid();
@@ -250,15 +250,13 @@ public class OrganisationDataExportJobStoreTests
         await using var db = BuildContext();
         var export = Seed(db, Guid.NewGuid(), new DateTimeOffset(Now.AddMinutes(-40)));
         var original = Guid.NewGuid();
-        export.BeginAttempt(original, new DateTimeOffset(Now.AddMinutes(-30))); // expired
+        export.BeginAttempt(original, new DateTimeOffset(Now.AddMinutes(-30)));
         await db.SaveChangesAsync();
         var store = StoreAt(db, Now);
 
-        // replacement worker takes over
         var replacement = Guid.NewGuid();
         Assert.True(await store.BeginAttemptAsync(export.Id, replacement, CancellationToken.None));
 
-        // original worker resumes and tries to finish
         Assert.False(await store.MarkCompletedAsync(export.Id, original, "stale-key", 123, CancellationToken.None));
 
         var view = await store.GetAsync(export.Id, CancellationToken.None);
@@ -330,11 +328,9 @@ public class OrganisationDataExportJobStoreTests
         var stalePending = Seed(db, Guid.NewGuid(), now.AddMinutes(-10));
         var freshPending = Seed(db, Guid.NewGuid(), now.AddMinutes(-1));
 
-        // crashed worker: claimed 40m ago, 15m lease long expired
         var crashedInProgress = Seed(db, Guid.NewGuid(), now.AddHours(-2));
         crashedInProgress.BeginAttempt(Guid.NewGuid(), now.AddMinutes(-40));
 
-        // healthy long-running worker: attempt started 2h ago but lease was just renewed
         var healthyInProgress = Seed(db, Guid.NewGuid(), now.AddHours(-3));
         var healthyToken = Guid.NewGuid();
         healthyInProgress.BeginAttempt(healthyToken, now.AddHours(-2));
@@ -365,8 +361,8 @@ public class OrganisationDataExportJobStoreTests
         var now = new DateTimeOffset(Now);
         var export = Seed(db, Guid.NewGuid(), now.AddHours(-3));
         var owner = Guid.NewGuid();
-        export.BeginAttempt(owner, now.AddMinutes(-40)); // original attempt > 30m ago
-        export.RenewLease(owner, now.AddMinutes(-2));    // but heartbeated recently
+        export.BeginAttempt(owner, now.AddMinutes(-40));
+        export.RenewLease(owner, now.AddMinutes(-2));
         await db.SaveChangesAsync();
         var store = StoreAt(db, Now);
 
@@ -376,14 +372,13 @@ public class OrganisationDataExportJobStoreTests
         Assert.False(await store.BeginAttemptAsync(export.Id, Guid.NewGuid(), CancellationToken.None));
     }
 
-    // ----- Follow-up H: recovery claim -----
 
     [Fact]
     public async Task ClaimForRecoveryAsync_Takes_The_Lease_From_A_Crashed_Worker()
     {
         await using var db = BuildContext();
         var export = Seed(db, Guid.NewGuid(), new DateTimeOffset(Now.AddHours(-2)));
-        export.BeginAttempt(Guid.NewGuid(), new DateTimeOffset(Now.AddMinutes(-40))); // lease expired
+        export.BeginAttempt(Guid.NewGuid(), new DateTimeOffset(Now.AddMinutes(-40)));
         await db.SaveChangesAsync();
         var store = StoreAt(db, Now);
         var recovery = Guid.NewGuid();
@@ -401,7 +396,7 @@ public class OrganisationDataExportJobStoreTests
     {
         await using var db = BuildContext();
         var export = Seed(db, Guid.NewGuid(), new DateTimeOffset(Now));
-        export.BeginAttempt(Guid.NewGuid(), new DateTimeOffset(Now)); // lease live for 15m
+        export.BeginAttempt(Guid.NewGuid(), new DateTimeOffset(Now));
         await db.SaveChangesAsync();
         var store = StoreAt(db, Now);
 
@@ -419,7 +414,7 @@ public class OrganisationDataExportJobStoreTests
         var recovery = Guid.NewGuid();
 
         Assert.True(await store.ClaimForRecoveryAsync(export.Id, recovery, CancellationToken.None));
-        Assert.False(await store.ResetForRetryAsync(export.Id, Guid.NewGuid(), CancellationToken.None)); // wrong token
+        Assert.False(await store.ResetForRetryAsync(export.Id, Guid.NewGuid(), CancellationToken.None));
         Assert.True(await store.ResetForRetryAsync(export.Id, recovery, CancellationToken.None));
 
         var view = await store.GetAsync(export.Id, CancellationToken.None);
@@ -427,7 +422,6 @@ public class OrganisationDataExportJobStoreTests
         Assert.Null(view.LeaseOwnerToken);
     }
 
-    // ----- Follow-up I: artefact cleanup candidates -----
 
     [Fact]
     public async Task GetArtefactCleanupCandidatesAsync_Returns_Only_Uncleaned_Terminal_Rows_Oldest_First_And_Bounded()
@@ -487,7 +481,6 @@ public class OrganisationDataExportJobStoreTests
         export.MarkFailed("boom", new DateTimeOffset(Now.AddDays(-40)));
         await db.SaveChangesAsync();
 
-        // clean it 20 days ago
         await StoreAt(db, Now.AddDays(-20)).MarkAttemptFilesCleanedAsync(export.Id, CancellationToken.None);
 
         var recent = await StoreAt(db, Now).GetRecentlyCleanedArtefactsAsync(50, CancellationToken.None);
@@ -633,7 +626,7 @@ public class OrganisationDataExportJobStoreTests
 
         var oldToken = Guid.NewGuid();
         var storeAOld = StoreAt(ctxA, Now.AddMinutes(-40));
-        Assert.True(await storeAOld.BeginAttemptAsync(id, oldToken, CancellationToken.None)); // lease expires Now-25
+        Assert.True(await storeAOld.BeginAttemptAsync(id, oldToken, CancellationToken.None));
 
         var recoveryToken = Guid.NewGuid();
         var storeBRecovery = StoreAt(ctxB, Now);
@@ -665,8 +658,6 @@ public class OrganisationDataExportJobStoreTests
         Assert.True(await storeB.ClaimForRecoveryAsync(id, recoveryToken, CancellationToken.None));
         Assert.True(await storeB.ResetForRetryAsync(id, recoveryToken, CancellationToken.None));
 
-        // Once recovery has reset the row to Pending the superseded worker's completion is a hard no-op
-        // (MarkCompleted is only valid from InProgress).
         var storeANow = StoreAt(ctxA, Now);
         Assert.False(await storeANow.MarkCompletedAsync(id, oldToken, "stale.zip", 1, CancellationToken.None));
 
@@ -693,10 +684,8 @@ public class OrganisationDataExportJobStoreTests
     {
         await using var db = BuildContext();
 
-        // Two never-deferred rows (null cursor) — must come first, oldest completion first.
         var nullOld = SeedFailed(db, new DateTimeOffset(Now.AddDays(-6)));
         var nullNew = SeedFailed(db, new DateTimeOffset(Now.AddDays(-2)));
-        // One row that has already been deferred into the past — must come last.
         var deferred = SeedFailed(db, new DateTimeOffset(Now.AddDays(-10)));
         await db.SaveChangesAsync();
 
@@ -731,7 +720,7 @@ public class OrganisationDataExportJobStoreTests
         var export = SeedFailed(db, new DateTimeOffset(Now.AddDays(-3)));
         await db.SaveChangesAsync();
 
-        await StoreAt(db, Now).DeferArtefactCleanupAsync(export.Id, CancellationToken.None); // next attempt = Now + 15m
+        await StoreAt(db, Now).DeferArtefactCleanupAsync(export.Id, CancellationToken.None);
 
         var notYetDue = await StoreAt(db, Now.AddMinutes(10)).GetArtefactCleanupCandidatesAsync(50, CancellationToken.None);
         Assert.DoesNotContain(export.Id, notYetDue.Select(c => c.Id));
@@ -763,7 +752,6 @@ public class OrganisationDataExportJobStoreTests
 
         await StoreAt(db, Now.AddDays(-2)).MarkAttemptFilesCleanedAsync(inWindow.Id, CancellationToken.None);
         await StoreAt(db, Now.AddDays(-2)).MarkAttemptFilesCleanedAsync(futureCursor.Id, CancellationToken.None);
-        // Push futureCursor's recheck cursor to tomorrow via a successful recheck.
         await StoreAt(db, Now).RecordLateUploadRecheckAsync(futureCursor.Id, succeeded: true, CancellationToken.None);
 
         var due = await StoreAt(db, Now).GetRecentlyCleanedArtefactsAsync(50, CancellationToken.None);
@@ -782,14 +770,11 @@ public class OrganisationDataExportJobStoreTests
         var export = SeedFailed(db, new DateTimeOffset(Now.AddDays(-40)));
         await db.SaveChangesAsync();
 
-        // Cleaned 20 days ago — already outside the 14-day window.
         await StoreAt(db, Now.AddDays(-20)).MarkAttemptFilesCleanedAsync(export.Id, CancellationToken.None);
 
-        // With no cursor it is not selected once past the window...
         var beforeFailure = await StoreAt(db, Now).GetRecentlyCleanedArtefactsAsync(50, CancellationToken.None);
         Assert.DoesNotContain(export.Id, beforeFailure.Select(c => c.Id));
 
-        // ...but a failed recheck leaves a cursor set, which keeps it retryable past the window.
         await StoreAt(db, Now.AddDays(-19)).RecordLateUploadRecheckAsync(export.Id, succeeded: false, CancellationToken.None);
 
         var afterFailure = await StoreAt(db, Now).GetRecentlyCleanedArtefactsAsync(50, CancellationToken.None);

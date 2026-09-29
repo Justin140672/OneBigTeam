@@ -24,10 +24,6 @@ internal sealed class Endpoint(
             return;
         }
 
-        // SICK-02: reporting-hierarchy/HR authorization for this single-resource read happens
-        // inside the handler (it needs the fetched review's EmployeeId), and unauthorized access
-        // is reported as NotFound rather than Forbidden so a manager cannot use the response
-        // status to distinguish "unrelated review" from "no such review" while guessing ids.
         var result = await handler.HandleAsync(request, callerId, cancellationToken);
 
         if (result.IsFailure)

@@ -6,16 +6,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Modules.Reporting.Features.DashboardSummaries;
 
-/// <summary>
-/// DSH-06 shared composer behind the HR and Manager bounded dashboard summary endpoints. Mirrors
-/// GetWorkloadActions/Handler.cs for the cross-module fan-out: every registered
-/// <see cref="IWorkloadActionProvider"/> is invoked in parallel, each on its OWN DI scope, and this
-/// composer never performs its own row-level authorization — each provider has already scoped its
-/// results to what <paramref name="caller"/> may see (HR company-wide, or a manager's full reporting
-/// sub-tree per DSH-02). This composer only merges, computes urgency centrally, bounds each category
-/// to a small display cap with an authoritative headline count, and records per-category load
-/// success/failure so a slow or throwing module degrades one card instead of the whole dashboard.
-/// </summary>
 internal sealed class DashboardSummaryComposer(
     IServiceScopeFactory scopeFactory,
     IConfiguration configuration,
@@ -41,12 +31,6 @@ internal sealed class DashboardSummaryComposer(
     {
         var today = DateOnly.FromDateTime(clock.UtcNow);
 
-        // Resolve provider count + category names in a dedicated counting scope. Providers are NOT
-        // called off this composer's own DI scope: several modules register more than one
-        // IWorkloadActionProvider against the same module DbContext, and because DbContext is
-        // scoped-per-request those providers would share one (non-thread-safe) DbContext instance if
-        // resolved here and run concurrently. Each parallel call below gets its own fresh scope so
-        // every provider resolves a dedicated DbContext instance.
         List<string> categoryNames;
         int providerCount;
         using (var countingScope = scopeFactory.CreateScope())
@@ -76,14 +60,10 @@ internal sealed class DashboardSummaryComposer(
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
-                // The linked deadline (or the provider's own cancellation) fired, NOT a client
-                // abort — degrade this one category rather than failing the whole dashboard.
                 return new ProviderOutcome(category, Failed: true, Array.Empty<WorkloadAction>());
             }
             catch (OperationCanceledException)
             {
-                // The outer cancellationToken is cancelled: a real client disconnect. Let it
-                // propagate so the request is abandoned, not reported as a category failure.
                 throw;
             }
             catch (Exception)

@@ -13,11 +13,6 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Recruitment.Tests;
 
-/// <summary>
-/// [P1] ScanCandidateDocumentJob: reads the stored bytes server-side (never via a signed URL), scans
-/// them with the shared IUploadedFileScanner and records Clean / Infected (+ durable quarantine) /
-/// failed attempt (+ bounded retry) — never Clean on error.
-/// </summary>
 public class ScanCandidateDocumentJobTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 9, 26, 9, 0, 0, DateTimeKind.Utc);
@@ -84,7 +79,6 @@ public class ScanCandidateDocumentJobTests
     private List<(Hangfire.Common.Job Job, IState State)> JobsOf<T>() =>
         _jobs.CreatedJobs.Select((j, i) => (j, _jobs.CreatedStates[i])).Where(x => x.j.Type == typeof(T)).ToList();
 
-    // ── Clean ─────────────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Clean_Content_Is_Marked_Clean_And_Audited_Without_Minting_A_Signed_Url()
@@ -101,7 +95,6 @@ public class ScanCandidateDocumentJobTests
         Assert.Equal(Now, saved.ScanCompletedAt);
         Assert.Null(saved.ScanFailureReason);
 
-        // The scanner saw exactly the stored bytes, read server-side.
         var scan = Assert.Single(scanner.Scans);
         Assert.Equal(HarmlessPdf, scan.Content);
         Assert.Empty(_storage.DownloadUrlRequests);
@@ -118,7 +111,6 @@ public class ScanCandidateDocumentJobTests
         Assert.Empty(_storage.Deletions);
     }
 
-    // ── Infected / quarantine ─────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Eicar_Content_Is_Infected_Quarantined_Audited_And_Purge_Enqueued()
@@ -133,7 +125,6 @@ public class ScanCandidateDocumentJobTests
         Assert.Equal(EicarTestFile.ThreatName, saved.ScanFailureReason);
         Assert.Equal(Now, saved.ScanCompletedAt);
 
-        // Durable deletion intent committed with the Infected status.
         var operation = Assert.Single(await DeletionOperationsAsync());
         Assert.Equal(document.StorageKey, operation.StorageKey);
         Assert.Equal(CandidateDocumentDeletionOperation.StatusPending, operation.Status);
@@ -153,7 +144,6 @@ public class ScanCandidateDocumentJobTests
         var purge = Assert.Single(JobsOf<PurgeCandidateDocumentStorageJob>());
         Assert.Equal(operation.Id, (Guid)purge.Job.Args[0]!);
 
-        // The job itself never deletes nor mints a URL — deletion is the durable pipeline's job.
         Assert.Empty(_storage.DownloadUrlRequests);
         Assert.Empty(_storage.Deletions);
     }
@@ -180,7 +170,6 @@ public class ScanCandidateDocumentJobTests
     [Fact]
     public async Task Eicar_Bytes_Spoofed_As_Pdf_Are_Still_Infected()
     {
-        // Declared name/content type say PDF; the bytes are the EICAR test file.
         var document = await SeedAsync(EicarTestFile.Bytes, fileName: "curriculum-vitae.pdf", contentType: "application/pdf");
         var scanner = new EicarDetectingUploadedFileScanner();
 
@@ -206,8 +195,6 @@ public class ScanCandidateDocumentJobTests
     [Fact]
     public async Task Harmless_File_With_Mismatched_Metadata_Is_Clean_Only_Because_The_Scanner_Says_So()
     {
-        // Name/type claim a Word document, bytes are a plain PDF: the job does not second-guess
-        // metadata either way — the scanner's verdict alone decides.
         var document = await SeedAsync(HarmlessPdf, fileName: "cv.docx",
             contentType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
 
@@ -243,7 +230,6 @@ public class ScanCandidateDocumentJobTests
             Assert.Single(_audit.Published.OfType<CandidateDocumentQuarantinedAuditEvent>()).ThreatName);
     }
 
-    // ── Scanner outage ────────────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Scanner_Outage_Is_A_Failed_Attempt_Not_Clean_With_Retry_Scheduled_And_Audited()
@@ -299,7 +285,6 @@ public class ScanCandidateDocumentJobTests
         var document = await SeedAsync(HarmlessPdf);
         var scanner = new ThrowingUploadedFileScanner(() => new SocketException((int)SocketError.HostUnreachable));
 
-        // Attempts 1-4: each returns to Pending with a back-off; run each once it is due.
         var at = Now;
         for (var attempt = 1; attempt < CandidateDocument.MaxScanAttempts; attempt++)
         {
@@ -312,7 +297,6 @@ public class ScanCandidateDocumentJobTests
             at = afterAttempt.ScanNextAttemptAt!.Value;
         }
 
-        // Attempt 5: terminally Failed, audited, and the job fails visibly.
         var ex = await Assert.ThrowsAsync<CandidateDocumentScanFailedException>(() => RunAsync(document.Id, scanner, at));
         Assert.IsType<SocketException>(ex.InnerException);
 
@@ -332,10 +316,8 @@ public class ScanCandidateDocumentJobTests
         Assert.DoesNotContain(_audit.Published.OfType<CandidateDocumentScanStatusChangedAuditEvent>(),
             e => e.NewStatus == nameof(CandidateDocumentScanStatus.Clean));
 
-        // Only the four retries were scheduled — no retry after the terminal failure.
         Assert.Equal(CandidateDocument.MaxScanAttempts - 1, JobsOf<ScanCandidateDocumentJob>().Count);
 
-        // A further run after the terminal failure is a no-op.
         await RunAsync(document.Id, scanner, at.AddDays(1));
         Assert.Equal(CandidateDocument.MaxScanAttempts, scanner.Calls);
         Assert.Equal(CandidateDocumentScanStatus.Failed, (await ReloadAsync(document.Id)).ScanStatus);
@@ -356,7 +338,6 @@ public class ScanCandidateDocumentJobTests
         Assert.Null(saved.ScanFailureReason);
     }
 
-    // ── Storage outage / missing blob ─────────────────────────────────────────────────────────
 
     [Fact]
     public async Task Storage_Read_Failure_Is_A_Failed_Attempt_And_The_Scanner_Is_Not_Called()
@@ -389,7 +370,6 @@ public class ScanCandidateDocumentJobTests
         Assert.Equal(CandidateDocumentScanFailureReasons.FileUnreadable, saved.ScanFailureReason);
     }
 
-    // ── Idempotency / guards ──────────────────────────────────────────────────────────────────
 
     [Theory]
     [InlineData(nameof(CandidateDocumentScanStatus.Clean))]
@@ -473,7 +453,6 @@ public class ScanCandidateDocumentJobTests
         var jobCount = _jobs.CreatedJobs.Count;
         var scanner = new EicarDetectingUploadedFileScanner();
 
-        // One tick before the back-off elapses.
         await RunAsync(document.Id, scanner, afterFailure.ScanNextAttemptAt!.Value.AddTicks(-1));
 
         var after = await ReloadAsync(document.Id);
@@ -545,7 +524,6 @@ public class ScanCandidateDocumentJobTests
         Assert.Empty(_storage.DownloadUrlRequests);
     }
 
-    // ── Best-effort side effects never undo the recorded outcome ─────────────────────────────
 
     [Fact]
     public async Task Job_Store_Outage_Does_Not_Undo_The_Quarantine()

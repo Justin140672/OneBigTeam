@@ -22,7 +22,6 @@ public class LocationTypeService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    // No dedicated backend GetById endpoint — the list already returns full item detail.
     async Task<LocationTypeEditModel?> IEditService<LocationTypeEditModel, Guid>.GetByIdAsync(Guid companyId, Guid id)
     {
         var list = await ListLocationTypesAsync(companyId, includeInactive: true);

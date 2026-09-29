@@ -8,15 +8,8 @@ internal sealed record VacancyAuditSnapshot(
     string? AdvertDescription,
     Guid HiringManagerId,
     Domain.VacancyStatus Status,
-    // Ticket #81: the assigned external recruitment agency (ExternalRecruiter.Id), folded into the
-    // existing vacancy.updated audit event rather than a bespoke event — this is now a plain optional
-    // field on Vacancy, not a separate assignment entity with its own audit trail.
     Guid? AssignedRecruiterId);
 
-// EffectiveTitle is resolved by the handler (vacancy.AdvertTitle ?? linked Position Profile's title)
-// purely for a readable audit Summary line — it is not part of the Before/After snapshot itself,
-// which records the vacancy's own raw field values only. Resolving it requires a cross-module read
-// via IPositionProfileReader, which the handler performs, not this record.
 internal sealed record VacancyUpdatedAuditEvent(
     Guid CompanyId,
     Guid VacancyId,
@@ -77,8 +70,6 @@ internal sealed record VacancyPublishedAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
-// SET-05: published when a vacancy is explicitly approved (required before it can be published if
-// the company's VacancyApprovalRequired setting is on — see ApproveVacancyHandler/PublishVacancyHandler).
 internal sealed record VacancyApprovedAuditEvent(
     Guid CompanyId,
     Guid VacancyId,
@@ -98,9 +89,6 @@ internal sealed record VacancyApprovedAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
-// SET-05: published when an offer for a specific application is explicitly approved (required
-// before OfferCandidateHandler will move the application to the offer stage if the company's
-// OfferApprovalRequired setting is on).
 internal sealed record OfferApprovedAuditEvent(
     Guid CompanyId,
     Guid ApplicationId,
@@ -169,8 +157,6 @@ internal sealed record OfferResponseRecordedAuditEvent(
     object? IAuditEvent.Metadata => new { VacancyId, CandidateId };
 }
 
-// SET-05: published once per PurgeEligibleCandidates run, summarising how many candidates (past the
-// company's CandidateRetentionDays window, per DOC-04-style explicit authorised action) were purged.
 internal sealed record CandidatesPurgedAuditEvent(
     Guid CompanyId,
     IReadOnlyList<Guid> PurgedCandidateIds,
@@ -495,10 +481,6 @@ internal sealed record ExternalRecruiterActiveStatusChangedAuditEvent(
     object? IAuditEvent.Metadata => null;
 }
 
-// Ticket #78: published whenever an application's source/recruiter attribution is set (at creation
-// today; also intended for any future "edit source" endpoint). SourceExternalRecruiterId references
-// the ExternalRecruiter row directly and is preserved verbatim in the audit trail even if that
-// recruiter's vacancy assignment is later removed.
 internal sealed record ApplicationSourceSetAuditEvent(
     Guid CompanyId,
     Guid ApplicationId,
@@ -624,7 +606,6 @@ internal sealed record ApplicationWithdrawnAuditEvent(
     object? IAuditEvent.Metadata => new { VacancyId, CandidateId };
 }
 
-// Ticket #97: audit events for the new per-company RecruitmentStage settings CRUD.
 internal sealed record RecruitmentStageCreatedAuditEvent(
     Guid CompanyId,
     Guid RecruitmentStageId,

@@ -2,16 +2,8 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the Employee Starter report
-/// (/companies/{companyId}/reporting/employee-starters — EmployeeStarterReportPage.razor).
-/// </summary>
 public sealed class EmployeeStarterReportPage(IPage page, string baseUrl)
 {
-    // Same reasoning as EmployeeDirectoryReportPage.RowsRenderedSelector — Syncfusion's EJ2 grid
-    // populates ".e-row"/".e-rowcell" on a separate JS render pass after the Blazor component
-    // mounts, so waiting for the row selector (or its empty-state sibling) is the only race-free
-    // wait tied to data actually being present.
     private const string RowsRenderedSelector = ".e-grid .e-row, .e-grid .e-emptyrow";
 
     public async Task GoToAsync(Guid companyId)
@@ -37,7 +29,6 @@ public sealed class EmployeeStarterReportPage(IPage page, string baseUrl)
         return await page.Locator(".e-grid .e-row").CountAsync();
     }
 
-    // ── Filter panel (ReportFilterPanel — Department/Location/PositionProfile/EmploymentType/DateRange only) ──
 
     private ILocator FilterField(string labelText) =>
         page.Locator(".card-body .col-md-3").Filter(new() { HasText = labelText }).First;
@@ -47,12 +38,6 @@ public sealed class EmployeeStarterReportPage(IPage page, string baseUrl)
         await DropDownSelector.SelectAsync(page, FilterField(labelText), valueText);
     }
 
-    /// <summary>
-    /// Reads the "Start Date From" SfDatePicker's current value (format dd/mm/yyyy, matching its
-    /// Format="dd/MM/yyyy" — see EmployeeStarterReportPage.razor's DateRangeStartLabel="Start Date
-    /// From"), which defaults to the 1st of the current month on first load (that page's own
-    /// _defaultStartDate).
-    /// </summary>
     public async Task<string> GetStartDateFromValueAsync()
     {
         var input = FilterField("Start Date From").Locator(".e-date-wrapper input.e-input").First;
@@ -71,7 +56,6 @@ public sealed class EmployeeStarterReportPage(IPage page, string baseUrl)
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 
-    // ── Export ─────────────────────────────────────────────────────────────────
 
     public async Task<IDownload> ExportAsync(string formatLabel)
     {
@@ -81,6 +65,5 @@ public sealed class EmployeeStarterReportPage(IPage page, string baseUrl)
         return await downloadTask;
     }
 
-    /// <summary>True if the page rendered its own graceful error banner rather than crashing (e.g. on a 403 from the report data endpoint).</summary>
     public async Task<bool> HasLoadErrorAsync() => await page.Locator(".alert-danger").IsVisibleAsync();
 }

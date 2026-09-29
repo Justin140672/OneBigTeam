@@ -22,19 +22,8 @@ public static class DbContextIdempotencyExtensions
 {
     private const string UniqueViolationSqlState = "23505";
 
-    /// <summary>
-    /// Default retention window: comfortably longer than any legitimate client retry (a user
-    /// re-clicking "Try again", a page rerender resubmitting a pending request, or the HTTP client's
-    /// own bounded retry budget - see HR.ServiceDefaults' TotalRequestTimeout, currently 120s) can
-    /// plausibly span. 7 days covers a user closing their laptop mid-request and resuming the next
-    /// working day, while still bounding how long a stored response body is retained.
-    /// </summary>
     public static readonly TimeSpan DefaultRetention = TimeSpan.FromDays(7);
 
-    /// <summary>
-    /// Deterministic fingerprint of a request payload, used to detect a key being reused for a
-    /// materially different request rather than a genuine retry of the same one.
-    /// </summary>
     public static string Fingerprint(object request)
     {
         var json = JsonSerializer.Serialize(request);
@@ -42,15 +31,6 @@ public static class DbContextIdempotencyExtensions
         return Convert.ToHexStringLower(hash);
     }
 
-    /// <summary>
-    /// Looks for a previously completed request under <paramref name="scope"/> + <paramref name="idempotencyKey"/>.
-    /// Call this before doing any business-entity work so a duplicate delivery short-circuits without
-    /// re-running side effects (e.g. publishing another audit event).
-    /// Returns <c>null</c> when the key hasn't been used before in this scope - the caller should
-    /// proceed as normal. A key that WAS used, but under a different scope, is indistinguishable from
-    /// one never used at all - by design, so one company/actor/operation can never discover or
-    /// replay another's stored result.
-    /// </summary>
     public static async Task<IdempotencyOutcome<TResponse>?> TryReplayAsync<TRecord, TResponse>(
         this DbContext dbContext,
         IdempotencyScope scope,
@@ -60,13 +40,6 @@ public static class DbContextIdempotencyExtensions
         where TRecord : class, IIdempotencyRecord =>
         await ReplayAsync<TRecord, TResponse>(dbContext, scope, idempotencyKey, requestFingerprint, cancellationToken);
 
-    /// <summary>
-    /// Stages a <typeparamref name="TRecord"/> for <paramref name="scope"/> + <paramref name="idempotencyKey"/>
-    /// and saves it in the SAME SaveChangesAsync call as whatever business-entity changes the caller
-    /// has already added to <paramref name="dbContext"/>'s change tracker (not yet saved). Either both
-    /// commit together, or - if a concurrent duplicate under the same scope+key won the race - neither
-    /// does, and the winner's stored result is returned instead.
-    /// </summary>
     public static async Task<IdempotencyOutcome<TResponse>> SaveIdempotentAsync<TRecord, TResponse>(
         this DbContext dbContext,
         DbSet<TRecord> records,
@@ -114,9 +87,6 @@ public static class DbContextIdempotencyExtensions
             if (dbContext.Database.CurrentTransaction is not null)
                 await dbContext.Database.RollbackTransactionAsync(cancellationToken);
 
-            // None of this attempt's business rows were persisted either. Detach everything staged
-            // so the (shared, scoped) DbContext stays safe to reuse, then replay the concurrent
-            // winner's stored result.
             foreach (var entry in dbContext.ChangeTracker.Entries().ToList())
                 entry.State = EntityState.Detached;
 

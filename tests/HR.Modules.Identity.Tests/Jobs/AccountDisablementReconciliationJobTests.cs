@@ -116,7 +116,7 @@ public class AccountDisablementReconciliationJobTests(IdentityDatabaseFixture fi
 
         var reloaded = await db.AccountDisablements.SingleAsync(d => d.Id == request.Id);
         Assert.Equal(AccountDisablement.StatusProcessing, reloaded.Status);
-        Assert.NotNull(reloaded.ClaimedBy); // Re-claimed under a fresh lease, not the stale one.
+        Assert.NotNull(reloaded.ClaimedBy);
         Assert.True(reloaded.LeaseExpiresAt > Now);
 
         Assert.Single(jobClient.CreatedJobs, j => (Guid)j.Args[0] == request.Id);
@@ -154,7 +154,6 @@ public class AccountDisablementReconciliationJobTests(IdentityDatabaseFixture fi
     [Fact]
     public async Task ExecuteAsync_Does_Not_Sweep_Fresh_Processing_Record()
     {
-        // Lease still has several minutes left — assumed to be a genuinely in-flight attempt.
         var request = await SeedRequestAsync(
             AccountDisablement.StatusProcessing, leaseExpiresAt: Now.AddMinutes(5));
 
@@ -165,7 +164,7 @@ public class AccountDisablementReconciliationJobTests(IdentityDatabaseFixture fi
         Assert.DoesNotContain(jobClient.CreatedJobs, j => (Guid)j.Args[0] == request.Id);
 
         var reloaded = await db.AccountDisablements.SingleAsync(d => d.Id == request.Id);
-        Assert.Equal(AccountDisablement.StatusProcessing, reloaded.Status); // untouched
+        Assert.Equal(AccountDisablement.StatusProcessing, reloaded.Status);
     }
 
     // ---- Ticket 19 (P2): terminal failures, and atomic claim under concurrency -------------------
@@ -193,7 +192,7 @@ public class AccountDisablementReconciliationJobTests(IdentityDatabaseFixture fi
         Assert.DoesNotContain(jobClient.CreatedJobs, j => (Guid)j.Args[0] == request.Id);
 
         var reloaded = await db.AccountDisablements.SingleAsync(d => d.Id == request.Id);
-        Assert.Equal(AccountDisablement.StatusFailed, reloaded.Status); // untouched — requires manual retry
+        Assert.Equal(AccountDisablement.StatusFailed, reloaded.Status);
         Assert.True(reloaded.IsTerminallyFailed);
     }
 
@@ -238,7 +237,6 @@ public class AccountDisablementReconciliationJobTests(IdentityDatabaseFixture fi
         var jobClientA = new RecordingBackgroundJobClient();
         var jobClientB = new RecordingBackgroundJobClient();
 
-        // Run both "sweeps" concurrently against the SAME real Postgres database.
         var taskA = BuildJob(dbA, jobClientA).ExecuteAsync();
         var taskB = BuildJob(dbB, jobClientB).ExecuteAsync();
         await Task.WhenAll(taskA, taskB);
@@ -246,13 +244,13 @@ public class AccountDisablementReconciliationJobTests(IdentityDatabaseFixture fi
         var enqueuedByA = jobClientA.CreatedJobs.Count(j => (Guid)j.Args[0] == request.Id);
         var enqueuedByB = jobClientB.CreatedJobs.Count(j => (Guid)j.Args[0] == request.Id);
 
-        Assert.Equal(1, enqueuedByA + enqueuedByB); // Exactly one reconciler claimed and enqueued it.
+        Assert.Equal(1, enqueuedByA + enqueuedByB);
 
         await using var verify = fixture.BuildContext();
         var reloaded = await verify.AccountDisablements.SingleAsync(d => d.Id == request.Id);
-        Assert.Equal(AccountDisablement.StatusProcessing, reloaded.Status); // claimed, not left Pending
+        Assert.Equal(AccountDisablement.StatusProcessing, reloaded.Status);
         Assert.NotNull(reloaded.ClaimedBy);
-        Assert.Equal(2, reloaded.Version); // Exactly one successful claim advanced the version once.
+        Assert.Equal(2, reloaded.Version);
     }
 
     [Fact]
@@ -288,16 +286,12 @@ public class AccountDisablementReconciliationJobTests(IdentityDatabaseFixture fi
         Assert.DoesNotContain(jobClient.CreatedJobs, j => (Guid)j.Args[0] == request.Id);
 
         var reloaded = await db.AccountDisablements.SingleAsync(d => d.Id == request.Id);
-        Assert.Equal(AccountDisablement.StatusProcessed, reloaded.Status); // untouched
+        Assert.Equal(AccountDisablement.StatusProcessed, reloaded.Status);
     }
 
     [Fact]
     public async Task ExecuteAsync_Does_Not_Enqueue_For_An_Unrelated_Fresh_Request()
     {
-        // Renamed from an "empty table" scenario: IdentityDatabaseFixture's database is shared
-        // across the whole test collection, so the table is never actually empty here. Instead,
-        // this pins that a brand new record which doesn't match any stale/pending criterion (a
-        // Processed record) never gets swept, and running the job doesn't throw.
         var request = await SeedRequestAsync(AccountDisablement.StatusProcessed);
 
         var jobClient = new RecordingBackgroundJobClient();

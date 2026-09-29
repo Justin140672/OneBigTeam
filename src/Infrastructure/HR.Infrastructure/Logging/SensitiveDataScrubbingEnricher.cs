@@ -4,21 +4,6 @@ using Serilog.Events;
 
 namespace HR.Infrastructure.Logging;
 
-/// <summary>
-/// NFR-01: rewrites structured-log properties so sensitive values never reach a sink
-/// (console, file, OTLP collector / traces).
-///
-/// For every log-event property:
-/// <list type="bullet">
-/// <item><description>if the property <b>name</b> is prohibited
-/// (<see cref="SensitiveDataScrubber.IsProhibitedFieldName"/>) the whole value is replaced with
-/// <see cref="SensitiveDataScrubber.Redacted"/>;</description></item>
-/// <item><description>otherwise any sensitive-looking token inside a string value is scrubbed
-/// via <see cref="SensitiveDataScrubber.ScrubText"/>.</description></item>
-/// </list>
-/// Serilog renders the output message from these same properties, so scrubbing them also
-/// scrubs the rendered message.
-/// </summary>
 public sealed class SensitiveDataScrubbingEnricher : ILogEventEnricher
 {
     public void Enrich(LogEvent logEvent, ILogEventPropertyFactory propertyFactory)

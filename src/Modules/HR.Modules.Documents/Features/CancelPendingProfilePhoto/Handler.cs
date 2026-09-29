@@ -63,9 +63,6 @@ internal sealed class CancelPendingProfilePhotoHandler(
             var outcome = await db.SaveIdempotentAsync(db.IdempotencyRecords,
             scope, key, fingerprint!, StatusCodes.Status204NoContent, true, now, cancellationToken);
 
-            // Lost a race against a concurrent duplicate under the same key — this attempt's
-            // removal was rolled back along with it, so skip the task-cancel/audit publishing
-            // below; the winner's request already did it.
             if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
                 return Result.Success();
         }

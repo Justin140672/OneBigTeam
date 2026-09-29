@@ -31,9 +31,6 @@ public sealed class ProbationRecordEditPanelComponent(IPage page)
     private ILocator NotesTextArea => Panel.Locator("#probation-notes-input");
     private ILocator SuccessAlert => Panel.Locator(".alert-success[role='status']");
 
-    // Scoped both to this panel and by the "Reload latest values" button so the shared
-    // warning-alert markup can never be ambiguous with an unrelated alert elsewhere on the page —
-    // same convention as EditFutureCompensationDialog.ConcurrencyWarningBanner.
     private ILocator ConflictBanner =>
         Panel.Locator(".save-conflict-banner[role='alert']")
             .Filter(new() { Has = page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }) });
@@ -61,9 +58,6 @@ public sealed class ProbationRecordEditPanelComponent(IPage page)
     public Task SelectManagerAsync(string managerNameFragment) =>
         DropDownSelector.SelectAsync(page, ManagerFieldGroup, managerNameFragment);
 
-    /// <summary>Sets the Expected End Date field, verifying the typed value actually stuck (same retry
-    /// philosophy as EmployeeEditPage.FillAddCompensationEffectiveFromAsync — SfDatePicker commits over
-    /// a Blazor Server round-trip that can lag behind the next action under load).</summary>
     public async Task SetExpectedEndDateAsync(string ddMMyyyy)
     {
         for (var attempt = 1; attempt <= 3; attempt++)
@@ -92,7 +86,6 @@ public sealed class ProbationRecordEditPanelComponent(IPage page)
         await page.WaitForTimeoutAsync(150);
     }
 
-    /// <summary>Clicks Save and waits for the success message — the save was accepted.</summary>
     public async Task SaveExpectingSuccessAsync()
     {
         await SaveButton.ClickAsync();
@@ -110,7 +103,6 @@ public sealed class ProbationRecordEditPanelComponent(IPage page)
 
     public Task<bool> IsSuccessMessageVisibleAsync() => SuccessAlert.IsVisibleAsync();
 
-    /// <summary>Clicks "Reload latest values" in the banner and waits for it to clear, staying in the edit form.</summary>
     public async Task ClickReloadLatestValuesAsync()
     {
         await ConflictBanner.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }).ClickAsync();
@@ -123,7 +115,6 @@ public sealed class ProbationRecordEditPanelComponent(IPage page)
 
     public Task<string?> GetExpectedEndDateFieldValueAsync() => DatePickerInput.InputValueAsync();
 
-    // ── Read-only summary (after Save/Cancel, panel is not in edit mode) ──────────────────────────
     public async Task<string?> GetManagerSummaryTextAsync() =>
         await ManagerSummary.IsVisibleAsync() ? (await ManagerSummary.TextContentAsync())?.Trim() : null;
 
@@ -135,9 +126,6 @@ public sealed class ProbationRecordEditPanelComponent(IPage page)
 
     // ── Ticket 18: business-rule conflict (terminal status) vs. concurrency conflict ──────────────
 
-    /// <summary>Clicks Save and waits for the plain business-rule error alert (not the stale-write
-    /// SaveConflictBanner) — used when the rejection is an ordinary conflict (e.g. code "conflict"
-    /// for a now-terminal record), which must never show the concurrency banner.</summary>
     public async Task SaveExpectingBusinessErrorAsync()
     {
         await SaveButton.ClickAsync();
@@ -149,9 +137,6 @@ public sealed class ProbationRecordEditPanelComponent(IPage page)
     public async Task<string?> GetGlobalErrorTextAsync() =>
         await GlobalErrorAlert.IsVisibleAsync() ? (await GlobalErrorAlert.TextContentAsync())?.Trim() : null;
 
-    /// <summary>Clicks "Reload latest values" and waits for the editor itself to close — the
-    /// terminal-transition case (OnBecameTerminal), where the panel exits instead of staying open
-    /// with refreshed values.</summary>
     public async Task ClickReloadLatestValuesExpectingTerminalExitAsync()
     {
         await ConflictBanner.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }).ClickAsync();

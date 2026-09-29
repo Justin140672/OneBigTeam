@@ -191,14 +191,11 @@ public class AutoApprovingLeaveSubmissionConcurrencyEndpointTests
     {
         var (client, companyId, leaveTypeId, employeeId) = await SetupAutoApprovingEmployeeAsync();
 
-        var taskA = SubmitAsync(client, companyId, employeeId, leaveTypeId, "2026-08-03", "2026-08-05"); // 3 days
-        var taskB = SubmitAsync(client, companyId, employeeId, leaveTypeId, "2026-09-07", "2026-09-08"); // 2 days
+        var taskA = SubmitAsync(client, companyId, employeeId, leaveTypeId, "2026-08-03", "2026-08-05");
+        var taskB = SubmitAsync(client, companyId, employeeId, leaveTypeId, "2026-09-07", "2026-09-08");
         var responses = await Task.WhenAll(taskA, taskB);
 
         var succeeded = responses.Where(r => r.StatusCode == HttpStatusCode.Created || r.StatusCode == HttpStatusCode.OK).ToList();
-        // SubmitLeaveRequest/Endpoint.cs routes both "conflict" AND "concurrency" error codes to
-        // HTTP 409, matching ApproveLeaveRequest/Endpoint.cs, so the losing request must be a clean,
-        // client-retryable 409 - never a 500.
         var rejected = responses.Where(r => r.StatusCode == HttpStatusCode.Conflict).ToList();
 
         Assert.Single(succeeded);
@@ -211,8 +208,6 @@ public class AutoApprovingLeaveSubmissionConcurrencyEndpointTests
         Assert.True(balance.UsedDays == 3m || balance.UsedDays == 2m);
         Assert.Equal(25m - balance.UsedDays, balance.RemainingDays);
 
-        // Both requests were auto-approved on success or never persisted on failure - either way,
-        // exactly one Approved leave request exists for this employee, never two, never zero.
         var listResponse = await client.GetAsync($"/api/companies/{companyId}/employees/{employeeId}/leave-requests");
         listResponse.EnsureSuccessStatusCode();
         var list = await listResponse.Content.ReadFromJsonAsync<ListResponse>();
@@ -224,69 +219,45 @@ public class AutoApprovingLeaveSubmissionConcurrencyEndpointTests
     {
         var (client, companyId, leaveTypeId, employeeId) = await SetupAutoApprovingEmployeeAsync();
 
-        // A regular (non-draft) auto-approving submission and a draft submission racing for the
-        // SAME balance row - the draft's own auto-approval path mutates the identical LeaveBalance
-        // row a direct submission would.
-        var draftId = await CreateDraftAsync(client, companyId, employeeId, leaveTypeId, "2026-09-07", "2026-09-08"); // 2 days
+        var draftId = await CreateDraftAsync(client, companyId, employeeId, leaveTypeId, "2026-09-07", "2026-09-08");
 
-        var directTask = SubmitAsync(client, companyId, employeeId, leaveTypeId, "2026-08-03", "2026-08-05"); // 3 days
+        var directTask = SubmitAsync(client, companyId, employeeId, leaveTypeId, "2026-08-03", "2026-08-05");
         var draftSubmitTask = SubmitDraftAsync(client, companyId, employeeId, draftId);
         var responses = await Task.WhenAll(directTask, draftSubmitTask);
 
         var directResponse = responses[0];
         var draftResponse = responses[1];
 
-        // SubmitLeaveRequestDraft/Endpoint.cs routes "concurrency" to 409 the same way
-        // SubmitLeaveRequest/Endpoint.cs does, so a losing save surfaces as a clean 409 here too.
-        //
-        // Two genuinely valid outcomes exist depending on real timing, neither of which is a bug:
-        //   (a) the two requests' SaveChangesAsync calls genuinely overlap on the same balance row -
-        //       one gets DbUpdateConcurrencyException / 409, the other succeeds.
-        //   (b) the requests happen to execute back-to-back with no real overlap (HTTP/DB scheduling
-        //       is not deterministic) - both succeed against the balance's state at the time each one
-        //       read it, and neither loses. This is NOT a lost update: both deductions are applied,
-        //       in some order, and the final balance reflects both.
-        // Only a THIRD outcome - both succeeding while only one deduction lands, or neither landing,
-        // or an unhandled 500 - would indicate the fix is broken. That is what's actually asserted
-        // below, rather than forcing a specific one-winner-one-loser shape that real timing does not
-        // guarantee.
         if (draftResponse.StatusCode == HttpStatusCode.Conflict)
         {
-            // The draft lost the race - its persisted row must be completely unchanged (still
-            // Draft) and retryable.
             var getResponse = await client.GetAsync($"/api/companies/{companyId}/employees/{employeeId}/leave-requests");
             getResponse.EnsureSuccessStatusCode();
             var list = await getResponse.Content.ReadFromJsonAsync<ListResponse>();
             var persistedDraft = list!.Items.Single(i => i.Id == draftId);
             Assert.Equal("Draft", persistedDraft.Status);
 
-            // Retry now succeeds against the balance's current (post-winner) state.
             var retryResponse = await SubmitDraftAsync(client, companyId, employeeId, draftId);
             Assert.Equal(HttpStatusCode.OK, retryResponse.StatusCode);
             var retryPayload = await retryResponse.Content.ReadFromJsonAsync<LeaveRequestPayload>();
             Assert.Equal("Approved", retryPayload!.Status);
 
             var balanceAfterLoss = await GetBalanceAsync(client, companyId, employeeId, leaveTypeId);
-            Assert.Equal(5m, balanceAfterLoss.UsedDays); // 3 (direct winner) + 2 (retried draft)
+            Assert.Equal(5m, balanceAfterLoss.UsedDays);
         }
         else if (directResponse.StatusCode == HttpStatusCode.Conflict)
         {
-            // The draft won instead - equally valid given genuine timing non-determinism - in
-            // which case the direct submission was the one turned away.
             Assert.Equal(HttpStatusCode.OK, draftResponse.StatusCode);
 
             var balanceAfterLoss = await GetBalanceAsync(client, companyId, employeeId, leaveTypeId);
-            Assert.Equal(2m, balanceAfterLoss.UsedDays); // only the draft's deduction landed
+            Assert.Equal(2m, balanceAfterLoss.UsedDays);
         }
         else
         {
-            // No real overlap occurred - both legitimately succeeded, each against the balance
-            // state it actually read. Both deductions must be reflected exactly once each.
             Assert.Equal(HttpStatusCode.Created, directResponse.StatusCode);
             Assert.Equal(HttpStatusCode.OK, draftResponse.StatusCode);
 
             var balanceBothSucceeded = await GetBalanceAsync(client, companyId, employeeId, leaveTypeId);
-            Assert.Equal(5m, balanceBothSucceeded.UsedDays); // 3 + 2, never lost, never double-counted
+            Assert.Equal(5m, balanceBothSucceeded.UsedDays);
 
             var finalListResponse = await client.GetAsync($"/api/companies/{companyId}/employees/{employeeId}/leave-requests");
             finalListResponse.EnsureSuccessStatusCode();

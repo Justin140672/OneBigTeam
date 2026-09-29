@@ -38,9 +38,6 @@ public sealed record CompensationHistoryItemModel(
 
 public sealed record GetCompensationHistoryResponse(IReadOnlyList<CompensationHistoryItemModel> Items);
 
-// Matches the CompensationChangeReason enum's raw string values — used wherever a Reason needs a
-// human-readable label instead of the enum's PascalCase serialized form (e.g. "Compensation
-// History" grid). Follows the same convention as EmployeeNoteCategories.Label.
 public static class CompensationChangeReasons
 {
     public static string Label(string reason) => reason switch
@@ -56,7 +53,6 @@ public static class CompensationChangeReasons
     };
 }
 
-// ── CREATE ────────────────────────────────────────────────────────────────────
 
 public sealed record CreateCompensationRecordRequest(
     Guid CompanyId,
@@ -87,7 +83,6 @@ public sealed record CreateCompensationRecordResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
-// ── UPDATE (future-dated only) ─────────────────────────────────────────────────
 
 public sealed record UpdateFutureCompensationRecordRequest(
     Guid CompanyId,
@@ -122,7 +117,6 @@ public sealed record UpdateFutureCompensationRecordResponse(
     DateTimeOffset UpdatedAt,
     int Version = 0);
 
-// ── BULK ADJUSTMENT ─────────────────────────────────────────────────────────
 
 public sealed record BulkCompensationAdjustmentItem(
     Guid EmployeeId,
@@ -151,7 +145,6 @@ public sealed record BulkApplyCompensationAdjustmentsResponse(
     Guid BulkOperationId,
     IReadOnlyList<BulkCompensationAdjustmentResultItem> Items);
 
-// ── IMPORT ───────────────────────────────────────────────────────────────────
 
 public sealed record ImportedCompensationItem(
     Guid EmployeeId,

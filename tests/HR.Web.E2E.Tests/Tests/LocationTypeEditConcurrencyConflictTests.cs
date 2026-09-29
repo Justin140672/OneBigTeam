@@ -81,11 +81,9 @@ public sealed class LocationTypeEditConcurrencyConflictTests(HrAdminPersonaFixtu
         var otherTabDesc = $"E2E Other {Guid.NewGuid():N}"[..20];
         var finalDesc    = $"E2E Final {Guid.NewGuid():N}"[..20];
 
-        // ── Tab 1: open the editor and start editing the Description (loads Version v1) ──
         await edit.GoToEditAsync(AcmeId, id);
         await edit.SetDescriptionAsync(firstTabDesc);
 
-        // ── Tab 2 (same context / persona): load the same location type and save first ──
         var otherPage = await _context.NewPageAsync();
         try
         {
@@ -99,7 +97,6 @@ public sealed class LocationTypeEditConcurrencyConflictTests(HrAdminPersonaFixtu
             await otherPage.CloseAsync();
         }
 
-        // ── Tab 1: saving now is stale → conflict banner, page stays, input preserved ──
         await edit.SaveExpectingConflictAsync();
 
         Assert.True(await edit.IsConcurrencyWarningVisibleAsync(),
@@ -107,14 +104,12 @@ public sealed class LocationTypeEditConcurrencyConflictTests(HrAdminPersonaFixtu
         Assert.Contains($"/location-types/{id}", _page.Url);
         Assert.Equal(firstTabDesc, await edit.GetDescriptionAsync());
 
-        // ── Tab 1: "Reload latest values" clears the banner and adopts the other tab's value ──
         await edit.ClickReloadLatestValuesAsync();
 
         Assert.False(await edit.IsConcurrencyWarningVisibleAsync(),
             "Expected the conflict banner to clear after reloading latest values");
         Assert.Equal(otherTabDesc, await edit.WaitForDescriptionAsync(otherTabDesc));
 
-        // ── Tab 1: re-edit against the fresh version and save successfully ──
         await edit.SetDescriptionAsync(finalDesc);
         await edit.SaveAsync();
 

@@ -168,13 +168,6 @@
 
     protected override string? ListUrl => $"/companies/{CompanyId}/leave-types";
 
-    // Only the Annual Leave type record is allowed a default entitlement — keyed off the
-    // IsSystem flag (see LeaveType.IsSystem / item 50) rather than matching Name, since Annual
-    // Leave can no longer be renamed anyway and this is more robust than a name comparison. Any
-    // other leave type's Default Days field is hidden in the form above and forced to 0 here
-    // before saving, so a stale value can never be silently persisted for a non-system type. For
-    // a brand-new (not-yet-saved) leave type, Model.IsSystem is always false — there is no way to
-    // create a system leave type via this form.
     private bool IsAnnualLeave => Model.IsSystem;
 
     protected override async Task<string?> SaveCoreAsync()

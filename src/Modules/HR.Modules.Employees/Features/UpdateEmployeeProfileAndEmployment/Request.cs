@@ -15,7 +15,6 @@ internal sealed record UpdateEmployeeProfileAndEmploymentRequest
     public Guid CompanyId { get; init; }
     public Guid Id { get; init; }
 
-    // Profile
     public string FirstName { get; init; } = string.Empty;
     public string LastName { get; init; } = string.Empty;
     public string? PreferredName { get; init; }
@@ -35,7 +34,6 @@ internal sealed record UpdateEmployeeProfileAndEmploymentRequest
     public string? Country { get; init; }
     public bool HasSystemAccess { get; init; } = true;
 
-    // Employment (authoritative for the fields shared with the profile tab)
     public string? EmployeeNumber { get; init; }
     public Guid? EmploymentTypeId { get; init; }
     public EmploymentStatus Status { get; init; }
@@ -53,7 +51,6 @@ internal sealed record UpdateEmployeeProfileAndEmploymentRequest
     public decimal? HoursPerDayOverride { get; init; }
     public string? Notes { get; init; }
 
-    // One correlation id for the merged audit entry, one version guarding the whole aggregate.
     public Guid? CorrelationId { get; init; }
     public int? ExpectedVersion { get; init; }
 }

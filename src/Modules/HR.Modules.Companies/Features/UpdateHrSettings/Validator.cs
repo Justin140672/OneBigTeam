@@ -72,9 +72,6 @@ internal sealed class UpdateHrSettingsValidator : AbstractValidator<UpdateHrSett
 			.MaximumLength(20)
 			.When(request => !string.IsNullOrWhiteSpace(request.AssetNumberPrefix));
 
-		// SET-04: probation checkpoints. Each configured checkpoint must be positive; the set of
-		// configured checkpoints (nulls are simply "disabled" and skipped) must be strictly
-		// increasing and fall before the approximate probation end point (ProbationMonths * 30).
 		RuleFor(request => request.ProbationCheckpointDay1)
 			.GreaterThan(0)
 			.When(request => request.ProbationCheckpointDay1.HasValue);

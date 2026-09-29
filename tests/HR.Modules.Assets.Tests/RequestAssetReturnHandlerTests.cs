@@ -182,7 +182,7 @@ public class RequestAssetReturnHandlerTests
 
         var result = await handler.HandleAsync(new RequestAssetReturnRequest
         {
-            CompanyId = Guid.NewGuid(), // different company
+            CompanyId = Guid.NewGuid(),
             Id = assignmentId,
             RequestedBy = Guid.NewGuid()
         }, CancellationToken.None);

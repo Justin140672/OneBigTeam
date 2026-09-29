@@ -13,11 +13,6 @@ public static class DbSetAuditOutboxExtensions
 {
     private const int MaxAttemptsBeforeTerminal = 10;
 
-    /// <summary>
-    /// Stages an outbox entry for <paramref name="auditEvent"/> on <paramref name="outbox"/> - call
-    /// this instead of <c>IAuditEventPublisher.PublishAsync</c> directly, then let the caller's own
-    /// SaveChangesAsync (or <c>SaveIdempotentAsync</c>) commit it together with the business write.
-    /// </summary>
     public static void EnqueueAuditOutbox<TEntry, TAuditEvent>(
         this DbSet<TEntry> outbox,
         TAuditEvent auditEvent,
@@ -70,17 +65,6 @@ public static class DbSetAuditOutboxExtensions
         });
     }
 
-    /// <summary>
-    /// Delivers one bounded batch of due, undelivered entries - audit-channel entries via
-    /// <paramref name="auditPublisher"/>, integration-channel entries via
-    /// <paramref name="integrationPublisher"/> (omit if this module never enqueues integration
-    /// events) - durably tracking success, attempt count, next-attempt backoff, and terminal
-    /// failure. Safe to call repeatedly (e.g. from a recurring background job) - a delivery that
-    /// already succeeded is never re-sent, and one that keeps failing is retried with exponential
-    /// backoff up to <see cref="MaxAttemptsBeforeTerminal"/> attempts before being marked terminally
-    /// failed for an operator to investigate (its row is kept, not deleted, so nothing is silently
-    /// lost).
-    /// </summary>
     public static async Task<int> DispatchPendingAsync<TEntry>(
         this DbContext dbContext,
         DbSet<TEntry> outbox,
@@ -117,8 +101,6 @@ public static class DbSetAuditOutboxExtensions
                             ?? throw new InvalidOperationException(
                                 $"Outbox entry {entry.Id} needs an IIntegrationEventPublisher but none was supplied to DispatchPendingAsync."),
                         typeof(IIntegrationEventPublisher)),
-                    // Rows written before the Channel column existed default to "audit" - see
-                    // AuditOutboxEntryConfiguration.
                     _ => (auditPublisher, typeof(IAuditEventPublisher)),
                 };
 
@@ -150,7 +132,6 @@ public static class DbSetAuditOutboxExtensions
             catch (Exception ex)
             {
                 entry.AttemptCount++;
-                // Exception message only - never entry.PayloadJson, which may hold sensitive data.
                 entry.LastError = ex.Message;
 
                 if (entry.AttemptCount >= MaxAttemptsBeforeTerminal)

@@ -66,13 +66,6 @@ internal static class InternalAppointmentTestSeeder
     public static string HireUrl(Guid companyId, Guid vacancyId, Guid applicationId) =>
         $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/hire";
 
-    /// <summary>
-    /// A client for a fresh user holding Recruiter (recruitment:manage — the only permission the
-    /// appoint endpoint requires) plus HR Administrator (employee:manage) and Employee
-    /// (role:employee) so the same caller can also read the employee's promotion history and
-    /// timeline. Use <see cref="ClientWithRolesAsync"/> with Recruiter alone to test the
-    /// least-privileged appointer.
-    /// </summary>
     public static Task<HttpClient> RecruiterHrClientAsync(ApiWebApplicationFactory factory, Guid companyId) =>
         ClientWithRolesAsync(factory, companyId, SystemRoles.Recruiter, SystemRoles.HrAdministrator, SystemRoles.Employee);
 
@@ -101,7 +94,6 @@ internal static class InternalAppointmentTestSeeder
             noManager,
         };
 
-    /// <summary>Seeds the Employees-module side only (reference data, employee and managers).</summary>
     public static async Task<EmployeeWorld> SeedEmployeesAsync(
         ApiWebApplicationFactory factory, Guid companyId, Guid? employeeId = null)
     {
@@ -130,10 +122,6 @@ internal static class InternalAppointmentTestSeeder
             oldManager.Id, newManager.Id, current, target, targetTitle);
     }
 
-    /// <summary>
-    /// Seeds the stages and an open, internally advertised vacancy for the world's target profile.
-    /// Returns the vacancy id and the default stages.
-    /// </summary>
     public static async Task<(Guid VacancyId, IReadOnlyList<RecruitmentStage> Stages)> SeedVacancyAsync(
         ApiWebApplicationFactory factory, EmployeeWorld world, string advertTitle = "Engineering Manager")
     {
@@ -158,12 +146,6 @@ internal static class InternalAppointmentTestSeeder
         return (vacancy.Id, stages);
     }
 
-    /// <summary>
-    /// Seeds the full scenario: employees + vacancy + the employee's internal application on the Offer
-    /// stage (accepted offer, one interview, CV Review → Offer history).
-    /// Pass <paramref name="source"/> to seed a non-internal application instead (its candidate is then
-    /// an ordinary external candidate, not linked to the employee).
-    /// </summary>
     public static async Task<Scenario> SeedAsync(
         ApiWebApplicationFactory factory,
         Guid companyId,
@@ -241,10 +223,6 @@ internal static class InternalAppointmentTestSeeder
             .ToListAsync();
     }
 
-    /// <summary>
-    /// Puts the application into appointment Pending directly (as an interrupted request would have
-    /// left it), bumping Version as a real save does.
-    /// </summary>
     public static async Task MarkAppointmentPendingAsync(
         ApiWebApplicationFactory factory, Guid applicationId, Guid employeeId, DateTimeOffset requestedAt)
     {

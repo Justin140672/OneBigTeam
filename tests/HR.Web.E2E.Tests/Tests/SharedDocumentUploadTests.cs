@@ -4,17 +4,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the "Upload a shared company document" UI flow end-to-end: HR uploads a document
-/// via SharedDocuments.razor / UploadSharedCompanyDocumentDialog.razor, and it appears in the
-/// list as a Draft. Also verifies a Manager (who has shared-document:view-published but not
-/// shared-document:manage) is redirected away from the page entirely, matching the
-/// IsHrAdministrator-only page guard.
-///
-/// Uses Laura Bennett (laura.bennett@acme.example, HrAdministrator) whose company already has
-/// seeded document categories (Policy, Handbook, Procedure, Form, Guidance, Health and Safety,
-/// Other — see DocumentsModule.SeedDocumentsAsync) to pick from.
-/// </summary>
 public sealed class SharedDocumentUploadTests(ParallelBlankPersonaFixture fixture)
     : RoleE2ETestBase<ParallelBlankPersonaFixture>(fixture)
 {
@@ -39,7 +28,6 @@ public sealed class SharedDocumentUploadTests(ParallelBlankPersonaFixture fixtur
         var title = $"Test Policy {Guid.NewGuid():N}";
         await dialog.GetByPlaceholder("Document title").FillAsync(title);
 
-        // Select a category via the shared Syncfusion SfDropDownList helper.
         var categoryGroup = dialog.Locator(".col-md-6").Filter(new() { HasText = "Category" });
         await DropDownSelector.SelectAsync(_page, categoryGroup, "Policy");
 
@@ -52,8 +40,6 @@ public sealed class SharedDocumentUploadTests(ParallelBlankPersonaFixture fixtur
             await dialog.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true }).ClickAsync();
             await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 30_000 });
 
-            // The grid re-fetches after a successful upload — the new title should appear,
-            // and (per "new documents are created as drafts") its status column must read Draft.
             await _page.WaitForSelectorAsync($"text={title}", new() { Timeout = 15_000 });
             var row = _page.Locator(".e-row").Filter(new() { HasText = title });
             await Microsoft.Playwright.Assertions.Expect(row).ToContainTextAsync("Draft");
@@ -74,12 +60,6 @@ public sealed class SharedDocumentUploadTests(ParallelBlankPersonaFixture fixtur
         var target = _fixture.WebBaseUrl + "/companies/00000000-0000-0000-0000-000000000001/shared-documents";
         await _page.GotoAsync(target);
 
-        // The deny guard is a client-side Blazor NavigateTo(replace: true) fired only once
-        // AppSession's api/me permission fetch resolves over the SignalR circuit — NetworkIdle
-        // after the initial GET does not reliably observe that (same reasoning documented in
-        // AdministrativeRoleSeparationTests/AdminAccessAssertions.AssertDeniedAsync). Poll the URL
-        // instead of trusting NetworkIdle plus an instant assert, which under headless timing can
-        // read the URL before the redirect has actually landed.
         try
         {
             await _page.WaitForURLAsync(u => !u.Contains("/shared-documents"), new() { Timeout = 25_000 });
@@ -91,7 +71,6 @@ public sealed class SharedDocumentUploadTests(ParallelBlankPersonaFixture fixtur
         Assert.DoesNotContain("/shared-documents", _page.Url);
     }
 
-    // %PDF- followed by padding, so magic-byte content validation passes.
     private static byte[] BuildTestPdf()
     {
         var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };

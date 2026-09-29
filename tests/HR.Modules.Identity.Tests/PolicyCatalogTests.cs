@@ -4,10 +4,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Modules.Identity.Tests;
 
-/// <summary>
-/// IAM-06: sanity checks over <see cref="PolicyCatalog"/> itself, independent of the exhaustive
-/// role/policy matrix covered by <see cref="PolicyMatrixTests"/>.
-/// </summary>
 public class PolicyCatalogTests
 {
     [Fact]
@@ -31,7 +27,6 @@ public class PolicyCatalogTests
             .Select(f => (Guid)f.GetValue(null)!)
             .ToHashSet();
 
-        // No default/empty Guid ever declared as a permission constant.
         Assert.DoesNotContain(Guid.Empty, declaredPermissionIds);
 
         foreach (var (policyName, permissionId) in PolicyCatalog.PermissionPolicies)

@@ -2,10 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// Page object for the document type create/edit page.
-/// Routes: /companies/{id}/document-types/new  and  /companies/{id}/document-types/{id}
-/// </summary>
 public sealed class DocumentTypeEditPage(IPage page, string baseUrl)
 {
     public async Task GoToNewAsync(Guid companyId)
@@ -49,18 +45,12 @@ public sealed class DocumentTypeEditPage(IPage page, string baseUrl)
     public async Task<string> GetNameAsync() =>
         await page.GetByPlaceholder("e.g. Passport, Contract").InputValueAsync();
 
-    /// <summary>Navigates straight to an existing document type's edit page (/companies/{id}/document-types/{id}).</summary>
     public async Task GoToEditAsync(Guid companyId, Guid id)
     {
         await page.GotoAsync($"{baseUrl}/companies/{companyId}/document-types/{id}");
         await page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
     }
 
-    // ── Description field (optional HrTextBox / SfTextBox) ─────────────────────
-    // Same click-focus / select-all / delete / type-for-real / Tab-to-commit technique as
-    // CompanyEditPage.SetFirstAddressLine1Async — a bare FillAsync sets the DOM value through CDP
-    // and bypasses the Syncfusion component's own keyup/input listeners, so the typed value never
-    // round-trips to the Blazor-bound model.
     public async Task SetDescriptionAsync(string value)
     {
         var input = page.GetByPlaceholder("Optional description");
@@ -77,7 +67,6 @@ public sealed class DocumentTypeEditPage(IPage page, string baseUrl)
     public Task<string> GetDescriptionAsync() =>
         page.GetByPlaceholder("Optional description").InputValueAsync();
 
-    /// <summary>Auto-retrying wait for the Description field to hold <paramref name="expected"/> (used after an async reload/round-trip).</summary>
     public async Task<string> WaitForDescriptionAsync(string expected)
     {
         var input = page.GetByPlaceholder("Optional description");
@@ -110,14 +99,11 @@ public sealed class DocumentTypeEditPage(IPage page, string baseUrl)
     public Task<bool> IsConcurrencyWarningVisibleAsync() =>
         ConcurrencyWarningBanner.IsVisibleAsync();
 
-    /// <summary>Clicks "Reload latest values" in the concurrency banner and waits for it to clear.</summary>
     public async Task ClickReloadLatestValuesAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Reload latest values" }).ClickAsync();
         await ConcurrencyWarningBanner.WaitForAsync(
             new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
-        // The reload round-trips the service Get before repopulating the model; give the re-bound
-        // values a beat to land before callers read them.
         await page.WaitForTimeoutAsync(300);
     }
 

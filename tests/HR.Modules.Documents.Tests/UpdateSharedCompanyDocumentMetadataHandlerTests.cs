@@ -81,8 +81,6 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
     [Fact]
     public async Task HandleAsync_Does_Not_Change_Audience_Or_Acknowledgement()
     {
-        // Audience/RequiresAcknowledgement aren't in the "Editable fields" list — audience now
-        // has its own dedicated endpoint, so metadata updates must leave its rule rows untouched.
         await using var db = BuildContext();
         var companyId    = Guid.NewGuid();
         var category     = await SeedCategory(db, companyId);
@@ -146,7 +144,7 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
         var result = await Handler(db).HandleAsync(
             new UpdateSharedCompanyDocumentMetadataRequest
             {
-                CompanyId  = Guid.NewGuid(), // wrong company
+                CompanyId  = Guid.NewGuid(),
                 DocumentId = doc.Id,
                 Title      = "Title",
                 CategoryId = category.Id,
@@ -421,9 +419,6 @@ public class UpdateSharedCompanyDocumentMetadataHandlerTests
         var evt = Assert.Single(audit.Published);
         Assert.Equal("shared_company_document.metadata_updated", evt.EventType);
 
-        // The before/after snapshot must actually carry the ReviewOwnerEmployeeId change, not
-        // just trigger publication — serialize both and confirm the new id is only present in
-        // "after".
         var beforeJson = JsonSerializer.Serialize(evt.Before);
         var afterJson  = JsonSerializer.Serialize(evt.After);
         Assert.DoesNotContain(reviewOwnerId.ToString(), beforeJson, StringComparison.OrdinalIgnoreCase);

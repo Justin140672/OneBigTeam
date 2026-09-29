@@ -103,7 +103,6 @@
 
     protected override async Task OnLoadedAsync()
     {
-        // Load all active departments for the parent picker, excluding self.
         var list = await DepartmentService.ListDepartmentsAsync(CompanyId);
         var all = list?.Items ?? [];
         _otherDepts = IsNew ? all : all.Where(d => d.Id != Id).ToList();

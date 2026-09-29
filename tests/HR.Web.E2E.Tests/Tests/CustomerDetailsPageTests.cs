@@ -18,17 +18,8 @@ namespace HR.Web.E2E.Tests.Tests;
 /// </summary>
 public sealed class CustomerDetailsPageTests(EmployeePersonaFixture fixture) : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
-    // Acme Corporation — the standing seeded dev/E2E tenant (see CompaniesModule.SeedCompaniesAsync).
-    // It always has a persisted CompanySettings row (CreateDefault, guarded by Settings being null)
-    // and a Trial CustomerSubscription (Beta Corp is the Active one), so it is a
-    // reliable "fully populated" fixture for this read-only page.
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
-    // Seeded platform-admin allow-listed persona — see appsettings.Development.json's
-    // "PlatformAdmin:AllowedEmails" and DevPersonaStore. Also a valid dev-login persona (any
-    // Development persona email + password "password" satisfies HR.Admin.Web's dev-login stub),
-    // but being a valid persona and being platform-admin-authorised are two separate checks — see
-    // AdminLoginPage's remarks.
     private const string AllowListedAdminEmail = "priya.shah@acme.example";
 
     // Seeded plain-Employee persona (no platform-admin allow-list entry) — valid dev-login
@@ -50,7 +41,6 @@ public sealed class CustomerDetailsPageTests(EmployeePersonaFixture fixture) : R
         Assert.False(await details.IsErrorBannerVisibleAsync(),
             "Expected the allow-listed admin to see customer details, not the error banner");
 
-        // Company information
         Assert.Equal("Acme Corporation", await details.GetCompanyNameAsync());
         Assert.False(string.IsNullOrWhiteSpace(await details.GetStatusAsync()));
 
@@ -58,12 +48,9 @@ public sealed class CustomerDetailsPageTests(EmployeePersonaFixture fixture) : R
         // Beta Corp is the pre-activated tenant used for lifecycle mutation tests).
         Assert.Equal("Trial", await details.GetSubscriptionStatusAsync());
 
-        // Current pricing — the panel must render a value (a trial may legitimately read
-        // "Not applicable"), never blank.
         var monthlyCharge = await details.GetMonthlyChargeAsync();
         Assert.False(string.IsNullOrWhiteSpace(monthlyCharge));
 
-        // Employee counts / storage usage stat cards
         Assert.False(string.IsNullOrWhiteSpace(await details.GetActiveEmployeeCountAsync()));
         Assert.False(string.IsNullOrWhiteSpace(await details.GetTotalEmployeeCountAsync()));
         Assert.False(string.IsNullOrWhiteSpace(await details.GetStorageUsedAsync()));
@@ -73,8 +60,6 @@ public sealed class CustomerDetailsPageTests(EmployeePersonaFixture fixture) : R
     [Fact]
     public async Task CompanySettingsSummary_ForSeededCompanyWithSettings_ShowsValues()
     {
-        // Acme always has a persisted CompanySettings row (see class remarks), so this must show
-        // the real summary, not the "No settings configured yet" fallback.
         var login = new AdminLoginPage(_page, _fixture.AdminWebBaseUrl);
         var details = new CustomerDetailsPage(_page, _fixture.AdminWebBaseUrl);
 
@@ -104,14 +89,10 @@ public sealed class CustomerDetailsPageTests(EmployeePersonaFixture fixture) : R
 
         await details.GoToAsync(AcmeId);
 
-        // Billing History is a real, implemented feature now (GetCustomerBillingHistory), not a
-        // placeholder — its panel explains honestly why there's nothing to show (no live Stripe
-        // key configured in this dev/test environment) rather than saying "not yet available".
         Assert.True(await details.IsBillingHistoryPanelVisibleAsync());
         var billingText = await details.GetBillingHistoryTextAsync() ?? "";
         Assert.Contains("Stripe", billingText, StringComparison.OrdinalIgnoreCase);
 
-        // Login History genuinely is still an unbuilt placeholder.
         Assert.True(await details.IsLoginHistoryPanelVisibleAsync());
         var loginHistoryText = await details.GetLoginHistoryTextAsync() ?? "";
         Assert.Contains("not yet available", loginHistoryText, StringComparison.OrdinalIgnoreCase);
@@ -159,11 +140,6 @@ public sealed class CustomerDetailsPageTests(EmployeePersonaFixture fixture) : R
     [Fact]
     public async Task NonAllowListedPersona_IsRejectedAtLogin_NotGivenCustomerAccess()
     {
-        // tom.williams@acme.example is a valid seeded dev-login persona (dev-login stub only
-        // checks the persona exists + password "password"), but is not on
-        // "PlatformAdmin:AllowedEmails". The Admin Portal is platform-admin-only, so Login.razor
-        // probes /api/platform-admin/me with the fresh token and rejects a non-authorised account
-        // on the login page itself rather than handing it a session cookie.
         var login = new AdminLoginPage(_page, _fixture.AdminWebBaseUrl);
 
         await login.GoToAsync();
@@ -188,7 +164,6 @@ public sealed class CustomerDetailsPageTests(EmployeePersonaFixture fixture) : R
         Assert.True(await details.LoginAsCustomerButton.WaitUntilVisibleAsync(),
             "Expected the 'Login as customer' button to be visible for an allow-listed platform admin");
 
-        // Honest-limitation messaging must actually render, not be silently dropped.
         Assert.True(await details.IsAutomaticSignInNotYetImplementedNoteVisibleAsync(),
             "Expected the 'full automatic sign-in not yet implemented' note near the button");
     }

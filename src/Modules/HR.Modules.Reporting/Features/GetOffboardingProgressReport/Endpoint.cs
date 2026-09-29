@@ -9,8 +9,6 @@ internal sealed class Endpoint(GetOffboardingProgressReportHandler handler)
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/reporting/offboarding-progress");
-        // Sensitive HR data (access/asset return status) — HR Administrator scope only, per product
-        // decision. Mirrors GetEmployeeLeaverReport/Endpoint.cs.
         Policies("reporting:view-hr");
     }
 

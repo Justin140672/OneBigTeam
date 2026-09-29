@@ -45,12 +45,6 @@ public sealed class TaskService(HrApiHttpClientFactory httpClientFactory)
         return result.Task;
     }
 
-    /// <summary>
-    /// Loads a single task, distinguishing "the task genuinely does not exist / caller cannot
-    /// access it" (404/403 — <see cref="TaskFetchResult.NotFound"/>) from a recoverable/transient
-    /// failure (network error, timeout, 5xx — <see cref="TaskFetchResult.Failed"/>), so TaskViewDialog
-    /// can offer a retry for the latter instead of treating every failure as "task not found".
-    /// </summary>
     public async Task<TaskFetchResult> GetTaskResultAsync(Guid companyId, Guid taskId, CancellationToken cancellationToken = default)
     {
         try
@@ -68,8 +62,6 @@ public sealed class TaskService(HrApiHttpClientFactory httpClientFactory)
         }
         catch
         {
-            // Network failure, timeout, deserialization error, etc. — recoverable, not evidence the
-            // task itself is missing.
             return TaskFetchResult.Failed;
         }
     }
@@ -103,9 +95,6 @@ public sealed class TaskService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    // ── DSH-03 non-swallowing siblings ──────────────────────────────────────
-    // Duplicate the URL/GET of the matching method above but let exceptions propagate so
-    // WidgetSourceLoader can observe (and log) a genuine source failure. Do not add try/catch.
 
     public Task<UnassignedTaskListResponse?> GetUnassignedTasksOrThrowAsync(Guid companyId, CancellationToken cancellationToken = default) =>
         Http.GetFromJsonAsync<UnassignedTaskListResponse>(

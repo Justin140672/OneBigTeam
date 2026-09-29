@@ -66,14 +66,6 @@ internal sealed class PurgeCandidateDocumentStorageReconciliationJob(
         await ReconcileAuditDeliveriesAsync();
     }
 
-    /// <summary>
-    /// Resolves durable pre-upload intents (status Reserved) that were never confirmed within the
-    /// grace period — see class remarks. Never deletes anything directly: an intent found to have an
-    /// object in storage is transitioned to Pending and left for
-    /// <see cref="ReconcileDocumentDeletionsAsync"/> to actually claim/delete (on this same sweep,
-    /// since it runs immediately afterward), keeping exactly one code path responsible for the
-    /// destructive delete + retry/alert logic.
-    /// </summary>
     private async Task ResolveUnconfirmedUploadIntentsAsync()
     {
         var now = clock.UtcNowOffset();
@@ -204,8 +196,6 @@ internal sealed class PurgeCandidateDocumentStorageReconciliationJob(
         var reconcilerInstanceId = Guid.NewGuid();
         var claimed = new List<CandidateDocumentDeletionOperation>();
 
-        // Grouped by company so a company with many held documents costs one hold check each sweep,
-        // not one per document.
         foreach (var group in held.GroupBy(o => o.CompanyId))
         {
             if (await legalHoldStatusReader.IsUnderLegalHoldAsync(group.Key, CancellationToken.None))

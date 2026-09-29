@@ -82,8 +82,6 @@ internal sealed class OfferCandidateHandler(
             return Result.Failure<OfferCandidateResponse>(
                 Error.Validation($"Cannot make an offer for an application already on the terminal stage '{currentStage.Name}'."));
 
-        // Prefer the stage the company has explicitly flagged as its Offer stage
-        // (RecruitmentStagePurpose.Offer); fall back to "last non-terminal stage by DisplayOrder".
         var activeNonTerminalStages = await db.RecruitmentStages
             .AsNoTracking()
             .Where(s => s.CompanyId == request.CompanyId && s.IsActive && !s.IsTerminal)
@@ -117,10 +115,6 @@ internal sealed class OfferCandidateHandler(
             return Result.Failure<OfferCandidateResponse>(
                 Error.NotFound($"Vacancy '{request.VacancyId}' was not found."));
 
-        // Cross-module read: informational-only employment defaults from the linked Position Profile
-        // (owned by HR.Modules.Employees), resolved via the narrow IPositionProfileReader contract.
-        // Read before recording terms so an omitted salary/frequency can be pre-populated from the
-        // role's defined compensation — HR can still override with the actual agreed figure.
         var employmentDefaults = await positionProfileReader.GetEmploymentDefaultsAsync(
             request.CompanyId, vacancy.PositionProfileId, cancellationToken);
 

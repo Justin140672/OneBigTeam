@@ -27,8 +27,6 @@ internal sealed class ListVacanciesHandler(RecruitmentDbContext db, IPositionPro
 
         if (request.DepartmentId.HasValue)
         {
-            // Vacancy has no department column of its own — resolve the matching Position Profile IDs
-            // first via the narrow IPositionProfileReader contract, then filter by that set.
             var positionProfileIdsInDepartment = (await positionProfileReader.GetIdsByDepartmentAsync(
                 request.CompanyId, request.DepartmentId.Value, cancellationToken)).ToList();
 
@@ -37,13 +35,6 @@ internal sealed class ListVacanciesHandler(RecruitmentDbContext db, IPositionPro
 
         var orderedQuery = query.OrderByDescending(v => v.CreatedAt).AsQueryable();
 
-        // Bound the expensive per-row enrichment below (a batched, but still per-vacancy-scaling,
-        // Position Profile summary lookup plus a GroupBy application-count query) at the SQL level
-        // when there's no search text to honour — the common "just open the dropdown" case. When
-        // Search is also supplied, defer bounding until after the in-memory search filter further
-        // down instead (see there), since Search itself only runs in-memory over whatever this
-        // query already fetched — bounding here first could silently exclude the very vacancy the
-        // caller is typing to find.
         if (request.PageSize is > 0 && string.IsNullOrWhiteSpace(request.Search))
             orderedQuery = orderedQuery.Take(request.PageSize.Value);
 
@@ -62,8 +53,6 @@ internal sealed class ListVacanciesHandler(RecruitmentDbContext db, IPositionPro
             })
             .ToListAsync(cancellationToken);
 
-        // Batch cross-module read: resolves every linked Position Profile's canonical title/department
-        // in one round trip (via the narrow IPositionProfileReader contract) rather than N+1 queries.
         var positionProfileIds = vacancies
             .Select(v => v.PositionProfileId)
             .Distinct()

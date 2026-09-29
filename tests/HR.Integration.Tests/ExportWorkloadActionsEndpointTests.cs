@@ -44,10 +44,6 @@ public class ExportWorkloadActionsEndpointTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // REP-04: this endpoint moved from the broader "reporting:view" policy (Manager, Recruiter,
-    // HrAdministrator) to the dedicated "reporting:view-workload-actions" policy (Manager,
-    // HrAdministrator only) — same gate as GetWorkloadActions and the report catalogue's
-    // "workload-actions" entry.
     [Fact]
     public async Task Export_WorkloadActions_Returns_Forbidden_For_Recruiter_Only_Caller()
     {
@@ -157,7 +153,6 @@ public class ExportWorkloadActionsEndpointTests
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 
-    // ── Seeding helpers ──────────────────────────────────────────────────────
 
     private async Task<Guid> SeedEmployeeAsync(Guid companyId, string firstName, string lastName)
     {

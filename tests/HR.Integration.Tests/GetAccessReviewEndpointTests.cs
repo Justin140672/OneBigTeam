@@ -41,8 +41,6 @@ public class GetAccessReviewEndpointTests
     [Fact]
     public async Task Get_AccessReview_Returns_Forbidden_For_A_Role_Without_UsersManage()
     {
-        // "users:manage" (not "users:view") gates this endpoint — a role that only has
-        // "users:view" territory (e.g. Manager) must be forbidden here.
         var companyId = Guid.NewGuid();
         using var client = await AuthenticatedClient(companyId, role: SystemRoles.Manager);
 

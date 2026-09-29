@@ -7,8 +7,6 @@ namespace HR.Modules.Leave.Services;
 
 internal sealed class LeaveSummaryReader(LeaveDbContext dbContext) : ILeaveSummaryReader
 {
-    // Row cap (OBT-720 perf pass) — see HR.Modules.Sickness.Services.SicknessReportReader.MaxRows
-    // for rationale.
     private const int MaxRows = 50_000;
 
     public async Task<IReadOnlyList<LeaveSummaryReportRow>> GetLeaveSummaryAsync(
@@ -37,10 +35,6 @@ internal sealed class LeaveSummaryReader(LeaveDbContext dbContext) : ILeaveSumma
                 .ToDictionaryAsync(t => t.Id, t => t.Name, cancellationToken)
             : new Dictionary<Guid, string>();
 
-        // Pending request counts, per employee + leave type, for the same policy year window
-        // (approximate by request start date falling within the calendar policy year — Leave's
-        // policy-year windowing itself is more nuanced (see LeaveYearCalculator) but a simple
-        // calendar-year filter is sufficient for a summary report count).
         var requestQuery = dbContext.LeaveRequests
             .AsNoTracking()
             .Where(r => r.CompanyId == companyId &&

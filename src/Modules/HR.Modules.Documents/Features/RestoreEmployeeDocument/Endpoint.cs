@@ -5,9 +5,6 @@ using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Documents.Features.RestoreEmployeeDocument;
 
-// DOC-04: "authorised HR users can ... restore archived documents" — HR-only, same narrower
-// scope as GetArchivedEmployeeDocuments (IsHrAdministratorAsync), distinct from the
-// self/manager-hierarchy scope used for normal document access.
 internal sealed class Endpoint(
     RestoreEmployeeDocumentHandler handler,
     ICurrentUser currentUser,

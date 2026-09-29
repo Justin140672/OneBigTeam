@@ -2,12 +2,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Companies.Features.RetryBackgroundJob;
 
-/// <summary>
-/// Records a platform-administrator manually retrying a failed background job — an administrative
-/// intervention, so it is audited via the same cross-cutting IAuditEventPublisher as every other
-/// audited admin action in this module (see ForceCustomerReadOnly's Audit.cs remarks). There is no
-/// company/tenant associated with a platform-wide job, so EntityId is the Hangfire job id itself.
-/// </summary>
 internal sealed record BackgroundJobRetriedByAdminAuditEvent(
     string JobId,
     string JobName,
@@ -17,8 +11,6 @@ internal sealed record BackgroundJobRetriedByAdminAuditEvent(
     bool Success,
     string? Error) : IAuditEvent
 {
-    // Platform-wide action, not tied to any single tenant — same "no company" convention as other
-    // cross-tenant admin actions would need; there is no CustomerSubscription/Company row involved.
     Guid IAuditEvent.CompanyId => Guid.Empty;
     string IAuditEvent.EventType => "background-job.admin-retried";
     string IAuditEvent.EntityType => "BackgroundJob";

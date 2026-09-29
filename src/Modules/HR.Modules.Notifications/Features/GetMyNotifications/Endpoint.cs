@@ -15,8 +15,6 @@ internal sealed class Endpoint(GetMyNotificationsHandler handler, ICurrentUser c
 
     public override async Task HandleAsync(GetMyNotificationsRequest request, CancellationToken cancellationToken)
     {
-        // NOT User.FindFirst("sub") — that's the raw Supabase Auth user id, not this app's resolved
-        // Employee/UserId (see GetMyEmployee/Endpoint.cs for the rationale).
         if (currentUser.UserId is not { } employeeId)
         {
             await Send.ResultAsync(TypedResults.Unauthorized());

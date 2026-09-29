@@ -11,11 +11,6 @@ internal static class LeaveYearCalculator
     public static int GetPolicyYear(DateTimeOffset dateTime, int startMonth) =>
         GetPolicyYear(DateOnly.FromDateTime(dateTime.Date), startMonth);
 
-    /// <summary>
-    /// Returns the calendar bounds (inclusive start and end dates) of the given policy year, based
-    /// on the company's configured leave-year start month. Never hard-codes January-December — a
-    /// company configured for e.g. an April-March leave year gets bounds Apr 1 - Mar 31.
-    /// </summary>
     public static (DateOnly Start, DateOnly End) GetPolicyYearBounds(int policyYear, int startMonth)
     {
         var effectiveStartMonth = Math.Clamp(startMonth, 1, 12);

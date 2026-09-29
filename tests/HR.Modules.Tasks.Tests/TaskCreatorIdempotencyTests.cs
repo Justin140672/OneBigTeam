@@ -83,9 +83,6 @@ public class TaskCreatorIdempotencyTests
     [Fact]
     public async Task CreateAsync_Without_A_Key_Never_Sets_IdempotencyKey_And_Does_Not_Dedupe_Against_A_Prior_Call()
     {
-        // Unchanged legacy behaviour: idempotencyKey null (the default, and what most existing
-        // callers still pass) means no read-before-create check at all — two calls with otherwise
-        // identical arguments both create their own task, exactly as before OBT-REM-13.
         await using var ctx = BuildContext();
         var companyId = Guid.NewGuid();
         var sourceEntityId = Guid.NewGuid();

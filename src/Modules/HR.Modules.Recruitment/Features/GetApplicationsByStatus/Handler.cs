@@ -31,9 +31,6 @@ internal sealed class GetApplicationsByStatusHandler(
                 })
             .ToListAsync(cancellationToken);
 
-        // Batch cross-module read for the pure-display "VacancyTitle" (this feature is not about
-        // distinguishing advert vs. Position Profile — it just needs a title that's always populated),
-        // resolved as AdvertTitle ?? PositionProfile.Title — same pattern as ListVacanciesHandler.
         var positionProfileIds = rows
             .Select(r => r.PositionProfileId)
             .Distinct()

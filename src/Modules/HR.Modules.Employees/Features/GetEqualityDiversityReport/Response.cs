@@ -1,10 +1,5 @@
 namespace HR.Modules.Employees.Features.GetEqualityDiversityReport;
 
-/// <summary>
-/// Aggregated, anonymous workforce equality statistics. Contains counts and percentages only —
-/// never employee identifiers or row-level data. Small groups are suppressed (see
-/// <see cref="EqualityDiversityReportOptions"/>).
-/// </summary>
 internal sealed record GetEqualityDiversityReportResponse(
     int TotalEmployees,
     int RespondentCount,

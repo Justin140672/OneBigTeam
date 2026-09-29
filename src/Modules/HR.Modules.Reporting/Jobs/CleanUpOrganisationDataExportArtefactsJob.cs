@@ -70,7 +70,6 @@ internal sealed class CleanUpOrganisationDataExportArtefactsJob(
                 await jobStore.DeferArtefactCleanupAsync(export.Id, cancellationToken);
         }
 
-        // Straggler re-check: a superseded worker may have finished uploading after an earlier sweep.
         var recheck = await jobStore.GetRecentlyCleanedArtefactsAsync(BatchSize, cancellationToken);
         foreach (var export in recheck)
         {
@@ -88,7 +87,6 @@ internal sealed class CleanUpOrganisationDataExportArtefactsJob(
         }
     }
 
-    /// <returns><c>true</c> only when every orphan attempt archive was confirmed removed.</returns>
     private async Task<bool> TryDeleteOrphanAttemptArchivesAsync(
         OrganisationDataExportJobView export, CancellationToken cancellationToken)
     {
@@ -108,7 +106,6 @@ internal sealed class CleanUpOrganisationDataExportArtefactsJob(
         var allDeleted = true;
         foreach (var key in keys)
         {
-            // Preserve the published archive.
             if (!string.IsNullOrWhiteSpace(export.StorageKey) &&
                 string.Equals(key, export.StorageKey, StringComparison.Ordinal))
                 continue;

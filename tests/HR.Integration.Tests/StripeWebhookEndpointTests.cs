@@ -134,7 +134,6 @@ public class StripeWebhookEndpointTests
     {
         var companyId = await SeedCompanyWithSubscriptionAsync("cus_sig_test", "sub_sig_test");
         _factory.StripeGateway.ExceptionToThrowOnConstructEvent = new StripeException("Invalid signature.");
-        // Also arm an event: if processing were (wrongly) reached it would activate/cancel the row.
         _factory.StripeGateway.WebhookEventToReturn = new StripeWebhookEvent(
             "customer.subscription.deleted", "cus_sig_test", "sub_sig_test", null, null, null, "canceled", null);
 
@@ -193,9 +192,6 @@ public class StripeWebhookEndpointTests
             await db.SaveChangesAsync();
         }
 
-        // Truncated to microsecond precision — Postgres' timestamptz has microsecond resolution,
-        // finer than .NET's tick resolution, so an un-truncated DateTimeOffset fails an exact
-        // round-trip equality check after a save/reload.
         var snapshotPeriodEnd = new DateTimeOffset(DateTimeOffset.UtcNow.AddMonths(9).Ticks / 10 * 10, TimeSpan.Zero);
         var payloadPeriodEnd = new DateTimeOffset(DateTimeOffset.UtcNow.AddMonths(1).Ticks / 10 * 10, TimeSpan.Zero);
         var tieTimestampForEvent = new DateTimeOffset(2026, 9, 16, 10, 0, 0, TimeSpan.Zero);
@@ -228,10 +224,6 @@ public class StripeWebhookEndpointTests
         Assert.Equal(SubscriptionStatus.Active, persisted.Status);
         Assert.Equal(snapshotPeriodEnd, persisted.CurrentPeriodEnd);
         Assert.False(persisted.CancelAtPeriodEnd);
-        // Reconciliation for an already-activated subscription goes through UpdateFromStripe (same
-        // as any ordinary customer.subscription.updated projection), which does not touch PriceId —
-        // only the initial ActivateSubscription call sets it. PriceId therefore remains whatever
-        // ActivateSubscription originally set, not the snapshot's value.
         Assert.Equal("price_1", persisted.PriceId);
     }
 
@@ -285,9 +277,6 @@ public class StripeWebhookEndpointTests
         using var client = _factory.CreateClient();
         var response = await client.SendAsync(BuildRequest("{}", "t=1,v1=fake"));
 
-        // Consistent with the other "throw and let Stripe redeliver" paths in this endpoint (e.g.
-        // exhausted concurrency retries) — an unhandled exception surfaces as a server error rather
-        // than a 2xx, so Stripe redelivers instead of the projection being silently guessed.
         Assert.True((int)response.StatusCode >= 500);
 
         using var verifyScope = _factory.Services.CreateScope();
@@ -332,8 +321,6 @@ public class StripeWebhookEndpointTests
     {
         var companyId = await SeedCompanyWithSubscriptionAsync("cus_resumed_test", "sub_resumed_test");
 
-        // Move the seeded subscription to Paused first via the paused webhook, mirroring a real
-        // pause -> resume lifecycle through the endpoint.
         _factory.StripeGateway.WebhookEventToReturn = new StripeWebhookEvent(
             "customer.subscription.paused",
             "cus_resumed_test",
@@ -401,8 +388,6 @@ public class StripeWebhookEndpointTests
             pauseResponse.EnsureSuccessStatusCode();
         }
 
-        // No live snapshot registered for "sub_resumed_fail_test" — GetSubscriptionAsync returns
-        // null, and reconciliation must fail rather than trust the "resumed" payload directly.
         _factory.StripeGateway.WebhookEventToReturn = new StripeWebhookEvent(
             "customer.subscription.resumed",
             "cus_resumed_fail_test",

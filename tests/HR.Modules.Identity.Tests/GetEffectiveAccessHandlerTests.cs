@@ -14,9 +14,6 @@ public class GetEffectiveAccessHandlerTests(IdentityDatabaseFixture fixture)
     private GetEffectiveAccessHandler BuildHandler(FakeTargetUserCompanyGuard? guard = null) =>
         new(fixture.BuildContext(), new FakeEmployeeNameReader(), guard ?? new FakeTargetUserCompanyGuard(), new IdentityAuthorizationService(fixture.BuildContext(), Clock), Clock);
 
-    // -----------------------------------------------------------------------
-    // 1. Guard short-circuit
-    // -----------------------------------------------------------------------
 
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Guard_Reports_Not_A_Member()
@@ -36,9 +33,6 @@ public class GetEffectiveAccessHandlerTests(IdentityDatabaseFixture fixture)
         Assert.Equal((companyId, employeeId), guard.LastCall);
     }
 
-    // -----------------------------------------------------------------------
-    // 2. Position + direct role, no overrides
-    // -----------------------------------------------------------------------
 
     [Fact]
     public async Task HandleAsync_Populates_Position_DirectRoles_And_InheritedRoles_With_Correct_Sources()
@@ -87,9 +81,6 @@ public class GetEffectiveAccessHandlerTests(IdentityDatabaseFixture fixture)
         Assert.Empty(response.DeniedPermissions);
     }
 
-    // -----------------------------------------------------------------------
-    // 3. Active Deny override
-    // -----------------------------------------------------------------------
 
     [Fact]
     public async Task HandleAsync_Active_Deny_Override_Removes_Inherited_Role_And_Populates_DeniedPermissions()
@@ -140,9 +131,6 @@ public class GetEffectiveAccessHandlerTests(IdentityDatabaseFixture fixture)
         Assert.True(overrideDto.IsActive);
     }
 
-    // -----------------------------------------------------------------------
-    // 4. Active Grant override
-    // -----------------------------------------------------------------------
 
     [Fact]
     public async Task HandleAsync_Active_Grant_Override_Adds_Role_With_Override_Source_And_Its_Permissions()
@@ -178,9 +166,6 @@ public class GetEffectiveAccessHandlerTests(IdentityDatabaseFixture fixture)
         Assert.Contains(response.EffectivePermissions, p => p.PermissionId == permissionId);
     }
 
-    // -----------------------------------------------------------------------
-    // 5. Expired override
-    // -----------------------------------------------------------------------
 
     [Fact]
     public async Task HandleAsync_Expired_Override_Does_Not_Affect_Effective_Access_But_Is_Listed_As_Inactive()
@@ -232,9 +217,6 @@ public class GetEffectiveAccessHandlerTests(IdentityDatabaseFixture fixture)
         }
     }
 
-    // -----------------------------------------------------------------------
-    // 6. Critical cross-check against the real IdentityAuthorizationService
-    // -----------------------------------------------------------------------
 
     [Fact]
     public async Task HandleAsync_EffectiveRoles_And_EffectivePermissions_Exactly_Match_AuthorizationService()

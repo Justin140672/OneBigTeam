@@ -11,7 +11,6 @@ internal sealed class GetCustomerDatabaseAssignmentHandler(
         Guid companyId,
         CancellationToken cancellationToken)
     {
-        // Query PlatformDbContext.CustomerDatabaseAssignments by companyId
         var assignment = await platformDb.CustomerDatabaseAssignments
             .AsNoTracking()
             .FirstOrDefaultAsync(a => a.CompanyId == companyId, cancellationToken);

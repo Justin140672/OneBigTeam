@@ -8,12 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Postgres integration coverage for DELETE /candidates/{c}/documents/{d}. See
-/// DeleteCandidateDocumentHandlerTests in HR.Modules.Recruitment.Tests for the unit-level equivalent.
-/// Covers: anonymous 401, wrong-role 403, happy 204 + row removed, unknown document 404,
-/// cross-company 404 (a company B caller cannot delete company A's document).
-/// </summary>
 [Collection("Integration")]
 public class DeleteCandidateDocumentEndpointTests
 {

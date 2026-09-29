@@ -25,8 +25,6 @@ public class TaskCompletionReconciliationJobTests
     private static readonly DateTimeOffset StaleCreatedAt = Now - TimeSpan.FromMinutes(10);
     private static readonly DateTimeOffset FreshCreatedAt = Now - TimeSpan.FromMinutes(1);
 
-    /// <summary>Stub ITaskCompletionAction used to simulate a succeeding/failing dispatch action for
-    /// a given (Source, ActionType) pair. Mirrors CompleteTaskHandlerTests.StubCompletionAction.</summary>
     private sealed class StubCompletionAction(TaskSource source, TaskActionType actionType, Result result) : ITaskCompletionAction
     {
         public TaskSource Source => source;
@@ -57,7 +55,6 @@ public class TaskCompletionReconciliationJobTests
             "Review leave request", null, TaskPriority.Medium, TaskSource.Leave, TaskActionType.Approve,
             null, assignedEmployee, null, DateTimeOffset.UtcNow, sourceEntityId: sourceEntityId ?? Guid.NewGuid());
 
-    // ---- Stale Pending: replay ----
 
     [Fact]
     public async Task ExecuteAsync_Replays_Stale_Pending_Operation_And_Completes_Task_On_Dispatch_Success()
@@ -145,8 +142,6 @@ public class TaskCompletionReconciliationJobTests
         context.TaskCompletionOperations.Add(operation);
         await context.SaveChangesAsync();
 
-        // A dispatcher that would fail the test if invoked — proves the fresh Pending operation was
-        // never touched.
         var alwaysFailingDispatcher = new TaskCompletionDispatcher(
             [new StubCompletionAction(TaskSource.Leave, TaskActionType.Approve,
                 Result.Failure(Error.Validation("must not be invoked")))]);
@@ -167,7 +162,6 @@ public class TaskCompletionReconciliationJobTests
         var companyId = Guid.NewGuid();
         var completedBy = Guid.NewGuid();
 
-        // No TaskItem seeded — it no longer exists.
         var operation = TaskCompletionOperation.CreatePending(
             Guid.NewGuid(), companyId, Guid.NewGuid(), completedBy, "Approve", null, StaleCreatedAt);
         context.TaskCompletionOperations.Add(operation);
@@ -211,12 +205,9 @@ public class TaskCompletionReconciliationJobTests
         var reloadedOperation = await context.TaskCompletionOperations.AsNoTracking().SingleAsync(o => o.Id == operation.Id);
         Assert.Equal(TaskCompletionOperation.StatusDispatchApplied, reloadedOperation.Status);
 
-        // Converging the operation forward does not itself enqueue TaskCompletionEffectsJob — only
-        // an actual replay dispatch does (see ReplayPendingAsync).
         Assert.Empty(jobClient.CreatedJobs);
     }
 
-    // ---- Abandoned DispatchApplied: re-enqueue confirmation ----
 
     [Fact]
     public async Task ExecuteAsync_ReEnqueues_TaskCompletionEffectsJob_For_Abandoned_DispatchApplied_Operation_With_Null_LastAttemptAt()
@@ -266,7 +257,6 @@ public class TaskCompletionReconciliationJobTests
         var operation = TaskCompletionOperation.CreatePending(
             Guid.NewGuid(), companyId, task.Id, completedBy, "Approve", null, StaleCreatedAt);
         operation.MarkDispatchApplied(StaleCreatedAt);
-        // A subsequent attempt was recorded, but it too is stale.
         operation.RecordAttempt(StaleCreatedAt);
         context.TaskCompletionOperations.Add(operation);
         await context.SaveChangesAsync();
@@ -372,7 +362,7 @@ public class TaskCompletionReconciliationJobTests
             Assert.Equal(TaskCompletionOperation.StatusDispatchApplied, reloadedOperation.Status);
 
             var reloadedTask = await verify.TaskItems.SingleAsync(t => t.Id == taskId);
-            Assert.Equal(TaskItemStatus.Completed, reloadedTask.Status); // completed exactly once
+            Assert.Equal(TaskItemStatus.Completed, reloadedTask.Status);
         }
         finally
         {

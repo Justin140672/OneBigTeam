@@ -33,7 +33,6 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         catch { return null; }
     }
 
-    // DSH-03: non-swallowing siblings.
     public Task<GetExpiringDocumentsResponse?> GetExpiringDocumentsOrThrowAsync(
         Guid companyId, CancellationToken cancellationToken = default) =>
         Http.GetFromJsonAsync<GetExpiringDocumentsResponse>(
@@ -203,7 +202,6 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         catch { return null; }
     }
 
-    // Returns null on success, or an error message string on failure.
     public async Task<string?> AcknowledgeSharedCompanyDocumentAsync(
         Guid companyId, Guid documentId, Guid? taskId, bool confirmed, CancellationToken cancellationToken = default)
     {
@@ -274,13 +272,9 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         return await ReadSaveResultAsync(response, "Update failed", cancellationToken);
     }
 
-    // Returns null on success, or an error message string on failure.
     public async Task<string?> PublishSharedCompanyDocumentAsync(
         Guid companyId, Guid documentId, CancellationToken cancellationToken = default)
     {
-        // FastEndpoints rejects a bodyless POST with 415 Unsupported Media Type once it has
-        // no Content-Type to bind against — an empty JSON object is the minimal body that
-        // satisfies model binding for this action, same as the integration tests' EmptyJson().
         var response = await Http.PostAsync(
             $"api/companies/{companyId}/shared-documents/{documentId}/publish",
             new StringContent("{}", Encoding.UTF8, "application/json"),
@@ -289,7 +283,6 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         return result.Success ? null : (result.DisplayMessage ?? "Publish failed.");
     }
 
-    // Returns null on success, or an error message string on failure.
     public async Task<string?> ReissueSharedCompanyDocumentAcknowledgementAsync(
         Guid companyId, Guid documentId, CancellationToken cancellationToken = default)
     {
@@ -301,7 +294,6 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         return result.Success ? null : (result.DisplayMessage ?? "Reissue failed.");
     }
 
-    // Returns null on success, or an error message string on failure.
     public async Task<string?> ArchiveSharedCompanyDocumentAsync(
         Guid companyId, Guid documentId, string reason, CancellationToken cancellationToken = default)
     {
@@ -312,13 +304,9 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         return result.Success ? null : (result.DisplayMessage ?? "Archive failed.");
     }
 
-    // Returns null on success, or an error message string on failure.
     public async Task<string?> ExpireSharedCompanyDocumentAsync(
         Guid companyId, Guid documentId, CancellationToken cancellationToken = default)
     {
-        // FastEndpoints rejects a bodyless POST with 415 Unsupported Media Type once it has
-        // no Content-Type to bind against — an empty JSON object is the minimal body that
-        // satisfies model binding for this action, same as the integration tests' EmptyJson().
         var response = await Http.PostAsync(
             $"api/companies/{companyId}/shared-documents/{documentId}/expire",
             new StringContent("{}", Encoding.UTF8, "application/json"),
@@ -327,7 +315,6 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         return result.Success ? null : (result.DisplayMessage ?? "Expire failed.");
     }
 
-    // Returns null on success, or an error message string on failure.
     public async Task<string?> CompleteSharedCompanyDocumentReviewAsync(
         Guid companyId, Guid documentId, string reviewNotes, CancellationToken cancellationToken = default)
     {
@@ -358,7 +345,6 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         return await ReadSaveResultAsync(response, "Update failed", cancellationToken);
     }
 
-    // Returns null on success, or an error message string on failure.
     public async Task<string?> UploadSharedCompanyDocumentVersionAsync(
         Guid companyId,
         Guid documentId,
@@ -387,17 +373,12 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         return result.Success ? null : (result.DisplayMessage ?? "Upload failed.");
     }
 
-    // Relative URL for the download redirect endpoint — bind directly to an <a href> so the
-    // browser follows the server-side redirect (and its access check) itself.
     public string GetSharedCompanyDocumentDownloadUrl(Guid companyId, Guid documentId) =>
         $"api/companies/{companyId}/shared-documents/{documentId}/download";
 
-    // Relative URL for the past-version download redirect endpoint — bind directly to an <a href> so the
-    // browser follows the server-side redirect (and its access check) itself.
     public string GetSharedCompanyDocumentVersionDownloadUrl(Guid companyId, Guid documentId, int versionNumber) =>
         $"api/companies/{companyId}/shared-documents/{documentId}/versions/{versionNumber}/download";
 
-    // Returns null on success, or an error message string on failure.
     public async Task<string?> UploadSharedCompanyDocumentAsync(
         Guid companyId,
         string title,
@@ -460,7 +441,6 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         return result.Success ? null : (result.DisplayMessage ?? "Upload failed.");
     }
 
-    // Returns null on success, or an error message string on failure.
     public async Task<string?> UploadEmployeeDocumentAsync(
         Guid companyId,
         Guid employeeId,
@@ -565,13 +545,9 @@ public sealed class DocumentService(HrApiHttpClientFactory httpClientFactory)
         return response.IsSuccessStatusCode;
     }
 
-    // Relative URL for the download redirect endpoint — bind directly to an <a href> so the
-    // browser follows the server-side redirect (and its scan-status gate and download audit
-    // event) itself. Do NOT resolve a signed URL via the detail endpoint — detail is metadata only.
     public string GetEmployeeDocumentDownloadUrl(Guid companyId, Guid employeeId, Guid employeeDocumentId) =>
         $"api/companies/{companyId}/employees/{employeeId}/documents/{employeeDocumentId}/download";
 
-    // Returns null on success, or an error message string on failure.
     public async Task<string?> UploadEmployeeDocumentVersionAsync(
         Guid companyId,
         Guid employeeId,

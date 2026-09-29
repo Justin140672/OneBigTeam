@@ -5,14 +5,6 @@ using Microsoft.Extensions.Configuration;
 
 namespace HR.Modules.Identity.Tests;
 
-/// <summary>
-/// CodeQL #34 (clear-text logging of sensitive information): <see cref="RequestPasswordResetHandler"/>
-/// handles an email address, a live Supabase recovery action URL (containing a single-use recovery
-/// token), the redirect URL and the caller's user agent. Only the boolean dispatch outcome
-/// (EmailSent) may reach the log — never the address, its local part, the recovery link/token,
-/// the redirect URL or the user agent, on any logging channel (message, structured state, scopes,
-/// exception). Also covers the no-matching-profile path.
-/// </summary>
 [Collection("IdentityDatabase")]
 public class RequestPasswordResetLogExposureTests(IdentityDatabaseFixture fixture)
 {
@@ -58,7 +50,7 @@ public class RequestPasswordResetLogExposureTests(IdentityDatabaseFixture fixtur
 
         Assert.True(result.IsSuccess);
         var sent = Assert.Single(emailSender.Sent);
-        Assert.Equal(ActionUrl, sent.ActionUrl); // the link really flowed through the handler
+        Assert.Equal(ActionUrl, sent.ActionUrl);
         var generated = Assert.Single(gateway.RecoveryLinksGenerated);
 
         AssertNoSensitiveText(logger.AllText, email, localPart, generated.RedirectTo);

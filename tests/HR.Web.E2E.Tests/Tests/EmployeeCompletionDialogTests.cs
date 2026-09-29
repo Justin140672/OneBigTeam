@@ -5,41 +5,9 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Covers the "Complete Initial Employee Record on First Login" feature: MainLayout.razor's global
-/// gate that renders ONLY EmployeeCompletionDialog.razor (no sidebar/topbar/@Body) whenever the
-/// current session's employee has RequiresInitialSetup = true, and the /getting-started checklist's
-/// integration with it.
-///
-/// ── Establishing a RequiresInitialSetup = true session ──────────────────────────────────────────
-/// There is no existing E2E fixture that reaches this state (every seeded dev persona's employee
-/// already has real personal details, so none of them has RequiresInitialSetup = true — see
-/// EmployeeProvisioningService.MarkAsInitialCompanyAdminAsync, which only sets it for a BRAND NEW
-/// company's auto-created initial admin at signup time). This test class instead signs a fresh
-/// company up for real against HR.Api's POST /api/signup (same technique
-/// VerifyEmailJourneyTests.DevActivateCompany_ActivatesNewlySignedUpCompany already uses to reach a
-/// PendingVerification company), then uses the dev-only POST /api/dev/activate-company bypass to
-/// flip it to Active without a live Supabase verification click.
-///
-/// Logging in as that brand-new admin (not a seeded dev persona) is only possible in this
-/// environment because E2E_TESTING=true swaps in FakeSupabaseAuthGateway (see that class's own
-/// remarks): SignInWithPasswordAsync accepts ANY email as long as the password matches the fixed
-/// seeded dev password, deriving a deterministic fake Supabase user id from the email — the exact
-/// same id EnsureDevUserAsync/CreateConfirmedUserAsync would have derived for that email during
-/// signup. So POST /api/signup is called with that same fixed password, and LoginPage.LoginAsync
-/// then logs in as the new admin exactly like any other persona. This is an ASSUMPTION specific to
-/// the E2E_TESTING fake-gateway environment this suite always runs against; it would not work
-/// against a real Supabase project.
-///
-/// Uses ParallelBlankPersonaFixture (no single fixed persona, never mid-test persona switching) —
-/// each test signs up and logs in as its OWN freshly-generated admin email, so tests never collide.
-/// </summary>
 public sealed class EmployeeCompletionDialogTests(ParallelBlankPersonaFixture fixture)
     : RoleE2ETestBase<ParallelBlankPersonaFixture>(fixture)
 {
-    // Mirrors LoginPage.DevPersonaPassword (private there) — FakeSupabaseAuthGateway.SignInWithPasswordAsync
-    // rejects any sign-in whose password doesn't match this fixed value, regardless of what was
-    // passed to POST /api/signup, so signup must use the same value for the later login to succeed.
     private const string DevPersonaPassword = "Dev-Only-Password-1!";
 
     private async Task<(Guid CompanyId, string Email)> SignUpAndActivateFreshCompanyAsync()
@@ -102,7 +70,6 @@ public sealed class EmployeeCompletionDialogTests(ParallelBlankPersonaFixture fi
     {
         var dialog = await LoginAndReachBlockedShellAsync();
 
-        // SignUpAndActivateFreshCompanyAsync registers the admin with first name "Placeholder".
         Assert.True(await dialog.HeadingShowsWelcomeForAsync("Placeholder"),
             $"Expected personalised welcome heading. Actual: {await dialog.HeadingTextAsync()}");
     }
@@ -185,8 +152,6 @@ public sealed class EmployeeCompletionDialogTests(ParallelBlankPersonaFixture fi
     {
         var dialog = await LoginAndReachBlockedShellAsync();
 
-        // Exact boundary: the rule requires strictly AFTER 1900-01-01 (see EmployeeCompletionDialog's
-        // DateAfter1900Attribute) — 1 Jan 1900 itself must fail.
         await dialog.FillDateOfBirthAsync("01/01/1900");
         await dialog.FillAddressLine1Async("1 Test Street");
         await dialog.FillCityAsync("London");
@@ -244,10 +209,6 @@ public sealed class EmployeeCompletionDialogTests(ParallelBlankPersonaFixture fi
     {
         var dialog = await LoginAndReachBlockedShellAsync();
 
-        // RequiresInitialSetup is still true — navigating to /getting-started is globally
-        // intercepted by MainLayout's gate and shows the SAME blocking dialog, not the checklist
-        // page itself (matches the feature's documented behaviour: the checklist's LinkUrl for this
-        // item is just "/getting-started").
         Assert.True(await dialog.IsVisibleAsync());
     }
 

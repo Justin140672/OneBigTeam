@@ -8,18 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// [P1] Case-insensitive candidate email uniqueness, end to end against PostgreSQL. Every candidate
-/// write path — legacy POST /candidates, the combined multipart POST .../applications/new-candidate,
-/// and PUT /candidates/{id} — treats emails that differ only in case or surrounding whitespace as the
-/// same candidate within a company, and a lost race is always a 409 (never a 500).
-///
-/// Status codes: FluentValidation failures are 422 (HR.Api configures FastEndpoints with
-/// <c>Errors.StatusCode = 422</c>); duplicates on either create path are 409 with the
-/// <c>candidate_email_exists</c> body; PUT duplicates are 409 <c>{ error }</c>.
-/// See CandidateEmailUniquenessPostgresTests / CandidateEmailMigrationTests in
-/// HR.Modules.Recruitment.Tests for handler-level race and migration coverage.
-/// </summary>
 [Collection("Integration")]
 public class CandidateEmailUniquenessEndpointTests
 {
@@ -55,7 +43,6 @@ public class CandidateEmailUniquenessEndpointTests
 
     private static string UniqueLocalPart(string prefix) => $"{prefix}.{Guid.NewGuid():N}";
 
-    /// <summary>Returns (lower, upper-padded) variants of a unique email.</summary>
     private static (string Lower, string Variant) EmailVariants(string prefix)
     {
         var local = UniqueLocalPart(prefix);
@@ -106,7 +93,6 @@ public class CandidateEmailUniquenessEndpointTests
         return body;
     }
 
-    // ---- Legacy create -----------------------------------------------------------------------------
 
     [Fact]
     public async Task Post_Legacy_Returns_Unauthorized_For_Anonymous_Request()
@@ -195,7 +181,6 @@ public class CandidateEmailUniquenessEndpointTests
         Assert.Empty(await CandidatesForCompanyAsync(companyId));
     }
 
-    // ---- Legacy create vs combined intake ----------------------------------------------------------
 
     [Fact]
     public async Task Intake_After_Legacy_Create_With_Case_Variant_Returns_Conflict_And_Creates_No_Application()
@@ -237,7 +222,6 @@ public class CandidateEmailUniquenessEndpointTests
         Assert.Equal(1, await CountApplicationsForVacancyAsync(vacancyId));
     }
 
-    // ---- Concurrency --------------------------------------------------------------------------------
 
     [Fact]
     public async Task Concurrent_Legacy_Posts_For_Case_Variants_Return_One_Created_And_One_Conflict()
@@ -306,7 +290,6 @@ public class CandidateEmailUniquenessEndpointTests
         }
     }
 
-    // ---- Update ------------------------------------------------------------------------------------
 
     [Fact]
     public async Task Put_Candidate_Returns_Conflict_When_Email_Is_Case_Variant_Of_Another_Candidate()

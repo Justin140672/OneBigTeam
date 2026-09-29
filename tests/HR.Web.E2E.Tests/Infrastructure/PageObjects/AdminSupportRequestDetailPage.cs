@@ -14,11 +14,6 @@ public sealed class AdminSupportRequestDetailPage(IPage page, string baseUrl)
 {
     private const string ResolvedSelector = ".details-grid, .dashboard-error";
 
-    // The status SfDropDownList — raw enum values are the DataSource with no ValueTemplate (see
-    // SupportRequestDetails.razor), so option text is the literal enum string (e.g. "UnderReview"),
-    // not a humanized label.
-    // Only one .admin-action-field group exists on this page (the Status field) — see
-    // SupportRequestDetails.razor's admin-actions-panel section.
     private ILocator StatusCombobox => page.Locator(".admin-action-field");
 
     public async Task GoToAsync(Guid companyId, Guid id)
@@ -32,20 +27,6 @@ public sealed class AdminSupportRequestDetailPage(IPage page, string baseUrl)
 
     public Task<string?> GetTitleAsync() => page.Locator("h2").First.TextContentAsync();
 
-    /// <summary>
-    /// The status combobox's own bound value (its native input's value — see DropDownSelector's
-    /// remarks on why the input, not the visible list-item text, is the reliable read of the
-    /// currently-committed value).
-    ///
-    /// GoToAsync only waits for the page's ".details-grid" markup to appear, which is Blazor Server
-    /// rendering the razor tree with _selectedStatus already populated — it says nothing about
-    /// whether Syncfusion's JS interop has finished initialising the SfDropDownList widget and
-    /// copied that bound value into its own native &lt;input&gt; yet (a separate, later interop
-    /// round trip — the same render-to-interop gap DropDownSelector's remarks describe for opening
-    /// a popup). Reading the input immediately after navigation can race that init and observe an
-    /// empty value. Wait for the input to actually hold some non-empty value before reading it back,
-    /// rather than reading it the instant the surrounding markup exists.
-    /// </summary>
     public async Task<string> GetSelectedStatusAsync()
     {
         var input = StatusCombobox.Locator("input").First;
@@ -61,7 +42,6 @@ public sealed class AdminSupportRequestDetailPage(IPage page, string baseUrl)
 
     public Task<bool> IsSaveDisabledAsync() => SaveStatusButton.IsDisabledAsync();
 
-    /// <summary>Saves and waits for either the success message or the conflict banner to settle.</summary>
     public async Task SaveAsync()
     {
         await SaveStatusButton.ClickAsync();
@@ -100,27 +80,12 @@ public sealed class AdminSupportRequestDetailPage(IPage page, string baseUrl)
     public ILocator BackToSupportRequestsLink =>
         page.GetByRole(AriaRole.Link, new() { Name = "Back to support requests" });
 
-    /// <summary>
-    /// The Conversation section (a <c>section.details-panel</c> whose own h2 is "Conversation" —
-    /// the page has several <c>.details-panel</c> sections, so the heading is what identifies it).
-    /// Only rendered once the request has at least one response.
-    /// </summary>
     private ILocator ConversationSection =>
         page.Locator("section.details-panel")
             .Filter(new() { Has = page.GetByRole(AriaRole.Heading, new() { Name = "Conversation", Level = 2, Exact = true }) });
 
-    /// <summary>
-    /// Every rendered support response body in the Conversation section (P1 stored-XSS fix: these
-    /// are the <c>div.support-response-body</c> containers rendered through the shared
-    /// SupportHtmlSanitizer). Plural by design — use <c>.First</c>/<c>.Nth</c> or count it.
-    /// </summary>
     public ILocator ConversationBodies => ConversationSection.Locator("div.support-response-body");
 
-    /// <summary>
-    /// Waits until the Conversation section has rendered exactly
-    /// <paramref name="expectedCount"/> response bodies (Blazor Server renders the detail
-    /// markup after its API round trip, so this is later than <see cref="GoToAsync"/>'s signal).
-    /// </summary>
     public async Task WaitForConversationAsync(int expectedCount = 1)
     {
         await ConversationBodies.First.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });

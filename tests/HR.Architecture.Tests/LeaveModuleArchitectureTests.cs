@@ -51,7 +51,6 @@ public class LeaveModuleArchitectureTests
         Assert.Equal("leave", context.Model.GetDefaultSchema());
     }
 
-    // ── LeaveType ────────────────────────────────────────────────────────────────
 
     [Fact]
     public void LeaveType_Entity_Is_Not_Public()
@@ -86,7 +85,6 @@ public class LeaveModuleArchitectureTests
         AssertSnakeCase(context.Model.FindEntityType(typeof(LeaveType))!);
     }
 
-    // ── LeavePolicy ──────────────────────────────────────────────────────────────
 
     [Fact]
     public void LeavePolicy_Entity_Is_Not_Public()
@@ -121,7 +119,6 @@ public class LeaveModuleArchitectureTests
         AssertSnakeCase(context.Model.FindEntityType(typeof(LeavePolicy))!);
     }
 
-    // ── LeaveBalance ─────────────────────────────────────────────────────────────
 
     [Fact]
     public void LeaveBalance_Entity_Is_Not_Public()
@@ -156,7 +153,6 @@ public class LeaveModuleArchitectureTests
         AssertSnakeCase(context.Model.FindEntityType(typeof(LeaveBalance))!);
     }
 
-    // ── LeaveRequest ─────────────────────────────────────────────────────────────
 
     [Fact]
     public void LeaveRequest_Entity_Is_Not_Public()
@@ -191,7 +187,6 @@ public class LeaveModuleArchitectureTests
         AssertSnakeCase(context.Model.FindEntityType(typeof(LeaveRequest))!);
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
 
     private static void AssertSnakeCase(Microsoft.EntityFrameworkCore.Metadata.IEntityType entityType)
     {

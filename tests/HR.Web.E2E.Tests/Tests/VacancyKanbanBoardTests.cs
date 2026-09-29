@@ -38,9 +38,6 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
     private const string MarcusEmail = "marcus.diallo@acme.example";
     private const string LauraEmail = "laura.bennett@acme.example";
 
-    // RecruitmentStageSeeder.BuildDefaultStages — the default stage set every company gets the first
-    // time recruitment data exists for it. A freshly created Application always starts on the first
-    // of these (DisplayOrder 1, "Application Received").
     private const string InitialStage      = "Application Received";
     private const string NonTerminalStage2 = "CV Review";
     private const string TerminalHired     = "Hired";
@@ -60,14 +57,9 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
                 $"Expected a Kanban column header for stage '{stage}' to render, including stages with no current candidates");
         }
 
-        // The freshly created application sits in the seeded initial stage — its column should show
-        // a count of at least 1 (other tests/data may also share this stage on other vacancies'
-        // boards, but this board is scoped to a single vacancy, so ours is the only contributor here).
         Assert.True(await kanban.GetColumnCountAsync(InitialStage) >= 1,
             $"Expected the '{InitialStage}' column count to include the new application for {candidateLast}");
 
-        // A stage nothing has reached yet on this vacancy's board (e.g. "Hired") should still
-        // render its header with a count of 0, not be hidden entirely.
         Assert.Equal(0, await kanban.GetColumnCountAsync(TerminalHired));
     }
 
@@ -79,14 +71,11 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
         Assert.True(await kanban.HasCardForNameAsync(candidateLast),
             "Expected the new candidate's card to be visible before filtering");
 
-        // Filter down to a name fragment that only matches a candidate that does not exist —
-        // the real candidate's card must disappear.
         await kanban.FillSearchAsync("NoSuchCandidateXyz");
         Assert.False(await kanban.HasCardForNameAsync(candidateLast),
             "Expected the candidate's card to be hidden once the search term no longer matches their name");
         Assert.Equal(0, await kanban.CountVisibleCardsAsync());
 
-        // Filtering back to (part of) the real name brings the card back.
         await kanban.FillSearchAsync(candidateLast);
         Assert.True(await kanban.HasCardForNameAsync(candidateLast),
             "Expected the candidate's card to reappear once the search term matches their name again");
@@ -99,12 +88,10 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
 
         await kanban.ClickCardAsync(candidateLast);
 
-        // VacancyKanbanBoard.OpenCandidate navigates to /companies/{companyId}/candidates/{candidateId}.
         await _page.WaitForURLAsync(new System.Text.RegularExpressions.Regex(@"/candidates/[0-9a-f-]{36}"),
             new() { Timeout = 15_000 });
         Assert.Matches(@"/candidates/[0-9a-f-]{36}", _page.Url);
 
-        // The candidate detail page that loads should be for this same candidate.
         var candidateEdit = new CandidateEditPage(_page, _fixture.WebBaseUrl);
         Assert.Equal("E2E", await candidateEdit.GetFirstNameAsync());
     }
@@ -126,9 +113,6 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
         Assert.False(await kanban.IsCardInColumnAsync(candidateLast, InitialStage),
             $"Expected the card for {candidateLast} to no longer be in the '{InitialStage}' column after the drag");
 
-        // Re-navigate to the standalone board (a fresh GetRecruitmentKanbanHandler query) to confirm
-        // MoveApplicationStageAsync's effect was actually persisted server-side, rather than only
-        // reflected in the client-side widget state left over from the drag.
         var vacancyId = ExtractVacancyIdFromUrl(_page.Url);
         var reloadedKanban = new VacancyKanbanBoardPage(_page, _fixture.WebBaseUrl);
         await reloadedKanban.GoToStandaloneAsync(AcmeId, vacancyId);
@@ -139,11 +123,6 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
             $"Expected the card to no longer be reported on '{InitialStage}' after a fresh page load");
     }
 
-    /// <summary>
-    /// The standalone Kanban route is /companies/{companyId}/vacancies/{vacancyId}/kanban
-    /// (VacancyKanbanBoardPage.GoToStandaloneAsync); the vacancy id is extracted from the current
-    /// URL so it can be re-navigated to for the persistence check.
-    /// </summary>
     private static Guid ExtractVacancyIdFromUrl(string url)
     {
         var match = System.Text.RegularExpressions.Regex.Match(url, @"/vacancies/([0-9a-fA-F-]{36})");
@@ -160,19 +139,8 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
         Assert.True(await kanban.HasCardForNameAsync(candidateLast),
             "Expected the freshly created application's card to be visible before withdrawal");
 
-        // ArrangeAppliedApplicationAsync leaves the browser on the standalone Kanban route (the
-        // embedded "Kanban" tab on Vacancy Detail was removed — see VacancyKanbanBoardPage's class
-        // remarks), so the vacancy id must be captured HERE, before navigating away to Vacancy
-        // Detail to withdraw via the Applications tab, then back to the standalone board again.
         var vacancyId = ExtractVacancyIdFromUrl(_page.Url);
 
-        // Withdraw via the Applications tab (VacancyApplicationsTab's grid toolbar), then return to
-        // the standalone Kanban board — GetRecruitmentKanbanHandler still returns a withdrawn
-        // application under its current stage (there's no dedicated "Withdrawn" column, see its
-        // remarks), but VacancyKanbanBoard.FilteredCards now excludes any card with IsWithdrawn from
-        // the board entirely, since a withdrawn application can never be moved
-        // (MoveApplicationStageHandler rejects it) and showing an undraggable card there only
-        // confused what dragging it should do.
         var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
         await vacancyDetail.GoToAsync(AcmeId, vacancyId);
         await vacancyDetail.OpenApplicationsTabAsync();
@@ -194,12 +162,6 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
         var dashboard = new RecruitmentDashboardPage(_page, _fixture.WebBaseUrl);
         await dashboard.GoToAsync();
 
-        // The dashboard defaults to the Board view already (RecruitmentDashboard.razor's
-        // PipelineView.Board), showing a per-vacancy Kanban board via a vacancy picker.
-        // data-testid="recruitment-board-vacancy-picker" is set directly on the SfDropDownList,
-        // which Syncfusion renders AS the span[role='combobox'] itself — not a wrapping element —
-        // so it can't be used as DropDownSelector's scope (which searches for a descendant
-        // span[role='combobox']). Scope to the surrounding wrapper div instead.
         var vacancyPicker = _page.Locator(".recruitment-dashboard-vacancy-picker");
         await vacancyPicker.WaitForAsync(new() { Timeout = 15_000 });
         await DropDownSelector.SelectAsync(_page, vacancyPicker, _vacancyTitle!);
@@ -210,13 +172,9 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
         await kanban.FillSearchAsync(candidateLast);
         Assert.True(await kanban.HasCardForNameAsync(candidateLast));
 
-        // Switch to the List view...
         await _page.Locator("[data-testid='recruitment-view-list-btn']").ClickAsync();
         Assert.True(await _page.Locator("[data-testid='recruitment-view-toggle']").IsVisibleAsync());
 
-        // ...then back to Board. The search text lives in the Dashboard component itself
-        // (_boardSearchText, bound via @bind-SearchText), so it must still be applied to the
-        // board without the user having to re-type it.
         await _page.Locator("[data-testid='recruitment-view-board-btn']").ClickAsync();
         await kanban.WaitForLoadedAsync();
 
@@ -224,11 +182,6 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
             "Expected the Kanban board's search filter to still be applied after switching away to the List view and back");
     }
 
-    /// <summary>
-    /// Creates a fresh candidate and vacancy, adds the candidate's application (leaving it on the
-    /// seeded initial stage), then navigates to the vacancy's standalone Kanban board. Returns the
-    /// candidate's (unique) last name and the ready-to-use board page object.
-    /// </summary>
     private string? _vacancyTitle;
 
     private async Task<(string CandidateLast, VacancyKanbanBoardPage Kanban)> ArrangeAppliedApplicationAsync()

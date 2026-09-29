@@ -1,6 +1,5 @@
 namespace HR.Web.Models;
 
-// ── LIST ──────────────────────────────────────────────────────────────────────
 
 public record ListApplicationsForVacancyResponse(List<ApplicationListItemModel> Items);
 
@@ -14,8 +13,6 @@ public record ApplicationListItemModel(
     string? InterviewOutcome,
     bool IsWithdrawn,
     DateTimeOffset AppliedAt,
-    // Ticket #2: offer response tracking. Null until an offer has been made.
-    // "AwaitingResponse" / "Accepted" / "Declined" / "Withdrawn".
     string? OfferResponseStatus = null,
     decimal? OfferedSalary = null,
     DateOnly? OfferedStartDate = null,
@@ -27,7 +24,6 @@ public record ApplicationListItemModel(
     string? InternalAppointmentStatus = null,
     DateOnly? InternalAppointmentEffectiveDate = null);
 
-// ── GET ───────────────────────────────────────────────────────────────────────
 
 public record GetApplicationResponse(
     Guid Id,
@@ -40,18 +36,14 @@ public record GetApplicationResponse(
     string CurrentStageName,
     string? InterviewOutcome,
     string? Notes,
-    // Ticket #99: candidate-initiated withdrawal, orthogonal to CurrentStageId.
     DateTimeOffset? WithdrawnAt,
     DateTimeOffset AppliedAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    // Ticket #78 — both null for applications recorded before this concept existed.
     string? Source,
     Guid? SourceExternalRecruiterId,
     string? SourceExternalRecruiterAgencyName,
-    // Ticket #66: stage-change history, ordered oldest first.
     IReadOnlyList<ApplicationStageHistoryItemModel>? StageHistory = null,
-    // Ticket #1: Candidate CV upload & review. All null for applications with no CV / no review yet.
     string? CvReviewNotes = null,
     DateTimeOffset? CvReviewedAt = null,
     Guid? CvReviewedByUserId = null,
@@ -63,11 +55,9 @@ public record GetApplicationResponse(
     string? CvContentType = null,
     long? CvFileSize = null,
     DateTimeOffset? CvUploadedAt = null,
-    // Ticket #2: offer terms & response.
     string? OfferResponseStatus = null,
     decimal? OfferedSalary = null,
     DateOnly? OfferedStartDate = null,
-    // Optimistic concurrency: round-trip as ExpectedVersion on SetApplicationCv.
     int Version = 1,
     // Internal recruitment Ticket 1: the candidate's most recently uploaded CV, independent of the
     // submitted CV (may equal CvDocumentId). Null when the candidate has no uploaded CV.
@@ -76,8 +66,6 @@ public record GetApplicationResponse(
     string? CurrentCandidateCvContentType = null,
     long? CurrentCandidateCvFileSize = null,
     DateTimeOffset? CurrentCandidateCvUploadedAt = null,
-    // Malware-scan state ("Pending"/"Scanning"/"Clean"/"Infected"/"Failed") of the submitted CV and of
-    // the candidate's current CV respectively. Only "Clean" may be viewed/downloaded.
     string? CvScanStatus = null,
     string? CurrentCandidateCvScanStatus = null,
     // Internal recruitment Ticket 6: true only when Source == Internal. EmployeeId is populated only
@@ -90,7 +78,6 @@ public record GetApplicationResponse(
 
 // ── INTERNAL RECRUITMENT TICKET 1: SUBMITTED CV ──────────────────────────────
 
-// PUT .../applications/{applicationId}/cv — null CvDocumentId removes the submitted-CV reference.
 public record SetApplicationCvRequest(Guid? CvDocumentId, int ExpectedVersion);
 
 public record SetApplicationCvResponse(
@@ -101,7 +88,6 @@ public record SetApplicationCvResponse(
     int Version,
     DateTimeOffset UpdatedAt);
 
-// ── TICKET #1: CV REVIEW ──────────────────────────────────────────────────────
 
 public record SaveCvReviewNotesRequest(Guid CompanyId, Guid VacancyId, Guid ApplicationId, string? CvReviewNotes);
 
@@ -135,15 +121,12 @@ public record ApplicationStageHistoryItemModel(
     string? Notes,
     DateTimeOffset ChangedAt);
 
-// ── CREATE ────────────────────────────────────────────────────────────────────
 
 public record CreateApplicationRequest(
     Guid CompanyId,
     Guid VacancyId,
     Guid CandidateId,
     string? Notes,
-    // Ticket #78. Both optional; SourceExternalRecruiterId is required if and only if
-    // Source == "ExternalRecruiter" (enforced server-side by CreateApplicationValidator).
     string? Source = null,
     Guid? SourceExternalRecruiterId = null,
     // Internal recruitment Ticket 1: optional candidate CV document (Kind = Cv) submitted with this application.
@@ -166,9 +149,6 @@ public record CreateApplicationResponse(
 
 // ── INTERNAL RECRUITMENT TICKET 3: NEW CANDIDATE + APPLICATION ───────────────
 
-// Fields of POST .../vacancies/{vacancyId}/applications/new-candidate (multipart/form-data — the
-// service maps this to form parts, omitting null optionals). The optional CV file is passed
-// separately as an IBrowserFile.
 public record CreateCandidateApplicationRequest(
     string FirstName,
     string LastName,
@@ -176,12 +156,9 @@ public record CreateCandidateApplicationRequest(
     string? Phone,
     string? ResumeUrl,
     string? Notes,
-    // Enum name: Unspecified|Direct|Referral|ExternalRecruiter|JobBoard|CareersSite (null = omitted).
     string? Source,
-    // Required iff Source == "ExternalRecruiter".
     Guid? SourceExternalRecruiterId);
 
-// 201 body.
 public record CreateCandidateApplicationResponse(
     Guid CandidateId,
     Guid ApplicationId,
@@ -196,7 +173,6 @@ public record CreateCandidateApplicationResponse(
     Guid? SourceExternalRecruiterId,
     DateTimeOffset AppliedAt);
 
-// The existing candidate identified by a 409 { code: "candidate_email_exists" } body.
 public record DuplicateCandidateModel(
     Guid CandidateId,
     string FirstName,
@@ -207,7 +183,6 @@ public record DuplicateCandidateModel(
     public string FullName => $"{FirstName} {LastName}";
 }
 
-// Exactly one of Created / Duplicate / Error is set.
 public sealed record CreateCandidateApplicationResult(
     CreateCandidateApplicationResponse? Created,
     DuplicateCandidateModel? Duplicate,
@@ -218,10 +193,7 @@ public sealed record CreateCandidateApplicationResult(
     public static CreateCandidateApplicationResult Failure(string error) => new(null, null, error);
 }
 
-// ── STATUS TRANSITIONS ────────────────────────────────────────────────────────
 
-// Dedicated response for the Withdraw action — WithdrawApplicationResponse (HR.Modules.Recruitment)
-// carries WithdrawnAt but no RejectionReason.
 public record WithdrawApplicationResponse(
     Guid Id,
     Guid VacancyId,
@@ -250,18 +222,14 @@ public record RejectCandidateResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
-// Dedicated response for the Offer action (rather than the generic ApplicationActionResponse) so the
-// linked Position Profile's read-only employment defaults are available to the UI while HR decides to
-// make an offer. See OfferCandidateResponse (HR.Modules.Recruitment) for the authoritative shape.
 public record OfferCandidateRequest(
     Guid CompanyId,
     Guid VacancyId,
     Guid ApplicationId,
-    // Ticket #2: all optional offer terms.
     decimal? OfferedSalary = null,
-    string? OfferedSalaryFrequency = null, // "Annual" | "Hourly" | "Daily"
+    string? OfferedSalaryFrequency = null,
     DateOnly? ProposedStartDate = null,
-    DateOnly? OfferDate = null, // defaults to today server-side when omitted
+    DateOnly? OfferDate = null,
     string? OfferNotes = null);
 
 public record OfferCandidateResponse(
@@ -284,7 +252,6 @@ public record OfferCandidateResponse(
     int? ProbationMonthsOverride,
     Guid? DefaultLeavePolicyId,
     string? LocationName,
-    // Ticket #2: offer terms & response echoed back.
     decimal? OfferedSalary = null,
     string? OfferedSalaryFrequency = null,
     DateOnly? ProposedStartDate = null,
@@ -294,13 +261,12 @@ public record OfferCandidateResponse(
     DateTimeOffset? OfferMadeAt = null,
     DateTimeOffset? OfferRespondedAt = null);
 
-// ── TICKET #2: OFFER RESPONSE ─────────────────────────────────────────────────
 
 public record RespondToOfferRequest(
     Guid CompanyId,
     Guid VacancyId,
     Guid ApplicationId,
-    string Status); // "Accepted" | "Declined" | "Withdrawn"
+    string Status);
 
 public record RespondToOfferResponse(
     Guid Id,
@@ -327,7 +293,6 @@ public record HireCandidateRequest(
     Guid CompanyId,
     Guid VacancyId,
     Guid ApplicationId,
-    // Ticket #2: optional — server falls back to the accepted offer's ProposedStartDate.
     DateOnly? StartDate,
     DateOnly DateOfBirth,
     string Nationality,
@@ -384,12 +349,10 @@ public record AppointInternalCandidateResponse(
     Guid LocationId,
     Guid? ManagerId,
     DateOnly EffectiveDate,
-    // False when the effective date is in the future: the change is scheduled and applied on that date.
     bool IsApplied,
     Guid? CompensationId,
     string AppointmentStatus);
 
-// ── DASHBOARD: APPLICATIONS BY STATUS ───────────────────────────────────────────
 
 public record GetApplicationsByStatusResponse(IReadOnlyList<ApplicationByStatusItem> Items);
 
@@ -424,7 +387,6 @@ public record ApplicationSearchItemModel(
     DateTimeOffset AppliedAt,
     string? CurrentStageName = null,
     bool IsWithdrawn = false,
-    // True only when Source == Internal. EmployeeId is populated only for internal applications.
     bool IsInternal = false,
     Guid? EmployeeId = null);
 
@@ -444,7 +406,6 @@ public sealed record ApplicationTypeFilterOption(ApplicationTypeFilter Value, st
 
 public static class ApplicationTypeFilterExtensions
 {
-    // null = all (omit the query param); true = internal only; false = external only.
     public static bool? ToIsInternal(this ApplicationTypeFilter filter) => filter switch
     {
         ApplicationTypeFilter.Internal => true,

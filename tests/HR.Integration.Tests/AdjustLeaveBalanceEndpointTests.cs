@@ -10,12 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// leave:manage is granted to HrAdministrator only (see LeavePolicyCrudEndpointTests;
-/// CompanyAdministrator is scoped to company profile/settings and does not hold it) —
-/// Manager has leave:approve but NOT leave:manage, which makes it the correct role to
-/// exercise the 403 boundary for this leave:manage-gated endpoint.
-/// </summary>
 [Collection("Integration")]
 public class AdjustLeaveBalanceEndpointTests
 {
@@ -64,7 +58,6 @@ public class AdjustLeaveBalanceEndpointTests
     {
         var (companyId, leaveTypeId, employeeId, hrAdminClient) = await SetupEmployeeWithBalanceAsync();
 
-        // Standard-behaviour leave type: adjustmentValue is interpreted directly as days.
         var response = await hrAdminClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-balance-adjustments",
             AdjustmentPayload(companyId, employeeId, leaveTypeId, 2m, "Correction", comments: "Corrected data entry error"));
@@ -77,13 +70,12 @@ public class AdjustLeaveBalanceEndpointTests
         Assert.Equal(employeeId, payload.EmployeeId);
         Assert.Equal(leaveTypeId, payload.LeaveTypeId);
         Assert.Equal(2m, payload.AdjustmentDays);
-        Assert.Null(payload.AdjustmentHours); // Standard behaviour: no hours value recorded
-        Assert.Equal(202.5m, payload.NewRemainingHours); // (25 entitlement + 2 adjustment) days * 7.5 hours/day
+        Assert.Null(payload.AdjustmentHours);
+        Assert.Equal(202.5m, payload.NewRemainingHours);
         Assert.Equal("Correction", payload.Reason);
         Assert.Equal("Corrected data entry error", payload.Comments);
         Assert.Equal(HrAdminUser, payload.AdjustedByEmployeeId);
 
-        // Verify the balance was actually persisted by re-querying it.
         var balanceResponse = await hrAdminClient.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-balances?policyYear={DateTimeOffset.UtcNow.Year}");
         balanceResponse.EnsureSuccessStatusCode();
@@ -98,8 +90,6 @@ public class AdjustLeaveBalanceEndpointTests
     {
         var (companyId, leaveTypeId, employeeId, hrAdminClient) = await SetupEmployeeWithBalanceAsync();
 
-        // Standard-behaviour leave type: adjustmentValue is interpreted directly as days
-        // (-1 day here, matching the original -7.5 hours / 7.5 hours-per-day intent).
         var response = await hrAdminClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-balance-adjustments",
             AdjustmentPayload(companyId, employeeId, leaveTypeId, -1m, "ManualDeduction", comments: "Correcting an over-award"));
@@ -109,18 +99,17 @@ public class AdjustLeaveBalanceEndpointTests
         var payload = await response.Content.ReadFromJsonAsync<AdjustmentPayloadResponse>();
         Assert.NotNull(payload);
         Assert.Equal(-1m, payload!.AdjustmentDays);
-        Assert.Null(payload.AdjustmentHours); // Standard behaviour: no hours value recorded
+        Assert.Null(payload.AdjustmentHours);
         Assert.Equal("ManualDeduction", payload.Reason);
-        Assert.Equal(180m, payload.NewRemainingHours); // (25 entitlement - 1 adjustment) days * 7.5 hours/day = 24 * 7.5
+        Assert.Equal(180m, payload.NewRemainingHours);
 
-        // Verify the balance was actually persisted lower by re-querying it.
         var balanceResponse = await hrAdminClient.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-balances?policyYear={DateTimeOffset.UtcNow.Year}");
         balanceResponse.EnsureSuccessStatusCode();
         var balancePayload = await balanceResponse.Content.ReadFromJsonAsync<BalanceListPayload>();
         var balance = balancePayload!.Balances.Single(b => b.LeaveTypeId == leaveTypeId);
         Assert.Equal(180m, balance.RemainingHours);
-        Assert.Equal(24m, balance.RemainingDays); // 25 - 1 (7.5h / 7.5h-per-day)
+        Assert.Equal(24m, balance.RemainingDays);
     }
 
     [Fact]
@@ -133,7 +122,6 @@ public class AdjustLeaveBalanceEndpointTests
         // DeactivateAssetCategoryEndpointTests.Delete_AssetCategory_Returns_NotFound_When_Category_Belongs_To_Different_Company).
         var (companyBId, leaveTypeIdB, employeeIdB, _) = await SetupEmployeeWithBalanceAsync();
 
-        // Re-authenticate a fresh HR admin scoped to Company A only (not Company B).
         var freshCompanyAId = Guid.NewGuid();
         using var hrAdminClientForA = await AuthenticatedClient(HrAdminUser, freshCompanyAId);
 
@@ -143,7 +131,6 @@ public class AdjustLeaveBalanceEndpointTests
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
 
-        // Sanity check: Company B's own balance must be completely unaffected.
         using var hrAdminClientForB = await AuthenticatedClient(HrAdminUser, companyBId);
         var balanceResponse = await hrAdminClientForB.GetAsync(
             $"/api/companies/{companyBId}/employees/{employeeIdB}/leave-balances?policyYear={DateTimeOffset.UtcNow.Year}");
@@ -207,10 +194,6 @@ public class AdjustLeaveBalanceEndpointTests
     [Fact]
     public async Task Post_AdjustLeaveBalance_Returns_UnprocessableEntity_For_Zero_AdjustmentHours()
     {
-        // A zero adjustment fails FluentValidation (AdjustLeaveBalanceValidator) before the
-        // handler ever runs; FastEndpoints is configured to return 422 for validator failures
-        // (see Program.cs — c.Errors.StatusCode = 422; and CreateAssetCategoryEndpointTests for
-        // the equivalent convention on another leave:manage-style endpoint).
         var (companyId, leaveTypeId, employeeId, hrAdminClient) = await SetupEmployeeWithBalanceAsync();
 
         var response = await hrAdminClient.PostAsJsonAsync(
@@ -223,9 +206,6 @@ public class AdjustLeaveBalanceEndpointTests
     [Fact]
     public async Task Post_AdjustLeaveBalance_Returns_UnprocessableEntity_When_AdjustmentHours_Exceeds_Column_Precision()
     {
-        // adjustment_hours/adjustment_days are numeric(6,2) columns (max magnitude 9999.99) —
-        // a wildly large value like 100,000 must fail FluentValidation with a clean 422 rather
-        // than reach SaveChangesAsync and blow up with a Postgres "numeric field overflow".
         var (companyId, leaveTypeId, employeeId, hrAdminClient) = await SetupEmployeeWithBalanceAsync();
 
         var response = await hrAdminClient.PostAsJsonAsync(
@@ -238,12 +218,9 @@ public class AdjustLeaveBalanceEndpointTests
     [Fact]
     public async Task Post_AdjustLeaveBalance_Returns_BadRequest_When_Negative_Adjustment_Would_Go_Below_Zero_Without_Override()
     {
-        // 5 days entitlement, no negative override allowed on the policy.
         var (companyId, leaveTypeId, employeeId, hrAdminClient) =
             await SetupEmployeeWithBalanceAsync(defaultEntitlementDays: 5, allowNegativeBalance: false);
 
-        // Standard-behaviour leave type: adjustmentValue is interpreted directly as days
-        // (-8 days here, matching the original -60 hours / 7.5 hours-per-day intent).
         var response = await hrAdminClient.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leave-balance-adjustments",
             AdjustmentPayload(companyId, employeeId, leaveTypeId, -8m, "ManualDeduction", allowNegativeOverride: false));
@@ -251,7 +228,6 @@ public class AdjustLeaveBalanceEndpointTests
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────────────
 
     private async Task<HttpClient> AuthenticatedClient(Guid userId, Guid companyId)
     {
@@ -285,9 +261,6 @@ public class AdjustLeaveBalanceEndpointTests
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
         var leaveTypeId = Guid.NewGuid();
-        // AccrualMethod.None: these tests exercise adjustment/balance math, not LEAVE-04's on-read
-        // accrual pacing — Monthly would gate RemainingDays by real elapsed-time-since-accrualStartDate
-        // (see LeaveAccrualCalculator), making assertions here spuriously fail as real time passes.
         db.LeaveTypes.Add(LeaveType.Create(
             leaveTypeId, companyId, "Annual Leave", "ANNUAL", defaultEntitlementDays,
             AccrualMethod.None, LeaveTypeBehaviour.Standard, DateTimeOffset.UtcNow));
@@ -365,11 +338,6 @@ public class AdjustLeaveBalanceEndpointTests
         return (departmentId, locationId, positionProfileId, employmentTypeId);
     }
 
-    /// <summary>
-    /// Creates a fresh company, a standard leave type, a leave policy, and an employee, then
-    /// assigns the policy to the employee (which auto-initialises a LeaveBalance row for every
-    /// active leave type in the company — see AssignLeavePolicyToEmployeeHandler).
-    /// </summary>
     private async Task<(Guid CompanyId, Guid LeaveTypeId, Guid EmployeeId, HttpClient HrAdminClient)> SetupEmployeeWithBalanceAsync(
         int defaultEntitlementDays = 25,
         bool allowNegativeBalance = false)

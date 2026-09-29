@@ -162,7 +162,6 @@ public class DisabledAccountMiddlewareTests
 
         var (context, nextCalled, middleware) = Build(_ =>
         {
-            // No authenticated principal, no resolved user.
         });
 
         await middleware.InvokeAsync(context, db);
@@ -279,7 +278,6 @@ public class DisabledAccountMiddlewareTests
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
-        // Simulate re-enablement.
         user.Reactivate(DateTimeOffset.UtcNow);
         await db.SaveChangesAsync();
 

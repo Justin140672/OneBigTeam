@@ -127,9 +127,6 @@ else
         await LoadAsync();
         _loading = false;
 
-        // Live countdown display: recompute/re-render periodically. No existing polling pattern was
-        // found elsewhere in HR.Admin.Web (SystemHealth.razor/Jobs.razor are load-once pages), so a
-        // simple System.Timers.Timer driving InvokeAsync(StateHasChanged) is used here.
         _refreshTimer = new System.Timers.Timer(TimeSpan.FromSeconds(30));
         _refreshTimer.Elapsed += async (_, _) => await InvokeAsync(StateHasChanged);
         _refreshTimer.AutoReset = true;

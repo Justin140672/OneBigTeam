@@ -2,13 +2,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
-/// <summary>
-/// "View all team" full roster page (src/HR.Web/Components/Pages/Employees/MyTeamRoster.razor).
-/// Route: /companies/{CompanyId:guid}/my-team. Lists every direct/indirect report the manager
-/// GetEmployeeTeamView endpoint still authorizes (Draft/Active/Suspended/Leaving —
-/// FormerEmployee excluded), unlike the compact, Active-only, 8-card dashboard preview
-/// (MyTeamWidget.razor).
-/// </summary>
 public sealed class MyTeamRosterPage(IPage page, string baseUrl)
 {
     public async Task GoToAsync(Guid companyId)
@@ -36,10 +29,6 @@ public sealed class MyTeamRosterPage(IPage page, string baseUrl)
     public async Task<IReadOnlyList<string>> GetRowNamesAsync()
     {
         await WaitForLoadedAsync();
-        // "td:first-child span" alone also matches ProfilePhotoAvatar's own initials span
-        // (class="hr-profile-avatar hr-profile-avatar--initials", rendered before the name span
-        // whenever the member has no photo) — excluding it, since otherwise each such row yields
-        // two "names" (e.g. "ET" and the real full name) instead of one.
         var cells = await Rows.Locator("td:first-child span:not(.hr-profile-avatar--initials)").AllAsync();
         var names = new List<string>();
         foreach (var c in cells)
@@ -47,7 +36,6 @@ public sealed class MyTeamRosterPage(IPage page, string baseUrl)
         return names;
     }
 
-    /// <summary>Switches between "Direct Reports" and "All Reports" scope, same control pattern as MyTeamWidget.</summary>
     public async Task SetScopeAsync(bool includeIndirect)
     {
         var label = includeIndirect ? "All Reports" : "Direct Reports";
@@ -56,7 +44,6 @@ public sealed class MyTeamRosterPage(IPage page, string baseUrl)
         await WaitForLoadedAsync();
     }
 
-    /// <summary>Types into the search box (search-on-change, same SfTextBox wiring as EmployeeDirectory's).</summary>
     public async Task SearchAsync(string term)
     {
         await SearchBox.FillAsync(term);
@@ -64,7 +51,6 @@ public sealed class MyTeamRosterPage(IPage page, string baseUrl)
         await page.WaitForTimeoutAsync(400);
     }
 
-    /// <summary>Clicks the "View profile" button on the row for <paramref name="employeeId"/>.</summary>
     public async Task ClickViewProfileAsync(Guid employeeId) =>
         await page.Locator($"[data-testid='roster-view-profile-{employeeId}']").ClickAsync();
 

@@ -4,11 +4,6 @@ using HR.Integration.Tests.Infrastructure;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// See GetPlatformSettingsEndpointTests remarks: the "platform:admin" policy now requires a real
-/// enabled identity.platform_administrators row (SEC-002 fix — PlatformAdminAuthorizationHandler).
-/// See PlatformSettingsAuthorizationTests for the full authorization matrix.
-/// </summary>
 [Collection("Integration")]
 public class UpdatePlatformSettingsEndpointTests
 {
@@ -98,10 +93,6 @@ public class UpdatePlatformSettingsEndpointTests
 
         var response = await client.PutAsJsonAsync("/api/companies/admin/platform-settings", body);
 
-        // FluentValidation rejects TrialLengthDays <= 0 before the handler runs, so this is the
-        // FastEndpoints validation-failure response (422), not the handler's Result.Failure ->
-        // BadRequest (400) mapping — see UpdatePlatformSettingsValidator and mirror
-        // CreateAssetCategoryEndpointTests' "missing required field" case for this same 422 pattern.
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
 

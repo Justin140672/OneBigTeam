@@ -12,10 +12,6 @@ internal sealed class GetMyTeamRosterHandler(
     public async Task<GetMyTeamRosterResponse> HandleAsync(
         Guid companyId, Guid managerId, bool includeIndirect, CancellationToken cancellationToken)
     {
-        // Excludes FormerEmployee only — every other status a manager's hierarchy check already
-        // authorizes (Draft, Active, Suspended, Leaving) is discoverable here, so this list and
-        // GetEmployeeTeamViewHandler's own authorization stay aligned. Same flat-pull/walk-in-
-        // memory pattern as GetMyTeamHandler.
         var employees = await dbContext.Employees
             .AsNoTracking()
             .Where(e => e.CompanyId == companyId && e.Status != EmploymentStatus.FormerEmployee)

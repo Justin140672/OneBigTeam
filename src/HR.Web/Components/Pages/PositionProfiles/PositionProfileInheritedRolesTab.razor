@@ -43,8 +43,6 @@
     [Parameter, EditorRequired] public Guid PositionProfileId { get; set; }
     [Parameter] public bool CanEdit { get; set; }
 
-    // The parent's Model.InheritedRoleIds — mutated in place; the mandatory Employee role is never
-    // in this list (it's implicit).
     [Parameter, EditorRequired] public List<Guid> SelectedRoleIds { get; set; } = [];
 
     private readonly List<RoleOption> _roleOptions = SystemRoleOptions.All.ToList();
@@ -52,7 +50,7 @@
     private void OnRoleCheckedChanged(Guid roleId, bool isChecked)
     {
         if (roleId == SystemRoleOptions.EmployeeRoleId)
-            return; // always inherited — the checkbox is disabled, this is just defence in depth
+            return;
 
         if (isChecked)
         {

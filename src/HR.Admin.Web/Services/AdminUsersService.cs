@@ -4,12 +4,6 @@ using HR.SharedKernel;
 
 namespace HR.Admin.Web.Services;
 
-/// <summary>
-/// Wraps the Platform Administrators endpoints (Admin User Management epic). Modeled exactly on
-/// DeletionQueueService: HttpClientFactory "hrapi" client, GetXxxOrNullAsync returning null on any
-/// failure (401/403/404 or a transport error), PostActionAsync-style methods returning bool or the
-/// typed response (null on failure).
-/// </summary>
 public sealed class AdminUsersService(HrApiHttpClientFactory httpClientFactory)
 {
     private HttpClient Http => httpClientFactory.CreateClient();
@@ -31,10 +25,6 @@ public sealed class AdminUsersService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    /// <summary>
-    /// Returns the created administrator, or null on any failure (409 conflict for a duplicate
-    /// email, 401 if the caller isn't an enabled PlatformOwner, or a transport error).
-    /// </summary>
     public async Task<CreateAdministratorResponse?> CreateAdministratorAsync(
         string email, string role, CancellationToken cancellationToken = default)
     {
@@ -79,11 +69,6 @@ public sealed class AdminUsersService(HrApiHttpClientFactory httpClientFactory)
     public Task<bool> AssignRoleAsync(Guid id, string role, CancellationToken cancellationToken = default) =>
         PostActionAsync($"api/platform-administrators/{id}/role", new AssignAdministratorRoleRequest(id, FormText.Required(role)), cancellationToken);
 
-    /// <summary>
-    /// Performs a real MFA reset via the identity provider: removes every multi-factor factor for
-    /// the administrator. Returns the typed response, or null on any failure (403/404/409/422/400
-    /// or a transport error).
-    /// </summary>
     public async Task<ResetAdministratorMfaResponse?> ResetMfaAsync(
         Guid id, string reason, CancellationToken cancellationToken = default)
     {
@@ -105,7 +90,6 @@ public sealed class AdminUsersService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    /// <summary>Fully implemented — sends a real Supabase password-recovery email.</summary>
     public Task<bool> ResetPasswordAsync(Guid id, CancellationToken cancellationToken = default) =>
         PostActionAsync($"api/platform-administrators/{id}/reset-password", new AdministratorIdRequest(id), cancellationToken);
 }

@@ -5,14 +5,6 @@ using HR.Integration.Tests.Infrastructure;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Same "platform:admin" policy + allow-list gate pattern as GetFailedPaymentsEndpointTests /
-/// ListBackgroundJobsEndpointTests — see their remarks. Runs against the test host's real
-/// HealthCheckService (database/storage/auth/email/stripe/hangfire checks, wired up exactly as in
-/// production), so this doesn't assert specific Healthy/Degraded/Unhealthy values (those depend on
-/// the test environment's actual DB/Stripe/etc. reachability) — only that all six named categories
-/// are present with a populated status.
-/// </summary>
 [Collection("Integration")]
 public class GetSystemHealthEndpointTests
 {
@@ -55,8 +47,6 @@ public class GetSystemHealthEndpointTests
 
         var response = await client.GetAsync(Url);
 
-        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
-        // is Forbidden (403), not Unauthorized (401).
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 

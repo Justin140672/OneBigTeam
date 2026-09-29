@@ -103,19 +103,8 @@ public sealed class RecruitmentStageManagementTests(RecruiterPersonaFixture fixt
         await stageList.ClickNewAsync();
 
         await stageEdit.FillNameAsync(stageName);
-        // Leave Terminal Outcome at its default ("None") — a plain non-terminal stage.
         await stageEdit.SaveAsync();
 
-        // A freshly created stage is appended to the end of the list, i.e. it gets the HIGHEST
-        // DisplayOrder of any stage in the company. OfferCandidateHandler picks the active
-        // non-terminal stage with the highest DisplayOrder when moving a candidate to "Offer", so
-        // leaving this stage active would silently outrank the seeded "Offer" stage and break
-        // ApplicationToEmployeeFlowTests (and any other test relying on offers landing on "Offer").
-        // Deactivate it once this test's own assertions are done so it can never be picked — guarded
-        // by try/finally so an assertion failure below still cleans it up: an un-deactivated stray
-        // stage here doesn't just affect THIS run, it permanently pollutes every future run against
-        // the shared, long-lived E2E dev database (e.g. shifting index-based order assertions in
-        // ReorderStage_MoveUpAndDown_PersistsAcrossReload).
         try
         {
             Assert.True(await stageList.HasItemAsync(stageName),
@@ -131,9 +120,6 @@ public sealed class RecruitmentStageManagementTests(RecruiterPersonaFixture fixt
     [Fact]
     public async Task SetStagePurpose_ToOffer_ShowsInListPurposeColumn_ThenClearsBackToNone()
     {
-        // DSH-04: a non-terminal stage gains a "Purpose" dropdown (None / New application /
-        // Interview / Offer) that tags it for the recruitment dashboard metric tiles, surfaced as a
-        // new "Purpose" column on the list.
         var stageName = $"E2E Stage Purpose {Guid.NewGuid().ToString("N")[..8]}";
 
         var login     = new LoginPage(_page, _fixture.WebBaseUrl);
@@ -147,16 +133,13 @@ public sealed class RecruitmentStageManagementTests(RecruiterPersonaFixture fixt
         await CleanupStrayStagesAsync(stageList);
         await stageList.ClickNewAsync();
         await stageEdit.FillNameAsync(stageName);
-        // Default Terminal Outcome "None" keeps the stage non-terminal so the Purpose field renders.
         await stageEdit.SaveAsync();
 
         try
         {
-            // A newly created stage defaults to Purpose = None.
             await stageList.GoToAsync(AcmeId);
             Assert.Equal("None", await stageList.GetPurposeAsync(stageName));
 
-            // Set Purpose = Offer and confirm the list column reflects it.
             await stageList.ClickRowLinkAsync(stageName);
             await _page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
             await stageEdit.SelectPurposeAsync("Offer");
@@ -165,7 +148,6 @@ public sealed class RecruitmentStageManagementTests(RecruiterPersonaFixture fixt
             await stageList.GoToAsync(AcmeId);
             Assert.Equal("Offer", await stageList.GetPurposeAsync(stageName));
 
-            // Clear it back to None.
             await stageList.ClickRowLinkAsync(stageName);
             await _page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
             await stageEdit.SelectPurposeAsync("None");
@@ -205,13 +187,9 @@ public sealed class RecruitmentStageManagementTests(RecruiterPersonaFixture fixt
             await stageList.ClickRowLinkAsync(stageName);
             await _page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
 
-            // Non-terminal (default "None" outcome) — Purpose field is shown.
             Assert.True(await stageEdit.IsPurposeFieldVisibleAsync(),
                 "Expected the Purpose field to render for a non-terminal stage");
 
-            // Flip Terminal Outcome to "Hired" in the form only (not saved — the company already has
-            // an active Hired stage and UpdateRecruitmentStageHandler enforces uniqueness). The
-            // Purpose field is bound to !Model.IsTerminal and should disappear immediately.
             await stageEdit.SelectTerminalOutcomeAsync("Hired");
             Assert.False(await stageEdit.IsPurposeFieldVisibleAsync(),
                 "Expected the Purpose field to be hidden once the stage is marked terminal");
@@ -256,10 +234,6 @@ public sealed class RecruitmentStageManagementTests(RecruiterPersonaFixture fixt
         await stageEdit.SelectTerminalOutcomeAsync("None");
         await stageEdit.SaveAsync();
 
-        // See CreateRecruitmentStage_AppearsInList's comment: a stage left active here (with the
-        // highest DisplayOrder in the company) can silently hijack OfferCandidateHandler's stage
-        // selection for unrelated tests — guarded by try/finally so an assertion failure below still
-        // deactivates it instead of permanently polluting every future run.
         try
         {
             await stageList.GoToAsync(AcmeId);
@@ -267,7 +241,6 @@ public sealed class RecruitmentStageManagementTests(RecruiterPersonaFixture fixt
                 "Expected the renamed stage to appear in the list");
             Assert.Equal("None", await stageList.GetTerminalOutcomeAsync(updatedName));
 
-            // Reload to confirm the change persisted server-side, not just in local component state.
             await stageList.ClickRowLinkAsync(updatedName);
             await _page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
             await _page.ReloadAsync();
@@ -294,21 +267,12 @@ public sealed class RecruitmentStageManagementTests(RecruiterPersonaFixture fixt
         await login.GoToAsync();
         await login.LoginAsync(MarcusEmail);
 
-        // A freshly created stage is appended to the end of the list (RecruitmentStageService's
-        // IEditService.CreateAsync sets DisplayOrder = existingCount + 1), so it starts as the last
-        // row and can always be moved up at least once regardless of how many stages already exist.
         await stageList.GoToAsync(AcmeId);
         await CleanupStrayStagesAsync(stageList);
         await stageList.ClickNewAsync();
         await stageEdit.FillNameAsync(stageName);
         await stageEdit.SaveAsync();
 
-        // See CreateRecruitmentStage_AppearsInList's comment: guarded by try/finally so an
-        // assertion failure anywhere below still deactivates this stage — an un-deactivated
-        // stray "E2E Stage Reorder …" here doesn't just fail THIS run, it permanently shifts
-        // index-based order assertions (in this test and others) on every future run against the
-        // shared, long-lived E2E dev database, since a leftover active stage changes every
-        // subsequent test's starting stage count/order.
         try
         {
             await stageList.GoToAsync(AcmeId);
@@ -322,13 +286,10 @@ public sealed class RecruitmentStageManagementTests(RecruiterPersonaFixture fixt
             var indexAfterUp = namesAfterUp.ToList().IndexOf(stageName);
             Assert.Equal(indexBefore - 1, indexAfterUp);
 
-            // Reload the page directly (fresh navigation) to confirm the reorder was persisted
-            // server-side (ReorderAsync), not just reflected in local grid state.
             await stageList.GoToAsync(AcmeId);
             var namesAfterReload = await stageList.GetNamesInOrderAsync();
             Assert.Equal(indexAfterUp, namesAfterReload.ToList().IndexOf(stageName));
 
-            // Move back down — should return to its original position.
             await stageList.MoveDownAsync(stageName);
             var namesAfterDown = await stageList.GetNamesInOrderAsync();
             Assert.Equal(indexBefore, namesAfterDown.ToList().IndexOf(stageName));
@@ -358,10 +319,6 @@ public sealed class RecruitmentStageManagementTests(RecruiterPersonaFixture fixt
         await stageEdit.FillNameAsync(stageName);
         await stageEdit.SaveAsync();
 
-        // See CreateRecruitmentStage_AppearsInList's comment: this test's assertions specifically
-        // require ending in the Active state, so the final deactivate can only happen after
-        // they're complete — guarded by try/finally so an assertion failure midway still leaves
-        // the stage deactivated instead of permanently polluting every future run.
         try
         {
             await stageList.GoToAsync(AcmeId);
@@ -400,12 +357,8 @@ public sealed class RecruitmentStageManagementTests(RecruiterPersonaFixture fixt
         await stageEdit.FillNameAsync(stageName);
         await stageEdit.SaveAsync();
 
-        // See CreateRecruitmentStage_AppearsInList's comment: the first (successfully created)
-        // stage above is still active with the highest DisplayOrder in the company — guarded by
-        // try/finally so an assertion failure below still deactivates it.
         try
         {
-            // Attempt to create a second stage with the exact same name for the same company.
             await stageList.GoToAsync(AcmeId);
             await stageList.ClickNewAsync();
             await stageEdit.FillNameAsync(stageName);
@@ -521,8 +474,6 @@ public sealed class RecruitmentStageManagementTests(RecruiterPersonaFixture fixt
 
         try
         {
-            // Isolate the assertion below from any other active stage sharing this outcome that
-            // other tests in this shared company may have left behind.
             foreach (var extra in activeWithOutcome.Skip(1))
             {
                 await stageList.DeactivateAsync(extra);

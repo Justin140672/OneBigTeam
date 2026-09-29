@@ -2,12 +2,6 @@ using System.Net;
 
 namespace HR.Infrastructure.Tests.Infrastructure;
 
-/// <summary>
-/// Minimal <see cref="HttpMessageHandler"/> test double for exercising the Infrastructure HTTP
-/// adapters (Postmark, etc.) with no network access. Records every request and returns a
-/// caller-configured canned response, an optional delay (for cancellation tests) or a thrown
-/// transport exception.
-/// </summary>
 internal sealed class FakeHttpMessageHandler : HttpMessageHandler
 {
     public List<(HttpRequestMessage Request, string? Body)> Requests { get; } = [];

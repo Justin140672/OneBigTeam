@@ -6,12 +6,8 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Recruitment.Tests.Infrastructure;
 
-/// <summary>
-/// [P1] Candidate CV malware scanning test doubles for <see cref="IUploadedFileScanner"/>.
-/// </summary>
 internal static class EicarTestFile
 {
-    /// <summary>The industry-standard, harmless EICAR anti-virus test string.</summary>
     public const string Signature = @"X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*";
 
     public const string ThreatName = "Eicar-Test-Signature";
@@ -19,12 +15,6 @@ internal static class EicarTestFile
     public static byte[] Bytes => Encoding.ASCII.GetBytes(Signature);
 }
 
-/// <summary>
-/// Content-inspecting scanner: reports Infected("Eicar-Test-Signature") when the stream's bytes
-/// contain the EICAR signature, otherwise Clean. Ignores the file name entirely, so it proves the
-/// verdict is driven by stored bytes rather than declared extension/content type. Records every
-/// call so tests can assert what was scanned.
-/// </summary>
 internal sealed class EicarDetectingUploadedFileScanner : IUploadedFileScanner
 {
     public List<(string FileName, byte[] Content)> Scans { get; } = [];
@@ -42,7 +32,6 @@ internal sealed class EicarDetectingUploadedFileScanner : IUploadedFileScanner
     }
 }
 
-/// <summary>Always returns the configured verdict, regardless of content.</summary>
 internal sealed class FixedVerdictUploadedFileScanner(UploadedFileScanResult verdict) : IUploadedFileScanner
 {
     public int Calls { get; private set; }
@@ -54,7 +43,6 @@ internal sealed class FixedVerdictUploadedFileScanner(UploadedFileScanResult ver
     }
 }
 
-/// <summary>Simulates a scanner outage by throwing the supplied exception on every call.</summary>
 internal sealed class ThrowingUploadedFileScanner(Func<Exception> exceptionFactory) : IUploadedFileScanner
 {
     public int Calls { get; private set; }
@@ -66,7 +54,6 @@ internal sealed class ThrowingUploadedFileScanner(Func<Exception> exceptionFacto
     }
 }
 
-/// <summary>An <see cref="IBackgroundJobClient"/> whose job store is unavailable.</summary>
 internal sealed class ThrowingBackgroundJobClient : IBackgroundJobClient
 {
     public int Attempts { get; private set; }

@@ -543,9 +543,6 @@
     private bool _versionDetailOpen;
     private SharedCompanyDocumentVersionModel? _versionDetailRow;
 
-    // The current version's own upload metadata (uploader/uploaded-at) isn't duplicated on the
-    // top-level detail response — it's derived by matching the current VersionNumber against the
-    // VersionHistory list the API already returns, rather than requiring a new backend field.
     private SharedCompanyDocumentVersionModel? CurrentVersionEntry =>
         _detail?.VersionHistory.FirstOrDefault(v => v.VersionNumber == _detail.VersionNumber);
 
@@ -765,11 +762,6 @@
             ? $"{bytes / 1024.0:0.#} KB"
             : $"{bytes / (1024.0 * 1024.0):0.#} MB";
 
-    // No secure inline preview (PDF/image viewer) capability exists elsewhere in this codebase for
-    // arbitrary shared-document file types, so "Current document" presents a file-summary card
-    // (icon by type, filename, size, type, version) with Open/Download actions rather than an
-    // inline preview pane. Both Open and Download currently resolve to the same
-    // GetSharedCompanyDocumentDownloadUrl — there's no separate inline-view endpoint; see report.
     private static string FileIconClass(string contentType, string fileName)
     {
         var lowerType = contentType.ToLowerInvariant();

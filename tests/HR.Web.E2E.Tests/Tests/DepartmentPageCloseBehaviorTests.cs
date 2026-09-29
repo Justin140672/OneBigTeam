@@ -3,12 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the Close button and "unsaved changes" confirmation prompt that <c>EditPageBase</c>
-/// provides to every edit page (see EditPageBase.cs / UnsavedChangesDialog.razor). Exercised
-/// via the Department edit page as a representative host — the behavior under test lives in
-/// the shared base class, not in DepartmentEdit itself.
-/// </summary>
 public sealed class DepartmentPageCloseBehaviorTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -28,7 +22,6 @@ public sealed class DepartmentPageCloseBehaviorTests(HrAdminPersonaFixture fixtu
         await deptList.GoToAsync(AcmeId);
         await deptList.ClickNewDepartmentAsync();
 
-        // Create a department first so we have an existing, unmodified record to reopen.
         var deptName = $"E2E Close {Guid.NewGuid().ToString("N")[..8]}";
         await deptEdit.FillNameAsync(deptName);
         await deptEdit.SaveAsync();
@@ -36,9 +29,6 @@ public sealed class DepartmentPageCloseBehaviorTests(HrAdminPersonaFixture fixtu
         await deptList.GoToAsync(AcmeId);
         Assert.True(await deptList.HasDepartmentAsync(deptName));
 
-        // Reopening it and clicking Close with no edits should navigate straight back to the
-        // list — no "unsaved changes" prompt should appear (the wait inside CloseAndWaitForListAsync
-        // would time out if one blocked navigation).
         var cells = await _page.Locator(".e-rowcell a").Filter(new() { HasText = deptName }).First.GetAttributeAsync("href");
         Assert.NotNull(cells);
         await _page.GotoAsync($"{_fixture.WebBaseUrl}{cells}");
@@ -139,8 +129,6 @@ public sealed class DepartmentPageCloseBehaviorTests(HrAdminPersonaFixture fixtu
 
         await deptEdit.CancelUnsavedChangesDialogAsync();
 
-        // Cancelling the prompt should just dismiss it — the user stays on the form with
-        // their edits untouched, free to keep editing or click Close again.
         Assert.Contains("/departments/new", _page.Url);
         Assert.Equal(deptName, await deptEdit.GetNameAsync());
     }

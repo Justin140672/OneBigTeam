@@ -41,7 +41,6 @@ internal sealed class CustomerDatabaseAssignmentConfiguration : IEntityTypeConfi
             .HasColumnName("updated_at")
             .IsRequired();
 
-        // Indexes as specified
         builder.HasIndex(a => a.CompanyId)
             .HasDatabaseName("ix_customer_database_assignments_company_id");
 

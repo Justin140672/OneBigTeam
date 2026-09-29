@@ -1,12 +1,5 @@
 namespace HR.Modules.Identity.Domain;
 
-/// <summary>
-/// Bulk employee invitations: a single "queue batch" request creates one <see cref="InvitationBatch"/>
-/// plus one <see cref="InvitationBatchRecipient"/> per resolved recipient. Status reflects the
-/// aggregate lifecycle only (Queued -> Processing -> Completed) — recipient-level counts (see
-/// <see cref="InvitationBatchRecipient"/>) convey per-recipient success/failure detail, so a batch
-/// can be "Completed" while still containing Failed recipients (see RetryInvitationBatch).
-/// </summary>
 internal sealed class InvitationBatch
 {
     private InvitationBatch() { }
@@ -61,7 +54,6 @@ internal sealed class InvitationBatch
         CompletedAt = now;
     }
 
-    /// <summary>Reopens a settled batch for another processing pass (RetryInvitationBatch).</summary>
     public void ReopenForRetry()
     {
         Status = StatusQueued;

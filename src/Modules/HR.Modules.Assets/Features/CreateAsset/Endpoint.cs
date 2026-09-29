@@ -30,8 +30,6 @@ internal sealed class Endpoint(CreateAssetHandler handler, ICurrentUser currentU
             var statusCode = result.Error.Code switch
             {
                 "not_found" => StatusCodes.Status404NotFound,
-                // A shape/requiredness failure the shape-only validator can't catch (e.g. the
-                // AssetNumberMode-dependent "asset number is required") is a 422, not a 409.
                 "validation" => StatusCodes.Status422UnprocessableEntity,
                 _ => StatusCodes.Status409Conflict,
             };

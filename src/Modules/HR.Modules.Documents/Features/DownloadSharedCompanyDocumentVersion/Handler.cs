@@ -40,9 +40,6 @@ internal sealed class DownloadSharedCompanyDocumentVersionHandler(
 
         var url = await storage.GetDownloadUrlAsync(version.FileReference, cancellationToken);
 
-        // Record the download of this specific past version, with that version's own
-        // VersionNumber — not the document's current VersionNumber — same audit event as
-        // DownloadSharedCompanyDocument reuses for the current-file download.
         await auditPublisher.PublishAsync(new SharedCompanyDocumentDownloadedAuditEvent(
             document.CompanyId,
             document.Id,

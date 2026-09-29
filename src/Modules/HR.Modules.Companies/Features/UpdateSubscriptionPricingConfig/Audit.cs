@@ -6,11 +6,6 @@ internal sealed record SubscriptionPricingConfigAuditSnapshot(
     string BandsJson,
     decimal MinimumMonthlyChargeGbp);
 
-/// <summary>
-/// Records a platform-administrator change to the configurable subscription pricing model
-/// (Story 4). Plugs into the existing cross-cutting IAuditEventPublisher/AuditDbContext
-/// infrastructure, mirroring PlatformSettingsUpdatedAuditEvent.
-/// </summary>
 internal sealed record SubscriptionPricingConfigUpdatedAuditEvent(
     Guid SettingsId,
     Guid? ActorUserId,

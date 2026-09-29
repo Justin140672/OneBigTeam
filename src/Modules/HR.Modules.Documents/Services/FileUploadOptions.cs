@@ -2,7 +2,7 @@ namespace HR.Modules.Documents.Services;
 
 internal sealed class FileUploadOptions
 {
-    public long MaxFileSizeBytes { get; set; } = 20 * 1024 * 1024; // 20 MB
+    public long MaxFileSizeBytes { get; set; } = 20 * 1024 * 1024;
 
     public List<string> AllowedExtensions { get; set; } =
     [

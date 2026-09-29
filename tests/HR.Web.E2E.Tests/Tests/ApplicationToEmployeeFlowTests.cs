@@ -3,25 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// End-to-end smoke test covering the full recruitment pipeline: a candidate applies to a
-/// vacancy, is interviewed, offered the role, and hired — at which point the Recruitment
-/// module provisions a real Employee record and links it back to the candidate.
-///
-/// Candidate → Application → Interview (scheduled + outcome recorded) → Offer → Hire → Employee
-///
-/// Uses the seeded Acme company (00000000-0000-0000-0000-000000000001) and James Okafor
-/// (30000000-0000-0000-0000-000000000002) as the hiring manager / interviewer, but creates a
-/// fresh Vacancy and Candidate each run (unique names) so the test can be re-run against the
-/// same database without colliding with a previous run's data.
-///
-/// Runs as Marcus Diallo (Recruiter role) throughout the recruitment steps — recruitment:manage/
-/// candidate:view are Recruiter-only (see IdentityModule.AddRolePolicies), and an HR Administrator
-/// does not automatically get recruitment access. The final "employee now exists" check is a
-/// genuinely separate permission (employee:manage, HR-Administrator-only) that a Recruiter does
-/// not hold, so that one step switches to Laura Bennett (HR Administrator) — mirroring the real
-/// handoff: a Recruiter hires someone, an HR Administrator manages their employee record after.
-/// </summary>
 public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -29,9 +10,6 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : R
     private const string MarcusEmail = "marcus.diallo@acme.example";
     private const string LauraEmail = "laura.bennett@acme.example";
 
-    // No longer joins HrSettingsSerialTestBase's gate: that was only needed while
-    // Candidate_Applies_..._BecomesEmployee flipped the shared Acme numbering mode, which it no
-    // longer does (see that test's remarks).
 
     [Fact]
     public async Task Candidate_Applies_Interviews_IsOffered_AndHired_BecomesEmployee()
@@ -49,11 +27,6 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : R
         var vacancyDetail  = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
         var employeeList   = new EmployeeListPage(_page, _fixture.WebBaseUrl);
 
-        // Acme's numbering mode is left at its seeded Automatic for the whole run and never
-        // mutated here (it used to be flipped to Manual for this test, which raced every ungated
-        // class creating Acme employees — see CreateEmployeeTests' remarks). The Hire dialog then
-        // shows "assigned automatically" instead of the Employee Number input, and
-        // FillHireEmployeeNumberAsync below is mode-aware (a no-op in Automatic mode).
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
@@ -65,7 +38,6 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : R
         var profileTitle = await PositionProfileTestHelpers.CreateUniquePositionProfileAsync(
             _page, _fixture.WebBaseUrl, AcmeId, login, LauraEmail, MarcusEmail);
 
-        // ── Step 1: Create the candidate ──────────────────────────────────────────
         await candidateList.GoToAsync(AcmeId);
         await candidateList.ClickNewCandidateAsync();
         await candidateEdit.FillFirstNameAsync(candidateFirst);
@@ -76,7 +48,6 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : R
         Assert.True(await candidateList.HasCandidateAsync(candidateLast),
             $"Expected the new candidate '{candidateLast}' to appear in the candidate list");
 
-        // ── Step 2: Create the vacancy ─────────────────────────────────────────────
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickNewVacancyAsync();
         await vacancyDetail.FillTitleAsync(vacancyTitle);
@@ -87,33 +58,23 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : R
         Assert.True(await vacancyList.HasVacancyAsync(vacancyTitle),
             $"Expected the new vacancy '{vacancyTitle}' to appear in the vacancy list");
 
-        // ── Step 3: Add the candidate's application to the vacancy ────────────────
         await vacancyList.ClickVacancyAsync(vacancyTitle);
         await vacancyDetail.PublishVacancyAsync();
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickAddCandidateAsync();
-        // The Add Candidate popup's item text is name-only (no email — item #26/product fix),
-        // so the candidate must be matched by name here even though search-as-you-type still
-        // works server-side against any field including email.
         await vacancyDetail.SelectCandidateInAddDialogAsync(candidateLast);
         await vacancyDetail.SubmitAddApplicationAsync();
 
         Assert.Equal("Application Received", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
 
-        // ── Step 4: Schedule an interview ──────────────────────────────────────────
         await vacancyDetail.ClickScheduleInterviewForAsync(candidateLast);
         await vacancyDetail.WaitForScheduleDialogAsync();
         await vacancyDetail.SelectInterviewerAsync("James");
         await vacancyDetail.FillScheduledAtAsync("01/09/2026 10:00");
         await vacancyDetail.SubmitScheduleInterviewAsync();
 
-        // Scheduling an interview never moves CurrentStageId — it's pure metadata (an Interview
-        // row plus InterviewOutcome defaulting to Pending); stage-shaped interview sub-states no
-        // longer exist (see ScheduleInterviewHandler's "Ticket #99" comment), moving stage is a
-        // separate explicit action, so the status badge is unchanged from "Application Received".
         Assert.Equal("Application Received", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
 
-        // ── Step 5: Record the interview outcome ───────────────────────────────────
         await vacancyDetail.OpenInterviewsTabAsync();
         Assert.Equal("Pending", await vacancyDetail.GetInterviewOutcomeAsync(candidateLast));
 
@@ -124,18 +85,12 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : R
 
         Assert.Equal("Passed", await vacancyDetail.GetInterviewOutcomeAsync(candidateLast));
 
-        // ── Step 6: Make an offer ───────────────────────────────────────────────────
-        // Recording the interview outcome, like scheduling it, is pure metadata (Application.
-        // InterviewOutcome) and never itself moves CurrentStageId either — see the same "Ticket #99"
-        // rationale referenced above. Status stays "Application Received" until an explicit
-        // stage-moving action (OfferCandidate below) runs.
         await vacancyDetail.OpenApplicationsTabAsync();
         Assert.Equal("Application Received", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
 
         await vacancyDetail.ClickOfferForAsync(candidateLast);
         Assert.Equal("Offer", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
 
-        // ── Step 7: Hire — this provisions a real Employee and links the candidate ─
         await vacancyDetail.ClickHireForAsync(candidateLast);
         await vacancyDetail.WaitForHireDialogAsync();
         await vacancyDetail.FillHireStartDateAsync("01/10/2026");
@@ -143,13 +98,6 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : R
         await vacancyDetail.SelectHireNationalityAsync("British");
         await vacancyDetail.SelectHireGenderAsync("Male");
 
-        // Employee Number and Employment Type are still filled in manually — Department,
-        // Location and Position Profile are no longer manual fields as of the "Vacancy - Position
-        // Profile relationship" epic: they're derived server-side by HireCandidateHandler from the
-        // Vacancy's own linked Position Profile (the unique profile created above via
-        // CreateUniquePositionProfileAsync, not the seeded "Senior Software Engineer" — see that
-        // helper's remarks on why a fresh profile is needed) and shown read-only in the dialog for
-        // confirmation.
         Assert.Equal(profileTitle, await vacancyDetail.GetHireDerivedPositionProfileTextAsync());
         Assert.Equal("London Office", await vacancyDetail.GetHireDerivedLocationTextAsync());
 
@@ -160,16 +108,11 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : R
 
         Assert.Equal("Hired", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
 
-        // ── Step 8: The candidate record should now show it was hired and linked ──
         await candidateList.GoToAsync(AcmeId);
         await candidateList.ClickCandidateAsync(candidateLast);
         Assert.True(await candidateEdit.HasHiredBannerAsync(),
             "Expected the candidate detail page to show the 'hired and linked to employee' banner");
 
-        // ── Step 9: A real Employee should now exist and appear in the employee list ─
-        // The employee list page requires employee:manage, which Marcus (Recruiter) doesn't
-        // hold — switch to Laura (HR Administrator) for this one check, matching the real
-        // handoff between the two roles.
         await login.SwitchAccountAsync(LauraEmail);
         await employeeList.GoToAsync(AcmeId);
         Assert.True(await employeeList.HasEmployeeAsync(candidateLast),
@@ -184,23 +127,15 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : R
         await vacancyDetail.ClickHireForAsync(candidateLast);
         await vacancyDetail.WaitForHireDialogAsync();
 
-        // The manual Department/Location/Position Profile dropdowns are gone entirely — those
-        // values are now shown read-only, derived from the Vacancy's linked Position Profile.
         Assert.False(await vacancyDetail.HasHireDropdownLabelAsync("Department"),
             "Expected the manual Department dropdown to no longer exist in the Hire dialog");
         Assert.False(await vacancyDetail.HasHireDropdownLabelAsync("Location"),
             "Expected the manual Location dropdown to no longer exist in the Hire dialog");
         Assert.False(await vacancyDetail.HasHireDropdownLabelAsync("Position Profile"),
             "Expected the manual Position Profile dropdown to no longer exist in the Hire dialog");
-        // ArrangeOfferedApplicationAsync creates a fresh, uniquely-named Position Profile for the
-        // vacancy (the seeded "Senior Software Engineer" profile already has a permanently-open
-        // vacancy in seed data — see PositionProfileTestHelpers' remarks), so the derived text here
-        // must be that unique profile's title, not the seeded name.
         Assert.Equal(profileTitle, await vacancyDetail.GetHireDerivedPositionProfileTextAsync());
         Assert.Equal("London Office", await vacancyDetail.GetHireDerivedLocationTextAsync());
 
-        // Fill in the fields that were already required before Employment Type/Employee Number
-        // became mandatory...
         await vacancyDetail.FillHireStartDateAsync("01/10/2026");
         await vacancyDetail.FillHireDateOfBirthAsync("15/06/1990");
         await vacancyDetail.SelectHireNationalityAsync("British");
@@ -217,18 +152,10 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : R
         Assert.True(await vacancyDetail.HasDialogErrorAsync("hire-candidate-dialog"),
             "Expected a validation error when submitting the Hire dialog without the newly required fields");
 
-        // The dialog stayed open rather than closing (which SubmitHireAsync would otherwise wait
-        // for), confirming the hire did not go through — the application should still be Offered.
         await vacancyDetail.CancelHireDialogAsync();
         Assert.Equal("Offer", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
     }
 
-    /// <summary>
-    /// Runs the candidate/vacancy/application/interview/offer pipeline (steps 1-6 of
-    /// <see cref="Candidate_Applies_Interviews_IsOffered_AndHired_BecomesEmployee"/>) so a test can
-    /// exercise just the Hire dialog against a fresh Offered application, without duplicating this
-    /// multi-step setup inline.
-    /// </summary>
     private async Task<(string CandidateLast, VacancyDetailPage VacancyDetail, string ProfileTitle)> ArrangeOfferedApplicationAsync()
     {
         var unique         = Guid.NewGuid().ToString("N")[..8];
@@ -271,9 +198,6 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : R
         await vacancyDetail.PublishVacancyAsync();
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickAddCandidateAsync();
-        // The Add Candidate popup's item text is name-only (no email — item #26/product fix),
-        // so the candidate must be matched by name here even though search-as-you-type still
-        // works server-side against any field including email.
         await vacancyDetail.SelectCandidateInAddDialogAsync(candidateLast);
         await vacancyDetail.SubmitAddApplicationAsync();
 

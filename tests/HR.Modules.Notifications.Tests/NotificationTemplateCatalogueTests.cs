@@ -3,9 +3,6 @@ using HR.Modules.Notifications.Domain;
 
 namespace HR.Modules.Notifications.Tests;
 
-// NOT-03: catalogue-wide consistency checks — not per-render behaviour (see
-// NotificationTemplateRendererTests for that). These guard against a missing/extra registered type
-// and a typo'd "{Token}" placeholder that doesn't match a declared RequiredTokens/OptionalTokens entry.
 public class NotificationTemplateCatalogueTests
 {
     private static readonly NotificationType[] ExpectedTypes =
@@ -27,10 +24,6 @@ public class NotificationTemplateCatalogueTests
         Assert.Equal(expected, actual);
     }
 
-    // NotificationTemplate itself is internal to HR.Modules.Notifications, so [MemberData] can only
-    // hand the (public) test methods the NotificationType key — the template is looked up inside
-    // each method via NotificationTemplateCatalogue.TryGet, keeping this test class public (required
-    // by xUnit1000) without an accessibility mismatch on the method signature.
     public static IEnumerable<object[]> AllTemplateTypes() =>
         NotificationTemplateCatalogue.All.Keys.Select(type => new object[] { type });
 

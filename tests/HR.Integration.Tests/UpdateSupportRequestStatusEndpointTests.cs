@@ -31,8 +31,6 @@ public class UpdateSupportRequestStatusEndpointTests
         var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
-        // Also needs role:employee — SubmitSupportRequest (used to seed a request in these tests) is
-        // gated behind that policy, independent of the support:manage policy on the status endpoint.
         await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.Employee, companyId);
         await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
         return client;

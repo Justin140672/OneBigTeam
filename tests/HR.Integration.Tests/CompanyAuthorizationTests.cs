@@ -5,22 +5,11 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// Proves the company:manage FastEndpoints policy actually enforces access end-to-end
-/// over real HTTP for UpdateCompany, UpdateCompanySettings, and UploadCompanyLogo.
-/// Company Administrator is the only role permitted to change company-level
-/// configuration. HR Administrator is a distinct role — broadly privileged over
-/// employee/leave/sickness data elsewhere — and must be denied here; that's the
-/// specific regression this file guards against.
-/// </summary>
 [Collection("Integration")]
 public class CompanyAuthorizationTests
 {
     private readonly ApiWebApplicationFactory _factory;
 
-    // Guid.NewGuid() rather than a hardcoded literal — under the shared-database test
-    // collection, a hardcoded id here previously collided with the same literal used (and
-    // assigned a role) in another test file, silently granting this "no role" user a role.
     private static readonly Guid NoRoleUser = Guid.NewGuid();
     private static readonly Guid EmployeeUser = new("cc000001-0000-0000-0000-000000000002");
     private static readonly Guid ManagerUser = new("cc000001-0000-0000-0000-000000000003");
@@ -52,14 +41,11 @@ public class CompanyAuthorizationTests
         return client;
     }
 
-    // POST /api/companies (CreateCompany) was removed in 78a43344; this now provisions the
-    // company directly via CompaniesDbContext, mirroring TestRoleSeeder.EnsureActiveSubscriptionAsync.
     private async Task<Guid> CreateCompanyAsync(Guid tenantId)
     {
         return await CompanyTestSeeder.CreateCompanyAsync(_factory, $"Auth Test {Guid.NewGuid():N}", companyId: tenantId);
     }
 
-    // --- UpdateCompany ---
 
     [Fact]
     public async Task Put_Company_Returns_Forbidden_For_User_With_No_Roles()
@@ -136,7 +122,6 @@ public class CompanyAuthorizationTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
-    // --- UpdateCompanySettings ---
 
     [Fact]
     public async Task Put_Company_Settings_Returns_Forbidden_For_User_With_No_Roles()
@@ -196,7 +181,6 @@ public class CompanyAuthorizationTests
         locale = "en-GB",
     };
 
-    // --- UpdateHrSettings ---
 
     [Fact]
     public async Task Put_Hr_Settings_Returns_Forbidden_For_User_With_No_Roles()
@@ -231,10 +215,6 @@ public class CompanyAuthorizationTests
     [Fact]
     public async Task Put_Hr_Settings_Returns_Forbidden_For_CompanyAdministrator_Role()
     {
-        // Mirrors the company:manage vs employee:manage separation above, but inverted:
-        // HR Administrator is the only role permitted to change HR-policy settings, and
-        // Company Administrator (without HR Administrator) must now be denied here — this
-        // is the specific authorization-gap fix this file guards against.
         var tenantId = Guid.NewGuid();
         var companyId = await CreateCompanyAsync(tenantId);
         using var client = await ClientFor(tenantId, CompanyAdminUser);
@@ -265,7 +245,6 @@ public class CompanyAuthorizationTests
         probationMonths = 6
     };
 
-    // --- UploadCompanyLogo ---
 
     [Fact]
     public async Task Post_Company_Logo_Returns_Forbidden_For_User_With_No_Roles()

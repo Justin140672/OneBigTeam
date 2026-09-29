@@ -159,7 +159,6 @@ public class SaveReportViewEndpointTests
             new { companyId, reportId = "employee-directory", name = "My View", filterCriteriaJson = "{}" });
         first.EnsureSuccessStatusCode();
 
-        // Case-insensitive and whitespace-insensitive collision with the same name.
         var duplicate = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/reporting/saved-views",
             new { companyId, reportId = "employee-directory", name = "  my view  ", filterCriteriaJson = "{}" });
@@ -235,10 +234,6 @@ public class SaveReportViewEndpointTests
     {
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
-        // HrAdministrator only — no Recruiter role, so the caller lacks reporting:view-recruitment,
-        // which "recruitment-pipeline-summary" requires. They still satisfy the endpoint-level
-        // "reporting:view" policy (HrAdministrator is one of its OR'd roles), so this exercises the
-        // handler's per-report access-gate check, not the endpoint policy.
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
         using var client = await ClientFor(userId, companyId);
 

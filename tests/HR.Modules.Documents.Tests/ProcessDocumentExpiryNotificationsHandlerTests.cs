@@ -60,7 +60,6 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
         return empDoc;
     }
 
-    // ── No-op cases ─────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Returns_Zero_Counts_When_No_Documents_Have_ExpiryDate()
@@ -94,7 +93,6 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
         Assert.Equal(0, result.ExpiredCount);
     }
 
-    // ── 90-day stage ─────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Fires_Only_NinetyDay_Stage_When_Document_Is_Exactly_90_Days_Out()
@@ -120,7 +118,6 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
         Assert.NotNull(updated!.ExpiryReminder90SentAt);
         Assert.Null(updated.ExpiryReminder30SentAt);
         Assert.Null(updated.ExpiryReminder7SentAt);
-        // 90-day stage is not the "legacy" stage, so ExpiringSoonNotifiedAt must remain untouched.
         Assert.Null(updated.ExpiringSoonNotifiedAt);
 
         var task = Assert.Single(tasks.Created);
@@ -144,15 +141,12 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
         Assert.Equal(0, result.ExpiringSoonCount);
     }
 
-    // ── 30-day stage boundary ────────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Sets_ThirtyDay_SentAt_Exactly_On_Boundary()
     {
         await using var db = BuildContext();
         var companyId      = Guid.NewGuid();
-        // Seed the document already past the 90-day threshold on a prior run so this run only
-        // exercises the 30-day boundary in isolation.
         var empDoc = await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(30));
         var entity = await db.EmployeeDocuments.FindAsync(empDoc.Id);
         entity!.MarkExpiryReminderSent(ExpiryReminderStage.NinetyDays, FixedUtcNow);
@@ -170,7 +164,7 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
 
         var updated = await db.EmployeeDocuments.FindAsync(empDoc.Id);
         Assert.NotNull(updated!.ExpiryReminder30SentAt);
-        Assert.NotNull(updated.ExpiringSoonNotifiedAt); // legacy flag kept in sync by the 30-day stage
+        Assert.NotNull(updated.ExpiringSoonNotifiedAt);
     }
 
     [Fact]
@@ -196,7 +190,6 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
         Assert.Null(updated.ExpiringSoonNotifiedAt);
     }
 
-    // ── 7-day stage boundary ─────────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Sets_SevenDay_SentAt_Exactly_On_Boundary()
@@ -250,7 +243,6 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
         Assert.Null(updated!.ExpiryReminder7SentAt);
     }
 
-    // ── Catch-up semantics: multiple stages firing in a single run ─────────────────
 
     [Fact]
     public async Task HandleAsync_Fires_NinetyAnd_ThirtyDay_Stages_Together_On_First_Evaluation()
@@ -306,7 +298,6 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
         Assert.NotNull(updated.ExpiryReminder7SentAt);
     }
 
-    // ── Idempotency across repeated runs ────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Second_Run_Returns_Zero_Counts_For_Stages_Already_Sent_And_Preserves_Timestamps()
@@ -352,7 +343,6 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
         }
     }
 
-    // ── Expired ─────────────────────────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Returns_Expired_Count_And_Publishes_Audit_Event()
@@ -448,7 +438,6 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
         Assert.Single(tasks.Created);
     }
 
-    // ── Multi-document and isolation ────────────────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Processes_Multiple_Documents_In_One_Pass()
@@ -457,7 +446,6 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
         var companyId      = Guid.NewGuid();
         var audit          = new FakeAuditPublisher();
         var tasks          = new FakeTaskCreator();
-        // Seed each with earlier stages already sent, so this run isolates a single new stage per doc.
         var docA = await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(25));
         var entityA = await db.EmployeeDocuments.FindAsync(docA.Id);
         entityA!.MarkExpiryReminderSent(ExpiryReminderStage.NinetyDays, FixedUtcNow);
@@ -470,7 +458,7 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
             new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
             CancellationToken.None);
 
-        Assert.Equal(2, result.ExpiringSoonCount); // docA (30-day) + docB (90-day)
+        Assert.Equal(2, result.ExpiringSoonCount);
         Assert.Equal(1, result.ExpiredCount);
         Assert.Equal(3, audit.Published.Count);
         Assert.Equal(3, tasks.Created.Count);
@@ -517,9 +505,6 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
     [Fact]
     public async Task HandleAsync_Uses_Company_Local_Day_Not_UTC_Day_To_Classify_Expired_Vs_ExpiringSoon()
     {
-        // At 2026-06-17T23:30:00Z the UTC day is still Jun 17. In a fixed UTC+12 zone (no DST) the
-        // local day is already Jun 18, so a document expiring Jun 17 must be classified Expired
-        // (not ExpiringSoon) once the company's timezone is applied.
         var fixedUtcNow = new DateTime(2026, 6, 17, 23, 30, 0, DateTimeKind.Utc);
 
         await using var db = BuildContext();
@@ -572,7 +557,6 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
         }
     }
 
-    // ── SET-07: configurable reminder schedule ──────────────────────────────────
 
     [Fact]
     public async Task HandleAsync_Custom_Single_Slot_Schedule_Fires_At_Configured_Threshold_Not_Old_Hardcoded_90()
@@ -580,7 +564,6 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var tasks = new FakeTaskCreator();
-        // Only slot 1 configured, at 60 days — slots 2/3 disabled.
         var reader = new FakeCompanyDocumentReminderSettingsReader(
             new CompanyDocumentReminderSettings(true, 60, null, null));
         var empDoc = await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(60));
@@ -590,7 +573,7 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
             new ProcessDocumentExpiryNotificationsRequest { CompanyId = companyId },
             CancellationToken.None);
 
-        Assert.Equal(1, result.Reminder90Count); // slot 1 counter, now representing the 60-day threshold
+        Assert.Equal(1, result.Reminder90Count);
         Assert.Equal(0, result.Reminder30Count);
         Assert.Equal(0, result.Reminder7Count);
         Assert.Equal(1, result.ExpiringSoonCount);
@@ -607,8 +590,6 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
         var companyId = Guid.NewGuid();
         var reader = new FakeCompanyDocumentReminderSettingsReader(
             new CompanyDocumentReminderSettings(true, 60, null, null));
-        // 90 days out would have fired under the old hardcoded stage — this company's schedule no
-        // longer has a 90-day stage at all.
         await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(90));
         var handler = BuildHandler(db, documentReminderSettingsReader: reader);
 
@@ -629,7 +610,6 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
             new CompanyDocumentReminderSettings(false, 90, 30, 7));
         var tasks = new FakeTaskCreator();
         var audit = new FakeAuditPublisher();
-        // Inside all three legacy windows — none should fire while disabled.
         await SeedDocumentAsync(db, companyId, Guid.NewGuid(), expiryDate: Today.AddDays(3));
         var handler = BuildHandler(db, audit, tasks, documentReminderSettingsReader: reader);
 
@@ -648,7 +628,6 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
     [Fact]
     public async Task HandleAsync_RemindersDisabled_Still_Fires_Overdue_Notification_For_Already_Expired_Document()
     {
-        // Proves the overdue/expired path is completely unaffected by RemindersEnabled=false.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var reader = new FakeCompanyDocumentReminderSettingsReader(
@@ -674,8 +653,6 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
     [Fact]
     public async Task HandleAsync_Defensive_AllNull_But_Enabled_Settings_Fires_No_Reminder_Stage()
     {
-        // Pathological state the validator should prevent from ever being persisted — the handler
-        // just trusts whatever it's given and should simply not evaluate any stage.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var reader = new FakeCompanyDocumentReminderSettingsReader(
@@ -696,7 +673,6 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
     [Fact]
     public async Task HandleAsync_Schedule_Change_Between_Runs_Does_Not_ReFire_Already_Sent_Slot()
     {
-        // First run: default 90/30/7 schedule, document 90 days out — slot 1 fires.
         var dbName = Guid.NewGuid().ToString("N");
         var companyId = Guid.NewGuid();
 
@@ -717,10 +693,6 @@ public class ProcessDocumentExpiryNotificationsHandlerTests
             Assert.NotNull(updated!.ExpiryReminder90SentAt);
         }
 
-        // Second run: schedule changed so slot 1's offset is now 60 (the document, still 90 days
-        // out relative to "today", would newly be inside the 60-day window on a hypothetical
-        // re-evaluation only once time passes — but per-slot idempotency must prevent a re-fire
-        // for the same document/expiry-date/slot regardless).
         var reconfiguredReader = new FakeCompanyDocumentReminderSettingsReader(
             new CompanyDocumentReminderSettings(true, 60, 30, 7));
 

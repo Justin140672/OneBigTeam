@@ -150,11 +150,9 @@ public class ProcessPromotionsJobTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        // Inconsistent state: promotion references an employee that does not exist.
         var missingEmployeePromotion = CreatePromotion(companyId, Guid.NewGuid(), Today.AddDays(-1), Now);
         context.EmployeePromotions.Add(missingEmployeePromotion);
 
-        // A normal, correctly-due promotion in the same run to prove it is unaffected.
         var okEmployee = CreateEmployee(companyId, Now);
         context.Employees.Add(okEmployee);
         var okPromotion = CreatePromotion(companyId, okEmployee.Id, Today.AddDays(-1), Now);
@@ -186,8 +184,6 @@ public class ProcessPromotionsJobTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        // A completed promotion exists, but nothing pending — the query should exclude it and the
-        // job should do no work at all.
         var employee = CreateEmployee(companyId, Now);
         context.Employees.Add(employee);
         var promotion = CreatePromotion(companyId, employee.Id, Today.AddDays(-1), Now);
@@ -208,9 +204,6 @@ public class ProcessPromotionsJobTests
     [Fact]
     public async Task ExecuteAsync_Resolves_Due_Date_Independently_Per_Company_Time_Zone()
     {
-        // 2026-07-25T23:30:00Z is still 2026-07-25 in UTC, but already 2026-07-26 00:30 in
-        // Europe/London (BST, UTC+1). A promotion effective 2026-07-26 is due in a UK company but
-        // not yet due in a UTC company at the same instant.
         var fixedUtcNow = new DateTime(2026, 7, 25, 23, 30, 0, DateTimeKind.Utc);
         var localNow = new DateTimeOffset(fixedUtcNow, TimeSpan.Zero);
 

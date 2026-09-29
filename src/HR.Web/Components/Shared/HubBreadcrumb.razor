@@ -19,10 +19,6 @@
     [Parameter, EditorRequired] public string CurrentPage { get; set; } = string.Empty;
     [Parameter] public (string Text, string Url)? Parent { get; set; }
 
-    // ADM-07 — when the user arrived here from a filtered list (which now passes its exact
-    // path+query as a "?returnUrl="), the "back to list" crumb should return to that filtered
-    // view rather than the bare list URL. Validated with ReturnUrlValidator to prevent
-    // open-redirect vulnerabilities.
     private string ParentUrl(string fallback)
     {
         var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(

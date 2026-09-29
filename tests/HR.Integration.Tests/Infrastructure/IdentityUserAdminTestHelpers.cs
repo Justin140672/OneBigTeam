@@ -8,13 +8,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests.Infrastructure;
 
-/// <summary>
-/// Shared setup for the User Administration integration tests (ListUsers, GetUserDetails,
-/// GetUserAuditHistory, InviteEmployeeUser, UpdateUserRoles, ResendInvite, CancelInvite,
-/// DisableUser, EnableUser). Seeds a real Employee row (via EF, fastest path — mirrors
-/// EmployeeReferenceDataSeeder) so IEmployeeNameReader resolves a name, and provides helpers for
-/// seeding ApplicationUser/UserInvite rows directly in the identity schema.
-/// </summary>
 internal static class IdentityUserAdminTestHelpers
 {
     public static async Task<Guid> SeedEmployeeAsync(
@@ -111,8 +104,6 @@ internal static class IdentityUserAdminTestHelpers
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
 
-        // createdAt backdates both CreatedAt and (CreatedAt + 7 days) ExpiresAt, so passing a value
-        // more than 7 days in the past yields an already-expired invite.
         var now = createdAt ?? DateTimeOffset.UtcNow;
         var invite = UserInvite.Create(employeeId, companyId, email, now, roleIds, createdByUserId);
 

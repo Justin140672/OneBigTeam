@@ -5,23 +5,6 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the HR-only dashboard (src/HR.Web/Components/Pages/Dashboards/HrDashboard.razor),
-/// reached via "/dashboard/hr". The page guards on Session.IsHrAdministrator and redirects any
-/// other role to Session.MyProfileUrl, so a non-HR-administrator can never see any of the
-/// widgets below at all.
-///
-/// Layout (top to bottom): greeting header -> DashboardSwitcher -> "Needs your attention" row
-/// (AttentionQueueWidget, a unified priority-sorted queue that replaced the standalone
-/// HrInboxWidget, LeaveRequestsWidget, UpcomingProbationReviewsWidget,
-/// OverdueReturnToWorkReviewsWidget, ComplianceDocumentExpiryWidget and DocumentReviewsWidget —
-/// alongside FavouriteReportsWidget in the same row, item 46) -> an "Analytics" section with a
-/// 3-chart grid (HeadcountByDepartmentChart, GenderSplitChart, EmploymentTypeSplitChart — all now
-/// plain horizontal-bar charts, not Syncfusion donuts) -> a "More" section (CurrentSicknessAbsenceWidget,
-/// MissingFitNotesWidget, RecentEmployeeChangesWidget).
-///
-/// Uses seeded personas: Laura Bennett (HR Administrator only) and Tom Williams (plain Employee).
-/// </summary>
 public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private const string LauraEmail = "laura.bennett@acme.example";
@@ -42,8 +25,6 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/dashboard/hr");
 
-        // Tom is a plain Employee — HrDashboard.razor's guard bounces him to his own profile
-        // (AppSession.MyProfileUrl) before any widget renders.
         await _page.WaitForURLAsync(new Regex(@"/employees/[0-9a-f-]{36}/profile"), new() { Timeout = 15_000 });
         Assert.DoesNotContain("/dashboard/hr", _page.Url);
     }
@@ -68,7 +49,6 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
         Assert.True(await dashboard.HasWidgetAsync("Favourite Reports"));
     }
 
-    // ── Ordering: attention queue precedes analytics ──────────────────────────
 
     [Fact]
     public async Task AttentionQueueSection_PrecedesAnalyticsSection_InDom()
@@ -92,17 +72,10 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
             $"Expected the attention queue (y={queueY}) to render above the analytics grid (y={analyticsY}).");
     }
 
-    // ── AttentionQueueWidget ("Needs your attention") ─────────────────────────
-    // Merges HR tasks, pending leave requests, overdue probation/return-to-work reviews, document
-    // expiry and document reviews into a single priority-sorted list — see
-    // src/HR.Web/Components/Pages/Dashboards/AttentionQueueWidget.razor.
 
     [Fact]
     public async Task AttentionQueue_ShowsCarlosRivera_ProbationReview()
     {
-        // Depends on the seeded "Carlos Rivera" probation record (company: Acme), which has a
-        // pending ManagerCheckIn review — previously covered by the standalone
-        // UpcomingProbationReviewsWidget.
         var login     = new LoginPage(_page, _fixture.WebBaseUrl);
         var dashboard = new HrDashboardPage(_page, _fixture.WebBaseUrl);
 
@@ -133,14 +106,9 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
         var carlos = employeeNames.First(n => n.Contains("Carlos", StringComparison.OrdinalIgnoreCase));
         await dashboard.ClickAttentionQueueItemAsync(carlos);
 
-        // GenerateDueProbationReviewsJob always creates a task for each seeded review, so the
-        // queue's activation opens the task dialog in place rather than navigating away.
         await task.WaitForLoadedAsync();
         Assert.Contains("/dashboard/hr", _page.Url);
 
-        // The dialog header shows the task's own title ("{Action} — {EmployeeName}"), not the
-        // queue row's "{EmployeeName} · Due {Date}" meta text used to find/click the row above
-        // — only the employee name is common to both, so that's what we can assert here.
         var title = await task.GetTitleAsync();
         Assert.Contains("Carlos", title, StringComparison.OrdinalIgnoreCase);
     }
@@ -157,18 +125,9 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
 
         await dashboard.WaitForAttentionQueueLoadedAsync();
 
-        // Rather than assert on any single seeded item (which can rotate as other suites' data
-        // changes), assert on the structural contract every row makes: a subject
-        // (.task-widget-title), a category/status line (.task-widget-meta), and a primary action
-        // control (.attention-queue-action) — see AttentionQueueWidget.razor's row markup.
-        // Actionable (button) rows only — read-only/stale rows have no ".attention-queue-action"
-        // and can legitimately sort first depending on other tests' data (see
-        // HrDashboardPage.ActionableAttentionQueueRows).
         var firstRow = dashboard.ActionableAttentionQueueRows.First;
         if (!await firstRow.IsVisibleAsync())
         {
-            // No exceptions currently seeded for this run — covered separately by the "all clear"
-            // test below.
             return;
         }
 
@@ -195,14 +154,9 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
         var overdueFlags = await dashboard.GetAttentionQueueOverdueFlagsAsync();
         if (overdueFlags.Count == 0)
         {
-            // Empty queue for this run — ordering has nothing to assert; covered by the
-            // structural test above and the "all clear" test below.
             return;
         }
 
-        // AttentionQueueWidget orders overdue-first (OrderByDescending(i => i.IsOverdue)), so once
-        // a row's class stops carrying "attention-queue-item--overdue", no later row should have
-        // it either.
         var seenNonOverdue = false;
         for (var i = 0; i < overdueFlags.Count; i++)
         {
@@ -216,21 +170,10 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
         }
     }
 
-    // DSH-06: the "Show resolved leave requests" checkbox was removed. The widget now issues one
-    // server-side bounded summary fetch that only ever returns actionable (e.g. pending) items, so
-    // there is no resolved-item reveal path left to exercise — the former
-    // AttentionQueue_HidesResolvedLeaveRequestsByDefault_AndRevealsThemViaToggle test was deleted.
-    // Resolved-request exclusion is now covered by
-    // LeaveRequestsWidgetTaskDialogTests.ApprovedLeaveRequest_IsNotShown_OnHrAttentionQueue.
 
     [Fact]
     public async Task AttentionQueue_ShowsAllClearSummary_WhenEmpty()
     {
-        // GAP: there is no seeded company reachable by this suite's fixtures with a genuinely
-        // empty attention queue (Acme always has some mix of seeded HR tasks / leave requests /
-        // reviews / documents). This test asserts the contract defensively: whenever the queue
-        // happens to be empty, the compact "All clear" summary must be shown instead of any
-        // individual empty-state cards, and vice versa — never both, never neither.
         var login     = new LoginPage(_page, _fixture.WebBaseUrl);
         var dashboard = new HrDashboardPage(_page, _fixture.WebBaseUrl);
 
@@ -266,13 +209,9 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
         var dueThisWeekFile  = Path.Combine(Path.GetTempPath(), $"shared-doc-{Guid.NewGuid():N}.pdf");
         try
         {
-            // ReviewDate in the past — the handler's IsOverdue = ReviewDate < today marks this one
-            // "overdue".
             await UploadDocumentWithReviewDateAsync(
                 overdueTitle, overdueFile, DateOnly.FromDateTime(DateTime.Today.AddDays(-3)));
 
-            // ReviewDate a few days out — still inside the widget's "today + 7 days" window, so it
-            // lands in the "due this week" bucket instead.
             await UploadDocumentWithReviewDateAsync(
                 dueThisWeekTitle, dueThisWeekFile, DateOnly.FromDateTime(DateTime.Today.AddDays(3)));
 
@@ -282,7 +221,6 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
             Assert.Contains(subjects, t => t.Contains(overdueTitle, StringComparison.Ordinal));
             Assert.Contains(subjects, t => t.Contains(dueThisWeekTitle, StringComparison.Ordinal));
 
-            // Overdue-first ordering: the overdue document's row must precede the due-this-week row.
             Assert.True(
                 subjects.ToList().IndexOf(subjects.First(t => t.Contains(overdueTitle, StringComparison.Ordinal)))
                 < subjects.ToList().IndexOf(subjects.First(t => t.Contains(dueThisWeekTitle, StringComparison.Ordinal))),
@@ -300,11 +238,6 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
         }
     }
 
-    // Uploads a shared document from the Shared Documents list page with a specific Next Review
-    // Date, leaving Review Frequency at its "None" default — same upload-dialog interaction
-    // pattern as SharedDocumentUploadTests.HrAdministrator_CanUploadSharedDocument_AndSeeItInList /
-    // SharedDocumentReviewFrequencyTests.UploadDocumentAsync, but setting the date directly instead
-    // of the fixed one-year-out date those use for their own (unrelated) assertions.
     private async Task UploadDocumentWithReviewDateAsync(string title, string filePath, DateOnly reviewDate)
     {
         await _page.GotoAsync(_fixture.WebBaseUrl + $"/companies/{AcmeId}/shared-documents");
@@ -336,7 +269,6 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
         await _page.WaitForSelectorAsync($"text={title}", new() { Timeout = 15_000 });
     }
 
-    // %PDF- followed by padding, so magic-byte content validation passes.
     private static byte[] BuildTestPdf()
     {
         var magic = new byte[] { 0x25, 0x50, 0x44, 0x46, 0x2D };
@@ -345,15 +277,6 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
         return bytes;
     }
 
-    // ── Analytics charts (HeadcountByDepartmentChart / GenderSplitChart / EmploymentTypeSplitChart) ─
-    // All three converted from Syncfusion donut charts to the shared HorizontalBarChart control
-    // (or, for Headcount, a bespoke clickable "hbar-row--button" list) with plain-text,
-    // non-truncated category labels — see src/HR.Web/Components/Controls/HorizontalBarChart.razor.
-    // The seeded Acme company (Laura's company) has active employees with departments, genders
-    // and employment types set, so these tests exercise the populated-chart path; there is no
-    // seeded company with zero active employees available to this suite to exercise the
-    // "No employee data available." empty state end-to-end without provisioning a brand-new
-    // company, which is outside this suite's existing patterns.
 
     [Fact]
     public async Task AnalyticsGrid_RendersAllThreeChartsTogether_AtDesktopViewport()
@@ -377,9 +300,6 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
         var bounds = await dashboard.GetAnalyticsGridTileBoundsAsync();
         Assert.Equal(3, bounds.Count);
 
-        // At a desktop width, the grid should lay the three tiles out side by side (same row) —
-        // assert they don't all stack vertically by checking their vertical positions roughly
-        // coincide (within a small tolerance for border/padding rounding).
         var ys = bounds.Select(b => b.Y).ToList();
         var maxYDelta = ys.Max() - ys.Min();
         Assert.True(maxYDelta < 40,
@@ -415,9 +335,6 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
 
         await dashboard.WaitForHeadcountChartLoadedAsync();
 
-        // Accessible name must be the specific "View all employees" text, not a generic
-        // "View all" — asserted via GetByRole with an exact name match, which throws if no
-        // element in the widget has exactly that accessible name.
         await dashboard.ClickHeadcountViewAllEmployeesAsync();
 
         Assert.Contains($"/companies/{AcmeId}/employees", _page.Url);
@@ -437,8 +354,6 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
 
         await dashboard.WaitForGenderSplitChartLoadedAsync();
 
-        // Acme has active employees with genders set, so this should render the chart, not the
-        // empty state.
         Assert.False(await dashboard.GenderSplitChartIsEmptyAsync());
 
         var labels = await dashboard.GetGenderSplitLabelsAsync();
@@ -460,8 +375,6 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
 
         await dashboard.WaitForEmploymentTypeSplitChartLoadedAsync();
 
-        // Acme has active employees with employment types set, so this should render the chart,
-        // not the empty state.
         Assert.False(await dashboard.EmploymentTypeSplitChartIsEmptyAsync());
 
         var labels = await dashboard.GetEmploymentTypeSplitLabelsAsync();
@@ -469,7 +382,6 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
         Assert.All(labels, l => Assert.False(string.IsNullOrWhiteSpace(l)));
     }
 
-    // ── Accessibility: descriptive link/button names, keyboard focus ──────────
 
     [Fact]
     public async Task ViewAllLinks_HaveDescriptiveAccessibleNames_NotGenericViewAll()
@@ -483,13 +395,9 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
 
         await dashboard.WaitForHeadcountChartLoadedAsync();
 
-        // "View all employees" — not a bare "View all".
         var headcountLink = _page.GetByRole(AriaRole.Link, new() { Name = "View all employees", Exact = true });
         await Assertions.Expect(headcountLink).ToBeVisibleAsync();
 
-        // No element on the page should have exactly the generic accessible name "View all" —
-        // every view-all-style link on this redesigned page should carry a more specific label
-        // (e.g. "View all employees").
         var genericViewAll = _page.GetByRole(AriaRole.Link, new() { Name = "View all", Exact = true });
         Assert.Equal(0, await genericViewAll.CountAsync());
     }
@@ -511,20 +419,14 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
         var firstItem = dashboard.ActionableAttentionQueueRows.First;
         if (!await firstItem.IsVisibleAsync())
         {
-            // Empty queue for this run — nothing to tab to; covered by the "all clear" test.
             return;
         }
 
-        // Queue rows are real <button> elements, so they're natively focusable and keyboard
-        // activatable — .FocusAsync() plus asserting document.activeElement is simpler and more
-        // reliable across browsers than simulating repeated Tab presses through the whole page.
         await firstItem.FocusAsync();
 
         var isFocused = await firstItem.EvaluateAsync<bool>("el => el === document.activeElement");
         Assert.True(isFocused, "Expected the first attention-queue row to be keyboard-focusable.");
 
-        // :focus-visible outline rule in app.css applies to .task-widget-item — confirm the
-        // computed outline is not "none" while focused.
         var outlineStyle = await firstItem.EvaluateAsync<string>(
             "el => getComputedStyle(el).outlineStyle");
         Assert.NotEqual("none", outlineStyle);
@@ -549,12 +451,11 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
         Assert.True(isFocused, "Expected the 'View all employees' link to be keyboard-focusable.");
     }
 
-    // ── Layout responsiveness ──────────────────────────────────────────────────
 
     [Theory]
-    [InlineData(1440, 900)]  // desktop
-    [InlineData(834, 1112)]  // tablet
-    [InlineData(390, 844)]   // mobile
+    [InlineData(1440, 900)]
+    [InlineData(834, 1112)]
+    [InlineData(390, 844)]
     public async Task Dashboard_LoadsAndKeepsQueueAndAnalyticsUsable_AtViewport(int width, int height)
     {
         var login     = new LoginPage(_page, _fixture.WebBaseUrl);
@@ -573,13 +474,6 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
         Assert.True(await dashboard.HasWidgetAsync("Headcount by Department"));
     }
 
-    // ── Remaining sickness widgets ────────────────────────────────────────────
-    // OverdueReturnToWorkReviewsWidget no longer renders standalone — its data now surfaces as
-    // "Return-to-work review" category rows inside AttentionQueueWidget (see
-    // AttentionQueueWidget.razor's `rtw` loop). CurrentSicknessAbsenceWidget and
-    // MissingFitNotesWidget remain in the "More" section and still gate on
-    // Session.CanManageEmployees (redundant with the route guard, but still asserted here for
-    // completeness).
 
     [Fact]
     public async Task HrAdministrator_Sees_RemainingSicknessWidgets()
@@ -611,12 +505,6 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
         await dashboard.WaitForWidgetLoadedAsync("Recent Employee Changes");
     }
 
-    // ── Favourite Reports Widget ──────────────────────────────────────────────
-    // FavouriteReportsWidget.razor ("Favourite Reports") — lists whatever's been favourited from
-    // the Reports catalog (ReportCatalogPage.razor's star toggle, see ReportCatalogTests.cs),
-    // server-persisted via ReportingService's favourites endpoints. No favouriting UI of its own on
-    // the dashboard, so these tests favourite via the catalog page first, same as
-    // ReportCatalogTests.FavouriteToggle_PersistsAcrossReload_AndSortsFirstInCategory.
 
     [Fact]
     public async Task FavouriteReportsWidget_ShowsEmptyState_WhenNothingFavourited()
@@ -643,9 +531,6 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
         await login.LoginAsync(LauraEmail);
 
         await catalog.GoToAsync(AcmeId);
-        // Self-heal rather than assert-and-fail: if an earlier run's assertion failure ever left
-        // this favourited despite the try/finally below, asserting False unconditionally would
-        // fail every subsequent run forever with no way to recover.
         if (await catalog.IsFavouritedAsync("Employee Starter Report"))
             await catalog.ClickFavouriteAsync("Employee Starter Report");
         Assert.False(await catalog.IsFavouritedAsync("Employee Starter Report"));
@@ -665,8 +550,6 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
         }
         finally
         {
-            // Leaves the persona's favourites clean for any other test relying on the seeded
-            // dev database, mirroring the "no lingering test data" convention used elsewhere.
             await catalog.GoToAsync(AcmeId);
             if (await catalog.IsFavouritedAsync("Employee Starter Report"))
                 await catalog.ClickFavouriteAsync("Employee Starter Report");

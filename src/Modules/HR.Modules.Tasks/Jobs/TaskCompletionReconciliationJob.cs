@@ -53,11 +53,6 @@ internal sealed class TaskCompletionReconciliationJob(
 {
     public const int MaxAttempts = 4;
 
-    /// <summary>
-    /// A Pending operation younger than this is assumed to still be genuinely in-flight inside a
-    /// normal CompleteTaskHandler call (which completes in milliseconds under healthy conditions),
-    /// not abandoned — avoids attempting to claim (and therefore contending with) a live request.
-    /// </summary>
     private static readonly TimeSpan StalePendingThreshold = TimeSpan.FromMinutes(5);
 
     [DisableConcurrentExecution(timeoutInSeconds: 300)]
@@ -151,9 +146,6 @@ internal sealed class TaskCompletionReconciliationJob(
 
         if (task.Status == Domain.TaskItemStatus.Completed)
         {
-            // The TaskItem was already completed by some other path (shouldn't normally happen for
-            // a Pending operation, but leaves nothing to redo) — converge the operation forward
-            // rather than leaving it stuck.
             operation.MarkDispatchApplied(now);
             await dbContext.SaveChangesAsync();
             return;
@@ -189,10 +181,6 @@ internal sealed class TaskCompletionReconciliationJob(
         task.Complete(operation.CompletedBy, now);
         await dbContext.SaveChangesAsync();
 
-        // Side effects (notification/audit) are not attempted inline here — handing off to
-        // TaskCompletionEffectsJob keeps this job focused purely on the business dispatch + task
-        // completion, and the next sweep's "abandoned DispatchApplied" pass will pick this operation
-        // up if that job doesn't run to completion on its own.
         backgroundJobClient.Enqueue<TaskCompletionEffectsJob>(
             job => job.ProcessAsync(operation.Id, operation.CompanyId));
     }

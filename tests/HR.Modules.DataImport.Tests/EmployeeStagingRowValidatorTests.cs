@@ -18,12 +18,6 @@ public class EmployeeStagingRowValidatorTests
             resolver ?? new FakeImportLookupResolver(),
             employeeNumberSettingsReader ?? new FakeCompanyEmployeeNumberSettingsReader());
 
-    // Builds a row that otherwise satisfies all required fields, with optional extras set.
-    // DateOfBirth/Nationality/Gender/EmployeeNumber/DepartmentName/LocationName/
-    // EmploymentTypeName/PositionProfileTitle/SalaryAmount all default to valid values (rather
-    // than being omitted) since they are mandatory Employee fields — tests that need to exercise
-    // a specific missing/absent scenario for one of them pass that parameter as an explicit
-    // `null` to override the default.
     private static ParsedImportRow ValidRow(
         int rowNumber,
         string firstName = "Alice",
@@ -79,8 +73,6 @@ public class EmployeeStagingRowValidatorTests
         return new ParsedImportRow(rowNumber, fields);
     }
 
-    // Derives the "mapped fields" set from whichever fields are present across the given rows,
-    // mirroring how the parser reports a field as mapped only when its header was found in the file.
     private static IReadOnlySet<string> MappedFieldsFrom(params ParsedImportRow[] rows) =>
         rows.SelectMany(r => r.Fields.Keys).ToHashSet();
 
@@ -219,7 +211,7 @@ public class EmployeeStagingRowValidatorTests
     {
         var validator = BuildValidator();
         var row1 = ValidRow(2, workEmail: "row1@example.com", employeeNumber: "EMP1");
-        var row2 = ValidRow(3, workEmail: "row2@example.com", employeeNumber: " emp1 "); // case-insensitive/trimmed match
+        var row2 = ValidRow(3, workEmail: "row2@example.com", employeeNumber: " emp1 ");
 
         var results = await validator.ValidateAsync(CompanyId, [row1, row2], MappedFieldsFrom(row1, row2), CancellationToken.None);
 
@@ -247,7 +239,7 @@ public class EmployeeStagingRowValidatorTests
     {
         var validator = BuildValidator();
         var row1 = ValidRow(2, workEmail: "Dup@Example.com");
-        var row2 = ValidRow(3, workEmail: " dup@example.com "); // case-insensitive/trimmed match
+        var row2 = ValidRow(3, workEmail: " dup@example.com ");
 
         var results = await validator.ValidateAsync(CompanyId, [row1, row2], MappedFieldsFrom(row1, row2), CancellationToken.None);
 
@@ -428,15 +420,8 @@ public class EmployeeStagingRowValidatorTests
     public async Task ValidateAsync_Skips_Compensation_Validation_When_No_Compensation_Column_Mapped()
     {
         var validator = BuildValidator();
-        // SalaryAmount is unconditionally required/validated regardless of mapped columns (see
-        // ValidateAsync_Validates_SalaryAmount_Format_Even_When_No_Compensation_Column_Mapped
-        // below), so it's given a valid value here — this test is only about the *other*
-        // compensation fields (SalaryType/Currency/HoursPerWeek/FTE) still being skipped when
-        // none of them are reported as mapped.
         var row = ValidRow(2, salaryAmount: "50000", currency: "not-a-currency");
 
-        // Currency is present on the row but not reported as a "mapped" field (simulating a
-        // column the parser found nowhere in the file's header row).
         var mappedFields = new HashSet<string> { "FirstName", "LastName", "WorkEmail", "StartDate", "SalaryAmount" };
 
         var results = await validator.ValidateAsync(CompanyId, [row], mappedFields, CancellationToken.None);
@@ -450,8 +435,6 @@ public class EmployeeStagingRowValidatorTests
         var validator = BuildValidator();
         var row = ValidRow(2, salaryAmount: "not-a-number");
 
-        // Unlike SalaryType/Currency/HoursPerWeek/FTE, SalaryAmount's format is checked
-        // unconditionally (ValidateSalaryAmountFormat), independent of which columns are mapped.
         var mappedFields = new HashSet<string> { "FirstName", "LastName", "WorkEmail", "StartDate" };
 
         var results = await validator.ValidateAsync(CompanyId, [row], mappedFields, CancellationToken.None);
@@ -491,8 +474,6 @@ public class EmployeeStagingRowValidatorTests
     public async Task ValidateAsync_Flags_Missing_SalaryAmount_When_SalaryType_Is_Mapped()
     {
         var validator = BuildValidator();
-        // SalaryAmount itself is blank/omitted, but SalaryType is mapped for the import — any
-        // mapped compensation column makes SalaryAmount mandatory.
         var row = ValidRow(2, salaryAmount: null, salaryType: "Annual");
 
         var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
@@ -506,7 +487,7 @@ public class EmployeeStagingRowValidatorTests
     public async Task ValidateAsync_Flags_Invalid_SalaryType()
     {
         var validator = BuildValidator();
-        var row = ValidRow(2, salaryType: "Monthly"); // not one of Annual/Hourly/Daily
+        var row = ValidRow(2, salaryType: "Monthly");
 
         var results = await validator.ValidateAsync(CompanyId, [row], MappedFieldsFrom(row), CancellationToken.None);
 
@@ -724,8 +705,6 @@ public class EmployeeStagingRowValidatorTests
         Assert.DoesNotContain(result.Warnings, w => w.Contains("Position Profile"));
     }
 
-    // ValidateWorkingPatternFields is only invoked when WorkingDays or HoursPerDay is a mapped
-    // column, mirroring the compensation/leave gating tested above.
     private static ParsedImportRow ValidRowWithWorkingPattern(
         int rowNumber, string? workingDays = null, string? hoursPerDay = null)
     {
@@ -774,8 +753,6 @@ public class EmployeeStagingRowValidatorTests
     [Fact]
     public async Task ValidateAsync_Flags_WorkingDays_That_Is_Only_Separators()
     {
-        // After TrimEntries + RemoveEmptyEntries splitting, a value of only commas/whitespace
-        // yields zero day names — must hit the "at least one day name" branch, not silently pass.
         var validator = BuildValidator();
         var row = ValidRowWithWorkingPattern(2, workingDays: " , , ");
 
@@ -826,7 +803,6 @@ public class EmployeeStagingRowValidatorTests
         Assert.Contains(result.Errors, e => e.Contains("'HoursPerDay'"));
     }
 
-    // --- EmployeeNumberMode-aware validation (Manual vs Automatic) ---
 
     [Fact]
     public async Task ValidateAsync_Manual_Mode_Flags_Missing_EmployeeNumber()
@@ -955,9 +931,6 @@ public class EmployeeStagingRowValidatorTests
     [Fact]
     public async Task ValidateAsync_Automatic_Mode_Does_Not_Duplicate_Check_EmployeeNumber_Within_File()
     {
-        // Both rows omit EmployeeNumber entirely (valid in Automatic mode) — if duplicate
-        // checking still ran on the (blank) EmployeeNumber field in this mode, two blanks would
-        // incorrectly be flagged as duplicates of each other.
         var validator = BuildValidator(
             employeeNumberSettingsReader: new FakeCompanyEmployeeNumberSettingsReader(EmployeeNumberMode.Automatic));
         var row1 = ValidRow(2, workEmail: "row1@example.com", employeeNumber: null);
@@ -971,9 +944,6 @@ public class EmployeeStagingRowValidatorTests
     [Fact]
     public async Task ValidateAsync_Automatic_Mode_Does_Not_Check_EmployeeNumber_Against_Existing_Employees()
     {
-        // Automatic-mode rows never carry a supplied EmployeeNumber to check (a supplied value is
-        // itself an error, asserted above) — this proves lookupReader.EmployeeNumberExistsAsync is
-        // never even consulted in this mode by seeding a value that would otherwise collide.
         var reader = new FakeEmployeeImportLookupReader();
         reader.SeedExistingEmployeeNumber("EMP99");
         var validator = BuildValidator(

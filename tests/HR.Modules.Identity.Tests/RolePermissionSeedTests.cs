@@ -4,11 +4,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Identity.Tests;
 
-/// <summary>
-/// Verifies the actual seeded <see cref="RolePermission"/> rows applied by the real
-/// EF Core migrations (including the CompanyAdministrator permission narrowing
-/// migration) match the expected permission set for each role.
-/// </summary>
 [Collection("IdentityDatabase")]
 public class RolePermissionSeedTests(IdentityDatabaseFixture fixture)
 {
@@ -22,14 +17,6 @@ public class RolePermissionSeedTests(IdentityDatabaseFixture fixture)
             .Select(rp => rp.PermissionId)
             .ToListAsync();
 
-        // IAM-06: role.assign removed from this set — see RolePermissionConfiguration.cs remarks.
-        // No authorization policy actually grants Company Administrator role-assignment access
-        // (Features/UpdateUserRoles is gated by "users:manage", which is HR Administrator-only), so
-        // that grant was misleading seeded data implying a capability the role could never exercise.
-        // OBT-IAM-09: onboarding:view, onboarding:manage and support:manage further removed — a
-        // Company-Administrator-only account is limited to company settings and subscription
-        // administration. The initial company creator retains onboarding/support access because
-        // signup also assigns HR Administrator (see SignUp/Handler.cs).
         var expected = new HashSet<Guid>
         {
             SystemPermissions.CompanyRead,

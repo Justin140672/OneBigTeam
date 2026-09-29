@@ -12,8 +12,6 @@ internal sealed class CompleteCompanyDetailsTask(CompaniesDbContext dbContext) :
     public bool IsMandatory => true;
     public int Order => 1;
 
-    // HR.Web's company edit route is company-scoped ("/companies/{CompanyId:guid}/edit") — the
-    // "{companyId}" placeholder is substituted by HR.Web with the current company id.
     public Task<string> GetLinkUrlAsync(Guid companyId, CancellationToken cancellationToken) =>
         Task.FromResult("/companies/{companyId}/edit");
 

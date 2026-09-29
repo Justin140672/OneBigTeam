@@ -62,8 +62,6 @@ public static class InfrastructureModule
         QuestPDF.Settings.License = LicenseType.Community;
         services.AddScoped<IReportExporter, ReportExporter>();
 
-        // System Health Dashboard (Platform Monitoring epic) — "email" (live Postmark reachability
-        // probe) and "storage" (live Supabase Storage reachability probe) named health checks.
         services.Configure<PostmarkOptions>(configuration.GetSection("Infrastructure:Postmark"));
         services.Configure<SupabaseProfilePhotoStorageOptions>(configuration.GetSection("Infrastructure:Supabase:ProfilePhotos"));
         services.AddHealthChecks()
@@ -73,7 +71,6 @@ public static class InfrastructureModule
             .AddCheck<PostmarkHealthCheck>("email", tags: ["degraded"])
             .AddCheck<SupabaseStorageHealthCheck>("storage", tags: ["degraded"]);
 
-        // Time services for company-local date resolution and testing
         services.AddScoped<IClockProvider, SystemClockProvider>();
         services.AddScoped<ICompanyTimeProvider, CompanyTimeProvider>();
 
@@ -138,10 +135,6 @@ public static class InfrastructureModule
     private static void AddProfilePhotoStorageService(
         IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
-        // The options validator resolves IHostEnvironment via constructor injection to gate the
-        // Development/Test-only HTTP allowance (security review finding 6). The host already
-        // registers IHostEnvironment in production; TryAddSingleton is a no-op there and only
-        // matters for tests that build a bare IServiceCollection.
         services.TryAddSingleton(environment);
 
         var supabaseSection = configuration.GetSection("Infrastructure:Supabase:ProfilePhotos");
@@ -246,11 +239,6 @@ public static class InfrastructureModule
     {
         var postmarkSection = configuration.GetSection("Infrastructure:Postmark");
 
-        // Never wire the live Postmark senders into the Playwright E2E run. That suite boots the real
-        // AppHost with ASPNETCORE_ENVIRONMENT=Development against seeded *.example / *.betacorp.example
-        // personas, so a configured server token would fire real Postmark API calls to reserved-domain
-        // addresses — guaranteed hard bounces that degrade the sending domain's reputation. Mirrors the
-        // existing E2E_TESTING swaps for Stripe (E2eStripeGateway) and Supabase auth (FakeSupabaseAuthGateway).
         var e2eTesting = string.Equals(
             Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
 
@@ -325,8 +313,6 @@ public static class InfrastructureModule
         });
 
         services.AddHealthChecks()
-            // NFR-03: background processing is a degraded (optional) dependency for request
-            // serving — if Hangfire is down, jobs queue up but the web/API surface stays available.
             .AddCheck<HangfireHealthCheck>("hangfire", tags: ["degraded"]);
 
         services.AddScoped<IBackgroundJobStatusReader, HangfireJobStatusReader>();
@@ -418,7 +404,6 @@ public static class InfrastructureModule
             }
             catch (Exception ex)
             {
-                // The raw exception is logged internally only; the response never echoes ex.Message.
                 logger.LogError(ex, "Background job health check failed while querying Hangfire monitoring API");
                 return Results.Json(new { status = "unhealthy", checkedAt = DateTimeOffset.UtcNow },
                     statusCode: StatusCodes.Status503ServiceUnavailable);

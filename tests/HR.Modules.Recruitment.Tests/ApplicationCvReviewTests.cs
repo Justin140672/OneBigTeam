@@ -37,7 +37,6 @@ public class ApplicationCvReviewTests
         application.RecordCvReview(notes, reviewedBy, Now.AddDays(1));
 
         Assert.Null(application.CvReviewNotes);
-        // The review is still stamped even when notes are cleared.
         Assert.Equal(Now.AddDays(1), application.CvReviewedAt);
         Assert.Equal(reviewedBy, application.CvReviewedByUserId);
     }

@@ -40,7 +40,6 @@ public sealed class EqualityDiversityReportPage(IPage page, string baseUrl)
     public async Task<bool> HasLoadErrorAsync() =>
         await Container.Locator(".alert-danger").IsVisibleAsync();
 
-    // ── Summary cards ────────────────────────────────────────────────────────────
 
     private ILocator Summary(string testId) => Container.Locator($"[data-testid='{testId}']");
 
@@ -53,12 +52,10 @@ public sealed class EqualityDiversityReportPage(IPage page, string baseUrl)
         && await Summary("equality-respondents").IsVisibleAsync()
         && await Summary("equality-reporting-date").IsVisibleAsync();
 
-    // ── Dimension cards ──────────────────────────────────────────────────────────
 
     public ILocator DimensionCard(string key) =>
         Container.Locator($"[data-testid='equality-dimension-{key}']");
 
-    /// <summary>Keys of the dimension cards actually present in the DOM, in page order.</summary>
     public async Task<IReadOnlyList<string>> GetRenderedDimensionKeysAsync()
     {
         var present = new List<string>();
@@ -73,7 +70,6 @@ public sealed class EqualityDiversityReportPage(IPage page, string baseUrl)
     public async Task<int> GetDimensionCardCountAsync() =>
         await Container.Locator("[data-testid^='equality-dimension-']").CountAsync();
 
-    /// <summary>True if at least one dimension card has a rendered Syncfusion chart svg.</summary>
     public async Task<bool> HasAnyChartRenderedAsync()
     {
         await page.WaitForSelectorAsync($"{ContainerSelector} .e-chart svg, {ContainerSelector} svg",
@@ -84,20 +80,13 @@ public sealed class EqualityDiversityReportPage(IPage page, string baseUrl)
     public async Task<int> GetDimensionTableRowCountAsync(string key) =>
         await DimensionCard(key).Locator("table tbody tr").CountAsync();
 
-    // ── Drill-through / navigation guards ────────────────────────────────────────
 
-    /// <summary>Number of anchor (&lt;a&gt;) elements anywhere inside the report container.</summary>
     public async Task<int> GetAnchorCountAsync() =>
         await Container.Locator("a").CountAsync();
 
-    /// <summary>Number of anchors inside any dimension card (chart + table area).</summary>
     public async Task<int> GetDimensionAnchorCountAsync() =>
         await Container.Locator("[data-testid^='equality-dimension-'] a").CountAsync();
 
-    /// <summary>
-    /// Clicks the first data row of the given dimension's table and returns the page URL
-    /// afterwards, so a caller can assert no navigation away from the report occurred.
-    /// </summary>
     public async Task<string> ClickFirstTableRowAndGetUrlAsync(string key)
     {
         var row = DimensionCard(key).Locator("table tbody tr").First;

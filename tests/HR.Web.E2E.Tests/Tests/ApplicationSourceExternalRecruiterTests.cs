@@ -41,7 +41,6 @@ public sealed class ApplicationSourceExternalRecruiterTests(RecruiterPersonaFixt
         await login.GoToAsync();
         await login.LoginAsync(MarcusEmail);
 
-        // ── Candidate ──────────────────────────────────────────────────────────────
         await candidateList.GoToAsync(AcmeId);
         await candidateList.ClickNewCandidateAsync();
         await candidateEdit.FillFirstNameAsync(candidateFirst);
@@ -49,7 +48,6 @@ public sealed class ApplicationSourceExternalRecruiterTests(RecruiterPersonaFixt
         await candidateEdit.FillEmailAsync(candidateEmail);
         await candidateEdit.SaveNewCandidateAsync();
 
-        // ── Active external recruiter ────────────────────────────────────────────
         await recruiterList.GoToAsync(AcmeId);
         await recruiterList.ClickNewAsync();
         await recruiterEdit.FillAgencyNameAsync(agencyName);
@@ -75,17 +73,10 @@ public sealed class ApplicationSourceExternalRecruiterTests(RecruiterPersonaFixt
         await vacancyDetail.SelectRecruitmentAgencyAsync(agencyName);
         await vacancyDetail.SaveNewVacancyAsync();
 
-        // ── Add the candidate with Source = External Recruiter ────────────────────
-        // SaveNewVacancyAsync navigates back to the vacancy list, and the Applications tab only
-        // renders once the vacancy is Open (Draft hides it entirely) — reopen the vacancy and
-        // publish it before reaching for the tab.
         await vacancyList.ClickVacancyAsync(vacancyTitle);
         await vacancyDetail.PublishVacancyAsync();
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickAddCandidateAsync();
-        // The Add Candidate popup's item text is name-only (no email — item #26/product fix),
-        // so the candidate must be matched by name here even though search-as-you-type still
-        // works server-side against any field including email.
         await vacancyDetail.SelectCandidateInAddDialogAsync(candidateLast);
         await vacancyDetail.SelectAddApplicationSourceAsync("External Recruiter");
         await vacancyDetail.SelectAddApplicationRecruiterAsync(agencyName);
@@ -102,13 +93,6 @@ public sealed class ApplicationSourceExternalRecruiterTests(RecruiterPersonaFixt
         Assert.Contains("External Recruiter", sourceText);
     }
 
-    /// <summary>
-    /// Risk/assumption: this exercises the non-blocking "not currently assigned" warning by
-    /// picking a recruiter that has never been assigned to this fresh vacancy at all (rather than
-    /// one whose assignment has since ended) — the warning's condition
-    /// (VacancyApplicationsTab.razor's _vacancyAssignedRecruiterIds check) covers both cases
-    /// identically, so this is a faithful, simpler trigger for the same code path.
-    /// </summary>
     [Fact]
     public async Task AddCandidate_WithUnassignedExternalRecruiter_ShowsNonBlockingWarning_ButStillCreatesApplication()
     {
@@ -157,9 +141,6 @@ public sealed class ApplicationSourceExternalRecruiterTests(RecruiterPersonaFixt
         await vacancyDetail.PublishVacancyAsync();
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickAddCandidateAsync();
-        // The Add Candidate popup's item text is name-only (no email — item #26/product fix),
-        // so the candidate must be matched by name here even though search-as-you-type still
-        // works server-side against any field including email.
         await vacancyDetail.SelectCandidateInAddDialogAsync(candidateLast);
         await vacancyDetail.SelectAddApplicationSourceAsync("External Recruiter");
         await vacancyDetail.SelectAddApplicationRecruiterAsync(agencyName);

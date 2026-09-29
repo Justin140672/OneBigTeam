@@ -37,8 +37,6 @@ internal sealed class CloseVacancyHandler(
         vacancy.Close(now, closedAt);
         await db.SaveChangesAsync(cancellationToken);
 
-        // Cross-module read purely for a readable audit Summary line — see VacancyClosedAuditEvent's
-        // remarks and the identical pattern in UpdateVacancyHandler.
         var effectiveTitle = vacancy.AdvertTitle
             ?? (await positionProfileReader.GetSummaryAsync(request.CompanyId, vacancy.PositionProfileId, cancellationToken))?.Title
             ?? "(untitled)";

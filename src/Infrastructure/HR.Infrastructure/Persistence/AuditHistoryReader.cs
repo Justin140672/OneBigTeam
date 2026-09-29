@@ -48,7 +48,6 @@ internal sealed class AuditHistoryReader(AuditDbContext context) : IAuditHistory
         HR.SharedKernel.Pagination pagination,
         CancellationToken cancellationToken)
     {
-        // companyId is always applied — this method must never return rows from another tenant.
         var query = context.AuditEvents
             .AsNoTracking()
             .Where(e => e.CompanyId == companyId);

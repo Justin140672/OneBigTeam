@@ -8,10 +8,6 @@ using System.Web;
 
 namespace HR.Web.Services;
 
-/// <summary>
-/// Employee-facing internal vacancies. Backed by the "internal-vacancies" endpoints which only
-/// require an authenticated employee of the company.
-/// </summary>
 public class InternalVacancyService(HrApiHttpClientFactory httpClientFactory)
 {
     private const string AlreadyAppliedCode = "already_applied";
@@ -50,14 +46,9 @@ public class InternalVacancyService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    /// <summary>
-    /// Applies the signed-in employee to an internal vacancy. Sends ONLY the CV file — the
-    /// applicant's identity is resolved server-side and must never be posted from the client.
-    /// </summary>
     public async Task<InternalVacancyApplyResult> ApplyAsync(
         Guid companyId, Guid vacancyId, IBrowserFile cvFile, CancellationToken cancellationToken = default)
     {
-        // OpenReadStream throws for anything over maxAllowedSize — report it instead of faulting the circuit.
         if (cvFile.Size > CandidateService.MaxCandidateDocumentBytes)
             return Failed("The CV file is larger than the 20 MB limit.");
 
@@ -96,8 +87,6 @@ public class InternalVacancyService(HrApiHttpClientFactory httpClientFactory)
 
             using (response)
             {
-                // ApiResponseReader discards the body (and so the "code") of a 403, but this endpoint's
-                // not_eligible_to_apply refusal needs it — read it with the shared envelope first.
                 if (response.StatusCode == HttpStatusCode.Forbidden)
                 {
                     var forbiddenCode = await ReadErrorCodeAsync(response, cancellationToken);
@@ -148,7 +137,6 @@ public class InternalVacancyService(HrApiHttpClientFactory httpClientFactory)
     private static InternalVacancyApplyResult Failed(string message) =>
         new(InternalVacancyApplyOutcome.Failed, message);
 
-    // Reads the shared { error, code } body; an empty/non-JSON body (e.g. a bare policy 403) yields null.
     private static async Task<string?> ReadErrorCodeAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         var raw = await response.Content.ReadAsStringAsync(cancellationToken);

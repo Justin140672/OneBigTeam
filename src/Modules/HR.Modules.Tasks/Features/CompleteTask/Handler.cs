@@ -68,20 +68,6 @@ internal sealed class CompleteTaskHandler(
             return Result.Failure<CompleteTaskResponse>(
                 Error.NotFound($"Task with id '{request.Id}' was not found."));
 
-        // SEC-003 / IAM-07: only the assignee, the assignee's manager (anywhere in the
-        // reporting hierarchy), or an HR Administrator may complete a task. Endpoint-level
-        // Policies("role:employee") only proves tenant membership, not resource ownership —
-        // the task's specific assignee is only known after this DB lookup, so the check must
-        // live here rather than at the endpoint. This runs before the cancelled-status check
-        // and before task.Complete()'s already-completed short-circuit, so an unauthorized
-        // caller can never use either as a bypass.
-        //
-        // Employee ID and User ID are the same value by construction throughout this app (see
-        // GetMyTasksHandler.cs), so AssignedUserId is a valid fallback when AssignedEmployeeId
-        // is null — a task assigned only via AssignedUserId must still be reachable by that
-        // person's manager. Unassigned tasks (both null) have no self/hierarchy path — only the
-        // HR-administrator override (evaluated inside CanAccessEmployeeTasksAsync) can complete
-        // them, since targetEmployeeId would equal request.CompletedBy only coincidentally.
         var effectiveAssigneeId = task.AssignedEmployeeId ?? task.AssignedUserId;
 
         var isAuthorized = effectiveAssigneeId.HasValue
@@ -154,9 +140,6 @@ internal sealed class CompleteTaskHandler(
                 catch (DbUpdateException ex) when (PostgresUniqueViolation.Is(
                     ex, "ix_task_completion_operations_task_id_active"))
                 {
-                    // Lost a race against a concurrent completion request for the same task —
-                    // detach this attempt's losing row and converge onto the winner's operation
-                    // instead, so only one business dispatch ever actually applies.
                     var entry = dbContext.Entry(operation);
                     if (entry.State != EntityState.Detached)
                         entry.State = EntityState.Detached;
@@ -168,9 +151,6 @@ internal sealed class CompleteTaskHandler(
                 }
             }
 
-            // Only dispatch when this operation hasn't already had its business action applied —
-            // a resumed DispatchApplied operation just needs the TaskItem completed below, never a
-            // second dispatch.
             if (operation.Status == TaskCompletionOperation.StatusPending)
             {
                 var dispatchResult = await dispatcher.DispatchAsync(new TaskCompletionContext(
@@ -204,8 +184,6 @@ internal sealed class CompleteTaskHandler(
         // decision/reason that was actually dispatched.
         task.Complete(operation?.CompletedBy ?? request.CompletedBy, now);
 
-        // Built from in-memory values ahead of the save, so it can double as both the response and
-        // the payload persisted for an idempotency replay.
         var response = new CompleteTaskResponse(
             task.Id,
             task.CompanyId,
@@ -230,9 +208,6 @@ internal sealed class CompleteTaskHandler(
 
             if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
             {
-                // Lost a race against a concurrent duplicate under the same key - this attempt's
-                // completion was rolled back along with it, so skip our own
-                // notification/audit/dispatch and hand back the winner's result untouched.
                 return Result.Success(outcome.Response!);
             }
         }

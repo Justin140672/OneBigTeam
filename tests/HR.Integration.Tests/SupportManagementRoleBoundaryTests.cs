@@ -5,16 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// OBT-IAM-09: support:manage was removed from Company Administrator's seed grants — a
-/// Company-Administrator-only account must now be denied every "support:manage"-gated endpoint,
-/// not just the requests queue already covered by
-/// <see cref="AdministrativeRoleSeparationTests"/>. This file covers the remaining
-/// support:manage-gated endpoints (AddSupportResponse, UpdateSupportRequestStatus,
-/// GetSupportDashboard) that were not previously exercised against the Company-Administrator-only
-/// persona, and confirms a Company Administrator who also holds HR Administrator retains access
-/// via HR Administrator's own grant.
-/// </summary>
 [Collection("Integration")]
 public class SupportManagementRoleBoundaryTests
 {
@@ -52,9 +42,6 @@ public class SupportManagementRoleBoundaryTests
             response.StatusCode is not (HttpStatusCode.Forbidden or HttpStatusCode.Unauthorized),
             $"Expected the request to reach the handler but got {(int)response.StatusCode} {response.StatusCode}");
 
-    // ---------------------------------------------------------------------
-    // GetSupportDashboard — GET /api/support/dashboard
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task CompanyAdministratorOnly_CannotReach_SupportDashboard()
@@ -78,9 +65,6 @@ public class SupportManagementRoleBoundaryTests
         AssertReachedHandler(response);
     }
 
-    // ---------------------------------------------------------------------
-    // AddSupportResponse — POST /api/companies/{companyId}/support/requests/{id}/responses
-    // ---------------------------------------------------------------------
 
     private static MultipartFormDataContent BuildResponseBody(Guid companyId, Guid id) => new()
     {
@@ -108,8 +92,6 @@ public class SupportManagementRoleBoundaryTests
         var companyId = Guid.NewGuid();
         using var client = await ClientFor(CompanyAdminPlusHrAdmin, companyId, alsoHrAdmin: true);
 
-        // No request exists for this id — the authorization layer must still let the request
-        // through to the handler, which then 404s. The load-bearing assertion is "not 401/403".
         var response = await client.PostAsync(
             $"/api/companies/{companyId}/support/requests/{Guid.NewGuid()}/responses",
             BuildResponseBody(companyId, Guid.NewGuid()));
@@ -117,9 +99,6 @@ public class SupportManagementRoleBoundaryTests
         AssertReachedHandler(response);
     }
 
-    // ---------------------------------------------------------------------
-    // UpdateSupportRequestStatus — PUT /api/companies/{companyId}/support/requests/{id}/status
-    // ---------------------------------------------------------------------
 
     [Fact]
     public async Task CompanyAdministratorOnly_CannotReach_UpdateSupportRequestStatus()

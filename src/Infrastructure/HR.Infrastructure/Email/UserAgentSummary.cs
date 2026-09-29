@@ -27,7 +27,6 @@ public readonly record struct UserAgentSummary(string BrowserName, string Operat
 
     private static string DetectBrowser(string ua)
     {
-        // Order matters: Edge and Chrome both contain "Chrome"; Chrome and Safari both contain "Safari".
         if (Has(ua, "Edg/") || Has(ua, "Edge/") || Has(ua, "EdgA/") || Has(ua, "EdgiOS/"))
             return "Edge";
         if (Has(ua, "OPR/") || Has(ua, "Opera"))

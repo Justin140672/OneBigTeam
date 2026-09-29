@@ -8,14 +8,12 @@ namespace HR.SharedKernel.Tests;
 /// </summary>
 public class ExecutionContextInfoTests
 {
-    // ── NewRoot ──────────────────────────────────────────────────────────────────
 
     [Fact]
     public void NewRoot_Sets_CorrelationId_Equal_To_MessageId()
     {
         var ctx = ExecutionContextInfo.NewRoot(ExecutionOrigin.HttpRequest);
 
-        // CorrelationId is the string form of the same freshly minted id as MessageId for a root context.
         Assert.Equal(ctx.MessageId.ToString("D"), ctx.CorrelationId);
         Assert.False(string.IsNullOrWhiteSpace(ctx.CorrelationId));
     }
@@ -66,7 +64,6 @@ public class ExecutionContextInfoTests
         Assert.Equal(AuditActorType.Human, ctx.ActorType);
     }
 
-    // ── CausedBy ─────────────────────────────────────────────────────────────────
 
     [Fact]
     public void CausedBy_Preserves_Parent_CorrelationId()
@@ -145,8 +142,6 @@ public class ExecutionContextInfoTests
     [Fact]
     public void CausedBy_Chain_Of_Two_Preserves_Root_CorrelationId_Through_Both_Hops()
     {
-        // A -> B -> C: C must still carry A's correlation id, and C's causation id must be B's
-        // message id (not A's) — proving the chain doesn't collapse to always pointing at the root.
         var a = ExecutionContextInfo.NewRoot(ExecutionOrigin.HttpRequest);
         var b = ExecutionContextInfo.CausedBy(a, ExecutionOrigin.IntegrationEvent);
         var c = ExecutionContextInfo.CausedBy(b, ExecutionOrigin.IntegrationEvent);
@@ -156,7 +151,6 @@ public class ExecutionContextInfoTests
         Assert.NotEqual(a.MessageId, c.CausationId);
     }
 
-    // ── Restore ──────────────────────────────────────────────────────────────────
 
     [Fact]
     public void Restore_Reconstructs_Exact_Persisted_Identity()
@@ -206,7 +200,6 @@ public class ExecutionContextInfoTests
         Assert.Equal("restored-trace", ctx.TraceId);
     }
 
-    // ── Recovered ────────────────────────────────────────────────────────────────
 
     [Fact]
     public void Recovered_Preserves_CorrelationId()

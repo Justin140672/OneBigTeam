@@ -4,10 +4,6 @@ using HR.SharedKernel;
 
 namespace HR.Modules.Probation.Features.GetProbationRecordAuditHistory;
 
-/// <summary>
-/// AUD-07: entity activity history for a specific probation record.
-/// Accessible to HR Administrators and Probation Managers (probation:manage policy).
-/// </summary>
 internal sealed class GetProbationRecordAuditHistoryHandler(
     IAuditHistoryReader auditHistoryReader,
     IEmployeeNameReader employeeNameReader)

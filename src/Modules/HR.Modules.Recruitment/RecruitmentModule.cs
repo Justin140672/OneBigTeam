@@ -95,10 +95,6 @@ public static class RecruitmentModule
             options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "recruitment"));
 
-            // [P1] Dispatches a malware scan for every committed candidate-document insert (one
-            // interceptor instance per context/unit of work). Hosts without Hangfire (design-time
-            // tooling, bare test containers) skip it; ReconcileCandidateDocumentScansJob remains the
-            // durable backstop for any Pending document either way.
             var backgroundJobClient = sp.GetService<IBackgroundJobClient>();
             if (backgroundJobClient is not null)
             {
@@ -108,7 +104,6 @@ public static class RecruitmentModule
             }
         });
 
-        // [P1] Candidate CV malware scanning — see Jobs/ScanCandidateDocumentJob.cs.
         services.AddScoped<ScanCandidateDocumentJob>();
         services.AddScoped<ReconcileCandidateDocumentScansJob>();
         services.AddHostedService<CandidateDocumentScannerStartupCheck>();
@@ -116,21 +111,9 @@ public static class RecruitmentModule
         return services;
     }
 
-    /// <summary>
-    /// Reliability review issue 2 (P1): candidate document storage must be durable (Supabase-backed)
-    /// in every environment except Development or an explicit automated-test environment, matching
-    /// the rule already applied to profile photos, support attachments, organisation exports, and
-    /// documents (see HR.Infrastructure.InfrastructureModule.IsLocalStorageAllowedEnvironment /
-    /// HR.Modules.Documents.DocumentsModule.AddStorageService). The local temp-directory fallback
-    /// loses every file on restart/redeploy and serves downloads through a dev-only route.
-    /// </summary>
     private static void AddCandidateDocumentStorage(
         IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
-        // The options validator resolves IHostEnvironment via constructor injection to gate the
-        // Development/Test-only HTTP allowance (security review finding 6). The host already
-        // registers IHostEnvironment in production; TryAddSingleton is a no-op there and only
-        // matters for tests that build a bare IServiceCollection.
         services.TryAddSingleton(environment);
 
         services.Configure<CandidateDocumentUploadOptions>(configuration.GetSection("Recruitment:CandidateDocuments"));
@@ -159,9 +142,6 @@ public static class RecruitmentModule
                 + "permitted in Development or an explicit automated-test environment.");
         }
 
-        // Dev-only local delivery route re-check (see ILocalStorageObjectResolver): a candidate
-        // document key is only served while its row exists and is Clean. Only the Development-only
-        // route in HR.Api consumes it, so it is not registered outside Development/explicit tests.
         if (IsLocalStorageAllowedEnvironment(environment))
             services.AddScoped<ILocalStorageObjectResolver, CandidateDocumentLocalStorageObjectResolver>();
     }
@@ -203,7 +183,6 @@ public static class RecruitmentModule
         services.AddScoped<PublishVacancyHandler>();
         services.AddScoped<IValidator<PublishVacancyRequest>, PublishVacancyValidator>();
 
-        // SET-05
         services.AddScoped<ApproveVacancyHandler>();
         services.AddScoped<IValidator<ApproveVacancyRequest>, ApproveVacancyValidator>();
         services.AddScoped<ApproveOfferHandler>();
@@ -312,7 +291,6 @@ public static class RecruitmentModule
         services.AddScoped<GetUpcomingInterviewsHandler>();
         services.AddScoped<GetStaleVacanciesHandler>();
 
-        // DSH-04: authoritative recruitment dashboard metric queries (count == drill-down list).
         services.AddScoped<Features.GetNewApplicationsMetric.GetNewApplicationsMetricHandler>();
         services.AddScoped<IValidator<Features.GetNewApplicationsMetric.GetNewApplicationsMetricRequest>,
             Features.GetNewApplicationsMetric.GetNewApplicationsMetricValidator>();
@@ -373,7 +351,6 @@ public static class RecruitmentModule
         services.AddScoped<GetExternalRecruiterActivitySummaryHandler>();
         services.AddScoped<IValidator<GetExternalRecruiterActivitySummaryRequest>, GetExternalRecruiterActivitySummaryValidator>();
 
-        // Ticket #97: RecruitmentStage settings CRUD.
         services.AddScoped<ListRecruitmentStagesHandler>();
 
         services.AddScoped<CreateRecruitmentStageHandler>();
@@ -420,9 +397,6 @@ public static class RecruitmentModule
             "recruitment-purge-storage-reconciliation",
             job => job.ExecuteAsync(),
             "*/10 * * * *");
-        // [P1] Re-dispatches Pending candidate-document scans whose job was lost (or which were
-        // backfilled to Pending) and releases abandoned Scanning claims — bounded by
-        // CandidateDocument.MaxScanAttempts.
         jobManager.AddOrUpdate<ReconcileCandidateDocumentScansJob>(
             "recruitment-candidate-document-scan-reconciliation",
             job => job.ExecuteAsync(),
@@ -451,8 +425,6 @@ public static class RecruitmentModule
         var seeder  = scope.ServiceProvider.GetRequiredService<RecruitmentStageSeeder>();
         var now     = DateTimeOffset.UtcNow;
 
-        // Ticket #98: demo companies get the same default stage set every real company gets on
-        // first use (see RecruitmentStageSeeder) — idempotent, so re-running seeding is safe.
         var acmeCompanyId    = Guid.Parse("00000000-0000-0000-0000-000000000001");
         var betaCorpCompanyId = Guid.Parse("00000000-0000-0000-0000-000000000002");
         await seeder.EnsureDefaultStagesSeededAsync(acmeCompanyId, now, CancellationToken.None);
@@ -464,23 +436,18 @@ public static class RecruitmentModule
                 .Where(s => s.CompanyId == companyId)
                 .ToDictionaryAsync(s => s.Name, s => s.Id);
 
-        // ── Acme Corporation ─────────────────────────────────────────────────
         var acmeStages      = await GetStageIdsByNameAsync(acmeCompanyId);
         var acmeId          = Guid.Parse("00000000-0000-0000-0000-000000000001");
-        var acmeJamesId     = Guid.Parse("30000000-0000-0000-0000-000000000002"); // James Okafor
-        var acmeLauraId     = Guid.Parse("30000000-0000-0000-0000-000000000005"); // Laura Bennett
+        var acmeJamesId     = Guid.Parse("30000000-0000-0000-0000-000000000002");
+        var acmeLauraId     = Guid.Parse("30000000-0000-0000-0000-000000000005");
 
         var acmeSeniorEngVacancyId = Guid.Parse("e0000000-0000-0000-0000-000000000001");
         var acmeHrBpVacancyId      = Guid.Parse("e0000000-0000-0000-0000-000000000002");
         var acmeDesignerVacancyId  = Guid.Parse("e0000000-0000-0000-0000-000000000003");
 
-        // Position profile IDs are the same literal GUIDs seeded by EmployeesModule.SeedEmployeesAsync
-        // for Acme (see posSenDevId/posHrAdvisorId/posDevId there) — the two modules cannot share a C#
-        // constant since Recruitment has no reference to Employees, so the literals are duplicated by
-        // convention, the same way department/employee IDs already are elsewhere in this method.
-        var acmeSenSoftwareEngineerPositionProfileId = Guid.Parse("20000000-0000-0000-0000-000000000002"); // "Senior Software Engineer" (Engineering) — exact title+department match
-        var acmeHrAdvisorPositionProfileId            = Guid.Parse("20000000-0000-0000-0000-000000000005"); // "HR Advisor" (People & HR) — closest existing role; no "HR Business Partner" profile exists, so this is a manual assignment rather than an automatic exact-title match
-        var acmeSoftwareEngineerPositionProfileId     = Guid.Parse("20000000-0000-0000-0000-000000000003"); // "Software Engineer" (Engineering) — closest existing role; no "Product Designer" profile exists, so this is a manual assignment rather than an automatic exact-title match
+        var acmeSenSoftwareEngineerPositionProfileId = Guid.Parse("20000000-0000-0000-0000-000000000002");
+        var acmeHrAdvisorPositionProfileId            = Guid.Parse("20000000-0000-0000-0000-000000000005");
+        var acmeSoftwareEngineerPositionProfileId     = Guid.Parse("20000000-0000-0000-0000-000000000003");
 
         if (!await db.Vacancies.AnyAsync(v => v.CompanyId == acmeId))
         {
@@ -542,16 +509,12 @@ public static class RecruitmentModule
             await db.SaveChangesAsync();
         }
 
-        // ── Beta Corp ─────────────────────────────────────────────────────────
         var betaStages    = await GetStageIdsByNameAsync(betaCorpCompanyId);
         var betaCorpId    = betaCorpCompanyId;
-        var betaAliceId   = Guid.Parse("30000000-0000-0000-0000-000000000011"); // Alice Morgan
+        var betaAliceId   = Guid.Parse("30000000-0000-0000-0000-000000000011");
 
         var betaBackendVacancyId = Guid.Parse("e0000000-0000-0000-0000-000000000011");
 
-        // Same literal-GUID convention as the Acme block above: matches betaPosDevId ("Software
-        // Developer") in EmployeesModule.SeedEmployeesAsync. No "Backend Engineer" profile exists for
-        // Beta, so this is a manual assignment rather than an automatic exact-title match.
         var betaSoftwareDeveloperPositionProfileId = Guid.Parse("20000000-0000-0000-0000-000000000012");
 
         if (!await db.Vacancies.AnyAsync(v => v.CompanyId == betaCorpId))

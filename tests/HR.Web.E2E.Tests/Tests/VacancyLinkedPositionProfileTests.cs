@@ -3,19 +3,6 @@ using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-/// <summary>
-/// Verifies the "Derive Vacancy Role Information from Position Profile" story's read-only
-/// "Linked Position Profile" card on the Vacancy detail page (data-testid=
-/// "linked-position-profile-card" in VacancyDetail.razor's RenderDetailsCard) and the
-/// corresponding "Position Profile" column on the Vacancy list grid (VacancyList.razor).
-///
-/// See VacancyPositionProfileDefaultsTests for the sibling coverage of the CREATE form's
-/// Position-Profile-driven defaults (the "From Position Profile" summary card / auto-populated
-/// Department) that this read-only detail-page card is the natural follow-on to. As there, vacancy
-/// creation (recruitment:manage) is Recruiter-only (Marcus Diallo) while Position Profile creation
-/// (infra:manage) belongs to an HR Administrator (Laura Bennett) — tests switch accounts via
-/// LoginPage.SwitchAccountAsync as needed.
-/// </summary>
 public sealed class VacancyLinkedPositionProfileTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -36,17 +23,12 @@ public sealed class VacancyLinkedPositionProfileTests(CrossUserFixture fixture) 
         var vacancyList   = new VacancyListPage(_page, _fixture.WebBaseUrl);
         var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
 
-        // Seed a Position Profile with its own distinct Title/Department/Description, independent
-        // of anything the vacancy itself will be given below, so the assertions can prove the
-        // "Linked Position Profile" card is genuinely sourced from the profile rather than
-        // coincidentally mirroring the vacancy's own fields.
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
         await ppList.GoToAsync(AcmeId);
         await ppList.ClickNewPositionProfileAsync();
         await ppEdit.FillTitleAsync(profileTitle);
-        // Department, Location and Default Leave Policy are now mandatory on Position Profile.
         await ppEdit.SelectDepartmentAsync("Engineering");
         await ppEdit.SelectLocationAsync("London Office");
         await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
@@ -56,10 +38,6 @@ public sealed class VacancyLinkedPositionProfileTests(CrossUserFixture fixture) 
         Assert.True(await ppList.HasPositionProfileAsync(profileTitle),
             $"Expected the new position profile '{profileTitle}' to appear in the list");
 
-        // Create a vacancy linked to that profile, giving the vacancy its own distinct Advert
-        // Title. (Selecting a Position Profile no longer auto-populates Advert Title as of the
-        // "Refactor Duplicate Vacancy Fields" story, so fill order no longer matters here — but
-        // filling it before selecting the profile still exercises the same happy path as before.)
         await login.SwitchAccountAsync(MarcusEmail);
 
         await vacancyList.GoToAsync(AcmeId);
@@ -79,12 +57,9 @@ public sealed class VacancyLinkedPositionProfileTests(CrossUserFixture fixture) 
         Assert.Contains("Engineering", await vacancyDetail.GetLinkedPositionProfileDepartmentAsync() ?? string.Empty);
         Assert.Equal(profileDescription, await vacancyDetail.GetLinkedPositionProfileDescriptionAsync());
 
-        // The vacancy's own Title (Recruitment Advert Details card) genuinely differs from the
-        // linked profile's Title, proving the card isn't just echoing the vacancy's own field.
         Assert.NotEqual(vacancyTitle, await vacancyDetail.GetLinkedPositionProfileTitleAsync());
         Assert.Equal(vacancyTitle, await vacancyDetail.GetTitleAsync());
 
-        // No "Inactive" indicator for a still-active profile.
         Assert.False(await vacancyDetail.IsLinkedPositionProfileInactiveBadgeVisibleAsync(),
             "Did not expect an 'Inactive' indicator for a still-active linked position profile");
     }
@@ -109,21 +84,6 @@ public sealed class VacancyLinkedPositionProfileTests(CrossUserFixture fixture) 
             await vacancyList.GetPositionProfileColumnTextAsync("HR Business Partner"));
     }
 
-    /// <summary>
-    /// Intended to verify that when a vacancy's linked Position Profile has since been
-    /// deactivated, the "Linked Position Profile" card still renders the profile's
-    /// Title/Department/Description and additionally shows an "Inactive" indicator (see
-    /// ActiveStatusBadge usage gated on "_vacancy.PositionProfileIsActive == false" in
-    /// VacancyDetail.razor's RenderDetailsCard).
-    ///
-    /// Position Profile deactivation is now available via a "Deactivate" toolbar action on
-    /// PositionProfileList.razor, backed by DELETE
-    /// /api/companies/{companyId}/position-profiles/{id} (see
-    /// PositionProfileListPage.DeactivateAsync). This test seeds/creates a position profile, links
-    /// a vacancy to it, deactivates the profile, then reloads the vacancy's detail page and asserts
-    /// IsLinkedPositionProfileInactiveBadgeVisibleAsync() is true while Title/Department/Description
-    /// are unchanged.
-    /// </summary>
     [Fact]
     public async Task ViewingVacancy_WithDeactivatedLinkedProfile_ShowsInactiveIndicator()
     {
@@ -143,7 +103,6 @@ public sealed class VacancyLinkedPositionProfileTests(CrossUserFixture fixture) 
         await ppList.GoToAsync(AcmeId);
         await ppList.ClickNewPositionProfileAsync();
         await ppEdit.FillTitleAsync(profileTitle);
-        // Department, Location and Default Leave Policy are now mandatory on Position Profile.
         await ppEdit.SelectDepartmentAsync("Engineering");
         await ppEdit.SelectLocationAsync("London Office");
         await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
@@ -153,7 +112,6 @@ public sealed class VacancyLinkedPositionProfileTests(CrossUserFixture fixture) 
         Assert.True(await ppList.HasPositionProfileAsync(profileTitle),
             $"Expected the new position profile '{profileTitle}' to appear in the list");
 
-        // Link a vacancy to the still-active profile before deactivating it.
         await login.SwitchAccountAsync(MarcusEmail);
 
         await vacancyList.GoToAsync(AcmeId);
@@ -163,13 +121,10 @@ public sealed class VacancyLinkedPositionProfileTests(CrossUserFixture fixture) 
         await vacancyDetail.SelectHiringManagerAsync("James");
         await vacancyDetail.SaveNewVacancyAsync();
 
-        // Deactivate the linked profile.
         await login.SwitchAccountAsync(LauraEmail);
         await ppList.GoToAsync(AcmeId);
         await ppList.DeactivateAsync(profileTitle);
 
-        // Reload the vacancy's detail page and confirm the linked profile card shows the
-        // "Inactive" indicator while its Title/Department/Description remain unchanged.
         await login.SwitchAccountAsync(MarcusEmail);
         await vacancyList.GoToAsync(AcmeId);
         await vacancyList.ClickVacancyAsync(vacancyTitle);

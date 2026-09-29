@@ -12,17 +12,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-/// <summary>
-/// The "platform:admin" endpoint policy only requires RequireAuthenticatedUser (no
-/// tenant/company header needed to satisfy it), so these tests never send
-/// TestAuthHandler.TenantHeader. The handler's own allow-list check requires the caller's
-/// email to match "PlatformAdmin:AllowedEmails" in configuration; appsettings.Development.json
-/// (loaded automatically because ApiWebApplicationFactory/WebApplicationFactory defaults to the
-/// Development environment) already seeds "priya.shah@acme.example" into that list, so tests use
-/// that address for the allow-listed caller and rely on TestAuthHandler.EmailHeader to put the
-/// email onto the authenticated principal's "email" claim. See GetCustomerDetailsEndpointTests
-/// and sibling platform-admin subscription-management tests for the shared pattern.
-/// </summary>
 [Collection("Integration")]
 public class ExtendCustomerTrialEndpointTests
 {
@@ -97,8 +86,6 @@ public class ExtendCustomerTrialEndpointTests
             Url(Guid.NewGuid()),
             new { newTrialExpiresAt = DateTimeOffset.UtcNow.AddDays(30), reason = "Extending trial for pilot" });
 
-        // See PlatformAdminAuthorizationHandler.cs / f2658d7d — authenticated-but-not-authorized
-        // is Forbidden (403), not Unauthorized (401).
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
@@ -162,9 +149,6 @@ public class ExtendCustomerTrialEndpointTests
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
         var persisted = await db.CustomerSubscriptions.SingleAsync(s => s.CompanyId == companyId);
-        // Postgres timestamptz only stores microsecond precision, so the sub-microsecond (100ns
-        // tick) portion of newExpiry is truncated on round-trip through the database — compare at
-        // microsecond precision rather than exact ticks.
         Assert.Equal(newExpiry.UtcTicks / 10, persisted.TrialExpiresAt.UtcTicks / 10);
 
         var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();

@@ -6,16 +6,6 @@ using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Leave.Jobs;
 
-/// <summary>
-/// Performs and confirms the actual <c>EmployeeLeavePolicyAssignment</c> deactivation requested by
-/// Features/DeactivateLeavePolicyAssignmentOnEmployeeDeparture — mirrors
-/// HR.Modules.Identity.Jobs.AccountDisablementJob's shape (idempotency-by-row-status,
-/// [AutomaticRetry], attempt tracking, final-attempt-marks-Failed-and-rethrows).
-///
-/// Uses the request's captured OccurredAt (the original departure-finalisation timestamp) as the
-/// deactivation timestamp on every attempt, including retries/replays, so a retried deactivation
-/// never shifts the audit trail to a later "now".
-/// </summary>
 [AutomaticRetry(Attempts = MaxAttempts, DelaysInSeconds = new[] { 30, 120, 600 })]
 internal sealed class LeavePolicyDeactivationJob(
     LeaveDbContext db,
@@ -45,8 +35,6 @@ internal sealed class LeavePolicyDeactivationJob(
                 $"LeavePolicyDeactivationOnDeparture {deactivationId} does not belong to company {companyId}.");
         }
 
-        // Idempotency guard: already completed (a prior attempt that succeeded but crashed before
-        // marking Processed, or a duplicate enqueue) — no-op.
         if (request.Status == Domain.LeavePolicyDeactivationOnDeparture.StatusProcessed)
             return;
 
@@ -59,8 +47,6 @@ internal sealed class LeavePolicyDeactivationJob(
             var assignment = await db.EmployeeLeavePolicyAssignments
                 .FirstOrDefaultAsync(a => a.CompanyId == request.CompanyId && a.EmployeeId == request.EmployeeId);
 
-            // Deactivate() is itself a no-op if already inactive — safe on a retry/replay racing
-            // against a manual deactivation or a duplicate job enqueue.
             assignment?.Deactivate(request.OccurredAt);
 
             var processedAt = clock.UtcNowOffset();
@@ -91,8 +77,6 @@ internal sealed class LeavePolicyDeactivationJob(
                     request.AttemptCount, request.EmployeeId, request.CompanyId);
             }
 
-            // Rethrow while retries remain so Hangfire schedules the next attempt; rethrow on the
-            // final attempt too so the standard operational-failure audit trail records it.
             throw;
         }
     }

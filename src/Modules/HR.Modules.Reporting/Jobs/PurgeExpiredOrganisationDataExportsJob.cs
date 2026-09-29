@@ -36,8 +36,6 @@ internal sealed class PurgeExpiredOrganisationDataExportsJob(
                 continue;
             }
 
-            // Follow-up D: remove every attempt archive stored for this export (superseded workers'
-            // orphans as well as the published one), not just the published key.
             try
             {
                 var keys = new HashSet<string>(StringComparer.Ordinal);

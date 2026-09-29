@@ -5,12 +5,6 @@ using HR.Infrastructure.Abstractions;
 
 namespace HR.Modules.Tasks.Features.SicknessEvidenceRequested;
 
-/// <summary>
-/// Creates an unassigned (HR inbox) task when a sickness record exceeds the fit note threshold.
-/// Runs alongside <see cref="SicknessEvidenceRequestedHandler"/>, which assigns the employee's
-/// "Upload fit note" task — this handler notifies HR separately since there is no existing
-/// mechanism to enumerate individual HR administrators for direct per-admin notification.
-/// </summary>
 internal sealed class NotifyHrOfFitNoteThresholdHandler(
     ITaskCreator taskCreator,
     IEmployeeNameReader employeeNameReader) : IIntegrationEventHandler<SicknessEvidenceRequestedIntegrationEvent>

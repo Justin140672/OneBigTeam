@@ -31,7 +31,6 @@ public sealed class BulkEmployeeInvitationWorkEmailPolicyTests(HrAdminPersonaFix
     private static readonly Guid LauraUserId = Guid.Parse("30000000-0000-0000-0000-000000000005");
     private const string HrAdminEmail = "laura.bennett@acme.example";
 
-    // Same seeded Acme reference data as ManagerTeamProfileTests' API arrange.
     private static readonly Guid DepartmentId = Guid.Parse("10000000-0000-0000-0000-000000000001");
     private static readonly Guid LocationId = Guid.Parse("70000000-0000-0000-0000-000000000001");
     private static readonly Guid PositionProfileId = Guid.Parse("20000000-0000-0000-0000-00000000000B");
@@ -58,8 +57,6 @@ public sealed class BulkEmployeeInvitationWorkEmailPolicyTests(HrAdminPersonaFix
 
         await LoginAndOpenEmployeeListAsync(empList);
 
-        // Narrow the grid to just this test's two employees (both last names contain the token),
-        // then check both rows within that result set.
         await empList.SearchAsync(token);
         await empList.CheckEmployeeRowAsync(gmailLastName);
         await empList.CheckEmployeeRowAsync(orgLastName);
@@ -67,14 +64,12 @@ public sealed class BulkEmployeeInvitationWorkEmailPolicyTests(HrAdminPersonaFix
         await empList.ClickInviteSelectedToolbarButtonAsync();
         await confirmDialog.WaitForVisibleAsync();
 
-        // The client-side preview doesn't apply the domain policy — both are offered as recipients.
         var previewEmails = await confirmDialog.GetRecipientEmailsAsync();
         Assert.Contains(previewEmails, e => e.Equals(gmailEmail, StringComparison.OrdinalIgnoreCase));
         Assert.Contains(previewEmails, e => e.Equals(orgEmail, StringComparison.OrdinalIgnoreCase));
 
         await confirmDialog.SendAsync();
 
-        // Server-side exclusion surfaced on the page.
         await Assertions.Expect(empList.InviteBatchExcludedAlert).ToBeVisibleAsync(new() { Timeout = 20_000 });
         await Assertions.Expect(empList.InviteBatchExcludedAlert).ToContainTextAsync("1 employee(s) were not invited:");
         await Assertions.Expect(empList.InviteBatchExcludedRows).ToHaveCountAsync(1);
@@ -85,9 +80,6 @@ public sealed class BulkEmployeeInvitationWorkEmailPolicyTests(HrAdminPersonaFix
         await Assertions.Expect(gmailRow).ToContainTextAsync(ExclusionExplanation);
         await Assertions.Expect(empList.InviteBatchExcludedAlert).Not.ToContainTextAsync(orgLastName);
 
-        // The organisation-email employee was queued: the progress panel tracks THIS batch
-        // (EmployeeList.HandleInviteBatchQueuedAsync -> ShowBatchAsync(result.BatchId)), and the
-        // gmail address never became a batch recipient.
         await progressPanel.WaitForVisibleAsync();
         await Assertions.Expect(progressPanel.RecipientRows.Filter(new() { HasText = orgEmail }))
             .ToHaveCountAsync(1, new() { Timeout = 20_000 });
@@ -134,7 +126,6 @@ public sealed class BulkEmployeeInvitationWorkEmailPolicyTests(HrAdminPersonaFix
         await confirmDialog.CancelAsync();
     }
 
-    // ── helpers ─────────────────────────────────────────────────────────────────
 
     private static string NewToken() => Guid.NewGuid().ToString("N")[..10];
 
@@ -146,13 +137,6 @@ public sealed class BulkEmployeeInvitationWorkEmailPolicyTests(HrAdminPersonaFix
         await empList.GoToAsync(AcmeId);
     }
 
-    /// <summary>
-    /// Creates a fresh Draft employee via POST /api/companies/{companyId}/employees under Laura
-    /// Bennett's (HR Administrator) dev-persona session — mirrors
-    /// ManagerTeamProfileTests.CreateEmployeeViaApiAsync (fast arrange, not the thing under test).
-    /// Draft employees are valid invite candidates (only FormerEmployee is excluded) and show in
-    /// the unfiltered Employees grid, so no activation step is needed here.
-    /// </summary>
     private async Task CreateEmployeeViaApiAsync(string lastName, string workEmail, string employeeNumberSuffix)
     {
         using var http = new HttpClient { BaseAddress = new Uri(_fixture.ApiBaseUrl) };

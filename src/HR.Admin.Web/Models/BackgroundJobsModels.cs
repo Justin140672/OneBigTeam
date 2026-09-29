@@ -1,7 +1,5 @@
 namespace HR.Admin.Web.Models;
 
-// Mirrors HR.Modules.Companies.Features.ListBackgroundJobs.Response exactly — same
-// "app-local DTO matching the API contract" convention as FailedPaymentsModels.cs.
 public sealed record BackgroundJobsResponse(
     bool Available,
     IReadOnlyList<BackgroundJobItem> Scheduled,

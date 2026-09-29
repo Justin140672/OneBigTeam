@@ -2,9 +2,6 @@ using HR.Modules.Leave.Domain;
 
 namespace HR.Modules.Leave.Tests.Domain;
 
-// Reliability follow-up: domain unit tests for LeavePolicyDeactivationOnDeparture's
-// Pending -> Processing -> Processed|Failed state machine (mirrors
-// HR.Modules.Identity.Domain.AccountDisablement's shape/tests).
 public class LeavePolicyDeactivationOnDepartureTests
 {
     private static readonly DateTimeOffset OccurredAt = new(2026, 9, 11, 7, 0, 0, TimeSpan.Zero);
@@ -119,7 +116,6 @@ public class LeavePolicyDeactivationOnDepartureTests
             request.MarkProcessing(RequestedAt.AddMinutes(1));
             request.MarkProcessed(RequestedAt.AddMinutes(2));
         }
-        // StatusPending: request is already Pending by construction.
 
         Assert.Throws<InvalidOperationException>(() => request.ResetForRetry());
     }

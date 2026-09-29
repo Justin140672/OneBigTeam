@@ -5,11 +5,6 @@ using HR.Modules.Identity.Domain;
 
 namespace HR.Integration.Tests;
 
-// OFF-07: exercises "Define and enforce offboarding completion rules" end-to-end through the real
-// HTTP API — mandatory-vs-optional completion gating, the "Skip" outcome requiring a reason, the
-// final HR completion-review task, and the Postgres row-lock concurrency guarantee around plan
-// completion (this suite runs against a real Postgres instance, unlike the InMemory-provider unit
-// tests in HR.Modules.Offboarding.Tests, which cannot exercise the `FOR UPDATE` raw SQL statement).
 [Collection("Integration")]
 public class OffboardingCompletionRulesIntegrationTests
 {
@@ -48,7 +43,6 @@ public class OffboardingCompletionRulesIntegrationTests
         return (await response.Content.ReadFromJsonAsync<IdPayload>())!.Id;
     }
 
-    // Relative to "today" so this test never becomes "backdated" as time passes.
     private static readonly DateOnly LeavingDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
     private static readonly DateOnly LastWorkingDay = LeavingDate.AddDays(-1);
 
@@ -124,8 +118,6 @@ public class OffboardingCompletionRulesIntegrationTests
         Assert.Equal(overviewAfter.TotalTasks, overviewAfter.ResolvedTasks);
         Assert.Equal(100, overviewAfter.ProgressPercent);
 
-        // The final HR completion-review task is assigned to this test's own HR administrator (the
-        // only one in this company), so it surfaces via "my tasks".
         var myTasksResponse = await client.GetAsync($"/api/companies/{companyId}/tasks/my");
         myTasksResponse.EnsureSuccessStatusCode();
         var myTasks = await myTasksResponse.Content.ReadFromJsonAsync<MyTasksPayload>();
@@ -146,8 +138,6 @@ public class OffboardingCompletionRulesIntegrationTests
         var overview = await GetOverviewAsync(client, companyId, employeeId);
         Assert.True(overview.Tasks.Count > 0);
 
-        // Leave exactly one task (the checklist's manager exit-interview task, if present, otherwise
-        // any single mandatory task) outstanding — complete every other one.
         var taskToLeaveOutstanding = overview.Tasks[0];
         foreach (var task in overview.Tasks.Where(t => t.Id != taskToLeaveOutstanding.Id))
         {
@@ -237,11 +227,6 @@ public class OffboardingCompletionRulesIntegrationTests
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
-    // OFF-07: the real point of TryCompletePlanAsync's row lock (`SELECT ... FOR UPDATE`) — firing
-    // two CompleteTask requests for a plan's last two outstanding mandatory tasks at "the same time"
-    // must still only ever complete the plan (and create its HR review task) exactly once, never
-    // twice. This only exercises the real guarantee against Postgres (unlike the InMemory-provider
-    // unit tests), since InMemory doesn't support the transaction/raw-SQL FOR UPDATE statement used.
     [Fact]
     public async Task Concurrently_Completing_The_Last_Two_Mandatory_Tasks_Completes_The_Plan_Exactly_Once()
     {
@@ -257,7 +242,6 @@ public class OffboardingCompletionRulesIntegrationTests
         var lastTwo = overview.Tasks.Take(2).ToList();
         var rest = overview.Tasks.Skip(2).ToList();
 
-        // Resolve every task except the last two.
         foreach (var task in rest)
         {
             var taskItemId = await FindTaskItemIdBySourceEntityAsync(client, companyId, employeeId, task.Id);
@@ -269,9 +253,6 @@ public class OffboardingCompletionRulesIntegrationTests
         foreach (var task in lastTwo)
             taskItemIds.Add(await FindTaskItemIdBySourceEntityAsync(client, companyId, employeeId, task.Id));
 
-        // Fire both completions "concurrently" using independent HttpClients against the same
-        // running host, so they hit separate DbContexts/transactions like two real simultaneous
-        // requests would.
         using var client2 = await AdminClient(companyId);
 
         var task1 = CompleteTaskAsync(client, companyId, taskItemIds[0]);
@@ -288,7 +269,6 @@ public class OffboardingCompletionRulesIntegrationTests
         myTasksResponse.EnsureSuccessStatusCode();
         var myTasks = await myTasksResponse.Content.ReadFromJsonAsync<MyTasksPayload>();
 
-        // Exactly one HR completion-review task must have been created for this plan — not two.
         var reviewTasks = myTasks!.Items
             .Where(t => t.Source == "Offboarding" && t.ActionType == "Review")
             .ToList();

@@ -8,14 +8,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Tasks.Tests;
 
-/// <summary>
-/// Covers the Search, Priority, DueDateFrom and DueDateTo filters added in SEA-04.
-/// </summary>
 public class TaskSearchFilterTests
 {
     private static readonly DateTimeOffset Now = new(2026, 7, 8, 10, 0, 0, TimeSpan.Zero);
 
-    // ── Search (title substring) ──────────────────────────────────────────
 
     [Fact]
     public async Task GetMyTasks_Search_Filters_By_Title()
@@ -37,7 +33,6 @@ public class TaskSearchFilterTests
         Assert.Contains("onboarding", result.Items[0].Title, StringComparison.OrdinalIgnoreCase);
     }
 
-    // ── Priority filter ───────────────────────────────────────────────────
 
     [Fact]
     public async Task GetMyTasks_Priority_Filters_Tasks()
@@ -60,7 +55,6 @@ public class TaskSearchFilterTests
         Assert.Equal("High priority task", result.Items[0].Title);
     }
 
-    // ── DueDateFrom / DueDateTo ───────────────────────────────────────────
 
     [Fact]
     public async Task GetEmployeeTasks_DueDateFrom_Excludes_Earlier_Tasks()
@@ -126,7 +120,6 @@ public class TaskSearchFilterTests
         Assert.Equal("Has due date", result.Items[0].Title);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────
 
     private static GetMyTasksHandler GetMyTasksHandler(TasksDbContext ctx) =>
         new(ctx, new FakeEmployeeNameReader());

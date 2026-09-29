@@ -19,9 +19,6 @@ internal sealed class OnboardingReminderJob(
     {
         var now = clock.UtcNowOffset();
 
-        // DueDate due-ness depends on each company's own configured time zone, so pending/
-        // in-progress tasks with any past-or-present due date are fetched broadly first and then
-        // filtered per company below using that company's "today".
         var candidateTasks = await dbContext.OnboardingTasks
             .AsNoTracking()
             .Where(t => t.DueDate != null

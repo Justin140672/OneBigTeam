@@ -21,11 +21,6 @@ public class StartLeavingProcessEndpointTests
     private static readonly Guid EmployeeRoleUser = new("ffffffff-1000-0000-0000-000000000007");
     private static readonly Guid ManagerRoleUser = new("ffffffff-1000-0000-0000-000000000008");
 
-    // Relative to "today" rather than hardcoded literals ("2026-07-01"/"2026-08-01" etc.) — those
-    // were comfortably in the future when this file was written, but StartLeavingProcessHandler
-    // treats any LeavingDate before "today" as backdated (requiring explicit confirmation), so a
-    // fixed near-term literal silently starts failing once real time catches up to it. Computed
-    // once per test run so every test in this file agrees on the same non-backdated window.
     private static readonly DateOnly Today = DateOnly.FromDateTime(DateTime.UtcNow);
     private static readonly DateOnly ResignationReceivedDate = Today.AddDays(-14);
     private static readonly DateOnly LeavingDate = Today.AddDays(30);
@@ -418,7 +413,6 @@ public class StartLeavingProcessEndpointTests
         Assert.Equal("FormerEmployee", employee!.Status);
     }
 
-    // OFF-06: ReplacementManagerEmployeeId
     [Fact]
     public async Task Post_LeavingProcess_With_Valid_ReplacementManagerEmployeeId_Succeeds()
     {
@@ -479,7 +473,6 @@ public class StartLeavingProcessEndpointTests
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
-    // Spec SPEC-OFF-01: Notes required when LeavingReason is Other.
     [Fact]
     public async Task Post_LeavingProcess_Returns_UnprocessableEntity_When_LeavingReason_Is_Other_And_Notes_Missing()
     {

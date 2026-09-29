@@ -8,8 +8,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Tests;
 
-// Unit tests for EmployeeDepartureFinalizer in isolation, exercised directly rather than through
-// ProcessLeavingEmployeesJob or the Start/AmendLeavingProcess handlers that also call it.
 public class EmployeeDepartureFinalizerTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 7, 25, 8, 0, 0, DateTimeKind.Utc);
@@ -334,7 +332,6 @@ public class EmployeeDepartureFinalizerTests
         Assert.Empty(notificationWriter.Written);
     }
 
-    // -- OFF-06: manager departure cascade --------------------------------------------------
 
     [Fact]
     public async Task FinalizeAsync_Reassigns_Direct_Reports_ManagerId_To_Replacement_And_Publishes_Event()
@@ -342,7 +339,7 @@ public class EmployeeDepartureFinalizerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var employee = CreateLeavingEmployee(companyId, Now); // the departing manager
+        var employee = CreateLeavingEmployee(companyId, Now);
         var replacement = CreateManager(companyId, Now);
         var report = CreateManager(companyId, Now);
         report.Assign(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), employee.Id, Now);
@@ -409,8 +406,8 @@ public class EmployeeDepartureFinalizerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var employee = CreateLeavingEmployee(companyId, Now); // departing top-level manager
-        var midManager = CreateManager(companyId, Now); // direct report of employee, manager of grandReport
+        var employee = CreateLeavingEmployee(companyId, Now);
+        var midManager = CreateManager(companyId, Now);
         midManager.Assign(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), employee.Id, Now);
         var grandReport = CreateManager(companyId, Now);
         grandReport.Assign(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), midManager.Id, Now);
@@ -420,7 +417,6 @@ public class EmployeeDepartureFinalizerTests
         await context.SaveChangesAsync();
 
         var integrationEventPublisher = new CapturingIntegrationEventPublisher();
-        // Only midManager is a direct report of employee; grandReport is not.
         var finalizer = BuildFinalizer(
             context,
             integrationEventPublisher: integrationEventPublisher,
@@ -432,7 +428,7 @@ public class EmployeeDepartureFinalizerTests
         Assert.Null(savedMidManager.ManagerId);
 
         var savedGrandReport = await context.Employees.SingleAsync(e => e.Id == grandReport.Id);
-        Assert.Equal(midManager.Id, savedGrandReport.ManagerId); // untouched
+        Assert.Equal(midManager.Id, savedGrandReport.ManagerId);
 
         Assert.Single(integrationEventPublisher.Published.OfType<EmployeeManagerChangedIntegrationEvent>());
     }
@@ -469,8 +465,6 @@ public class EmployeeDepartureFinalizerTests
         var employee = CreateLeavingEmployee(companyId, Now);
         var someoneElse = CreateManager(companyId, Now);
         var report = CreateManager(companyId, Now);
-        // Report's ManagerId no longer points at the departing employee (e.g. reassigned separately
-        // before finalisation ran) — the idempotency guard should leave it untouched.
         report.Assign(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), someoneElse.Id, Now);
         context.Employees.AddRange(employee, someoneElse, report);
         var process = CreateLeavingProcess(companyId, employee.Id, DateOnly.FromDateTime(FixedUtcNow).AddDays(-1), Now);
@@ -481,8 +475,6 @@ public class EmployeeDepartureFinalizerTests
         var finalizer = BuildFinalizer(
             context,
             integrationEventPublisher: integrationEventPublisher,
-            // GetDirectReportIdsAsync still returns this report (e.g. stale cache/read model)
-            // but its ManagerId no longer matches, so the cascade must skip it.
             directReportsReader: new FakeDirectReportsReader(report.Id));
 
         await finalizer.FinalizeAsync(employee, process, Now, CancellationToken.None);
@@ -495,10 +487,6 @@ public class EmployeeDepartureFinalizerTests
     [Fact]
     public async Task FinalizeAsync_Writes_PendingManagerChangedEvent_Row_In_Same_Save_As_Reassignment_And_Marks_Published()
     {
-        // Durability fix: CascadeManagerDepartureAsync must persist a PendingManagerChangedEvent
-        // row (capturing previous/new manager) in the SAME save as the report's ManagerId
-        // reassignment, then publish and mark it published once the publish loop succeeds — see
-        // PendingManagerChangedEvent's remarks.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
@@ -556,16 +544,10 @@ public class EmployeeDepartureFinalizerTests
         Assert.True(auditEvent.OffboardingIncomplete);
     }
 
-    // -- Terminal-state / downstream-finalisation ordering and resumption -------------------
 
     [Fact]
     public async Task FinalizeAsync_Produces_Correct_Final_State_When_DirectReports_Cause_An_Intermediate_Save()
     {
-        // Regression test for the ordering bug: CascadeManagerDepartureAsync's own SaveChangesAsync
-        // (triggered here by the departing employee having a direct report) used to run AFTER the
-        // employee/process terminal-state mutations were applied in memory, prematurely flushing
-        // them before the downstream steps ran. Asserts the full call still ends in the correct
-        // final state, including FinalisationCompletedAt being set.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
@@ -607,10 +589,6 @@ public class EmployeeDepartureFinalizerTests
     [Fact]
     public async Task FinalizeAsync_Resumes_Downstream_Steps_Only_For_A_Stranded_Partial_Failure()
     {
-        // Simulates a process that got as far as PersistTerminalStateAsync succeeding (Employee ->
-        // FormerEmployee, Process -> Completed) but never reached CompleteDownstreamFinalisationAsync
-        // (FinalisationCompletedAt still null) — built directly via the domain methods since the
-        // finalizer itself won't leave the fixture in this state under test doubles.
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
 
@@ -621,7 +599,6 @@ public class EmployeeDepartureFinalizerTests
         var employee = CreateLeavingEmployee(companyId, Now, managerId: manager.Id);
         var process = CreateLeavingProcess(companyId, employee.Id, DateOnly.FromDateTime(FixedUtcNow).AddDays(-1), Now);
 
-        // Drive both aggregates to the stranded state directly.
         employee.SetFormerEmployee(Now);
         process.Complete(Now);
         Assert.Null(process.FinalisationCompletedAt);
@@ -666,7 +643,6 @@ public class EmployeeDepartureFinalizerTests
         var employee = CreateLeavingEmployee(companyId, Now);
         var process = CreateLeavingProcess(companyId, employee.Id, DateOnly.FromDateTime(FixedUtcNow).AddDays(-1), Now);
 
-        // Drive to the fully-finalised state directly.
         employee.SetFormerEmployee(Now);
         process.Complete(Now);
         process.MarkFinalisationCompleted(Now);

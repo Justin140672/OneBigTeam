@@ -74,7 +74,6 @@ internal sealed class ListEmployeesHandler
             .Take(request.PageSize)
             .ToListAsync(cancellationToken);
 
-        // Resolve display names with two targeted lookups — no N+1
         var departmentIds = employees
             .Select(e => e.DepartmentId)
             .ToHashSet();
@@ -120,15 +119,10 @@ internal sealed class ListEmployeesHandler
                 .ToDictionaryAsync(e => e.Id, e => $"{e.FirstName} {e.LastName}", cancellationToken)
             : new Dictionary<Guid, string>();
 
-        // Employee.ProfileImageUrl is a legacy field that nothing writes to any more — current
-        // profile photos live in the Documents module, resolved here via IProfilePhotoReader for
-        // just the current page of results (same bulk, no-N+1 lookup style as the dictionaries above).
         var employeeIds = employees.Select(e => e.Id).ToList();
         var photoUrls = await _profilePhotoReader.GetCurrentPhotoUrlsAsync(
             request.CompanyId, employeeIds, cancellationToken);
 
-        // Employees not present in the returned dictionary are treated as NoUser (see
-        // IEmployeeUserAccountStatusReader contract) — no ApplicationUser and no active invite exist.
         var accountStatuses = await _userAccountStatusReader.GetStatusesAsync(
             request.CompanyId, employeeIds, cancellationToken);
 
@@ -162,11 +156,6 @@ internal sealed class ListEmployeesHandler
         return Result.Success(new ListEmployeesResponse(items, totalCount, request.PageNumber, request.PageSize, totalPages));
     }
 
-    // Sent as the display-ready label (not the raw enum name) so the grid's "User Account"
-    // column, its Excel filter checkbox list, and any client-side filter query all agree on
-    // "No User" — previously this was a bare enum ToString() ("NoUser"), which rendered fine
-    // via client-side reformatting but meant the value the grid actually filtered/queried by
-    // was the unspaced enum name.
     private static string FormatAccountStatus(EmployeeUserAccountStatus status) => status switch
     {
         EmployeeUserAccountStatus.NoUser => "No User",

@@ -46,7 +46,6 @@ public class OutstandingInterviewFeedbackReminderJobTests
     public async Task ExecuteAsync_Notifies_HiringManager_When_Feedback_Overdue()
     {
         await using var db = BuildContext();
-        // Interview was 2 days ago -> its +1 day feedback window has passed.
         var (interviewId, hiringManagerId, companyId) = await SeedInterviewAsync(db, Now.AddDays(-2));
 
         var writer = new FakeNotificationWriter();
@@ -80,7 +79,6 @@ public class OutstandingInterviewFeedbackReminderJobTests
     public async Task ExecuteAsync_Does_Not_Notify_When_Interview_Was_Within_The_One_Day_Feedback_Window()
     {
         await using var db = BuildContext();
-        // Interview happened 12 hours ago -> still within the +1 day feedback window.
         await SeedInterviewAsync(db, Now.AddHours(-12));
 
         var writer = new FakeNotificationWriter();

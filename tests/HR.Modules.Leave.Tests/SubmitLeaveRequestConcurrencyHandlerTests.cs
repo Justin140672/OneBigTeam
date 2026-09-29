@@ -31,8 +31,6 @@ public class SubmitLeaveRequestConcurrencyHandlerTests
 
     private readonly string _store = "submit-leave-conc-" + Guid.NewGuid().ToString("N");
 
-    // .UseVersionedAggregates() is required - without it, VersionAdvancingSaveChangesInterceptor
-    // never runs, Version never advances on save, and no conflict can ever be detected.
     private LeaveDbContext Ctx()
     {
         var builder = new DbContextOptionsBuilder<LeaveDbContext>()
@@ -112,15 +110,12 @@ public class SubmitLeaveRequestConcurrencyHandlerTests
             Reason = "Concurrency test",
         };
 
-    // ─── SubmitLeaveRequestHandler: two concurrent auto-approving submissions ──
 
     [Fact]
     public async Task Two_Concurrent_AutoApproving_Submissions_Against_The_Same_Balance_Second_Loses_With_Concurrency_Error()
     {
         var (companyId, employeeId, leaveTypeId, _) = await SeedAutoApprovingSetupAsync();
 
-        // Both contexts load the (as yet un-mutated) balance BEFORE either commits - a genuine race
-        // between two employees' overlap-free auto-approving submissions draining the same pot.
         await using var ctxA = Ctx();
         await using var ctxB = Ctx();
         _ = await ctxA.LeaveBalances.SingleAsync();
@@ -137,25 +132,21 @@ public class SubmitLeaveRequestConcurrencyHandlerTests
         var handlerB = SubmitHandler(ctxB, auditB, integrationB, notificationsB);
 
         var resultA = await handlerA.HandleAsync(
-            SubmitRequest(companyId, employeeId, leaveTypeId, new DateOnly(2026, 8, 3), new DateOnly(2026, 8, 5)), // 3 days
+            SubmitRequest(companyId, employeeId, leaveTypeId, new DateOnly(2026, 8, 3), new DateOnly(2026, 8, 5)),
             CancellationToken.None);
         Assert.True(resultA.IsSuccess);
-        Assert.NotEmpty(auditA.Published); // winner's audit event fired
+        Assert.NotEmpty(auditA.Published);
 
         var resultB = await handlerB.HandleAsync(
-            SubmitRequest(companyId, employeeId, leaveTypeId, new DateOnly(2026, 9, 7), new DateOnly(2026, 9, 8)), // 2 days
+            SubmitRequest(companyId, employeeId, leaveTypeId, new DateOnly(2026, 9, 7), new DateOnly(2026, 9, 8)),
             CancellationToken.None);
         Assert.True(resultB.IsFailure);
         Assert.Equal("concurrency", resultB.Error.Code);
 
-        // No audit/notification/integration-event side effects fire for the losing save - all of
-        // those calls happen strictly after SaveChangesAsync in the handler body.
         Assert.Empty(auditB.Published);
         Assert.Empty(integrationB.Published);
         Assert.Empty(notificationsB.Written);
 
-        // Final balance reflects only the winner's 3-day deduction - never a lost update, never
-        // both applied.
         await using var verify = Ctx();
         var savedBalance = await verify.LeaveBalances.SingleAsync();
         Assert.Equal(3m, savedBalance.UsedDays);
@@ -170,7 +161,6 @@ public class SubmitLeaveRequestConcurrencyHandlerTests
         // HR.Integration.Tests/AutoApprovingLeaveSubmissionConcurrencyEndpointTests.cs.
     }
 
-    // ─── SubmitLeaveRequestDraftHandler: two concurrent auto-approving drafts ──
 
     [Fact]
     public async Task Two_Concurrent_AutoApproving_Draft_Submissions_Against_The_Same_Balance_Second_Loses_And_Draft_Is_Unchanged_And_Retryable()
@@ -223,9 +213,6 @@ public class SubmitLeaveRequestConcurrencyHandlerTests
         Assert.Empty(integrationB.Published);
         Assert.Empty(notificationsB.Written);
 
-        // The persisted draft is byte-for-byte unchanged: still Draft, same TotalDays/dates -
-        // MarkSubmittedPending/ApplyBalanceEffectsAndApproveAsync's in-memory mutations on
-        // trackedDraftB never reached the database because SaveChangesAsync threw before flushing.
         await using (var verify = Ctx())
         {
             var persistedDraftB = await verify.LeaveRequests.SingleAsync(r => r.Id == draftBId);
@@ -233,16 +220,10 @@ public class SubmitLeaveRequestConcurrencyHandlerTests
             Assert.Equal(2m, persistedDraftB.TotalDays);
             Assert.Equal(new DateOnly(2026, 9, 7), persistedDraftB.StartDate);
             Assert.Equal(new DateOnly(2026, 9, 8), persistedDraftB.EndDate);
-            Assert.Equal(1, persistedDraftB.Version); // never advanced by the failed save
+            Assert.Equal(1, persistedDraftB.Version);
         }
-        // Also sanity-check the in-memory entity the losing handler mutated before the failed save
-        // still reports Draft's business-rule shape (defensive: MarkSubmittedPending/Approve throw
-        // if called twice on an already-transitioned entity - see LeaveRequest.MarkSubmittedPending).
         Assert.NotNull(trackedDraftB);
 
-        // Still retryable: a fresh context reloading the untouched draft and re-running the same
-        // handler now succeeds, because the balance's Version has already moved on and this is a
-        // brand-new attempt starting from the current state, not a replay of the stale one.
         await using var retryCtx = Ctx();
         var retryAudit = new CapturingAuditEventPublisher();
         var retryHandler = DraftHandler(retryCtx, retryAudit, new CapturingIntegrationEventPublisher(), new FakeNotificationWriter());
@@ -254,6 +235,6 @@ public class SubmitLeaveRequestConcurrencyHandlerTests
 
         await using var finalVerify = Ctx();
         var finalBalance = await finalVerify.LeaveBalances.SingleAsync();
-        Assert.Equal(5m, finalBalance.UsedDays); // 3 (winner A) + 2 (retried B)
+        Assert.Equal(5m, finalBalance.UsedDays);
     }
 }

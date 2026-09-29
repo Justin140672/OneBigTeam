@@ -59,7 +59,6 @@ public class AssetReminderJobTests
     private static AssetReminderJob BuildJob(AssetsDbContext db, FakeNotificationWriter writer, FakeClock clock)
         => new(db, writer, clock);
 
-    // ── Acknowledgement reminders ─────────────────────────────────────────────
 
     [Fact]
     public async Task ExecuteAsync_Sends_Acknowledgement_Reminder_For_Unacknowledged_Active_Assignment()
@@ -89,7 +88,6 @@ public class AssetReminderJobTests
         var writer = new FakeNotificationWriter();
         var job    = BuildJob(db, writer, new FakeClock(FixedUtcNow));
 
-        // Run twice — second run sees the existing reminder via ExistsAsync and skips
         await job.ExecuteAsync();
         await job.ExecuteAsync();
 
@@ -132,7 +130,6 @@ public class AssetReminderJobTests
         Assert.DoesNotContain(writer.Written, n => n.Type == NotificationType.AssetAcknowledgementReminder);
     }
 
-    // ── Return reminders ──────────────────────────────────────────────────────
 
     [Fact]
     public async Task ExecuteAsync_Sends_Return_Reminder_When_Return_Was_Requested_But_Not_Completed()
@@ -143,7 +140,6 @@ public class AssetReminderJobTests
         var writer = new FakeNotificationWriter();
         var now    = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        // Seed AssetReturnRequested to simulate a prior RequestAssetReturn call
         await writer.WriteAsync(
             Guid.NewGuid(), companyId, employeeId,
             "Asset return requested", null,
@@ -214,7 +210,6 @@ public class AssetReminderJobTests
         assignment!.Return(now);
         await db.SaveChangesAsync();
 
-        // Even if a return-requested notification exists, no reminder should go out
         var writer = new FakeNotificationWriter();
         await writer.WriteAsync(
             Guid.NewGuid(), companyId, employeeId,
@@ -231,7 +226,6 @@ public class AssetReminderJobTests
         Assert.DoesNotContain(writer.Written, n => n.Type == NotificationType.AssetReturnReminder);
     }
 
-    // ── Acknowledgement overdue ───────────────────────────────────────────────
 
     [Fact]
     public async Task ExecuteAsync_Sends_Acknowledgement_Overdue_When_Unacknowledged_For_More_Than_7_Days()
@@ -239,7 +233,6 @@ public class AssetReminderJobTests
         await using var db = BuildContext();
         var (assignmentId, employeeId, companyId) = await SeedActiveAssignmentAsync(db);
 
-        // Backdate AssignedAt to 8 days ago
         var assignment = await db.AssetAssignments.FindAsync(assignmentId);
         var pastDate = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero).AddDays(-8);
         typeof(AssetAssignment)
@@ -266,7 +259,6 @@ public class AssetReminderJobTests
         await using var db = BuildContext();
         var (assignmentId, employeeId, companyId) = await SeedActiveAssignmentAsync(db);
 
-        // Backdate AssignedAt to exactly 7 days ago — boundary is inclusive (AssignedAt <= cutoff)
         var assignment = await db.AssetAssignments.FindAsync(assignmentId);
         var pastDate = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero).AddDays(-7);
         typeof(AssetAssignment)
@@ -313,7 +305,6 @@ public class AssetReminderJobTests
     {
         await using var db = BuildContext();
         await SeedActiveAssignmentAsync(db);
-        // Assignment was seeded at FixedUtcNow (0 days ago) — not yet overdue
 
         var writer = new FakeNotificationWriter();
         var job    = BuildJob(db, writer, new FakeClock(FixedUtcNow));
@@ -345,7 +336,6 @@ public class AssetReminderJobTests
         Assert.Single(writer.Written, n => n.Type == NotificationType.AssetAcknowledgementOverdue);
     }
 
-    // ── Return overdue ────────────────────────────────────────────────────────
 
     [Fact]
     public async Task ExecuteAsync_Sends_Return_Overdue_When_Reminder_Already_Sent()
@@ -356,7 +346,6 @@ public class AssetReminderJobTests
         var now    = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
         var writer = new FakeNotificationWriter();
 
-        // Seed prior notifications: return requested and reminder already sent
         await writer.WriteAsync(
             Guid.NewGuid(), companyId, employeeId,
             "Asset return requested", null,
@@ -390,7 +379,6 @@ public class AssetReminderJobTests
         var now    = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
         var writer = new FakeNotificationWriter();
 
-        // Only seed the return-requested notification, not the reminder
         await writer.WriteAsync(
             Guid.NewGuid(), companyId, employeeId,
             "Asset return requested", null,
