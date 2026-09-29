@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using ClosedXML.Excel;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
@@ -50,6 +51,26 @@ public class DownloadImportTemplateEndpointTests
         Assert.Contains("Last Name", headerCells);
         Assert.Contains("Work Email", headerCells);
     }
+
+    [Fact]
+    public async Task Download_Does_Not_Change_Onboarding_Progress()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await AdminClient(companyId);
+
+        var before = await client.GetFromJsonAsync<ChecklistPayload>("/api/company-onboarding/checklist");
+        var response = await client.GetAsync(TemplateUrl(companyId));
+        var after = await client.GetFromJsonAsync<ChecklistPayload>("/api/company-onboarding/checklist");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(before!.CompletionPercentage, after!.CompletionPercentage);
+        Assert.Equal(
+            before.Tasks.Where(t => t.IsCompleted).Select(t => t.Key).Order(),
+            after.Tasks.Where(t => t.IsCompleted).Select(t => t.Key).Order());
+    }
+
+    private sealed record ChecklistTaskPayload(string Key, bool IsCompleted);
+    private sealed record ChecklistPayload(List<ChecklistTaskPayload> Tasks, int CompletionPercentage);
 
     [Fact]
     public async Task Returns_Unauthorized_Without_Auth()

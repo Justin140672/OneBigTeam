@@ -25,7 +25,7 @@ public sealed class GettingStartedAndExploreTests(HrAdminPersonaFixture fixture)
 
         await gettingStarted.GoToAsync();
 
-        Assert.Equal(10, await gettingStarted.GetTaskCardCountAsync());
+        Assert.Equal(9, await gettingStarted.GetTaskCardCountAsync());
 
         foreach (var taskName in new[]
                  {
@@ -160,7 +160,46 @@ public sealed class GettingStartedAndExploreTests(HrAdminPersonaFixture fixture)
             return;
         }
 
-        Assert.Matches(new Regex("^/companies/[0-9a-fA-F-]+/employees$"), href);
+        Assert.Matches(new Regex("^/companies/[0-9a-fA-F-]+/data-import/employees\\?returnUrl=%2Fgetting-started$"), href);
+    }
+
+    [Fact]
+    public async Task FreshCompany_AddYourTeam_ShowsImportActions_AndTemplateDownloadStaysOnGettingStarted()
+    {
+        var email = await ProvisionFreshCompanyAdminAsync();
+
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var gettingStarted = new GettingStartedPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(email);
+
+        var completionDialog = new EmployeeCompletionDialogPage(_page);
+        await completionDialog.WaitForVisibleAsync();
+        await completionDialog.FillAllRequiredFieldsAsync(
+            dobDdMMyyyy: "02/01/1990",
+            nationality: "British",
+            gender: "Female",
+            addressLine1: "1 Test Street",
+            city: "London",
+            postcode: "SW1A 1AA");
+        await completionDialog.SaveAndWaitForCloseAsync();
+
+        await gettingStarted.GoToAsync();
+
+        Assert.False(await gettingStarted.HasTaskAsync("Download the Employee import template"));
+        Assert.True(await gettingStarted.HasTaskAsync("Add employees individually or import your team from a spreadsheet."));
+        Assert.True(await gettingStarted.TaskActionLink("Add your team", "Add or import employees").IsVisibleAsync());
+
+        var percentageBefore = await gettingStarted.GetCompletionPercentageAsync();
+        var download = await gettingStarted.ClickDownloadImportTemplateAsync();
+
+        Assert.EndsWith(".xlsx", download.SuggestedFilename);
+        Assert.Contains("/getting-started", _page.Url);
+
+        await gettingStarted.GoToAsync();
+        Assert.Equal(percentageBefore, await gettingStarted.GetCompletionPercentageAsync());
+        Assert.False(await gettingStarted.IsTaskCompletedAsync("Add your team"));
     }
 
     [Fact]

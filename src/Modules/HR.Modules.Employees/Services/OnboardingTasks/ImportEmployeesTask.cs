@@ -8,7 +8,7 @@ internal sealed class ImportEmployeesTask(EmployeesDbContext dbContext) : IOnboa
 {
     public string Key => "import-employees";
     public string Name => "Add your team";
-    public string Description => "Import or add your employees to get started.";
+    public string Description => "Add employees individually or import your team from a spreadsheet.";
     public bool IsMandatory => true;
     public int Order => 5;
 

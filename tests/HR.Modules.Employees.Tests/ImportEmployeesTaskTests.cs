@@ -12,6 +12,30 @@ public class ImportEmployeesTaskTests
     private static readonly DateOnly Dob = new(1990, 5, 20);
 
     [Fact]
+    public async Task Definition_Is_Mandatory_With_Updated_Description()
+    {
+        await using var context = BuildContext();
+
+        var task = new ImportEmployeesTask(context);
+
+        Assert.Equal("import-employees", task.Key);
+        Assert.Equal("Add your team", task.Name);
+        Assert.Equal("Add employees individually or import your team from a spreadsheet.", task.Description);
+        Assert.True(task.IsMandatory);
+        Assert.Equal(5, task.Order);
+    }
+
+    [Fact]
+    public void Employees_Assembly_Does_Not_Define_A_Download_Template_Task()
+    {
+        var keys = typeof(ImportEmployeesTask).Assembly.GetTypes()
+            .Where(t => typeof(HR.Infrastructure.Abstractions.IOnboardingTaskDefinition).IsAssignableFrom(t) && !t.IsAbstract)
+            .Select(t => t.Name);
+
+        Assert.DoesNotContain("DownloadEmployeeImportTemplateTask", keys);
+    }
+
+    [Fact]
     public async Task IsCompletedAsync_Returns_False_When_Company_Has_No_Employees()
     {
         await using var context = BuildContext();

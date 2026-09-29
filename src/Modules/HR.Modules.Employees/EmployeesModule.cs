@@ -459,7 +459,6 @@ public static class EmployeesModule
         services.AddScoped<IWorkloadActionProvider, UpcomingEmployeeStartDatesWorkloadActionProvider>();
         services.AddScoped<IWorkloadActionProvider, UpcomingEmployeeLeavingDatesWorkloadActionProvider>();
 
-        services.AddScoped<IOnboardingTaskDefinition, DownloadEmployeeImportTemplateTask>();
         services.AddScoped<IOnboardingTaskDefinition, ImportEmployeesTask>();
         services.AddScoped<IOnboardingTaskDefinition, CompleteEmployeeRecordTask>();
     }

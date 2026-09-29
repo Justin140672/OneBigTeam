@@ -29,12 +29,21 @@ public sealed class GettingStartedPage(IPage page, string baseUrl)
 
     public async Task<string?> GetTaskLinkUrlAsync(string taskNameFragment)
     {
-        var link = TaskCard(taskNameFragment).GetByRole(AriaRole.Link);
+        var link = TaskCard(taskNameFragment).GetByRole(AriaRole.Link).First;
         return await link.IsVisibleAsync() ? await link.GetAttributeAsync("href") : null;
     }
 
     public Task ClickTaskLinkAsync(string taskNameFragment) =>
-        TaskCard(taskNameFragment).GetByRole(AriaRole.Link).ClickAsync();
+        TaskCard(taskNameFragment).GetByRole(AriaRole.Link).First.ClickAsync();
+
+    public ILocator TaskActionLink(string taskNameFragment, string accessibleName) =>
+        TaskCard(taskNameFragment).GetByRole(AriaRole.Link, new() { Name = accessibleName });
+
+    public async Task<IDownload> ClickDownloadImportTemplateAsync()
+    {
+        var link = TaskActionLink("Add your team", "Download import template");
+        return await page.RunAndWaitForDownloadAsync(() => link.ClickAsync());
+    }
 
     public async Task<int> GetCompletionPercentageAsync()
     {

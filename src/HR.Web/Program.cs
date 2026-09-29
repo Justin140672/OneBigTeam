@@ -583,14 +583,6 @@ app.MapGet("/companies/{companyId:guid}/data-import/employees/template/download"
         ?? response.Content.Headers.ContentDisposition?.FileName
         ?? "employee-import-template.xlsx";
 
-    try
-    {
-        await http.PostAsync("api/company-onboarding/checklist/tasks/download-employee-import-template/mark-complete", null);
-    }
-    catch
-    {
-    }
-
     return Results.File(bytes, contentType, fileName);
 }).RequireAuthorization();
 

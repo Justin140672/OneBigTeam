@@ -9,7 +9,7 @@ namespace HR.Integration.Tests;
 [Collection("Integration")]
 public class MarkOnboardingTaskCompleteEndpointTests
 {
-    private const string KnownTaskKey = "download-employee-import-template";
+    private const string KnownTaskKey = "review-company-documents";
 
     private readonly ApiWebApplicationFactory _factory;
 

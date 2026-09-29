@@ -67,8 +67,24 @@ public class GetOnboardingChecklistEndpointTests
 
         var payload = await response.Content.ReadFromJsonAsync<ChecklistPayload>();
         Assert.NotNull(payload);
-        Assert.Equal(9, payload!.Tasks.Count);
+        Assert.Equal(8, payload!.Tasks.Count);
         Assert.InRange(payload.CompletionPercentage, 0, 100);
+    }
+
+    [Fact]
+    public async Task Get_Checklist_Omits_Download_Template_Task_And_Keeps_Add_Your_Team()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await ClientFor(companyId, HrAdminUserId);
+
+        var payload = await client.GetFromJsonAsync<ChecklistPayload>("/api/company-onboarding/checklist");
+
+        Assert.DoesNotContain(payload!.Tasks, t => t.Key == "download-employee-import-template");
+        var addTeam = Assert.Single(payload.Tasks, t => t.Key == "import-employees");
+        Assert.Equal("Add your team", addTeam.Name);
+        Assert.Equal("Add employees individually or import your team from a spreadsheet.", addTeam.Description);
+        Assert.True(addTeam.IsMandatory);
+        Assert.False(addTeam.IsCompleted);
     }
 
     [Fact]
