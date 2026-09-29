@@ -6,6 +6,7 @@ internal sealed class FakeProfilePhotoStorageService : IProfilePhotoStorageServi
 {
     public List<(string FileName, string StorageKey)> Uploads { get; } = [];
     public List<string> Deletions { get; } = [];
+    public bool ThrowOnDelete { get; set; }
 
     public Task<string> UploadAsync(
         Stream content,
@@ -24,6 +25,9 @@ internal sealed class FakeProfilePhotoStorageService : IProfilePhotoStorageServi
 
     public Task DeleteAsync(string storageKey, CancellationToken cancellationToken)
     {
+        if (ThrowOnDelete)
+            throw new InvalidOperationException("Simulated storage delete failure.");
+
         Deletions.Add(storageKey);
         return Task.CompletedTask;
     }

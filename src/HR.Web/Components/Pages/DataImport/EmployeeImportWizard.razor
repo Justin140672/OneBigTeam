@@ -379,14 +379,14 @@
         _uploading = true;
         try
         {
-            var (result, error) = await DataImportService.UploadFileAsync(CompanyId, _selectedFile);
-            if (result is null)
+            var apiResult = await DataImportService.UploadFileAsync(CompanyId, _selectedFile);
+            if (!apiResult.Success)
             {
-                _globalError = error ?? "Upload failed.";
+                _globalError = ApiFailurePresenter.Message(apiResult, "upload the file");
                 return;
             }
 
-            _session = result;
+            _session = apiResult.Value!;
             await LoadColumnsAsync();
         }
         finally
@@ -403,13 +403,14 @@
         _loadingColumns = true;
         try
         {
-            var (result, error) = await DataImportService.GetSessionColumnsAsync(CompanyId, _session.Id);
-            if (result is null)
+            var apiResult = await DataImportService.GetSessionColumnsAsync(CompanyId, _session.Id);
+            if (!apiResult.Success)
             {
-                _globalError = error ?? "Failed to detect columns.";
+                _globalError = ApiFailurePresenter.Message(apiResult, "detect the columns in the file");
                 return;
             }
 
+            var result = apiResult.Value!;
             _columns = result;
             _mappingSelections = result.FieldSuggestions.ToDictionary(f => f.TargetField, f => f.SuggestedHeader);
         }
@@ -436,15 +437,15 @@
                 .Where(kv => !string.IsNullOrWhiteSpace(kv.Value))
                 .ToDictionary(kv => kv.Key, kv => kv.Value!);
 
-            var (result, error) = await DataImportService.ValidateSessionAsync(
+            var apiResult = await DataImportService.ValidateSessionAsync(
                 CompanyId, _session.Id, mapping.Count > 0 ? mapping : null);
-            if (result is null)
+            if (!apiResult.Success)
             {
-                _globalError = error ?? "Validation failed.";
+                _globalError = ApiFailurePresenter.Message(apiResult, "validate the import");
                 return;
             }
 
-            _validation = result;
+            _validation = apiResult.Value!;
         }
         finally
         {
@@ -460,14 +461,14 @@
         _loadingPreview = true;
         try
         {
-            var (result, error) = await DataImportService.GetPreviewAsync(CompanyId, _session.Id);
-            if (result is null)
+            var apiResult = await DataImportService.GetPreviewAsync(CompanyId, _session.Id);
+            if (!apiResult.Success)
             {
-                _globalError = error ?? "Failed to load preview.";
+                _globalError = ApiFailurePresenter.Message(apiResult, "load the import preview");
                 return;
             }
 
-            _preview = result;
+            _preview = apiResult.Value!;
         }
         finally
         {
@@ -483,14 +484,14 @@
         _confirming = true;
         try
         {
-            var (result, error) = await DataImportService.ConfirmSessionAsync(CompanyId, _session.Id);
-            if (result is null)
+            var apiResult = await DataImportService.ConfirmSessionAsync(CompanyId, _session.Id);
+            if (!apiResult.Success)
             {
-                _globalError = error ?? "Confirm failed.";
+                _globalError = ApiFailurePresenter.Message(apiResult, "confirm the import");
                 return;
             }
 
-            _confirmResult = result;
+            _confirmResult = apiResult.Value!;
         }
         finally
         {
@@ -504,14 +505,14 @@
         _downloadingTemplate = true;
         try
         {
-            var (bytes, fileName, error) = await DataImportService.DownloadTemplateAsync(CompanyId);
-            if (bytes is null)
+            var apiResult = await DataImportService.DownloadTemplateAsync(CompanyId);
+            if (!apiResult.Success)
             {
-                _globalError = error ?? "Failed to download template.";
+                _globalError = ApiFailurePresenter.Message(apiResult, "download the template");
                 return;
             }
 
-            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(bytes));
+            await JS.InvokeVoidAsync("downloadFileFromBase64", apiResult.Value!.FileName, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Convert.ToBase64String(apiResult.Value!.Bytes));
         }
         finally
         {
@@ -527,14 +528,14 @@
         _downloadingErrors = true;
         try
         {
-            var (bytes, fileName, error) = await DataImportService.DownloadErrorReportAsync(CompanyId, _session.Id);
-            if (bytes is null)
+            var apiResult = await DataImportService.DownloadErrorReportAsync(CompanyId, _session.Id);
+            if (!apiResult.Success)
             {
-                _globalError = error ?? "Failed to download error report.";
+                _globalError = ApiFailurePresenter.Message(apiResult, "download the error report");
                 return;
             }
 
-            await JS.InvokeVoidAsync("downloadFileFromBase64", fileName, "text/csv", Convert.ToBase64String(bytes));
+            await JS.InvokeVoidAsync("downloadFileFromBase64", apiResult.Value!.FileName, "text/csv", Convert.ToBase64String(apiResult.Value!.Bytes));
         }
         finally
         {

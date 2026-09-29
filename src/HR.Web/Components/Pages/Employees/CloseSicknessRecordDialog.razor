@@ -66,13 +66,13 @@
 
     protected override async Task<string?> SaveCoreAsync()
     {
-        var (success, error) = await SicknessService.CloseSicknessRecordAsync(
+        var result = await SicknessService.CloseSicknessRecordAsync(
             CompanyId,
             EmployeeId,
             RecordId,
             new CloseSicknessRecordRequest(Model.EndDate!.Value, Model.EndDayPart, Model.ReturnToWorkDate, Model.Notes));
 
-        return success ? null : error;
+        return result.Success ? null : ApiFailurePresenter.Message(result, "close this sickness record");
     }
 
     protected override Task OnOpenedAsync()

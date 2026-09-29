@@ -15,6 +15,7 @@
         }
         else
         {
+            <ApiFailureAlert Failure="_loadFailure" OnRetry="LoadReviewAsync" />
             @if (_review is not null)
             {
                 <dl class="row mb-3 small">
@@ -61,6 +62,7 @@
     private ReturnToWorkReviewDetailModel? _review;
     private string? _notes;
     private string? _error;
+    private ApiFailurePresentation? _loadFailure;
     private bool _submitting;
     private bool _justCompleted;
 
@@ -69,7 +71,23 @@
         if (_justCompleted) return;
 
         if (Task.SourceEntityId.HasValue)
-            _review = await SicknessService.GetReturnToWorkReviewAsync(CompanyId, Task.SourceEntityId.Value);
+            await LoadReviewAsync();
+    }
+
+    private async Task LoadReviewAsync()
+    {
+        var result = await SicknessService.GetReturnToWorkReviewAsync(CompanyId, Task.SourceEntityId!.Value);
+        if (result.Success)
+        {
+            _review = result.Value;
+            _loadFailure = null;
+        }
+        else
+        {
+            // The review summary is informational; completing the task remains possible, but the user
+            // is told why the details are missing instead of silently seeing no summary.
+            _loadFailure = ApiFailurePresenter.Present(result, "load the review details");
+        }
     }
 
     private async Task CompleteReviewAsync()

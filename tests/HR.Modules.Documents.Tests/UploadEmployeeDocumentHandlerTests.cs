@@ -24,14 +24,16 @@ public class UploadEmployeeDocumentHandlerTests
         FakeDocumentStorageService? storage = null,
         FileUploadOptions? options = null,
         FakeAuditPublisher? auditPublisher = null,
-        HR.SharedKernel.IIntegrationEventPublisher? integrationEventPublisher = null) =>
+        HR.SharedKernel.IIntegrationEventPublisher? integrationEventPublisher = null,
+        Microsoft.Extensions.Logging.ILogger<UploadEmployeeDocumentHandler>? logger = null) =>
         new(db,
             storage ?? new FakeDocumentStorageService(),
             new FileUploadValidator(Options.Create(options ?? new FileUploadOptions())),
             new FakeClock(FixedUtcNow),
             auditPublisher ?? new FakeAuditPublisher(),
             integrationEventPublisher ?? new NoOpIntegrationEventPublisher(),
-            new NoOpBackgroundJobClient());
+            new NoOpBackgroundJobClient(),
+            logger);
 
     [Fact]
     public async Task HandleAsync_Publishes_EmployeeDocumentUploaded_IntegrationEvent()
@@ -546,6 +548,36 @@ public class UploadEmployeeDocumentHandlerTests
             CancellationToken.None);
 
         Assert.Empty(audit.Published);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Rethrows_Original_Db_Failure_And_Logs_Orphan_When_Compensating_Delete_Also_Fails()
+    {
+        var storage    = new FakeDocumentStorageService { ThrowOnDelete = true };
+        var logger     = new FakeLogger<UploadEmployeeDocumentHandler>();
+        var companyId  = Guid.NewGuid();
+
+        var options = new DbContextOptionsBuilder<DocumentsDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+        await using var db = new ThrowingDocumentsDbContext(options);
+        var docType        = DocumentType.Create(Guid.NewGuid(), companyId, "Contract", null, DateTimeOffset.UtcNow);
+        db.DocumentTypes.Add(docType);
+        await db.BaseSaveChangesAsync();
+
+        var handler = BuildHandler(db, storage, logger: logger);
+
+        // The original database failure must surface, not the cleanup exception.
+        var ex = await Assert.ThrowsAsync<DbUpdateException>(() =>
+            handler.HandleAsync(
+                BuildRequest(companyId, Guid.NewGuid(), docType.Id), Guid.NewGuid(), CancellationToken.None));
+
+        Assert.Equal("Simulated database failure.", ex.Message);
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Error, entry.Level);
+        Assert.Contains(storage.Uploads[0].StorageKey, entry.Message);
+        Assert.Contains(companyId.ToString(), entry.Message);
+        Assert.DoesNotContain("Contract", entry.Message);
     }
 
     private sealed class ThrowingDocumentsDbContext(DbContextOptions<DocumentsDbContext> options)

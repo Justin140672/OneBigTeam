@@ -6,6 +6,8 @@ internal sealed class FakeLogger<T> : ILogger<T>
 {
     public List<string> Messages { get; } = [];
 
+    public List<(LogLevel Level, string Message, Exception? Exception)> Entries { get; } = [];
+
     public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
     public bool IsEnabled(LogLevel logLevel) => true;
@@ -17,6 +19,8 @@ internal sealed class FakeLogger<T> : ILogger<T>
         Exception? exception,
         Func<TState, Exception?, string> formatter)
     {
-        Messages.Add(formatter(state, exception));
+        var message = formatter(state, exception);
+        Messages.Add(message);
+        Entries.Add((logLevel, message, exception));
     }
 }

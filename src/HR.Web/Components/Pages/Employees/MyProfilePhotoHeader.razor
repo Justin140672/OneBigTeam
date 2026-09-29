@@ -1,3 +1,4 @@
+@using HR.SharedKernel.Http
 @inject ProfilePhotoService ProfilePhotoService
 
 <div class="photo-header-row">
@@ -32,7 +33,9 @@
 
 <UploadProfilePhotoDialog IsOpen="_dialogOpen"
                            Title="Change Profile Photo"
-                           UploadFunc="@((file, ct) => ProfilePhotoService.UploadMyProfilePhotoAsync(CompanyId, file, ct))"
+                           UploadFunc="@(async (file, ct) => ApiFailurePresenter.ErrorOrNull(
+                               await ProfilePhotoService.UploadMyProfilePhotoAsync(CompanyId, file, ct),
+                               "upload your photo"))"
                            OnSaved="HandleUploaded"
                            OnCancelled="CloseDialog" />
 
@@ -52,7 +55,20 @@
     private async Task LoadAsync()
     {
         _loading = true;
-        _photo = await ProfilePhotoService.GetMyProfilePhotoAsync(CompanyId);
+        var result = await ProfilePhotoService.GetMyProfilePhotoAsync(CompanyId);
+        if (result.Success)
+        {
+            _photo = result.Value;
+        }
+        else if (result.FailureKind == ApiFailureKind.NotFound)
+        {
+            _photo = null; // no photo on file
+        }
+        else
+        {
+            // Keep whatever was shown before rather than presenting a failure as "no photo".
+            _error = ApiFailurePresenter.Message(result, "load your profile photo");
+        }
         _loading = false;
     }
 
@@ -75,7 +91,7 @@
         for (var attempt = 0; attempt < 20; attempt++)
         {
             await LoadAsync();
-            if (_photo?.PendingPhoto is not null)
+            if (_photo?.PendingPhoto is not null || _error is not null)
                 return;
 
             await Task.Delay(500);
@@ -88,11 +104,14 @@
         _error = null;
         StateHasChanged();
 
-        var success = await ProfilePhotoService.CancelPendingProfilePhotoAsync(CompanyId);
-        if (!success)
-            _error = "Failed to cancel the pending photo.";
+        var cancelResult = await ProfilePhotoService.CancelPendingProfilePhotoAsync(CompanyId);
+        var cancelError = ApiFailurePresenter.ErrorOrNull(cancelResult, "cancel the pending photo");
 
         _cancelling = false;
         await LoadAsync();
+
+        // Set after reloading so a successful reload cannot hide the cancel failure.
+        if (cancelError is not null)
+            _error = cancelError;
     }
 }

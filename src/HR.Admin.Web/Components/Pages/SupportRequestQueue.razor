@@ -29,7 +29,10 @@ else if (_outcome == SupportRequestFetchOutcome.NotFound)
 }
 else if (_outcome == SupportRequestFetchOutcome.Failed)
 {
-    <div class="dashboard-error">A temporary error occurred while loading support requests. Please try again.</div>
+    <div class="dashboard-error" role="alert" data-testid="support-requests-load-failed">
+        A temporary error occurred while loading support requests. Please try again.
+        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="LoadAsync">Try again</button>
+    </div>
 }
 else if (_requests is null || _requests.Count == 0)
 {
@@ -71,7 +74,9 @@ else
     private SupportRequestFetchOutcome _outcome = SupportRequestFetchOutcome.Success;
     private bool _loading = true;
 
-    protected override async Task OnParametersSetAsync()
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
     {
         _loading = true;
         var result = await SupportRequestAdminService.ListSupportRequestsAsync(CompanyId);

@@ -1,0 +1,20 @@
+@* Shows a safe (never raw-exception) message for a failed API call. Retryable failures (network, server,
+   unreadable response) get a "Try again" button; non-retryable ones (permission, session expiry, not found)
+   are message-only, because repeating the same request cannot help. *@
+@if (Failure is not null)
+{
+    <div class="alert @(Failure.IsRetryable ? "alert-warning" : "alert-danger") d-flex align-items-center gap-2 mb-2"
+         role="alert" data-testid="api-failure-alert">
+        <span class="flex-grow-1">@Failure.Message</span>
+        @if (Failure.IsRetryable && OnRetry.HasDelegate)
+        {
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-testid="api-failure-retry"
+                    @onclick="OnRetry">Try again</button>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public ApiFailurePresentation? Failure { get; set; }
+    [Parameter] public EventCallback OnRetry { get; set; }
+}

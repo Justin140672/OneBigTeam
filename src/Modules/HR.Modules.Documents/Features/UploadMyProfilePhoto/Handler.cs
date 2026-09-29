@@ -8,6 +8,7 @@ using HR.Modules.Documents.Services;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Documents.Features.UploadMyProfilePhoto;
 
@@ -19,7 +20,8 @@ internal sealed class UploadMyProfilePhotoHandler(
     IClock clock,
     IAuditEventPublisher auditPublisher,
     IEmployeeNameReader employeeNameReader,
-    IBackgroundJobClient backgroundJobClient)
+    IBackgroundJobClient backgroundJobClient,
+    ILogger<UploadMyProfilePhotoHandler>? logger = null)
 {
     public async Task<Result<UploadMyProfilePhotoResponse>> HandleAsync(
         UploadMyProfilePhotoRequest request,
@@ -85,13 +87,15 @@ internal sealed class UploadMyProfilePhotoHandler(
         }
         catch
         {
-            try { await storage.DeleteAsync(storageKey, cancellationToken); } catch { }
+            await StorageCleanup.TryDeleteAsync(
+                storage, logger, "UploadMyProfilePhoto", storageKey, request.CompanyId, pendingPhoto.Id);
             throw;
         }
 
         if (oldStorageKey is not null)
         {
-            try { await storage.DeleteAsync(oldStorageKey, cancellationToken); } catch { }
+            await StorageCleanup.TryDeleteAsync(
+                storage, logger, "UploadMyProfilePhoto.ReplacedPendingPhoto", oldStorageKey, request.CompanyId, pendingPhoto.Id);
         }
 
         var names = await employeeNameReader.GetNamesAsync(request.CompanyId, [employeeId], cancellationToken);

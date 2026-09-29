@@ -22,6 +22,7 @@
 }
 else
 {
+    <ApiFailureAlert Failure="_failure" OnRetry="LoadAsync" />
     <div class="card">
         <div class="card-header d-flex align-items-center">
             <h5 class="mb-0">Sickness</h5>
@@ -111,6 +112,7 @@ else
     private Guid? _closeTargetId;
 
     private List<SicknessRecordListItemModel> _records = [];
+    private ApiFailurePresentation? _failure;
 
     protected override async Task OnParametersSetAsync() => await LoadAsync();
 
@@ -119,7 +121,17 @@ else
         _loading = _records.Count == 0;
 
         var result = await SicknessService.ListEmployeeSicknessRecordsAsync(CompanyId, EmployeeId);
-        _records = result?.Records ?? [];
+        if (result.Success)
+        {
+            _failure = null;
+            _records = result.Value?.Records ?? [];
+        }
+        else
+        {
+            // Keep any previously loaded rows rather than presenting a failure as an empty list.
+            _failure = ApiFailurePresenter.Present(result, "load sickness records");
+        }
+
         _loading = false;
         StateHasChanged();
     }

@@ -7,6 +7,7 @@ using HR.Modules.Documents.Services;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Documents.Features.UploadRequestedDocument;
 
@@ -17,7 +18,8 @@ internal sealed class UploadRequestedDocumentHandler(
     ITaskCompleter taskCompleter,
     IClock clock,
     IAuditEventPublisher auditPublisher,
-    IBackgroundJobClient backgroundJobClient)
+    IBackgroundJobClient backgroundJobClient,
+    ILogger<UploadRequestedDocumentHandler>? logger = null)
 {
     public async Task<Result<UploadRequestedDocumentResponse>> HandleAsync(
         UploadRequestedDocumentRequest request,
@@ -111,7 +113,8 @@ internal sealed class UploadRequestedDocumentHandler(
         }
         catch
         {
-            try { await storage.DeleteAsync(storageKey, cancellationToken); } catch { }
+            await StorageCleanup.TryDeleteAsync(
+                storage, logger, "UploadRequestedDocument", storageKey, request.CompanyId, document.Id);
             throw;
         }
 

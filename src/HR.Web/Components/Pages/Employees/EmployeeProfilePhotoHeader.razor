@@ -1,3 +1,4 @@
+@using HR.SharedKernel.Http
 @inject ProfilePhotoService ProfilePhotoService
 @implements IDisposable
 
@@ -55,7 +56,9 @@
 
 <UploadProfilePhotoDialog IsOpen="_dialogOpen"
                            Title="Upload / Replace Profile Photo"
-                           UploadFunc="@((file, ct) => ProfilePhotoService.UploadEmployeeProfilePhotoAsync(CompanyId, EmployeeId, file, ct))"
+                           UploadFunc="@(async (file, ct) => ApiFailurePresenter.ErrorOrNull(
+                               await ProfilePhotoService.UploadEmployeeProfilePhotoAsync(CompanyId, EmployeeId, file, ct),
+                               "upload this photo"))"
                            OnSaved="HandleUploaded"
                            OnCancelled="CloseDialog" />
 
@@ -85,14 +88,34 @@
     private async Task LoadPendingAsync()
     {
         _loading = true;
-        _pending = await ProfilePhotoService.GetPendingProfilePhotoAsync(CompanyId, EmployeeId);
+        var result = await ProfilePhotoService.GetPendingProfilePhotoAsync(CompanyId, EmployeeId);
+        if (result.Success)
+            _pending = result.Value;
+        else if (result.FailureKind == ApiFailureKind.NotFound)
+            _pending = null; // no pending submission
+        else
+            _error = ApiFailurePresenter.Message(result, "load the pending photo");
         _loading = false;
     }
 
-    private async Task LoadCurrentPhotoAsync()
+    // Returns false when the lookup itself failed (as opposed to "there is no photo yet").
+    private async Task<bool> LoadCurrentPhotoAsync()
     {
         var current = await ProfilePhotoService.GetEmployeeProfilePhotoAsync(CompanyId, EmployeeId);
-        _currentPhotoUrl = current?.DownloadUrl;
+        if (current.Success)
+        {
+            _currentPhotoUrl = current.Value?.DownloadUrl;
+            return true;
+        }
+
+        if (current.FailureKind == ApiFailureKind.NotFound)
+        {
+            _currentPhotoUrl = null;
+            return true;
+        }
+
+        _error = ApiFailurePresenter.Message(current, "load the current photo");
+        return false;
     }
 
     private void OpenUploadDialog()
@@ -121,8 +144,7 @@
         {
             while (!_disposeCts.IsCancellationRequested && DateTime.UtcNow - started < TimeSpan.FromMinutes(2))
             {
-                await LoadCurrentPhotoAsync();
-                if (_currentPhotoUrl is not null)
+                if (!await LoadCurrentPhotoAsync() || _currentPhotoUrl is not null)
                     return;
 
                 var delay = DateTime.UtcNow - started < TimeSpan.FromSeconds(20)
@@ -148,7 +170,8 @@
         _error = null;
         StateHasChanged();
 
-        var error = await ProfilePhotoService.ApproveProfilePhotoAsync(CompanyId, EmployeeId);
+        var error = ApiFailurePresenter.ErrorOrNull(
+            await ProfilePhotoService.ApproveProfilePhotoAsync(CompanyId, EmployeeId), "approve this photo");
         if (error is not null)
             _error = error;
 
@@ -166,7 +189,8 @@
         _error = null;
         StateHasChanged();
 
-        var error = await ProfilePhotoService.RejectProfilePhotoAsync(CompanyId, EmployeeId, _rejectReason);
+        var error = ApiFailurePresenter.ErrorOrNull(
+            await ProfilePhotoService.RejectProfilePhotoAsync(CompanyId, EmployeeId, _rejectReason), "reject this photo");
         if (error is not null)
             _error = error;
 

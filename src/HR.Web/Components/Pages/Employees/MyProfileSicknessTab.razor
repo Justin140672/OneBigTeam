@@ -6,6 +6,7 @@
 }
 else
 {
+    <ApiFailureAlert Failure="_failure" OnRetry="ReloadAsync" />
     <div class="mb-4">
         <SfButton IsPrimary="true" OnClick="@(() => _showRecordDialog = true)">Notify Sickness</SfButton>
     </div>
@@ -65,23 +66,34 @@ else
     private bool _loading = true;
     private bool _showRecordDialog;
     private List<SicknessRecordListItemModel> _records = [];
+    private ApiFailurePresentation? _failure;
 
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
-
-        var response = await SicknessService.GetMySicknessRecordsAsync(CompanyId, EmployeeId);
-        _records = response?.Records ?? [];
-
+        await ReloadAsync();
         _loading = false;
     }
 
     private async Task OnRecordedAsync()
     {
         _showRecordDialog = false;
+        await ReloadAsync();
+    }
 
+    private async Task ReloadAsync()
+    {
         var response = await SicknessService.GetMySicknessRecordsAsync(CompanyId, EmployeeId);
-        _records = response?.Records ?? [];
+        if (response.Success)
+        {
+            _failure = null;
+            _records = response.Value?.Records ?? [];
+        }
+        else
+        {
+            // Keep any previously loaded rows rather than presenting a failure as "No sickness records yet."
+            _failure = ApiFailurePresenter.Present(response, "load your sickness records");
+        }
     }
 
     private static string FormatDate(DateOnly date, string part) =>

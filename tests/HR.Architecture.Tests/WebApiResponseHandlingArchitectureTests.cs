@@ -85,13 +85,8 @@ public class WebApiResponseHandlingArchitectureTests
 
     private static readonly string[] BaselineBroadCatchFiles =
     [
-        "src/HR.Admin.Web/Services/SupportRequestAdminService.cs",
-        "src/HR.Web/Services/DataImportService.cs",
         "src/HR.Web/Services/DocumentService.cs",
         "src/HR.Web/Services/EmployeeService.cs",
-        "src/HR.Web/Services/NotificationService.cs",
-        "src/HR.Web/Services/ProfilePhotoService.cs",
-        "src/HR.Web/Services/SicknessService.cs",
         "src/HR.Web/Services/TaskService.cs",
         "src/HR.Web/Services/ApplicationService.cs",
         "src/HR.Web/Services/AppSession.cs",
@@ -144,6 +139,25 @@ public class WebApiResponseHandlingArchitectureTests
             "specific exception types you need) instead so cancellation propagates and network failures " +
             "are distinguishable from a genuine empty result:" +
             Environment.NewLine + string.Join(Environment.NewLine, newViolations));
+    }
+
+    [Fact]
+    public void Documents_Handlers_Do_Not_Silently_Swallow_Storage_Deletion_Failures()
+    {
+        // Ticket 3 (P1): compensating storage deletion must go through StorageCleanup.TryDeleteAsync, which
+        // logs the failure with identifiers of the orphaned object instead of discarding it.
+        var featuresDir = Path.Combine(FindRepoRoot(), "src", "Modules", "HR.Modules.Documents", "Features");
+        Assert.True(Directory.Exists(featuresDir), "Documents Features directory not found.");
+
+        var offenders = Directory.EnumerateFiles(featuresDir, "Handler.cs", SearchOption.AllDirectories)
+            .Where(path => System.Text.RegularExpressions.Regex.IsMatch(
+                File.ReadAllText(path), @"DeleteAsync\([^;]*\);\s*\}\s*catch\s*\{\s*\}"))
+            .Select(path => Path.GetRelativePath(featuresDir, path).Replace('\\', '/'))
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            "Handlers swallow storage deletion failures with 'catch { }'. Use StorageCleanup.TryDeleteAsync:" +
+            Environment.NewLine + string.Join(Environment.NewLine, offenders));
     }
 
     private static List<(string RelativePath, string Text)> EnumerateServiceFiles(string repoRoot)

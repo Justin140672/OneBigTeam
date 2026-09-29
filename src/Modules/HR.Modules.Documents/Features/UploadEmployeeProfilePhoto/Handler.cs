@@ -6,6 +6,7 @@ using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Documents.Features.UploadEmployeeProfilePhoto;
 
@@ -15,7 +16,8 @@ internal sealed class UploadEmployeeProfilePhotoHandler(
     IImageUploadValidator imageValidator,
     IClock clock,
     IAuditEventPublisher auditPublisher,
-    IBackgroundJobClient backgroundJobClient)
+    IBackgroundJobClient backgroundJobClient,
+    ILogger<UploadEmployeeProfilePhotoHandler>? logger = null)
 {
     public async Task<Result<UploadEmployeeProfilePhotoResponse>> HandleAsync(
         UploadEmployeeProfilePhotoRequest request,
@@ -81,13 +83,15 @@ internal sealed class UploadEmployeeProfilePhotoHandler(
         }
         catch
         {
-            try { await storage.DeleteAsync(storageKey, cancellationToken); } catch { }
+            await StorageCleanup.TryDeleteAsync(
+                storage, logger, "UploadEmployeeProfilePhoto", storageKey, request.CompanyId, photo.Id);
             throw;
         }
 
         if (oldStorageKey is not null)
         {
-            try { await storage.DeleteAsync(oldStorageKey, cancellationToken); } catch { }
+            await StorageCleanup.TryDeleteAsync(
+                storage, logger, "UploadEmployeeProfilePhoto.ReplacedPhoto", oldStorageKey, request.CompanyId, photo.Id);
         }
 
         await auditPublisher.PublishAsync(new ProfilePhotoUploadedAuditEvent(

@@ -125,11 +125,11 @@
             Model.AlreadyEnded ? Model.EndDayPart : null,
             Model.Notes);
 
-        var (success, error) = SelfService
+        var result = SelfService
             ? await SicknessService.RecordMySicknessAsync(CompanyId, EmployeeId, request)
             : await SicknessService.RecordSicknessAsync(CompanyId, EmployeeId, request);
 
-        return success ? null : error;
+        return result.Success ? null : ApiFailurePresenter.Message(result, "record this sickness");
     }
 
     protected override void ResetForm()

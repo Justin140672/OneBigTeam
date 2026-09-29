@@ -1,7 +1,5 @@
-using System.Net;
-using System.Net.Http.Json;
-using System.Text.Json;
 using HR.Admin.Web.Models;
+using HR.SharedKernel.Http;
 
 namespace HR.Admin.Web.Services;
 
@@ -13,52 +11,54 @@ namespace HR.Admin.Web.Services;
 // UpdateSupportRequestStatus/AdminEndpoint.cs and ListSupportRequests/AdminEndpoint.cs, which reuse
 // the exact same handlers as the tenant routes so query/transition/concurrency/notification
 // behaviour is identical, only the authorization gate differs.
-public sealed class SupportRequestAdminService(HrApiHttpClientFactory httpClientFactory)
+//
+// Ticket 3 (P1): responses are read through the shared ApiResponseReader, so network failures, 5xx
+// responses and malformed/empty bodies surface as SupportRequestFetchOutcome.Failed (never as an empty
+// or "not found" result), and caller cancellation propagates instead of being swallowed.
+public sealed class SupportRequestAdminService(
+    HrApiHttpClientFactory httpClientFactory,
+    ILogger<SupportRequestAdminService>? logger = null)
 {
     private HttpClient Http => httpClientFactory.CreateClient();
 
     public async Task<SupportRequestListFetchResult> ListSupportRequestsAsync(
         Guid companyId, string? status = null, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var url = $"api/admin/companies/{companyId}/support/requests";
-            if (!string.IsNullOrWhiteSpace(status))
-                url += $"?status={Uri.EscapeDataString(status)}";
+        var url = $"api/admin/companies/{companyId}/support/requests";
+        if (!string.IsNullOrWhiteSpace(status))
+            url += $"?status={Uri.EscapeDataString(status)}";
 
-            var response = await Http.GetAsync(url, cancellationToken);
-            if (response.IsSuccessStatusCode)
-            {
-                var items = await response.Content.ReadFromJsonAsync<List<SupportRequestListItem>>(cancellationToken: cancellationToken);
-                return new SupportRequestListFetchResult(SupportRequestFetchOutcome.Success, items ?? []);
-            }
+        var result = await ApiResponseReader.ExecuteAsync<List<SupportRequestListItem>>(
+            ct => Http.GetAsync(url, ct), cancellationToken: cancellationToken);
+        result.LogFailure(logger, "SupportRequests.List");
 
-            return new SupportRequestListFetchResult(MapFailureOutcome(response.StatusCode), null);
-        }
-        catch (HttpRequestException)
+        // A 200 with an empty JSON array is a genuine empty list; a 200 with a null body is malformed.
+        if (result.Success)
         {
-            return new SupportRequestListFetchResult(SupportRequestFetchOutcome.Failed, null);
+            return result.Value is null
+                ? new SupportRequestListFetchResult(SupportRequestFetchOutcome.Failed, null)
+                : new SupportRequestListFetchResult(SupportRequestFetchOutcome.Success, result.Value);
         }
+
+        return new SupportRequestListFetchResult(MapFailureOutcome(result.FailureKind), null);
     }
 
     public async Task<SupportRequestDetailFetchResult> GetSupportRequestAsync(
         Guid companyId, Guid id, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await Http.GetAsync($"api/admin/companies/{companyId}/support/requests/{id}", cancellationToken);
-            if (response.IsSuccessStatusCode)
-            {
-                var detail = await response.Content.ReadFromJsonAsync<SupportRequestDetailModel>(cancellationToken: cancellationToken);
-                return new SupportRequestDetailFetchResult(SupportRequestFetchOutcome.Success, detail);
-            }
+        var result = await ApiResponseReader.ExecuteAsync<SupportRequestDetailModel>(
+            ct => Http.GetAsync($"api/admin/companies/{companyId}/support/requests/{id}", ct),
+            cancellationToken: cancellationToken);
+        result.LogFailure(logger, "SupportRequests.Get");
 
-            return new SupportRequestDetailFetchResult(MapFailureOutcome(response.StatusCode), null);
-        }
-        catch (HttpRequestException)
+        if (result.Success)
         {
-            return new SupportRequestDetailFetchResult(SupportRequestFetchOutcome.Failed, null);
+            return result.Value is null
+                ? new SupportRequestDetailFetchResult(SupportRequestFetchOutcome.Failed, null)
+                : new SupportRequestDetailFetchResult(SupportRequestFetchOutcome.Success, result.Value);
         }
+
+        return new SupportRequestDetailFetchResult(MapFailureOutcome(result.FailureKind), null);
     }
 
     /// <summary>
@@ -66,69 +66,56 @@ public sealed class SupportRequestAdminService(HrApiHttpClientFactory httpClient
     /// Distinguishes HTTP 409 (stale <paramref name="expectedVersion"/> — caller must show the
     /// conflict banner and not overwrite local state until the user explicitly reloads) from every
     /// other failure (network error, 403 not an enabled platform administrator, 404, 422
-    /// validation, etc. — caller shows one generic error message). See
-    /// UpdateSupportRequestStatus/AdminEndpoint.cs and ProblemResults.FromError for the exact
+    /// validation, etc. — caller shows one safe error message). A failed call never reports Success.
+    /// See UpdateSupportRequestStatus/AdminEndpoint.cs and ProblemResults.FromError for the exact
     /// `{ error, code }` 409 body shape this reads.
     /// </summary>
     public async Task<SupportRequestStatusUpdateResult> UpdateStatusAsync(
         Guid companyId, Guid id, string status, int? expectedVersion, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await Http.PutAsJsonAsync(
+        var result = await ApiResponseReader.ExecuteAsync<UpdateSupportRequestStatusResponse>(
+            ct => Http.PutAsJsonAsync(
                 $"api/admin/companies/{companyId}/support/requests/{id}/status",
                 new UpdateSupportRequestStatusRequest(companyId, id, status, expectedVersion),
-                cancellationToken);
+                ct),
+            cancellationToken: cancellationToken);
+        result.LogFailure(logger, "SupportRequests.UpdateStatus");
 
-            if (response.IsSuccessStatusCode)
-            {
-                var result = await response.Content.ReadFromJsonAsync<UpdateSupportRequestStatusResponse>(cancellationToken: cancellationToken);
-                return new SupportRequestStatusUpdateResult(SupportRequestStatusUpdateOutcome.Success, result, null);
-            }
-
-            if (response.StatusCode == HttpStatusCode.Conflict)
-            {
-                var errorMessage = await ReadErrorAsync(response, cancellationToken);
-                return new SupportRequestStatusUpdateResult(SupportRequestStatusUpdateOutcome.Conflict, null, errorMessage);
-            }
-
-            return new SupportRequestStatusUpdateResult(
-                SupportRequestStatusUpdateOutcome.Failed,
-                null,
-                await ReadErrorAsync(response, cancellationToken) ?? DescribeFailure(response.StatusCode));
-        }
-        catch (HttpRequestException ex)
+        if (result.Success)
         {
-            return new SupportRequestStatusUpdateResult(SupportRequestStatusUpdateOutcome.Failed, null, ex.Message);
+            return result.Value is null
+                ? new SupportRequestStatusUpdateResult(
+                    SupportRequestStatusUpdateOutcome.Failed, null, DescribeFailure(ApiFailureKind.InvalidResponse, null))
+                : new SupportRequestStatusUpdateResult(SupportRequestStatusUpdateOutcome.Success, result.Value, null);
         }
+
+        // 409 in either flavour (explicit concurrency code or a plain conflict) is the stale-version case.
+        if (result.FailureKind is ApiFailureKind.Concurrency or ApiFailureKind.Conflict)
+        {
+            return new SupportRequestStatusUpdateResult(
+                SupportRequestStatusUpdateOutcome.Conflict, null, result.DisplayMessage);
+        }
+
+        return new SupportRequestStatusUpdateResult(
+            SupportRequestStatusUpdateOutcome.Failed, null, DescribeFailure(result.FailureKind, result.DisplayMessage));
     }
 
-    private static SupportRequestFetchOutcome MapFailureOutcome(HttpStatusCode statusCode) => statusCode switch
+    private static SupportRequestFetchOutcome MapFailureOutcome(ApiFailureKind kind) => kind switch
     {
-        HttpStatusCode.Unauthorized => SupportRequestFetchOutcome.Unauthenticated,
-        HttpStatusCode.Forbidden => SupportRequestFetchOutcome.NotAnEnabledPlatformAdministrator,
-        HttpStatusCode.NotFound => SupportRequestFetchOutcome.NotFound,
+        ApiFailureKind.Unauthenticated => SupportRequestFetchOutcome.Unauthenticated,
+        ApiFailureKind.Forbidden => SupportRequestFetchOutcome.NotAnEnabledPlatformAdministrator,
+        ApiFailureKind.NotFound => SupportRequestFetchOutcome.NotFound,
         _ => SupportRequestFetchOutcome.Failed,
     };
 
-    private static string DescribeFailure(HttpStatusCode statusCode) => statusCode switch
+    // Only API-authored validation text is passed through; every other kind gets a fixed, safe message
+    // (never raw exception or response-body text).
+    private static string DescribeFailure(ApiFailureKind kind, string? apiMessage) => kind switch
     {
-        HttpStatusCode.Unauthorized => "You are not signed in. Please sign in again.",
-        HttpStatusCode.Forbidden => "You are not an enabled platform administrator, so you cannot perform this action.",
-        HttpStatusCode.NotFound => "The support request could not be found.",
+        ApiFailureKind.Unauthenticated => "You are not signed in. Please sign in again.",
+        ApiFailureKind.Forbidden => "You are not an enabled platform administrator, so you cannot perform this action.",
+        ApiFailureKind.NotFound => "The support request could not be found.",
+        ApiFailureKind.Validation when !string.IsNullOrWhiteSpace(apiMessage) => apiMessage,
         _ => "A temporary error occurred. Please try again.",
     };
-
-    private static async Task<string?> ReadErrorAsync(HttpResponseMessage response, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-            if (body.TryGetProperty("error", out var errorProp))
-                return errorProp.GetString();
-        }
-        catch { }
-
-        return null;
-    }
 }

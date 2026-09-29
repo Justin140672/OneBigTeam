@@ -182,4 +182,161 @@ public class SupportRequestAdminServiceTests
         Assert.Equal(SupportRequestStatusUpdateOutcome.Failed, result.Outcome);
         Assert.NotEqual(SupportRequestStatusUpdateOutcome.Conflict, result.Outcome);
     }
+
+    // ---- Ticket 3: failures are never represented as empty/not-found data; cancellation propagates ----
+
+    [Fact]
+    public async Task ListSupportRequestsAsync_Success_With_Empty_Array_Is_A_Successful_Empty_List()
+    {
+        var (service, handler) = BuildService();
+        handler.OnSend = _ => Task.FromResult(
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = JsonContent.Create(Array.Empty<SupportRequestListItem>()) });
+
+        var result = await service.ListSupportRequestsAsync(Guid.NewGuid());
+
+        Assert.Equal(SupportRequestFetchOutcome.Success, result.Outcome);
+        Assert.NotNull(result.Items);
+        Assert.Empty(result.Items!);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized, SupportRequestFetchOutcome.Unauthenticated)]
+    [InlineData(HttpStatusCode.Forbidden, SupportRequestFetchOutcome.NotAnEnabledPlatformAdministrator)]
+    [InlineData(HttpStatusCode.NotFound, SupportRequestFetchOutcome.NotFound)]
+    [InlineData(HttpStatusCode.InternalServerError, SupportRequestFetchOutcome.Failed)]
+    [InlineData(HttpStatusCode.BadGateway, SupportRequestFetchOutcome.Failed)]
+    public async Task ListSupportRequestsAsync_Maps_Each_Failure_Distinctly_And_Returns_No_Items(
+        HttpStatusCode status, SupportRequestFetchOutcome expected)
+    {
+        var (service, handler) = BuildService();
+        handler.OnSend = _ => Task.FromResult(new HttpResponseMessage(status));
+
+        var result = await service.ListSupportRequestsAsync(Guid.NewGuid());
+
+        Assert.Equal(expected, result.Outcome);
+        Assert.Null(result.Items);
+    }
+
+    [Fact]
+    public async Task ListSupportRequestsAsync_Network_Failure_Is_Failed_Not_Empty()
+    {
+        var (service, handler) = BuildService();
+        handler.OnSend = _ => throw new HttpRequestException("connection refused");
+
+        var result = await service.ListSupportRequestsAsync(Guid.NewGuid());
+
+        Assert.Equal(SupportRequestFetchOutcome.Failed, result.Outcome);
+        Assert.Null(result.Items);
+    }
+
+    [Theory]
+    [InlineData("{ not json")]
+    [InlineData("")]
+    [InlineData("null")]
+    public async Task Fetches_Treat_A_200_With_Malformed_Empty_Or_Null_Body_As_Failed(string body)
+    {
+        var (service, handler) = BuildService();
+        handler.OnSend = _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json"),
+        });
+
+        var list = await service.ListSupportRequestsAsync(Guid.NewGuid());
+        var detail = await service.GetSupportRequestAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.Equal(SupportRequestFetchOutcome.Failed, list.Outcome);
+        Assert.Equal(SupportRequestFetchOutcome.Failed, detail.Outcome);
+        Assert.Null(list.Items);
+        Assert.Null(detail.Detail);
+    }
+
+    [Fact]
+    public async Task GetSupportRequestAsync_Server_Error_Is_Failed_Not_NotFound()
+    {
+        var (service, handler) = BuildService();
+        handler.OnSend = _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError));
+
+        var result = await service.GetSupportRequestAsync(Guid.NewGuid(), Guid.NewGuid());
+
+        Assert.Equal(SupportRequestFetchOutcome.Failed, result.Outcome);
+    }
+
+    [Fact]
+    public async Task Reads_And_Writes_Propagate_Caller_Cancellation()
+    {
+        var (service, handler) = BuildService();
+        handler.OnSend = _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            service.ListSupportRequestsAsync(Guid.NewGuid(), cancellationToken: cts.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            service.GetSupportRequestAsync(Guid.NewGuid(), Guid.NewGuid(), cts.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            service.UpdateStatusAsync(Guid.NewGuid(), Guid.NewGuid(), "Planned", 1, cts.Token));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized)]
+    [InlineData(HttpStatusCode.NotFound)]
+    [InlineData(HttpStatusCode.InternalServerError)]
+    public async Task UpdateStatusAsync_Failure_Is_Never_Success_And_Message_Is_Safe(HttpStatusCode status)
+    {
+        var (service, handler) = BuildService();
+        handler.OnSend = _ => Task.FromResult(new HttpResponseMessage(status)
+        {
+            Content = JsonContent.Create(new { error = "System.Exception: SELECT * FROM secrets" }),
+        });
+
+        var result = await service.UpdateStatusAsync(Guid.NewGuid(), Guid.NewGuid(), "Planned", 1);
+
+        Assert.Equal(SupportRequestStatusUpdateOutcome.Failed, result.Outcome);
+        Assert.Null(result.Response);
+        Assert.False(string.IsNullOrWhiteSpace(result.ErrorMessage));
+        Assert.DoesNotContain("secrets", result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_Network_Failure_Is_Failed_With_Retryable_Message()
+    {
+        var (service, handler) = BuildService();
+        handler.OnSend = _ => throw new HttpRequestException("boom with internal host name db-01");
+
+        var result = await service.UpdateStatusAsync(Guid.NewGuid(), Guid.NewGuid(), "Planned", 1);
+
+        Assert.Equal(SupportRequestStatusUpdateOutcome.Failed, result.Outcome);
+        Assert.DoesNotContain("db-01", result.ErrorMessage);
+        Assert.Contains("try again", result.ErrorMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_Validation_Failure_Passes_Through_Api_Message()
+    {
+        var (service, handler) = BuildService();
+        handler.OnSend = _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.UnprocessableEntity)
+        {
+            Content = JsonContent.Create(new { error = "Cannot move a closed request back to Submitted." }),
+        });
+
+        var result = await service.UpdateStatusAsync(Guid.NewGuid(), Guid.NewGuid(), "Submitted", 1);
+
+        Assert.Equal(SupportRequestStatusUpdateOutcome.Failed, result.Outcome);
+        Assert.Equal("Cannot move a closed request back to Submitted.", result.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task UpdateStatusAsync_Malformed_Success_Body_Is_Not_Reported_As_Success()
+    {
+        var (service, handler) = BuildService();
+        handler.OnSend = _ => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{ nope", System.Text.Encoding.UTF8, "application/json"),
+        });
+
+        var result = await service.UpdateStatusAsync(Guid.NewGuid(), Guid.NewGuid(), "Planned", 1);
+
+        Assert.Equal(SupportRequestStatusUpdateOutcome.Failed, result.Outcome);
+        Assert.Null(result.Response);
+    }
 }

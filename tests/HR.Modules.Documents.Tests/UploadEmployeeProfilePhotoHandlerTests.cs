@@ -23,13 +23,15 @@ public class UploadEmployeeProfilePhotoHandlerTests
         FakeProfilePhotoStorageService? storage = null,
         ImageUploadOptions? options = null,
         FakeAuditPublisher? auditPublisher = null,
-        Hangfire.IBackgroundJobClient? backgroundJobClient = null) =>
+        Hangfire.IBackgroundJobClient? backgroundJobClient = null,
+        Microsoft.Extensions.Logging.ILogger<UploadEmployeeProfilePhotoHandler>? logger = null) =>
         new(db,
             storage ?? new FakeProfilePhotoStorageService(),
             new ImageUploadValidator(Options.Create(options ?? new ImageUploadOptions())),
             new FakeClock(FixedUtcNow),
             auditPublisher ?? new FakeAuditPublisher(),
-            backgroundJobClient ?? new NoOpBackgroundJobClient());
+            backgroundJobClient ?? new NoOpBackgroundJobClient(),
+            logger);
 
     private static IFormFile FakePngFile(
         string fileName = "avatar.png",
@@ -357,6 +359,32 @@ public class UploadEmployeeProfilePhotoHandlerTests
         Assert.Single(storage.Uploads);
         Assert.Single(storage.Deletions);
         Assert.Equal(storage.Uploads[0].StorageKey, storage.Deletions[0]);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Rethrows_Original_Db_Failure_And_Logs_Orphan_When_Compensating_Delete_Also_Fails()
+    {
+        var storage    = new FakeProfilePhotoStorageService { ThrowOnDelete = true };
+        var logger     = new FakeLogger<UploadEmployeeProfilePhotoHandler>();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        var options = new DbContextOptionsBuilder<DocumentsDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
+            .Options;
+        await using var db = new ThrowingDocumentsDbContext(options);
+
+        var handler = BuildHandler(db, storage, logger: logger);
+
+        // The original database failure must surface, not the cleanup exception.
+        var ex = await Assert.ThrowsAsync<DbUpdateException>(() =>
+            handler.HandleAsync(BuildRequest(companyId, employeeId), employeeId, CancellationToken.None));
+
+        Assert.Equal("Simulated database failure.", ex.Message);
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Error, entry.Level);
+        Assert.Contains(storage.Uploads[0].StorageKey, entry.Message);
+        Assert.Contains(companyId.ToString(), entry.Message);
     }
 
     private sealed class ThrowingDocumentsDbContext(DbContextOptions<DocumentsDbContext> options)

@@ -7,6 +7,7 @@ using HR.Modules.Documents.Services;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Documents.Features.UploadEmployeeDocumentVersion;
 
@@ -18,7 +19,8 @@ internal sealed class UploadEmployeeDocumentVersionHandler(
     IClock clock,
     IAuditEventPublisher auditPublisher,
     IIntegrationEventPublisher integrationEventPublisher,
-    IBackgroundJobClient backgroundJobClient)
+    IBackgroundJobClient backgroundJobClient,
+    ILogger<UploadEmployeeDocumentVersionHandler>? logger = null)
 {
     public async Task<Result<UploadEmployeeDocumentVersionResponse>> HandleAsync(
         UploadEmployeeDocumentVersionRequest request,
@@ -130,7 +132,8 @@ internal sealed class UploadEmployeeDocumentVersionHandler(
         }
         catch
         {
-            try { await storage.DeleteAsync(storageKey, cancellationToken); } catch { }
+            await StorageCleanup.TryDeleteAsync(
+                storage, logger, "UploadEmployeeDocumentVersion", storageKey, request.CompanyId, newDocument.Id);
             throw;
         }
 

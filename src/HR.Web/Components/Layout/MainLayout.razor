@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
 @implements IDisposable
 @using HR.Web.Components.Pages.Tasks
+@using HR.SharedKernel.Http
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JS
 @inject AppSession Session
@@ -195,6 +196,16 @@ else
                                         {
                                             <div class="notif-loading">Loading…</div>
                                         }
+                                        else if (_notifError is not null && _notifications.Count == 0)
+                                        {
+                                            <div class="notif-empty" role="alert" data-testid="notif-error">
+                                                @_notifError.Message
+                                                @if (_notifError.IsRetryable)
+                                                {
+                                                    <button class="notif-load-more" @onclick="LoadNotificationsAsync" data-testid="notif-retry">Try again</button>
+                                                }
+                                            </div>
+                                        }
                                         else if (_notifications.Count == 0)
                                         {
                                             <div class="notif-empty">No notifications</div>
@@ -227,6 +238,10 @@ else
                                             }
                                         }
                                     </div>
+                                    @if (_notifError is not null && _notifications.Count > 0)
+                                    {
+                                        <div class="notif-empty" role="alert" data-testid="notif-error">@_notifError.Message</div>
+                                    }
                                     @if (_notifications.Count > 0 && _notifHasMore)
                                     {
                                         <div class="notif-footer">
@@ -340,6 +355,7 @@ else
     private int _notifPageNumber = 1;
     private bool _notifHasMore;
     private bool _notifLoadingMore;
+    private ApiFailurePresentation? _notifError;
 
     private IReadOnlyList<DevPersonaDto> _personas = [];
     private List<PersonaOption> _personaOptions = [];
@@ -441,15 +457,13 @@ else
     private async Task LoadUnreadCountAsync()
     {
         if (!Session.EmployeeId.HasValue) return;
-        try
-        {
-            _unreadCount = await NotificationService.GetUnreadCountAsync(Session.CompanyId);
-        }
-        catch
-        {
-            // Badge count is best-effort — a failed/timed-out fetch must not crash the layout.
-            _unreadCount = 0;
-        }
+
+        // The badge is a passive, polled indicator: a failed fetch keeps the last known count rather than
+        // showing a misleading "0" or interrupting the user (the service already logs operational failures).
+        // Cancellation (circuit teardown) propagates.
+        var result = await NotificationService.GetUnreadCountAsync(Session.CompanyId);
+        if (result.Success)
+            _unreadCount = result.Value;
     }
 
     private async Task LoadNotificationsAsync()
@@ -460,10 +474,18 @@ else
         try
         {
             var result = await NotificationService.GetAsync(Session.CompanyId, _notifPageNumber, NotifPageSize);
-            if (result is null) return;
-            _unreadCount = result.UnreadCount;
-            _notifications = result.Items;
-            _notifHasMore = result.PageNumber < result.TotalPages;
+            if (!result.Success || result.Value is null)
+            {
+                _notifError = ApiFailurePresenter.Present(
+                    result.Success ? ApiResult<NotificationsResponse>.Fail(ApiFailureKind.InvalidResponse, null) : result,
+                    "load your notifications");
+                return;
+            }
+
+            _notifError = null;
+            _unreadCount = result.Value.UnreadCount;
+            _notifications = result.Value.Items;
+            _notifHasMore = result.Value.PageNumber < result.Value.TotalPages;
         }
         finally
         {
@@ -480,12 +502,19 @@ else
         {
             var nextPage = _notifPageNumber + 1;
             var result = await NotificationService.GetAsync(Session.CompanyId, nextPage, NotifPageSize);
-            if (result is null) return;
+            if (!result.Success || result.Value is null)
+            {
+                _notifError = ApiFailurePresenter.Present(
+                    result.Success ? ApiResult<NotificationsResponse>.Fail(ApiFailureKind.InvalidResponse, null) : result,
+                    "load more notifications");
+                return;
+            }
 
+            _notifError = null;
             _notifPageNumber = nextPage;
-            _unreadCount = result.UnreadCount;
-            _notifications.AddRange(result.Items);
-            _notifHasMore = result.PageNumber < result.TotalPages;
+            _unreadCount = result.Value.UnreadCount;
+            _notifications.AddRange(result.Value.Items);
+            _notifHasMore = result.Value.PageNumber < result.Value.TotalPages;
         }
         finally
         {
@@ -548,11 +577,22 @@ else
         _notifOpen = false;
         if (!notification.IsRead)
         {
-            await NotificationService.MarkReadAsync(Session.CompanyId, notification.Id);
-            _unreadCount = Math.Max(0, _unreadCount - 1);
-            var idx = _notifications.IndexOf(notification);
-            if (idx >= 0)
-                _notifications[idx] = notification with { IsRead = true };
+            var markResult = await NotificationService.MarkReadAsync(Session.CompanyId, notification.Id);
+            if (markResult.Success)
+            {
+                _notifError = null;
+                _unreadCount = Math.Max(0, _unreadCount - 1);
+                var idx = _notifications.IndexOf(notification);
+                if (idx >= 0)
+                    _notifications[idx] = notification with { IsRead = true };
+            }
+            else
+            {
+                // Do not pretend it was marked read: leave it unread and keep the panel open with the
+                // reason. The user can still reach the linked item below.
+                _notifError = ApiFailurePresenter.Present(markResult, "mark this notification as read");
+                _notifOpen = true;
+            }
         }
 
         if (TaskBackedNotificationTypes.Contains(notification.Type))
@@ -577,7 +617,14 @@ else
     private async Task MarkAllRead()
     {
         if (!Session.EmployeeId.HasValue) return;
-        await NotificationService.MarkAllReadAsync(Session.CompanyId, Session.EmployeeId.Value);
+        var markAllResult = await NotificationService.MarkAllReadAsync(Session.CompanyId, Session.EmployeeId.Value);
+        if (!markAllResult.Success)
+        {
+            _notifError = ApiFailurePresenter.Present(markAllResult, "mark your notifications as read");
+            return;
+        }
+
+        _notifError = null;
         _unreadCount = 0;
         _notifications = _notifications.Select(n => n with { IsRead = true }).ToList();
     }

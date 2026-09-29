@@ -28,6 +28,11 @@ public static class ApiResponseReader
             {
                 return ApiResult<T>.Fail(ApiFailureKind.InvalidResponse, "The server returned an unreadable response.");
             }
+            catch (NotSupportedException)
+            {
+                // Non-JSON content type (e.g. an HTML page from an intermediary) on a 2xx response.
+                return ApiResult<T>.Fail(ApiFailureKind.InvalidResponse, "The server returned an unreadable response.");
+            }
         }
 
         return await ReadFailureAsync<T>(response, cancellationToken);
@@ -162,6 +167,67 @@ public static class ApiResponseReader
         }
     }
 
+    /// <summary>
+    /// Sends a request expected to return a file (CSV/XLSX download). Failures use the same
+    /// classification as JSON calls. A missing/odd Content-Disposition is tolerated silently and the
+    /// <paramref name="fallbackFileName"/> is used; only the base name is ever returned.
+    /// </summary>
+    public static async Task<ApiResult<ApiFile>> ExecuteFileAsync(
+        Func<CancellationToken, Task<HttpResponseMessage>> send,
+        string fallbackFileName,
+        CancellationToken cancellationToken = default)
+    {
+        HttpResponseMessage response;
+        try
+        {
+            response = await send(cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (HttpRequestException)
+        {
+            return ApiResult<ApiFile>.Fail(ApiFailureKind.Network, "Unable to reach the server. Please check your connection and try again.");
+        }
+        catch (OperationCanceledException)
+        {
+            return ApiResult<ApiFile>.Fail(ApiFailureKind.Network, "The request timed out. Please try again.");
+        }
+
+        using (response)
+        {
+            if (!response.IsSuccessStatusCode)
+                return await ReadFailureAsync<ApiFile>(response, cancellationToken);
+
+            try
+            {
+                var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
+                var disposition = response.Content.Headers.ContentDisposition;
+                var rawName = disposition?.FileNameStar ?? disposition?.FileName;
+                var fileName = string.IsNullOrWhiteSpace(rawName)
+                    ? fallbackFileName
+                    : Path.GetFileName(rawName.Trim().Trim('"'));
+                if (string.IsNullOrWhiteSpace(fileName))
+                    fileName = fallbackFileName;
+
+                return ApiResult<ApiFile>.Ok(new ApiFile(bytes, fileName));
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (HttpRequestException)
+            {
+                return ApiResult<ApiFile>.Fail(ApiFailureKind.Network, "The download was interrupted. Please try again.");
+            }
+            catch (IOException)
+            {
+                return ApiResult<ApiFile>.Fail(ApiFailureKind.Network, "The download was interrupted. Please try again.");
+            }
+        }
+    }
+
     private static T? TryDeserialize<T>(string json) where T : class
     {
         if (string.IsNullOrWhiteSpace(json)) return null;
@@ -177,6 +243,8 @@ public static class ApiResponseReader
 
     private static readonly JsonSerializerOptions DefaultJsonOptions = new(JsonSerializerDefaults.Web);
 }
+
+public sealed record ApiFile(byte[] Bytes, string FileName);
 
 public readonly struct Unit
 {

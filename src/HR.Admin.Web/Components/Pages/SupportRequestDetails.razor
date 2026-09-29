@@ -22,13 +22,16 @@ else if (_outcome == SupportRequestFetchOutcome.NotAnEnabledPlatformAdministrato
         You are not an enabled platform administrator, so you cannot view this support request.
     </div>
 }
+else if (_outcome == SupportRequestFetchOutcome.Failed)
+{
+    <div class="dashboard-error" role="alert" data-testid="support-request-load-failed">
+        A temporary error occurred while loading this support request. Please try again.
+        <button type="button" class="btn btn-sm btn-outline-secondary ms-2" @onclick="LoadAsync">Try again</button>
+    </div>
+}
 else if (_outcome == SupportRequestFetchOutcome.NotFound || _detail is null)
 {
     <div class="dashboard-error">This support request could not be found.</div>
-}
-else if (_outcome == SupportRequestFetchOutcome.Failed)
-{
-    <div class="dashboard-error">A temporary error occurred while loading this support request. Please try again.</div>
 }
 else
 {

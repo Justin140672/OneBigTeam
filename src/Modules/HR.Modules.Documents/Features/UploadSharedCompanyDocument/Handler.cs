@@ -7,6 +7,7 @@ using HR.Modules.Documents.Services;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Documents.Features.UploadSharedCompanyDocument;
 
@@ -18,7 +19,8 @@ internal sealed class UploadSharedCompanyDocumentHandler(
     IEmployeeAudienceReader employeeAudienceReader,
     IAuditEventPublisher auditPublisher,
     IClock clock,
-    IBackgroundJobClient backgroundJobClient)
+    IBackgroundJobClient backgroundJobClient,
+    ILogger<UploadSharedCompanyDocumentHandler>? logger = null)
 {
     public async Task<Result<UploadSharedCompanyDocumentResponse>> HandleAsync(
         UploadSharedCompanyDocumentRequest request,
@@ -137,7 +139,8 @@ internal sealed class UploadSharedCompanyDocumentHandler(
         }
         catch
         {
-            try { await storage.DeleteAsync(storageKey, cancellationToken); } catch { }
+            await StorageCleanup.TryDeleteAsync(
+                storage, logger, "UploadSharedCompanyDocument", storageKey, request.CompanyId, document.Id);
             throw;
         }
 

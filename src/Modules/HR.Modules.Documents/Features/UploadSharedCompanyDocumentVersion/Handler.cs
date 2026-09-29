@@ -7,6 +7,7 @@ using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Documents.Features.UploadSharedCompanyDocumentVersion;
 
@@ -20,7 +21,8 @@ internal sealed class UploadSharedCompanyDocumentVersionHandler(
     INotificationWriter notificationWriter,
     IAuditEventPublisher auditPublisher,
     IClock clock,
-    IBackgroundJobClient backgroundJobClient)
+    IBackgroundJobClient backgroundJobClient,
+    ILogger<UploadSharedCompanyDocumentVersionHandler>? logger = null)
 {
     public async Task<Result<UploadSharedCompanyDocumentVersionResponse>> HandleAsync(
         UploadSharedCompanyDocumentVersionRequest request,
@@ -178,7 +180,8 @@ internal sealed class UploadSharedCompanyDocumentVersionHandler(
         }
         catch
         {
-            try { await storage.DeleteAsync(storageKey, cancellationToken); } catch { }
+            await StorageCleanup.TryDeleteAsync(
+                storage, logger, "UploadSharedCompanyDocumentVersion", storageKey, request.CompanyId, document.Id);
             throw;
         }
 

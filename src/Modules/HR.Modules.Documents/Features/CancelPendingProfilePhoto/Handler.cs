@@ -5,6 +5,8 @@ using HR.SharedKernel;
 using HR.SharedKernel.Idempotency;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using HR.Modules.Documents.Services;
 
 namespace HR.Modules.Documents.Features.CancelPendingProfilePhoto;
 
@@ -13,7 +15,8 @@ internal sealed class CancelPendingProfilePhotoHandler(
     IProfilePhotoStorageService storage,
     ITaskCanceller taskCanceller,
     IClock clock,
-    IAuditEventPublisher auditPublisher)
+    IAuditEventPublisher auditPublisher,
+    ILogger<CancelPendingProfilePhotoHandler>? logger = null)
 {
     public async Task<Result> HandleAsync(
         CancelPendingProfilePhotoRequest request,
@@ -52,7 +55,10 @@ internal sealed class CancelPendingProfilePhotoHandler(
         if (pendingPhoto is null)
             return Result.Failure(Error.NotFound("No pending profile photo submission was found."));
 
-        try { await storage.DeleteAsync(pendingPhoto.StorageKey, cancellationToken); } catch { }
+        // The submission record is removed regardless; if the stored object cannot be deleted it is
+        // logged with its identifiers (the record is the only thing that references it) so it can be purged.
+        await StorageCleanup.TryDeleteAsync(
+            storage, logger, "CancelPendingProfilePhoto", pendingPhoto.StorageKey, request.CompanyId, pendingPhoto.Id);
 
         db.PendingProfilePhotos.Remove(pendingPhoto);
 

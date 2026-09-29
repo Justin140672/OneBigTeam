@@ -18,12 +18,15 @@ public class CancelPendingProfilePhotoHandlerTests
             .Options);
 
     private static (CancelPendingProfilePhotoHandler Handler, FakeProfilePhotoStorageService Storage, FakeAuditPublisher Audit)
-        BuildHandler(DocumentsDbContext db, FakeTaskCanceller? taskCanceller = null)
+        BuildHandler(
+            DocumentsDbContext db, FakeTaskCanceller? taskCanceller = null,
+            bool throwOnDelete = false,
+            Microsoft.Extensions.Logging.ILogger<CancelPendingProfilePhotoHandler>? logger = null)
     {
-        var storage = new FakeProfilePhotoStorageService();
+        var storage = new FakeProfilePhotoStorageService { ThrowOnDelete = throwOnDelete };
         var audit   = new FakeAuditPublisher();
         var handler = new CancelPendingProfilePhotoHandler(
-            db, storage, taskCanceller ?? new FakeTaskCanceller(), new FakeClock(FixedUtcNow), audit);
+            db, storage, taskCanceller ?? new FakeTaskCanceller(), new FakeClock(FixedUtcNow), audit, logger);
         return (handler, storage, audit);
     }
 
@@ -116,5 +119,26 @@ public class CancelPendingProfilePhotoHandlerTests
         Assert.Equal(otherPending.Id, remainingPhoto.Id);
 
         Assert.DoesNotContain(otherPending.StorageKey, storage.Deletions);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Still_Removes_Record_But_Logs_Orphaned_Blob_When_Storage_Delete_Fails()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var pending    = SeedPendingPhoto(db, companyId, employeeId, "pending/orphan.png");
+        var logger     = new FakeLogger<CancelPendingProfilePhotoHandler>();
+        var (handler, _, _) = BuildHandler(db, throwOnDelete: true, logger: logger);
+
+        var result = await handler.HandleAsync(
+            new CancelPendingProfilePhotoRequest(companyId), employeeId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(await db.PendingProfilePhotos.ToListAsync());
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Error, entry.Level);
+        Assert.Contains("pending/orphan.png", entry.Message);
+        Assert.Contains(pending.Id.ToString(), entry.Message);
     }
 }

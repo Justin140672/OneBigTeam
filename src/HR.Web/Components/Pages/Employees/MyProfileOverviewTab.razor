@@ -176,7 +176,7 @@ else
                         <i class="fa-solid fa-house-medical"></i>
                     </div>
                     <div class="stat-body">
-                        <span class="stat-value">@FormatDays(_sicknessDays)</span>
+                        <span class="stat-value" title="@(_sicknessUnavailable ? "Sickness absence could not be loaded." : null)">@(_sicknessUnavailable ? "Unavailable" : FormatDays(_sicknessDays))</span>
                         <span class="stat-label">Sickness Absence</span>
                     </div>
                 </div>
@@ -337,6 +337,7 @@ else
     private decimal? _annualLeaveRemaining;
     private int _pendingLeaveCount;
     private decimal? _sicknessDays;
+    private bool _sicknessUnavailable;
     private List<LeaveRequestListItem> _upcomingLeave = [];
     private MyProbationStatusModel? _probationStatus;
     private MyOnboardingStatusModel? _onboardingStatus;
@@ -412,7 +413,7 @@ else
         if (tasks is not null)
             _openTaskCount = tasks.Items.Count(t => t.Status is "Open" or "InProgress");
 
-        ApplySicknessData(Result(sicknessTask));
+        ApplySicknessData(sicknessTask.IsCompletedSuccessfully ? sicknessTask.Result : null);
 
         _loading = false;
     }
@@ -437,9 +438,18 @@ else
         }
     }
 
-    private void ApplySicknessData(ListEmployeeSicknessRecordsResponseModel? sickness)
+    // A null result means the request never completed in time; a failed result means the API call failed.
+    // Either way the stat is flagged "Unavailable" rather than shown as zero days.
+    private void ApplySicknessData(HR.SharedKernel.Http.ApiResult<ListEmployeeSicknessRecordsResponseModel>? result)
     {
-        if (sickness is null) return;
+        if (result is null || !result.Success || result.Value is null)
+        {
+            _sicknessUnavailable = true;
+            return;
+        }
+
+        _sicknessUnavailable = false;
+        var sickness = result.Value;
 
         var completedDays = sickness.Records
             .Where(r => r.TotalDays.HasValue)

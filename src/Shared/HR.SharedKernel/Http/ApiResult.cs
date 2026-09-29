@@ -42,6 +42,20 @@ public sealed record ApiResult<T>(
 
     public bool IsConcurrencyConflict => FailureKind == ApiFailureKind.Concurrency;
 
+    /// <summary>
+    /// True when repeating the same request could plausibly succeed (transient network, server or
+    /// unreadable-response failures). Authentication, permission, validation, not-found and conflict
+    /// failures are not retryable without the user changing something first.
+    /// </summary>
+    public bool IsRetryable =>
+        FailureKind is ApiFailureKind.Network or ApiFailureKind.Server or ApiFailureKind.InvalidResponse;
+
+    /// <summary>Projects a successful value while carrying a failure through unchanged.</summary>
+    public ApiResult<TOut> Map<TOut>(Func<T?, TOut?> selector)
+        => Success
+            ? ApiResult<TOut>.Ok(selector(Value))
+            : ApiResult<TOut>.Fail(FailureKind, Error, Code, ValidationErrors);
+
     public string? DisplayMessage =>
         ValidationErrors is { Count: > 0 }
             ? string.Join(" ", ValidationErrors.Values.SelectMany(m => m))

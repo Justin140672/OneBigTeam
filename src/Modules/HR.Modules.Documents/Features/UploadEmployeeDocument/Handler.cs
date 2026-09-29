@@ -5,6 +5,7 @@ using HR.Modules.Documents.Persistence;
 using HR.Modules.Documents.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Documents.Features.UploadEmployeeDocument;
 
@@ -15,7 +16,8 @@ internal sealed class UploadEmployeeDocumentHandler(
     IClock clock,
     IAuditEventPublisher auditPublisher,
     IIntegrationEventPublisher integrationEventPublisher,
-    IBackgroundJobClient backgroundJobClient)
+    IBackgroundJobClient backgroundJobClient,
+    ILogger<UploadEmployeeDocumentHandler>? logger = null)
 {
     public Task<Result<UploadEmployeeDocumentResponse>> HandleAsync(
         UploadEmployeeDocumentRequest request,
@@ -104,7 +106,8 @@ internal sealed class UploadEmployeeDocumentHandler(
         }
         catch
         {
-            try { await storage.DeleteAsync(storageKey, cancellationToken); } catch { }
+            await StorageCleanup.TryDeleteAsync(
+                storage, logger, "UploadEmployeeDocument", storageKey, request.CompanyId, document.Id);
             throw;
         }
 

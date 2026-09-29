@@ -31,7 +31,11 @@
             </div>
 
             <div class="widget-body">
-                @if (_items.Count == 0)
+                @if (_failure is not null)
+                {
+                    <ApiFailureAlert Failure="_failure" OnRetry="LoadAsync" />
+                }
+                else if (_items.Count == 0)
                 {
                     <div class="widget-empty">
                         <i class="fa-solid fa-circle-check fa-lg mb-2"></i>
@@ -65,6 +69,7 @@
     private IReadOnlyDictionary<Guid, string> _employeeNames = new Dictionary<Guid, string>();
     private IReadOnlyDictionary<Guid, string> _categoryNames = new Dictionary<Guid, string>();
     private DateOnly _today;
+    private ApiFailurePresentation? _failure;
 
     protected override async Task OnInitializedAsync()
     {
@@ -74,6 +79,12 @@
             return;
         }
 
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
         _today = CompanyTimeProvider.Today;
 
         var teamTask       = SicknessService.GetTeamSicknessTodayAsync(Session.CompanyId, Session.EmployeeId.Value);
@@ -82,7 +93,9 @@
 
         await Task.WhenAll(teamTask, employeesTask, categoriesTask);
 
-        _items = (await teamTask)?.Items ?? [];
+        var team = await teamTask;
+        _failure = team.Success ? null : ApiFailurePresenter.Present(team, "load team sickness");
+        _items = team.Value?.Items ?? [];
         _employeeNames = await employeesTask;
         _categoryNames = await categoriesTask;
 

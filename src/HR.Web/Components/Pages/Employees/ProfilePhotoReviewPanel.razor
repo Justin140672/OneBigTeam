@@ -1,4 +1,5 @@
 @using HR.Web.Models
+@using HR.SharedKernel.Http
 @inject ProfilePhotoService ProfilePhotoService
 
 <div class="card" data-testid="profile-photo-review-panel">
@@ -89,7 +90,20 @@
         if (Task.SourceEntityId.HasValue)
         {
             _loading = true;
-            _pending = await ProfilePhotoService.GetPendingProfilePhotoByIdAsync(CompanyId, Task.SourceEntityId.Value);
+            var result = await ProfilePhotoService.GetPendingProfilePhotoByIdAsync(CompanyId, Task.SourceEntityId.Value);
+            if (result.Success)
+            {
+                _pending = result.Value;
+                _error = null;
+            }
+            else if (result.FailureKind == ApiFailureKind.NotFound)
+            {
+                _pending = null; // submission was already actioned or withdrawn
+            }
+            else
+            {
+                _error = ApiFailurePresenter.Message(result, "load the photo for review");
+            }
             _loading = false;
         }
     }
@@ -102,7 +116,8 @@
         _error = null;
         StateHasChanged();
 
-        var error = await ProfilePhotoService.ApproveProfilePhotoAsync(CompanyId, _pending.EmployeeId);
+        var error = ApiFailurePresenter.ErrorOrNull(
+            await ProfilePhotoService.ApproveProfilePhotoAsync(CompanyId, _pending.EmployeeId), "approve this photo");
 
         _reviewing = false;
 
@@ -130,7 +145,8 @@
         _error = null;
         StateHasChanged();
 
-        var error = await ProfilePhotoService.RejectProfilePhotoAsync(CompanyId, _pending.EmployeeId, _rejectReason);
+        var error = ApiFailurePresenter.ErrorOrNull(
+            await ProfilePhotoService.RejectProfilePhotoAsync(CompanyId, _pending.EmployeeId, _rejectReason), "reject this photo");
 
         _reviewing = false;
 

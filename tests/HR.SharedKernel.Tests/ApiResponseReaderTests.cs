@@ -352,6 +352,7 @@ public class ApiResponseReaderTests
 
 public class ApiResultDisplayMessageTests
 {
+    private sealed record Sample(string Name);
     [Fact]
     public void DisplayMessage_Flattens_ValidationErrors_When_Present()
     {
@@ -394,5 +395,163 @@ public class ApiResultDisplayMessageTests
 
         Assert.True(concurrency.IsConcurrencyConflict);
         Assert.False(conflict.IsConcurrencyConflict);
+    }
+
+    [Fact]
+    public async Task ReadJsonAsync_Returns_InvalidResponse_For_200_With_NonJson_ContentType()
+    {
+        var response = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("<html>proxy error</html>", Encoding.UTF8, "text/html"),
+        };
+
+        var result = await ApiResponseReader.ReadJsonAsync<Sample>(response);
+
+        Assert.False(result.Success);
+        Assert.Equal(ApiFailureKind.InvalidResponse, result.FailureKind);
+    }
+
+    [Theory]
+    [InlineData(ApiFailureKind.Network, true)]
+    [InlineData(ApiFailureKind.Server, true)]
+    [InlineData(ApiFailureKind.InvalidResponse, true)]
+    [InlineData(ApiFailureKind.Unauthenticated, false)]
+    [InlineData(ApiFailureKind.Forbidden, false)]
+    [InlineData(ApiFailureKind.NotFound, false)]
+    [InlineData(ApiFailureKind.Validation, false)]
+    [InlineData(ApiFailureKind.Conflict, false)]
+    [InlineData(ApiFailureKind.Concurrency, false)]
+    public void IsRetryable_Is_True_Only_For_Transient_Failures(ApiFailureKind kind, bool expected) =>
+        Assert.Equal(expected, ApiResult<string>.Fail(kind, "x").IsRetryable);
+
+    [Fact]
+    public void Map_Projects_Success_And_Preserves_Failure_Details()
+    {
+        var ok = ApiResult<int>.Ok(2).Map(v => v.ToString());
+        var failed = ApiResult<int>.Fail(ApiFailureKind.Conflict, "dupe", "code-1").Map(v => v.ToString());
+
+        Assert.Equal("2", ok.Value);
+        Assert.False(failed.Success);
+        Assert.Equal(ApiFailureKind.Conflict, failed.FailureKind);
+        Assert.Equal("dupe", failed.Error);
+        Assert.Equal("code-1", failed.Code);
+    }
+
+    // ---- ExecuteFileAsync ----
+
+    private static HttpResponseMessage FileResponse(byte[] bytes, string? dispositionFileName)
+    {
+        var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) };
+        if (dispositionFileName is not null)
+            response.Content.Headers.ContentDisposition =
+                new System.Net.Http.Headers.ContentDispositionHeaderValue("attachment") { FileName = dispositionFileName };
+        return response;
+    }
+
+    [Fact]
+    public async Task ExecuteFileAsync_Returns_Bytes_And_FileName_From_ContentDisposition()
+    {
+        var result = await ApiResponseReader.ExecuteFileAsync(
+            _ => Task.FromResult(FileResponse([1, 2, 3], "\"report.csv\"")), "fallback.csv");
+
+        Assert.True(result.Success);
+        Assert.Equal(new byte[] { 1, 2, 3 }, result.Value!.Bytes);
+        Assert.Equal("report.csv", result.Value.FileName);
+    }
+
+    [Fact]
+    public async Task ExecuteFileAsync_Uses_Fallback_And_Strips_Paths_From_Server_Supplied_Names()
+    {
+        var noHeader = await ApiResponseReader.ExecuteFileAsync(_ => Task.FromResult(FileResponse([1], null)), "fallback.csv");
+        var traversal = await ApiResponseReader.ExecuteFileAsync(_ => Task.FromResult(FileResponse([1], "../../evil.csv")), "fallback.csv");
+
+        Assert.Equal("fallback.csv", noHeader.Value!.FileName);
+        Assert.Equal("evil.csv", traversal.Value!.FileName);
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.Unauthorized, ApiFailureKind.Unauthenticated)]
+    [InlineData(HttpStatusCode.Forbidden, ApiFailureKind.Forbidden)]
+    [InlineData(HttpStatusCode.NotFound, ApiFailureKind.NotFound)]
+    [InlineData(HttpStatusCode.InternalServerError, ApiFailureKind.Server)]
+    public async Task ExecuteFileAsync_Classifies_Failure_Statuses(HttpStatusCode status, ApiFailureKind expected)
+    {
+        var result = await ApiResponseReader.ExecuteFileAsync(
+            _ => Task.FromResult(new HttpResponseMessage(status)), "fallback.csv");
+
+        Assert.False(result.Success);
+        Assert.Equal(expected, result.FailureKind);
+    }
+
+    [Fact]
+    public async Task ExecuteFileAsync_Network_Failure_And_Timeout_Are_Network_Failures()
+    {
+        var network = await ApiResponseReader.ExecuteFileAsync(
+            _ => throw new HttpRequestException("down"), "f.csv");
+        var timeout = await ApiResponseReader.ExecuteFileAsync(
+            _ => throw new TaskCanceledException("timeout"), "f.csv");
+
+        Assert.Equal(ApiFailureKind.Network, network.FailureKind);
+        Assert.Equal(ApiFailureKind.Network, timeout.FailureKind);
+    }
+
+    [Fact]
+    public async Task ExecuteFileAsync_Propagates_Caller_Cancellation()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            ApiResponseReader.ExecuteFileAsync(
+                ct => { ct.ThrowIfCancellationRequested(); return Task.FromResult(FileResponse([1], null)); },
+                "f.csv", cts.Token));
+    }
+
+    // ---- LogFailure ----
+
+    private sealed class ListLogger : Microsoft.Extensions.Logging.ILogger
+    {
+        public List<string> Messages { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId,
+            TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Messages.Add(formatter(state, exception));
+    }
+
+    [Theory]
+    [InlineData(ApiFailureKind.Network, true)]
+    [InlineData(ApiFailureKind.Server, true)]
+    [InlineData(ApiFailureKind.InvalidResponse, true)]
+    [InlineData(ApiFailureKind.Unauthenticated, false)]
+    [InlineData(ApiFailureKind.Forbidden, false)]
+    [InlineData(ApiFailureKind.NotFound, false)]
+    [InlineData(ApiFailureKind.Validation, false)]
+    [InlineData(ApiFailureKind.Conflict, false)]
+    public void LogFailure_Logs_Only_Operational_Failures_And_Never_The_Error_Text(ApiFailureKind kind, bool logged)
+    {
+        var logger = new ListLogger();
+        var result = ApiResult<string>.Fail(kind, "response-body-secret");
+
+        var returned = result.LogFailure(logger, "Op.Name");
+
+        Assert.Same(result, returned);
+        Assert.Equal(logged ? 1 : 0, logger.Messages.Count);
+        Assert.All(logger.Messages, m =>
+        {
+            Assert.Contains("Op.Name", m);
+            Assert.DoesNotContain("response-body-secret", m);
+        });
+    }
+
+    [Fact]
+    public void LogFailure_Does_Not_Log_Successes_Or_When_No_Logger()
+    {
+        var logger = new ListLogger();
+
+        ApiResult<string>.Ok("x").LogFailure(logger, "Op");
+        ApiResult<string>.Fail(ApiFailureKind.Server, "x").LogFailure(null, "Op");
+
+        Assert.Empty(logger.Messages);
     }
 }

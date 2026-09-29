@@ -1,201 +1,119 @@
-using System.Net;
 using System.Net.Http.Headers;
-using System.Net.Http.Json;
-using System.Text.Json;
+using HR.SharedKernel.Http;
 using HR.Web.Models;
 using Microsoft.AspNetCore.Components.Forms;
 
 namespace HR.Web.Services;
 
-public sealed class ProfilePhotoService(HrApiHttpClientFactory httpClientFactory)
+/// <summary>
+/// Profile-photo API client. Reads return <see cref="ApiResult{T}"/>: a 404 is <see cref="ApiFailureKind.NotFound"/>
+/// ("no such photo") and is therefore distinguishable from 401/403/5xx/network/malformed-response failures.
+/// Mutations never report success when the API call failed, and caller cancellation propagates.
+/// </summary>
+public sealed class ProfilePhotoService(
+    HrApiHttpClientFactory httpClientFactory,
+    ILogger<ProfilePhotoService>? logger = null)
 {
+    private const long MaxPhotoBytes = 5 * 1024 * 1024;
+
     private HttpClient Http => httpClientFactory.CreateClient();
 
+    private async Task<ApiResult<T>> GetAsync<T>(string operation, string url, CancellationToken cancellationToken)
+    {
+        var result = await ApiResponseReader.ExecuteAsync<T>(
+            ct => Http.GetAsync(url, ct), HrApiJsonOptions.Default, cancellationToken);
+        return result.LogFailure(logger, operation);
+    }
 
-    public async Task<GetMyProfilePhotoResponse?> GetMyProfilePhotoAsync(
+    public Task<ApiResult<GetMyProfilePhotoResponse>> GetMyProfilePhotoAsync(
+        Guid companyId, CancellationToken cancellationToken = default) =>
+        GetAsync<GetMyProfilePhotoResponse>(
+            "ProfilePhoto.GetMine", $"api/companies/{companyId}/employees/me/profile-photo", cancellationToken);
+
+    public Task<ApiResult<Unit>> UploadMyProfilePhotoAsync(
+        Guid companyId, IBrowserFile file, CancellationToken cancellationToken = default) =>
+        UploadAsync("ProfilePhoto.UploadMine", $"api/companies/{companyId}/employees/me/profile-photo", file, cancellationToken);
+
+    public Task<ApiResult<Unit>> UploadEmployeeProfilePhotoAsync(
+        Guid companyId, Guid employeeId, IBrowserFile file, CancellationToken cancellationToken = default) =>
+        UploadAsync(
+            "ProfilePhoto.UploadEmployee", $"api/companies/{companyId}/employees/{employeeId}/profile-photo",
+            file, cancellationToken);
+
+    public async Task<ApiResult<Unit>> CancelPendingProfilePhotoAsync(
         Guid companyId, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            return await Http.GetFromJsonAsync<GetMyProfilePhotoResponse>(
-                $"api/companies/{companyId}/employees/me/profile-photo", HrApiJsonOptions.Default, cancellationToken);
-        }
-        catch { return null; }
+        var result = await ApiResponseReader.ExecuteNoContentAsync(
+            ct => Http.DeleteAsync($"api/companies/{companyId}/employees/me/profile-photo/pending", ct),
+            cancellationToken);
+        return result.LogFailure(logger, "ProfilePhoto.CancelPending");
     }
 
-    public async Task<string?> UploadMyProfilePhotoAsync(
-        Guid companyId, IBrowserFile file, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            using var content = new MultipartFormDataContent();
-            await using var stream = file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024, cancellationToken);
-            var fileContent = new StreamContent(stream);
-            fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
-            content.Add(fileContent, "File", file.Name);
+    public Task<ApiResult<GetPendingProfilePhotoResponse>> GetPendingProfilePhotoAsync(
+        Guid companyId, Guid employeeId, CancellationToken cancellationToken = default) =>
+        GetAsync<GetPendingProfilePhotoResponse>(
+            "ProfilePhoto.GetPending",
+            $"api/companies/{companyId}/employees/{employeeId}/profile-photo/pending", cancellationToken);
 
-            var response = await Http.PostAsync(
-                $"api/companies/{companyId}/employees/me/profile-photo",
-                content, cancellationToken);
+    public Task<ApiResult<GetPendingProfilePhotoByIdResponse>> GetPendingProfilePhotoByIdAsync(
+        Guid companyId, Guid pendingPhotoId, CancellationToken cancellationToken = default) =>
+        GetAsync<GetPendingProfilePhotoByIdResponse>(
+            "ProfilePhoto.GetPendingById",
+            $"api/companies/{companyId}/profile-photo/pending/{pendingPhotoId}", cancellationToken);
 
-            if (response.IsSuccessStatusCode)
-                return null;
+    public Task<ApiResult<GetEmployeeProfilePhotoResponse>> GetEmployeeProfilePhotoAsync(
+        Guid companyId, Guid employeeId, CancellationToken cancellationToken = default) =>
+        GetAsync<GetEmployeeProfilePhotoResponse>(
+            "ProfilePhoto.GetEmployee",
+            $"api/companies/{companyId}/employees/{employeeId}/profile-photo", cancellationToken);
 
-            return await ReadErrorAsync(response, "Upload", cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            return ex.Message;
-        }
-    }
-
-    public async Task<bool> CancelPendingProfilePhotoAsync(
-        Guid companyId, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var response = await Http.DeleteAsync(
-                $"api/companies/{companyId}/employees/me/profile-photo/pending", cancellationToken);
-            return response.IsSuccessStatusCode;
-        }
-        catch { return false; }
-    }
-
-
-    public async Task<string?> UploadEmployeeProfilePhotoAsync(
-        Guid companyId, Guid employeeId, IBrowserFile file, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            using var content = new MultipartFormDataContent();
-            await using var stream = file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024, cancellationToken);
-            var fileContent = new StreamContent(stream);
-            fileContent.Headers.ContentType = new MediaTypeHeaderValue(file.ContentType);
-            content.Add(fileContent, "File", file.Name);
-
-            var response = await Http.PostAsync(
-                $"api/companies/{companyId}/employees/{employeeId}/profile-photo",
-                content, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-                return null;
-
-            return await ReadErrorAsync(response, "Upload", cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            return ex.Message;
-        }
-    }
-
-    public async Task<GetPendingProfilePhotoResponse?> GetPendingProfilePhotoAsync(
+    public async Task<ApiResult<Unit>> ApproveProfilePhotoAsync(
         Guid companyId, Guid employeeId, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var response = await Http.GetAsync(
-                $"api/companies/{companyId}/employees/{employeeId}/profile-photo/pending", cancellationToken);
-
-            if (response.StatusCode == HttpStatusCode.NotFound)
-                return null;
-
-            if (!response.IsSuccessStatusCode)
-                return null;
-
-            return await response.Content.ReadFromJsonAsync<GetPendingProfilePhotoResponse>(HrApiJsonOptions.Default, cancellationToken);
-        }
-        catch { return null; }
+        var result = await ApiResponseReader.ExecuteNoContentAsync(
+            ct => Http.PostAsJsonAsync(
+                $"api/companies/{companyId}/employees/{employeeId}/profile-photo/pending/approve", new { }, ct),
+            cancellationToken);
+        return result.LogFailure(logger, "ProfilePhoto.Approve");
     }
 
-    public async Task<GetPendingProfilePhotoByIdResponse?> GetPendingProfilePhotoByIdAsync(
-        Guid companyId, Guid pendingPhotoId, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var response = await Http.GetAsync(
-                $"api/companies/{companyId}/profile-photo/pending/{pendingPhotoId}", cancellationToken);
-
-            if (response.StatusCode == HttpStatusCode.NotFound)
-                return null;
-
-            if (!response.IsSuccessStatusCode)
-                return null;
-
-            return await response.Content.ReadFromJsonAsync<GetPendingProfilePhotoByIdResponse>(HrApiJsonOptions.Default, cancellationToken);
-        }
-        catch { return null; }
-    }
-
-    public async Task<GetEmployeeProfilePhotoResponse?> GetEmployeeProfilePhotoAsync(
-        Guid companyId, Guid employeeId, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var response = await Http.GetAsync(
-                $"api/companies/{companyId}/employees/{employeeId}/profile-photo", cancellationToken);
-
-            if (response.StatusCode == HttpStatusCode.NotFound)
-                return null;
-
-            if (!response.IsSuccessStatusCode)
-                return null;
-
-            return await response.Content.ReadFromJsonAsync<GetEmployeeProfilePhotoResponse>(HrApiJsonOptions.Default, cancellationToken);
-        }
-        catch { return null; }
-    }
-
-    public async Task<string?> ApproveProfilePhotoAsync(
-        Guid companyId, Guid employeeId, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var response = await Http.PostAsJsonAsync(
-                $"api/companies/{companyId}/employees/{employeeId}/profile-photo/pending/approve",
-                new { }, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-                return null;
-
-            return await ReadErrorAsync(response, "Approve", cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            return ex.Message;
-        }
-    }
-
-    public async Task<string?> RejectProfilePhotoAsync(
+    public async Task<ApiResult<Unit>> RejectProfilePhotoAsync(
         Guid companyId, Guid employeeId, string? rejectionReason, CancellationToken cancellationToken = default)
     {
-        try
-        {
-            var body = new { rejectionReason };
-            var response = await Http.PostAsJsonAsync(
-                $"api/companies/{companyId}/employees/{employeeId}/profile-photo/pending/reject",
-                body, cancellationToken);
-
-            if (response.IsSuccessStatusCode)
-                return null;
-
-            return await ReadErrorAsync(response, "Reject", cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            return ex.Message;
-        }
+        var body = new { rejectionReason };
+        var result = await ApiResponseReader.ExecuteNoContentAsync(
+            ct => Http.PostAsJsonAsync(
+                $"api/companies/{companyId}/employees/{employeeId}/profile-photo/pending/reject", body, ct),
+            cancellationToken);
+        return result.LogFailure(logger, "ProfilePhoto.Reject");
     }
 
-    private static async Task<string> ReadErrorAsync(HttpResponseMessage response, string action, CancellationToken cancellationToken)
+    private async Task<ApiResult<Unit>> UploadAsync(
+        string operation, string url, IBrowserFile file, CancellationToken cancellationToken)
     {
+        Stream stream;
         try
         {
-            var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken: cancellationToken);
-            if (body.TryGetProperty("error", out var errorProp))
-                return errorProp.GetString() ?? $"{action} failed ({(int)response.StatusCode}).";
+            stream = file.OpenReadStream(MaxPhotoBytes, cancellationToken);
         }
-        catch { }
+        catch (IOException)
+        {
+            // Oversized or unreadable selection: a problem with the user's input, not a server fault.
+            return ApiResult<Unit>.Fail(
+                ApiFailureKind.Validation, "The selected file is too large or could not be read. Photos must be 5 MB or smaller.");
+        }
 
-        return $"{action} failed ({(int)response.StatusCode}).";
+        await using (stream)
+        {
+            using var content = new MultipartFormDataContent();
+            var fileContent = new StreamContent(stream);
+            if (MediaTypeHeaderValue.TryParse(file.ContentType, out var contentType))
+                fileContent.Headers.ContentType = contentType;
+            content.Add(fileContent, "File", file.Name);
+
+            var result = await ApiResponseReader.ExecuteNoContentAsync(
+                ct => Http.PostAsync(url, content, ct), cancellationToken);
+            return result.LogFailure(logger, operation);
+        }
     }
 }
