@@ -19,11 +19,8 @@ namespace HR.Web.E2E.Tests.Tests;
 /// (RecruitmentModule.SeedRecruitmentAsync) being Open. It is NOT advertised internally in seed
 /// data, so every test that needs the populated list first flips that flag on via the Recruiter UI
 /// (idempotent — the checkbox just stays checked once saved).
-///
-/// Joins CrossUserVacancyTestBase's serialization group: the positive-path tests mutate the shared
-/// seeded vacancy, and other recruitment tests in that group read the same shared data.
 /// </summary>
-public sealed class InternalVacanciesTests(CrossUserFixture fixture) : CrossUserVacancyTestBase(fixture)
+public sealed class InternalVacanciesTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId = Guid.Parse("30000000-0000-0000-0000-000000000004");

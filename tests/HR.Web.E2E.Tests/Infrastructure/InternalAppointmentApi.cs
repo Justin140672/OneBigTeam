@@ -44,8 +44,7 @@ internal static class InternalAppointmentApi
     /// <summary>
     /// Returns the process-wide HR Administrator + Recruiter appointer user (see class remarks),
     /// creating it on first use. Only needed when a test must also open the appointee's full profile.
-    /// Makes real Supabase calls on first use (ensure-employee-login + /api/login) — callers must
-    /// hold <see cref="SupabaseAuthGate"/>.
+    /// Makes real Supabase calls on first use (ensure-employee-login + /api/login).
     /// </summary>
     public static async Task<Appointer> EnsureAppointerAsync(HttpClient hrAdminApi, string apiBaseUrl)
     {

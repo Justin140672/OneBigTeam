@@ -1,6 +1,7 @@
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 using Microsoft.Playwright;
+using System.Net.Http.Json;
 using System.Threading;
 
 namespace HR.Web.E2E.Tests.Tests;
@@ -66,6 +67,13 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     // Beta Corp — seeded with active subscription, used for subscription lifecycle tests.
     private static readonly Guid BetaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000002");
 
+    // Gamma Industries — seeded with active subscription, dedicated to
+    // ActiveSubscription_Cancel_ShowsConfirmation_AndSchedulesCancellation only (see
+    // CompaniesModule.SeedCompaniesAsync's remarks: this test kept racing on the shared Beta Corp
+    // company even behind the semaphore, because a Blazor Server page doesn't auto-update when a
+    // different test's circuit mutates the same company concurrently).
+    private static readonly Guid GammaCorpId = Guid.Parse("00000000-0000-0000-0000-000000000003");
+
     // ── Personas ───────────────────────────────────────────────────────────────
 
     // Priya Shah — seeded Company Administrator persona for Acme Corporation.
@@ -88,6 +96,11 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     // Beta Corp admin — for isolated active subscription tests.
     // Charlie Wilson is seeded as Beta Corp's Company Administrator.
     private const string BetaCompanyAdminEmail = "charlie.wilson@betacorp.example";
+
+    // Gamma Industries admin — dedicated to ActiveSubscription_Cancel_ShowsConfirmation_... only.
+    // Diana Chen is seeded as Gamma Industries' Company Administrator.
+    private const string GammaCompanyAdminEmail = "diana.chen@gamma.example";
+    private const string GammaCompanyAdminUserId = "30000000-0000-0000-0000-000000000019";
 
     // ── Access Control Tests ───────────────────────────────────────────────────
 
@@ -473,38 +486,52 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     /// - Confirming transition shows warning that subscription will end at period end
     /// - Subscription status becomes "Scheduled for cancellation"
     ///
-    /// Uses try/finally to guarantee cleanup: Beta Corp is restored to Active state
-    /// regardless of assertion failures, ensuring subsequent tests receive a predictable state.
+    /// Uses try/finally to guarantee cleanup: the subscription is restored to Active state
+    /// regardless of assertion failures, so a repeat run of just this test still starts clean.
     ///
-    /// Concurrency protection: semaphore covers entire test (arrange → act → verify → cleanup).
+    /// Runs against Gamma Industries, a company dedicated to this test alone (see the field
+    /// remarks on GammaCorpId) — this test used to share Beta Corp with the other cancel/resume
+    /// mutation tests behind BetaCorpCleanupSemaphore, but kept flaking even after the semaphore
+    /// and the arrange-step reload were both fixed: this app is Blazor Server, so this test's own
+    /// page (navigated to before acquiring the semaphore) is a live circuit that can hold a stale
+    /// DOM snapshot from whatever the previous semaphore-holder left behind. Giving this one test
+    /// its own never-contended company removes that race entirely rather than trying to out-time it.
     /// </summary>
     [Fact]
     public async Task ActiveSubscription_Cancel_ShowsConfirmation_AndSchedulesCancellation()
     {
-        // Use Beta Corp (shared active subscription) for this mutation test
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
-        await login.LoginAsync(BetaCompanyAdminEmail);
+        await login.LoginAsync(GammaCompanyAdminEmail);
 
         // Verify company ID matches expected tenant to catch persona errors early
-        await VerifyCompanyIdAfterLoginAsync(BetaCorpId, BetaCompanyAdminEmail);
+        await VerifyCompanyIdAfterLoginAsync(GammaCorpId, GammaCompanyAdminEmail);
 
         await subscription.GoToAsync();
 
-        // ── ACQUIRE SEMAPHORE: Protect entire test from arrange through cleanup ──
-        await BetaCorpCleanupSemaphore.WaitAsync();
+        // ── ARRANGE: Ensure Gamma Industries is in Active state (only matters if a previous run
+        // of just this test failed before its own cleanup ran). Resume() is an unconditional,
+        // unguarded flag-flip (CustomerSubscription.Resume) — safe to call even when already
+        // Active — so call it unconditionally instead of gating on a UI IsVisibleAsync() snapshot
+        // first. A prior version of this gate checked subscription.HasResumeButtonAsync() before
+        // restoring, which depends on Blazor having actually rendered the current server state
+        // into this exact page load; if that read anything other than the true state for any
+        // reason, the restore never ran and the test then failed waiting for a Cancel button that
+        // was never coming. Always restoring and always reloading afterwards removes that
+        // dependency entirely — this test drives off confirmed server state, not a UI guess.
+        await RestoreSubscriptionToActiveInternalAsync(
+            GammaCompanyAdminUserId, "Diana Chen",
+            "ActiveSubscription_Cancel_ShowsConfirmation_AndSchedulesCancellation (arrange)");
+        await _page.ReloadAsync();
+        await _page.WaitForSelectorAsync(".card-header h5", new() { Timeout = 20_000 });
+
+        Exception? scenarioException = null;
+        Exception? cleanupException = null;
+
         try
         {
-            // ── ARRANGE: Ensure Beta Corp is in Active state ──
-            await EnsureBetaCorpActiveSubscriptionAsync();
-
-            Exception? scenarioException = null;
-            Exception? cleanupException = null;
-
-            try
-            {
                 // ── ACT & ASSERT ──
                 // Verify we start with an Active subscription
                 var initialStatus = await subscription.GetSubscriptionStatusAsync();
@@ -527,12 +554,17 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
                 Assert.False(string.IsNullOrWhiteSpace(successMessage),
                     "Expected success message after cancellation");
 
-                // Step 5: Verify status changed (should now show as "Scheduled for cancellation" or similar)
-                // Wait a moment for state to update
+                // Step 5: Scheduling a cancellation does NOT change the Status field — that's real
+                // Stripe semantics (ConfirmCancelAsync in SubscriptionOverview.razor only updates
+                // CancelAtPeriodEnd on _details; the "Status" label is driven by a separate _status
+                // object that ConfirmCancelAsync never touches). The subscription stays "Active"
+                // until the billing period actually ends; the scheduled-cancellation state is
+                // surfaced instead via the cancellation warning and Resume button, asserted below.
+                // Wait a moment for state to update.
                 await _page.WaitForTimeoutAsync(500);
 
                 var newStatus = await subscription.GetSubscriptionStatusAsync();
-                Assert.NotEqual(initialStatus ?? "", newStatus ?? "");
+                Assert.Equal(initialStatus ?? "", newStatus ?? "");
 
                 // Step 6: Verify cancellation warning is now visible
                 Assert.True(await subscription.HasCancellationWarningAsync(),
@@ -554,13 +586,15 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
             finally
             {
                 // ───────────────────────────────────────────────────────────────────────────────
-                // CLEANUP: Restore subscription to Active state for parallel test safety.
-                // This runs regardless of assertion failures above, ensuring Beta Corp is ready
-                // for the next test (or the next run of this test).
+                // CLEANUP: Restore Gamma Industries' subscription to Active state so a repeat run
+                // of just this test starts clean. No other test touches this company, so this is
+                // purely for this test's own idempotency, not parallel-test safety.
                 // ───────────────────────────────────────────────────────────────────────────────
                 try
                 {
-                    await RestoreBetaCorpToActiveInternalAsync("ActiveSubscription_Cancel_ShowsConfirmation_AndSchedulesCancellation");
+                    await RestoreSubscriptionToActiveInternalAsync(
+                        GammaCompanyAdminUserId, "Diana Chen",
+                        "ActiveSubscription_Cancel_ShowsConfirmation_AndSchedulesCancellation (cleanup)");
                 }
                 catch (Exception cleanupEx)
                 {
@@ -588,12 +622,6 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
                     throw cleanupException;
                 }
             }
-        }
-        finally
-        {
-            // ── RELEASE SEMAPHORE ──
-            BetaCorpCleanupSemaphore.Release();
-        }
     }
 
     /// <summary>
@@ -635,9 +663,12 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
             try
             {
                 // ── ACT & ASSERT ──
-                // Now cancel it to establish the "Scheduled for cancellation" state needed for this test
-                var status = await subscription.GetSubscriptionStatusAsync();
-                if (!(status?.Equals("Scheduled for cancellation", StringComparison.OrdinalIgnoreCase) ?? false))
+                // Establish the scheduled-cancellation state needed for this test. The "Status"
+                // field never becomes "Scheduled for cancellation" — it stays "Active" throughout
+                // (see the comment in ActiveSubscription_Cancel_ShowsConfirmation... above) — so
+                // detect the already-cancelled case via the Resume button instead, the same
+                // real indicator the assertions below use.
+                if (!await subscription.HasResumeButtonAsync())
                 {
                     // If not already cancelled, cancel it first
                     if (await subscription.HasCancelButtonAsync())
@@ -673,9 +704,13 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
                 Assert.False(string.IsNullOrWhiteSpace(successMessage),
                     "Expected success message after resuming subscription");
 
-                // Step 3: Verify status returned to Active (or equivalent)
+                // Step 3: The Status field never left "Active" (see the comment above and in
+                // ActiveSubscription_Cancel_ShowsConfirmation... — it's driven by a separate
+                // _status object that neither ConfirmCancelAsync nor ResumeAsync touch), so verify
+                // it's unchanged rather than expecting it to differ. The real before/after signal
+                // is the Resume button and cancellation warning, asserted in Steps 4-5 below.
                 var resumedStatus = await subscription.GetSubscriptionStatusAsync();
-                Assert.NotEqual(cancelledStatus ?? "", resumedStatus ?? "");
+                Assert.Equal(cancelledStatus ?? "", resumedStatus ?? "");
 
                 // Step 4: Verify cancellation warning is gone
                 Assert.False(await subscription.HasCancellationWarningAsync(),
@@ -911,6 +946,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
+        var sidebar = new SidebarPage(_page);
 
         await login.GoToAsync();
         await login.LoginAsync(AcmeCompanyAdminEmail);
@@ -919,29 +955,17 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/dashboard");
         await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 20_000 });
 
-        // Look for subscription link in sidebar navigation
-        // Try multiple possible selectors that might contain the subscription link
-        var subscriptionLink = _page.Locator("nav").Locator("a[href*='subscription']");
+        // The old "nav" / "a[href*='subscription']" locators never matched anything — MainLayout's
+        // sidebar has no <nav> element at all (it's an SfSidebar/SfMenu with CssClass="app-nav-menu",
+        // see SidebarPage) — so both checks always failed regardless of subscription state. The
+        // sidebar item is also role-gated on CanManageCompany, not on the subscription being
+        // Active (see AdminNavigation.cs's "Subscription & Billing" destination), so this test's
+        // name is a slight misnomer, but it's still a real, correct check for a Company
+        // Administrator persona.
+        Assert.True(await sidebar.HasTopLevelMenuItemAsync("Subscription & Billing"),
+            "Expected 'Subscription & Billing' to be visible in the sidebar for a Company Administrator");
 
-        // Also try looking for a link with "Subscription" text in the sidebar
-        var subscriptionTextLink = _page.Locator("nav").GetByText("Subscription", new() { Exact = false });
-
-        // Check which one exists
-        var linkExists = await subscriptionLink.CountAsync() > 0;
-        var textLinkExists = await subscriptionTextLink.CountAsync() > 0;
-
-        Assert.True(linkExists || textLinkExists,
-            "Expected subscription link or text to be visible in sidebar for Active subscription (checked both href-based and text-based locators)");
-
-        // Use whichever link we found
-        if (linkExists)
-        {
-            await subscriptionLink.First.ClickAsync();
-        }
-        else
-        {
-            await subscriptionTextLink.First.ClickAsync();
-        }
+        await sidebar.ClickTopLevelMenuItemAsync("Subscription & Billing");
 
         // Verify we're on the subscription page
         await _page.WaitForURLAsync(url => url.Contains("/subscription"), new() { Timeout = 15_000 });
@@ -1034,15 +1058,48 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     /// Verifies that the logged-in user's company ID matches the expected company.
     /// Catches persona/company mismatch errors early by validating the /api/me response.
     /// </summary>
+    /// <remarks>
+    /// This deliberately does NOT call /api/me via <c>_page.Context.APIRequest</c> — that issues an
+    /// anonymous, browser-context-scoped HTTP request with no Authorization header and no relevant
+    /// cookie. HR.Web is Blazor Server: its own calls to HR.Api run server-side using a bearer token
+    /// held in <c>CircuitSessionState</c> (see HrApiHttpClientFactory), never exposed to the browser
+    /// as a cookie or header the API's own origin would ever see. A request built that way 401s for
+    /// EVERY persona unconditionally, regardless of any seed/role data — confirmed by direct
+    /// diagnosis (a locally run API instance rejects an identical unauthenticated request the same
+    /// way for every account). This mints its own short-lived session via the same
+    /// /api/dev/persona/{userId} test seam the other Infrastructure API helpers
+    /// (E2eEmployeeApi/DepartureFinaliserApi) already use, and calls /api/me with a real
+    /// Authorization header instead.
+    /// </remarks>
     private async Task VerifyCompanyIdAfterLoginAsync(Guid expectedCompanyId, string email)
     {
         try
         {
-            // The api/me endpoint returns the current user's profile, including companyId
-            var apiResponse = await _page.Context.APIRequest.GetAsync($"{_fixture.ApiBaseUrl}/api/me");
-            Assert.True(apiResponse.Ok, $"Expected /api/me to return 200, but got {apiResponse.Status} for {email}");
+            using var http = new HttpClient { BaseAddress = new Uri(_fixture.ApiBaseUrl) };
 
-            var json = await apiResponse.JsonAsync();
+            var personasResponse = await http.GetAsync("/api/dev/personas");
+            Assert.True(personasResponse.IsSuccessStatusCode,
+                $"Expected /api/dev/personas to succeed, got {personasResponse.StatusCode}");
+            var personas = await personasResponse.Content.ReadFromJsonAsync<List<DevPersonaLookup>>();
+            var userId = personas?.FirstOrDefault(p =>
+                string.Equals(p.Email, email, StringComparison.OrdinalIgnoreCase))?.UserId;
+            Assert.False(string.IsNullOrEmpty(userId), $"Expected a seeded dev persona for {email}");
+
+            var sessionResponse = await http.PostAsync($"/api/dev/persona/{userId}", content: null);
+            Assert.True(sessionResponse.IsSuccessStatusCode,
+                $"Expected /api/dev/persona/{{userId}} to succeed for {email}, got {sessionResponse.StatusCode}");
+            var session = await sessionResponse.Content.ReadFromJsonAsync<DevPersonaSessionResult>();
+            Assert.NotNull(session);
+
+            http.DefaultRequestHeaders.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", session!.AccessToken);
+
+            // The api/me endpoint returns the current user's profile, including companyId
+            var apiResponse = await http.GetAsync("/api/me");
+            Assert.True(apiResponse.IsSuccessStatusCode,
+                $"Expected /api/me to return 200, but got {apiResponse.StatusCode} for {email}");
+
+            var json = await apiResponse.Content.ReadFromJsonAsync<System.Text.Json.JsonElement?>();
             if (json.HasValue && json.Value.TryGetProperty("companyId", out var companyIdElement))
             {
                 if (companyIdElement.ValueKind == System.Text.Json.JsonValueKind.String)
@@ -1060,6 +1117,9 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         }
     }
 
+    private sealed record DevPersonaLookup(string UserId, string CompanyId, string Name, string JobTitle, string Email);
+    private sealed record DevPersonaSessionResult(string AccessToken, string RefreshToken, int ExpiresIn);
+
     /// <summary>
     /// Ensures Beta Corp's subscription is in Active state, idempotently restoring it
     /// if a previous test left it in Cancelled state. Called at the start of each
@@ -1074,10 +1134,26 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     {
         var subscription = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
 
-        // Check current status via UI
-        var currentStatus = await subscription.GetSubscriptionStatusAsync();
+        // This app is Blazor Server — the page this test navigated to (before acquiring
+        // BetaCorpCleanupSemaphore, at the top of each caller) is a live circuit that only
+        // re-renders on ITS OWN interactions. It does not auto-update when a different test's
+        // circuit cancels/resumes Beta Corp's subscription concurrently. So the DOM snapshot this
+        // test is holding by the time it actually acquires the semaphore can be stale relative to
+        // whatever the previous semaphore-holder left behind — reload unconditionally here, right
+        // as we get exclusive access, so every check below reads genuinely current server state
+        // rather than whatever happened to be true when GoToAsync ran.
+        await _page.ReloadAsync();
+        await _page.WaitForSelectorAsync(".card-header h5", new() { Timeout = 20_000 });
 
-        if (currentStatus?.Equals("Scheduled for cancellation", StringComparison.OrdinalIgnoreCase) ?? false)
+        // The "Status" field never becomes "Scheduled for cancellation" — it stays "Active" right
+        // up until the billing period actually ends (see the comments in
+        // ActiveSubscription_Cancel_ShowsConfirmation... and CancelledSubscription_Resume... above:
+        // ConfirmCancelAsync only ever sets CancelAtPeriodEnd on _details, never _status). Checking
+        // for that string was always false, so this restoration step silently did nothing whenever
+        // a previous test left Beta Corp with CancelAtPeriodEnd still true — leaving only the
+        // Resume button visible and no Cancel button for this test to click. Detect the real
+        // scheduled-cancellation state via the Resume button instead.
+        if (await subscription.HasResumeButtonAsync())
         {
             // Subscription is cancelled — use API to resume it for reliability
             // Use internal method (assumes semaphore already acquired by test)
@@ -1088,11 +1164,14 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
             await _page.WaitForSelectorAsync(".card-header h5", new() { Timeout = 20_000 });
         }
 
-        // Verify we're now in Active state
+        // Verify we're now in Active state — both the Status field and, more importantly, that the
+        // Cancel button (not the Resume button) is what's showing.
         var finalStatus = await subscription.GetSubscriptionStatusAsync();
         Assert.True(
             finalStatus?.Equals("Active", StringComparison.OrdinalIgnoreCase) ?? false,
             $"Expected Beta Corp subscription to be Active, but got '{finalStatus}'");
+        Assert.False(await subscription.HasResumeButtonAsync(),
+            "Expected Beta Corp subscription to not be scheduled for cancellation after restoring to Active");
     }
 
     /// <summary>
@@ -1149,16 +1228,26 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
     /// - If both scenario and cleanup fail, test output includes both exceptions
     /// - Cleanup failures are visible, not swallowed
     /// </summary>
-    private async Task RestoreBetaCorpToActiveInternalAsync(string callerContext)
+    private Task RestoreBetaCorpToActiveInternalAsync(string callerContext) =>
+        RestoreSubscriptionToActiveInternalAsync(CharlieWilsonUserId, "Charlie Wilson", callerContext);
+
+    /// <summary>
+    /// Generalized version of the original Beta-Corp-only restore, parameterized by persona so
+    /// GammaCompanyAdminUserId/Diana Chen (ActiveSubscription_Cancel_ShowsConfirmation_...'s
+    /// dedicated, never-contended company) can reuse the same resume-and-verify logic without a
+    /// second near-identical copy of it.
+    /// </summary>
+    private async Task RestoreSubscriptionToActiveInternalAsync(string userId, string personaName, string callerContext)
     {
-        // Assumes semaphore already acquired by caller
+        // Assumes semaphore already acquired by caller (where the persona's company is one that
+        // needs cross-test serialization at all — Gamma's dedicated persona doesn't).
 
         // Step 1: Obtain authenticated access token via /api/dev/persona endpoint
-        var token = await GetAuthenticatedTokenForCharlieWilsonAsync();
+        var token = await GetAuthenticatedTokenForUserAsync(userId, personaName);
         if (string.IsNullOrEmpty(token))
         {
             throw new InvalidOperationException(
-                $"[RestoreBetaCorpToActiveInternalAsync] Failed to obtain access token for Charlie Wilson from {callerContext}");
+                $"[RestoreSubscriptionToActiveInternalAsync] Failed to obtain access token for {personaName} from {callerContext}");
         }
 
         // Step 2: Resume subscription with Authorization header
@@ -1178,7 +1267,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         {
             var errorBody = await apiResponse.TextAsync();
             throw new InvalidOperationException(
-                $"[RestoreBetaCorpToActiveInternalAsync] Resume subscription API returned {apiResponse.Status} " +
+                $"[RestoreSubscriptionToActiveInternalAsync] Resume subscription API returned {apiResponse.Status} " +
                 $"from {callerContext}. URL: {resumeUrl}\nResponse: {errorBody}");
         }
 
@@ -1198,7 +1287,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         {
             var errorBody = await stateResponse.TextAsync();
             throw new InvalidOperationException(
-                $"[RestoreBetaCorpToActiveInternalAsync] State verification GET returned {stateResponse.Status} " +
+                $"[RestoreSubscriptionToActiveInternalAsync] State verification GET returned {stateResponse.Status} " +
                 $"from {callerContext}. URL: {stateUrl}\nResponse: {errorBody}");
         }
 
@@ -1207,14 +1296,14 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         if (!json.HasValue)
         {
             throw new InvalidOperationException(
-                $"[RestoreBetaCorpToActiveInternalAsync] State verification returned no JSON from {callerContext}");
+                $"[RestoreSubscriptionToActiveInternalAsync] State verification returned no JSON from {callerContext}");
         }
 
         // Validate Status field
         if (!json.Value.TryGetProperty("status", out var statusElement))
         {
             throw new InvalidOperationException(
-                $"[RestoreBetaCorpToActiveInternalAsync] State response missing 'status' field from {callerContext}. " +
+                $"[RestoreSubscriptionToActiveInternalAsync] State response missing 'status' field from {callerContext}. " +
                 $"Full response: {json.Value}");
         }
 
@@ -1222,8 +1311,8 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         if (!status.Equals("Active", StringComparison.OrdinalIgnoreCase))
         {
             throw new InvalidOperationException(
-                $"[RestoreBetaCorpToActiveInternalAsync] Status verification failed: " +
-                $"Beta Corp's subscription status is '{status}' (expected 'Active') from {callerContext}. " +
+                $"[RestoreSubscriptionToActiveInternalAsync] Status verification failed: " +
+                $"{personaName}'s subscription status is '{status}' (expected 'Active') from {callerContext}. " +
                 $"Full response: {json.Value}");
         }
 
@@ -1231,7 +1320,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         if (!json.Value.TryGetProperty("cancelAtPeriodEnd", out var cancelAtPeriodEndElement))
         {
             throw new InvalidOperationException(
-                $"[RestoreBetaCorpToActiveInternalAsync] State response missing 'cancelAtPeriodEnd' field from {callerContext}. " +
+                $"[RestoreSubscriptionToActiveInternalAsync] State response missing 'cancelAtPeriodEnd' field from {callerContext}. " +
                 $"Full response: {json.Value}");
         }
 
@@ -1244,34 +1333,34 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         if (cancelAtPeriodEnd)
         {
             throw new InvalidOperationException(
-                $"[RestoreBetaCorpToActiveInternalAsync] State verification failed: " +
-                $"Beta Corp's subscription still has CancelAtPeriodEnd=true after resume from {callerContext}. " +
+                $"[RestoreSubscriptionToActiveInternalAsync] State verification failed: " +
+                $"{personaName}'s subscription still has CancelAtPeriodEnd=true after resume from {callerContext}. " +
                 $"Full response: {json.Value}");
         }
 
         // Success: restoration verified
         System.Diagnostics.Debug.WriteLine(
-            $"[RestoreBetaCorpToActiveInternalAsync] Successfully restored Beta Corp from {callerContext}: " +
+            $"[RestoreSubscriptionToActiveInternalAsync] Successfully restored {personaName}'s subscription from {callerContext}: " +
             $"Status=Active, CancelAtPeriodEnd=false confirmed");
     }
 
     /// <summary>
-    /// Obtains an access token for Charlie Wilson (Beta Corp's Company Administrator) via the
-    /// /api/dev/persona/{userId} endpoint. Used by RestoreBetaCorpToActiveAsync to authenticate
-    /// subscription resume operations in cleanup code.
+    /// Obtains an access token for the given persona via the /api/dev/persona/{userId} endpoint.
+    /// Used by RestoreSubscriptionToActiveInternalAsync to authenticate subscription resume
+    /// operations in cleanup code.
     /// </summary>
-    private async Task<string> GetAuthenticatedTokenForCharlieWilsonAsync()
+    private async Task<string> GetAuthenticatedTokenForUserAsync(string userId, string personaName)
     {
         try
         {
-            var personaUrl = $"{_fixture.ApiBaseUrl}/api/dev/persona/{CharlieWilsonUserId}";
+            var personaUrl = $"{_fixture.ApiBaseUrl}/api/dev/persona/{userId}";
             var personaResponse = await _page.Context.APIRequest.PostAsync(personaUrl);
 
             if (!personaResponse.Ok)
             {
                 var body = await personaResponse.TextAsync();
                 System.Diagnostics.Debug.WriteLine(
-                    $"[GetAuthenticatedTokenForCharlieWilsonAsync] /api/dev/persona failed: " +
+                    $"[GetAuthenticatedTokenForUserAsync:{personaName}] /api/dev/persona failed: " +
                     $"{personaResponse.Status}\n{body}");
                 return string.Empty;
             }
@@ -1280,14 +1369,14 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
             if (!json.HasValue)
             {
                 System.Diagnostics.Debug.WriteLine(
-                    "[GetAuthenticatedTokenForCharlieWilsonAsync] No JSON response from /api/dev/persona");
+                    $"[GetAuthenticatedTokenForUserAsync:{personaName}] No JSON response from /api/dev/persona");
                 return string.Empty;
             }
 
             if (!json.Value.TryGetProperty("accessToken", out var tokenElement))
             {
                 System.Diagnostics.Debug.WriteLine(
-                    "[GetAuthenticatedTokenForCharlieWilsonAsync] Response missing accessToken field");
+                    $"[GetAuthenticatedTokenForUserAsync:{personaName}] Response missing accessToken field");
                 return string.Empty;
             }
 
@@ -1297,7 +1386,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine(
-                $"[GetAuthenticatedTokenForCharlieWilsonAsync] Exception: {ex.Message}");
+                $"[GetAuthenticatedTokenForUserAsync:{personaName}] Exception: {ex.Message}");
             return string.Empty;
         }
     }

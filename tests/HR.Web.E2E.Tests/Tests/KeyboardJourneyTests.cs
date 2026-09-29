@@ -35,8 +35,11 @@ public sealed class KeyboardJourneyTests(EmployeePersonaFixture fixture)
         var profile = await OpenLeaveTabAsync();
         await profile.ClickRequestLeaveAsync();
 
-        var start = DateTime.Today.AddMonths(2);
-        var end   = start.AddDays(1);
+        // Unique, weekday-only dates per run: this persona's requests persist between runs, so a fixed
+        // "today + 2 months" range would overlap an earlier run's request and be rejected by the API.
+        var start = DateTime.Today.AddMonths(2).AddDays(Random.Shared.Next(0, 100));
+        while (start.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) start = start.AddDays(1);
+        var end   = start;
         var reason = $"NFR-05 keyboard {Guid.NewGuid():N}".Substring(0, 24);
 
         // FillLeaveRequestAsync drives every field via Tab + typing (the Syncfusion combobox goes
@@ -80,7 +83,15 @@ public sealed class KeyboardJourneyTests(EmployeePersonaFixture fixture)
             // once, re-focusing and re-pressing, before treating this as a genuine failure.
             await submit.FocusAsync();
             await _page.Keyboard.PressAsync("Enter");
-            await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 30_000 });
+            try
+            {
+                await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 30_000 });
+            }
+            catch (TimeoutException)
+            {
+                var errors = await dialog.Locator(".alert-danger, .validation-message, .text-danger").AllInnerTextsAsync();
+                Assert.Fail($"Request Leave dialog stayed open after keyboard submit. Visible errors: [{string.Join(" | ", errors)}]");
+            }
         }
     }
 

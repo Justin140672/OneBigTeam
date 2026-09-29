@@ -17,7 +17,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// "true"/"false" string — asserting ToHaveAttributeAsync("aria-invalid", "true") is safe here.
 /// </summary>
 public sealed class SignupWorkEmailPolicyTests(ParallelBlankPersonaFixture fixture)
-    : SupabaseAuthSerialBlankTestBase(fixture)
+    : RoleE2ETestBase<ParallelBlankPersonaFixture>(fixture)
 {
     private const string WorkEmailRequiredMessage =
         "Please use your organisation's work email address. Public email services such as Gmail, Hotmail and Outlook.com cannot be used to create an account.";

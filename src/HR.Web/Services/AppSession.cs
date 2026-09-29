@@ -35,7 +35,9 @@ public sealed class AppSession(HrApiHttpClientFactory httpClientFactory, Employe
     public bool CanManageLeavePolicies        => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000022"));
     public bool CanManageSickness             => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000015"));
     public bool CanManageRecruitment          => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000026"));
-    public bool CanViewCandidates             => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000028"));
+    // Ticket 7 removed the redundant candidate.view permission (id ...028); candidate access is
+    // recruitment:manage (Recruiter). Checking the deleted id made every user "no access".
+    public bool CanViewCandidates             => CanManageRecruitment;
     public bool CanViewReporting              => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000034"));
     public bool CanViewHrReports              => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000036"));
     public bool CanViewRecruitmentReports     => PermissionIds.Contains(new Guid("00000000-0000-0000-0001-000000000035"));

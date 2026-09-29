@@ -10,7 +10,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// 2. A success banner confirms the submission.
 /// 3. An HR task is created and visible in the HR Inbox.
 /// </summary>
-public sealed class PersonalDetailsChangeRequestTests(CrossUserFixture fixture) : CrossUserDocumentsAndRequestsTestBase(fixture)
+public sealed class PersonalDetailsChangeRequestTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId   = Guid.Parse("30000000-0000-0000-0000-000000000004");

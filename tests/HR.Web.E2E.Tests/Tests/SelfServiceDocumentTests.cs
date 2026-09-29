@@ -12,7 +12,7 @@ namespace HR.Web.E2E.Tests.Tests;
 ///   - Seeded uploaded docs: Employment Contract, Offer Letter
 ///   - Seeded document request: Passport (b0000000-...-001, task a0000000-...-010)
 /// </summary>
-public sealed class SelfServiceDocumentTests(EmployeePersonaFixture fixture) : SupabaseAuthSerialEmployeeTestBase(fixture)
+public sealed class SelfServiceDocumentTests(EmployeePersonaFixture fixture) : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId  = Guid.Parse("30000000-0000-0000-0000-000000000004");

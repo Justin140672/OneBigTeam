@@ -27,7 +27,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// also removed) used that source purely as generic filler unrelated to reassignment mechanics,
 /// which are source-agnostic (see ReassignTaskHandler). Laura's task now uses TaskSource.Workflow.
 /// </summary>
-public sealed class TaskReassignmentTests(CrossUserFixture fixture) : CrossUserTenantAndMiscTestBase(fixture)
+public sealed class TaskReassignmentTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid LauraId = Guid.Parse("30000000-0000-0000-0000-000000000005");

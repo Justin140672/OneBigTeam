@@ -20,7 +20,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// ensure-employee-login endpoint) so no other parallel test class mutates its contact details.
 /// </summary>
 public sealed class MyProfileContactDetailsConcurrencyTests(EmployeePersonaFixture fixture)
-    : SupabaseAuthSerialEmployeeTestBase(fixture)
+    : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = SeededE2eEmployees.AcmeCompanyId;
 

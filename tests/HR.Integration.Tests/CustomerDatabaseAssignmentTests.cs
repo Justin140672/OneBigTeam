@@ -191,6 +191,7 @@ public class GetCustomerDatabaseAssignmentEndpointTests
 
     internal sealed record GetCustomerDatabaseAssignmentPayload(
         Guid CompanyId,
+        [property: System.Text.Json.Serialization.JsonConverter(typeof(System.Text.Json.Serialization.JsonStringEnumConverter<CustomerDatabaseAssignmentStatus>))]
         CustomerDatabaseAssignmentStatus Status,
         string? DatabaseKey,
         uint? SchemaOid,

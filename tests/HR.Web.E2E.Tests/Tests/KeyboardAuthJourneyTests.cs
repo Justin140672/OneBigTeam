@@ -5,12 +5,11 @@ namespace HR.Web.E2E.Tests.Tests;
 
 /// <summary>
 /// NFR-05: keyboard-only authentication journey — Tab through the <c>/login</c> form fields in DOM
-/// order, type credentials, and submit with the keyboard, reaching the app shell. Uses
-/// <see cref="SupabaseAuthSerialBlankTestBase"/> because it drives a real (uncached) Supabase
+/// order, type credentials, and submit with the keyboard, reaching the app shell. Drives a real (uncached) Supabase
 /// password-grant login rather than the storageState fast path.
 /// </summary>
 public sealed class KeyboardAuthJourneyTests(ParallelBlankPersonaFixture fixture)
-    : SupabaseAuthSerialBlankTestBase(fixture)
+    : RoleE2ETestBase<ParallelBlankPersonaFixture>(fixture)
 {
     private const string TomEmail = "tom.williams@acme.example";
     private const string DevPersonaPassword = "Dev-Only-Password-1!";

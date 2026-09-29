@@ -9,6 +9,7 @@ namespace HR.Modules.Assets.Tests;
 
 public class GetAssetHandlerTests
 {
+    private static readonly Guid HrAdmin = Guid.NewGuid();
     private static readonly DateTime FixedUtcNow = new(2026, 6, 30, 10, 0, 0, DateTimeKind.Utc);
 
     private static AssetsDbContext BuildContext()
@@ -51,13 +52,13 @@ public class GetAssetHandlerTests
     {
         await using var db = BuildContext();
         var (categoryId, companyId, assetId) = await SeedAssetAsync(db, "ASSET-001", "Laptop");
-        var handler = new GetAssetHandler(db);
+        var handler = new GetAssetHandler(db, TestAssetResourceAuthorizer.Create(hrAdministratorUserId: HrAdmin));
 
         var result = await handler.HandleAsync(new GetAssetRequest
         {
             CompanyId = companyId,
             Id = assetId
-        }, callerUserId: null, CancellationToken.None);
+        }, callerUserId: HrAdmin, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(assetId, result.Value!.Id);
@@ -72,13 +73,13 @@ public class GetAssetHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Asset_Does_Not_Exist()
     {
         await using var db = BuildContext();
-        var handler = new GetAssetHandler(db);
+        var handler = new GetAssetHandler(db, TestAssetResourceAuthorizer.Create(hrAdministratorUserId: HrAdmin));
 
         var result = await handler.HandleAsync(new GetAssetRequest
         {
             CompanyId = Guid.NewGuid(),
             Id = Guid.NewGuid()
-        }, callerUserId: null, CancellationToken.None);
+        }, callerUserId: HrAdmin, CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
@@ -89,13 +90,13 @@ public class GetAssetHandlerTests
     {
         await using var db = BuildContext();
         var (_, _, assetId) = await SeedAssetAsync(db);
-        var handler = new GetAssetHandler(db);
+        var handler = new GetAssetHandler(db, TestAssetResourceAuthorizer.Create(hrAdministratorUserId: HrAdmin));
 
         var result = await handler.HandleAsync(new GetAssetRequest
         {
             CompanyId = Guid.NewGuid(), // different company
             Id = assetId
-        }, callerUserId: null, CancellationToken.None);
+        }, callerUserId: HrAdmin, CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
@@ -128,12 +129,12 @@ public class GetAssetHandlerTests
             PurchasePrice = 3000m
         }, CancellationToken.None);
 
-        var handler = new GetAssetHandler(db);
+        var handler = new GetAssetHandler(db, TestAssetResourceAuthorizer.Create(hrAdministratorUserId: HrAdmin));
         var result = await handler.HandleAsync(new GetAssetRequest
         {
             CompanyId = companyId,
             Id = assetResult.Value!.Id
-        }, callerUserId: null, CancellationToken.None);
+        }, callerUserId: HrAdmin, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Apple", result.Value!.Manufacturer);
@@ -149,13 +150,13 @@ public class GetAssetHandlerTests
     {
         await using var db = BuildContext();
         var (_, companyId, assetId) = await SeedAssetAsync(db, "ASSET-CAT", "Monitor");
-        var handler = new GetAssetHandler(db);
+        var handler = new GetAssetHandler(db, TestAssetResourceAuthorizer.Create(hrAdministratorUserId: HrAdmin));
 
         var result = await handler.HandleAsync(new GetAssetRequest
         {
             CompanyId = companyId,
             Id = assetId
-        }, callerUserId: null, CancellationToken.None);
+        }, callerUserId: HrAdmin, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("Electronics", result.Value!.CategoryName);

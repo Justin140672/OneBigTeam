@@ -22,6 +22,11 @@ internal sealed class AssetResourceAuthorizer(
     // sanctioned escape hatch — same pattern as LeaveResourceAuthorizer.
     private static readonly Guid HrAdministratorRoleId = new("00000000-0000-0000-0000-000000000004");
 
+    /// <summary>Checks whether the caller holds the HR Administrator role.</summary>
+    public async Task<bool> IsHrAdministratorAsync(Guid callerUserId, CancellationToken cancellationToken)
+        => (await authorizationService.GetEffectiveRolesAsync(callerUserId, cancellationToken))
+            .Contains(HrAdministratorRoleId);
+
     /// <summary>
     /// Checks if a caller can view assets assigned to a specific employee.
     /// Authorization rule: self, direct manager (not full hierarchy), or HR Administrator.

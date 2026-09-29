@@ -104,6 +104,59 @@ public static class E2eEmployeeApi
         return new CreatedEmployee(created!.Id, firstName, lastName);
     }
 
+    /// <summary>
+    /// Starts a leaving process for <paramref name="employeeId"/> via the same endpoint the Start
+    /// Leaving Process wizard posts to. Defaults to a leaving date of today in the company's time
+    /// zone (Europe/London) — NOT backdated, because a backdated start finalises the employee
+    /// immediately (StartLeavingProcessHandler), which would skip the "Leaving" state the
+    /// departure-finaliser tests need. A leaving date of today leaves the process InProgress but
+    /// already due for ProcessLeavingEmployeesJob.
+    /// </summary>
+    public static async Task StartLeavingProcessAsync(
+        string apiBaseUrl, Guid employeeId, DateOnly? leavingDate = null, string reason = "Resignation",
+        string? notes = null)
+    {
+        using var http = await CreateHrAdminClientAsync(apiBaseUrl);
+
+        var today = DateOnly.FromDateTime(
+            TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/London")).DateTime);
+        var leaving = leavingDate ?? today;
+
+        var response = await http.PostAsJsonAsync(
+            $"/api/companies/{AcmeId}/employees/{employeeId}/leaving-process",
+            new
+            {
+                companyId = AcmeId,
+                employeeId,
+                resignationReceivedDate = leaving.AddDays(-7).ToString("yyyy-MM-dd"),
+                leavingDate = leaving.ToString("yyyy-MM-dd"),
+                lastWorkingDay = leaving.ToString("yyyy-MM-dd"),
+                leavingReason = reason,
+                confirmBackdatedLeavingDate = leaving < today,
+                notes,
+            });
+        Assert.True(response.IsSuccessStatusCode,
+            $"Expected start-leaving-process to succeed, got {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
+    }
+
+    /// <summary>
+    /// Cancels the current in-progress leaving process for <paramref name="employeeId"/> via the
+    /// same endpoint CancelLeavingProcessDialog posts to. Only an InProgress process can be
+    /// started again — StartLeavingProcessAsync returns a 409 Conflict otherwise — so tests that
+    /// need a second/historical process must cancel the first one via this first.
+    /// </summary>
+    public static async Task CancelLeavingProcessAsync(
+        string apiBaseUrl, Guid employeeId, string cancellationReason = "E2E test cancellation")
+    {
+        using var http = await CreateHrAdminClientAsync(apiBaseUrl);
+
+        var response = await http.PostAsJsonAsync(
+            $"/api/companies/{AcmeId}/employees/{employeeId}/leaving-process/cancel",
+            new { companyId = AcmeId, employeeId, cancellationReason });
+        Assert.True(response.IsSuccessStatusCode,
+            $"Expected cancel-leaving-process to succeed, got {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
+    }
+
     private static async Task<HttpClient> CreateHrAdminClientAsync(string apiBaseUrl)
     {
         var http = new HttpClient { BaseAddress = new Uri(apiBaseUrl) };

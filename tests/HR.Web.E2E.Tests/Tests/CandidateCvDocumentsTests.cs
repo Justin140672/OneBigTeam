@@ -15,9 +15,8 @@ namespace HR.Web.E2E.Tests.Tests;
 /// creates its own fresh Position Profile + Vacancy via the UI (same flow as CandidateCvReviewTests)
 /// and seeds the application/CV via the API, so no shared seeded vacancy is mutated.
 ///
-/// Uses Marcus Diallo (Recruiter role) — uploads are gated on Session.CanManageRecruitment. Serializes
-/// on the CrossUserVacancyTestBase gate like CandidateCvReviewTests, because the referenced scenario
-/// creates a vacancy (which seeds / relies on Acme's shared recruitment pipeline config).
+/// Uses Marcus Diallo (Recruiter role) — uploads are gated on Session.CanManageRecruitment. Runs in parallel with the
+/// other recruitment classes (it creates a vacancy, which relies on Acme's shared pipeline config).
 /// </summary>
 public sealed class CandidateCvDocumentsTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
@@ -25,24 +24,6 @@ public sealed class CandidateCvDocumentsTests(RecruiterPersonaFixture fixture) :
 
     private const string MarcusEmail = "marcus.diallo@acme.example";
     private const string LauraEmail  = "laura.bennett@acme.example";
-
-    public override async Task InitializeAsync()
-    {
-        await CrossUserVacancyTestBase.GateInstance.WaitAsync();
-        await base.InitializeAsync();
-    }
-
-    public override async Task DisposeAsync()
-    {
-        try
-        {
-            await base.DisposeAsync();
-        }
-        finally
-        {
-            CrossUserVacancyTestBase.GateInstance.Release();
-        }
-    }
 
     [Fact]
     public async Task FirstUpload_FromCandidateDetails_ShowsSingleRowWithCurrentCvBadge()

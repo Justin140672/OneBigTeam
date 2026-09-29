@@ -3,7 +3,7 @@
    count. Mirrors ApplicationsByStatusDialog's grid treatment. *@
 
 <SfDialog Visible="Visible" IsModal="true" Width="720px" ShowCloseIcon="true" CssClass="recruitment-metric-drilldown-dialog">
-    <DialogEvents Closed="HandleClosed" />
+    <DialogEvents Closed="HandleDialogClosed" />
     <DialogTemplates>
         <Header>@Title</Header>
         <Content>
@@ -39,4 +39,12 @@
     [Parameter] public EventCallback OnClosed { get; set; }
 
     private Task HandleClosed() => OnClosed.InvokeAsync();
+
+    // Syncfusion raises Closed after the hide animation for programmatic closes too (Visible=false).
+    // That late event must not tell the parent to close again: if the user has already re-opened the
+    // dialog by then (e.g. clicking the next metric tile), it would immediately hide the new dialog.
+    // Only user-initiated closes (X icon / Esc / overlay) need to flow back to the parent here; the
+    // Close button calls HandleClosed directly.
+    private Task HandleDialogClosed(Syncfusion.Blazor.Popups.CloseEventArgs args) =>
+        args.IsInteracted ? HandleClosed() : Task.CompletedTask;
 }

@@ -10,7 +10,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// The HR Manager can then claim it, after which it disappears from the inbox
 /// and appears in their own task list.
 /// </summary>
-public sealed class HrInboxTests(CrossUserFixture fixture) : CrossUserDocumentsAndRequestsTestBase(fixture)
+public sealed class HrInboxTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId   = Guid.Parse("30000000-0000-0000-0000-000000000004");

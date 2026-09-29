@@ -1,22 +1,24 @@
 using HR.Modules.Assets.Persistence;
+using HR.Modules.Assets.Services;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Assets.Features.ListEmployeeAssets;
 
-internal sealed class ListEmployeeAssetsHandler(AssetsDbContext db)
+internal sealed class ListEmployeeAssetsHandler(AssetsDbContext db, AssetResourceAuthorizer authorizer)
 {
     public async Task<Result<List<ListEmployeeAssetsResponse>>> HandleAsync(
         ListEmployeeAssetsRequest request,
         Guid? callerUserId,
         CancellationToken cancellationToken)
     {
-        // Inline authorization: only the employee themselves can view their own assets
-        // (HR admin check is handled by endpoint policy)
-        if (callerUserId != request.EmployeeId)
+        // Self, direct manager or HR administrator only.
+        if (callerUserId is not { } callerId
+            || !await authorizer.CanViewEmployeeAssetsAsync(
+                request.CompanyId, callerId, request.EmployeeId, cancellationToken))
             return Result.Failure<List<ListEmployeeAssetsResponse>>(
-                Error.Forbidden("You can only view your own assets."));
+                Error.Forbidden("You do not have permission to view these assets."));
 
         var assignments = await db.AssetAssignments
             .AsNoTracking()

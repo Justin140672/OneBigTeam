@@ -14,9 +14,8 @@ namespace HR.Web.E2E.Tests.Tests;
 /// seeded Acme applications (Emma Clarke et al.) — Move Forward / Reject mutate stage, and doing that
 /// to shared seed data would race RecruitmentDashboardTests / RecruitmentPipelineReportTests etc.
 ///
-/// Uses Marcus Diallo (Recruiter role) — recruitment:manage is Recruiter-only. Serializes against
-/// the CrossUserVacancyTestBase gate the same way VacancyKanbanBoardTests / RecruitmentStageManagement
-/// Tests do: Move Forward resolves "the next active non-terminal stage" from Acme's shared, ordered
+/// Uses Marcus Diallo (Recruiter role) — recruitment:manage is Recruiter-only. Runs in parallel with
+/// RecruitmentStageManagementTests (no gate): Move Forward resolves "the next active non-terminal stage" from Acme's shared, ordered
 /// recruitment pipeline config, which RecruitmentStageManagementTests mutates.
 ///
 /// Internal recruitment Ticket 1 (CvPanel_* tests): the CV panel distinguishes the CV submitted with
@@ -40,24 +39,6 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
     private const string InitialStage = "Application Received";
     private const string NextStage    = "CV Review";
     private const string RejectedStage = "Rejected";
-
-    public override async Task InitializeAsync()
-    {
-        await CrossUserVacancyTestBase.GateInstance.WaitAsync();
-        await base.InitializeAsync();
-    }
-
-    public override async Task DisposeAsync()
-    {
-        try
-        {
-            await base.DisposeAsync();
-        }
-        finally
-        {
-            CrossUserVacancyTestBase.GateInstance.Release();
-        }
-    }
 
     [Fact]
     public async Task ReviewCv_FromKanbanCardMenu_LoadsWithCandidateVacancyAndStage()

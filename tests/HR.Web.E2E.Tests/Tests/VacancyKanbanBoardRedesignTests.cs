@@ -13,10 +13,8 @@ namespace HR.Web.E2E.Tests.Tests;
 /// VacancyKanbanBoard.MoveApplicationAsync's remarks), and the "dragging" CSS class lifecycle on the
 /// board's columns container.
 ///
-/// Follows VacancyKanbanBoardTests' exact fixture/persona/gating pattern: RecruiterPersonaFixture,
-/// Marcus Diallo (Recruiter) against the seeded Acme company, and the same shared
-/// CrossUserVacancyTestBase.GateInstance serialization since these tests also read the shared,
-/// DisplayOrder-ranked seeded stage list (RecruitmentStageManagementTests mutates that same list).
+/// Follows VacancyKanbanBoardTests' exact fixture/persona pattern: RecruiterPersonaFixture,
+/// Marcus Diallo (Recruiter) against the seeded Acme company.
 /// </summary>
 public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
@@ -29,24 +27,6 @@ public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixt
     private const string InitialStage  = "Application Received";
     private const string SecondStage   = "CV Review";
     private const string TerminalHired = "Hired";
-
-    public override async Task InitializeAsync()
-    {
-        await CrossUserVacancyTestBase.GateInstance.WaitAsync();
-        await base.InitializeAsync();
-    }
-
-    public override async Task DisposeAsync()
-    {
-        try
-        {
-            await base.DisposeAsync();
-        }
-        finally
-        {
-            CrossUserVacancyTestBase.GateInstance.Release();
-        }
-    }
 
     [Fact]
     public async Task NarrowViewport_PipelineToolbar_RemainsUsable()

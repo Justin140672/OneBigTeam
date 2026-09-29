@@ -94,7 +94,7 @@ public sealed class SubscriptionBillingPage(IPage page, string baseUrl)
     /// This button appears when subscription is Active (not in trial).
     /// </summary>
     public Task<bool> HasManageBillingButtonAsync() =>
-        page.GetByRole(AriaRole.Button, new() { Name = "Manage billing" }).IsEnabledAsync();
+        IsVisibleAndEnabledAsync("Manage billing");
 
     /// <summary>
     /// Returns true if the "Resume subscription" button is visible and enabled.
@@ -108,7 +108,21 @@ public sealed class SubscriptionBillingPage(IPage page, string baseUrl)
     /// This button appears when subscription is Active and not already cancelled.
     /// </summary>
     public Task<bool> HasCancelButtonAsync() =>
-        page.GetByRole(AriaRole.Button, new() { Name = "Cancel subscription" }).IsEnabledAsync();
+        IsVisibleAndEnabledAsync("Cancel subscription");
+
+    /// <summary>
+    /// IsEnabledAsync() requires the element to actually exist — unlike IsVisibleAsync(), which
+    /// gracefully returns false when nothing matches, IsEnabledAsync() errors/hangs once the
+    /// button is genuinely absent from the DOM (e.g. after a state transition swaps it out for a
+    /// different button entirely, as Cancel -> Resume does). Check visibility first so a caller
+    /// asking "is this button here and usable" gets a clean false instead of an exception when the
+    /// button simply isn't there at all.
+    /// </summary>
+    private async Task<bool> IsVisibleAndEnabledAsync(string buttonName)
+    {
+        var button = page.GetByRole(AriaRole.Button, new() { Name = buttonName });
+        return await button.IsVisibleAsync() && await button.IsEnabledAsync();
+    }
 
     /// <summary>
     /// Clicks the "Start subscription" button and waits for navigation to Stripe checkout.

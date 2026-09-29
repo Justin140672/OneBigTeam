@@ -13,6 +13,21 @@ public static class ReturnUrlValidator
     /// </summary>
     /// <param name="returnUrl">The URL to validate, typically from a query parameter.</param>
     /// <returns>The validated URL if valid; null if invalid, empty, or dangerous.</returns>
+    /// <summary>
+    /// Like <see cref="ValidateInternalPath"/>, but also accepts base-relative paths without a leading
+    /// '/' (as produced by NavigationManager.ToBaseRelativePath, which the kanban board and
+    /// applications tab use when building returnUrl) by prefixing '/' before validating.
+    /// Absolute URLs still fail because the '://' check runs on the prefixed value.
+    /// </summary>
+    public static string? ValidateInternalPathAllowingBaseRelative(string? returnUrl)
+    {
+        if (string.IsNullOrWhiteSpace(returnUrl))
+            return null;
+
+        var trimmed = returnUrl.Trim();
+        return ValidateInternalPath(trimmed.StartsWith('/') ? trimmed : "/" + trimmed);
+    }
+
     public static string? ValidateInternalPath(string? returnUrl)
     {
         // Empty, null, or whitespace-only values are invalid

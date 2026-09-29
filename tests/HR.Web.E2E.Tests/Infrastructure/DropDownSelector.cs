@@ -187,8 +187,26 @@ public static class DropDownSelector
 
         if (!foundInInitialList)
         {
-            var filterInput = combobox.Locator("input").First;
-            await filterInput.FillAsync(text);
+            // An SfDropDownList (as opposed to a SfComboBox) keeps its own combobox input readonly;
+            // with AllowFiltering it renders a separate search box INSIDE the open popup instead —
+            // a "span.e-filter-parent" wrapping an "input.e-input" (confirmed against
+            // sf-dropdownlist.min.js's own filterInput = t.querySelector("input.e-input") — there is
+            // no ".e-input-filter" class in this widget, that was this method's own earlier, wrong
+            // guess and matched nothing, silently falling through to the same readonly combobox
+            // input every time). Prefer the popup's own filter box when present, otherwise fall back
+            // to the combobox input (editable ComboBox-style pickers, which have no popup-level
+            // filter box at all).
+            var popupFilterInput = popup.Locator("span.e-filter-parent input.e-input").First;
+            var filterInput = await popupFilterInput.CountAsync() > 0 ? popupFilterInput : combobox.Locator("input").First;
+
+            // FillAsync sets the value and dispatches a bare "input" event, but this widget's own
+            // filtering is driven through Syncfusion's KeyboardEvents wrapper (keydown-based) rather
+            // than listening for "input" directly — a bare Fill can land without ever making the
+            // component re-query/re-render its list. Type it as real keystrokes instead (dispatches
+            // the full keydown/keypress/input/keyup sequence per character), which is what an actual
+            // user interaction produces and what the component's own key handling expects.
+            await filterInput.ClickAsync();
+            await filterInput.PressSequentiallyAsync(text, new() { Delay = 40 });
 
             // Re-scope after typing: a server-filtered list swaps its items out from under the
             // popup (same detach-and-replace behaviour the retry loop below already guards

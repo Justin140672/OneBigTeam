@@ -165,33 +165,21 @@ public sealed class HrDashboardAttentionQueueSummaryTests(HrAdminPersonaFixture 
         var dashboard = new HrDashboardPage(_page, _fixture.WebBaseUrl);
         var task      = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
-        // Carlos Rivera's seeded probation review always has a generated review task
-        // (GenerateDueProbationReviewsJob), so its queue row is task-backed and activation opens
-        // TaskViewDialog rather than navigating away. Gate against ProbationReviewFlowTests as the
-        // other HR-dashboard probation tests do.
-        await SharedProbationGate.Instance.WaitAsync();
-        try
-        {
-            await LoginAndOpenAsync();
+        await LoginAndOpenAsync();
 
-            var employeeNames = await dashboard.GetAttentionQueueEmployeeNamesAsync();
-            var carlos = employeeNames.FirstOrDefault(n => n.Contains("Carlos", StringComparison.OrdinalIgnoreCase));
-            if (carlos is null)
-                return; // Carlos' review not in this run's top-25 window — nothing to assert here.
+        var employeeNames = await dashboard.GetAttentionQueueEmployeeNamesAsync();
+        var carlos = employeeNames.FirstOrDefault(n => n.Contains("Carlos", StringComparison.OrdinalIgnoreCase));
+        if (carlos is null)
+            return; // Carlos' review not in this run's top-25 window — nothing to assert here.
 
-            await dashboard.ClickAttentionQueueItemAsync(carlos);
+        await dashboard.ClickAttentionQueueItemAsync(carlos);
 
-            await task.WaitForLoadedAsync();
-            Assert.Contains("/dashboard/hr", _page.Url);
-            // The dialog header shows the task's own title ("{Action} — {EmployeeName}"), not the
-            // queue row's "{EmployeeName} · Due {Date}" meta text used to find/click the row above
-            // — only the employee name is common to both, so that's what we can assert here.
-            Assert.Contains("Carlos", await task.GetTitleAsync(), StringComparison.OrdinalIgnoreCase);
-        }
-        finally
-        {
-            SharedProbationGate.Instance.Release();
-        }
+        await task.WaitForLoadedAsync();
+        Assert.Contains("/dashboard/hr", _page.Url);
+        // The dialog header shows the task's own title ("{Action} — {EmployeeName}"), not the
+        // queue row's "{EmployeeName} · Due {Date}" meta text used to find/click the row above
+        // — only the employee name is common to both, so that's what we can assert here.
+        Assert.Contains("Carlos", await task.GetTitleAsync(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

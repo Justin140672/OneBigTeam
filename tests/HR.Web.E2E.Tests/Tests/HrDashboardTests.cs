@@ -21,13 +21,8 @@ namespace HR.Web.E2E.Tests.Tests;
 /// MissingFitNotesWidget, RecentEmployeeChangesWidget).
 ///
 /// Uses seeded personas: Laura Bennett (HR Administrator only) and Tom Williams (plain Employee).
-///
-/// Runs serialized against ReportCatalogTests (HrFavouritesSerialTestBase) — both toggle Laura
-/// Bennett's shared, server-persisted report favourites, and the FavouriteReportsWidget tests
-/// below assert on her favourites being empty/exactly-one, which races ReportCatalogTests'
-/// equivalent favourite toggles under real concurrency. See GroupSerializedTestBases.cs.
 /// </summary>
-public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : HrFavouritesSerialTestBase(fixture)
+public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private const string LauraEmail = "laura.bennett@acme.example";
     private const string TomEmail   = "tom.williams@acme.example";
@@ -111,28 +106,16 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : HrFavourit
         var login     = new LoginPage(_page, _fixture.WebBaseUrl);
         var dashboard = new HrDashboardPage(_page, _fixture.WebBaseUrl);
 
-        // Gate against ProbationReviewFlowTests.CompletingReviewTask_IsReflectedOnProbationTab,
-        // which completes Sophie Laurent's seeded pending review — while pending, her review can
-        // sort ahead of and evict Carlos Rivera's from the queue's ordering. See
-        // SharedProbationGate's remarks in GroupSerializedTestBases.cs.
-        await SharedProbationGate.Instance.WaitAsync();
-        try
-        {
-            await login.GoToAsync();
-            await login.LoginAsync(LauraEmail);
-            await dashboard.GoToAsync();
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+        await dashboard.GoToAsync();
 
-            var employeeNames = await dashboard.GetAttentionQueueEmployeeNamesAsync();
+        var employeeNames = await dashboard.GetAttentionQueueEmployeeNamesAsync();
 
-            Assert.True(
-                employeeNames.Any(n => n.Contains("Carlos", StringComparison.OrdinalIgnoreCase)),
-                $"Expected 'Carlos Rivera' to appear in the attention queue. " +
-                $"Meta text found: [{string.Join(", ", employeeNames)}]");
-        }
-        finally
-        {
-            SharedProbationGate.Instance.Release();
-        }
+        Assert.True(
+            employeeNames.Any(n => n.Contains("Carlos", StringComparison.OrdinalIgnoreCase)),
+            $"Expected 'Carlos Rivera' to appear in the attention queue. " +
+            $"Meta text found: [{string.Join(", ", employeeNames)}]");
     }
 
     [Fact]
@@ -142,32 +125,24 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : HrFavourit
         var dashboard = new HrDashboardPage(_page, _fixture.WebBaseUrl);
         var task      = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
-        await SharedProbationGate.Instance.WaitAsync();
-        try
-        {
-            await login.GoToAsync();
-            await login.LoginAsync(LauraEmail);
-            await dashboard.GoToAsync();
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+        await dashboard.GoToAsync();
 
-            var employeeNames = await dashboard.GetAttentionQueueEmployeeNamesAsync();
-            var carlos = employeeNames.First(n => n.Contains("Carlos", StringComparison.OrdinalIgnoreCase));
-            await dashboard.ClickAttentionQueueItemAsync(carlos);
+        var employeeNames = await dashboard.GetAttentionQueueEmployeeNamesAsync();
+        var carlos = employeeNames.First(n => n.Contains("Carlos", StringComparison.OrdinalIgnoreCase));
+        await dashboard.ClickAttentionQueueItemAsync(carlos);
 
-            // GenerateDueProbationReviewsJob always creates a task for each seeded review, so the
-            // queue's activation opens the task dialog in place rather than navigating away.
-            await task.WaitForLoadedAsync();
-            Assert.Contains("/dashboard/hr", _page.Url);
+        // GenerateDueProbationReviewsJob always creates a task for each seeded review, so the
+        // queue's activation opens the task dialog in place rather than navigating away.
+        await task.WaitForLoadedAsync();
+        Assert.Contains("/dashboard/hr", _page.Url);
 
-            // The dialog header shows the task's own title ("{Action} — {EmployeeName}"), not the
-            // queue row's "{EmployeeName} · Due {Date}" meta text used to find/click the row above
-            // — only the employee name is common to both, so that's what we can assert here.
-            var title = await task.GetTitleAsync();
-            Assert.Contains("Carlos", title, StringComparison.OrdinalIgnoreCase);
-        }
-        finally
-        {
-            SharedProbationGate.Instance.Release();
-        }
+        // The dialog header shows the task's own title ("{Action} — {EmployeeName}"), not the
+        // queue row's "{EmployeeName} · Due {Date}" meta text used to find/click the row above
+        // — only the employee name is common to both, so that's what we can assert here.
+        var title = await task.GetTitleAsync();
+        Assert.Contains("Carlos", title, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

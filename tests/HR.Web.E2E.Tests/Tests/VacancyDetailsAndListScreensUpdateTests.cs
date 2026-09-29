@@ -25,7 +25,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// (infra:manage), switching accounts via LoginPage.SwitchAccountAsync as needed — same pattern
 /// as the sibling test files above.
 /// </summary>
-public sealed class VacancyDetailsAndListScreensUpdateTests(CrossUserFixture fixture) : CrossUserVacancyTestBase(fixture)
+public sealed class VacancyDetailsAndListScreensUpdateTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

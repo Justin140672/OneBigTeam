@@ -197,7 +197,27 @@ public static class CompaniesModule
             db.Companies.Add(betaCorp);
         }
 
-        // Both seeded dev/E2E companies must have a persisted company_settings row, same as every
+        // Gamma Industries: dedicated to SubscriptionBillingJourneyTests.
+        // ActiveSubscription_Cancel_ShowsConfirmation_AndSchedulesCancellation ONLY — every other
+        // Beta-Corp-mutating subscription test still shares Beta Corp behind BetaCorpCleanupSemaphore.
+        // That test kept flaking even with the semaphore fix: this is Blazor Server, so a test's
+        // page (navigated to before it acquires the semaphore) is a live circuit that doesn't
+        // auto-update when a DIFFERENT test's circuit cancels/resumes Beta Corp concurrently — giving
+        // this one test its own company removes the shared state entirely rather than trying to
+        // out-race that staleness.
+        var gammaId = Guid.Parse("00000000-0000-0000-0000-000000000003");
+        var gamma = await db.Companies.Include(c => c.Settings).SingleOrDefaultAsync(c => c.Id == gammaId);
+        if (gamma is null)
+        {
+            gamma = Company.Create(gammaId, "Gamma Industries", now);
+            gamma.SetAddress(
+                CompanyAddress.Create(Guid.NewGuid(), gammaId, CompanyAddressType.RegisteredOffice,
+                    "22 Gamma Way", null, "Leeds", null, "LS1 1AA", "GB", now),
+                now);
+            db.Companies.Add(gamma);
+        }
+
+        // All seeded dev/E2E companies must have a persisted company_settings row, same as every
         // real company gets from CompanyProvisioner.ProvisionCompanyAsync on signup — without one,
         // EmployeeNumberGenerator.GenerateNextAsync (Automatic mode's atomic next-number counter)
         // has no row to claim/increment against and throws. CreateDefault() only supplies the same
@@ -212,12 +232,17 @@ public static class CompaniesModule
         {
             betaCorp.SetSettings(CompanySettings.CreateDefault(betaCorpId, now), now);
         }
+        if (gamma.Settings is null)
+        {
+            gamma.SetSettings(CompanySettings.CreateDefault(gammaId, now), now);
+        }
 
         await db.SaveChangesAsync();
 
-        // Seeded dev companies: Acme stays Trial to support trial-state E2E tests; Beta Corp is
-        // activated to support subscription lifecycle/mutation tests. Real trials only start via the
-        // self-service SignUp flow (Identity's SignUp feature, via ICompanyProvisioner).
+        // Seeded dev companies: Acme stays Trial to support trial-state E2E tests; Beta Corp and
+        // Gamma Industries are activated to support subscription lifecycle/mutation tests. Real
+        // trials only start via the self-service SignUp flow (Identity's SignUp feature, via
+        // ICompanyProvisioner).
         // Acme: Trial state (tests trial display, "Start subscription" button, trial days remaining)
         if (!await db.CustomerSubscriptions.AnyAsync(s => s.CompanyId == acmeId))
         {
@@ -236,6 +261,20 @@ public static class CompaniesModule
                 currentPeriodEnd: now.AddYears(1),
                 now);
             db.CustomerSubscriptions.Add(betaSubscription);
+        }
+
+        // Gamma Industries: Active state, dedicated to a single mutation test (see the comment on
+        // the company seed above) — never contended by anything else.
+        if (!await db.CustomerSubscriptions.AnyAsync(s => s.CompanyId == gammaId))
+        {
+            var gammaSubscription = CustomerSubscription.StartTrial(gammaId, now, trialLengthDays: 14);
+            gammaSubscription.ActivateSubscription(
+                stripeCustomerId: "dev-stub-customer-gamma",
+                stripeSubscriptionId: "dev-stub-subscription-gamma",
+                priceId: "dev-stub-price",
+                currentPeriodEnd: now.AddYears(1),
+                now);
+            db.CustomerSubscriptions.Add(gammaSubscription);
         }
 
         await db.SaveChangesAsync();

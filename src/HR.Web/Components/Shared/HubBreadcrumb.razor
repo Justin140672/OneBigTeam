@@ -1,6 +1,7 @@
 @* Shared breadcrumb for settings/detail screens. The former "Administration" root crumb was
    removed with the Administration Home hub — the trail now starts at the parent list (or the
    current page when there is no parent). *@
+@using HR.SharedKernel.Http
 @inject NavigationManager Navigation
 
 <SfBreadcrumb Class="mb-3">
@@ -20,7 +21,8 @@
 
     // ADM-07 — when the user arrived here from a filtered list (which now passes its exact
     // path+query as a "?returnUrl="), the "back to list" crumb should return to that filtered
-    // view rather than the bare list URL. Only an app-relative path is trusted.
+    // view rather than the bare list URL. Validated with ReturnUrlValidator to prevent
+    // open-redirect vulnerabilities.
     private string ParentUrl(string fallback)
     {
         var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(
@@ -28,9 +30,9 @@
 
         if (query.TryGetValue("returnUrl", out var value))
         {
-            var returnUrl = value.ToString();
-            if (returnUrl.StartsWith('/') && !returnUrl.StartsWith("//"))
-                return returnUrl;
+            var validatedUrl = ReturnUrlValidator.ValidateInternalPath(value.ToString());
+            if (validatedUrl is not null)
+                return validatedUrl;
         }
 
         return fallback;

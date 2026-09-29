@@ -31,68 +31,72 @@ public sealed class DepartureFinaliserE2ETests(HrAdminPersonaFixture fixture) : 
     private const string LauraEmail = "laura.bennett@acme.example";
 
     /// <summary>
-    /// Returns a fixed date in the past (guaranteed to be before today, so leaving-date comparisons
-    /// will be deterministic regardless of when the suite runs). Used for all backdated leaving
-    /// dates so the finaliser picks them up immediately — no waiting for simulated time progression.
+    /// Today's date in the company's time zone — the leaving date used for every test employee. It is
+    /// not backdated (a backdated start finalises immediately), but is already due for the job.
     /// </summary>
-    private static string BackdatedLeavingDate => "01/01/2026";
+    private static DateOnly CompanyToday => DateOnly.FromDateTime(
+        TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("Europe/London")).DateTime);
 
     /// <summary>
-    /// Transitions an employee through the full departure journey:
-    /// 1. Creates a fresh employee via the E2E API (Active status)
-    /// 2. Starts a leaving process with a backdated leaving date
-    /// 3. Verifies the leaving process was created in "InProgress" status
-    /// 4. Calls the test seam to manually trigger the finalization job
-    /// 5. Returns the employee ID for downstream assertions
+    /// Arranges a departure candidate through the API only (no wizard, no form login): creates an
+    /// Active employee and starts a leaving process due today, then makes sure the browser session is
+    /// authenticated as Laura (cached storageState, so this is cheap). The wizard itself is covered
+    /// by exactly one UI test, <see cref="DepartureFinalisation_Transitions_Employee_Status_FromLeavingToFormerEmployee"/>.
     /// </summary>
-    private async Task<Guid> SetupDepartureCandidateAsync(string namePrefix)
+    private async Task<Guid> SetupDepartureCandidateAsync(string namePrefix) =>
+        (await SetupDepartureEmployeeAsync(namePrefix)).Id;
+
+    private async Task<E2eEmployeeApi.CreatedEmployee> SetupDepartureEmployeeAsync(string namePrefix)
+    {
+        var employee = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, namePrefix, activate: true);
+        await E2eEmployeeApi.StartLeavingProcessAsync(_fixture.ApiBaseUrl, employee.Id);
+        await EnsureLoggedInAsync();
+        return employee;
+    }
+
+    private async Task EnsureLoggedInAsync()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+    }
+
+    /// <summary>The single UI-driven path: drives the Start Leaving Process wizard end to end.</summary>
+    private async Task<Guid> SetupDepartureCandidateViaWizardAsync(string namePrefix)
     {
         var employee = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, namePrefix, activate: true);
 
-        var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
         var startDialog = new StartLeavingProcessDialog(_page);
         var leavingTab = new EmployeeLeavingTab(_page);
+        var todayText = CompanyToday.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
 
-        await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
+        await EnsureLoggedInAsync();
 
-        // Navigate to the employee and start a leaving process with a backdated date.
         await empEdit.GoToAsync(AcmeId, employee.Id);
         await startDialog.OpenAsync();
-        await startDialog.FillResignationReceivedDateAsync("31/12/2025");
+        await startDialog.FillResignationReceivedDateAsync(CompanyToday.AddDays(-7).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture));
         await startDialog.ClickNextAsync();
 
-        var leavingDateRaw = await startDialog.GetLeavingDateTextAsync();
-        Assert.False(string.IsNullOrWhiteSpace(leavingDateRaw), "Expected step 2 to auto-populate a leaving date");
-
-        // Clear and set to a backdated date to make it immediately eligible for finalization.
+        Assert.False(string.IsNullOrWhiteSpace(await startDialog.GetLeavingDateTextAsync()),
+            "Expected step 2 to auto-populate a leaving date");
         await startDialog.ClearLeavingDateAsync();
-        await startDialog.FillLeavingDateAsync(BackdatedLeavingDate);
-        Assert.True(await startDialog.IsBackdatedConfirmationVisibleAsync(),
-            "Expected the backdating checkbox to appear for a past-dated leaving date");
-
+        await startDialog.FillLeavingDateAsync(todayText);
         await startDialog.ClickNextAsync();
 
-        // Last working day must be on or before the leaving date.
-        await startDialog.FillLastWorkingDayAsync(BackdatedLeavingDate);
+        await startDialog.FillLastWorkingDayAsync(todayText);
         await startDialog.ClickNextAsync();
 
-        // Select a reason.
         await startDialog.SelectLeavingReasonAsync("Resignation");
         await startDialog.ClickNextAsync();
 
-        // Confirm the wizard.
         await startDialog.ConfirmAsync();
         Assert.False(await startDialog.IsVisibleAsync(),
             "Expected the Start Leaving Process dialog to close after a successful submission");
 
-        // Wait for the resulting full page reload to the Leaving tab.
         await _page.WaitForSelectorAsync("[role='tablist']", new() { Timeout = 20_000 });
         await leavingTab.OpenAsync();
-
-        var status = await leavingTab.GetStatusBadgeTextAsync();
-        Assert.Equal("In Progress", status);
+        Assert.Equal("In Progress", await leavingTab.GetStatusBadgeTextAsync());
 
         return employee.Id;
     }
@@ -100,7 +104,7 @@ public sealed class DepartureFinaliserE2ETests(HrAdminPersonaFixture fixture) : 
     [Fact]
     public async Task DepartureFinalisation_Transitions_Employee_Status_FromLeavingToFormerEmployee()
     {
-        var employeeId = await SetupDepartureCandidateAsync("Depart");
+        var employeeId = await SetupDepartureCandidateViaWizardAsync("Depart");
 
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
@@ -126,8 +130,14 @@ public sealed class DepartureFinaliserE2ETests(HrAdminPersonaFixture fixture) : 
     [Fact]
     public async Task DepartureFinalisation_RemovesEmployee_FromEmployeeList()
     {
-        var employeeId = await SetupDepartureCandidateAsync("ListRemove");
+        // The admin employee list (ListEmployeesHandler) is unfiltered by status by default — it
+        // deliberately still shows Former Employees by name/number search, since HR needs to find
+        // historical records. "Removed from the list" therefore means removed from the *Active*
+        // filter view, not the unfiltered default view (which SetupDepartureEmployeeAsync/
+        // SetupDepartureCandidateAsync would already have left "Leaving", not "Active", by the time
+        // this test could check it anyway).
         var employee = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "ListRemove", activate: true);
+        var employeeId = employee.Id;
         var employeeName = employee.FullName;
 
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
@@ -136,26 +146,34 @@ public sealed class DepartureFinaliserE2ETests(HrAdminPersonaFixture fixture) : 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Before finalization: employee should be in the list (via search).
+        // Before departure: employee is Active and shows in the Active-filtered list.
         await empList.GoToAsync(AcmeId);
+        await empList.SelectStatusFilterAsync("Active");
         Assert.True(await empList.HasEmployeeAsync(employeeName),
-            $"Expected {employeeName} to appear in the employee list before departure finalization");
+            $"Expected {employeeName} to appear in the Active-filtered employee list before departure");
 
-        // Trigger finalization.
+        // Start the leaving process (API) and finalize it.
+        await E2eEmployeeApi.StartLeavingProcessAsync(_fixture.ApiBaseUrl, employeeId);
         var finalized = await DepartureFinaliserApi.FinalizeAsync(_fixture.ApiBaseUrl, employeeId);
         Assert.True(finalized, "Expected departure finalization to succeed");
 
-        // After finalization: employee should no longer appear in the list.
+        // After finalization: employee is Former Employee and no longer appears in the
+        // Active-filtered list (the unfiltered default view still contains the historical record).
         await empList.GoToAsync(AcmeId);
+        await empList.SelectStatusFilterAsync("Active");
         Assert.False(await empList.HasEmployeeAsync(employeeName),
-            $"Expected {employeeName} to no longer appear in the employee list after departure finalization");
+            $"Expected {employeeName} to no longer appear in the Active-filtered employee list after departure finalization");
     }
 
     [Fact]
     public async Task DepartureFinalisation_RemovesEmployee_FromCompanyDirectory()
     {
-        var employeeId = await SetupDepartureCandidateAsync("DirRemove");
+        // The employee directory (ListDirectoryEmployees/SearchEmployeeDirectory) only ever shows
+        // Status == Active employees — so "before" must be checked while still Active, i.e. before
+        // the leaving process is even started (starting it immediately moves Status to Leaving,
+        // which is already excluded).
         var employee = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "DirRemove", activate: true);
+        var employeeId = employee.Id;
         var employeeName = employee.FullName;
 
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
@@ -164,14 +182,15 @@ public sealed class DepartureFinaliserE2ETests(HrAdminPersonaFixture fixture) : 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Before finalization: employee should appear in the directory.
+        // Before the leaving process starts: employee is Active and should appear in the directory.
         await directory.GoToAsync(AcmeId);
         await directory.SearchAsync(employeeName);
         var cardCountBefore = await directory.CardCount();
         Assert.True(cardCountBefore > 0,
             $"Expected {employeeName} to appear in the company directory before departure finalization");
 
-        // Trigger finalization.
+        // Start the leaving process (API) and finalize it.
+        await E2eEmployeeApi.StartLeavingProcessAsync(_fixture.ApiBaseUrl, employeeId);
         var finalized = await DepartureFinaliserApi.FinalizeAsync(_fixture.ApiBaseUrl, employeeId);
         Assert.True(finalized, "Expected departure finalization to succeed");
 
@@ -189,29 +208,9 @@ public sealed class DepartureFinaliserE2ETests(HrAdminPersonaFixture fixture) : 
         var manager = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "ManagerStay", activate: true);
         var departingReport = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "ReportDepart", managerId: manager.Id, activate: true);
 
-        // Set up the departing report's leaving process and finalize.
-        var login = new LoginPage(_page, _fixture.WebBaseUrl);
-        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
-        var startDialog = new StartLeavingProcessDialog(_page);
-
-        await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
-
-        await empEdit.GoToAsync(AcmeId, departingReport.Id);
-        await startDialog.OpenAsync();
-        await startDialog.FillResignationReceivedDateAsync("31/12/2025");
-        await startDialog.ClickNextAsync();
-
-        await startDialog.ClearLeavingDateAsync();
-        await startDialog.FillLeavingDateAsync(BackdatedLeavingDate);
-        await startDialog.ClickNextAsync();
-        await startDialog.FillLastWorkingDayAsync(BackdatedLeavingDate);
-        await startDialog.ClickNextAsync();
-        await startDialog.SelectLeavingReasonAsync("Resignation");
-        await startDialog.ClickNextAsync();
-        await startDialog.ConfirmAsync();
-
-        await _page.WaitForSelectorAsync("[role='tablist']", new() { Timeout = 20_000 });
+        // Set up the departing report's leaving process via the API, then finalize.
+        await E2eEmployeeApi.StartLeavingProcessAsync(_fixture.ApiBaseUrl, departingReport.Id);
+        await EnsureLoggedInAsync();
 
         // Trigger finalization.
         var finalized = await DepartureFinaliserApi.FinalizeAsync(_fixture.ApiBaseUrl, departingReport.Id);
@@ -349,42 +348,16 @@ public sealed class DepartureFinaliserE2ETests(HrAdminPersonaFixture fixture) : 
         var report1 = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "Report1", managerId: manager.Id, activate: true);
         var report2 = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "Report2", managerId: manager.Id, activate: true);
 
+        // Start both leaving processes via the API (both due today); the per-employee finaliser
+        // seam then finalises only report1.
+        await E2eEmployeeApi.StartLeavingProcessAsync(_fixture.ApiBaseUrl, report1.Id);
+        await E2eEmployeeApi.StartLeavingProcessAsync(_fixture.ApiBaseUrl, report2.Id);
+
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
-        var startDialog = new StartLeavingProcessDialog(_page);
 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
-
-        // Set up report1's leaving process.
-        await empEdit.GoToAsync(AcmeId, report1.Id);
-        await startDialog.OpenAsync();
-        await startDialog.FillResignationReceivedDateAsync("31/12/2025");
-        await startDialog.ClickNextAsync();
-        await startDialog.ClearLeavingDateAsync();
-        await startDialog.FillLeavingDateAsync(BackdatedLeavingDate);
-        await startDialog.ClickNextAsync();
-        await startDialog.FillLastWorkingDayAsync(BackdatedLeavingDate);
-        await startDialog.ClickNextAsync();
-        await startDialog.SelectLeavingReasonAsync("Resignation");
-        await startDialog.ClickNextAsync();
-        await startDialog.ConfirmAsync();
-        await _page.WaitForSelectorAsync("[role='tablist']", new() { Timeout = 20_000 });
-
-        // Set up report2's leaving process.
-        await empEdit.GoToAsync(AcmeId, report2.Id);
-        await startDialog.OpenAsync();
-        await startDialog.FillResignationReceivedDateAsync("31/12/2025");
-        await startDialog.ClickNextAsync();
-        await startDialog.ClearLeavingDateAsync();
-        await startDialog.FillLeavingDateAsync(BackdatedLeavingDate);
-        await startDialog.ClickNextAsync();
-        await startDialog.FillLastWorkingDayAsync(BackdatedLeavingDate);
-        await startDialog.ClickNextAsync();
-        await startDialog.SelectLeavingReasonAsync("Resignation");
-        await startDialog.ClickNextAsync();
-        await startDialog.ConfirmAsync();
-        await _page.WaitForSelectorAsync("[role='tablist']", new() { Timeout = 20_000 });
 
         // Finalize only report1.
         var finalized = await DepartureFinaliserApi.FinalizeAsync(_fixture.ApiBaseUrl, report1.Id);
@@ -419,11 +392,17 @@ public sealed class DepartureFinaliserE2ETests(HrAdminPersonaFixture fixture) : 
             Assert.Equal("Leaving", await empEdit.GetEmployeeStatusBadgeTextAsync());
         }
 
-        // Trigger finalization for the first employee (job processes all due employees)
-        var finalized = await DepartureFinaliserApi.FinalizeAsync(_fixture.ApiBaseUrl, emp1);
-        Assert.True(finalized, "Expected departure finalization to succeed");
+        // Trigger finalization for each of the three due employees. The test seam
+        // (DepartureFinaliserTestEndpoint) finalizes one employee at a time by design — see
+        // ProcessLeavingEmployeesJob.ExecuteForEmployeeAsync's remarks — so a test's own finalizer
+        // call cannot also finalize another parallel test's due leaver in the same company.
+        foreach (var employeeId in new[] { emp1, emp2, emp3 })
+        {
+            var finalized = await DepartureFinaliserApi.FinalizeAsync(_fixture.ApiBaseUrl, employeeId);
+            Assert.True(finalized, "Expected departure finalization to succeed");
+        }
 
-        // Verify all three transitioned to "Former Employee" in the batch
+        // Verify all three transitioned to "Former Employee"
         foreach (var employeeId in new[] { emp1, emp2, emp3 })
         {
             await empEdit.GoToAsync(AcmeId, employeeId);
@@ -597,9 +576,13 @@ public sealed class DepartureFinaliserE2ETests(HrAdminPersonaFixture fixture) : 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Trigger finalization on the first employee (job processes all due)
-        var finalized = await DepartureFinaliserApi.FinalizeAsync(_fixture.ApiBaseUrl, employees[0]);
-        Assert.True(finalized, "Expected departure finalization to succeed");
+        // Trigger finalization on each employee individually — the test seam finalizes one
+        // employee at a time by design (see ProcessLeavingEmployeesJob.ExecuteForEmployeeAsync).
+        foreach (var employeeId in employees)
+        {
+            var finalized = await DepartureFinaliserApi.FinalizeAsync(_fixture.ApiBaseUrl, employeeId);
+            Assert.True(finalized, "Expected departure finalization to succeed");
+        }
 
         // Verify all employees consistently transitioned to Former Employee
         foreach (var employeeId in employees)
@@ -645,9 +628,13 @@ public sealed class DepartureFinaliserE2ETests(HrAdminPersonaFixture fixture) : 
             Assert.Equal("In Progress", await leavingTab.GetStatusBadgeTextAsync());
         }
 
-        // Trigger batch finalization (processes all three employees simultaneously)
-        var finalized = await DepartureFinaliserApi.FinalizeAsync(_fixture.ApiBaseUrl, emp1);
-        Assert.True(finalized, "Expected batch departure finalization to succeed");
+        // Trigger finalization for each employee individually — the test seam finalizes one
+        // employee at a time by design (see ProcessLeavingEmployeesJob.ExecuteForEmployeeAsync).
+        foreach (var empId in empIds)
+        {
+            var finalized = await DepartureFinaliserApi.FinalizeAsync(_fixture.ApiBaseUrl, empId);
+            Assert.True(finalized, "Expected departure finalization to succeed");
+        }
 
         // Verify all three employees consistently transitioned to Former Employee status
         // with Completed leaving process status

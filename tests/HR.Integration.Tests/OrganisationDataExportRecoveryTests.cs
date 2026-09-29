@@ -247,6 +247,8 @@ public class OrganisationDataExportRecoveryTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, AcmeCompanyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, CompanyAdmin, SystemRoles.Employee, AcmeCompanyId);
         await TestRoleSeeder.AssignRoleAsync(_factory, CompanyAdmin, SystemRoles.CompanyAdministrator, AcmeCompanyId);
+        // 5e985cea: organisation-data exports require BOTH Company Administrator and HR Administrator roles.
+        await TestRoleSeeder.AssignRoleAsync(_factory, CompanyAdmin, SystemRoles.HrAdministrator, AcmeCompanyId);
         return client;
     }
 

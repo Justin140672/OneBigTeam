@@ -148,7 +148,7 @@ public class QueueInvitationBatchHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.UserInvites.Add(UserInvite.Create(employeeId, companyId, "pending@test.com", Now));
+            db.UserInvites.Add(UserInvite.Create(employeeId, companyId, "pending@test.com", DateTimeOffset.UtcNow) /* UserInvite.IsExpired reads the real clock, so a fixed past "Now" would eventually expire */);
             await db.SaveChangesAsync();
         }
 

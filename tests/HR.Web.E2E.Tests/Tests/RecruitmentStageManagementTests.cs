@@ -18,36 +18,16 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Every test here mutates the single shared, DisplayOrder-ranked list of Acme recruitment
 /// pipeline stages (create at the end, reorder up/down, deactivate) — anything elsewhere that
 /// reads that list by stage name/position races it. In particular ApplicationToEmployeeFlowTests
-/// (CrossUserVacancyTestBase group) asserts the candidate lands on the "Offer" stage by reading
+/// asserts the candidate lands on the "Offer" stage by reading
 /// the pipeline's current stage list; if it reads that list while this class's newly-created
 /// "E2E Stage Reorder …" stage is still active and hasn't been moved back/deactivated yet, "Offer"
-/// can be displaced. This class can't join CrossUserVacancyTestBase directly (different fixture —
-/// RecruiterPersonaFixture, not CrossUserFixture), so it serializes against that group's shared
-/// static gate instance directly instead, via its own IAsyncLifetime override below.
+/// can be displaced.
 /// </summary>
 public sealed class RecruitmentStageManagementTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private const string MarcusEmail = "marcus.diallo@acme.example";
-
-    public override async Task InitializeAsync()
-    {
-        await CrossUserVacancyTestBase.GateInstance.WaitAsync();
-        await base.InitializeAsync();
-    }
-
-    public override async Task DisposeAsync()
-    {
-        try
-        {
-            await base.DisposeAsync();
-        }
-        finally
-        {
-            CrossUserVacancyTestBase.GateInstance.Release();
-        }
-    }
 
     /// <summary>
     /// Deactivates any leftover active "E2E Stage ..." row still sitting in the list from an

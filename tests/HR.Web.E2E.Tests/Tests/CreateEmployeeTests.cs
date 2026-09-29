@@ -20,12 +20,9 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Only 3 of this class's methods (the Manual-mode ones below) mutate a shared CompanySettings row
 /// (Beta Corp's employee-numbering mode) — the rest just create/view employees against
 /// already-seeded, per-test-uniquely-named data and never touch that row. This class therefore
-/// runs as an ordinary parallel-eligible class (not class-level HrSettingsSerialTestBase) so those
-/// aren't forced to queue behind the whole "HrSettingsSerial" group (HrSettingsPageTests,
-/// DataImportWizardTests, etc.) for no reason; the mutating methods
-/// acquire HrSettingsSerialTestBase.GateInstance directly around just their mutating/asserting
-/// section instead, matching the narrow method-level pattern already used by
-/// PositionRoleDefaultsSerialTestBase/SharedProbationGate — see GroupSerializedTestBases.cs.
+/// runs as an ordinary parallel-eligible class (not class-level HrSettingsSerialTestBase); only the
+/// mutating methods acquire HrSettingsSerialTestBase.GateInstance directly around their
+/// mutating/asserting section — see GroupSerializedTestBases.cs.
 ///
 /// Employee-numbering MODE tests never mutate Acme's numbering mode. Acme stays on its seeded
 /// Automatic mode for the whole run because dozens of ungated classes create Acme employees

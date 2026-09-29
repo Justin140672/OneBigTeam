@@ -20,7 +20,7 @@ public sealed class CustomerDetailsPageTests(EmployeePersonaFixture fixture) : R
 {
     // Acme Corporation — the standing seeded dev/E2E tenant (see CompaniesModule.SeedCompaniesAsync).
     // It always has a persisted CompanySettings row (CreateDefault, guarded by Settings being null)
-    // and an already-active CustomerSubscription (ActivateSubscription over StartTrial), so it's a
+    // and a Trial CustomerSubscription (Beta Corp is the Active one), so it is a
     // reliable "fully populated" fixture for this read-only page.
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
@@ -54,15 +54,14 @@ public sealed class CustomerDetailsPageTests(EmployeePersonaFixture fixture) : R
         Assert.Equal("Acme Corporation", await details.GetCompanyNameAsync());
         Assert.False(string.IsNullOrWhiteSpace(await details.GetStatusAsync()));
 
-        // Subscription — seeded companies are activated (ActivateSubscription over StartTrial),
-        // never left as a bare trial.
-        Assert.Equal("Active", await details.GetSubscriptionStatusAsync());
+        // Subscription — Acme is deliberately seeded as a Trial (CompaniesModule.SeedCompaniesAsync;
+        // Beta Corp is the pre-activated tenant used for lifecycle mutation tests).
+        Assert.Equal("Trial", await details.GetSubscriptionStatusAsync());
 
-        // Current pricing — an active seeded subscription has a real Stripe-stub price attached,
-        // so this must not fall back to "Not applicable".
+        // Current pricing — the panel must render a value (a trial may legitimately read
+        // "Not applicable"), never blank.
         var monthlyCharge = await details.GetMonthlyChargeAsync();
         Assert.False(string.IsNullOrWhiteSpace(monthlyCharge));
-        Assert.NotEqual("Not applicable", monthlyCharge);
 
         // Employee counts / storage usage stat cards
         Assert.False(string.IsNullOrWhiteSpace(await details.GetActiveEmployeeCountAsync()));

@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using FluentValidation;
 using Hangfire;
 using HR.Infrastructure.Abstractions;
@@ -484,10 +485,19 @@ public static class IdentityModule
             (Id: new Guid("30000000-0000-0000-0000-000000000011"), First: "Alice",  Last: "Morgan",  Email: "alice.morgan@betacorp.example",    Roles: new[] { SystemRoles.Employee, SystemRoles.Manager }),
             (Id: new Guid("30000000-0000-0000-0000-000000000012"), First: "Bob",    Last: "Taylor",  Email: "bob.taylor@betacorp.example",      Roles: new[] { SystemRoles.Employee }),
             (Id: new Guid("30000000-0000-0000-0000-000000000015"), First: "Grace",  Last: "Kim",     Email: "grace.kim@betacorp.example",       Roles: new[] { SystemRoles.Employee, SystemRoles.HrAdministrator }),
+            // Beta Corp Company Administrator — dedicated login for the subscription-lifecycle E2E tests
+            // (SubscriptionBillingJourneyTests), which mutate Beta Corp's subscription instead of Acme's.
+            // Listed in HR.Api's DevPersonaStore; without an ApplicationUser + roles here LoginHandler
+            // rejects the login ("Invalid email or password").
+            (Id: new Guid("30000000-0000-0000-0000-000000000018"), First: "Charlie", Last: "Wilson", Email: "charlie.wilson@betacorp.example", Roles: new[] { SystemRoles.Employee, SystemRoles.CompanyAdministrator }),
             // Dedicated to CrossTabLogoutEnforcementTests only — see DevPersonaStore's remarks.
             (Id: new Guid("30000000-0000-0000-0000-000000000016"), First: "Olivia", Last: "Reyes",   Email: "olivia.reyes@acme.example",        Roles: new[] { SystemRoles.Employee, SystemRoles.HrAdministrator }),
             // Dedicated to ManagerTeamProfileTests only — see DevPersonaStore's remarks.
             (Id: new Guid("30000000-0000-0000-0000-000000000017"), First: "Nina",   Last: "Patel",   Email: "nina.patel@acme.example",          Roles: new[] { SystemRoles.Employee, SystemRoles.Manager }),
+            // Gamma Industries Company Administrator — dedicated login for
+            // ActiveSubscription_Cancel_ShowsConfirmation_AndSchedulesCancellation only (see
+            // DevPersonaStore's remarks / CompaniesModule.SeedCompaniesAsync's Gamma seed).
+            (Id: new Guid("30000000-0000-0000-0000-000000000019"), First: "Diana",  Last: "Chen",    Email: "diana.chen@gamma.example",         Roles: new[] { SystemRoles.Employee, SystemRoles.CompanyAdministrator }),
         };
 
         foreach (var persona in personas)
@@ -574,39 +584,65 @@ public static class IdentityModule
         using var scope = services.CreateScope();
         var gateway = scope.ServiceProvider.GetRequiredService<ISupabaseAuthGateway>();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+        var logger = scope.ServiceProvider.GetService<ILoggerFactory>()?.CreateLogger("HR.Modules.Identity.IdentityModule");
         var now = DateTimeOffset.UtcNow;
 
+        // Reliability: each persona makes a real, network-dependent Supabase Admin API call
+        // (EnsureDevUserAsync). This used to be a single foreach with ONE SaveChangesAsync after the
+        // whole loop — if any one persona's call threw (most likely a brand-new email never created
+        // in Supabase before, e.g. a newly-added dev persona), the exception propagated out of the
+        // loop before SaveChangesAsync was ever reached, silently discarding every other persona's
+        // already-successful, still-only-in-memory work from this run too (including personas
+        // processed earlier in the list). On a fresh/reset dev database this could leave EARLIER
+        // personas' UserProfile rows never created, breaking their login ("no resolvable tenant")
+        // even though their own EnsureDevUserAsync call had already succeeded. Each persona is now
+        // isolated: failures are logged and skipped rather than aborting the whole batch, and
+        // progress is saved after every persona so one bad account can never roll back another's.
         foreach (var persona in personas)
         {
-            var supabaseUserId = await gateway.EnsureDevUserAsync(
-                persona.Email, SupabaseAuthGateway.DevSupabasePassword, CancellationToken.None);
+            try
+            {
+                var supabaseUserId = await gateway.EnsureDevUserAsync(
+                    persona.Email, SupabaseAuthGateway.DevSupabasePassword, CancellationToken.None);
 
-            var profile = await db.UserProfiles.FirstOrDefaultAsync(p => p.Id == persona.Id);
-            if (profile is null)
-            {
-                db.UserProfiles.Add(UserProfile.Create(
-                    persona.Id, supabaseUserId, persona.CompanyId, persona.Email,
-                    persona.FirstName, persona.LastName, now));
-            }
-            else if (profile.SupabaseAuthUserId != supabaseUserId)
-            {
-                // Self-heal: an earlier seeding run's admin-list-users lookup (since replaced with a
-                // password-grant sign-in — see SupabaseAuthGateway.EnsureDevUserAsync) could store a
-                // SupabaseAuthUserId that doesn't match the "sub" claim actually issued on tokens,
-                // permanently 404/403ing every request for that persona until corrected.
-                profile.UpdateSupabaseAuthUserId(supabaseUserId, now);
-            }
+                var profile = await db.UserProfiles.FirstOrDefaultAsync(p => p.Id == persona.Id);
+                if (profile is null)
+                {
+                    db.UserProfiles.Add(UserProfile.Create(
+                        persona.Id, supabaseUserId, persona.CompanyId, persona.Email,
+                        persona.FirstName, persona.LastName, now));
+                }
+                else if (profile.SupabaseAuthUserId != supabaseUserId)
+                {
+                    // Self-heal: an earlier seeding run's admin-list-users lookup (since replaced with a
+                    // password-grant sign-in — see SupabaseAuthGateway.EnsureDevUserAsync) could store a
+                    // SupabaseAuthUserId that doesn't match the "sub" claim actually issued on tokens,
+                    // permanently 404/403ing every request for that persona until corrected.
+                    profile.UpdateSupabaseAuthUserId(supabaseUserId, now);
+                }
 
-            // Ticket 9: converge a persona whose seeded login email changed (the Justin Etherington
-            // persona moved from a Hotmail address to an organisation-style test domain) so an
-            // existing dev database doesn't keep showing the old address on the profile.
-            if (profile is not null && !string.Equals(profile.Email, persona.Email, StringComparison.OrdinalIgnoreCase))
+                // Ticket 9: converge a persona whose seeded login email changed (the Justin Etherington
+                // persona moved from a Hotmail address to an organisation-style test domain) so an
+                // existing dev database doesn't keep showing the old address on the profile.
+                if (profile is not null && !string.Equals(profile.Email, persona.Email, StringComparison.OrdinalIgnoreCase))
+                {
+                    profile.UpdateEmail(persona.Email, now);
+                }
+
+                await db.SaveChangesAsync();
+            }
+            catch (Exception ex)
             {
-                profile.UpdateEmail(persona.Email, now);
+                logger?.LogWarning(ex,
+                    "Failed to seed dev Supabase user/profile for persona {Email} — skipping, other personas unaffected.",
+                    persona.Email);
+
+                // Discard this persona's partially-tracked changes so a later iteration's
+                // SaveChangesAsync can't accidentally try to flush them too.
+                foreach (var entry in db.ChangeTracker.Entries().Where(e => e.State != Microsoft.EntityFrameworkCore.EntityState.Unchanged).ToList())
+                    entry.State = Microsoft.EntityFrameworkCore.EntityState.Detached;
             }
         }
-
-        await db.SaveChangesAsync();
     }
 
     /// <summary>

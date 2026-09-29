@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @inherits SearchPageBase<EmployeeListItemModel>
 @using HR.SharedKernel
+@using HR.SharedKernel.Http
 @using HR.Web.Services
 @using HR.Web.Components.Pages.Users
 @using Syncfusion.Blazor.SplitButtons
@@ -320,7 +321,7 @@
     private bool _isInviteMode => string.Equals(Mode, "invite", StringComparison.OrdinalIgnoreCase);
 
     private string BackToListUrl =>
-        string.IsNullOrWhiteSpace(ReturnUrl) ? $"/companies/{CompanyId}/employees" : ReturnUrl;
+        ReturnUrlValidator.ValidateInternalPathAllowingBaseRelative(ReturnUrl) ?? $"/companies/{CompanyId}/employees";
 
     private InvitationBatchProgressPanel? _progressPanel;
     private InviteModeCandidateGrid? _inviteModeGrid;

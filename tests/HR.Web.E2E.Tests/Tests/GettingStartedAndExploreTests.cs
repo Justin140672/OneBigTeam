@@ -33,36 +33,6 @@ namespace HR.Web.E2E.Tests.Tests;
 /// </summary>
 public sealed class GettingStartedAndExploreTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
-    // HrAdministrator_LandingOnRoot_RedirectsToGettingStarted below (via ProvisionFreshCompanyAdminAsync)
-    // calls the real /api/dev/persona/register endpoint, which — per its own remarks — makes a real,
-    // network-dependent call to Supabase's Admin API to seed a genuinely loggable user (unlike most
-    // other E2E auth paths, which are faked under E2E_TESTING=true). Every other test class that makes
-    // this kind of real Supabase call is serialized against SupabaseAuthGate.Instance (see
-    // SupabaseAuthSerialBlankTestBase/SupabaseAuthSerialEmployeeTestBase's own remarks on concurrent
-    // real Supabase logins timing out under contention) — this class was missing that, so its one real
-    // network call could run concurrently with every other class's, spiking latency generally on the
-    // shared web app under load and manifesting as this specific test's otherwise-unexplained 30s
-    // navigation timeout. This class can't derive from either serial base directly (different fixture —
-    // HrAdminPersonaFixture, needed by its other tests), so it joins the same static gate manually,
-    // same pattern as RecruitmentStageManagementTests joining CrossUserVacancyTestBase's gate.
-    public override async Task InitializeAsync()
-    {
-        await SupabaseAuthGate.Instance.WaitAsync();
-        await base.InitializeAsync();
-    }
-
-    public override async Task DisposeAsync()
-    {
-        try
-        {
-            await base.DisposeAsync();
-        }
-        finally
-        {
-            SupabaseAuthGate.Instance.Release();
-        }
-    }
-
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     // Laura has the HrAdministrator role (CanManageEmployees true) — same persona used by

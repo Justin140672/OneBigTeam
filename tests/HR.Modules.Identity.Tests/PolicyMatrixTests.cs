@@ -34,6 +34,7 @@ public class PolicyMatrixTests(IdentityDatabaseFixture fixture)
         // Administrator only — a Company-Administrator-only account is limited to company settings
         // and subscription administration (see RolePermissionConfiguration remarks).
         ["support:manage"] = [SystemRoles.HrAdministrator],
+        ["support:request"] = [SystemRoles.Employee, SystemRoles.HrAdministrator],
         ["hr-settings:manage"] = [SystemRoles.HrAdministrator],
         ["users:view"] = [SystemRoles.HrAdministrator],
         ["users:manage"] = [SystemRoles.HrAdministrator],

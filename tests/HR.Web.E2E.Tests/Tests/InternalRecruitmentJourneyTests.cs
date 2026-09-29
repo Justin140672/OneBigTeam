@@ -34,11 +34,6 @@ namespace HR.Web.E2E.Tests.Tests;
 /// completes every recruiter step including Appoint. Marcus has no employee:manage, so the success
 /// banner names the employee instead of linking to their full HR record, and the employee record is
 /// verified through the HR Administrator API client (Laura) instead of through the UI.
-///
-/// Serialization (same order as every other internal-recruitment class, so no deadlock):
-///   1. CrossUserVacancyTestBase.GateInstance for the whole test — stage assertions read Acme's shared
-///      recruitment pipeline by name, which RecruitmentStageManagementTests mutates.
-///   2. SupabaseAuthGate only around provisioning logins and each sign-in / /api/login.
 /// </summary>
 public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixture)
     : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
@@ -52,53 +47,19 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
 
     private const string InterviewerName = "James";
 
-    public override async Task InitializeAsync()
-    {
-        await CrossUserVacancyTestBase.GateInstance.WaitAsync();
-        try
-        {
-            await base.InitializeAsync();
-        }
-        catch
-        {
-            CrossUserVacancyTestBase.GateInstance.Release();
-            throw;
-        }
-    }
-
-    public override async Task DisposeAsync()
-    {
-        try
-        {
-            await base.DisposeAsync();
-        }
-        finally
-        {
-            CrossUserVacancyTestBase.GateInstance.Release();
-        }
-    }
-
     private static DateOnly Today => DateOnly.FromDateTime(DateTime.Today);
 
-    /// <summary>Signs the browser in as <paramref name="email"/> while holding the Supabase gate.</summary>
+    /// <summary>Signs the browser in as <paramref name="email"/>.</summary>
     private async Task SignInAsAsync(LoginPage login, string email, bool switchAccount)
     {
-        await SupabaseAuthGate.Instance.WaitAsync();
-        try
+        if (switchAccount)
         {
-            if (switchAccount)
-            {
-                await login.SwitchAccountAsync(email);
-            }
-            else
-            {
-                await login.GoToAsync();
-                await login.LoginAsync(email);
-            }
+            await login.SwitchAccountAsync(email);
         }
-        finally
+        else
         {
-            SupabaseAuthGate.Instance.Release();
+            await login.GoToAsync();
+            await login.LoginAsync(email);
         }
     }
 
@@ -122,15 +83,7 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
         var newManager = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "JourneyMgr", activate: true);
 
         InternalVacancyApplyApi.FreshEmployee applicant;
-        await SupabaseAuthGate.Instance.WaitAsync();
-        try
-        {
-            applicant = await InternalVacancyApplyApi.CreateActiveEmployeeWithLoginAsync(hrAdminApi, _fixture.ApiBaseUrl);
-        }
-        finally
-        {
-            SupabaseAuthGate.Instance.Release();
-        }
+        applicant = await InternalVacancyApplyApi.CreateActiveEmployeeWithLoginAsync(hrAdminApi, _fixture.ApiBaseUrl);
 
         var before = await InternalRecruitmentJourneyApi.GetEmployeeRecordAsync(hrAdminApi, applicant.Id);
         Assert.NotEqual(InternalRecruitmentJourneyApi.SalesDepartmentId, before.DepartmentId);
@@ -187,16 +140,7 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
             "Expected the vacancy card to show Applied after a reload");
 
         // A duplicate submission (a second POST as the same employee) is refused server-side.
-        await SupabaseAuthGate.Instance.WaitAsync();
-        HttpClient employeeApi;
-        try
-        {
-            employeeApi = await InternalVacancyApplyApi.CreateEmployeeApiClientAsync(_fixture.ApiBaseUrl, applicant.WorkEmail);
-        }
-        finally
-        {
-            SupabaseAuthGate.Instance.Release();
-        }
+        var employeeApi = await InternalVacancyApplyApi.CreateEmployeeApiClientAsync(_fixture.ApiBaseUrl, applicant.WorkEmail);
         using (employeeApi)
         {
             using var duplicate = await InternalRecruitmentJourneyApi.PostInternalApplicationAsync(

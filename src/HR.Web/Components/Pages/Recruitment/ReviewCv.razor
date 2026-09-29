@@ -1,6 +1,7 @@
 @page "/companies/{CompanyId:guid}/vacancies/{VacancyId:guid}/applications/{ApplicationId:guid}/review-cv"
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Components.Forms
+@using HR.SharedKernel.Http
 @inject ApplicationService ApplicationService
 @inject CandidateService CandidateService
 @inject VacancyService VacancyService
@@ -263,13 +264,13 @@
         && currentId != _app.CvDocumentId;
 
     // CandidateDetail's Close honours returnUrl, so this brings the user back to this review page.
+    // The returnUrl here is internal (built from Navigation.Uri) so it's guaranteed safe.
     private string ManageCandidateCvsUrl => _app is null
         ? string.Empty
         : $"/companies/{CompanyId}/candidates/{_app.CandidateId}?returnUrl={Uri.EscapeDataString("/" + Navigation.ToBaseRelativePath(Navigation.Uri))}";
 
-    private string BackTarget => string.IsNullOrWhiteSpace(ReturnUrl)
-        ? $"/companies/{CompanyId}/vacancies/{VacancyId}"
-        : (ReturnUrl.StartsWith('/') ? ReturnUrl : "/" + ReturnUrl);
+    private string BackTarget => ReturnUrlValidator.ValidateInternalPathAllowingBaseRelative(ReturnUrl)
+        ?? $"/companies/{CompanyId}/vacancies/{VacancyId}";
 
     // Internal recruitment Ticket 1: prefer the CV submitted with this application; fall back to the
     // candidate's current CV only when none was captured (labelled as such in the markup).

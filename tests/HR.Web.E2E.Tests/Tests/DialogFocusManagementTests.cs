@@ -10,7 +10,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// leave-type deactivation, and the self-service Change Profile Photo dialog.
 /// </summary>
 public sealed class DialogFocusManagementTests(CrossUserFixture fixture)
-    : CrossUserTenantAndMiscTestBase(fixture)
+    : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId  = Guid.Parse("30000000-0000-0000-0000-000000000004");

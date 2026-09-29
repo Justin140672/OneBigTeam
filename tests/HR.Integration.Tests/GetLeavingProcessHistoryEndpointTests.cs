@@ -95,13 +95,14 @@ public class GetLeavingProcessHistoryEndpointTests
         string newReason = "Resignation",
         string? notes = null)
     {
-        var response = await client.PatchAsJsonAsync(
+        var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/leaving-process",
             new
             {
                 leavingDate = newLeavingDate.ToString("yyyy-MM-dd"),
                 lastWorkingDay = newLastWorkingDay.ToString("yyyy-MM-dd"),
                 leavingReason = newReason,
+                expectedVersion = 1,
                 notes
             });
         response.EnsureSuccessStatusCode();

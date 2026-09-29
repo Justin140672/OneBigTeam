@@ -77,17 +77,21 @@ public sealed class AssetDetailPageTests(EmployeePersonaFixture fixture) : RoleE
     }
 
     [Fact]
-    public async Task AssetDetail_ShowsDifferentAsset_WhenNavigatingToSarahAsset()
+    public async Task AssetDetail_IsDenied_WhenEmployeeNavigatesToAnotherEmployeesAsset()
     {
+        // Resource-level authorization (self / direct manager / HR administrator): Tom Williams is a
+        // plain employee and must not see the asset assigned to Sarah Chen, so the API refuses the
+        // read and the page shows the "Asset not found" alert instead of the detail content.
         var login  = new LoginPage(_page, _fixture.WebBaseUrl);
         var detail = new AssetDetailPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(TomEmail);
 
-        await detail.GoToAsync(AcmeId, SarahAssetId);
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/assets/{SarahAssetId}/view");
+        await _page.WaitForSelectorAsync(".alert-danger", new() { Timeout = 20_000 });
 
-        Assert.Equal("ASSET-0002", await detail.GetAssetNumberAsync());
-        Assert.Equal("Dell UltraSharp 27\"", await detail.GetAssetNameAsync());
+        Assert.True(await detail.IsNotFoundAlertVisibleAsync());
+        Assert.False(await _page.Locator("[data-testid='asset-detail-content']").IsVisibleAsync());
     }
 }

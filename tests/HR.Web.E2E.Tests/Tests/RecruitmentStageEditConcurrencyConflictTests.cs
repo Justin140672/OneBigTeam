@@ -16,8 +16,7 @@ namespace HR.Web.E2E.Tests.Tests;
 ///
 /// The "second editor" is a second tab in the same authenticated Recruiter context. Each test
 /// creates its own uniquely-named non-terminal ("None" outcome) stage and mutates its Name; the
-/// stage is deactivated in a finally block. Serializes against the CrossUserVacancyTestBase gate
-/// exactly like RecruitmentStageManagementTests, because every test here mutates the single shared,
+/// stage is deactivated in a finally block. Every test here mutates the single shared,
 /// DisplayOrder-ranked list of Acme recruitment pipeline stages and a leftover active stage with the
 /// highest DisplayOrder can hijack OfferCandidateHandler's stage selection for unrelated tests.
 ///
@@ -29,24 +28,6 @@ public sealed class RecruitmentStageEditConcurrencyConflictTests(RecruiterPerson
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private const string MarcusEmail = "marcus.diallo@acme.example";
-
-    public override async Task InitializeAsync()
-    {
-        await CrossUserVacancyTestBase.GateInstance.WaitAsync();
-        await base.InitializeAsync();
-    }
-
-    public override async Task DisposeAsync()
-    {
-        try
-        {
-            await base.DisposeAsync();
-        }
-        finally
-        {
-            CrossUserVacancyTestBase.GateInstance.Release();
-        }
-    }
 
     [Fact]
     public async Task RecruitmentStageEdit_PageLoads_ShowsStageForm()

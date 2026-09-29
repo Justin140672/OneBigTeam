@@ -13,7 +13,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// /dashboard/recruitment and fails on any serious/critical WCAG violation. Compile-only in this
 /// repo's CI, like the rest of HR.Web.E2E.Tests.
 /// </summary>
-public sealed class AxeCoreDashboardScanTests(CrossUserFixture fixture) : CrossUserTenantAndMiscTestBase(fixture)
+public sealed class AxeCoreDashboardScanTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     [Theory]
     [InlineData("laura.bennett@acme.example", "/dashboard/hr")]

@@ -1,6 +1,7 @@
 using HR.Modules.Assets.Domain;
 using HR.Modules.Assets.Features.ListEmployeeAssets;
 using HR.Modules.Assets.Persistence;
+using HR.Modules.Assets.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Assets.Tests;
@@ -46,7 +47,7 @@ public class ListEmployeeAssetsHandlerTests
         SeedAssignment(db, companyId, asset.Id, employeeId);
         await db.SaveChangesAsync();
 
-        var handler = new ListEmployeeAssetsHandler(db);
+        var handler = new ListEmployeeAssetsHandler(db, TestAssetResourceAuthorizer.Create());
         var result = await handler.HandleAsync(
             new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
             callerUserId: employeeId,
@@ -68,7 +69,7 @@ public class ListEmployeeAssetsHandlerTests
         SeedAssignment(db, companyId, asset.Id, employeeId, returnedAt: FixedOffset.AddDays(1));
         await db.SaveChangesAsync();
 
-        var handler = new ListEmployeeAssetsHandler(db);
+        var handler = new ListEmployeeAssetsHandler(db, TestAssetResourceAuthorizer.Create());
         var result = await handler.HandleAsync(
             new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
             callerUserId: employeeId,
@@ -90,7 +91,7 @@ public class ListEmployeeAssetsHandlerTests
         SeedAssignment(db, companyId, asset.Id, otherEmployeeId);
         await db.SaveChangesAsync();
 
-        var handler = new ListEmployeeAssetsHandler(db);
+        var handler = new ListEmployeeAssetsHandler(db, TestAssetResourceAuthorizer.Create());
         var result = await handler.HandleAsync(
             new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
             callerUserId: employeeId,
@@ -112,7 +113,7 @@ public class ListEmployeeAssetsHandlerTests
         SeedAssignment(db, otherCompanyId, asset.Id, employeeId);
         await db.SaveChangesAsync();
 
-        var handler = new ListEmployeeAssetsHandler(db);
+        var handler = new ListEmployeeAssetsHandler(db, TestAssetResourceAuthorizer.Create());
         var result = await handler.HandleAsync(
             new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
             callerUserId: employeeId,
@@ -139,7 +140,7 @@ public class ListEmployeeAssetsHandlerTests
         db.AssetAssignments.Add(AssetAssignment.Create(Guid.NewGuid(), companyId, asset2.Id, employeeId, Guid.NewGuid(), null, later));
         await db.SaveChangesAsync();
 
-        var handler = new ListEmployeeAssetsHandler(db);
+        var handler = new ListEmployeeAssetsHandler(db, TestAssetResourceAuthorizer.Create());
         var result = await handler.HandleAsync(
             new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
             callerUserId: employeeId,
@@ -166,7 +167,7 @@ public class ListEmployeeAssetsHandlerTests
         db.AssetAssignments.Add(assignment);
         await db.SaveChangesAsync();
 
-        var handler = new ListEmployeeAssetsHandler(db);
+        var handler = new ListEmployeeAssetsHandler(db, TestAssetResourceAuthorizer.Create());
         var result = await handler.HandleAsync(
             new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
             callerUserId: employeeId,
@@ -198,7 +199,7 @@ public class ListEmployeeAssetsHandlerTests
         SeedAssignment(db, companyId, asset.Id, employeeId);
         await db.SaveChangesAsync();
 
-        var handler = new ListEmployeeAssetsHandler(db);
+        var handler = new ListEmployeeAssetsHandler(db, TestAssetResourceAuthorizer.Create());
         var result = await handler.HandleAsync(
             new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
             callerUserId: employeeId,
@@ -220,7 +221,7 @@ public class ListEmployeeAssetsHandlerTests
         SeedAssignment(db, companyId, asset.Id, employeeId);
         await db.SaveChangesAsync();
 
-        var handler = new ListEmployeeAssetsHandler(db);
+        var handler = new ListEmployeeAssetsHandler(db, TestAssetResourceAuthorizer.Create());
         var result = await handler.HandleAsync(
             new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
             callerUserId: employeeId,
@@ -242,7 +243,7 @@ public class ListEmployeeAssetsHandlerTests
         assignment.Acknowledge(FixedOffset);
         await db.SaveChangesAsync();
 
-        var handler = new ListEmployeeAssetsHandler(db);
+        var handler = new ListEmployeeAssetsHandler(db, TestAssetResourceAuthorizer.Create());
         var result = await handler.HandleAsync(
             new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
             callerUserId: employeeId,
@@ -259,7 +260,7 @@ public class ListEmployeeAssetsHandlerTests
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
-        var handler = new ListEmployeeAssetsHandler(db);
+        var handler = new ListEmployeeAssetsHandler(db, TestAssetResourceAuthorizer.Create());
         var result = await handler.HandleAsync(
             new ListEmployeeAssetsRequest { CompanyId = companyId, EmployeeId = employeeId },
             callerUserId: employeeId,

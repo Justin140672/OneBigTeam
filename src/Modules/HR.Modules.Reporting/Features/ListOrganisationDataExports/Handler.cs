@@ -6,8 +6,7 @@ namespace HR.Modules.Reporting.Features.ListOrganisationDataExports;
 
 internal sealed class ListOrganisationDataExportsHandler(
     ReportingDbContext db,
-    IClock clock,
-    IAuthorizationService authorizationService)
+    IClock clock)
 {
     private const int MaxRows = 50;
 
@@ -16,23 +15,6 @@ internal sealed class ListOrganisationDataExportsHandler(
         Guid userId,
         CancellationToken cancellationToken)
     {
-        // Ticket 5: Organisation data exports require BOTH Company Administrator AND HR Administrator roles.
-        // Company Administrator alone (without HR Admin role) is insufficient.
-        var effectiveRoles = await authorizationService.GetEffectiveRolesAsync(userId, cancellationToken);
-
-        // SystemRoles.HrAdministrator = 00000000-0000-0000-0000-000000000004
-        // SystemRoles.CompanyAdministrator = 00000000-0000-0000-0000-000000000006
-        var hrAdministratorRoleId = new Guid("00000000-0000-0000-0000-000000000004");
-        var companyAdministratorRoleId = new Guid("00000000-0000-0000-0000-000000000006");
-
-        var hasHrAdminRole = effectiveRoles.Contains(hrAdministratorRoleId);
-        var hasCompanyAdminRole = effectiveRoles.Contains(companyAdministratorRoleId);
-
-        if (!hasHrAdminRole || !hasCompanyAdminRole)
-        {
-            return Result.Failure<ListOrganisationDataExportsResponse>(
-                Error.Forbidden("This action requires both Company Administrator and HR Administrator roles."));
-        }
 
         var now = clock.UtcNowOffset();
 

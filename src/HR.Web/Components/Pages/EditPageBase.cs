@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.AspNetCore.WebUtilities;
+using HR.SharedKernel.Http;
 using HR.SharedKernel.Idempotency;
 using HR.Web.Services;
 
@@ -76,8 +77,8 @@ public abstract class EditPageBase : ComponentBase, IDisposable
 
     // Where Close/Save-and-close should actually go: a "?returnUrl=" query param set by callers
     // that sent the user here from somewhere other than ListUrl (e.g. the Getting Started
-    // checklist), falling back to ListUrl when absent. Only trusts an app-relative path (starts
-    // with "/", not "//") so a crafted external returnUrl can't redirect the user off-site.
+    // checklist), falling back to ListUrl when absent. Validated with ReturnUrlValidator to
+    // prevent open-redirect vulnerabilities.
     private string? ReturnUrl
     {
         get
@@ -86,8 +87,7 @@ public abstract class EditPageBase : ComponentBase, IDisposable
             if (!QueryHelpers.ParseQuery(uri.Query).TryGetValue("returnUrl", out var value))
                 return null;
 
-            var returnUrl = value.ToString();
-            return returnUrl.StartsWith('/') && !returnUrl.StartsWith("//") ? returnUrl : null;
+            return ReturnUrlValidator.ValidateInternalPath(value.ToString());
         }
     }
 

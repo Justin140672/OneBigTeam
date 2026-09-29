@@ -14,11 +14,10 @@ namespace HR.Web.E2E.Tests.Tests;
 /// entity. "QA Engineer" has no inherited roles configured in seed data, and nothing else in the
 /// suite edits its role defaults (other files only ever select it in a Position Profile dropdown).
 ///
-/// Inherits <see cref="PositionRoleDefaultsSerialTestBase"/> because every test here saves the
-/// full role-defaults list for "QA Engineer" via the same read-modify-write-the-whole-list
-/// endpoint — see that base's remarks.
+/// Every test here saves the full role-defaults list for "QA Engineer" via the same
+/// read-modify-write-the-whole-list endpoint, so tests in this class can race each other (last save wins).
 /// </summary>
-public sealed class PositionProfileInheritedRolesTabTests(HrAdminPersonaFixture fixture) : PositionRoleDefaultsSerialTestBase(fixture)
+public sealed class PositionProfileInheritedRolesTabTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

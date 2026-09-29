@@ -8,7 +8,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Verifies that a Company 1 (Acme) user cannot see tasks, notifications, or task detail
 /// pages that belong to Company 2 (Beta Corp).
 /// </summary>
-public sealed class TenantIsolationTests(CrossUserFixture fixture) : CrossUserTenantAndMiscTestBase(fixture)
+public sealed class TenantIsolationTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     // ── Company 1 — Acme Corporation ─────────────────────────────────────────
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");

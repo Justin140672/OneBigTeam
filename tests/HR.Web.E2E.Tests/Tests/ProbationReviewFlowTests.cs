@@ -17,7 +17,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// This test is designed to be resilient: if another test has already completed the review,
 /// this test simply verifies the completed state is visible on the probation tab.
 /// </summary>
-public sealed class ProbationReviewFlowTests(CrossUserFixture fixture) : CrossUserTenantAndMiscTestBase(fixture)
+public sealed class ProbationReviewFlowTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     private static readonly Guid AcmeId           = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid ReviewerId           = Guid.Parse("30000000-0000-0000-0000-000000000008");
@@ -42,32 +42,20 @@ public sealed class ProbationReviewFlowTests(CrossUserFixture fixture) : CrossUs
 
         // ── Step 1: Log in as the review task assignee (David Park) and complete the review ──
 
-        // Gate against HrDashboardTests.UpcomingProbationReviewsWidget_ShowsCarlosRivera, which
-        // reads a capped "upcoming probation reviews" list that Sophie's still-pending review can
-        // evict Carlos Rivera's from — see SharedProbationGate's remarks in
-        // GroupSerializedTestBases.cs.
-        await SharedProbationGate.Instance.WaitAsync();
-        try
+        await login.GoToAsync();
+        await login.LoginAsync(ReviewerEmail);
+
+        await taskView.GoToAsync(AcmeId, ReviewerId, ProbationTaskId);
+
+        var statusBefore = await taskView.GetStatusAsync();
+        if (statusBefore != "Completed")
         {
-            await login.GoToAsync();
-            await login.LoginAsync(ReviewerEmail);
-
-            await taskView.GoToAsync(AcmeId, ReviewerId, ProbationTaskId);
-
-            var statusBefore = await taskView.GetStatusAsync();
-            if (statusBefore != "Completed")
-            {
-                await taskView.EnterReviewNotesAsync(
-                    "Manager check-in complete. Sophie is meeting all objectives.");
-                await taskView.CompleteReviewAsync();
-            }
-
-            Assert.Equal("Completed", await taskView.GetStatusAsync());
+            await taskView.EnterReviewNotesAsync(
+                "Manager check-in complete. Sophie is meeting all objectives.");
+            await taskView.CompleteReviewAsync();
         }
-        finally
-        {
-            SharedProbationGate.Instance.Release();
-        }
+
+        Assert.Equal("Completed", await taskView.GetStatusAsync());
 
         // ── Step 2: Switch to Laura (HR admin) and check the probation tab ──
 

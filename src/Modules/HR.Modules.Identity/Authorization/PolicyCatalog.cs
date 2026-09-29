@@ -29,6 +29,7 @@ internal static class PolicyCatalog
         ["employee:read"] = SystemPermissions.EmployeeRead,
         ["company:manage"] = SystemPermissions.CompanyEdit,
         ["support:manage"] = SystemPermissions.SupportManage,
+        ["support:request"] = SystemPermissions.SupportRequest,
         ["hr-settings:manage"] = SystemPermissions.HrSettingsManage,
         ["users:view"] = SystemPermissions.UsersView,
         ["users:manage"] = SystemPermissions.UsersManage,

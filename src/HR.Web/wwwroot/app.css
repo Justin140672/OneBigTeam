@@ -257,6 +257,14 @@ html, body {
     justify-content: space-between;
 }
 
+/* Syncfusion renders the close-icon button as a DOM child of .e-dlg-header-content BEFORE the
+   title text span, so the space-between above (which spaces existing children apart without
+   reordering them) puts the close icon on the left and the title on the right — the opposite of
+   every other dialog convention in the app. Push the close icon after the title instead. */
+.hr-dialog.e-dialog .e-dlg-header-content .e-dlg-closeicon-btn {
+    order: 2;
+}
+
 .hr-dialog.e-dialog .e-footer-content {
     display: flex;
     justify-content: flex-end;

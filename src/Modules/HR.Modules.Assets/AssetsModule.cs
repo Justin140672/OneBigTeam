@@ -59,6 +59,7 @@ public static class AssetsModule
         services.AddScoped<ListAssetsHandler>();
         services.AddScoped<UpdateAssetCategoryHandler>();
         services.AddScoped<DeactivateAssetCategoryHandler>();
+        services.AddScoped<AssetResourceAuthorizer>();
         services.AddScoped<GetAssetHandler>();
         services.AddScoped<GetAssetAssignmentHandler>();
         services.AddScoped<UpdateAssetHandler>();

@@ -39,7 +39,7 @@ public sealed class CustomerSupportViewTests(EmployeePersonaFixture fixture) : R
         Assert.True(await support.IsDetailsGridVisibleAsync());
 
         Assert.Equal("Acme Corporation", await support.GetCompanyNameAsync());
-        Assert.Equal("Active", await support.GetSubscriptionStatusAsync());
+        Assert.Equal("Trial", await support.GetSubscriptionStatusAsync());
 
         Assert.False(string.IsNullOrWhiteSpace(await support.GetStatCardValueAsync("Portal users")));
         Assert.False(string.IsNullOrWhiteSpace(await support.GetStatCardValueAsync("Subscription status")));

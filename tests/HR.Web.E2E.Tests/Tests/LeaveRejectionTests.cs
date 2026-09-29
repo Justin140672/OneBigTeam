@@ -4,7 +4,7 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
-public sealed class LeaveRejectionTests(CrossUserFixture fixture) : CrossUserLeaveNotificationsTestBase(fixture)
+public sealed class LeaveRejectionTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId   = Guid.Parse("30000000-0000-0000-0000-000000000004");

@@ -672,7 +672,8 @@ public class AdministrativeRoleSeparationTests
 
     // OBT-IAM-09: support:manage removed from Company Administrator — a
     // Company-Administrator-only account is limited to company settings and subscription
-    // administration. CompanyAdminPlusHrAdmin retains access via HR Administrator's own grant (see
+    // administration (the queue admin surface is the support dashboard; GET .../support/requests is
+    // now self-service, own-requests-only, gated by support:request). CompanyAdminPlusHrAdmin retains access via HR Administrator's own grant (see
     // CompanyAdministratorPlusHrAdministrator_CanReach_SupportRequestsQueue below).
     [Fact]
     public async Task CompanyAdministratorOnly_CannotReach_SupportRequestsQueue()
@@ -680,7 +681,7 @@ public class AdministrativeRoleSeparationTests
         var companyId = Guid.NewGuid();
         using var client = await ClientFor(CompanyAdmin, companyId);
 
-        var response = await client.GetAsync($"/api/companies/{companyId}/support/requests");
+        var response = await client.GetAsync("/api/support/dashboard");
 
         AssertForbidden(response);
     }
@@ -691,7 +692,7 @@ public class AdministrativeRoleSeparationTests
         var companyId = Guid.NewGuid();
         using var client = await ClientFor(CompanyAdminPlusHrAdmin, companyId);
 
-        var response = await client.GetAsync($"/api/companies/{companyId}/support/requests");
+        var response = await client.GetAsync("/api/support/dashboard");
 
         AssertReachedHandler(response);
     }

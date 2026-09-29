@@ -16,11 +16,10 @@ namespace HR.Web.E2E.Tests.Tests;
 /// for one specific employee email.
 ///
 /// Each test uses its OWN dedicated pool employee (<see cref="SeededE2eEmployees.ContactSaveControl"/>,
-/// seeds 51-54) so the per-email control store gives it full isolation. The class serialises real
-/// Supabase logins via <see cref="SupabaseAuthSerialEmployeeTestBase"/>.
+/// seeds 51-54) so the per-email control store gives it full isolation.
 /// </summary>
 public sealed class ContactDetailsTabSavingControlTests(EmployeePersonaFixture fixture)
-    : SupabaseAuthSerialEmployeeTestBase(fixture)
+    : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = SeededE2eEmployees.AcmeCompanyId;
 

@@ -88,16 +88,24 @@ public class AwardToilEndpointTests
     public async Task Post_AwardToil_Returns_Created_For_Manager()
     {
         // Ticket 4: manager must be set up as a manager of the target employee to award TOIL
-        var (client, companyId, employeeId) = await SetupAsync(ManagerUserId);
+        var (_, companyId, employeeId) = await SetupAsync(ManagerUserId);
         await SeedToilLeaveTypeAsync(companyId);
         await SeedPolicyAssignmentAsync(companyId, employeeId);
 
-        // Set up manager relationship
         var setupClient = _factory.CreateClient();
         setupClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, HrAdminUserId.ToString());
         setupClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
-        await UpdateManagerAsync(setupClient, companyId, employeeId, ManagerUserId);
+        // The manager must be a real employee in the company (AssignManager rejects unknown manager
+        // ids), and the caller identity must be that employee's id for the reporting-line check.
+        var managerEmployeeId = await CreateEmployeeAsync(setupClient, companyId, "Manager");
+        await TestRoleSeeder.AssignRoleAsync(_factory, managerEmployeeId, SystemRoles.Manager, companyId);
+        await UpdateManagerAsync(setupClient, companyId, employeeId, managerEmployeeId);
+
+        using var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, managerEmployeeId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, managerEmployeeId, companyId);
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/toil",
@@ -150,6 +158,19 @@ public class AwardToilEndpointTests
         setupClient.DefaultRequestHeaders.Remove(TestAuthHandler.TenantHeader);
         setupClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
+        var employeeId = await CreateEmployeeAsync(setupClient, companyId, "TOIL");
+
+        // Return a client authenticated as the target userId, scoped to the created company
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
+
+        return (client, companyId, employeeId);
+    }
+
+    private static async Task<Guid> CreateEmployeeAsync(HttpClient setupClient, Guid companyId, string firstName)
+    {
         var (departmentId, locationId, positionProfileId, employmentTypeId) =
             await CreateEmployeeReferenceDataAsync(setupClient, companyId);
 
@@ -158,7 +179,7 @@ public class AwardToilEndpointTests
             new
             {
                 companyId,
-                firstName = "TOIL",
+                firstName,
                 lastName = "Tester",
                 workEmail = $"toil.{Guid.NewGuid():N}@example.com",
                 startDate = "2026-01-01",
@@ -172,15 +193,7 @@ public class AwardToilEndpointTests
                 positionProfileId
             });
         empResp.EnsureSuccessStatusCode();
-        var employee = await empResp.Content.ReadFromJsonAsync<EmployeePayload>();
-
-        // Return a client authenticated as the target userId, scoped to the created company
-        var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
-        await TestRoleSeeder.SyncCompanyAsync(_factory, userId, companyId);
-
-        return (client, companyId, employee!.Id);
+        return (await empResp.Content.ReadFromJsonAsync<EmployeePayload>())!.Id;
     }
 
     private static async Task<(Guid DepartmentId, Guid LocationId, Guid PositionProfileId, Guid EmploymentTypeId)>

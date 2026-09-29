@@ -2,10 +2,10 @@
    cancel-subscription-type actions. Thin wrapper over HrConfirmDialog (DangerConfirm forced on)
    so call sites read their intent at a glance instead of remembering to set a boolean flag. *@
 <HrConfirmDialog Visible="Visible"
-                 Title="Title"
-                 Message="Message"
-                 ConfirmText="ConfirmText"
-                 CancelText="CancelText"
+                 Title="@Title"
+                 Message="@Message"
+                 ConfirmText="@ConfirmText"
+                 CancelText="@CancelText"
                  DangerConfirm="true"
                  Busy="Busy"
                  OnConfirmed="OnConfirmed"

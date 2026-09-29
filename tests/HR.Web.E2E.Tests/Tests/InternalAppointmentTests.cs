@@ -28,13 +28,6 @@ namespace HR.Web.E2E.Tests.Tests;
 /// tests that go on to FOLLOW the profile link sign in instead as the dedicated HR Administrator +
 /// Recruiter "appointer" (InternalAppointmentApi.EnsureAppointerAsync, created once per process and
 /// never mutated). Employee-record checks always go through the HR Administrator API client.
-///
-/// Serialization (two gates, always acquired in this order — the same order
-/// InternalApplicationIdentificationTests/InternalVacancyApplyTests use, so they can't deadlock):
-///   1. CrossUserVacancyTestBase.GateInstance, for the whole test — stage assertions read Acme's
-///      shared, ordered recruitment pipeline by name ("Application Received"/"Hired"), which
-///      RecruitmentStageManagementTests mutates.
-///   2. SupabaseAuthGate, only around provisioning logins and signing in (real Supabase calls).
 /// </summary>
 public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
     : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
@@ -48,32 +41,6 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
     // RecruitmentStageSeeder.BuildDefaultStages.
     private const string InitialStage = "Application Received";
     private const string HiredStage = "Hired";
-
-    public override async Task InitializeAsync()
-    {
-        await CrossUserVacancyTestBase.GateInstance.WaitAsync();
-        try
-        {
-            await base.InitializeAsync();
-        }
-        catch
-        {
-            CrossUserVacancyTestBase.GateInstance.Release();
-            throw;
-        }
-    }
-
-    public override async Task DisposeAsync()
-    {
-        try
-        {
-            await base.DisposeAsync();
-        }
-        finally
-        {
-            CrossUserVacancyTestBase.GateInstance.Release();
-        }
-    }
 
     private sealed class Arranged(
         HttpClient hrAdminApi,
@@ -123,28 +90,20 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
 
         InternalVacancyApplyApi.FreshEmployee applicant;
         InternalVacancyApplyApi.InternalApplication internalApplication;
-        await SupabaseAuthGate.Instance.WaitAsync();
-        try
-        {
-            var browserUserEmail = withEmployeeProfileAccess
-                ? (await InternalAppointmentApi.EnsureAppointerAsync(hrAdminApi, _fixture.ApiBaseUrl)).WorkEmail
-                : InternalAppointmentApi.RecruiterEmail;
+        var browserUserEmail = withEmployeeProfileAccess
+            ? (await InternalAppointmentApi.EnsureAppointerAsync(hrAdminApi, _fixture.ApiBaseUrl)).WorkEmail
+            : InternalAppointmentApi.RecruiterEmail;
 
-            applicant = await InternalVacancyApplyApi.CreateActiveEmployeeWithLoginAsync(hrAdminApi, _fixture.ApiBaseUrl);
-            using (var employeeApi = await InternalVacancyApplyApi.CreateEmployeeApiClientAsync(_fixture.ApiBaseUrl, applicant.WorkEmail))
-            {
-                internalApplication = await InternalVacancyApplyApi.ApplyAsEmployeeAsync(
-                    employeeApi, vacancy.Id, $"cv-{applicant.LastName}.pdf");
-            }
-
-            var login = new LoginPage(_page, _fixture.WebBaseUrl);
-            await login.GoToAsync();
-            await login.LoginAsync(browserUserEmail);
-        }
-        finally
+        applicant = await InternalVacancyApplyApi.CreateActiveEmployeeWithLoginAsync(hrAdminApi, _fixture.ApiBaseUrl);
+        using (var employeeApi = await InternalVacancyApplyApi.CreateEmployeeApiClientAsync(_fixture.ApiBaseUrl, applicant.WorkEmail))
         {
-            SupabaseAuthGate.Instance.Release();
+            internalApplication = await InternalVacancyApplyApi.ApplyAsEmployeeAsync(
+                employeeApi, vacancy.Id, $"cv-{applicant.LastName}.pdf");
         }
+
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        await login.GoToAsync();
+        await login.LoginAsync(browserUserEmail);
 
         Guid? externalApplicationId = null;
         string? externalLastName = null;

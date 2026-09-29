@@ -12,46 +12,13 @@ namespace HR.Web.E2E.Tests.Tests;
 /// a brand-new Active employee with a freshly provisioned login (never a shared seeded persona such
 /// as Tom) and a brand-new, GUID-titled, internally-advertised Open vacancy. The page's search box
 /// narrows the list to that one vacancy before any card is opened.
-///
-/// Serialization (two gates, always acquired in this order: vacancy gate, then Supabase gate):
-///   1. CrossUserVacancyTestBase.GateInstance — applying creates candidates/applications on Acme's
-///      shared recruitment pipeline, which the other recruitment tests read by stage/position.
-///   2. SupabaseAuthGate (via SupabaseAuthSerialEmployeeTestBase) — ensure-employee-login and the
-///      UI login as a non-persona user are real, uncached Supabase calls.
-/// No other class in this project holds both gates, so the fixed order cannot deadlock.
 /// </summary>
-public sealed class InternalVacancyApplyTests(EmployeePersonaFixture fixture) : SupabaseAuthSerialEmployeeTestBase(fixture)
+public sealed class InternalVacancyApplyTests(EmployeePersonaFixture fixture) : RoleE2ETestBase<EmployeePersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = InternalVacancyApplyApi.AcmeId;
 
     private const string PdfMime = "application/pdf";
     private const long MaxCvBytes = 20 * 1024 * 1024;
-
-    public override async Task InitializeAsync()
-    {
-        await CrossUserVacancyTestBase.GateInstance.WaitAsync();
-        try
-        {
-            await base.InitializeAsync();
-        }
-        catch
-        {
-            CrossUserVacancyTestBase.GateInstance.Release();
-            throw;
-        }
-    }
-
-    public override async Task DisposeAsync()
-    {
-        try
-        {
-            await base.DisposeAsync();
-        }
-        finally
-        {
-            CrossUserVacancyTestBase.GateInstance.Release();
-        }
-    }
 
     private sealed record Arranged(
         InternalVacancyApplyApi.FreshEmployee Employee,

@@ -18,8 +18,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// shared CandidateCvApi. All names, emails and file names are Guid-suffixed, so nothing depends on
 /// shared seed state beyond Acme's recruitment pipeline.
 ///
-/// Uses Marcus Diallo (Recruiter role) — recruitment:manage is Recruiter-only. Serializes on the
-/// CrossUserVacancyTestBase gate like the other CV/vacancy tests: new applications land on the first
+/// Uses Marcus Diallo (Recruiter role) — recruitment:manage is Recruiter-only. New applications land on the first
 /// stage of Acme's shared, ordered pipeline ("Application Received"), which
 /// RecruitmentStageManagementTests mutates.
 /// </summary>
@@ -32,24 +31,6 @@ public sealed class VacancyCreateCandidateTests(RecruiterPersonaFixture fixture)
 
     // RecruitmentStageSeeder.BuildDefaultStages — a freshly created Application starts here.
     private const string InitialStage = "Application Received";
-
-    public override async Task InitializeAsync()
-    {
-        await CrossUserVacancyTestBase.GateInstance.WaitAsync();
-        await base.InitializeAsync();
-    }
-
-    public override async Task DisposeAsync()
-    {
-        try
-        {
-            await base.DisposeAsync();
-        }
-        finally
-        {
-            CrossUserVacancyTestBase.GateInstance.Release();
-        }
-    }
 
     // ── 1. New candidate, no CV ───────────────────────────────────────────────────
 

@@ -28,10 +28,6 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Active employee(s) with fresh logins. After each rejected probe the test re-reads the affected data
 /// to prove nothing was created or changed, and where it matters follows up with the legitimate call
 /// to prove the rejection left nothing half-done.
-///
-/// Serialization: same two gates, same order, as every other internal-recruitment class —
-/// CrossUserVacancyTestBase.GateInstance for the whole test (applications land on Acme's shared
-/// recruitment pipeline), SupabaseAuthGate only around provisioning logins and /api/login.
 /// </summary>
 public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFixture fixture)
     : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
@@ -42,32 +38,6 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
     private const string InitialStage = "Application Received";
     private const string HiredStage = "Hired";
 
-    public override async Task InitializeAsync()
-    {
-        await CrossUserVacancyTestBase.GateInstance.WaitAsync();
-        try
-        {
-            await base.InitializeAsync();
-        }
-        catch
-        {
-            CrossUserVacancyTestBase.GateInstance.Release();
-            throw;
-        }
-    }
-
-    public override async Task DisposeAsync()
-    {
-        try
-        {
-            await base.DisposeAsync();
-        }
-        finally
-        {
-            CrossUserVacancyTestBase.GateInstance.Release();
-        }
-    }
-
     /// <summary>A fresh Active employee with a login, plus an HttpClient signed in AS that employee.</summary>
     private sealed record SignedInEmployee(InternalVacancyApplyApi.FreshEmployee Employee, HttpClient Api) : IDisposable
     {
@@ -76,17 +46,9 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
 
     private async Task<SignedInEmployee> CreateSignedInEmployeeAsync(HttpClient hrAdminApi)
     {
-        await SupabaseAuthGate.Instance.WaitAsync();
-        try
-        {
-            var employee = await InternalVacancyApplyApi.CreateActiveEmployeeWithLoginAsync(hrAdminApi, _fixture.ApiBaseUrl);
-            var api = await InternalVacancyApplyApi.CreateEmployeeApiClientAsync(_fixture.ApiBaseUrl, employee.WorkEmail);
-            return new SignedInEmployee(employee, api);
-        }
-        finally
-        {
-            SupabaseAuthGate.Instance.Release();
-        }
+        var employee = await InternalVacancyApplyApi.CreateActiveEmployeeWithLoginAsync(hrAdminApi, _fixture.ApiBaseUrl);
+        var api = await InternalVacancyApplyApi.CreateEmployeeApiClientAsync(_fixture.ApiBaseUrl, employee.WorkEmail);
+        return new SignedInEmployee(employee, api);
     }
 
     // ── 1. Impersonation ──────────────────────────────────────────────────────────────────────

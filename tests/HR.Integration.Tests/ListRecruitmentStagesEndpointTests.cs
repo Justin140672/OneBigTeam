@@ -54,7 +54,7 @@ public class ListRecruitmentStagesEndpointTests
     }
 
     [Fact]
-    public async Task Get_RecruitmentStages_Returns_Ok_For_RecruitmentView_User()
+    public async Task Get_RecruitmentStages_Returns_Forbidden_For_Plain_Employee_Without_RecruitmentManage()
     {
         var companyId = Guid.NewGuid();
         await SeedDefaultStagesAsync(companyId);
@@ -62,10 +62,9 @@ public class ListRecruitmentStagesEndpointTests
 
         var response = await client.GetAsync($"/api/companies/{companyId}/recruitment-stages");
 
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
-        Assert.NotNull(payload);
-        Assert.Equal(6, payload!.Items.Count);
+        // c3b6f4f3: stage administration is recruiter-only (recruitment:manage); the internal vacancy
+        // board is the employee-facing surface.
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]

@@ -32,7 +32,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// /resend-verification proxy are likewise static forms.
 /// </summary>
 public sealed class SignupToCheckYourEmailJourneyTests(ParallelBlankPersonaFixture fixture)
-    : SupabaseAuthSerialBlankTestBase(fixture)
+    : RoleE2ETestBase<ParallelBlankPersonaFixture>(fixture)
 {
     private async Task<string> SignUpAsync()
     {

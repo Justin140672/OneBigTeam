@@ -15,7 +15,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Like SignupToCheckYourEmailJourneyTests, this drives a plain HTML form (no Blazor circuit).
 /// </summary>
 public sealed class SignupPageRedesignTests(ParallelBlankPersonaFixture fixture)
-    : SupabaseAuthSerialBlankTestBase(fixture)
+    : RoleE2ETestBase<ParallelBlankPersonaFixture>(fixture)
 {
     [Fact]
     public async Task SignupHeader_LoginLink_PointsAtWebLogin_NotHash()

@@ -17,7 +17,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// (Laura Bennett = HR, James Okafor = Manager, Marcus Diallo = Recruiter) across its tests — none of
 /// the four cached single-role fixtures covers all three dashboards.
 /// </summary>
-public sealed class DashboardAccessibilityTests(CrossUserFixture fixture) : CrossUserTenantAndMiscTestBase(fixture)
+public sealed class DashboardAccessibilityTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     private const string HrEmail        = "laura.bennett@acme.example";
     private const string ManagerEmail   = "james.okafor@acme.example";

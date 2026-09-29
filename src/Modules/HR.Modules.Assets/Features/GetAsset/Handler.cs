@@ -1,10 +1,11 @@
 using HR.Modules.Assets.Persistence;
+using HR.Modules.Assets.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Assets.Features.GetAsset;
 
-internal sealed class GetAssetHandler(AssetsDbContext db)
+internal sealed class GetAssetHandler(AssetsDbContext db, AssetResourceAuthorizer authorizer)
 {
     public async Task<Result<GetAssetResponse>> HandleAsync(
         GetAssetRequest request,
@@ -17,20 +18,20 @@ internal sealed class GetAssetHandler(AssetsDbContext db)
         if (asset is null)
             return Result.Failure<GetAssetResponse>(Error.NotFound("Asset not found."));
 
-        // Inline resource-level authorization: verify caller is authorized to view this asset.
-        // Only the assigned employee (if assigned) can view the asset. HR admins and managers
-        // are checked at the endpoint level via AssetResourceAuthorizer (to be integrated).
-        // For now, unassigned assets are only viewable by HR admins (via policy), and attempting
-        // to view an assigned asset you don't own returns Forbidden.
+        // Resource-level authorization: assigned asset -> self, direct manager or HR administrator;
+        // unassigned asset -> HR administrator only.
+        if (callerUserId is not { } callerId)
+            return Result.Failure<GetAssetResponse>(Error.Forbidden("You do not have permission to view this asset."));
+
         var assignment = await db.AssetAssignments
             .FirstOrDefaultAsync(aa => aa.AssetId == asset.Id && aa.ReturnedAt == null, cancellationToken);
 
-        // If asset is assigned and caller is not the assigned employee, deny access
-        if (assignment is not null && assignment.EmployeeId != callerUserId)
-            return Result.Failure<GetAssetResponse>(Error.Forbidden("You do not have permission to view this asset."));
+        var allowed = assignment is null
+            ? await authorizer.IsHrAdministratorAsync(callerId, cancellationToken)
+            : await authorizer.CanViewAssetAssignmentAsync(
+                request.CompanyId, callerId, assignment.EmployeeId, cancellationToken);
 
-        // If asset is unassigned, deny access (only HR admin can view unassigned assets, checked via policy)
-        if (assignment is null)
+        if (!allowed)
             return Result.Failure<GetAssetResponse>(Error.Forbidden("You do not have permission to view this asset."));
 
         var categoryName = await db.AssetCategories

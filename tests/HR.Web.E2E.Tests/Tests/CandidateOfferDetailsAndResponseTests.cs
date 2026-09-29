@@ -20,7 +20,7 @@ namespace HR.Web.E2E.Tests.Tests;
 ///  5. The "Record Offer Response" toolbar item is disabled unless the selected application's offer
 ///     is AwaitingResponse (before any offer, and again once the response has been recorded).
 ///
-/// Runs in the CrossUserVacancy serialization group (fresh, GUID-suffixed Position Profile /
+/// Runs in parallel (fresh, GUID-suffixed Position Profile /
 /// Vacancy / Candidate per test). Position Profile creation needs an HR Administrator
 /// (employee:manage — Laura Bennett); the recruitment pipeline steps need a Recruiter
 /// (recruitment:manage — Marcus Diallo), same account-switch pattern as
@@ -30,7 +30,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// field and this class does not touch HR Settings (unlike ApplicationToEmployeeFlowTests, which
 /// needs Manual mode to type a number and therefore takes the HrSettingsSerial gate).
 /// </summary>
-public sealed class CandidateOfferDetailsAndResponseTests(CrossUserFixture fixture) : CrossUserVacancyTestBase(fixture)
+public sealed class CandidateOfferDetailsAndResponseTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

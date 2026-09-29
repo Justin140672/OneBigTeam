@@ -9,7 +9,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Tom submits a leave request which creates a notification for his manager James.
 /// James opens the notification panel, clicks "Mark all read", and the unread badge disappears.
 /// </summary>
-public sealed class NotificationMarkAllReadTests(CrossUserFixture fixture) : CrossUserLeaveNotificationsTestBase(fixture)
+public sealed class NotificationMarkAllReadTests(CrossUserFixture fixture) : RoleE2ETestBase<CrossUserFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid TomId  = Guid.Parse("30000000-0000-0000-0000-000000000004");

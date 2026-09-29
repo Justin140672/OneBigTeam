@@ -32,26 +32,22 @@ public sealed class LeavingProcessHistoryE2ETests(HrAdminPersonaFixture fixture)
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        // Create a fresh employee with no leaving processes
-        await empEdit.GoToNewAsync(AcmeId);
-        await empEdit.FillFirstNameAsync("Test");
-        await empEdit.FillLastNameAsync("Employee");
-        await empEdit.FillWorkEmailAsync($"test-{Guid.NewGuid():N}@example.com");
-        await empEdit.SelectDropdownAsync("Gender", "Male");
-        await empEdit.SelectDropdownAsync("Nationality", "British");
-        await empEdit.FillDateOfBirthAsync("15011990");
-        await empEdit.FillStartDateAsync("01012024");
-        await empEdit.FillEmployeeNumberAsync($"EMP-{Guid.NewGuid():N}");
-        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", "Software Developer");
-        await empEdit.SaveNewEmployeeAsync();
+        // Create a fresh employee with no leaving processes. SaveNewEmployeeAsync lands on the
+        // employee list, not this employee's own profile — use the shared helper (which searches
+        // for the new row and clicks into it) rather than duplicating that creation flow inline and
+        // then opening the leaving tab straight off the list page.
+        var employeeId = await CreateEmployeeAsync(empEdit);
 
-        // Navigate to the Leaving & Offboarding tab
-        await leavingTab.OpenAsync();
+        // Navigate to the employee's own profile. OpenAsync() is only valid once a leaving process
+        // has actually been started — the "Leaving & Offboarding" tab isn't rendered at all
+        // otherwise (EmployeeEdit.razor's _showLeavingTab/_showOffboardingTab guard), so calling it
+        // here would fail regardless of navigation. Use IsTabVisibleAsync() instead, which is built
+        // for exactly this case: it opens the "Tasks & Records" group and reports whether the
+        // section tab is present.
+        await empEdit.GoToAsync(AcmeId, employeeId);
 
-        // Verify the history section is not visible (no past attempts to show)
-        Assert.False(await leavingTab.IsHistorySectionVisibleAsync(),
-            "Expected the history section to not be visible when no leaving processes exist");
+        Assert.False(await leavingTab.IsTabVisibleAsync(),
+            "Expected the Leaving & Offboarding tab to not be visible when no leaving processes exist");
     }
 
     [Fact]
@@ -217,7 +213,10 @@ public sealed class LeavingProcessHistoryE2ETests(HrAdminPersonaFixture fixture)
         // Create an employee with a leaving process
         var employeeId = await CreateAndStartLeavingProcessAsync(empEdit);
 
-        // Start a second process to make the first one historical
+        // Only an InProgress process can be started again (StartLeavingProcessAsync returns a 409
+        // Conflict otherwise) — cancel the first one before starting a second to make it
+        // historical.
+        await E2eEmployeeApi.CancelLeavingProcessAsync(_fixture.ApiBaseUrl, employeeId);
         await CreateAndStartLeavingProcessAsync(empEdit, employeeId);
 
         // Navigate to the employee's profile
@@ -262,7 +261,10 @@ public sealed class LeavingProcessHistoryE2ETests(HrAdminPersonaFixture fixture)
         // Create an employee with a process that has notes
         var employeeId = await CreateEmployeeWithNotesAsync(empEdit);
 
-        // Start a second process to make the first one historical
+        // Only an InProgress process can be started again (StartLeavingProcessAsync returns a 409
+        // Conflict otherwise) — cancel the first one before starting a second to make it
+        // historical.
+        await E2eEmployeeApi.CancelLeavingProcessAsync(_fixture.ApiBaseUrl, employeeId);
         await CreateAndStartLeavingProcessAsync(empEdit, employeeId);
 
         // Navigate to the employee's profile
@@ -272,8 +274,10 @@ public sealed class LeavingProcessHistoryE2ETests(HrAdminPersonaFixture fixture)
         // Expand the history section
         await leavingTab.ExpandHistorySectionAsync();
 
-        // Get the notes from the first (most recent historical) entry
-        var notes = await leavingTab.GetHistoryNotesAsync(1); // Second entry (older)
+        // The second (just-started) process is "current" and excluded from "Past Leaving
+        // Attempts" (EmployeeLeavingTab.razor's GetPastAttempts filters on !IsCurrent) — the
+        // cancelled first process (which has the notes) is the ONLY history entry, at index 0.
+        var notes = await leavingTab.GetHistoryNotesAsync(0);
 
         Assert.NotNull(notes);
         Assert.NotEmpty(notes);
@@ -406,23 +410,34 @@ public sealed class LeavingProcessHistoryE2ETests(HrAdminPersonaFixture fixture)
     {
         await empEdit.GoToNewAsync(AcmeId);
         var uniqueId = Guid.NewGuid().ToString("N")[..8];
+        var lastName = $"Test{uniqueId}";
         await empEdit.FillFirstNameAsync($"Employee{uniqueId}");
-        await empEdit.FillLastNameAsync("Test");
+        await empEdit.FillLastNameAsync(lastName);
         await empEdit.FillWorkEmailAsync($"emp-{Guid.NewGuid():N}@example.com");
         await empEdit.SelectDropdownAsync("Gender", "Male");
         await empEdit.SelectDropdownAsync("Nationality", "British");
-        await empEdit.FillDateOfBirthAsync("15011990");
-        await empEdit.FillStartDateAsync("01012024");
+        await empEdit.FillDateOfBirthAsync("15/01/1990");
+        await empEdit.FillStartDateAsync("01/01/2024");
         await empEdit.FillEmployeeNumberAsync($"EMP-{uniqueId}");
         await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", "Software Developer");
+        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
+        // Selecting a Position Profile triggers an async server round trip that auto-populates
+        // Department/Location (EmployeeEmploymentTab.OnPositionProfileChanged) -- wait for it before
+        // saving, otherwise Save can race ahead and submit with those required fields still blank.
+        await empEdit.WaitForDropdownPopulatedAsync("Department");
         await empEdit.SaveNewEmployeeAsync();
 
-        // Extract employee ID from URL after save
-        var url = _page.Url;
-        var parts = url.Split('/');
-        if (Guid.TryParse(parts[^1], out var employeeId))
-            return employeeId;
+        // SaveNewEmployeeAsync lands on the employee list, not a detail page — click into the
+        // just-created row (searching by its unique last name first, the same way
+        // EmployeeAssetsTabTests/EmployeeCompensationTabTests etc. do it) and read the id back out
+        // of the resulting detail-page URL.
+        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        await empList.ClickEmployeeAsync(lastName);
+
+        var match = System.Text.RegularExpressions.Regex.Match(_page.Url,
+            @"/employees/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})");
+        if (match.Success)
+            return Guid.Parse(match.Groups[1].Value);
 
         throw new InvalidOperationException("Could not extract employee ID from URL after save");
     }
@@ -432,79 +447,39 @@ public sealed class LeavingProcessHistoryE2ETests(HrAdminPersonaFixture fixture)
         var id = employeeId ?? await CreateEmployeeAsync(empEdit);
         var leavingDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
 
-        // Navigate to the employee's profile to start a leaving process
-        await empEdit.GoToAsync(AcmeId, id);
-
-        // Use the more-actions menu to start a leaving process
-        var moreActionsButton = _page.GetByRole(AriaRole.Button, new() { Name = "More actions" });
-        if (await moreActionsButton.IsVisibleAsync())
-        {
-            await moreActionsButton.ClickAsync();
-            var startOffboardingItem = _page.GetByRole(AriaRole.Menuitem, new() { Name = "Start offboarding" });
-            if (await startOffboardingItem.IsVisibleAsync())
-            {
-                await startOffboardingItem.ClickAsync();
-
-                // A dialog should appear for starting the leaving process
-                var dialog = _page.Locator(".e-dialog");
-                if (await dialog.IsVisibleAsync())
-                {
-                    // Fill in the dialog fields
-                    var resignationDateInput = _page.Locator("input[placeholder*='Resignation']").First;
-                    if (await resignationDateInput.IsVisibleAsync())
-                    {
-                        await resignationDateInput.FillAsync(leavingDate.AddDays(-30).ToString("ddMMyyyy"));
-                    }
-
-                    var startButton = _page.GetByRole(AriaRole.Button, new() { Name = "Start" });
-                    if (await startButton.IsVisibleAsync())
-                    {
-                        await startButton.ClickAsync();
-                        await _page.WaitForLoadStateAsync();
-                    }
-                }
-            }
-        }
+        // Start the leaving process via the API test seam (the same one DepartureFinaliserE2ETests
+        // uses) rather than driving the dialog through the UI. The old UI-driven version wrapped
+        // every step in an IsVisibleAsync() check and silently did nothing when a locator didn't
+        // match the real dialog markup — no leaving process was ever created, so the server-side
+        // hasAnyLeavingProcess flag stayed false and the "Leaving & Offboarding" tab never appeared
+        // at all, rather than failing loudly.
+        await E2eEmployeeApi.StartLeavingProcessAsync(_fixture.ApiBaseUrl, id, leavingDate);
 
         return id;
     }
 
+    /// <summary>
+    /// Creates an employee with two CANCELLED leaving processes, both genuinely "past". The
+    /// "Past Leaving Attempts" history section only ever shows items where !IsCurrent
+    /// (EmployeeLeavingTab.razor's GetPastAttempts) — a cancel-then-start-again sequence that
+    /// leaves the second process InProgress only ever produces ONE history row (the cancelled
+    /// first process; the newly-started second one is excluded as "current"), which is not
+    /// enough for callers asserting >= 2 history entries. Cancel both so there are two.
+    /// </summary>
     private async Task<Guid> CreateEmployeeWithMultipleLeavingProcessesAsync(EmployeeEditPage empEdit)
     {
         var employeeId = await CreateAndStartLeavingProcessAsync(empEdit);
         await Task.Delay(500); // Small delay to ensure different timestamps
 
-        // Cancel the first process
-        var leavingTab = new EmployeeLeavingTab(_page);
-        await empEdit.GoToAsync(AcmeId, employeeId);
-        await leavingTab.OpenAsync();
+        // Cancel the first process via the API seam (same endpoint CancelLeavingProcessDialog
+        // posts to) rather than driving the dialog through the UI — only an InProgress process
+        // can be started again, so this must actually succeed before starting a second one.
+        await E2eEmployeeApi.CancelLeavingProcessAsync(_fixture.ApiBaseUrl, employeeId, "Employee decided to stay");
 
-        var hasCancelButton = await leavingTab.HasCancelButtonAsync();
-        if (hasCancelButton)
-        {
-            // Click cancel button and fill in the dialog
-            var cancelBtn = _page.GetByRole(AriaRole.Button, new() { Name = "Cancel Leaving Process" });
-            if (await cancelBtn.IsVisibleAsync())
-            {
-                await cancelBtn.ClickAsync();
-
-                // Fill in cancellation reason
-                var reasonInput = _page.Locator("textarea, input[type='text']").First;
-                if (await reasonInput.IsVisibleAsync())
-                {
-                    await reasonInput.FillAsync("Employee decided to stay");
-                    var confirmBtn = _page.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).Last;
-                    if (await confirmBtn.IsVisibleAsync())
-                    {
-                        await confirmBtn.ClickAsync();
-                        await _page.WaitForLoadStateAsync();
-                    }
-                }
-            }
-        }
-
-        // Start a new leaving process
+        // Start a second leaving process, then cancel it too, so both are "past" entries.
         await CreateAndStartLeavingProcessAsync(empEdit, employeeId);
+        await Task.Delay(500); // Small delay to ensure different timestamps
+        await E2eEmployeeApi.CancelLeavingProcessAsync(_fixture.ApiBaseUrl, employeeId, "Employee changed their mind again");
 
         return employeeId;
     }
@@ -514,30 +489,15 @@ public sealed class LeavingProcessHistoryE2ETests(HrAdminPersonaFixture fixture)
         var employeeId = await CreateAndStartLeavingProcessAsync(empEdit);
 
         var leavingTab = new EmployeeLeavingTab(_page);
+        var cancelDialog = new CancelLeavingProcessDialog(_page);
         await empEdit.GoToAsync(AcmeId, employeeId);
         await leavingTab.OpenAsync();
 
-        var hasCancelButton = await leavingTab.HasCancelButtonAsync();
-        if (hasCancelButton)
+        if (await leavingTab.HasCancelButtonAsync())
         {
-            var cancelBtn = _page.GetByRole(AriaRole.Button, new() { Name = "Cancel Leaving Process" });
-            if (await cancelBtn.IsVisibleAsync())
-            {
-                await cancelBtn.ClickAsync();
-
-                // Fill in cancellation reason
-                var reasonInput = _page.Locator("input[type='text'], textarea").First;
-                if (await reasonInput.IsVisibleAsync())
-                {
-                    await reasonInput.FillAsync("Employee cancelled their resignation");
-                    var confirmBtn = _page.GetByRole(AriaRole.Button, new() { Name = "Confirm" });
-                    if (await confirmBtn.IsVisibleAsync())
-                    {
-                        await confirmBtn.ClickAsync();
-                        await _page.WaitForLoadStateAsync();
-                    }
-                }
-            }
+            await cancelDialog.OpenAsync();
+            await cancelDialog.FillCancellationReasonAsync("Employee cancelled their resignation");
+            await cancelDialog.ConfirmAsync();
         }
 
         return employeeId;
@@ -548,49 +508,13 @@ public sealed class LeavingProcessHistoryE2ETests(HrAdminPersonaFixture fixture)
         var employeeId = await CreateEmployeeAsync(empEdit);
         var leavingDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
 
-        // Navigate to the employee's profile to start a leaving process
-        await empEdit.GoToAsync(AcmeId, employeeId);
-
-        // Use the more-actions menu to start a leaving process
-        var moreActionsButton = _page.GetByRole(AriaRole.Button, new() { Name = "More actions" });
-        if (await moreActionsButton.IsVisibleAsync())
-        {
-            await moreActionsButton.ClickAsync();
-            var startOffboardingItem = _page.GetByRole(AriaRole.Menuitem, new() { Name = "Start offboarding" });
-            if (await startOffboardingItem.IsVisibleAsync())
-            {
-                await startOffboardingItem.ClickAsync();
-
-                // A dialog should appear for starting the leaving process
-                var dialog = _page.Locator(".e-dialog");
-                if (await dialog.IsVisibleAsync())
-                {
-                    // Fill in the dialog fields including notes
-                    var fields = _page.Locator("input, textarea");
-                    var inputs = await fields.AllAsync();
-
-                    for (int i = 0; i < inputs.Count; i++)
-                    {
-                        var placeholder = await inputs[i].GetAttributeAsync("placeholder");
-                        if (placeholder?.Contains("Resignation") == true)
-                        {
-                            await inputs[i].FillAsync(leavingDate.AddDays(-30).ToString("ddMMyyyy"));
-                        }
-                        else if (placeholder?.Contains("Note") == true || placeholder?.Contains("note") == true)
-                        {
-                            await inputs[i].FillAsync("This employee is relocating to another country");
-                        }
-                    }
-
-                    var startButton = _page.GetByRole(AriaRole.Button, new() { Name = "Start" });
-                    if (await startButton.IsVisibleAsync())
-                    {
-                        await startButton.ClickAsync();
-                        await _page.WaitForLoadStateAsync();
-                    }
-                }
-            }
-        }
+        // Same API-seam approach as CreateAndStartLeavingProcessAsync above — the old hand-rolled
+        // version walked every input/textarea on the page by raw index looking for a "Note"
+        // placeholder, which silently did nothing (no exception, no process created) once the real
+        // dialog markup didn't match.
+        await E2eEmployeeApi.StartLeavingProcessAsync(
+            _fixture.ApiBaseUrl, employeeId, leavingDate,
+            notes: "This employee is relocating to another country");
 
         return employeeId;
     }

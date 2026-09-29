@@ -21,14 +21,6 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Every assertion is scoped to those ids (data-application-id) or to the unique vacancy title, so
 /// nothing depends on other tests' data. The recruiter UI session is Marcus Diallo (Recruiter), who
 /// holds recruitment:manage, candidate:view and reporting:view-recruitment.
-///
-/// Serialization (two gates, always acquired in this order: vacancy gate, then Supabase gate — the
-/// same order InternalVacancyApplyTests uses, so the two can never deadlock):
-///   1. CrossUserVacancyTestBase.GateInstance, for the whole test — the Kanban/stage assertions read
-///      Acme's shared, ordered recruitment pipeline stages by name, which
-///      RecruitmentStageManagementTests mutates (same reason as CandidateCvReviewTests).
-///   2. SupabaseAuthGate, only around provisioning the employee login and signing in as that
-///      employee (real, uncached auth calls).
 /// </summary>
 public sealed class InternalApplicationIdentificationTests(RecruiterPersonaFixture fixture)
     : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
@@ -40,32 +32,6 @@ public sealed class InternalApplicationIdentificationTests(RecruiterPersonaFixtu
     // RecruitmentStageSeeder.BuildDefaultStages — both the internal apply and the recruiter's
     // CreateApplication start an application on the first active non-terminal stage.
     private const string InitialStage = "Application Received";
-
-    public override async Task InitializeAsync()
-    {
-        await CrossUserVacancyTestBase.GateInstance.WaitAsync();
-        try
-        {
-            await base.InitializeAsync();
-        }
-        catch
-        {
-            CrossUserVacancyTestBase.GateInstance.Release();
-            throw;
-        }
-    }
-
-    public override async Task DisposeAsync()
-    {
-        try
-        {
-            await base.DisposeAsync();
-        }
-        finally
-        {
-            CrossUserVacancyTestBase.GateInstance.Release();
-        }
-    }
 
     private sealed record Arranged(
         Guid VacancyId,
@@ -90,18 +56,10 @@ public sealed class InternalApplicationIdentificationTests(RecruiterPersonaFixtu
 
         InternalVacancyApplyApi.FreshEmployee employee;
         InternalVacancyApplyApi.InternalApplication internalApplication;
-        await SupabaseAuthGate.Instance.WaitAsync();
-        try
-        {
-            employee = await InternalVacancyApplyApi.CreateActiveEmployeeWithLoginAsync(hrAdminApi, _fixture.ApiBaseUrl);
-            using var employeeApi = await InternalVacancyApplyApi.CreateEmployeeApiClientAsync(_fixture.ApiBaseUrl, employee.WorkEmail);
-            internalApplication = await InternalVacancyApplyApi.ApplyAsEmployeeAsync(
-                employeeApi, vacancy.Id, $"cv-{employee.LastName}.pdf");
-        }
-        finally
-        {
-            SupabaseAuthGate.Instance.Release();
-        }
+        employee = await InternalVacancyApplyApi.CreateActiveEmployeeWithLoginAsync(hrAdminApi, _fixture.ApiBaseUrl);
+        using var employeeApi = await InternalVacancyApplyApi.CreateEmployeeApiClientAsync(_fixture.ApiBaseUrl, employee.WorkEmail);
+        internalApplication = await InternalVacancyApplyApi.ApplyAsEmployeeAsync(
+            employeeApi, vacancy.Id, $"cv-{employee.LastName}.pdf");
 
         var unique = Guid.NewGuid().ToString("N")[..8];
         var externalLastName = $"External{unique}";

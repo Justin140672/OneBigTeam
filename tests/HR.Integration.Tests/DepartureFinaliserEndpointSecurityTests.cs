@@ -71,6 +71,14 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
     {
         _factory = factory;
         _factory.SupabaseAuthGateway.Reset();
+
+        // The endpoint authorises via the real "role:hr-administrator" policy (DB-resolved roles),
+        // so the personas must actually hold their roles in Acme.
+        Task.Run(async () =>
+        {
+            await TestRoleSeeder.AssignRoleAsync(factory, HrAdminUserId, SystemRoles.HrAdministrator, AcmeCompanyId);
+            await TestRoleSeeder.AssignRoleAsync(factory, EmployeeUserId, SystemRoles.Employee, AcmeCompanyId);
+        }).GetAwaiter().GetResult();
     }
 
     /// <summary>
@@ -149,7 +157,7 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
 
             // First, set up HR admin role for BetaCorpHrAdminId in BetaCorp
             await TestRoleSeeder.AssignRoleAsync(_factory, BetaCorpHrAdminId,
-                Guid.Parse("ffffffff-ffff-ffff-ffff-ffffffffffff"), // role ID doesn't matter for this test
+                SystemRoles.HrAdministrator,
                 BetaCorpId, ensureActiveSubscription: false);
 
             using var client = _factory.CreateClient();
@@ -297,6 +305,7 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
     private async Task<Guid> CreateEmployeeAsync(Guid companyId)
     {
         var hrAdminId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrAdminId, SystemRoles.HrAdministrator, companyId);
         using var adminClient = _factory.CreateClient();
         adminClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, hrAdminId.ToString());
         adminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
@@ -338,6 +347,7 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
         var employeeId = await CreateEmployeeAsync(companyId);
 
         var hrAdminId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, hrAdminId, SystemRoles.HrAdministrator, companyId);
         using var adminClient = _factory.CreateClient();
         adminClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, hrAdminId.ToString());
         adminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
@@ -347,8 +357,14 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
             $"/api/companies/{companyId}/employees/{employeeId}/leaving-process",
             new
             {
+                companyId,
+                employeeId,
+                resignationReceivedDate = leavingDate.AddDays(-30),
                 leavingDate,
-                leavingReason = "Resignation"
+                lastWorkingDay = leavingDate,
+                leavingReason = "Resignation",
+                // Leaving date is already past so the finaliser job picks the process up.
+                confirmBackdatedLeavingDate = true
             });
 
         response.EnsureSuccessStatusCode();

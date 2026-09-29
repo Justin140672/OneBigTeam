@@ -4,6 +4,7 @@ using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Jobs;
 using HR.Modules.Employees.Persistence;
 using HR.SharedKernel;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -33,7 +34,8 @@ namespace HR.Modules.Employees.Features.Dev;
 internal sealed class DepartureFinaliserTestEndpoint(
     ProcessLeavingEmployeesJob departureFinaliserJob,
     EmployeesDbContext db,
-    ICurrentTenant currentTenant) : EndpointWithoutRequest
+    ICurrentTenant currentTenant,
+    Microsoft.AspNetCore.Authorization.IAuthorizationService authorizationService) : EndpointWithoutRequest
 {
     public override void Configure()
     {
@@ -60,8 +62,11 @@ internal sealed class DepartureFinaliserTestEndpoint(
             return;
         }
 
-        // Authorization gate: must have hr-administrator role
-        if (!HttpContext.User.HasClaim("role", "hr-administrator"))
+        // Authorization gate: must hold the HR Administrator role. Roles are not JWT claims (they are
+        // resolved from the database), so evaluate the same "role:hr-administrator" policy the rest of
+        // the API uses instead of inspecting claims.
+        var roleAuth = await authorizationService.AuthorizeAsync(HttpContext.User, "role:hr-administrator");
+        if (!roleAuth.Succeeded)
         {
             await Send.ResultAsync(TypedResults.Forbid());
             return;
@@ -149,7 +154,7 @@ internal sealed class DepartureFinaliserTestEndpoint(
             // Execute the job scoped to the requested company so it only processes employees
             // in that company with Status == Leaving and LeavingDate <= today. This prevents
             // the cross-company mutation that was happening before.
-            await departureFinaliserJob.ExecuteAsync(companyId);
+            await departureFinaliserJob.ExecuteForEmployeeAsync(companyId, employeeId);
 
             await Send.ResultAsync(TypedResults.Ok());
         }

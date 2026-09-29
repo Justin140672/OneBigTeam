@@ -63,9 +63,12 @@ public class PolicyBasedAuthorizationEndpointTests
     {
         var companyId = Guid.NewGuid();
         // Employee holds "asset:view" per RolePermissionConfiguration.cs.
-        using var client = await AuthenticatedClient(companyId, Guid.NewGuid(), SystemRoles.Employee);
+        // The employee lists their own assets (self-service); listing another employee's assets is
+        // additionally restricted to that employee's direct manager or an HR Administrator.
+        var userId = Guid.NewGuid();
+        using var client = await AuthenticatedClient(companyId, userId, SystemRoles.Employee);
 
-        var response = await client.GetAsync($"/api/companies/{companyId}/employees/{Guid.NewGuid()}/assets");
+        var response = await client.GetAsync($"/api/companies/{companyId}/employees/{userId}/assets");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }

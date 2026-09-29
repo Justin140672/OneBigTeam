@@ -14,11 +14,8 @@ namespace HR.Web.E2E.Tests.Tests;
 /// Acknowledgement reports. Access-control coverage (non-HR persona not
 /// seeing the Employee Directory card, direct-URL 403 handling on the report page itself) lives
 /// in <see cref="EmployeeDirectoryReportTests"/>.
-///
-/// Runs serialized against HrDashboardTests (HrFavouritesSerialTestBase) — both toggle Laura
-/// Bennett's shared, server-persisted report favourites. See GroupSerializedTestBases.cs.
 /// </summary>
-public sealed class ReportCatalogTests(HrAdminPersonaFixture fixture) : HrFavouritesSerialTestBase(fixture)
+public sealed class ReportCatalogTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 

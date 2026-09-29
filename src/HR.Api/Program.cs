@@ -87,6 +87,10 @@ if (devToolsOptions.Enabled && !builder.Environment.IsDevelopment())
 		+ "Development tools are only allowed under Development. Refusing to start.");
 }
 
+// The Identity dev endpoints (DevActivateCompany / DevEnsureEmployeeLogin) read IOptions<DevToolsOptions>,
+// which must be bound to the same "DevTools" section or they always see Enabled=false and 404.
+builder.Services.Configure<DevToolsOptions>(builder.Configuration.GetSection(DevToolsOptions.SectionName));
+
 builder.Services.AddCompaniesModule(connectionString, builder.Configuration);
 builder.Services.AddCompanyOnboardingModule(connectionString);
 builder.Services.AddDataImportModule(connectionString, builder.Configuration, builder.Environment);
@@ -248,6 +252,7 @@ var migrationRunner = app.Services.GetRequiredService<StartupMigrationRunner>();
 // Required migrations + seeding, run in dependency order. Each step is awaited in sequence; a
 // failure records the affected module and (below) prevents the normal request pipeline and the
 // Hangfire recurring job registration from being wired up.
+// (Health key stays "companies": it is part of the /health/startup-migrations payload contract.)
 // The core application startup (Companies migration + seed + Platform migration) is orchestrated by
 // CompaniesModule.MigrateAndSeedCoreApplicationAsync(), which enforces the mandatory ordering:
 // Companies must run before Platform (Platform migration has FK to companies.companies and
@@ -255,7 +260,7 @@ var migrationRunner = app.Services.GetRequiredService<StartupMigrationRunner>();
 // Integration tests call the same orchestration method to ensure consistency.
 // The orchestration is the single source of truth: changing the order inside it will be reflected
 // in both Program.cs and integration tests automatically.
-await migrationRunner.RunAsync("companies-and-platform", app.Services, async sp =>
+await migrationRunner.RunAsync("companies", app.Services, async sp =>
 {
 	await sp.MigrateAndSeedCoreApplicationAsync();
 });

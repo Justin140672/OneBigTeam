@@ -38,30 +38,6 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
     private const string MarcusEmail = "marcus.diallo@acme.example";
     private const string LauraEmail = "laura.bennett@acme.example";
 
-    // Every test here asserts against the exact seeded stage set/order for Acme (see class doc
-    // comment) — that races RecruitmentStageManagementTests, which mutates the same shared,
-    // DisplayOrder-ranked stage list (create/reorder/deactivate). This class can't join
-    // CrossUserVacancyTestBase directly (different fixture — RecruiterPersonaFixture, not
-    // CrossUserFixture), so it serializes against that group's shared static gate instance
-    // directly instead. See RecruitmentStageManagementTests' own remarks for the full rationale.
-    public override async Task InitializeAsync()
-    {
-        await CrossUserVacancyTestBase.GateInstance.WaitAsync();
-        await base.InitializeAsync();
-    }
-
-    public override async Task DisposeAsync()
-    {
-        try
-        {
-            await base.DisposeAsync();
-        }
-        finally
-        {
-            CrossUserVacancyTestBase.GateInstance.Release();
-        }
-    }
-
     // RecruitmentStageSeeder.BuildDefaultStages — the default stage set every company gets the first
     // time recruitment data exists for it. A freshly created Application always starts on the first
     // of these (DisplayOrder 1, "Application Received").

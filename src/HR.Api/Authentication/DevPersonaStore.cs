@@ -12,6 +12,7 @@ public sealed class DevPersonaStore
 {
     private const string Acme     = "00000000-0000-0000-0000-000000000001";
     private const string BetaCorp = "00000000-0000-0000-0000-000000000002";
+    private const string Gamma    = "00000000-0000-0000-0000-000000000003";
 
     public static readonly IReadOnlyList<DevPersona> Personas =
     [
@@ -36,6 +37,11 @@ public sealed class DevPersonaStore
         // shared seeded teams that other E2E classes assert on. Its Employee row is seeded only
         // for the E2E run (EmployeesModule.SeedEmployeesAsync's E2E test pool section).
         new("30000000-0000-0000-0000-000000000017", Acme,     "Nina Patel",    "Team Lead",           "nina.patel@acme.example"),
+        // Dedicated to SubscriptionBillingJourneyTests.
+        // ActiveSubscription_Cancel_ShowsConfirmation_AndSchedulesCancellation only — Gamma
+        // Industries is a company no other test touches, so this test cannot race any other
+        // Beta-Corp-mutating subscription test (see CompaniesModule.SeedCompaniesAsync's remarks).
+        new("30000000-0000-0000-0000-000000000019", Gamma,    "Diana Chen",    "Company Administrator", "diana.chen@gamma.example"),
     ];
 
     // Personas created via the self-service SignUp flow (HR.Modules.Identity's SignUp feature) —
