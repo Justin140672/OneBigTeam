@@ -35,29 +35,6 @@ public class EmployeeUserAccountStatusReaderTests(IdentityDatabaseFixture fixtur
     }
 
     [Fact]
-    public async Task GetStatusesAsync_Prefers_ApplicationUser_Over_UserProfile_When_Both_Exist()
-    {
-        var companyId = Guid.NewGuid();
-        var employeeId = Guid.NewGuid();
-
-        await using (var db = fixture.BuildContext())
-        {
-            db.Users.Add(ApplicationUser.Create(employeeId, "employee@example.com", "hash", "Ada", "Lovelace", Now));
-            db.UserProfiles.Add(UserProfile.Create(
-                employeeId, Guid.NewGuid(), companyId, "employee@example.com", "Ada", "Lovelace", Now));
-            await db.SaveChangesAsync();
-        }
-
-        await using var context = fixture.BuildContext();
-        var reader = new EmployeeUserAccountStatusReader(context);
-
-        var statuses = await reader.GetStatusesAsync(companyId, [employeeId], CancellationToken.None);
-
-        Assert.True(statuses.TryGetValue(employeeId, out var summary));
-        Assert.Equal(EmployeeUserAccountStatus.Active, summary!.Status);
-    }
-
-    [Fact]
     public async Task GetStatusesAsync_Returns_Disabled_For_A_Disabled_UserProfile_Based_Account()
     {
         // Ticket 1 (P1) negated-branch coverage: before UserProfile.IsActive existed this always

@@ -55,7 +55,7 @@ public class InviteEmployeeUserHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employeeId, "existing@test.com", "hash", "Existing", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(employeeId, Guid.NewGuid(), Guid.Empty, "existing@test.com", "Existing", "User", Now));
             await db.SaveChangesAsync();
         }
 

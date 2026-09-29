@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 namespace HR.Modules.Identity.Jobs;
 
 /// <summary>
-/// P1 fix: performs and confirms the actual <c>ApplicationUser.IsActive</c> disablement requested
+/// P1 fix: performs and confirms the actual <c>UserProfile.IsActive</c> disablement requested
 /// by Features/OnEmployeeDepartureFinalised — mirrors
 /// HR.Modules.Companies.Jobs.EmployeeRenumberSideEffectJob's shape (idempotency-by-row-status,
 /// [AutomaticRetry], attempt tracking, final-attempt-marks-Failed-and-rethrows so the existing
@@ -129,27 +129,16 @@ internal sealed class AccountDisablementJob(
 
         try
         {
-            var user = await db.Users.SingleOrDefaultAsync(u => u.Id == request.ApplicationUserId);
-            // Ticket 1 (P1): real Supabase-backed accounts (AcceptInvite, self-service SignUp) have
-            // no ApplicationUser row — fall back to UserProfile so departure disablement actually
-            // covers those accounts too, not just legacy ApplicationUser-backed ones.
-            var profile = user is null
-                ? await db.UserProfiles.SingleOrDefaultAsync(p => p.Id == request.ApplicationUserId)
-                : null;
+            var profile = await db.UserProfiles.SingleOrDefaultAsync(p => p.Id == request.ApplicationUserId);
 
-            if (user is null && profile is null)
+            if (profile is null)
             {
                 request.MarkProcessed(clock.UtcNow);
                 await db.SaveChangesAsync();
                 return;
             }
 
-            if (user is { IsActive: true })
-            {
-                user.Deactivate(clock.UtcNow);
-            }
-
-            if (profile is { IsActive: true })
+            if (profile.IsActive)
             {
                 profile.Deactivate(clock.UtcNow);
             }

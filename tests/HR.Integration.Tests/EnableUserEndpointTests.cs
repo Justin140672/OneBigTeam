@@ -75,7 +75,7 @@ public class EnableUserEndpointTests
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
-        var userId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(
+        var userId = await IdentityUserAdminTestHelpers.SeedAccountAsync(
             _factory, employeeId, $"active.{Guid.NewGuid():N}@test.com", isActive: true);
 
         var response = await client.PostAsync(
@@ -91,7 +91,7 @@ public class EnableUserEndpointTests
         var otherCompanyId = Guid.NewGuid();
         using var client = AuthenticatedClient(ownCompanyId);
         var otherCompanyEmployeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, otherCompanyId, "Other", "Company");
-        var otherCompanyUserId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(
+        var otherCompanyUserId = await IdentityUserAdminTestHelpers.SeedAccountAsync(
             _factory, otherCompanyEmployeeId, $"othercompany.{Guid.NewGuid():N}@test.com", isActive: false);
 
         var response = await client.PostAsync(
@@ -101,7 +101,7 @@ public class EnableUserEndpointTests
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        var reloaded = await db.Users.FirstAsync(u => u.Id == otherCompanyUserId);
+        var reloaded = await db.UserProfiles.FirstAsync(u => u.Id == otherCompanyUserId);
         Assert.False(reloaded.IsActive);
     }
 
@@ -111,7 +111,7 @@ public class EnableUserEndpointTests
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
-        var userId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(
+        var userId = await IdentityUserAdminTestHelpers.SeedAccountAsync(
             _factory, employeeId, $"disabled.{Guid.NewGuid():N}@test.com", isActive: false);
 
         var response = await client.PostAsync(
@@ -121,12 +121,12 @@ public class EnableUserEndpointTests
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        var reloaded = await db.Users.FirstAsync(u => u.Id == userId);
+        var reloaded = await db.UserProfiles.FirstAsync(u => u.Id == userId);
         Assert.True(reloaded.IsActive);
     }
 
     // Ticket 1 (P1): mirror DisableUser's UserProfile-only coverage — real Supabase-backed accounts
-    // (AcceptInvite, self-service SignUp) have no ApplicationUser row, so EnableUser must fall back
+    // (AcceptInvite, self-service SignUp) have no legacy users row, so EnableUser must fall back
     // to re-enabling their UserProfile.
     [Fact]
     public async Task Post_EnableUser_Reenables_UserProfile_Only_Account_On_Happy_Path()

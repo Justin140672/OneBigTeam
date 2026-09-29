@@ -751,6 +751,12 @@ html[data-theme="dark"] .employee-cell-name {
     margin-bottom: 0.4rem;
 }
 
+/* Plain Bootstrap inputs default to 1rem; match the 14px Syncfusion inputs they sit beside */
+input.form-control,
+textarea.form-control {
+    font-size: 14px;
+}
+
 /* Normalize Syncfusion form controls to match Bootstrap form fields */
 .e-input-group,
 .e-input-group.e-control-wrapper,
@@ -1896,10 +1902,6 @@ html[data-theme="dark"] .chart-tile .e-accumulationchart text {
 .position-profile-description textarea {
     min-height: 240px;
     resize: vertical;
-}
-
-.employee-section-divider {
-    border-top: 2px solid #dee2e6;
 }
 
 /* ══════════════════════════════════════════════════════════════════════════

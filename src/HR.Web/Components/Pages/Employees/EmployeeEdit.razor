@@ -8,7 +8,6 @@
 @inject PositionProfileService PositionProfileService
 @inject EmploymentTypeService EmploymentTypeService
 @inject LeavePolicyService LeavePolicyService
-@inject InviteService InviteService
 @inject CompanyService CompanyService
 @inject AppSession Session
 @inject IJSRuntime JS
@@ -37,7 +36,7 @@
     else if (IsNew)
     {
         <h1 class="mb-1">Add Employee</h1>
-        <p class="text-muted mb-4">Add a new employee and set up their employment, contact, and system access details.</p>
+        <p class="text-muted mb-4">Add a new employee and set up their employment and contact details.</p>
 
         @if (!string.IsNullOrEmpty(GlobalError))
         {
@@ -266,27 +265,6 @@
                                     <ValidationMessage For="@(() => Model.HomePhone)" />
                                 </div>
                             </div>
-                        </div>
-                    </div>
-
-                    <div class="card mb-4">
-                        <div class="card-header">
-                            <h5 class="mb-0">Users &amp; Access</h5>
-                        </div>
-                        <div class="card-body">
-                            <SfCheckBox TChecked="bool"
-                                        Label="Allow this employee to sign in."
-                                        @bind-Checked="Model.HasSystemAccess" />
-                            @if (Model.HasSystemAccess)
-                            {
-                                <hr class="my-3" />
-                                <p class="text-muted small mb-2">
-                                    Invite links expire after 7 days. Generating a new invite link invalidates any previous unused link.
-                                </p>
-                                <SfCheckBox TChecked="bool"
-                                            Label="Send invite link after creating employee"
-                                            @bind-Checked="_sendInviteOnCreate" />
-                            }
                         </div>
                     </div>
 
@@ -526,57 +504,6 @@
                                             </div>
                                         </div>
                                     </div>
-
-                                    <hr class="my-4 employee-section-divider" />
-
-                                    <!-- Users & Access: kept within the Details sub-section (own heading + divider)
-                                         rather than promoted to its own section, so it stays next to the personal
-                                         information it relates to. -->
-                                    <h6 class="text-muted text-uppercase small mb-2">Users &amp; Access</h6>
-                                    <div class="card mb-4">
-                                        <div class="card-header">
-                                            <h5 class="mb-0">Users &amp; Access</h5>
-                                        </div>
-                                        <div class="card-body @(IsViewMode ? "view-mode" : "")">
-                                            <SfCheckBox TChecked="bool"
-                                                        Label="Allow this employee to sign in."
-                                                        @bind-Checked="Model.HasSystemAccess"
-                                                        Enabled="@(!IsViewMode)" />
-                                            @if (Model.HasSystemAccess)
-                                            {
-                                                <hr class="my-3" />
-                                                <p class="text-muted small mb-2">
-                                                    Invite links expire after 7 days. Generating a new invite link invalidates any previous unused link.
-                                                </p>
-                                                @if (!string.IsNullOrEmpty(_inviteError))
-                                                {
-                                                    <div class="alert alert-danger py-2">@_inviteError</div>
-                                                }
-                                                @if (_inviteLink is not null)
-                                                {
-                                                    <div class="alert alert-success py-2">
-                                                        <div class="mb-1"><strong>Invite link generated</strong> — expires @_inviteExpiresAt.ToString("MMM d, yyyy")</div>
-                                                        <div class="input-group">
-                                                            <input class="form-control form-control-sm font-monospace" readonly value="@_inviteLink" />
-                                                            <SfButton CssClass="e-small" OnClick="CopyLink">Copy</SfButton>
-                                                        </div>
-                                                        <small class="text-muted">Share this link with the employee to let them set their password.</small>
-                                                    </div>
-                                                }
-                                                else
-                                                {
-                                                    <SfButton OnClick="SendInvite" Disabled="@(_sendingInvite || IsViewMode)">
-                                                        @if (_sendingInvite)
-                                                        {
-                                                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                                                        }
-                                                        Generate Invite Link
-                                                    </SfButton>
-                                                }
-                                            }
-                                        </div>
-                                    </div>
-
                                 </div>
                             </div>
                         </EditForm>
@@ -881,11 +808,6 @@
         (_employee?.LastName?.Length  > 0 ? _employee.LastName[0].ToString()  : "")).ToUpperInvariant()
         is { Length: > 0 } i ? i : "?";
 
-    private bool _sendInviteOnCreate;
-    private bool _sendingInvite;
-    private string? _inviteLink;
-    private DateOnly _inviteExpiresAt;
-    private string? _inviteError;
     private string? _redirectUrl;
     private string? _saveSuccessMessage;
 
@@ -1088,10 +1010,6 @@
                         currentProfile.NoticePeriodLengthOverride));
                 }
             }
-
-            var uri = new Uri(Navigation.Uri);
-            if (uri.Query.Contains("invited=true") && _employee is not null)
-                await SendInvite();
         }
         else
         {
@@ -1364,17 +1282,6 @@
             if (created is null)
                 return error ?? "Failed to create employee.";
 
-            if (_sendInviteOnCreate)
-            {
-                var email = FormText.Required(Model.WorkEmail);
-                var (token, expiresAt, _) = await InviteService.SendInviteAsync(CompanyId, created.Id, email);
-                if (token is not null)
-                {
-                    _redirectUrl = $"/companies/{CompanyId}/employees/{created.Id}?invited=true";
-                    return null;
-                }
-            }
-
             _redirectUrl = $"/companies/{CompanyId}/employees";
             return null;
         }
@@ -1486,35 +1393,6 @@
 
     protected override void ResetChildSectionsUnsavedState() =>
         _employmentTab?.ResetBaseline();
-
-    private async Task SendInvite()
-    {
-        if (_employee is null) return;
-
-        _sendingInvite = true;
-        _inviteError = null;
-
-        var email = _employee.WorkEmail;
-        var (token, expiresAt, error) = await InviteService.SendInviteAsync(CompanyId, Id!.Value, email);
-
-        _sendingInvite = false;
-
-        if (token is not null)
-        {
-            var baseUrl = Navigation.BaseUri.TrimEnd('/');
-            _inviteLink = $"{baseUrl}/invite/{token}";
-            _inviteExpiresAt = DateOnly.FromDateTime(expiresAt.LocalDateTime);
-        }
-        else
-        {
-            _inviteError = error;
-        }
-    }
-
-    private async Task CopyLink()
-    {
-        await Task.CompletedTask;
-    }
 
     private static string StatusBadgeClass(string status) => status switch
     {

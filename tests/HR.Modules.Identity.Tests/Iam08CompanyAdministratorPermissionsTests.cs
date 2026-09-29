@@ -92,7 +92,7 @@ public class Iam08CompanyAdministratorPermissionsTests(IdentityDatabaseFixture f
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(userId, $"iam08-{userId:N}@test.com", "hash", "Test", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(userId, Guid.NewGuid(), Guid.Empty, $"iam08-{userId:N}@test.com", "Test", "User", Now));
             db.Roles.Add(Role.Create(roleId, $"Iam08ExpiredGrant{userId:N}", Now));
             db.EmployeeRoleOverrides.Add(EmployeeRoleOverride.Create(
                 Guid.NewGuid(), userId, roleId, EmployeeRoleOverrideType.Grant, "iam-08", Now.AddSeconds(-1), Now));
@@ -113,7 +113,7 @@ public class Iam08CompanyAdministratorPermissionsTests(IdentityDatabaseFixture f
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(userId, $"iam08-hr-{userId:N}@test.com", "hash", "Test", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(userId, Guid.NewGuid(), Guid.Empty, $"iam08-hr-{userId:N}@test.com", "Test", "User", Now));
             db.UserRoles.Add(UserRole.Create(userId, SystemRoles.Employee, Now));
             db.UserRoles.Add(UserRole.Create(userId, SystemRoles.CompanyAdministrator, Now));
             db.UserRoles.Add(UserRole.Create(userId, SystemRoles.HrAdministrator, Now));

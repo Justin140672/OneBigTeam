@@ -54,7 +54,7 @@ public class RemoveEmployeeRoleOverrideEndpointTests
         var otherCompanyId = Guid.NewGuid();
         using var client = await AuthenticatedClient(ownCompanyId);
         var otherCompanyEmployeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, otherCompanyId, "Other", "Company");
-        var otherCompanyUserId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(
+        var otherCompanyUserId = await IdentityUserAdminTestHelpers.SeedAccountAsync(
             _factory, otherCompanyEmployeeId, $"othercompany.{Guid.NewGuid():N}@test.com");
 
         var response = await client.DeleteAsync(
@@ -69,7 +69,7 @@ public class RemoveEmployeeRoleOverrideEndpointTests
         var companyId = Guid.NewGuid();
         using var client = await AuthenticatedClient(companyId);
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
-        var userId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, employeeId, $"no-override.{Guid.NewGuid():N}@test.com");
+        var userId = await IdentityUserAdminTestHelpers.SeedAccountAsync(_factory, employeeId, $"no-override.{Guid.NewGuid():N}@test.com");
 
         var response = await client.DeleteAsync(
             $"/api/companies/{companyId}/users/{userId}/role-overrides/{SystemRoles.Manager}");
@@ -83,7 +83,7 @@ public class RemoveEmployeeRoleOverrideEndpointTests
         var companyId = Guid.NewGuid();
         using var client = await AuthenticatedClient(companyId);
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
-        var userId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, employeeId, $"happy-path.{Guid.NewGuid():N}@test.com");
+        var userId = await IdentityUserAdminTestHelpers.SeedAccountAsync(_factory, employeeId, $"happy-path.{Guid.NewGuid():N}@test.com");
         await AddOverrideAsync(client, companyId, userId, SystemRoles.Manager);
 
         var response = await client.DeleteAsync(

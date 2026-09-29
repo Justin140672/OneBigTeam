@@ -22,9 +22,9 @@ internal sealed class InviteAdditionalUsersTask(
     {
         var employeeIds = await employeeAudienceReader.GetAllEmployeeIdsAsync(companyId, cancellationToken);
 
-        var activeUserCount = await dbContext.Users
+        var activeUserCount = await dbContext.UserProfiles
             .AsNoTracking()
-            .CountAsync(u => employeeIds.Contains(u.Id) && u.IsActive, cancellationToken);
+            .CountAsync(p => employeeIds.Contains(p.Id) && p.IsActive, cancellationToken);
 
         if (activeUserCount > 1)
             return true;

@@ -181,7 +181,7 @@ public class ListEmployeesEndpointTests
     {
         var companyId = Guid.NewGuid();
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
-        await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, employeeId, $"active.{Guid.NewGuid():N}@test.com", isActive: true);
+        await IdentityUserAdminTestHelpers.SeedAccountAsync(_factory, employeeId, $"active.{Guid.NewGuid():N}@test.com", isActive: true);
 
         using var client = _factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, ListEmpUser1.ToString());

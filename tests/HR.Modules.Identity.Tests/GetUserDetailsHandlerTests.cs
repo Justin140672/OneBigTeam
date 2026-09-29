@@ -161,4 +161,64 @@ public class GetUserDetailsHandlerTests(IdentityDatabaseFixture fixture)
         Assert.Equal(positionProfileId, result.Value.PositionProfileId);
         Assert.Null(result.Value.PositionTitle);
     }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Active_Details_For_SignUp_Admin_With_Profile_Roles_And_No_Invite()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        await using (var db = fixture.BuildContext())
+        {
+            db.UserProfiles.Add(UserProfile.Create(
+                employeeId, Guid.NewGuid(), companyId, "signup.admin@test.com", "Sign", "Up", Now));
+            db.UserRoles.Add(UserRole.Create(employeeId, SystemRoles.Employee, Now));
+            db.UserRoles.Add(UserRole.Create(employeeId, SystemRoles.CompanyAdministrator, Now));
+            db.UserRoles.Add(UserRole.Create(employeeId, SystemRoles.HrAdministrator, Now));
+            await db.SaveChangesAsync();
+        }
+
+        var result = await BuildHandler().HandleAsync(
+            new GetUserDetailsRequest { CompanyId = companyId, EmployeeId = employeeId },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var details = result.Value;
+        Assert.Equal(employeeId, details.UserId);
+        Assert.Equal("Active", details.AccountStatus);
+        Assert.Equal("Claimed", details.InvitationStatus);
+        Assert.Equal("Sign Up", details.Name);
+        Assert.Equal("signup.admin@test.com", details.Email);
+        Assert.Null(details.InviteId);
+        Assert.Equivalent(
+            new[] { SystemRoles.Employee, SystemRoles.CompanyAdministrator, SystemRoles.HrAdministrator },
+            details.RoleIds);
+        Assert.Equal(3, details.RoleNames.Count);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Reports_Disabled_And_LastLogin_For_Disabled_Profile_Account()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var lastLogin = new DateTimeOffset(2026, 9, 27, 10, 30, 0, TimeSpan.Zero);
+
+        await using (var db = fixture.BuildContext())
+        {
+            var profile = UserProfile.Create(
+                employeeId, Guid.NewGuid(), companyId, "disabled.details@test.com", "Dis", "Abled", Now.AddDays(-30));
+            profile.RecordLogin(lastLogin);
+            profile.Deactivate(Now);
+            db.UserProfiles.Add(profile);
+            await db.SaveChangesAsync();
+        }
+
+        var result = await BuildHandler().HandleAsync(
+            new GetUserDetailsRequest { CompanyId = companyId, EmployeeId = employeeId },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Disabled", result.Value.AccountStatus);
+        Assert.Equal(lastLogin, result.Value.LastLoginAt);
+    }
 }

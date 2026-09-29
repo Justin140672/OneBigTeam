@@ -80,7 +80,7 @@ public class UpdateUserRolesEndpointTests
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
-        var userId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, employeeId, "test@test.com");
+        var userId = await IdentityUserAdminTestHelpers.SeedAccountAsync(_factory, employeeId, "test@test.com");
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/users/{userId}/roles",
@@ -95,7 +95,7 @@ public class UpdateUserRolesEndpointTests
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
-        var userId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, employeeId, "test2@test.com");
+        var userId = await IdentityUserAdminTestHelpers.SeedAccountAsync(_factory, employeeId, "test2@test.com");
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/users/{userId}/roles",
@@ -111,7 +111,7 @@ public class UpdateUserRolesEndpointTests
         var otherCompanyId = Guid.NewGuid();
         using var client = AuthenticatedClient(ownCompanyId);
         var otherCompanyEmployeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, otherCompanyId, "Other", "Company");
-        var otherCompanyUserId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(
+        var otherCompanyUserId = await IdentityUserAdminTestHelpers.SeedAccountAsync(
             _factory, otherCompanyEmployeeId, $"othercompany.{Guid.NewGuid():N}@test.com");
         var roleId = await IdentityUserAdminTestHelpers.SeedRoleAsync(_factory, $"Role-{Guid.NewGuid():N}");
 
@@ -128,7 +128,7 @@ public class UpdateUserRolesEndpointTests
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
-        var userId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, employeeId, "test3@test.com");
+        var userId = await IdentityUserAdminTestHelpers.SeedAccountAsync(_factory, employeeId, "test3@test.com");
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/users/{userId}/roles",
@@ -149,7 +149,7 @@ public class UpdateUserRolesEndpointTests
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
-        var userId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, employeeId, $"forbid.{Guid.NewGuid():N}@test.com");
+        var userId = await IdentityUserAdminTestHelpers.SeedAccountAsync(_factory, employeeId, $"forbid.{Guid.NewGuid():N}@test.com");
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/users/{userId}/roles",
@@ -164,7 +164,7 @@ public class UpdateUserRolesEndpointTests
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
-        var userId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, employeeId, $"noemp.{Guid.NewGuid():N}@test.com");
+        var userId = await IdentityUserAdminTestHelpers.SeedAccountAsync(_factory, employeeId, $"noemp.{Guid.NewGuid():N}@test.com");
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{companyId}/users/{userId}/roles",

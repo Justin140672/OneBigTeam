@@ -394,23 +394,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         }
     }
 
-    public async Task<bool> IsUsersAndAccessCardVisibleAsync()
-    {
-        try
-        {
-            await Assertions.Expect(page.Locator(".card-header:has-text('Users & Access')").First)
-                .ToBeVisibleAsync(new() { Timeout = 10_000 });
-            return true;
-        }
-        catch (PlaywrightException)
-        {
-            return false;
-        }
-    }
-
-    public Task<bool> HasInviteExpiryNoteAsync() =>
-        page.Locator("p").Filter(new() { HasText = "Invite links expire after 7 days" }).First.IsVisibleAsync();
-
 
     public async Task OpenEmploymentTabAsync()
     {

@@ -78,7 +78,7 @@ public class ListInvitableEmployeesEndpointTests
 
         var invitableId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId, "Still", "Invitable");
         var withAccountId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId, "Has", "Account");
-        await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, withAccountId, "hasaccount@test.com");
+        await IdentityUserAdminTestHelpers.SeedAccountAsync(_factory, withAccountId, "hasaccount@test.com");
 
         var response = await client.GetAsync(Url(companyId));
 

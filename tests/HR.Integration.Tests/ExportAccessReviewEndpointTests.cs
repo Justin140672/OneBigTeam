@@ -66,7 +66,7 @@ public class ExportAccessReviewEndpointTests
         using var client = await AuthenticatedClient(companyId);
 
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId, "Export", "Review");
-        var userId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(
+        var userId = await IdentityUserAdminTestHelpers.SeedAccountAsync(
             _factory, employeeId, $"export-review.{Guid.NewGuid():N}@test.com");
         var roleId = await IdentityUserAdminTestHelpers.SeedRoleAsync(_factory, $"ExportReviewRole.{Guid.NewGuid():N}");
 

@@ -88,7 +88,7 @@ public class SignUpEndpointTests
         Assert.NotNull(department);
         Assert.Equal("General", department!.Name);
 
-        var location = await employeesDb.Locations.SingleOrDefaultAsync(l => l.CompanyId == payload.CompanyId);
+        var location = await employeesDb.Locations.SingleOrDefaultAsync(l => l.CompanyId == payload.CompanyId && l.Name == "Head Office");
         Assert.NotNull(location);
         Assert.Equal("Head Office", location!.Name);
 
@@ -224,6 +224,38 @@ public class SignUpEndpointTests
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
+
+    [Fact]
+    public async Task Post_SignUp_Scaffolds_Home_Location_Visible_Through_Locations_List()
+    {
+        using var client = _factory.CreateClient();
+        _factory.SupabaseAuthGateway.UserIdToReturn = Guid.NewGuid();
+
+        var response = await client.PostAsJsonAsync("/api/signup", ValidSignUpRequest());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<SignUpPayload>();
+        var companyId = payload!.CompanyId;
+
+        var readerId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, readerId, SystemRoles.HrAdministrator, companyId);
+        await TestRoleSeeder.AssignRoleAsync(_factory, readerId, SystemRoles.Employee, companyId);
+        using var reader = _factory.CreateClient();
+        reader.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, readerId.ToString());
+        reader.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+
+        var list = await reader.GetAsync($"/api/companies/{companyId}/locations");
+
+        Assert.Equal(HttpStatusCode.OK, list.StatusCode);
+        var locations = await list.Content.ReadFromJsonAsync<LocationListPayload>();
+        Assert.Contains(locations!.Items, l => l.Name == "Home" && l.IsActive);
+        Assert.Contains(locations.Items, l => l.Name == "Head Office" && l.IsActive);
+        Assert.Equal(2, locations.Items.Count);
+    }
+
+    private sealed record LocationListPayload(IReadOnlyList<LocationListItem> Items);
+
+    private sealed record LocationListItem(Guid Id, string Name, bool IsActive);
 
     private sealed record SignUpPayload(Guid UserId, Guid CompanyId, string Email, string FirstName, string LastName);
 }

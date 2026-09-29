@@ -14,6 +14,9 @@ internal sealed class CompanyDefaultDataSeeder(
     ISicknessCategoryDefaultsProvisioner sicknessCategoryDefaultsProvisioner,
     IDocumentTypeDefaultsProvisioner documentTypeDefaultsProvisioner) : ICompanyDefaultDataSeeder
 {
+    internal const string HomeLocationName = "Home";
+    internal const string HomeLocationTypeName = "Remote";
+
     public async Task<CompanyDefaultDataResult> SeedDefaultsAsync(Guid companyId, CancellationToken cancellationToken)
     {
         var now = clock.UtcNowOffset();
@@ -21,11 +24,8 @@ internal sealed class CompanyDefaultDataSeeder(
         var department = Department.Create(Guid.NewGuid(), companyId, "General", null, now);
         dbContext.Departments.Add(department);
 
-        var locationType = LocationType.Create(Guid.NewGuid(), companyId, "Office", null, now);
-        dbContext.LocationTypes.Add(locationType);
-
-        var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "Head Office", null, now);
-        dbContext.Locations.Add(location);
+        var location = await EnsureLocationAsync(companyId, "Office", "Head Office", now, cancellationToken);
+        await EnsureLocationAsync(companyId, HomeLocationTypeName, HomeLocationName, now, cancellationToken);
 
         var employmentTypePermanent  = EmploymentType.Create(Guid.NewGuid(), companyId, "Permanent", null, now);
         var employmentTypeFixedTerm  = EmploymentType.Create(Guid.NewGuid(), companyId, "Fixed Term", null, now);
@@ -65,5 +65,28 @@ internal sealed class CompanyDefaultDataSeeder(
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return new CompanyDefaultDataResult(department.Id, location.Id, positionProfile.Id, employmentType.Id);
+    }
+
+    private async Task<Location> EnsureLocationAsync(
+        Guid companyId, string typeName, string locationName, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var existingLocation = await dbContext.Locations
+            .SingleOrDefaultAsync(l => l.CompanyId == companyId && l.Name == locationName, cancellationToken);
+        if (existingLocation is not null)
+        {
+            return existingLocation;
+        }
+
+        var locationType = await dbContext.LocationTypes
+            .SingleOrDefaultAsync(t => t.CompanyId == companyId && t.Name == typeName, cancellationToken);
+        if (locationType is null)
+        {
+            locationType = LocationType.Create(Guid.NewGuid(), companyId, typeName, null, now);
+            dbContext.LocationTypes.Add(locationType);
+        }
+
+        var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, locationName, null, now);
+        dbContext.Locations.Add(location);
+        return location;
     }
 }

@@ -45,7 +45,7 @@ public class ListEmployeeRoleOverridesEndpointTests
         var otherCompanyId = Guid.NewGuid();
         using var client = await AuthenticatedClient(ownCompanyId);
         var otherCompanyEmployeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, otherCompanyId, "Other", "Company");
-        var otherCompanyUserId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(
+        var otherCompanyUserId = await IdentityUserAdminTestHelpers.SeedAccountAsync(
             _factory, otherCompanyEmployeeId, $"othercompany.{Guid.NewGuid():N}@test.com");
 
         var response = await client.GetAsync($"/api/companies/{ownCompanyId}/users/{otherCompanyUserId}/role-overrides");
@@ -59,7 +59,7 @@ public class ListEmployeeRoleOverridesEndpointTests
         var companyId = Guid.NewGuid();
         using var client = await AuthenticatedClient(companyId);
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
-        var userId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, employeeId, $"happy-path.{Guid.NewGuid():N}@test.com");
+        var userId = await IdentityUserAdminTestHelpers.SeedAccountAsync(_factory, employeeId, $"happy-path.{Guid.NewGuid():N}@test.com");
 
         var addResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/users/{userId}/role-overrides",

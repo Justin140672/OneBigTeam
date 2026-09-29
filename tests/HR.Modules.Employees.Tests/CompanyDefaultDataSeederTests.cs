@@ -23,8 +23,8 @@ public class CompanyDefaultDataSeederTests
         await seeder.SeedDefaultsAsync(companyId, CancellationToken.None);
 
         Assert.Equal(1, await context.Departments.CountAsync(d => d.CompanyId == companyId));
-        Assert.Equal(1, await context.LocationTypes.CountAsync(lt => lt.CompanyId == companyId));
-        Assert.Equal(1, await context.Locations.CountAsync(l => l.CompanyId == companyId));
+        Assert.Equal(2, await context.LocationTypes.CountAsync(lt => lt.CompanyId == companyId));
+        Assert.Equal(2, await context.Locations.CountAsync(l => l.CompanyId == companyId));
         Assert.Equal(5, await context.EmploymentTypes.CountAsync(et => et.CompanyId == companyId));
         Assert.Equal(1, await context.PositionProfiles.CountAsync(pp => pp.CompanyId == companyId));
     }
@@ -51,11 +51,10 @@ public class CompanyDefaultDataSeederTests
         Assert.Equal(result.DepartmentId, department.Id);
         Assert.Equal("General", department.Name);
 
-        var location = await context.Locations.SingleAsync(l => l.CompanyId == companyId);
+        var location = await context.Locations.SingleAsync(l => l.CompanyId == companyId && l.Name == "Head Office");
         Assert.Equal(result.LocationId, location.Id);
-        Assert.Equal("Head Office", location.Name);
 
-        var locationType = await context.LocationTypes.SingleAsync(lt => lt.CompanyId == companyId);
+        var locationType = await context.LocationTypes.SingleAsync(lt => lt.CompanyId == companyId && lt.Name == "Office");
         Assert.Equal(locationType.Id, location.LocationTypeId);
         Assert.Equal("Office", locationType.Name);
 
@@ -132,6 +131,70 @@ public class CompanyDefaultDataSeederTests
         Assert.Equal(companyId, Assert.Single(sicknessCategoryProvisioner.RequestedCompanyIds));
         Assert.Equal(1, documentTypeProvisioner.CallCount);
         Assert.Equal(companyId, Assert.Single(documentTypeProvisioner.RequestedCompanyIds));
+    }
+
+    private static CompanyDefaultDataSeeder BuildSeeder(EmployeesDbContext context) =>
+        new(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyProvisioner(),
+            new FakeLeaveTypeDefaultsProvisioner(), new FakeSicknessCategoryDefaultsProvisioner(),
+            new FakeDocumentTypeDefaultsProvisioner());
+
+    [Fact]
+    public async Task SeedDefaultsAsync_Scaffolds_Home_Location_With_Remote_Type()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        await BuildSeeder(context).SeedDefaultsAsync(companyId, CancellationToken.None);
+
+        var home = await context.Locations.SingleAsync(l => l.CompanyId == companyId && l.Name == "Home");
+        var type = await context.LocationTypes.SingleAsync(t => t.Id == home.LocationTypeId);
+        Assert.Equal("Remote", type.Name);
+        Assert.Equal(companyId, type.CompanyId);
+        Assert.True(home.IsActive);
+    }
+
+    [Fact]
+    public async Task SeedDefaultsAsync_Is_Idempotent_For_Locations_And_Types()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var seeder = BuildSeeder(context);
+
+        var first = await seeder.SeedDefaultsAsync(companyId, CancellationToken.None);
+        var second = await seeder.SeedDefaultsAsync(companyId, CancellationToken.None);
+
+        Assert.Equal(first.LocationId, second.LocationId);
+        Assert.Equal(2, await context.Locations.CountAsync(l => l.CompanyId == companyId));
+        Assert.Equal(2, await context.LocationTypes.CountAsync(t => t.CompanyId == companyId));
+    }
+
+    [Fact]
+    public async Task SeedDefaultsAsync_Does_Not_Duplicate_Existing_Home_Location_Or_Type()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow);
+        var type = HR.Modules.Employees.Domain.LocationType.Create(Guid.NewGuid(), companyId, "Remote", null, now);
+        var home = HR.Modules.Employees.Domain.Location.Create(Guid.NewGuid(), companyId, type.Id, "Home", null, now);
+        context.LocationTypes.Add(type);
+        context.Locations.Add(home);
+        await context.SaveChangesAsync();
+
+        await BuildSeeder(context).SeedDefaultsAsync(companyId, CancellationToken.None);
+
+        Assert.Equal(home.Id, (await context.Locations.SingleAsync(l => l.CompanyId == companyId && l.Name == "Home")).Id);
+        Assert.Equal(1, await context.LocationTypes.CountAsync(t => t.CompanyId == companyId && t.Name == "Remote"));
+    }
+
+    [Fact]
+    public async Task SeedDefaultsAsync_Does_Not_Touch_Other_Companies()
+    {
+        await using var context = BuildContext();
+        var otherCompanyId = Guid.NewGuid();
+
+        await BuildSeeder(context).SeedDefaultsAsync(Guid.NewGuid(), CancellationToken.None);
+
+        Assert.Equal(0, await context.Locations.CountAsync(l => l.CompanyId == otherCompanyId));
     }
 
     private static EmployeesDbContext BuildContext()

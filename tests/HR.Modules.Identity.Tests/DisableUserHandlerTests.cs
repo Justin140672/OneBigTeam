@@ -43,9 +43,9 @@ public class DisableUserHandlerTests(IdentityDatabaseFixture fixture)
         var userId = Guid.NewGuid();
         await using (var db = fixture.BuildContext())
         {
-            var user = ApplicationUser.Create(userId, $"disabled-{userId}@test.com", "hash", "Test", "User", Now);
+            var user = UserProfile.Create(userId, Guid.NewGuid(), Guid.Empty, $"disabled-{userId}@test.com", "Test", "User", Now);
             user.Deactivate(Now);
-            db.Users.Add(user);
+            db.UserProfiles.Add(user);
             await db.SaveChangesAsync();
         }
 
@@ -66,7 +66,7 @@ public class DisableUserHandlerTests(IdentityDatabaseFixture fixture)
         var userId = Guid.NewGuid();
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(userId, $"active-{userId}@test.com", "hash", "Test", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(userId, Guid.NewGuid(), Guid.Empty, $"active-{userId}@test.com", "Test", "User", Now));
             await db.SaveChangesAsync();
         }
 
@@ -82,7 +82,7 @@ public class DisableUserHandlerTests(IdentityDatabaseFixture fixture)
         Assert.False(result.Value.IsActive);
 
         await using var db2 = fixture.BuildContext();
-        var reloaded = await db2.Users.FirstAsync(u => u.Id == userId);
+        var reloaded = await db2.UserProfiles.FirstAsync(u => u.Id == userId);
         Assert.False(reloaded.IsActive);
 
         Assert.Single(auditPublisher.PublishedEvents, e => e is UserDisabledAuditEvent);
@@ -94,7 +94,7 @@ public class DisableUserHandlerTests(IdentityDatabaseFixture fixture)
         var userId = Guid.NewGuid();
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(userId, $"cross-tenant-{userId}@test.com", "hash", "Test", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(userId, Guid.NewGuid(), Guid.Empty, $"cross-tenant-{userId}@test.com", "Test", "User", Now));
             await db.SaveChangesAsync();
         }
 
@@ -110,7 +110,7 @@ public class DisableUserHandlerTests(IdentityDatabaseFixture fixture)
         Assert.Equal("not_found", result.Error.Code);
 
         await using var db2 = fixture.BuildContext();
-        var reloaded = await db2.Users.FirstAsync(u => u.Id == userId);
+        var reloaded = await db2.UserProfiles.FirstAsync(u => u.Id == userId);
         Assert.True(reloaded.IsActive);
 
         Assert.Empty(auditPublisher.PublishedEvents);
@@ -123,7 +123,7 @@ public class DisableUserHandlerTests(IdentityDatabaseFixture fixture)
         var userId = Guid.NewGuid();
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(userId, $"last-admin-{userId}@test.com", "hash", "Test", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(userId, Guid.NewGuid(), Guid.Empty, $"last-admin-{userId}@test.com", "Test", "User", Now));
             db.UserRoles.Add(UserRole.Create(userId, SystemRoles.CompanyAdministrator, Now));
             await db.SaveChangesAsync();
         }
@@ -141,7 +141,7 @@ public class DisableUserHandlerTests(IdentityDatabaseFixture fixture)
         Assert.Single(auditPublisher.PublishedEvents, e => e is RoleChangeRejectedAuditEvent);
 
         await using var db2 = fixture.BuildContext();
-        var reloaded = await db2.Users.FirstAsync(u => u.Id == userId);
+        var reloaded = await db2.UserProfiles.FirstAsync(u => u.Id == userId);
         Assert.True(reloaded.IsActive);
     }
 
@@ -153,8 +153,8 @@ public class DisableUserHandlerTests(IdentityDatabaseFixture fixture)
         var otherAdminId = Guid.NewGuid();
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(userId, $"disable-me-{userId}@test.com", "hash", "Test", "User", Now));
-            db.Users.Add(ApplicationUser.Create(otherAdminId, $"other-admin-{otherAdminId}@test.com", "hash", "Test", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(userId, Guid.NewGuid(), Guid.Empty, $"disable-me-{userId}@test.com", "Test", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(otherAdminId, Guid.NewGuid(), Guid.Empty, $"other-admin-{otherAdminId}@test.com", "Test", "User", Now));
             db.UserRoles.Add(UserRole.Create(userId, SystemRoles.CompanyAdministrator, Now));
             db.UserRoles.Add(UserRole.Create(otherAdminId, SystemRoles.CompanyAdministrator, Now));
             await db.SaveChangesAsync();
@@ -172,7 +172,7 @@ public class DisableUserHandlerTests(IdentityDatabaseFixture fixture)
     }
 
     // Ticket 1 (P1): real Supabase-backed accounts (AcceptInvite, self-service SignUp) have a
-    // UserProfile row but no ApplicationUser row at all — DisableUser must fall back to disabling
+    // UserProfile row but no legacy users row — DisableUser must fall back to disabling
     // that instead of silently 404ing / no-opping.
 
     [Fact]
@@ -207,7 +207,7 @@ public class DisableUserHandlerTests(IdentityDatabaseFixture fixture)
     }
 
     [Fact]
-    public async Task HandleAsync_Returns_NotFound_When_Neither_ApplicationUser_Nor_UserProfile_Exists()
+    public async Task HandleAsync_Returns_NotFound_When_No_UserProfile_Exists()
     {
         var handler = BuildHandler(new FakeAuditEventPublisher());
 

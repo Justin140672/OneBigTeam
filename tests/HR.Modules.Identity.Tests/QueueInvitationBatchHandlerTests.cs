@@ -80,7 +80,7 @@ public class QueueInvitationBatchHandlerTests(IdentityDatabaseFixture fixture)
     }
 
     [Fact]
-    public async Task HandleAsync_Excludes_Employee_With_Existing_ApplicationUser_Account()
+    public async Task HandleAsync_Excludes_Employee_With_Existing_Account()
     {
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -88,7 +88,7 @@ public class QueueInvitationBatchHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employeeId, "existing-batch-recipient@test.com", "hash", "Existing", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(employeeId, Guid.NewGuid(), Guid.Empty, "existing-batch-recipient@test.com", "Existing", "User", Now));
             await db.SaveChangesAsync();
         }
 

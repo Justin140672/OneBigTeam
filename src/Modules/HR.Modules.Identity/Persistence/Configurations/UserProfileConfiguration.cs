@@ -52,6 +52,9 @@ internal sealed class UserProfileConfiguration : IEntityTypeConfiguration<UserPr
         builder.Property(profile => profile.DisabledAt)
             .HasColumnName("disabled_at");
 
+        builder.Property(profile => profile.LastLoginAt)
+            .HasColumnName("last_login_at");
+
         builder.Property(profile => profile.CreatedAt)
             .HasColumnName("created_at")
             .IsRequired();

@@ -44,26 +44,19 @@ internal sealed class EnableUserHandler(
         if (!isMember)
             return Result.Failure<EnableUserResponse>(Error.NotFound("User was not found."));
 
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == request.UserId, cancellationToken);
-        // Ticket 1 (P1): mirror DisableUser's fallback to UserProfile for real Supabase-backed
-        // accounts (AcceptInvite, self-service SignUp).
-        var profile = user is null
-            ? await db.UserProfiles.FirstOrDefaultAsync(p => p.Id == request.UserId, cancellationToken)
-            : null;
+        var profile = await db.UserProfiles.FirstOrDefaultAsync(p => p.Id == request.UserId, cancellationToken);
 
-        if (user is null && profile is null)
+        if (profile is null)
             return Result.Failure<EnableUserResponse>(Error.NotFound("User was not found."));
 
-        var isCurrentlyActive = user?.IsActive ?? profile!.IsActive;
-        if (isCurrentlyActive)
+        if (profile.IsActive)
             return Result.Failure<EnableUserResponse>(Error.Conflict("User account is already active."));
 
         var now = clock.UtcNow;
-        user?.Reactivate(now);
-        profile?.Reactivate(now);
+        profile.Reactivate(now);
 
-        var targetId = user?.Id ?? profile!.Id;
-        var response = new EnableUserResponse(targetId, user?.IsActive ?? profile!.IsActive);
+        var targetId = profile.Id;
+        var response = new EnableUserResponse(targetId, profile.IsActive);
 
         if (request.IdempotencyKey is { } key)
         {

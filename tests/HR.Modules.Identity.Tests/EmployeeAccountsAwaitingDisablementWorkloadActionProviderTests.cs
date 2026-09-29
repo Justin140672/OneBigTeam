@@ -25,8 +25,8 @@ public class EmployeeAccountsAwaitingDisablementWorkloadActionProviderTests
     private static OffboardingReportItem BuildOffboardingItem(Guid employeeId, DateOnly lastWorkingDay, string status) =>
         new(employeeId, lastWorkingDay, status, 1, 0, [], [], DocumentsReturned: false);
 
-    private static ApplicationUser CreateActiveUser(Guid employeeId) =>
-        ApplicationUser.Create(employeeId, $"{employeeId:N}@example.com", "hash", "First", "Last", DateTimeOffset.UtcNow);
+    private static UserProfile CreateActiveUser(Guid employeeId) =>
+        UserProfile.Create(employeeId, Guid.NewGuid(), Guid.Empty, $"{employeeId:N}@example.com", "First", "Last", DateTimeOffset.UtcNow);
 
     [Fact]
     public async Task HrCaller_Sees_Still_Active_Accounts_Past_LastWorkingDay_CompanyWide()
@@ -34,7 +34,7 @@ public class EmployeeAccountsAwaitingDisablementWorkloadActionProviderTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        context.Users.Add(CreateActiveUser(employeeId));
+        context.UserProfiles.Add(CreateActiveUser(employeeId));
         await context.SaveChangesAsync();
 
         var offboardingReader = new FakeOffboardingReportReader(
@@ -57,7 +57,7 @@ public class EmployeeAccountsAwaitingDisablementWorkloadActionProviderTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        context.Users.Add(CreateActiveUser(employeeId));
+        context.UserProfiles.Add(CreateActiveUser(employeeId));
         await context.SaveChangesAsync();
 
         var offboardingReader = new FakeOffboardingReportReader(
@@ -81,7 +81,7 @@ public class EmployeeAccountsAwaitingDisablementWorkloadActionProviderTests
         var employeeId = Guid.NewGuid();
         var user = CreateActiveUser(employeeId);
         user.Deactivate(DateTimeOffset.UtcNow);
-        context.Users.Add(user);
+        context.UserProfiles.Add(user);
         await context.SaveChangesAsync();
 
         var offboardingReader = new FakeOffboardingReportReader(
@@ -104,7 +104,7 @@ public class EmployeeAccountsAwaitingDisablementWorkloadActionProviderTests
         var companyId = Guid.NewGuid();
         var completedEmployeeId = Guid.NewGuid();
         var futureEmployeeId = Guid.NewGuid();
-        context.Users.AddRange(CreateActiveUser(completedEmployeeId), CreateActiveUser(futureEmployeeId));
+        context.UserProfiles.AddRange(CreateActiveUser(completedEmployeeId), CreateActiveUser(futureEmployeeId));
         await context.SaveChangesAsync();
 
         var offboardingReader = new FakeOffboardingReportReader(
@@ -128,7 +128,7 @@ public class EmployeeAccountsAwaitingDisablementWorkloadActionProviderTests
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var lastWorkingDay = Today.AddDays(-2);
-        context.Users.Add(CreateActiveUser(employeeId));
+        context.UserProfiles.Add(CreateActiveUser(employeeId));
         await context.SaveChangesAsync();
 
         var offboardingReader = new FakeOffboardingReportReader(
@@ -155,7 +155,7 @@ public class EmployeeAccountsAwaitingDisablementWorkloadActionProviderTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
-        context.Users.Add(CreateActiveUser(employeeId));
+        context.UserProfiles.Add(CreateActiveUser(employeeId));
         await context.SaveChangesAsync();
 
         var offboardingReader = new FakeOffboardingReportReader(

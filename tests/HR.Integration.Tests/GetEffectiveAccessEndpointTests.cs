@@ -94,7 +94,7 @@ public class GetEffectiveAccessEndpointTests
         using var client = await AuthenticatedClient(ownCompanyId);
 
         var otherCompanyEmployeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, otherCompanyId, "Other", "Company");
-        var otherCompanyUserId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(
+        var otherCompanyUserId = await IdentityUserAdminTestHelpers.SeedAccountAsync(
             _factory, otherCompanyEmployeeId, $"cross-tenant.{Guid.NewGuid():N}@test.com");
 
         var response = await client.GetAsync($"/api/companies/{ownCompanyId}/users/{otherCompanyUserId}/effective-access");
@@ -109,7 +109,7 @@ public class GetEffectiveAccessEndpointTests
         using var client = await AuthenticatedClient(companyId);
 
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId, "Effective", "Access");
-        var userId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(
+        var userId = await IdentityUserAdminTestHelpers.SeedAccountAsync(
             _factory, employeeId, $"effective-access.{Guid.NewGuid():N}@test.com");
 
         var (positionId, inheritedRoleId) = await SeedPositionWithRoleAsync(companyId, userId);

@@ -8,7 +8,7 @@ namespace HR.Modules.Identity;
 /// <summary>
 /// Rejects any authenticated request whose linked application account has been disabled — whether
 /// disabled manually (Features/DisableUser) or automatically when an offboarding plan completes
-/// (Features/OnOffboardingPlanCompleted). Both paths flip the single <c>ApplicationUser.IsActive</c>
+/// (Features/OnOffboardingPlanCompleted). Both paths flip the single <c>UserProfile.IsActive</c>
 /// flag, so checking that flag on every request is enough to cover both.
 ///
 /// This closes the gap where an already-issued, still-valid Supabase access token kept working
@@ -21,9 +21,9 @@ namespace HR.Modules.Identity;
 /// Platform administrators are exempted ONLY on genuine platform-administration endpoints (those
 /// guarded by the "platform:admin" policy — detected via endpoint <see cref="IAuthorizeData"/>
 /// metadata, which FastEndpoints' <c>Policies("platform:admin")</c> emits). On every ordinary
-/// company endpoint a disabled <c>ApplicationUser</c> is still rejected even when the same person is
+/// company endpoint a disabled <c>UserProfile</c> is still rejected even when the same person is
 /// also an enabled platform administrator — otherwise the disabled company account's retained
-/// permissions would stay usable. A platform administrator with no <c>ApplicationUser</c> row (or an
+/// permissions would stay usable. A platform administrator with no <c>UserProfile</c> row (or an
 /// active one) is unaffected either way.
 /// </summary>
 internal sealed class DisabledAccountMiddleware(RequestDelegate next)
@@ -53,23 +53,11 @@ internal sealed class DisabledAccountMiddleware(RequestDelegate next)
 
         if (resolvedUserId is Guid userId)
         {
-            var accountIsActive = await dbContext.Users
+            var accountIsActive = await dbContext.UserProfiles
                 .AsNoTracking()
-                .Where(u => u.Id == userId)
-                .Select(u => (bool?)u.IsActive)
+                .Where(p => p.Id == userId)
+                .Select(p => (bool?)p.IsActive)
                 .FirstOrDefaultAsync(context.RequestAborted);
-
-            // Ticket 1 (P1): real Supabase-backed accounts (AcceptInvite, self-service SignUp) have
-            // no ApplicationUser row at all — without this fallback a disabled UserProfile-only
-            // account's still-valid token would keep working here indefinitely.
-            if (accountIsActive is null)
-            {
-                accountIsActive = await dbContext.UserProfiles
-                    .AsNoTracking()
-                    .Where(p => p.Id == userId)
-                    .Select(p => (bool?)p.IsActive)
-                    .FirstOrDefaultAsync(context.RequestAborted);
-            }
 
             if (accountIsActive == false)
             {

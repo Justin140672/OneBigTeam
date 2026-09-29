@@ -20,7 +20,7 @@ public class IdentityAuthorizationServiceTests(IdentityDatabaseFixture fixture)
         var userId = Guid.NewGuid();
         var roleId = Guid.NewGuid();
 
-        db.Users.Add(ApplicationUser.Create(userId, $"user{suffix}@test.com", "hash", "Test", "User", Now));
+        db.UserProfiles.Add(UserProfile.Create(userId, Guid.NewGuid(), Guid.Empty, $"user{suffix}@test.com", "Test", "User", Now));
         db.Roles.Add(Role.Create(roleId, $"Role{suffix}", Now));
         db.UserRoles.Add(UserRole.Create(userId, roleId, Now));
 
@@ -38,7 +38,7 @@ public class IdentityAuthorizationServiceTests(IdentityDatabaseFixture fixture)
         var positionId = Guid.NewGuid();
         var roleId = Guid.NewGuid();
 
-        db.Users.Add(ApplicationUser.Create(userId, $"pos{suffix}@test.com", "hash", "Test", "User", Now));
+        db.UserProfiles.Add(UserProfile.Create(userId, Guid.NewGuid(), Guid.Empty, $"pos{suffix}@test.com", "Test", "User", Now));
         db.Positions.Add(Position.Create(positionId, Guid.NewGuid(), $"Position{suffix}", Now));
         db.Roles.Add(Role.Create(roleId, $"PosRole{suffix}", Now));
         db.PositionRoles.Add(PositionRole.Create(positionId, roleId, Now));
@@ -236,7 +236,7 @@ public class IdentityAuthorizationServiceTests(IdentityDatabaseFixture fixture)
     {
         await using var db = fixture.BuildContext();
         var userId = Guid.NewGuid();
-        db.Users.Add(ApplicationUser.Create(userId, "noroles@test.com", "hash", "No", "Roles", Now));
+        db.UserProfiles.Add(UserProfile.Create(userId, Guid.NewGuid(), Guid.Empty, "noroles@test.com", "No", "Roles", Now));
         await db.SaveChangesAsync();
 
         var svc = BuildService();
@@ -255,7 +255,7 @@ public class IdentityAuthorizationServiceTests(IdentityDatabaseFixture fixture)
         var permA = Guid.NewGuid();
         var permB = Guid.NewGuid();
 
-        db.Users.Add(ApplicationUser.Create(userId, "multirole@test.com", "hash", "Multi", "Role", Now));
+        db.UserProfiles.Add(UserProfile.Create(userId, Guid.NewGuid(), Guid.Empty, "multirole@test.com", "Multi", "Role", Now));
         db.Roles.Add(Role.Create(roleA, "MultiRoleA", Now));
         db.Roles.Add(Role.Create(roleB, "MultiRoleB", Now));
         db.UserRoles.Add(UserRole.Create(userId, roleA, Now));
@@ -282,7 +282,7 @@ public class IdentityAuthorizationServiceTests(IdentityDatabaseFixture fixture)
         var roleB = Guid.NewGuid();
         var sharedPerm = Guid.NewGuid();
 
-        db.Users.Add(ApplicationUser.Create(userId, "dedupe@test.com", "hash", "De", "Dupe", Now));
+        db.UserProfiles.Add(UserProfile.Create(userId, Guid.NewGuid(), Guid.Empty, "dedupe@test.com", "De", "Dupe", Now));
         db.Roles.Add(Role.Create(roleA, "DedupeRoleA", Now));
         db.Roles.Add(Role.Create(roleB, "DedupeRoleB", Now));
         db.UserRoles.Add(UserRole.Create(userId, roleA, Now));
@@ -319,7 +319,7 @@ public class IdentityAuthorizationServiceTests(IdentityDatabaseFixture fixture)
         var roleB = Guid.NewGuid();
         var permId = Guid.NewGuid();
 
-        db.Users.Add(ApplicationUser.Create(userId, "partial-deny@test.com", "hash", "Partial", "Deny", Now));
+        db.UserProfiles.Add(UserProfile.Create(userId, Guid.NewGuid(), Guid.Empty, "partial-deny@test.com", "Partial", "Deny", Now));
         db.Roles.Add(Role.Create(roleA, "PartialDenyRoleA", Now));
         db.Roles.Add(Role.Create(roleB, "PartialDenyRoleB", Now));
         db.UserRoles.Add(UserRole.Create(userId, roleA, Now));

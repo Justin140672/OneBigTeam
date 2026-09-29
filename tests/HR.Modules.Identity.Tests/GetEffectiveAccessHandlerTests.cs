@@ -45,7 +45,7 @@ public class GetEffectiveAccessHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employeeId, "position-direct@test.com", "hash", "Test", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(employeeId, Guid.NewGuid(), Guid.Empty, "position-direct@test.com", "Test", "User", Now));
             db.Positions.Add(Position.Create(positionId, companyId, "Team Lead", Now));
             db.Roles.Add(Role.Create(inheritedRoleId, "InheritedRole", Now));
             db.Roles.Add(Role.Create(directRoleId, "DirectRole", Now));
@@ -94,7 +94,7 @@ public class GetEffectiveAccessHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employeeId, "deny-override@test.com", "hash", "Test", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(employeeId, Guid.NewGuid(), Guid.Empty, "deny-override@test.com", "Test", "User", Now));
             db.Positions.Add(Position.Create(positionId, companyId, "Denied Position", Now));
             db.Roles.Add(Role.Create(deniedRoleId, "RoleToDeny", Now));
             db.PositionRoles.Add(PositionRole.Create(positionId, deniedRoleId, Now));
@@ -142,7 +142,7 @@ public class GetEffectiveAccessHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employeeId, "grant-override@test.com", "hash", "Test", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(employeeId, Guid.NewGuid(), Guid.Empty, "grant-override@test.com", "Test", "User", Now));
             db.Roles.Add(Role.Create(grantedRoleId, "GrantedRole", Now));
             db.Permissions.Add(Permission.Create(permissionId, "granted.permission", Now));
             db.RolePermissions.Add(RolePermission.Create(grantedRoleId, permissionId));
@@ -176,7 +176,7 @@ public class GetEffectiveAccessHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employeeId, "expired-override@test.com", "hash", "Test", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(employeeId, Guid.NewGuid(), Guid.Empty, "expired-override@test.com", "Test", "User", Now));
             db.Roles.Add(Role.Create(grantedRoleId, "ExpiredGrantRole", Now));
             db.EmployeeRoleOverrides.Add(
                 EmployeeRoleOverride.Create(companyId, employeeId, grantedRoleId, EmployeeRoleOverrideType.Grant, "Expired", Now.AddSeconds(-1), Now));
@@ -237,7 +237,7 @@ public class GetEffectiveAccessHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employeeId, "cross-check@test.com", "hash", "Test", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(employeeId, Guid.NewGuid(), Guid.Empty, "cross-check@test.com", "Test", "User", Now));
             db.Positions.Add(Position.Create(positionId, companyId, "Cross Check Position", Now));
 
             db.Roles.Add(Role.Create(directRoleId, "CrossDirectRole", Now));

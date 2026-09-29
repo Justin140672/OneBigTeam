@@ -11,10 +11,10 @@ namespace HR.Modules.Identity.Authorization;
 ///
 /// Deliberately built on the Employees module's own company-scoped read contract
 /// (<see cref="HR.Modules.Employees.Contracts.IEmployeeAudienceReader.EmployeeExistsAsync"/>) rather
-/// than Identity's own tables: ApplicationUser has no CompanyId column at all, and UserProfile rows
-/// only exist for users that have completed AcceptInvite/SignUp (dev-seeded/legacy ApplicationUser
-/// rows have neither). The Employees module is the single source of truth for which company an
-/// employee id belongs to — the same association every user id is minted against (ApplicationUser.Id
+/// than Identity's own tables: UserProfile rows
+/// only exist for users that have completed AcceptInvite/SignUp (not for employees who have
+/// no account yet). The Employees module is the single source of truth for which company an
+/// employee id belongs to — the same association every user id is minted against (UserProfile.Id
 /// == EmployeeId by convention across this module).
 /// </summary>
 internal interface ITargetUserCompanyGuard

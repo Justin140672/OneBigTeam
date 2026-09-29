@@ -61,7 +61,6 @@ public class SignUpWorkEmailPolicyEndpointTests
         var identityDb = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         var lowered = email.Trim().ToLowerInvariant();
         Assert.False(await identityDb.UserProfiles.AnyAsync(p => p.Email.ToLower() == lowered));
-        Assert.False(await identityDb.Users.AnyAsync(u => u.Email.ToLower() == lowered));
 
         Assert.DoesNotContain(_factory.SupabaseAuthGateway.CreatedUsers, u => string.Equals(u.Email, email, StringComparison.OrdinalIgnoreCase));
         Assert.DoesNotContain(_factory.SupabaseAuthGateway.ConfirmedUsersCreated, u => string.Equals(u.Email, email, StringComparison.OrdinalIgnoreCase));

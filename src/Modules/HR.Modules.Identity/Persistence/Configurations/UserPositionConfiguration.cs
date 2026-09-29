@@ -29,12 +29,12 @@ internal sealed class UserPositionConfiguration : IEntityTypeConfiguration<UserP
             .IsRequired(false);
 
         // IAM-03: no FK constraint on UserId, matching UserRoleConfiguration's precedent (see its
-        // remarks) — UserId here is the owning Employee's id (ApplicationUser.Id == EmployeeId by
+        // remarks) — UserId here is the owning Employee's id (UserProfile.Id == EmployeeId by
         // convention, see AcceptInvite/SignUp), and by design a UserPosition row is written the
         // moment an employee is assigned to a position profile (Features/OnEmployeeCreated,
         // Features/OnEmployeePositionChanged), which routinely happens before that employee has
-        // any ApplicationUser/UserProfile row at all (accounts are only created later via
-        // InviteEmployeeUser -> AcceptInvite, or self-service SignUp). A hard FK to ApplicationUser
+        // any UserProfile row at all (accounts are only created later via
+        // InviteEmployeeUser -> AcceptInvite, or self-service SignUp). A hard FK to UserProfile
         // would reject every such write. An index still supports the lookups
         // IdentityAuthorizationService performs.
         builder.HasIndex(up => up.UserId);

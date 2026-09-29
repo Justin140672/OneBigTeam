@@ -43,10 +43,10 @@ public class AccountDisablementJobTests(IdentityDatabaseFixture fixture)
         var applicationUserId = employeeId;
 
         await using var db = fixture.BuildContext();
-        var user = ApplicationUser.Create(applicationUserId, $"{Guid.NewGuid():N}@test.com", "hash", "First", "Last", RequestedAt);
+        var user = UserProfile.Create(applicationUserId, Guid.NewGuid(), Guid.Empty, $"{Guid.NewGuid():N}@test.com", "First", "Last", RequestedAt);
         if (!userActive)
             user.Deactivate(RequestedAt);
-        db.Users.Add(user);
+        db.UserProfiles.Add(user);
 
         var request = AccountDisablement.CreatePending(
             Guid.NewGuid(), companyId, applicationUserId, employeeId, RequestedAt);
@@ -67,7 +67,7 @@ public class AccountDisablementJobTests(IdentityDatabaseFixture fixture)
 
         await job.ProcessAsync(request.Id, companyId);
 
-        var reloadedUser = await db.Users.SingleAsync(u => u.Id == request.ApplicationUserId);
+        var reloadedUser = await db.UserProfiles.SingleAsync(u => u.Id == request.ApplicationUserId);
         Assert.False(reloadedUser.IsActive);
 
         var reloadedRequest = await db.AccountDisablements.SingleAsync(d => d.Id == request.Id);
@@ -141,7 +141,7 @@ public class AccountDisablementJobTests(IdentityDatabaseFixture fixture)
 
         await job.ProcessAsync(request.Id, companyId);
 
-        var reloadedUser = await db.Users.SingleAsync(u => u.Id == request.ApplicationUserId);
+        var reloadedUser = await db.UserProfiles.SingleAsync(u => u.Id == request.ApplicationUserId);
         Assert.False(reloadedUser.IsActive);
 
         var reloadedRequest = await db.AccountDisablements.SingleAsync(d => d.Id == request.Id);

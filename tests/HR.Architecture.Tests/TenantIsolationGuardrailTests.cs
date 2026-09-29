@@ -46,7 +46,6 @@ public class TenantIsolationGuardrailTests
         ["UserRole"] = "Join row keyed by user id; reached only after target-user company guard.",
         ["UserPosition"] = "Join row keyed by user id; reached only after target-user company guard.",
         ["PositionRole"] = "Join row keyed by position id; positions are tenant-owned.",
-        ["ApplicationUser"] = "Legacy login identity keyed by employee id; reached after target-user company guard.",
         ["InvitationBatchRecipient"] = "Child of tenant-owned InvitationBatch (BatchId); reached via batch.CompanyId check.",
 
 

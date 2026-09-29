@@ -5,11 +5,11 @@ namespace HR.Web.E2E.Tests.Tests;
 
 /// <summary>
 /// Permission-based visibility for the redesigned employee profile page: a user without
-/// Session.CanManageEmployees must not be able to reach "Edit details" or the "Users &amp; Access"
-/// administration controls for another employee's profile. EmployeeEdit.razor's own LoadAsync
+/// Session.CanManageEmployees must not be able to reach "Edit details"
+/// on another employee's profile. EmployeeEdit.razor's own LoadAsync
 /// gates the *entire* page (both view and edit routes) behind Session.CanManageEmployees,
 /// redirecting to Session.MyProfileUrl otherwise (see its `if (!Session.CanManageEmployees)`
-/// guard) — so the "Edit details" button / "Users &amp; Access" card are never even reachable to
+/// guard) — so the "Edit details" button is never even reachable to
 /// probe for, and the correct end-to-end assertion is that direct navigation to either route is
 /// redirected away entirely. Same persona and redirect-assertion pattern as
 /// CompanyAdministratorAccessTests.CompanyAdministrator_CannotAccess_EmployeeList, extended here to
@@ -62,6 +62,6 @@ public sealed class EmployeeProfilePermissionsTests(PriyaShahPersonaFixture fixt
             $"another employee's profile edit route, but ended up at: {finalUrl}");
 
         Assert.False(await _page.Locator(".employee-edit-sticky-bar").IsVisibleAsync(),
-            "Expected no editable Users & Access / sticky action bar to ever render for a user without CanManageEmployees");
+            "Expected no editable sticky action bar to ever render for a user without CanManageEmployees");
     }
 }

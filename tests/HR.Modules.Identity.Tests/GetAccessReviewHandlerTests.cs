@@ -27,8 +27,8 @@ public class GetAccessReviewHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(inScopeUser, "in-scope@test.com", "hash", "In", "Scope", Now));
-            db.Users.Add(ApplicationUser.Create(outOfScopeUser, "out-of-scope@test.com", "hash", "Out", "OfScope", Now));
+            db.UserProfiles.Add(UserProfile.Create(inScopeUser, Guid.NewGuid(), Guid.Empty, "in-scope@test.com", "In", "Scope", Now));
+            db.UserProfiles.Add(UserProfile.Create(outOfScopeUser, Guid.NewGuid(), Guid.Empty, "out-of-scope@test.com", "Out", "OfScope", Now));
             db.Roles.Add(Role.Create(roleId, $"ScopedRole.{Guid.NewGuid():N}", Now));
             db.UserRoles.Add(UserRole.Create(inScopeUser, roleId, Now));
             db.UserRoles.Add(UserRole.Create(outOfScopeUser, roleId, Now));
@@ -64,7 +64,7 @@ public class GetAccessReviewHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(baselineOnlyUser, "baseline@test.com", "hash", "Baseline", "Only", Now));
+            db.UserProfiles.Add(UserProfile.Create(baselineOnlyUser, Guid.NewGuid(), Guid.Empty, "baseline@test.com", "Baseline", "Only", Now));
             db.UserRoles.Add(UserRole.Create(baselineOnlyUser, SystemRoles.Employee, Now));
             await db.SaveChangesAsync();
         }
@@ -86,7 +86,7 @@ public class GetAccessReviewHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(privilegedUser, "direct-priv@test.com", "hash", "Direct", "Priv", Now));
+            db.UserProfiles.Add(UserProfile.Create(privilegedUser, Guid.NewGuid(), Guid.Empty, "direct-priv@test.com", "Direct", "Priv", Now));
             db.Roles.Add(Role.Create(roleId, $"AccessReviewDirectRole.{Guid.NewGuid():N}", Now));
             db.UserRoles.Add(UserRole.Create(privilegedUser, roleId, Now));
             await db.SaveChangesAsync();
@@ -112,7 +112,7 @@ public class GetAccessReviewHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employeeId, "inherited-priv@test.com", "hash", "Inherited", "Priv", Now));
+            db.UserProfiles.Add(UserProfile.Create(employeeId, Guid.NewGuid(), Guid.Empty, "inherited-priv@test.com", "Inherited", "Priv", Now));
             db.Positions.Add(Position.Create(positionId, companyId, "Access Review Position", Now));
             db.Roles.Add(Role.Create(roleId, $"AccessReviewInheritedRole.{Guid.NewGuid():N}", Now));
             db.PositionRoles.Add(PositionRole.Create(positionId, roleId, Now));
@@ -140,7 +140,7 @@ public class GetAccessReviewHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employeeId, "grant-priv@test.com", "hash", "Grant", "Priv", Now));
+            db.UserProfiles.Add(UserProfile.Create(employeeId, Guid.NewGuid(), Guid.Empty, "grant-priv@test.com", "Grant", "Priv", Now));
             db.Roles.Add(Role.Create(roleId, $"AccessReviewGrantRole.{Guid.NewGuid():N}", Now));
             db.EmployeeRoleOverrides.Add(
                 EmployeeRoleOverride.Create(companyId, employeeId, roleId, EmployeeRoleOverrideType.Grant, "Cover", expiresAt, Now));
@@ -168,7 +168,7 @@ public class GetAccessReviewHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employeeId, "expired-priv@test.com", "hash", "Expired", "Priv", Now));
+            db.UserProfiles.Add(UserProfile.Create(employeeId, Guid.NewGuid(), Guid.Empty, "expired-priv@test.com", "Expired", "Priv", Now));
             db.Roles.Add(Role.Create(roleId, $"AccessReviewExpiredGrantRole.{Guid.NewGuid():N}", Now));
             db.EmployeeRoleOverrides.Add(
                 EmployeeRoleOverride.Create(companyId, employeeId, roleId, EmployeeRoleOverrideType.Grant, "Expired", Now.AddSeconds(-1), Now));
@@ -211,7 +211,7 @@ public class GetAccessReviewHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employeeId, "deny-only@test.com", "hash", "Deny", "Only", Now));
+            db.UserProfiles.Add(UserProfile.Create(employeeId, Guid.NewGuid(), Guid.Empty, "deny-only@test.com", "Deny", "Only", Now));
             db.Roles.Add(Role.Create(roleId, $"AccessReviewDenyOnlyRole.{Guid.NewGuid():N}", Now));
             db.EmployeeRoleOverrides.Add(
                 EmployeeRoleOverride.Create(companyId, employeeId, roleId, EmployeeRoleOverrideType.Deny, "No privilege", null, Now));

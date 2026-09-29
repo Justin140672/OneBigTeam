@@ -63,7 +63,7 @@ DECLARE
         'companies.companies',
         'companies.customer_subscriptions',
         'employees.employees',
-        'identity.users'
+        'identity.user_profiles'
     ];
     cnt bigint;
 BEGIN

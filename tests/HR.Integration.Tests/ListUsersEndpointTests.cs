@@ -89,7 +89,7 @@ public class ListUsersEndpointTests
     }
 
     [Fact]
-    public async Task Get_ListUsers_Returns_Row_For_UserProfile_With_No_Invite_And_No_ApplicationUser()
+    public async Task Get_ListUsers_Returns_Row_For_UserProfile_With_No_Invite()
     {
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);

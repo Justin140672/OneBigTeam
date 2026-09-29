@@ -81,8 +81,7 @@ internal sealed class ProcessInvitationBatchJob(
             return;
         }
 
-        var hasLinkedUser = await db.Users.AnyAsync(u => u.Id == recipient.EmployeeId, cancellationToken)
-            || await db.UserProfiles.AnyAsync(p => p.Id == recipient.EmployeeId, cancellationToken);
+        var hasLinkedUser = await db.UserProfiles.AnyAsync(p => p.Id == recipient.EmployeeId, cancellationToken);
         if (hasLinkedUser)
         {
             recipient.MarkSkipped("AlreadyHasAccount", clock.UtcNow);

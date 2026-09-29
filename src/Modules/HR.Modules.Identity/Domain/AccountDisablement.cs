@@ -4,12 +4,12 @@ using HR.SharedKernel.ExecutionContext;
 namespace HR.Modules.Identity.Domain;
 
 /// <summary>
-/// A durable, module-scoped record of a required <see cref="ApplicationUser"/> disablement
+/// A durable, module-scoped record of a required UserProfile disablement
 /// triggered by an employee's departure being finalised (see
 /// Features/OnEmployeeDepartureFinalised/Handler.cs and Jobs/AccountDisablementJob.cs).
 ///
 /// P1 fix: departure finalisation previously only flipped Employees.Employee.HasSystemAccess,
-/// while authentication actually enforces ApplicationUser.IsActive (see
+/// while authentication actually enforces UserProfile.IsActive (see
 /// DisabledAccountMiddleware) — the two could disagree indefinitely. This record makes the
 /// resulting ApplicationUser update durable and retryable (mirrors
 /// HR.Modules.Companies.Domain.OutboxMessage's Pending -&gt; Processing -&gt; Processed|Failed shape),

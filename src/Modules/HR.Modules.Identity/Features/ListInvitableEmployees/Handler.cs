@@ -19,12 +19,6 @@ internal sealed class ListInvitableEmployeesHandler(
 
         var employeeIds = candidates.Select(c => c.EmployeeId).ToList();
 
-        var accountIds = await db.Users
-            .AsNoTracking()
-            .Where(u => employeeIds.Contains(u.Id))
-            .Select(u => u.Id)
-            .ToListAsync(cancellationToken);
-
         var profileIds = await db.UserProfiles
             .AsNoTracking()
             .Where(p => employeeIds.Contains(p.Id))
@@ -44,7 +38,7 @@ internal sealed class ListInvitableEmployeesHandler(
             .Select(i => i.EmployeeId)
             .ToHashSet();
 
-        var excluded = accountIds.Concat(profileIds).Concat(pendingInviteEmployeeIds).ToHashSet();
+        var excluded = profileIds.Concat(pendingInviteEmployeeIds).ToHashSet();
 
         var items = candidates
             .Where(c => !excluded.Contains(c.EmployeeId))

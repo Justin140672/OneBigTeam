@@ -56,12 +56,6 @@ internal sealed class QueueInvitationBatchHandler(
 
         var requestedIds = request.EmployeeIds.Distinct().ToList();
 
-        var accountIds = await db.Users
-            .AsNoTracking()
-            .Where(u => requestedIds.Contains(u.Id))
-            .Select(u => u.Id)
-            .ToListAsync(cancellationToken);
-
         var profileIds = await db.UserProfiles
             .AsNoTracking()
             .Where(p => requestedIds.Contains(p.Id))
@@ -81,7 +75,7 @@ internal sealed class QueueInvitationBatchHandler(
             .Select(i => i.EmployeeId)
             .ToHashSet();
 
-        var hasAccountIds = accountIds.Concat(profileIds).ToHashSet();
+        var hasAccountIds = profileIds.ToHashSet();
 
         var excluded = new List<ExcludedInvitationCandidate>();
         var resolved = new List<(Guid EmployeeId, string Email)>();

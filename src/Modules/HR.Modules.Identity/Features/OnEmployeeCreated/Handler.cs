@@ -8,11 +8,11 @@ using Microsoft.EntityFrameworkCore;
 namespace HR.Modules.Identity.Features.OnEmployeeCreated;
 
 // IAM-03: a newly created employee with a PositionProfileId immediately inherits that position's
-// default roles. By convention in this system, ApplicationUser.Id == EmployeeId (see
+// default roles. By convention in this system, UserProfile.Id == EmployeeId (see
 // UserInvite.EmployeeId doc comment and AcceptInvite) — the same convention Features/OnOffboardingPlanCompleted
 // relies on — so EmployeeId is used directly as the identity.user_positions.user_id.
 //
-// This handler only maintains the UserPosition row; it must not create an ApplicationUser (a new
+// This handler only maintains the UserPosition row; it must not create a UserProfile (a new
 // employee has no login/user account yet — that only happens via InviteEmployeeUser/AcceptInvite).
 // The UserPosition row is written regardless, so that once/if the employee later gets a user
 // account, GetEffectiveRolesAsync already finds the correct inherited position immediately.

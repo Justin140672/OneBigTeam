@@ -68,12 +68,12 @@ public class GetAccessReviewEndpointTests
         using var client = await AuthenticatedClient(companyId);
 
         var privilegedEmployeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId, "Privileged", "User");
-        var privilegedUserId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(
+        var privilegedUserId = await IdentityUserAdminTestHelpers.SeedAccountAsync(
             _factory, privilegedEmployeeId, $"access-review-priv.{Guid.NewGuid():N}@test.com");
         var roleId = await IdentityUserAdminTestHelpers.SeedRoleAsync(_factory, $"AccessReviewRole.{Guid.NewGuid():N}");
 
         var baselineEmployeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId, "Baseline", "User");
-        var baselineUserId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(
+        var baselineUserId = await IdentityUserAdminTestHelpers.SeedAccountAsync(
             _factory, baselineEmployeeId, $"access-review-baseline.{Guid.NewGuid():N}@test.com");
 
         using (var scope = _factory.Services.CreateScope())

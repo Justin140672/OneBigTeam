@@ -50,7 +50,7 @@ internal static class IdentityUserAdminTestHelpers
         return employeeId;
     }
 
-    public static async Task<Guid> SeedApplicationUserAsync(
+    public static async Task<Guid> SeedAccountAsync(
         ApiWebApplicationFactory factory,
         Guid employeeId,
         string email,
@@ -60,11 +60,11 @@ internal static class IdentityUserAdminTestHelpers
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
 
         var now = DateTimeOffset.UtcNow;
-        var user = ApplicationUser.Create(employeeId, email, "not-used-in-tests", "Test", "User", now);
+        var user = UserProfile.Create(employeeId, Guid.NewGuid(), Guid.Empty, email, "Test", "User", now);
         if (!isActive)
             user.Deactivate(now);
 
-        db.Users.Add(user);
+        db.UserProfiles.Add(user);
         await db.SaveChangesAsync();
 
         return user.Id;

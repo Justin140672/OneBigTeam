@@ -13,15 +13,9 @@ internal sealed class UserProfile
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
-    // Ticket 1 (P1): real Supabase-backed accounts (AcceptInvite, self-service SignUp) previously
-    // had no account-status concept of their own — only ApplicationUser (the local-auth stand-in)
-    // could be disabled/enabled. IsActive here mirrors ApplicationUser.IsActive exactly so
-    // DisableUser/EnableUser, DisabledAccountMiddleware, OnEmployeeDepartureFinalised and login all
-    // have a single authoritative status regardless of which table backs a given account. Defaults
-    // to true (including for every pre-existing row via migration default) — an explicit,
-    // conservative backfill: no previously-usable account becomes silently locked out.
     public bool IsActive { get; private set; } = true;
     public DateTimeOffset? DisabledAt { get; private set; }
+    public DateTimeOffset? LastLoginAt { get; private set; }
 
     public static UserProfile Create(
         Guid id,
@@ -76,5 +70,10 @@ internal sealed class UserProfile
         IsActive = true;
         DisabledAt = null;
         UpdatedAt = now;
+    }
+
+    public void RecordLogin(DateTimeOffset now)
+    {
+        LastLoginAt = now;
     }
 }

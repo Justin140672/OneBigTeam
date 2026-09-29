@@ -31,7 +31,7 @@ public class ExportAccessReviewHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employeeId, "export-priv@test.com", "hash", "Export", "Priv", Now));
+            db.UserProfiles.Add(UserProfile.Create(employeeId, Guid.NewGuid(), Guid.Empty, "export-priv@test.com", "Export", "Priv", Now));
             db.Roles.Add(Role.Create(roleId, $"ExportRole.{Guid.NewGuid():N}", Now));
             db.UserRoles.Add(UserRole.Create(employeeId, roleId, Now));
             await db.SaveChangesAsync();

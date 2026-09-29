@@ -97,6 +97,7 @@
 }
 
 .cd-readonly {
+    font-size: 14px;
     background: #f9fafb;
     color: #6b7280;
 }

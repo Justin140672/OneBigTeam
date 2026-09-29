@@ -49,8 +49,8 @@ internal sealed class UpdateUserRolesHandler(
         if (!isMember)
             return Result.Failure<UpdateUserRolesResponse>(Error.NotFound("User was not found."));
 
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == request.UserId, cancellationToken);
-        if (user is null)
+        var accountExists = await db.UserProfiles.AnyAsync(p => p.Id == request.UserId, cancellationToken);
+        if (!accountExists)
             return Result.Failure<UpdateUserRolesResponse>(Error.NotFound("User was not found."));
 
         var requestedRoleIds = request.RoleIds.Distinct().ToList();

@@ -25,7 +25,7 @@ public class AddEmployeeRoleOverrideHandlerTests(IdentityDatabaseFixture fixture
     {
         await using var db = fixture.BuildContext();
         var userId = Guid.NewGuid();
-        db.Users.Add(ApplicationUser.Create(userId, $"user-{suffix}-{userId:N}@test.com", "hash", "Test", "User", Now));
+        db.UserProfiles.Add(UserProfile.Create(userId, Guid.NewGuid(), Guid.Empty, $"user-{suffix}-{userId:N}@test.com", "Test", "User", Now));
         await db.SaveChangesAsync();
         return userId;
     }

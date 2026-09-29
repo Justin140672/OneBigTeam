@@ -26,9 +26,9 @@ internal sealed class GetUserDetailsHandler(
             .OrderByDescending(i => i.CreatedAt)
             .FirstOrDefaultAsync(cancellationToken);
 
-        var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == request.EmployeeId, cancellationToken);
+        var profile = await db.UserProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.Id == request.EmployeeId, cancellationToken);
 
-        if (invite is null && user is null)
+        if (invite is null && profile is null)
             return Result.Failure<GetUserDetailsResponse>(Error.NotFound("No user or invitation found for this employee."));
 
         var roleIds = await db.UserRoles
@@ -51,7 +51,7 @@ internal sealed class GetUserDetailsHandler(
 
         var name = names.TryGetValue(request.EmployeeId, out var employeeName)
             ? employeeName
-            : user is not null ? $"{user.FirstName} {user.LastName}".Trim() : invite!.Email;
+            : profile is not null ? $"{profile.FirstName} {profile.LastName}".Trim() : invite!.Email;
 
         string invitationStatus;
         if (invite is null)
@@ -65,7 +65,7 @@ internal sealed class GetUserDetailsHandler(
         else
             invitationStatus = "Pending";
 
-        var accountStatus = user is null ? "NoAccount" : user.IsActive ? "Active" : "Disabled";
+        var accountStatus = profile is null ? "NoAccount" : profile.IsActive ? "Active" : "Disabled";
 
         var createdByName = invite?.CreatedByUserId is { } actorId
             ? names.GetValueOrDefault(actorId)
@@ -80,9 +80,9 @@ internal sealed class GetUserDetailsHandler(
 
         return Result.Success(new GetUserDetailsResponse(
             request.EmployeeId,
-            user?.Id,
+            profile?.Id,
             string.IsNullOrWhiteSpace(name) ? invite?.Email ?? string.Empty : name,
-            user?.Email ?? invite?.Email ?? string.Empty,
+            profile?.Email ?? invite?.Email ?? string.Empty,
             roleIds,
             roleNames,
             accountStatus,
@@ -90,8 +90,8 @@ internal sealed class GetUserDetailsHandler(
             invite?.Id,
             invite?.ExpiresAt,
             createdByName,
-            user?.LastLoginAt,
-            invite?.CreatedAt ?? user!.CreatedAt,
+            profile?.LastLoginAt,
+            invite?.CreatedAt ?? profile!.CreatedAt,
             positionProfileId,
             positionTitle));
     }

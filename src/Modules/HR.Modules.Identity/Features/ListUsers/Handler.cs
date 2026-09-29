@@ -16,7 +16,7 @@ internal sealed class ListUsersHandler(
     public async Task<Result<ListUsersResponse>> HandleAsync(ListUsersRequest request, CancellationToken cancellationToken)
     {
         // Build one row per employee in the company, invited or not — starting from the invite
-        // table alone (the original approach) silently dropped every ApplicationUser that was
+        // table alone (the original approach) silently dropped every account that was
         // never routed through the invite flow, e.g. dev-seeded personas created directly in
         // IdentityModule's seed data. GetAllEmployeeIdsAsync (not GetEligibleEmployeeIdsAsync,
         // which is Active-only and built for document-audience matching) is used deliberately here
@@ -33,11 +33,6 @@ internal sealed class ListUsersHandler(
             .GroupBy(i => i.EmployeeId)
             .ToDictionary(g => g.Key, g => g.First());
 
-        var users = await db.Users
-            .AsNoTracking()
-            .Where(u => employeeIds.Contains(u.Id))
-            .ToListAsync(cancellationToken);
-        var usersById = users.ToDictionary(u => u.Id);
 
         var profiles = await db.UserProfiles
             .AsNoTracking()
@@ -71,10 +66,9 @@ internal sealed class ListUsersHandler(
         foreach (var employeeId in employeeIds)
         {
             latestInviteByEmployee.TryGetValue(employeeId, out var invite);
-            usersById.TryGetValue(employeeId, out var user);
             profilesById.TryGetValue(employeeId, out var profile);
 
-            if (invite is null && user is null && profile is null)
+            if (invite is null && profile is null)
                 continue;
 
             var roleIds = userRoles.Where(ur => ur.UserId == employeeId).Select(ur => ur.RoleId).ToList();
@@ -82,7 +76,6 @@ internal sealed class ListUsersHandler(
 
             var name = names.TryGetValue(employeeId, out var employeeName)
                 ? employeeName
-                : user is not null ? $"{user.FirstName} {user.LastName}".Trim()
                 : profile is not null ? $"{profile.FirstName} {profile.LastName}".Trim()
                 : invite?.Email ?? string.Empty;
 
@@ -98,14 +91,9 @@ internal sealed class ListUsersHandler(
             else
                 invitationStatus = "Pending";
 
-            // Ticket 10 (P1): UserProfile (Supabase-backed) now has a real IsActive concept (see
-            // Ticket 1 / AccountDisablementJob), so a disabled profile-backed account must be
-            // reported as Disabled here too, not unconditionally Active.
-            var accountStatus = user is not null
-                ? user.IsActive ? "Active" : "Disabled"
-                : profile is not null ? (profile.IsActive ? "Active" : "Disabled") : "NoAccount";
+            var accountStatus = profile is not null ? (profile.IsActive ? "Active" : "Disabled") : "NoAccount";
 
-            var email = user?.Email ?? profile?.Email ?? invite?.Email ?? string.Empty;
+            var email = profile?.Email ?? invite?.Email ?? string.Empty;
 
             positionProfileIdByEmployee.TryGetValue(employeeId, out var positionProfileId);
             var positionTitle = positionProfileId != Guid.Empty
@@ -115,7 +103,7 @@ internal sealed class ListUsersHandler(
 
             rows.Add(new UserAdministrationListItem(
                 employeeId,
-                user?.Id ?? profile?.Id,
+                profile?.Id,
                 string.IsNullOrWhiteSpace(name) ? email : name,
                 email,
                 roleIds,
@@ -123,8 +111,8 @@ internal sealed class ListUsersHandler(
                 accountStatus,
                 invitationStatus,
                 invite?.Id,
-                user?.LastLoginAt,
-                invite?.CreatedAt ?? user?.CreatedAt ?? profile?.CreatedAt ?? DateTimeOffset.UtcNow,
+                profile?.LastLoginAt,
+                invite?.CreatedAt ?? profile?.CreatedAt ?? DateTimeOffset.UtcNow,
                 positionProfileId == Guid.Empty ? null : positionProfileId,
                 positionTitle));
         }

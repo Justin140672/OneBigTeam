@@ -108,7 +108,7 @@ public class InviteEmployeeUserEndpointTests
         var companyId = Guid.NewGuid();
         using var client = AuthenticatedClient(companyId);
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
-        await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, employeeId, "already@test.com");
+        await IdentityUserAdminTestHelpers.SeedAccountAsync(_factory, employeeId, "already@test.com");
 
         var response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/invite-user",

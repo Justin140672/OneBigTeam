@@ -260,7 +260,7 @@ public static class IdentityModule
     /// disabled user's persona and records LastLoginAt on success. This will need to be revisited
     /// once real Supabase-backed authentication replaces the dev persona switcher.
     /// Returns false if the persona's linked user account is disabled (sign-in must be rejected);
-    /// true otherwise (allowed — including when no ApplicationUser row exists at all).
+    /// true otherwise (allowed — including when no UserProfile row exists at all).
     /// </summary>
     public static async Task<bool> TryDevSignInAsync(this IServiceProvider services, Guid userId)
     {
@@ -268,25 +268,16 @@ public static class IdentityModule
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
         var clock = scope.ServiceProvider.GetRequiredService<IClock>();
 
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == userId);
-        if (user is not null)
-        {
-            if (!user.IsActive)
-                return false;
-
-            user.RecordLogin(clock.UtcNow);
-            await db.SaveChangesAsync();
-            return true;
-        }
-
-        // Ticket 1 (P1): real Supabase-backed accounts (AcceptInvite, self-service SignUp) have no
-        // ApplicationUser row at all — they must still be gated by their own UserProfile.IsActive,
-        // otherwise a disabled invited/signed-up user could keep signing in indefinitely.
         var profile = await db.UserProfiles.FirstOrDefaultAsync(p => p.Id == userId);
         if (profile is null)
             return true;
 
-        return profile.IsActive;
+        if (!profile.IsActive)
+            return false;
+
+        profile.RecordLogin(clock.UtcNow);
+        await db.SaveChangesAsync();
+        return true;
     }
 
     public static IApplicationBuilder UseIdentityModule(this IApplicationBuilder app)
@@ -441,15 +432,6 @@ public static class IdentityModule
 
         foreach (var persona in personas)
         {
-            var exists = await db.Users.AnyAsync(u => u.Id == persona.Id);
-            if (!exists)
-            {
-                db.Users.Add(ApplicationUser.Create(
-                    persona.Id, persona.Email,
-                    passwordHash: "dev-only-not-used",
-                    firstName: persona.First, lastName: persona.Last, now));
-            }
-
             foreach (var roleId in persona.Roles)
             {
                 var roleExists = await db.UserRoles.AnyAsync(
@@ -572,17 +554,6 @@ public static class IdentityModule
         if (!hasAnyRole)
         {
             db.UserRoles.Add(UserRole.Create(id, SystemRoles.Employee, DateTimeOffset.UtcNow));
-            await db.SaveChangesAsync(cancellationToken);
-        }
-
-        var normalizedEmail = email.Trim().ToUpperInvariant();
-        var userExists = await db.Users.AnyAsync(
-            u => u.Id == id || u.NormalizedEmail == normalizedEmail, cancellationToken);
-        if (!userExists)
-        {
-            db.Users.Add(ApplicationUser.Create(
-                id, email, passwordHash: "dev-only-not-used",
-                firstName: firstName, lastName: lastName, DateTimeOffset.UtcNow));
             await db.SaveChangesAsync(cancellationToken);
         }
     }

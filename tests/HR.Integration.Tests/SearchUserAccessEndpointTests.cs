@@ -78,7 +78,7 @@ public class SearchUserAccessEndpointTests
         using var client = await AuthenticatedClient(companyId);
 
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId, "Access", "Search");
-        var userId = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(
+        var userId = await IdentityUserAdminTestHelpers.SeedAccountAsync(
             _factory, employeeId, $"access-search.{Guid.NewGuid():N}@test.com");
         var roleId = await IdentityUserAdminTestHelpers.SeedRoleAsync(_factory, $"AccessSearchRole.{Guid.NewGuid():N}");
 

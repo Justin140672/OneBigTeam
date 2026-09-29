@@ -23,8 +23,6 @@ internal sealed class GetAccessReviewHandler(
         if (employeeIds.Count == 0)
             return new GetAccessReviewResponse([], 0);
 
-        var users = await db.Users.AsNoTracking().Where(u => employeeIds.Contains(u.Id)).ToListAsync(cancellationToken);
-        var usersById = users.ToDictionary(u => u.Id);
         var profiles = await db.UserProfiles.AsNoTracking().Where(p => employeeIds.Contains(p.Id)).ToListAsync(cancellationToken);
         var profilesById = profiles.ToDictionary(p => p.Id);
 
@@ -69,9 +67,8 @@ internal sealed class GetAccessReviewHandler(
 
         foreach (var employeeId in employeeIds)
         {
-            usersById.TryGetValue(employeeId, out var user);
             profilesById.TryGetValue(employeeId, out var profile);
-            if (user is null && profile is null)
+            if (profile is null)
                 continue;
 
             var privileges = new List<PrivilegeSourceItem>();
@@ -96,12 +93,11 @@ internal sealed class GetAccessReviewHandler(
 
             var name = names.TryGetValue(employeeId, out var employeeName)
                 ? employeeName
-                : user is not null ? $"{user.FirstName} {user.LastName}".Trim()
-                : $"{profile!.FirstName} {profile.LastName}".Trim();
-            var email = user?.Email ?? profile?.Email ?? string.Empty;
+                : $"{profile.FirstName} {profile.LastName}".Trim();
+            var email = profile.Email;
 
             items.Add(new AccessReviewItem(
-                employeeId, user?.Id ?? profile?.Id,
+                employeeId, profile.Id,
                 string.IsNullOrWhiteSpace(name) ? email : name, email,
                 privileges.OrderBy(p => p.RoleName, StringComparer.Ordinal).ToList()));
         }

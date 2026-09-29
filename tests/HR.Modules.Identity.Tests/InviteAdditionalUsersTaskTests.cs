@@ -31,7 +31,7 @@ public class InviteAdditionalUsersTaskTests
         var companyId = Guid.NewGuid();
         var employeeId1 = Guid.NewGuid();
         var employeeId2 = Guid.NewGuid();
-        context.Users.Add(ApplicationUser.Create(employeeId1, "alice@example.com", "hash", "Alice", "Smith", Now));
+        context.UserProfiles.Add(UserProfile.Create(employeeId1, Guid.NewGuid(), Guid.Empty, "alice@example.com", "Alice", "Smith", Now));
         await context.SaveChangesAsync();
 
         var task = new InviteAdditionalUsersTask(context, new FakeEmployeeAudienceReader([employeeId1, employeeId2]));
@@ -48,8 +48,8 @@ public class InviteAdditionalUsersTaskTests
         var companyId = Guid.NewGuid();
         var employeeId1 = Guid.NewGuid();
         var employeeId2 = Guid.NewGuid();
-        context.Users.Add(ApplicationUser.Create(employeeId1, "alice@example.com", "hash", "Alice", "Smith", Now));
-        context.Users.Add(ApplicationUser.Create(employeeId2, "bob@example.com", "hash", "Bob", "Jones", Now));
+        context.UserProfiles.Add(UserProfile.Create(employeeId1, Guid.NewGuid(), Guid.Empty, "alice@example.com", "Alice", "Smith", Now));
+        context.UserProfiles.Add(UserProfile.Create(employeeId2, Guid.NewGuid(), Guid.Empty, "bob@example.com", "Bob", "Jones", Now));
         await context.SaveChangesAsync();
 
         var task = new InviteAdditionalUsersTask(context, new FakeEmployeeAudienceReader([employeeId1, employeeId2]));
@@ -66,11 +66,11 @@ public class InviteAdditionalUsersTaskTests
         var companyId = Guid.NewGuid();
         var employeeId1 = Guid.NewGuid();
         var employeeId2 = Guid.NewGuid();
-        var user1 = ApplicationUser.Create(employeeId1, "alice@example.com", "hash", "Alice", "Smith", Now);
-        var user2 = ApplicationUser.Create(employeeId2, "bob@example.com", "hash", "Bob", "Jones", Now);
+        var user1 = UserProfile.Create(employeeId1, Guid.NewGuid(), Guid.Empty, "alice@example.com", "Alice", "Smith", Now);
+        var user2 = UserProfile.Create(employeeId2, Guid.NewGuid(), Guid.Empty, "bob@example.com", "Bob", "Jones", Now);
         user2.Deactivate(Now);
-        context.Users.Add(user1);
-        context.Users.Add(user2);
+        context.UserProfiles.Add(user1);
+        context.UserProfiles.Add(user2);
         await context.SaveChangesAsync();
 
         var task = new InviteAdditionalUsersTask(context, new FakeEmployeeAudienceReader([employeeId1, employeeId2]));

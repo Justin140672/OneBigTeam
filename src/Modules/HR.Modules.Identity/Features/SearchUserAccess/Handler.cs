@@ -23,8 +23,6 @@ internal sealed class SearchUserAccessHandler(
         if (employeeIds.Count == 0)
             return new SearchUserAccessResponse([], 0, request.Page, request.PageSize);
 
-        var users = await db.Users.AsNoTracking().Where(u => employeeIds.Contains(u.Id)).ToListAsync(cancellationToken);
-        var usersById = users.ToDictionary(u => u.Id);
 
         var profiles = await db.UserProfiles.AsNoTracking().Where(p => employeeIds.Contains(p.Id)).ToListAsync(cancellationToken);
         var profilesById = profiles.ToDictionary(p => p.Id);
@@ -62,9 +60,8 @@ internal sealed class SearchUserAccessHandler(
 
         foreach (var employeeId in employeeIds)
         {
-            usersById.TryGetValue(employeeId, out var user);
             profilesById.TryGetValue(employeeId, out var profile);
-            if (user is null && profile is null)
+            if (profile is null)
                 continue;
 
             var directForUser = directRoles.Where(r => r.UserId == employeeId)
@@ -107,12 +104,11 @@ internal sealed class SearchUserAccessHandler(
 
             var name = names.TryGetValue(employeeId, out var employeeName)
                 ? employeeName
-                : user is not null ? $"{user.FirstName} {user.LastName}".Trim()
-                : $"{profile!.FirstName} {profile.LastName}".Trim();
-            var email = user?.Email ?? profile?.Email ?? string.Empty;
+                : $"{profile.FirstName} {profile.LastName}".Trim();
+            var email = profile.Email;
 
             items.Add(new UserAccessSearchItem(
-                employeeId, user?.Id ?? profile?.Id,
+                employeeId, profile.Id,
                 string.IsNullOrWhiteSpace(name) ? email : name, email,
                 directForUser, inheritedForUser, overridesForUser));
         }

@@ -71,9 +71,9 @@ public class DisabledAccountMiddlewareTests
             new EndpointMetadataCollection(new AuthorizeAttribute("role:hr-administrator")),
             displayName: "company-endpoint"));
 
-    private static ApplicationUser CreateUser(Guid id, bool active)
+    private static UserProfile CreateUser(Guid id, bool active)
     {
-        var user = ApplicationUser.Create(id, $"{id:N}@example.com", "hash", "First", "Last", DateTimeOffset.UtcNow);
+        var user = UserProfile.Create(id, Guid.NewGuid(), Guid.Empty, $"{id:N}@example.com", "First", "Last", DateTimeOffset.UtcNow);
         if (!active)
             user.Deactivate(DateTimeOffset.UtcNow);
         return user;
@@ -91,7 +91,7 @@ public class DisabledAccountMiddlewareTests
     {
         await using var db = BuildContext();
         var userId = Guid.NewGuid();
-        db.Users.Add(CreateUser(userId, active: true));
+        db.UserProfiles.Add(CreateUser(userId, active: true));
         await db.SaveChangesAsync();
 
         var (context, nextCalled, middleware) = Build(ctx =>
@@ -111,7 +111,7 @@ public class DisabledAccountMiddlewareTests
     {
         await using var db = BuildContext();
         var userId = Guid.NewGuid();
-        db.Users.Add(CreateUser(userId, active: false));
+        db.UserProfiles.Add(CreateUser(userId, active: false));
         await db.SaveChangesAsync();
 
         var (context, nextCalled, middleware) = Build(ctx =>
@@ -136,7 +136,7 @@ public class DisabledAccountMiddlewareTests
     {
         await using var db = BuildContext();
         var userId = Guid.NewGuid();
-        db.Users.Add(CreateUser(userId, active: false));
+        db.UserProfiles.Add(CreateUser(userId, active: false));
         await db.SaveChangesAsync();
 
         var (context, nextCalled, middleware) = Build(ctx =>
@@ -157,7 +157,7 @@ public class DisabledAccountMiddlewareTests
     {
         await using var db = BuildContext();
         var userId = Guid.NewGuid();
-        db.Users.Add(CreateUser(userId, active: false));
+        db.UserProfiles.Add(CreateUser(userId, active: false));
         await db.SaveChangesAsync();
 
         var (context, nextCalled, middleware) = Build(_ =>
@@ -175,7 +175,7 @@ public class DisabledAccountMiddlewareTests
     {
         await using var db = BuildContext();
         var userId = Guid.NewGuid();
-        db.Users.Add(CreateUser(userId, active: false));
+        db.UserProfiles.Add(CreateUser(userId, active: false));
         db.PlatformAdministrators.Add(PlatformAdministrator.Create(
             "admin@example.com", PlatformAdministratorRole.PlatformOwner, DateTimeOffset.UtcNow,
             supabaseAuthUserId: userId));
@@ -199,7 +199,7 @@ public class DisabledAccountMiddlewareTests
     {
         await using var db = BuildContext();
         var userId = Guid.NewGuid();
-        db.Users.Add(CreateUser(userId, active: false));
+        db.UserProfiles.Add(CreateUser(userId, active: false));
         db.PlatformAdministrators.Add(PlatformAdministrator.Create(
             "admin@example.com", PlatformAdministratorRole.SupportStaff, DateTimeOffset.UtcNow));
         await db.SaveChangesAsync();
@@ -222,7 +222,7 @@ public class DisabledAccountMiddlewareTests
     {
         await using var db = BuildContext();
         var userId = Guid.NewGuid();
-        db.Users.Add(CreateUser(userId, active: false));
+        db.UserProfiles.Add(CreateUser(userId, active: false));
         db.PlatformAdministrators.Add(PlatformAdministrator.Create(
             "admin@example.com", PlatformAdministratorRole.PlatformOwner, DateTimeOffset.UtcNow,
             supabaseAuthUserId: userId));
@@ -249,7 +249,7 @@ public class DisabledAccountMiddlewareTests
     {
         await using var db = BuildContext();
         var userId = Guid.NewGuid();
-        db.Users.Add(CreateUser(userId, active: false));
+        db.UserProfiles.Add(CreateUser(userId, active: false));
         var admin = PlatformAdministrator.Create(
             "admin@example.com", PlatformAdministratorRole.SupportStaff, DateTimeOffset.UtcNow,
             supabaseAuthUserId: userId);
@@ -275,7 +275,7 @@ public class DisabledAccountMiddlewareTests
         await using var db = BuildContext();
         var userId = Guid.NewGuid();
         var user = CreateUser(userId, active: false);
-        db.Users.Add(user);
+        db.UserProfiles.Add(user);
         await db.SaveChangesAsync();
 
         user.Reactivate(DateTimeOffset.UtcNow);

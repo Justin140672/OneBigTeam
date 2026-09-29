@@ -251,31 +251,6 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
 
 
     [Fact]
-    public async Task UsersAndAccessCard_IsSeparateFromPersonalInfo_WithSignInCheckboxAndInviteExpiryNote()
-    {
-        var login = new LoginPage(_page, _fixture.WebBaseUrl);
-        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
-        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
-
-        await login.GoToAsync();
-        await login.LoginAsync(LauraEmail);
-
-        await GetSharedEmployeeAsync(empList, empEdit);
-        await empEdit.ClickEditDetailsButtonAsync();
-
-        Assert.True(await empEdit.IsUsersAndAccessCardVisibleAsync(),
-            "Expected a 'Users & Access' card, structurally separated from Personal Information");
-
-        var checkbox = _page.GetByLabel("Allow this employee to sign in.");
-        await Assertions.Expect(checkbox).ToBeVisibleAsync(new() { Timeout = 10_000 });
-
-        await checkbox.CheckAsync();
-        Assert.True(await empEdit.HasInviteExpiryNoteAsync(),
-            "Expected explanatory text about the 7-day invite link expiry once system access is enabled");
-    }
-
-
-    [Fact]
     public async Task DetailsTab_HasRequiredFieldsNote_AndLabelsAreAccessiblyAssociated()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);

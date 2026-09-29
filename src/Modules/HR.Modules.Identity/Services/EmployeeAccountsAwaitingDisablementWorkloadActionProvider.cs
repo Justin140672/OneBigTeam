@@ -41,10 +41,10 @@ internal sealed class EmployeeAccountsAwaitingDisablementWorkloadActionProvider(
 
         var employeeIds = pastLastWorkingDay.Select(i => i.EmployeeId).ToList();
 
-        var stillActiveUserIds = await dbContext.Users
+        var stillActiveUserIds = await dbContext.UserProfiles
             .AsNoTracking()
-            .Where(u => employeeIds.Contains(u.Id) && u.IsActive)
-            .Select(u => u.Id)
+            .Where(p => employeeIds.Contains(p.Id) && p.IsActive)
+            .Select(p => p.Id)
             .ToListAsync(cancellationToken);
 
         if (stillActiveUserIds.Count == 0)

@@ -20,7 +20,7 @@ public class EnsureDevSupabaseUserTests
     }
 
     [Fact]
-    public async Task Creates_ApplicationUser_Profile_And_EmployeeRole_UnderTheEmployeeId()
+    public async Task Creates_Profile_And_EmployeeRole_UnderTheEmployeeId()
     {
         await using var services = BuildServices();
         var id = Guid.NewGuid();
@@ -30,9 +30,9 @@ public class EnsureDevSupabaseUserTests
 
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        var user = await db.Users.SingleAsync(u => u.Id == id);
-        Assert.Equal("E2E.SOMEONE@ACME.EXAMPLE", user.NormalizedEmail);
-        Assert.True(await db.UserProfiles.AnyAsync(p => p.Id == id));
+        var profile = await db.UserProfiles.SingleAsync(p => p.Id == id);
+        Assert.Equal("e2e.someone@acme.example", profile.Email);
+        Assert.Equal(companyId, profile.CompanyId);
         Assert.True(await db.UserRoles.AnyAsync(r => r.UserId == id && r.RoleId == SystemRoles.Employee));
     }
 
@@ -48,6 +48,6 @@ public class EnsureDevSupabaseUserTests
 
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        Assert.Equal(1, await db.Users.CountAsync(u => u.Id == id));
+        Assert.Equal(1, await db.UserProfiles.CountAsync(u => u.Id == id));
     }
 }

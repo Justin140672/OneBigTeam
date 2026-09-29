@@ -131,7 +131,7 @@ public class ListUsersHandlerTests(IdentityDatabaseFixture fixture)
     }
 
     // Ticket 10 (P1): a disabled (IsActive=false) UserProfile-backed account previously always
-    // reported accountStatus "Active" — it must now mirror IsActive like an ApplicationUser does.
+    // reported accountStatus "Active" — it must now mirror IsActive like any other account.
     [Fact]
     public async Task HandleAsync_Reports_Disabled_AccountStatus_For_Inactive_UserProfile_Backed_Employee()
     {
@@ -176,5 +176,34 @@ public class ListUsersHandlerTests(IdentityDatabaseFixture fixture)
         Assert.True(result.IsSuccess);
         var row = Assert.Single(result.Value.Items);
         Assert.Equal("Active", row.AccountStatus);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_SignUp_Admin_With_Profile_Roles_And_No_Invite()
+    {
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        await using (var db = fixture.BuildContext())
+        {
+            db.UserProfiles.Add(UserProfile.Create(
+                employeeId, Guid.NewGuid(), companyId, "signup.admin.list@test.com", "Sign", "Up", Now));
+            db.UserRoles.Add(UserRole.Create(employeeId, SystemRoles.Employee, Now));
+            db.UserRoles.Add(UserRole.Create(employeeId, SystemRoles.CompanyAdministrator, Now));
+            await db.SaveChangesAsync();
+        }
+
+        var result = await BuildHandler(new FakeEmployeeAudienceReader([employeeId]))
+            .HandleAsync(Request(companyId), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var row = Assert.Single(result.Value.Items);
+        Assert.Equal(employeeId, row.UserId);
+        Assert.Equal("Active", row.AccountStatus);
+        Assert.Equal("Claimed", row.InvitationStatus);
+        Assert.Equal("Sign Up", row.Name);
+        Assert.Equal("signup.admin.list@test.com", row.Email);
+        Assert.Null(row.InviteId);
+        Assert.Equivalent(new[] { SystemRoles.Employee, SystemRoles.CompanyAdministrator }, row.RoleIds);
     }
 }

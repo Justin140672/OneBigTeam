@@ -10,8 +10,8 @@ namespace HR.Integration.Tests;
 
 /// <summary>
 /// Ticket 1 — end-to-end enforcement of <c>DisabledAccountMiddleware</c> through the real HTTP
-/// pipeline. A single authenticated caller (whose <see cref="ApplicationUser.Id"/> equals the
-/// <c>X-Test-User</c> guid, by the <c>ApplicationUser.Id == EmployeeId</c> convention) hits an
+/// pipeline. A single authenticated caller (whose <c>UserProfile.Id</c> equals the
+/// <c>X-Test-User</c> guid, by the <c>UserProfile.Id == EmployeeId</c> convention) hits an
 /// ordinary HrAdministrator GET endpoint; flipping that caller's <c>IsActive</c> flag directly in
 /// <see cref="IdentityDbContext"/> — as if an already-issued Supabase session were still live —
 /// must immediately gate the same client with 403 <c>account_disabled</c>.
@@ -40,7 +40,7 @@ public class DisabledAccountEnforcementTests
     {
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
         var email = $"enforce.{Guid.NewGuid():N}@test.com";
-        await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, employeeId, email, isActive);
+        await IdentityUserAdminTestHelpers.SeedAccountAsync(_factory, employeeId, email, isActive);
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.HrAdministrator);
         return (employeeId, email);
     }
@@ -49,7 +49,7 @@ public class DisabledAccountEnforcementTests
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        var user = await db.Users.FirstAsync(u => u.Id == userId);
+        var user = await db.UserProfiles.FirstAsync(u => u.Id == userId);
         if (isActive)
             user.Reactivate(DateTimeOffset.UtcNow);
         else
@@ -112,7 +112,7 @@ public class DisabledAccountEnforcementTests
     // finalisation (see HR.Modules.Employees.Services.EmployeeDepartureFinalizer /
     // HR.Modules.Identity.Features.OnEmployeeDepartureFinalised) is now the sole trigger for that.
     // OffboardingPlanCompletedIntegrationEvent currently has zero consumers — this proves publishing
-    // it is a genuine no-op and does not touch ApplicationUser.IsActive.
+    // it is a genuine no-op and does not touch UserProfile.IsActive.
     // See DepartureFinalisationDisablesAccountIntegrationTests for the replacement end-to-end
     // coverage of the actual (departure-finalisation-driven) disablement path.
     [Fact]
@@ -136,7 +136,7 @@ public class DisabledAccountEnforcementTests
         using (var scope = _factory.Services.CreateScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-            Assert.True(await db.Users.Where(u => u.Id == userId).Select(u => u.IsActive).FirstAsync());
+            Assert.True(await db.UserProfiles.Where(u => u.Id == userId).Select(u => u.IsActive).FirstAsync());
         }
 
         var afterOffboarding = await client.GetAsync($"/api/companies/{companyId}/users");
@@ -144,12 +144,12 @@ public class DisabledAccountEnforcementTests
     }
 
     [Fact]
-    public async Task Platform_Administrator_With_Disabled_ApplicationUser_Is_Not_Gated()
+    public async Task Platform_Administrator_With_Disabled_Account_Is_Not_Gated()
     {
         var companyId = Guid.NewGuid();
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
         var email = $"platform.{Guid.NewGuid():N}@test.com";
-        await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, employeeId, email, isActive: false);
+        await IdentityUserAdminTestHelpers.SeedAccountAsync(_factory, employeeId, email, isActive: false);
         await PlatformAdministratorTestHelpers.SeedAdministratorAsync(
             _factory, PlatformAdministratorRole.SupportStaff, email: email);
 
@@ -161,12 +161,12 @@ public class DisabledAccountEnforcementTests
     }
 
     [Fact]
-    public async Task Platform_Administrator_With_Disabled_ApplicationUser_Is_Still_Gated_On_Company_Endpoint()
+    public async Task Platform_Administrator_With_Disabled_Account_Is_Still_Gated_On_Company_Endpoint()
     {
         var companyId = Guid.NewGuid();
         var employeeId = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyId);
         var email = $"platform.{Guid.NewGuid():N}@test.com";
-        await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(_factory, employeeId, email, isActive: false);
+        await IdentityUserAdminTestHelpers.SeedAccountAsync(_factory, employeeId, email, isActive: false);
         await PlatformAdministratorTestHelpers.SeedAdministratorAsync(
             _factory, PlatformAdministratorRole.SupportStaff, email: email);
 
@@ -204,9 +204,9 @@ public class DisabledAccountEnforcementTests
     }
 
     // Ticket 1 (P1): real Supabase-backed accounts (AcceptInvite, self-service SignUp) have a
-    // UserProfile row but no ApplicationUser row at all. SupabaseCurrentUserResolutionMiddleware
+    // UserProfile row but no legacy users row. SupabaseCurrentUserResolutionMiddleware
     // resolves ResolvedCurrentUser.UserId to profile.Id by matching the incoming "sub" claim against
-    // UserProfile.SupabaseAuthUserId — so, unlike the ApplicationUser-only callers above, the
+    // UserProfile.SupabaseAuthUserId — so, unlike the callers above, the
     // X-Test-User header for these callers must carry the *SupabaseAuthUserId*, not the profile/
     // employee id, for the middleware to resolve them at all.
     private async Task<(Guid employeeId, Guid supabaseAuthUserId, string email)> SeedUserProfileOnlyCallerAsync(

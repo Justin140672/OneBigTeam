@@ -27,7 +27,10 @@ internal sealed class GetEffectiveAccessHandler(
         var names = await employeeNameReader.GetNamesAsync(request.CompanyId, [request.EmployeeId], cancellationToken);
         var employeeName = names.TryGetValue(request.EmployeeId, out var resolvedName) ? resolvedName : string.Empty;
 
-        var user = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == request.EmployeeId, cancellationToken);
+        var accountId = await db.UserProfiles.AsNoTracking()
+            .Where(p => p.Id == request.EmployeeId)
+            .Select(p => (Guid?)p.Id)
+            .FirstOrDefaultAsync(cancellationToken);
 
         var activePositions = await db.UserPositions
             .AsNoTracking()
@@ -207,7 +210,7 @@ internal sealed class GetEffectiveAccessHandler(
 
         return Result.Success(new GetEffectiveAccessResponse(
             request.EmployeeId,
-            user?.Id,
+            accountId,
             employeeName,
             position,
             directRoles,

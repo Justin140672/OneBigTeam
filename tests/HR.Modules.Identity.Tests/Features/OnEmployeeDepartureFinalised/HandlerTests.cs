@@ -30,7 +30,7 @@ public class HandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employeeId, "active@test.com", "hash", "Active", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(employeeId, Guid.NewGuid(), Guid.Empty, "active@test.com", "Active", "User", Now));
             await db.SaveChangesAsync();
         }
 
@@ -45,7 +45,7 @@ public class HandlerTests(IdentityDatabaseFixture fixture)
     }
 
     [Fact]
-    public async Task HandleAsync_Is_NoOp_When_No_Linked_ApplicationUser()
+    public async Task HandleAsync_Is_NoOp_When_No_Linked_Account()
     {
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -61,16 +61,16 @@ public class HandlerTests(IdentityDatabaseFixture fixture)
     }
 
     [Fact]
-    public async Task HandleAsync_Is_NoOp_When_ApplicationUser_Already_Inactive()
+    public async Task HandleAsync_Is_NoOp_When_Account_Already_Inactive()
     {
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
 
         await using (var db = fixture.BuildContext())
         {
-            var user = ApplicationUser.Create(employeeId, "already-off@test.com", "hash", "Already", "Off", Now);
+            var user = UserProfile.Create(employeeId, Guid.NewGuid(), Guid.Empty, "already-off@test.com", "Already", "Off", Now);
             user.Deactivate(Now);
-            db.Users.Add(user);
+            db.UserProfiles.Add(user);
             await db.SaveChangesAsync();
         }
 
@@ -92,7 +92,7 @@ public class HandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employeeId, "departing@test.com", "hash", "Dep", "Arting", Now));
+            db.UserProfiles.Add(UserProfile.Create(employeeId, Guid.NewGuid(), Guid.Empty, "departing@test.com", "Dep", "Arting", Now));
             await db.SaveChangesAsync();
         }
 
@@ -122,7 +122,7 @@ public class HandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(employeeId, "redelivered@test.com", "hash", "Re", "Delivered", Now));
+            db.UserProfiles.Add(UserProfile.Create(employeeId, Guid.NewGuid(), Guid.Empty, "redelivered@test.com", "Re", "Delivered", Now));
             await db.SaveChangesAsync();
         }
 
@@ -139,7 +139,7 @@ public class HandlerTests(IdentityDatabaseFixture fixture)
     }
 
     // Ticket 10 (P1): profile-only (real Supabase-backed) accounts previously never got a
-    // disablement request created for them at all — this handler only ever looked in db.Users.
+    // disablement request created for them at all — this handler only ever looked in db.UserProfiles.
     [Fact]
     public async Task HandleAsync_Creates_Pending_AccountDisablement_And_Enqueues_Job_For_Active_ProfileOnly_Account()
     {
@@ -194,33 +194,6 @@ public class HandlerTests(IdentityDatabaseFixture fixture)
         await using var db2 = fixture.BuildContext();
         Assert.False(await db2.AccountDisablements.AnyAsync(d => d.EmployeeId == employeeId));
         Assert.Empty(jobClient.CreatedJobs);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Prefers_ApplicationUser_Over_UserProfile_When_Both_Exist()
-    {
-        var companyId = Guid.NewGuid();
-        var employeeId = Guid.NewGuid();
-
-        await using (var db = fixture.BuildContext())
-        {
-            db.Users.Add(ApplicationUser.Create(employeeId, "both-user@test.com", "hash", "Both", "User", Now));
-            db.UserProfiles.Add(UserProfile.Create(
-                employeeId, Guid.NewGuid(), companyId, "both-profile@test.com", "Both", "Profile", Now));
-            await db.SaveChangesAsync();
-        }
-
-        var jobClient = new RecordingBackgroundJobClient();
-        var handler = BuildHandler(fixture.BuildContext(), jobClient);
-
-        await handler.HandleAsync(BuildEvent(companyId, employeeId, accessDisabled: true), CancellationToken.None);
-
-        await using var db2 = fixture.BuildContext();
-        var request = await db2.AccountDisablements.SingleAsync(d => d.EmployeeId == employeeId);
-        Assert.Equal(employeeId, request.ApplicationUserId);
-
-        var enqueued = Assert.Single(jobClient.CreatedJobs);
-        Assert.Equal(request.Id, enqueued.Args[0]);
     }
 
     [Fact]

@@ -64,7 +64,7 @@ public class Ticket23AccountDisablementMetadataTests(IdentityDatabaseFixture fix
 
         await using (var seedDb = fixture.BuildContext())
         {
-            seedDb.Users.Add(ApplicationUser.Create(employeeId, $"{Guid.NewGuid():N}@test.com", "hash", "First", "Last", Now));
+            seedDb.UserProfiles.Add(UserProfile.Create(employeeId, Guid.NewGuid(), Guid.Empty, $"{Guid.NewGuid():N}@test.com", "First", "Last", Now));
             await seedDb.SaveChangesAsync();
         }
 
@@ -93,7 +93,7 @@ public class Ticket23AccountDisablementMetadataTests(IdentityDatabaseFixture fix
 
         await using (var seedDb = fixture.BuildContext())
         {
-            seedDb.Users.Add(ApplicationUser.Create(employeeId, $"{Guid.NewGuid():N}@test.com", "hash", "First", "Last", Now));
+            seedDb.UserProfiles.Add(UserProfile.Create(employeeId, Guid.NewGuid(), Guid.Empty, $"{Guid.NewGuid():N}@test.com", "First", "Last", Now));
             await seedDb.SaveChangesAsync();
         }
 
@@ -132,7 +132,7 @@ public class Ticket23AccountDisablementMetadataTests(IdentityDatabaseFixture fix
 
         await using (var seedDb = fixture.BuildContext())
         {
-            seedDb.Users.Add(ApplicationUser.Create(applicationUserId, $"{Guid.NewGuid():N}@test.com", "hash", "First", "Last", Now));
+            seedDb.UserProfiles.Add(UserProfile.Create(applicationUserId, Guid.NewGuid(), Guid.Empty, $"{Guid.NewGuid():N}@test.com", "First", "Last", Now));
             var request = AccountDisablement.CreatePending(
                 Guid.NewGuid(), companyId, applicationUserId, employeeId, Now, executionContext);
             seedDb.AccountDisablements.Add(request);
@@ -166,7 +166,7 @@ public class Ticket23AccountDisablementMetadataTests(IdentityDatabaseFixture fix
 
         await using (var seedDb = fixture.BuildContext())
         {
-            seedDb.Users.Add(ApplicationUser.Create(applicationUserId, $"{Guid.NewGuid():N}@test.com", "hash", "First", "Last", Now));
+            seedDb.UserProfiles.Add(UserProfile.Create(applicationUserId, Guid.NewGuid(), Guid.Empty, $"{Guid.NewGuid():N}@test.com", "First", "Last", Now));
             var request = AccountDisablement.CreatePending(Guid.NewGuid(), companyId, applicationUserId, employeeId, Now);
             seedDb.AccountDisablements.Add(request);
             await seedDb.SaveChangesAsync();

@@ -71,8 +71,8 @@ internal static class TestRoleSeeder
     /// Retries <paramref name="action"/> against a fresh change-tracker state when it fails with a
     /// Postgres unique-constraint violation (SQLSTATE 23505). xUnit runs test classes in parallel
     /// by default, and several tests reuse the same fixed/static test user id (e.g. one seeded
-    /// "admin" persona per test class); if two such tests race to seed that user's ApplicationUser
-    /// / UserProfile row for the first time concurrently, both can pass the check-then-insert's
+    /// "admin" persona per test class); if two such tests race to seed that user's
+    /// UserProfile row for the first time concurrently, both can pass the check-then-insert's
     /// <c>SingleOrDefaultAsync</c> "does it exist?" check before either has committed its insert
     /// (a classic TOCTOU race), and the loser's SaveChangesAsync then fails on the row the winner
     /// just committed. On that specific failure we clear the tracked (now-stale, pre-conflict)
@@ -167,18 +167,6 @@ internal static class TestRoleSeeder
 
     private static async Task EnsureUserAndCompanyAsync(IdentityDbContext db, Guid userId, Guid? companyId)
     {
-        var userExists = await db.Users.AnyAsync(u => u.Id == userId);
-        if (!userExists)
-        {
-            db.Users.Add(ApplicationUser.Create(
-                userId,
-                email: $"testuser-{userId:N}@test.internal",
-                passwordHash: "not-used-in-tests",
-                firstName: "Test",
-                lastName: "User",
-                now: DateTimeOffset.UtcNow));
-        }
-
         // Also ensure a matching UserProfile exists, keyed by Id == userId — the same id
         // UserRoles rows below are keyed by, and the id RoleAuthorizationHandler resolves role
         // membership via once SupabaseCurrentUserResolutionMiddleware sets ICurrentUser.UserId to

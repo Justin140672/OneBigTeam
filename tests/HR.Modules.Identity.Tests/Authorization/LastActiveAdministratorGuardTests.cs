@@ -79,7 +79,7 @@ public class LastActiveAdministratorGuardTests(IdentityDatabaseFixture fixture)
     }
 
     [Fact]
-    public async Task HasOtherActiveHolderAsync_Reports_Other_Active_Holder_When_ApplicationUser_Is_Active()
+    public async Task HasOtherActiveHolderAsync_Reports_Other_Active_Holder_When_Account_Is_Active()
     {
         var roleId = await SeedRole("CompanyAdministrator-User-Guard-Active");
         var excludedUserId = Guid.NewGuid();
@@ -87,7 +87,7 @@ public class LastActiveAdministratorGuardTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(activeUserId, "active-user-admin@test.com", "hash", "Active", "Admin", Now));
+            db.UserProfiles.Add(UserProfile.Create(activeUserId, Guid.NewGuid(), Guid.Empty, "active-user-admin@test.com", "Active", "Admin", Now));
 
             db.UserRoles.Add(UserRole.Create(excludedUserId, roleId, Now));
             db.UserRoles.Add(UserRole.Create(activeUserId, roleId, Now));
@@ -103,7 +103,7 @@ public class LastActiveAdministratorGuardTests(IdentityDatabaseFixture fixture)
     }
 
     [Fact]
-    public async Task HasOtherActiveHolderAsync_Reports_No_Other_Active_Holder_When_Other_ApplicationUser_Is_Disabled()
+    public async Task HasOtherActiveHolderAsync_Reports_No_Other_Active_Holder_When_Other_Account_Is_Disabled()
     {
         var roleId = await SeedRole("CompanyAdministrator-User-Guard-Disabled");
         var excludedUserId = Guid.NewGuid();
@@ -111,9 +111,9 @@ public class LastActiveAdministratorGuardTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            var user = ApplicationUser.Create(disabledUserId, "disabled-user-admin@test.com", "hash", "Disabled", "Admin", Now);
+            var user = UserProfile.Create(disabledUserId, Guid.NewGuid(), Guid.Empty, "disabled-user-admin@test.com", "Disabled", "Admin", Now);
             user.Deactivate(Now);
-            db.Users.Add(user);
+            db.UserProfiles.Add(user);
 
             db.UserRoles.Add(UserRole.Create(excludedUserId, roleId, Now));
             db.UserRoles.Add(UserRole.Create(disabledUserId, roleId, Now));

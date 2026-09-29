@@ -25,8 +25,8 @@ public class SearchUserAccessHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(inScopeUser, "in-scope-search@test.com", "hash", "In", "Scope", Now));
-            db.Users.Add(ApplicationUser.Create(outOfScopeUser, "out-of-scope-search@test.com", "hash", "Out", "OfScope", Now));
+            db.UserProfiles.Add(UserProfile.Create(inScopeUser, Guid.NewGuid(), Guid.Empty, "in-scope-search@test.com", "In", "Scope", Now));
+            db.UserProfiles.Add(UserProfile.Create(outOfScopeUser, Guid.NewGuid(), Guid.Empty, "out-of-scope-search@test.com", "Out", "OfScope", Now));
             await db.SaveChangesAsync();
         }
 
@@ -65,10 +65,10 @@ public class SearchUserAccessHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(directUser, "direct@test.com", "hash", "Direct", "User", Now));
-            db.Users.Add(ApplicationUser.Create(inheritedUser, "inherited@test.com", "hash", "Inherited", "User", Now));
-            db.Users.Add(ApplicationUser.Create(overrideUser, "override@test.com", "hash", "Override", "User", Now));
-            db.Users.Add(ApplicationUser.Create(unrelatedUser, "unrelated@test.com", "hash", "Unrelated", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(directUser, Guid.NewGuid(), Guid.Empty, "direct@test.com", "Direct", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(inheritedUser, Guid.NewGuid(), Guid.Empty, "inherited@test.com", "Inherited", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(overrideUser, Guid.NewGuid(), Guid.Empty, "override@test.com", "Override", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(unrelatedUser, Guid.NewGuid(), Guid.Empty, "unrelated@test.com", "Unrelated", "User", Now));
 
             db.Roles.Add(Role.Create(roleId, $"SearchRole.{Guid.NewGuid():N}", Now));
             db.Roles.Add(Role.Create(otherRoleId, $"OtherSearchRole.{Guid.NewGuid():N}", Now));
@@ -103,8 +103,8 @@ public class SearchUserAccessHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(inPosition, "inpos@test.com", "hash", "In", "Position", Now));
-            db.Users.Add(ApplicationUser.Create(notInPosition, "notinpos@test.com", "hash", "Not", "InPosition", Now));
+            db.UserProfiles.Add(UserProfile.Create(inPosition, Guid.NewGuid(), Guid.Empty, "inpos@test.com", "In", "Position", Now));
+            db.UserProfiles.Add(UserProfile.Create(notInPosition, Guid.NewGuid(), Guid.Empty, "notinpos@test.com", "Not", "InPosition", Now));
             db.Positions.Add(Position.Create(positionId, companyId, "Filter Position", Now));
             db.UserPositions.Add(UserPosition.Create(inPosition, positionId, Now));
             await db.SaveChangesAsync();
@@ -133,9 +133,9 @@ public class SearchUserAccessHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(grantUser, $"grantstate-{grantUser:N}@test.com", "hash", "Grant", "User", Now));
-            db.Users.Add(ApplicationUser.Create(denyUser, $"denystate-{denyUser:N}@test.com", "hash", "Deny", "User", Now));
-            db.Users.Add(ApplicationUser.Create(noOverrideUser, $"nostate-{noOverrideUser:N}@test.com", "hash", "No", "Override", Now));
+            db.UserProfiles.Add(UserProfile.Create(grantUser, Guid.NewGuid(), Guid.Empty, $"grantstate-{grantUser:N}@test.com", "Grant", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(denyUser, Guid.NewGuid(), Guid.Empty, $"denystate-{denyUser:N}@test.com", "Deny", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(noOverrideUser, Guid.NewGuid(), Guid.Empty, $"nostate-{noOverrideUser:N}@test.com", "No", "Override", Now));
             db.Roles.Add(Role.Create(roleId, $"OverrideStateRole.{Guid.NewGuid():N}", Now));
             db.EmployeeRoleOverrides.Add(
                 EmployeeRoleOverride.Create(companyId, grantUser, roleId, EmployeeRoleOverrideType.Grant, "Grant", null, Now));
@@ -165,9 +165,9 @@ public class SearchUserAccessHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(expiringSoonUser, "soon@test.com", "hash", "Soon", "User", Now));
-            db.Users.Add(ApplicationUser.Create(expiringLaterUser, "later@test.com", "hash", "Later", "User", Now));
-            db.Users.Add(ApplicationUser.Create(noExpiryUser, "never@test.com", "hash", "Never", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(expiringSoonUser, Guid.NewGuid(), Guid.Empty, "soon@test.com", "Soon", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(expiringLaterUser, Guid.NewGuid(), Guid.Empty, "later@test.com", "Later", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(noExpiryUser, Guid.NewGuid(), Guid.Empty, "never@test.com", "Never", "User", Now));
             db.Roles.Add(Role.Create(roleId, $"ExpiringRole.{Guid.NewGuid():N}", Now));
             db.EmployeeRoleOverrides.Add(
                 EmployeeRoleOverride.Create(companyId, expiringSoonUser, roleId, EmployeeRoleOverrideType.Grant, "Soon", Now.AddDays(13), Now));
@@ -196,8 +196,8 @@ public class SearchUserAccessHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(matchingUser, "ZEBRA@test.com", "hash", "Zebra", "Match", Now));
-            db.Users.Add(ApplicationUser.Create(nonMatchingUser, "other@test.com", "hash", "Other", "Person", Now));
+            db.UserProfiles.Add(UserProfile.Create(matchingUser, Guid.NewGuid(), Guid.Empty, "ZEBRA@test.com", "Zebra", "Match", Now));
+            db.UserProfiles.Add(UserProfile.Create(nonMatchingUser, Guid.NewGuid(), Guid.Empty, "other@test.com", "Other", "Person", Now));
             await db.SaveChangesAsync();
         }
 
@@ -218,7 +218,7 @@ public class SearchUserAccessHandlerTests(IdentityDatabaseFixture fixture)
         await using (var db = fixture.BuildContext())
         {
             foreach (var id in ids)
-                db.Users.Add(ApplicationUser.Create(id, $"{id:N}@test.com", "hash", "Paged", "User", Now));
+                db.UserProfiles.Add(UserProfile.Create(id, Guid.NewGuid(), Guid.Empty, $"{id:N}@test.com", "Paged", "User", Now));
             await db.SaveChangesAsync();
         }
 

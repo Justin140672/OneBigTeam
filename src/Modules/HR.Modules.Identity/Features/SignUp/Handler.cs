@@ -24,11 +24,6 @@ namespace HR.Modules.Identity.Features.SignUp;
 // That only happens once the admin clicks the real verification email link (Phase D's VerifyEmail
 // handler exchanges the code for a Supabase session and activates the company).
 //
-// Local-auth ApplicationUser creation (Phase A's stand-in for this step, SHA256 password hashing
-// mirroring AcceptInvite) has been removed from this handler now that Phase B supersedes it for
-// self-service signup. ApplicationUser itself is untouched and still used by AcceptInvite,
-// DevAuthHandler, and seeded dev personas — this handler simply no longer creates one.
-//
 // Note: company provisioning (Companies schema), default data seeding + employee creation
 // (Employees schema, and transitively Leave schema for the default leave policy), and identity
 // record creation (Identity schema, plus a live call to Supabase) are committed as separate
@@ -93,8 +88,7 @@ internal sealed class SignUpHandler(
 
         var normalizedEmail = request.AdminEmail.Trim().ToUpperInvariant();
 
-        var emailInUse = await dbContext.Users.AnyAsync(u => u.NormalizedEmail == normalizedEmail, cancellationToken)
-            || await dbContext.UserProfiles.AnyAsync(p => p.Email.ToUpper() == normalizedEmail, cancellationToken);
+        var emailInUse = await dbContext.UserProfiles.AnyAsync(p => p.Email.ToUpper() == normalizedEmail, cancellationToken);
         if (emailInUse)
         {
             return Result.Failure<SignUpResponse>(Error.Conflict("An account with this email already exists."));

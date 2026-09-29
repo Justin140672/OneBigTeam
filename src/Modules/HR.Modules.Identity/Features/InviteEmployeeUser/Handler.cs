@@ -60,8 +60,7 @@ internal sealed class InviteEmployeeUserHandler(
         if (emailPolicy.IsFailure)
             return Result.Failure<InviteEmployeeUserResponse>(emailPolicy.Error);
 
-        var hasLinkedUser = await db.Users.AnyAsync(u => u.Id == request.EmployeeId, cancellationToken)
-            || await db.UserProfiles.AnyAsync(p => p.Id == request.EmployeeId, cancellationToken);
+        var hasLinkedUser = await db.UserProfiles.AnyAsync(p => p.Id == request.EmployeeId, cancellationToken);
         if (hasLinkedUser)
             return Result.Failure<InviteEmployeeUserResponse>(
                 Error.Conflict("This employee already has a linked user account."));

@@ -357,7 +357,7 @@ public class CrossTenantResourceIsolationTests
         var companyB = Guid.NewGuid();
         using var clientB = await ClientFor(companyB);
         var employeeA = await IdentityUserAdminTestHelpers.SeedEmployeeAsync(_factory, companyA, "Victim", "User");
-        var userA = await IdentityUserAdminTestHelpers.SeedApplicationUserAsync(
+        var userA = await IdentityUserAdminTestHelpers.SeedAccountAsync(
             _factory, employeeA, $"victim.{Guid.NewGuid():N}@test.example", isActive: true);
 
         var disable = await clientB.PostAsync($"/api/companies/{companyB}/users/{userA}/disable",
@@ -366,6 +366,6 @@ public class CrossTenantResourceIsolationTests
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        Assert.True((await db.Users.AsNoTracking().SingleAsync(u => u.Id == userA)).IsActive);
+        Assert.True((await db.UserProfiles.AsNoTracking().SingleAsync(u => u.Id == userA)).IsActive);
     }
 }

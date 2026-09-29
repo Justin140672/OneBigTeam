@@ -140,45 +140,6 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
     }
 
     [Fact]
-    public async Task HandleAsync_Does_Not_Create_ApplicationUser_For_SelfService_SignUp()
-    {
-        var deps = BuildDependencies();
-        var handler = BuildHandler(deps);
-        var request = ValidRequest();
-
-        var result = await handler.HandleAsync(request, CancellationToken.None);
-
-        Assert.True(result.IsSuccess);
-
-        await using var db = fixture.BuildContext();
-        var applicationUserExists = await db.Users.AnyAsync(u => u.Email == request.AdminEmail);
-        Assert.False(applicationUserExists);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Returns_Conflict_When_ApplicationUser_Email_Already_In_Use()
-    {
-        var existingEmail = $"existing-{Guid.NewGuid():N}@example.com";
-
-        await using (var db = fixture.BuildContext())
-        {
-            db.Users.Add(ApplicationUser.Create(
-                Guid.NewGuid(), existingEmail, "hash", "Existing", "User", Now));
-            await db.SaveChangesAsync();
-        }
-
-        var deps = BuildDependencies();
-        var handler = BuildHandler(deps);
-        var request = ValidRequest() with { AdminEmail = existingEmail.ToUpperInvariant() };
-
-        var result = await handler.HandleAsync(request, CancellationToken.None);
-
-        Assert.True(result.IsFailure);
-        Assert.Equal("conflict", result.Error.Code);
-        Assert.Equal(0, deps.Provisioner.CallCount);
-    }
-
-    [Fact]
     public async Task HandleAsync_Returns_Conflict_When_UserProfile_Email_Already_In_Use()
     {
         var existingEmail = $"existing-{Guid.NewGuid():N}@example.com";
@@ -208,8 +169,8 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(
-                Guid.NewGuid(), existingEmail, "hash", "Existing", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(
+                Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), existingEmail, "Existing", "User", Now));
             await db.SaveChangesAsync();
         }
 
@@ -220,7 +181,7 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
         await handler.HandleAsync(request, CancellationToken.None);
 
         await using var db2 = fixture.BuildContext();
-        var userCount = await db2.Users.CountAsync(u => u.Email == existingEmail);
+        var userCount = await db2.UserProfiles.CountAsync(u => u.Email == existingEmail);
         Assert.Equal(1, userCount);
     }
 
@@ -269,8 +230,6 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
 
         Assert.Empty(deps.SupabaseAuthGateway.CreatedUsers);
         await using var db = fixture.BuildContext();
-        var userExists = await db.Users.AnyAsync(u => u.Email == request.AdminEmail);
-        Assert.False(userExists);
         var profileExists = await db.UserProfiles.AnyAsync(p => p.Email == request.AdminEmail);
         Assert.False(profileExists);
     }
@@ -296,8 +255,6 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
         Assert.False(registrationEvent.Succeeded);
 
         await using var db = fixture.BuildContext();
-        var userExists = await db.Users.AnyAsync(u => u.Email == request.AdminEmail);
-        Assert.False(userExists);
         var profileExists = await db.UserProfiles.AnyAsync(p => p.Email == request.AdminEmail);
         Assert.False(profileExists);
     }
@@ -343,12 +300,11 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
         var handler = BuildHandler(deps);
         var request = ValidRequest() with { AdminEmail = $"ada-{Guid.NewGuid():N}@{domain}" };
 
-        int profilesBefore, rolesBefore, usersBefore;
+        int profilesBefore, rolesBefore;
         await using (var before = fixture.BuildContext())
         {
             profilesBefore = await before.UserProfiles.CountAsync();
             rolesBefore = await before.UserRoles.CountAsync();
-            usersBefore = await before.Users.CountAsync();
         }
 
         var result = await handler.HandleAsync(request, CancellationToken.None);
@@ -371,7 +327,6 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
         await using var db = fixture.BuildContext();
         Assert.Equal(profilesBefore, await db.UserProfiles.CountAsync());
         Assert.Equal(rolesBefore, await db.UserRoles.CountAsync());
-        Assert.Equal(usersBefore, await db.Users.CountAsync());
         Assert.False(await db.UserProfiles.AnyAsync(p => p.Email.ToLower() == request.AdminEmail.ToLower()));
 
         var rejection = Assert.IsType<AccountCreationEmailRejectedAuditEvent>(Assert.Single(deps.AuditEventPublisher.PublishedEvents));

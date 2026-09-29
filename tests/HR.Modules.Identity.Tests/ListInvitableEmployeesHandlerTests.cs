@@ -48,7 +48,7 @@ public class ListInvitableEmployeesHandlerTests(IdentityDatabaseFixture fixture)
     }
 
     [Fact]
-    public async Task HandleAsync_Excludes_Employee_With_ApplicationUser()
+    public async Task HandleAsync_Excludes_Employee_With_Account()
     {
         var companyId = Guid.NewGuid();
         var withAccount = Candidate(Guid.NewGuid(), "Has Account");
@@ -56,7 +56,7 @@ public class ListInvitableEmployeesHandlerTests(IdentityDatabaseFixture fixture)
 
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(withAccount.EmployeeId, "has@test.com", "hash", "Has", "Account", Now));
+            db.UserProfiles.Add(UserProfile.Create(withAccount.EmployeeId, Guid.NewGuid(), Guid.Empty, "has@test.com", "Has", "Account", Now));
             await db.SaveChangesAsync();
         }
 

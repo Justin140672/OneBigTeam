@@ -157,7 +157,6 @@ public class PositionRoleSyncRecoveryIntegrationTests
         await employeesDb.SaveChangesAsync();
 
         var identityDb = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        identityDb.Users.Add(ApplicationUser.Create(employeeId, employee.WorkEmail, "not-used-in-tests", "Sync", "Recovery", now));
         identityDb.UserProfiles.Add(UserProfile.Create(employeeId, Guid.NewGuid(), companyId, employee.WorkEmail, "Sync", "Recovery", now));
         await identityDb.SaveChangesAsync();
 

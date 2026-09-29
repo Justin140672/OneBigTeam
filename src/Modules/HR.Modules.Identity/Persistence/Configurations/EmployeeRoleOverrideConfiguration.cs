@@ -57,7 +57,7 @@ internal sealed class EmployeeRoleOverrideConfiguration : IEntityTypeConfigurati
             .HasDatabaseName("ix_employee_role_overrides_user_role");
 
         // IAM-04: no FK constraint on UserId, matching UserRoleConfiguration/UserPositionConfiguration's
-        // precedent — UserId is the owning Employee's id (ApplicationUser.Id == EmployeeId by
+        // precedent — UserId is the owning Employee's id (UserProfile.Id == EmployeeId by
         // convention) and overrides may need to be administered for a user id before an
         // ApplicationUser row necessarily exists for every code path that could set one.
 

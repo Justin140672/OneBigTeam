@@ -44,13 +44,13 @@ public class IdentityModuleArchitectureTests
     }
 
     [Fact]
-    public void ApplicationUser_Entity_Is_Not_Public()
+    public void UserProfile_Entity_Is_Not_Public()
     {
         var entityType = ModuleAssembly
             .GetTypes()
-            .Single(t => t.Name == "ApplicationUser");
+            .Single(t => t.Name == "UserProfile");
 
-        Assert.False(entityType.IsPublic, "ApplicationUser entity must be internal, not public.");
+        Assert.False(entityType.IsPublic, "UserProfile entity must be internal, not public.");
     }
 
     [Fact]
@@ -62,22 +62,22 @@ public class IdentityModuleArchitectureTests
     }
 
     [Fact]
-    public void ApplicationUser_Entity_Maps_To_Correct_Table_And_Schema()
+    public void UserProfile_Entity_Maps_To_Correct_Table_And_Schema()
     {
         using var context = BuildContext();
 
-        var entityType = context.Model.FindEntityType(typeof(ApplicationUser))!;
+        var entityType = context.Model.FindEntityType(typeof(UserProfile))!;
 
-        Assert.Equal("users", entityType.GetTableName());
+        Assert.Equal("user_profiles", entityType.GetTableName());
         Assert.Equal("identity", entityType.GetSchema());
     }
 
     [Fact]
-    public void ApplicationUser_Entity_Primary_Key_Is_Guid()
+    public void UserProfile_Entity_Primary_Key_Is_Guid()
     {
         using var context = BuildContext();
 
-        var entityType = context.Model.FindEntityType(typeof(ApplicationUser))!;
+        var entityType = context.Model.FindEntityType(typeof(UserProfile))!;
         var pk = entityType.FindPrimaryKey()!;
 
         Assert.Single(pk.Properties);
@@ -85,11 +85,11 @@ public class IdentityModuleArchitectureTests
     }
 
     [Fact]
-    public void ApplicationUser_Entity_All_Columns_Are_snake_case()
+    public void UserProfile_Entity_All_Columns_Are_snake_case()
     {
         using var context = BuildContext();
 
-        var entityType = context.Model.FindEntityType(typeof(ApplicationUser))!;
+        var entityType = context.Model.FindEntityType(typeof(UserProfile))!;
 
         var violations = entityType
             .GetProperties()
@@ -124,17 +124,6 @@ public class IdentityModuleArchitectureTests
         Assert.Equal(2, pk.Properties.Count);
         Assert.Contains(pk.Properties, p => p.Name == nameof(UserRole.UserId));
         Assert.Contains(pk.Properties, p => p.Name == nameof(UserRole.RoleId));
-    }
-
-    [Fact]
-    public void UserProfile_Entity_Maps_To_Correct_Table_And_Schema()
-    {
-        using var context = BuildContext();
-
-        var entityType = context.Model.FindEntityType(typeof(UserProfile))!;
-
-        Assert.Equal("user_profiles", entityType.GetTableName());
-        Assert.Equal("identity", entityType.GetSchema());
     }
 
     [Fact]

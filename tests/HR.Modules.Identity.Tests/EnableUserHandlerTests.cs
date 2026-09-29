@@ -34,7 +34,7 @@ public class EnableUserHandlerTests(IdentityDatabaseFixture fixture)
         var userId = Guid.NewGuid();
         await using (var db = fixture.BuildContext())
         {
-            db.Users.Add(ApplicationUser.Create(userId, $"active-{userId}@test.com", "hash", "Test", "User", Now));
+            db.UserProfiles.Add(UserProfile.Create(userId, Guid.NewGuid(), Guid.Empty, $"active-{userId}@test.com", "Test", "User", Now));
             await db.SaveChangesAsync();
         }
 
@@ -55,9 +55,9 @@ public class EnableUserHandlerTests(IdentityDatabaseFixture fixture)
         var userId = Guid.NewGuid();
         await using (var db = fixture.BuildContext())
         {
-            var user = ApplicationUser.Create(userId, $"disabled-{userId}@test.com", "hash", "Test", "User", Now);
+            var user = UserProfile.Create(userId, Guid.NewGuid(), Guid.Empty, $"disabled-{userId}@test.com", "Test", "User", Now);
             user.Deactivate(Now);
-            db.Users.Add(user);
+            db.UserProfiles.Add(user);
             await db.SaveChangesAsync();
         }
 
@@ -73,7 +73,7 @@ public class EnableUserHandlerTests(IdentityDatabaseFixture fixture)
         Assert.True(result.Value.IsActive);
 
         await using var db2 = fixture.BuildContext();
-        var reloaded = await db2.Users.FirstAsync(u => u.Id == userId);
+        var reloaded = await db2.UserProfiles.FirstAsync(u => u.Id == userId);
         Assert.True(reloaded.IsActive);
 
         Assert.Single(auditPublisher.PublishedEvents, e => e is UserEnabledAuditEvent);
@@ -85,9 +85,9 @@ public class EnableUserHandlerTests(IdentityDatabaseFixture fixture)
         var userId = Guid.NewGuid();
         await using (var db = fixture.BuildContext())
         {
-            var user = ApplicationUser.Create(userId, $"cross-tenant-{userId}@test.com", "hash", "Test", "User", Now);
+            var user = UserProfile.Create(userId, Guid.NewGuid(), Guid.Empty, $"cross-tenant-{userId}@test.com", "Test", "User", Now);
             user.Deactivate(Now);
-            db.Users.Add(user);
+            db.UserProfiles.Add(user);
             await db.SaveChangesAsync();
         }
 
@@ -103,14 +103,14 @@ public class EnableUserHandlerTests(IdentityDatabaseFixture fixture)
         Assert.Equal("not_found", result.Error.Code);
 
         await using var db2 = fixture.BuildContext();
-        var reloaded = await db2.Users.FirstAsync(u => u.Id == userId);
+        var reloaded = await db2.UserProfiles.FirstAsync(u => u.Id == userId);
         Assert.False(reloaded.IsActive);
 
         Assert.Empty(auditPublisher.PublishedEvents);
     }
 
     // Ticket 1 (P1): mirror DisableUser's UserProfile fallback for real Supabase-backed accounts
-    // (AcceptInvite, self-service SignUp) that have no ApplicationUser row.
+    // (AcceptInvite, self-service SignUp) that have no legacy users row.
 
     [Fact]
     public async Task HandleAsync_Reenables_Previously_Disabled_UserProfile_Only_Account()

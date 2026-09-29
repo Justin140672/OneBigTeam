@@ -24,12 +24,10 @@ internal sealed class UserRoleConfiguration : IEntityTypeConfiguration<UserRole>
             .HasColumnName("assigned_at")
             .IsRequired();
 
-        // No FK constraint on UserId: this column can reference either ApplicationUser.Id
-        // (local-auth path — AcceptInvite, DevAuthHandler, seeded dev personas) or
-        // UserProfile.Id (real Supabase-backed users, created by self-service SignUp as of
-        // Phase B) — see SignUpHandler.CreateIdentityRecordAsync's remarks on why UserRole.UserId
-        // must equal UserProfile.Id, not the raw Supabase auth user id. A single FK to one table
-        // would incorrectly reject role rows for the other table's users.
+        // No FK constraint on UserId: it is keyed by UserProfile.Id (== EmployeeId by convention),
+        // and role rows may be assigned before an account exists — see
+        // SignUpHandler.CreateIdentityRecordAsync's remarks on why UserRole.UserId must equal
+        // UserProfile.Id, not the raw Supabase auth user id.
         builder.HasIndex(ur => ur.UserId);
 
         builder.HasOne<Role>()

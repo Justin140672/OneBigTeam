@@ -96,7 +96,7 @@ public class ProcessInvitationBatchJobTests(IdentityDatabaseFixture fixture)
 
         await using (var seedDb = fixture.BuildContext())
         {
-            seedDb.Users.Add(ApplicationUser.Create(recipient.EmployeeId, recipient.Email, "hash", "Test", "User", Now));
+            seedDb.UserProfiles.Add(UserProfile.Create(recipient.EmployeeId, Guid.NewGuid(), Guid.Empty, recipient.Email, "Test", "User", Now));
             await seedDb.SaveChangesAsync();
         }
 

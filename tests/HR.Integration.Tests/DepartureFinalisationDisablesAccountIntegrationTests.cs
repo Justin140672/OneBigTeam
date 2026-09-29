@@ -58,7 +58,7 @@ public class DepartureFinalisationDisablesAccountIntegrationTests
         await employeesDb.SaveChangesAsync();
 
         var identityDb = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        identityDb.Users.Add(ApplicationUser.Create(employeeId, email, "not-used-in-tests", "Departing", "Employee", DateTimeOffset.UtcNow));
+        identityDb.UserProfiles.Add(UserProfile.Create(employeeId, Guid.NewGuid(), Guid.Empty, email, "Departing", "Employee", DateTimeOffset.UtcNow));
         await identityDb.SaveChangesAsync();
     }
 
@@ -136,7 +136,7 @@ public class DepartureFinalisationDisablesAccountIntegrationTests
         using (var scope = _factory.Services.CreateScope())
         {
             var identityDb = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-            var user = await identityDb.Users.SingleAsync(u => u.Id == employeeId);
+            var user = await identityDb.UserProfiles.SingleAsync(u => u.Id == employeeId);
             Assert.False(user.IsActive);
 
             var request = await identityDb.AccountDisablements.SingleAsync(d => d.Id == accountDisablementId);
@@ -173,7 +173,7 @@ public class DepartureFinalisationDisablesAccountIntegrationTests
 
         using var scope2 = _factory.Services.CreateScope();
         var identityDb = scope2.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        var user = await identityDb.Users.SingleAsync(u => u.Id == employeeId);
+        var user = await identityDb.UserProfiles.SingleAsync(u => u.Id == employeeId);
         Assert.True(user.IsActive);
         Assert.False(await identityDb.AccountDisablements.AnyAsync(d => d.EmployeeId == employeeId));
     }
@@ -194,7 +194,7 @@ public class DepartureFinalisationDisablesAccountIntegrationTests
 
         using var scope = _factory.Services.CreateScope();
         var identityDb = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
-        var user = await identityDb.Users.SingleAsync(u => u.Id == employeeId);
+        var user = await identityDb.UserProfiles.SingleAsync(u => u.Id == employeeId);
         Assert.True(user.IsActive);
         Assert.False(await identityDb.AccountDisablements.AnyAsync(d => d.EmployeeId == employeeId));
     }
