@@ -4,9 +4,10 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 public sealed class CompanyEditPage(IPage page, string baseUrl)
 {
-    public async Task GoToAsync(Guid companyId)
+    public async Task GoToAsync(Guid companyId, string? returnUrl = null)
     {
-        await page.GotoAsync($"{baseUrl}/companies/{companyId}/edit");
+        var query = returnUrl is null ? "" : $"?returnUrl={Uri.EscapeDataString(returnUrl)}";
+        await page.GotoAsync($"{baseUrl}/companies/{companyId}/edit{query}");
         await page.WaitForSelectorAsync("#company-name", new() { Timeout = 20_000 });
     }
 
@@ -41,20 +42,30 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
     }
 
     /// <summary>
-    /// Clicks Save and waits for the inline "Company saved successfully." banner — CompanyEdit's
-    /// own Save button intentionally stays on the page (no list to navigate to) and shows this
-    /// <c>.alert-success</c> banner instead.
+    /// Clicks Save on a page opened without a returnUrl by a company-admin-only user, whose landing
+    /// page is this edit page: the save stays in place and shows the inline success alert.
     /// </summary>
     public async Task SaveExpectingSuccessAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
-        await page.WaitForSpinnerToClearAsync();
+        await page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
         await page.Locator(".alert-success").First.WaitForAsync(
             new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
     }
 
-    public Task<bool> IsSaveSuccessVisibleAsync() =>
-        page.Locator(".alert-success").First.IsVisibleAsync();
+    /// <summary>
+    /// Clicks Save on a page opened with a returnUrl and waits for the navigation back to it.
+    /// </summary>
+    public async Task SaveExpectingNavigationToAsync(string returnPath)
+    {
+        await page.RunAndWaitForNavigationAsync(
+            () => page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync(),
+            new()
+            {
+                UrlFunc = url => string.Equals(new Uri(url).AbsolutePath, returnPath, StringComparison.OrdinalIgnoreCase),
+                WaitUntil = WaitUntilState.Commit,
+                Timeout = 30_000,
+            });
+    }
 
     // ── Optimistic-concurrency conflict banner (Ticket 2) ─────────────────────
     // CompanyEdit.razor renders the shared <SaveConflictBanner> — a single

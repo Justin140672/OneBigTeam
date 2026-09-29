@@ -1,0 +1,36 @@
+@implements IDisposable
+@inject AppSession Session
+
+@{
+    var alert = SubscriptionAlertPresenter.Present(Session);
+}
+@if (alert.IsVisible)
+{
+    <div class="subscription-alert subscription-alert--@alert.VariantKey"
+         role="@(alert.IsUrgent ? "alert" : "status")"
+         aria-labelledby="subscription-alert-heading"
+         data-testid="subscription-alert"
+         data-variant="@alert.VariantKey">
+        <span class="subscription-alert__icon" aria-hidden="true"><i class="@alert.IconCss"></i></span>
+        <div class="subscription-alert__body">
+            <p id="subscription-alert-heading" class="subscription-alert__heading" role="heading" aria-level="2" data-testid="subscription-alert-heading">@alert.Heading</p>
+            <p class="subscription-alert__text">@alert.Text</p>
+            @if (alert.Guidance is not null)
+            {
+                <p class="subscription-alert__guidance" data-testid="subscription-alert-guidance">@alert.Guidance</p>
+            }
+        </div>
+        @if (alert.ActionHref is not null)
+        {
+            <a class="subscription-alert__action" href="@alert.ActionHref" data-testid="subscription-alert-action">@alert.ActionLabel</a>
+        }
+    </div>
+}
+
+@code {
+    protected override void OnInitialized() => Session.Changed += OnSessionChanged;
+
+    private void OnSessionChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Session.Changed -= OnSessionChanged;
+}

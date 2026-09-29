@@ -71,17 +71,94 @@ public sealed class ExpiredTrialCompleteProfileTests(ParallelBlankPersonaFixture
     }
 
     [Fact]
-    public async Task ExpiredTrialAdmin_SeesReadOnlyBanner_AndCanOpenSubscriptionAndStartCheckout()
+    public async Task ExpiredTrialAdmin_SeesSubscriptionAlert_AndCanOpenSubscriptionAndStartCheckout()
     {
         var email = await SignUpActivateAndExpireFreshCompanyAsync();
 
         await LoginWithDialogWatcherAsync(email);
 
-        var banner = _page.Locator(".trial-banner--expired");
-        await banner.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
-        Assert.Contains("read-only", await banner.InnerTextAsync(), StringComparison.OrdinalIgnoreCase);
+        var alert = await WaitForExpiredAlertAsync();
+        Assert.Equal("Your free trial has ended", (await alert.GetByTestId("subscription-alert-heading").InnerTextAsync()).Trim());
+        Assert.Contains("read-only", await alert.InnerTextAsync(), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("Start subscription", (await alert.GetByTestId("subscription-alert-action").InnerTextAsync()).Trim());
+        Assert.Equal(0, await alert.GetByTestId("subscription-alert-guidance").CountAsync());
 
-        await banner.Locator(".trial-banner-action").ClickAsync();
+        await alert.GetByTestId("subscription-alert-action").ClickAsync();
+        await AssertSubscriptionPageOpenedAsync();
+    }
+
+    [Fact]
+    public async Task ExpiredTrialAdmin_CanActivateSubscriptionAlertActionWithKeyboard()
+    {
+        var email = await SignUpActivateAndExpireFreshCompanyAsync();
+
+        await LoginWithDialogWatcherAsync(email);
+
+        var alert = await WaitForExpiredAlertAsync();
+        await alert.GetByTestId("subscription-alert-action").FocusAsync();
+        await _page.Keyboard.PressAsync("Enter");
+
+        await AssertSubscriptionPageOpenedAsync();
+    }
+
+    [Fact]
+    public async Task ExpiredTrialAdmin_AlertRemainsVisibleAfterNavigatingToAnotherPage()
+    {
+        var email = await SignUpActivateAndExpireFreshCompanyAsync();
+
+        await LoginWithDialogWatcherAsync(email);
+        await WaitForExpiredAlertAsync();
+
+        await _page.GetByText("Company Profile & Addresses").First.ClickAsync();
+        await _page.WaitForURLAsync(url => url.Contains("/edit"), new() { Timeout = 15_000 });
+
+        await WaitForExpiredAlertAsync();
+    }
+
+    [Fact]
+    public async Task ExpiredTrialAdmin_AlertReflowsOnNarrowViewportWithoutHorizontalScroll()
+    {
+        var email = await SignUpActivateAndExpireFreshCompanyAsync();
+
+        await _page.SetViewportSizeAsync(375, 800);
+        await LoginWithDialogWatcherAsync(email);
+
+        var alert = await WaitForExpiredAlertAsync();
+        var action = alert.GetByTestId("subscription-alert-action");
+        await action.WaitForAsync(new() { State = WaitForSelectorState.Visible });
+
+        var overflows = await _page.EvaluateAsync<bool>(
+            "document.documentElement.scrollWidth > document.documentElement.clientWidth");
+        Assert.False(overflows, "The subscription alert must not cause horizontal scrolling at 375px.");
+
+        var box = await action.BoundingBoxAsync();
+        Assert.NotNull(box);
+        Assert.True(box!.Height >= 44);
+        Assert.True(box.X >= 0 && box.X + box.Width <= 375);
+    }
+
+    [Fact]
+    public async Task ExpiredTrialAdmin_AlertStateHasNoSeriousAccessibilityViolations()
+    {
+        var email = await SignUpActivateAndExpireFreshCompanyAsync();
+
+        await LoginWithDialogWatcherAsync(email);
+        await WaitForExpiredAlertAsync();
+        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+        await AccessibilityScan.AssertNoSeriousViolationsAsync(_page, "expired-trial subscription alert");
+    }
+
+    private async Task<ILocator> WaitForExpiredAlertAsync()
+    {
+        var alert = _page.GetByTestId("subscription-alert");
+        await alert.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        Assert.Equal("expired", await alert.GetAttributeAsync("data-variant"));
+        return alert;
+    }
+
+    private async Task AssertSubscriptionPageOpenedAsync()
+    {
         await _page.WaitForURLAsync(url => url.Contains("/subscription"), new() { Timeout = 15_000 });
         await _page.WaitForSelectorAsync(".card-header h5", new() { Timeout = 20_000 });
 

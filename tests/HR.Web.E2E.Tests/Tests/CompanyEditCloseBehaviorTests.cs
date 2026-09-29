@@ -90,7 +90,7 @@ public sealed class CompanyEditCloseBehaviorTests(PriyaShahPersonaFixture fixtur
         finally
         {
             await companyEdit.FillCompanyNameInputAsync(originalName);
-            await companyEdit.SaveAsync();
+            await companyEdit.SaveExpectingSuccessAsync();
         }
     }
 

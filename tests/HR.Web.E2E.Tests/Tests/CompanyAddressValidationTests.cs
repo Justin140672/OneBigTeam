@@ -38,7 +38,7 @@ public sealed class CompanyAddressValidationTests(PriyaShahPersonaFixture fixtur
         finally
         {
             await companyEdit.SetFirstAddressLine1Async(originalLine1);
-            await companyEdit.SaveAsync();
+            await companyEdit.SaveExpectingSuccessAsync();
         }
     }
 }

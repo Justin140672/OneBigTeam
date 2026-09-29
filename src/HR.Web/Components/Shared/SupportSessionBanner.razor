@@ -2,7 +2,7 @@
 
 @* Visible support banner (Support epic, "Login As Customer" acceptance criterion). Renders
    whenever SupportSessionState reports an active support session. Placed alongside
-   ReadOnlyBanner/TrialBanner in MainLayout.razor. See SupportSessionState's remarks: nothing
+   SubscriptionStatusAlert in MainLayout.razor. See SupportSessionState's remarks: nothing
    currently activates a support session (full redemption is stubbed), so this banner is built
    and ready but not yet reachable in a real browsing session. *@
 @if (SupportSession.IsActive)

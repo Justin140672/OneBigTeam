@@ -135,8 +135,13 @@
 
     protected override Task OnSavedAsync()
     {
-        SuccessMsg = "Company saved successfully.";
-        return Task.CompletedTask;
+        if (SaveNavigationTarget.IsSamePage(ReturnUrl, Session.LandingUrl, Navigation.Uri))
+        {
+            SuccessMsg = "Company saved successfully.";
+            return Task.CompletedTask;
+        }
+
+        return base.OnSavedAsync();
     }
 
     protected override string? ListUrl => "/";

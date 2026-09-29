@@ -124,8 +124,6 @@ else
 
         <main class="main-content">
             <SupportSessionBanner />
-            <ReadOnlyBanner />
-            <TrialBanner />
             <div class="top-bar">
                 @if (ShowSidebar && !SidebarOpen)
                 {
@@ -294,6 +292,8 @@ else
                     }
                 </div>
             </div>
+
+            <SubscriptionStatusAlert />
 
             <section class="content-area">
                 <ErrorBoundary @ref="_errorBoundary">

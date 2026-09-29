@@ -61,7 +61,7 @@ public abstract class EditPageBase : ComponentBase, IDisposable
 
     protected virtual string? ListUrl => null;
 
-    private string? ReturnUrl
+    protected string? ReturnUrl
     {
         get
         {

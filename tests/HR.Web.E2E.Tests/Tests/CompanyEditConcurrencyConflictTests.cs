@@ -48,7 +48,7 @@ public sealed class CompanyEditConcurrencyConflictTests(PriyaShahPersonaFixture 
     }
 
     [Fact]
-    public async Task CompanyEdit_NormalEditAndSave_ShowsSuccessBanner()
+    public async Task CompanyEdit_NormalEditAndSave_NavigatesBackAndPersists()
     {
         var newLine1 = $"E2E Save {Guid.NewGuid():N}"[..20];
 
@@ -67,9 +67,6 @@ public sealed class CompanyEditConcurrencyConflictTests(PriyaShahPersonaFixture 
             await companyEdit.SetFirstAddressLine1Async(newLine1);
             await companyEdit.SaveExpectingSuccessAsync();
 
-            Assert.True(await companyEdit.IsSaveSuccessVisibleAsync(),
-                "Expected the inline success banner after a normal Company profile save");
-
             await companyEdit.GoToAsync(AcmeId);
             await companyEdit.OpenProfileTabAsync();
             Assert.Equal(newLine1, await companyEdit.GetFirstAddressLine1Async());
@@ -77,7 +74,7 @@ public sealed class CompanyEditConcurrencyConflictTests(PriyaShahPersonaFixture 
         finally
         {
             await companyEdit.SetFirstAddressLine1Async(originalLine1);
-            await companyEdit.SaveAsync();
+            await companyEdit.SaveExpectingSuccessAsync();
         }
     }
 
@@ -132,13 +129,12 @@ public sealed class CompanyEditConcurrencyConflictTests(PriyaShahPersonaFixture 
             await companyEdit.SetFirstAddressLine1Async(finalValue);
             await companyEdit.SaveExpectingSuccessAsync();
 
-            Assert.True(await companyEdit.IsSaveSuccessVisibleAsync(),
-                "Expected a success banner after saving against the reloaded version");
+            Assert.Equal(finalValue, await companyEdit.GetFirstAddressLine1Async());
         }
         finally
         {
             await companyEdit.SetFirstAddressLine1Async(originalLine1);
-            await companyEdit.SaveAsync();
+            await companyEdit.SaveExpectingSuccessAsync();
         }
     }
 }
