@@ -42,6 +42,37 @@ public class AdminContentSecurityPolicyTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public void ScriptSrc_Never_Allows_Unsafe_Eval_In_Any_Environment(bool isDevelopment)
+    {
+        var policy = AdminContentSecurityPolicy.Build(Nonce, isDevelopment);
+
+        Assert.DoesNotContain("'unsafe-eval'", ParseDirectives(policy)["script-src"]);
+        Assert.DoesNotContain("unsafe-eval", policy, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("wasm-unsafe-eval", policy, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Admin_Web_Source_Contains_No_Js_Eval_Or_New_Function()
+    {
+        var root = AppContext.BaseDirectory;
+        while (root is not null && !File.Exists(Path.Combine(root, "OneBigTeam.slnx")) && !Directory.Exists(Path.Combine(root, "src", "HR.Admin.Web")))
+            root = Path.GetDirectoryName(root);
+        Assert.NotNull(root);
+
+        var offenders = Directory.EnumerateFiles(Path.Combine(root!, "src", "HR.Admin.Web"), "*.*", SearchOption.AllDirectories)
+            .Where(f => f.EndsWith(".razor") || f.EndsWith(".cs") || (f.EndsWith(".js") && !f.Contains("wwwroot" + Path.DirectorySeparatorChar + "lib")))
+            .Where(f => !f.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar)
+                        && !f.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar)
+                        && !f.EndsWith("AdminContentSecurityPolicy.cs"))
+            .Where(f => System.Text.RegularExpressions.Regex.IsMatch(File.ReadAllText(f), "\"eval\"|\\beval\\(|new Function\\("))
+            .ToList();
+
+        Assert.Empty(offenders);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public void Policy_Contains_The_Hardening_Directives(bool isDevelopment)
     {
         var directives = ParseDirectives(AdminContentSecurityPolicy.Build(Nonce, isDevelopment));

@@ -22,9 +22,18 @@ public static class AdminContentSecurityPolicy
             ? ["ws://localhost:*", "wss://localhost:*", "http://localhost:*", "https://localhost:*"]
             : [];
 
+        // No 'unsafe-eval' in ANY environment (Ticket 5). Audit of HR.Admin.Web: the app's only
+        // runtime JS compilation was the dev sign-in's JS eval (now NavigationManager.NavigateTo).
+        // Syncfusion Blazor 34.2.9 renders templates in C# (RenderFragment), not via new Function;
+        // every Syncfusion component the Admin Portal uses (Grid, Chart, Dialog, DropDownList,
+        // DatePicker, TextBox, NumericTextBox, CheckBox, Button) is also used by HR.Web at the same
+        // pinned version under a policy that has no 'unsafe-eval'. NOT empirically re-verified in a
+        // browser by the author; AdminContentSecurityPolicyBrowserTests (Playwright, CSP enforced)
+        // fails on any violation. If it ever reports one, capture the directive/sample, record the
+        // component and Syncfusion version, and re-add only with a documented, time-boxed exception.
         return new ContentSecurityPolicyBuilder()
             .Add("default-src", "'self'")
-            .Add("script-src", ["'self'", ContentSecurityPolicyBuilder.NonceSource(nonce), "'unsafe-eval'", .. devSources])
+            .Add("script-src", ["'self'", ContentSecurityPolicyBuilder.NonceSource(nonce), .. devSources])
             .Add("style-src", "'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://cdn.jsdelivr.net")
             .Add("font-src", "'self'", "data:", "https://fonts.gstatic.com")
             .Add("img-src", "'self'", "data:")

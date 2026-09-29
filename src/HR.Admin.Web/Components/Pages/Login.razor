@@ -3,7 +3,6 @@
 @attribute [Microsoft.AspNetCore.Authorization.AllowAnonymous]
 @inject DevAuthService DevAuth
 @inject NavigationManager Navigation
-@inject IJSRuntime JS
 @inject HR.Admin.Web.Services.AuthHandoffStore HandoffStore
 
 <PageTitle>Sign in — Admin Portal</PageTitle>
@@ -85,7 +84,9 @@
 
         var code = HandoffStore.Issue(new AuthHandoffStore.Session(
             session.AccessToken, session.RefreshToken, session.ExpiresIn));
-        await JS.InvokeVoidAsync("eval", $"window.location.href='/dev/persona-cookie?code={Uri.EscapeDataString(code)}'");
+        // A forced (full-page) navigation so the endpoint can set the auth cookie on a real HTTP
+        // response. Uses NavigationManager rather than JS eval: the Admin CSP has no 'unsafe-eval'.
+        Navigation.NavigateTo($"/dev/persona-cookie?code={Uri.EscapeDataString(code)}", forceLoad: true);
     }
 
     private sealed class LoginForm
