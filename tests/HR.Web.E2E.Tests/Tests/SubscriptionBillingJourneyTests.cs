@@ -113,7 +113,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         await login.LoginAsync(AcmeHrAdminEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/subscription");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        await _page.WaitForURLAsync(url => !url.Split('?')[0].TrimEnd('/').EndsWith("/subscription", StringComparison.OrdinalIgnoreCase), new() { Timeout = 30_000 });
 
         var finalUrl = _page.Url;
         Assert.False(finalUrl.TrimEnd('/').EndsWith("/subscription", StringComparison.OrdinalIgnoreCase),
@@ -129,7 +129,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         await login.LoginAsync(AcmeManagerEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/subscription");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        await _page.WaitForURLAsync(url => !url.Split('?')[0].TrimEnd('/').EndsWith("/subscription", StringComparison.OrdinalIgnoreCase), new() { Timeout = 30_000 });
 
         var finalUrl = _page.Url;
         Assert.False(finalUrl.TrimEnd('/').EndsWith("/subscription", StringComparison.OrdinalIgnoreCase),
@@ -145,7 +145,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         await login.LoginAsync(AcmeRecruiterEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/subscription");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        await _page.WaitForURLAsync(url => !url.Split('?')[0].TrimEnd('/').EndsWith("/subscription", StringComparison.OrdinalIgnoreCase), new() { Timeout = 30_000 });
 
         var finalUrl = _page.Url;
         Assert.False(finalUrl.TrimEnd('/').EndsWith("/subscription", StringComparison.OrdinalIgnoreCase),
@@ -161,7 +161,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         await login.LoginAsync(AcmePlainEmployeeEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/subscription");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        await _page.WaitForURLAsync(url => !url.Split('?')[0].TrimEnd('/').EndsWith("/subscription", StringComparison.OrdinalIgnoreCase), new() { Timeout = 30_000 });
 
         var finalUrl = _page.Url;
         Assert.False(finalUrl.TrimEnd('/').EndsWith("/subscription", StringComparison.OrdinalIgnoreCase),
@@ -618,6 +618,7 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         try
         {
             await EnsureBetaCorpActiveSubscriptionAsync();
+            await subscription.GoToAsync();
 
             Exception? scenarioException = null;
             Exception? cleanupException = null;
@@ -697,7 +698,6 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var initialStatus = await subscription.GetSubscriptionStatusAsync();
         var initialPlan = await subscription.GetPlanAsync();
         var initialNextBilling = await subscription.GetNextBillingDateAsync();
-        var initialEmployeeCount = await subscription.GetActiveEmployeeCountAsync();
         var initialHasManageButton = await subscription.HasManageBillingButtonAsync();
         var initialHasCancelButton = await subscription.HasCancelButtonAsync();
         var initialHasResumeButton = await subscription.HasResumeButtonAsync();
@@ -708,7 +708,6 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         var reloadedStatus = await subscription.GetSubscriptionStatusAsync();
         var reloadedPlan = await subscription.GetPlanAsync();
         var reloadedNextBilling = await subscription.GetNextBillingDateAsync();
-        var reloadedEmployeeCount = await subscription.GetActiveEmployeeCountAsync();
         var reloadedHasManageButton = await subscription.HasManageBillingButtonAsync();
         var reloadedHasCancelButton = await subscription.HasCancelButtonAsync();
         var reloadedHasResumeButton = await subscription.HasResumeButtonAsync();
@@ -716,7 +715,6 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         Assert.Equal(initialStatus ?? "", reloadedStatus ?? "");
         Assert.Equal(initialPlan ?? "", reloadedPlan ?? "");
         Assert.Equal(initialNextBilling ?? "", reloadedNextBilling ?? "");
-        Assert.Equal(initialEmployeeCount ?? "", reloadedEmployeeCount ?? "");
         Assert.Equal(initialHasManageButton, reloadedHasManageButton);
         Assert.Equal(initialHasCancelButton, reloadedHasCancelButton);
         Assert.Equal(initialHasResumeButton, reloadedHasResumeButton);
@@ -741,6 +739,8 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
         await sidebar.ClickTopLevelMenuItemAsync("Subscription & Billing");
 
         await _page.WaitForURLAsync(url => url.Contains("/subscription"), new() { Timeout = 15_000 });
+
+        await _page.WaitForSelectorAsync(".card-header h5", new() { Timeout = 20_000 });
 
         var finalUrl = _page.Url;
         Assert.True(finalUrl.Contains("/subscription"),

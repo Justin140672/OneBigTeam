@@ -141,6 +141,7 @@ public sealed class SharedDocumentArchiveTests(HrAdminPersonaFixture fixture) : 
 
     private async Task<Guid> GetUploadedDocumentIdAsync(string title)
     {
+        await _page.RevealGridRowAsync(title);
         var href = await _page.Locator(".e-rowcell a").Filter(new() { HasText = title }).First.GetAttributeAsync("href");
         Assert.NotNull(href);
         return Guid.Parse(href.Split('/').Last());

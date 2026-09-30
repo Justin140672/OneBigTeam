@@ -225,7 +225,7 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
     public async Task<string?> GetProbationReviewTypeAsync()
     {
         var el = Dialog.Locator("[data-testid='review-type']");
-        return await el.IsVisibleAsync() ? (await el.TextContentAsync())?.Trim() : null;
+        return await el.WaitUntilVisibleAsync(15_000) ? (await el.TextContentAsync())?.Trim() : null;
     }
 
     public async Task EnterReviewNotesAsync(string notes)
@@ -256,7 +256,6 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
 
     public async Task ClickViewAndAcknowledgeDocumentAsync()
     {
-        await Dialog.Locator("[data-testid='view-document-btn']").ClickAsync();
-        await page.WaitForURLAsync(url => url.Contains("/shared-documents/published/"), new() { Timeout = 15_000 });
+        await Dialog.Locator("[data-testid='view-document-btn']").ClickUntilUrlAsync(page, u => u.Contains("/shared-documents/published/"));
     }
 }

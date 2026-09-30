@@ -131,11 +131,50 @@ public sealed class LoginPage(IPage page, string baseUrl)
             {
                 E2eDiag.Log("LoginPage", $"RealFormLoginAsync({email}): 45s app-shell wait TIMED OUT — this is the app itself not rendering the shell in time, not a credential/Supabase rejection");
                 throw new TimeoutException(
-                    $"Timed out waiting for the app shell (or a login error) after submitting real credentials for '{email}'.");
+                    $"Timed out waiting for the app shell (or a login error) after submitting real credentials for '{email}'. " +
+                    await DescribePageStateAsync());
             }
 
             await Task.Delay(100);
         }
+    }
+
+    private async Task<string> DescribePageStateAsync()
+    {
+        static async Task<string> Safe(Func<Task<string?>> read)
+        {
+            try { return await read() ?? "(null)"; }
+            catch (Exception ex) { return $"(unavailable: {ex.GetType().Name})"; }
+        }
+
+        var url = page.Url;
+        var title = await Safe(async () => await page.TitleAsync());
+        var headings = await Safe(async () =>
+        {
+            var texts = await page.Locator("h1:visible, h2:visible").AllInnerTextsAsync();
+            return string.Join(" | ", texts.Select(t => t.Trim()).Where(t => t.Length > 0));
+        });
+        var body = await Safe(async () =>
+        {
+            var text = (await page.Locator("body").InnerTextAsync(new() { Timeout = 3_000 })).Trim();
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
+            return text.Length > 300 ? text[..300] : text;
+        });
+        var cookies = await Safe(async () =>
+        {
+            var all = await page.Context.CookiesAsync();
+            return all.Count == 0 ? "none" : string.Join(",", all.Select(c => c.Name));
+        });
+        var markers = await Safe(async () =>
+        {
+            var loading = await page.Locator(".app-loading").CountAsync();
+            var shell = await page.Locator(".app-shell").CountAsync();
+            var dialog = await page.Locator(".employee-completion-dialog").CountAsync();
+            var busy = await page.Locator(".login-btn .spinner-border").CountAsync();
+            return $"app-loading={loading}, app-shell={shell}, completion-dialog={dialog}, login-busy-spinner={busy}";
+        });
+
+        return $"Page state: url={url}; title=\"{title}\"; headings=\"{headings}\"; cookies=[{cookies}]; {markers}; body=\"{body}\"";
     }
 
     private async Task<bool> IsAuthenticatedAsAsync(string email)

@@ -105,6 +105,29 @@ public static class TasksModule
         await db.Database.MigrateAsync();
     }
 
+
+    public static async Task SeedE2eProbationReviewTaskAsync(this IServiceProvider services, Guid companyId, Guid managerId)
+    {
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
+
+        var taskId = Guid.Parse("a0000000-0000-0000-0000-0000000000f5");
+        if (await db.TaskItems.AnyAsync(t => t.Id == taskId))
+            return;
+
+        db.TaskItems.Add(TaskItem.Create(
+            taskId, companyId, managerId,
+            "Complete probation review — E2E SeedProbationTask",
+            "Probation manager check-in due 7 May 2026.",
+            TaskPriority.High, TaskSource.Probation, TaskActionType.Review,
+            new DateOnly(2026, 5, 7),
+            assignedEmployeeId: managerId,
+            assignedUserId: managerId,
+            DateTimeOffset.UtcNow,
+            sourceEntityId: Guid.Parse("50000000-0000-0000-0000-000000000105")));
+
+        await db.SaveChangesAsync();
+    }
     public static async Task SeedTasksAsync(this IServiceProvider services)
     {
         using var scope = services.CreateScope();

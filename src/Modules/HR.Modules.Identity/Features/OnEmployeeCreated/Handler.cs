@@ -37,8 +37,21 @@ internal sealed class Handler(
 
         await positionSync.EnsureExistsAsync(integrationEvent.CompanyId, positionId, now, cancellationToken);
 
-        db.UserPositions.Add(UserPosition.Create(integrationEvent.EmployeeId, positionId, now));
-        await db.SaveChangesAsync(cancellationToken);
+        var assignment = UserPosition.Create(integrationEvent.EmployeeId, positionId, now);
+        db.UserPositions.Add(assignment);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            db.Entry(assignment).State = EntityState.Detached;
+            var assignedByConcurrentDelivery = await db.UserPositions
+                .AnyAsync(up => up.UserId == integrationEvent.EmployeeId && up.PositionId == positionId, cancellationToken);
+            if (assignedByConcurrentDelivery)
+                return;
+            throw;
+        }
 
         var grantedRoleIds = await db.PositionRoles
             .Where(pr => pr.PositionId == positionId)

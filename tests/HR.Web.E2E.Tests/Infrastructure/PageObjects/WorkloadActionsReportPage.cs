@@ -48,8 +48,19 @@ public sealed class WorkloadActionsReportPage(IPage page, string baseUrl)
     public Task SelectEmployeeAsync(string employeeName) =>
         DropDownSelector.SelectAsync(page, FilterField("Employee"), employeeName);
 
-    public Task SelectGroupByAsync(string groupByLabel) =>
-        DropDownSelector.SelectAsync(page, FilterField("Group By"), groupByLabel);
+    public async Task SelectGroupByAsync(string groupByLabel)
+    {
+        try
+        {
+            await DropDownSelector.SelectAsync(page, FilterField("Group By"), groupByLabel);
+        }
+        catch (Exception ex) when (ex is PlaywrightException or TimeoutException)
+        {
+            await page.WaitForSelectorAsync(LoadedSelector, new() { Timeout = 20_000 });
+            await Assertions.Expect(FilterField("Group By").Locator("span[role='combobox'] input").First)
+                .ToHaveValueAsync(groupByLabel, new() { Timeout = 15_000 });
+        }
+    }
 
     public async Task SetDueDateRangeAsync(DateOnly from, DateOnly to)
     {

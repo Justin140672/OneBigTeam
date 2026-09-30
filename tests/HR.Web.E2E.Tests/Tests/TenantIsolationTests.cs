@@ -80,13 +80,11 @@ public sealed class TenantIsolationTests(CrossUserFixture fixture) : RoleE2ETest
         await _page.GotoAsync(
             $"{_fixture.WebBaseUrl}/companies/{BetaCorpId}/employees/{BobId}/profile");
 
-        // The app should redirect away or show an error — the page must NOT remain on
-        // Bob's BetaCorp profile URL. We check the URL rather than page content because
-        // Bob's name also appears in the dev persona switcher which is always in the topbar.
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
-
-        var finalUrl = _page.Url;
+        // The app should redirect away or show an error; the page must NOT remain on
+        // Bob's BetaCorp profile URL.
         var expectedBlockedPath = $"/companies/{BetaCorpId}/employees/{BobId}/profile";
-        Assert.DoesNotContain(expectedBlockedPath, finalUrl, StringComparison.OrdinalIgnoreCase);
+        await _page.WaitForURLAsync(url => !url.Contains(expectedBlockedPath, StringComparison.OrdinalIgnoreCase), new() { Timeout = 30_000 });
+
+        Assert.DoesNotContain(expectedBlockedPath, _page.Url, StringComparison.OrdinalIgnoreCase);
     }
 }

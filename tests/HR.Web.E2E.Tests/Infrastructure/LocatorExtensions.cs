@@ -17,6 +17,25 @@ public static class LocatorExtensions
         }
     }
 
+    public static async Task ClickUntilUrlAsync(this ILocator target, IPage page, Func<string, bool> urlMatches, int attempts = 6)
+    {
+        for (var attempt = 1; attempt <= attempts; attempt++)
+        {
+            if (urlMatches(page.Url))
+                return;
+
+            try
+            {
+                await target.ClickAsync(new() { Timeout = attempt < attempts ? 5_000 : 30_000 });
+                await page.WaitForURLAsync(urlMatches, new() { Timeout = attempt < attempts ? 4_000 : 30_000, WaitUntil = WaitUntilState.Commit });
+                return;
+            }
+            catch (TimeoutException) when (attempt < attempts)
+            {
+            }
+        }
+    }
+
     public static async Task RevealGridRowAsync(this IPage page, string text)
     {
         if (!await page.HasGridCellOnAnyPageAsync(text))

@@ -28,6 +28,7 @@ public sealed class PublicHolidayEditCloseBehaviorTests(HrAdminPersonaFixture fi
         await holEdit.SaveAsync();
 
         await holList.GoToAsync(AcmeId);
+        await _page.RevealGridRowAsync(holName);
         var href = await _page.Locator(".e-rowcell a").Filter(new() { HasText = holName }).First.GetAttributeAsync("href");
         Assert.NotNull(href);
         await _page.GotoAsync($"{_fixture.WebBaseUrl}{href}");

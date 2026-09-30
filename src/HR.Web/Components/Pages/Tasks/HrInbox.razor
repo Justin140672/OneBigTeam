@@ -97,6 +97,9 @@
 @code {
     [Parameter] public Guid CompanyId { get; set; }
 
+    [SupplyParameterFromQuery(Name = "search")]
+    public string? Search { get; set; }
+
     private bool _loading = true;
     private bool _accessDenied;
     private List<UnassignedTaskItem> _items = [];
@@ -124,7 +127,7 @@
 
     private async Task LoadTasksAsync()
     {
-        var result = await TaskService.GetUnassignedTasksAsync(CompanyId);
+        var result = await TaskService.GetUnassignedTasksAsync(CompanyId, Search);
         _items = result?.Items.ToList() ?? [];
     }
 

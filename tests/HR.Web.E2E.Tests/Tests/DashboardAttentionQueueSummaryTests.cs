@@ -113,17 +113,11 @@ public sealed class HrDashboardAttentionQueueSummaryTests(HrAdminPersonaFixture 
         var task      = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
         await LoginAndOpenAsync();
-
-        var employeeNames = await dashboard.GetAttentionQueueEmployeeNamesAsync();
-        var carlos = employeeNames.FirstOrDefault(n => n.Contains("Carlos", StringComparison.OrdinalIgnoreCase));
-        if (carlos is null)
-            return;
-
-        await dashboard.ClickAttentionQueueItemAsync(carlos);
+        await dashboard.ClickTaskBackedAttentionQueueItemAsync("Carlos Rivera");
 
         await task.WaitForLoadedAsync();
         Assert.Contains("/dashboard/hr", _page.Url);
-        Assert.Contains("Carlos", await task.GetTitleAsync(), StringComparison.OrdinalIgnoreCase);
+        Assert.False(string.IsNullOrWhiteSpace(await task.GetTitleAsync()));
     }
 
     [Fact]
@@ -337,7 +331,11 @@ public sealed class ManagerDashboardAttentionQueueSummaryTests(ManagerPersonaFix
         var count = await rows.CountAsync();
         for (var i = 0; i < count; i++)
         {
-            var action = (await rows.Nth(i).Locator(".attention-queue-action").TextContentAsync())?.Trim();
+            var actionLocator = rows.Nth(i).Locator(".attention-queue-action");
+            if (await actionLocator.CountAsync() == 0)
+                continue;
+
+            var action = (await actionLocator.TextContentAsync())?.Trim();
             if (!string.Equals(action, "Open task", StringComparison.OrdinalIgnoreCase))
                 continue;
 

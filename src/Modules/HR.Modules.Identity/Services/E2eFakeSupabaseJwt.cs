@@ -44,6 +44,7 @@ internal static class E2eFakeSupabaseJwt
             [
                 new Claim("sub", userId.ToString()),
                 new Claim("email", email),
+                new Claim(JwtRegisteredClaimNames.Iat, new DateTimeOffset(now).ToUnixTimeSeconds().ToString(System.Globalization.CultureInfo.InvariantCulture), ClaimValueTypes.Integer64),
             ],
             notBefore: now,
             expires: now.Add(lifetime),

@@ -6,7 +6,7 @@ namespace HR.Web.E2E.Tests.Tests;
 
 public sealed class TopBarLogoutTests : IAsyncLifetime
 {
-    private const string Email = "laura.bennett@acme.example";
+    private const string Email = "olivia.reyes@acme.example";
 
     private AppFixture _app = null!;
     private Microsoft.Playwright.IBrowserContext _context = null!;

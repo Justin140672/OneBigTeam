@@ -589,9 +589,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     {
         var link = ApplicationRow(candidateNameFragment).First.Locator("[data-testid='review-cv-link']");
         await link.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
-        await link.ClickAsync();
-        await page.WaitForURLAsync("**/review-cv**",
-            new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
+        await link.ClickUntilUrlAsync(page, u => u.Contains("/review-cv"));
     }
 
     public async Task<string?> GetApplicationStatusAsync(string candidateNameFragment)
@@ -995,7 +993,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
 
     public async Task SetOfferedSalaryAsync(string value)
     {
-        var expectedDigits = new string(value.Where(char.IsDigit).ToArray());
+        var expected = decimal.Parse(value, System.Globalization.CultureInfo.InvariantCulture);
         await Assertions.Expect(OfferSalaryInput).ToBeEnabledAsync(new() { Timeout = 30_000 });
 
         for (var attempt = 1; attempt <= 3; attempt++)
@@ -1003,13 +1001,13 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             await OfferSalaryInput.ClickAsync();
             await page.Keyboard.PressAsync("Control+A");
             await page.Keyboard.PressAsync("Delete");
-            await Assertions.Expect(OfferSalaryInput).ToHaveValueAsync("", new() { Timeout = 5_000 });
-
+            await page.WaitForTimeoutAsync(150);
             await OfferSalaryInput.PressSequentiallyAsync(value, new() { Delay = 30 });
             await page.Keyboard.PressAsync("Tab");
 
             var committed = await OfferSalaryInput.InputValueAsync();
-            if (new string(committed.Where(char.IsDigit).ToArray()) == expectedDigits)
+            var numeric = new string(committed.Where(c => char.IsDigit(c) || c == '.').ToArray());
+            if (decimal.TryParse(numeric, System.Globalization.NumberStyles.Number, System.Globalization.CultureInfo.InvariantCulture, out var actual) && actual == expected)
                 return;
 
             await page.WaitForTimeoutAsync(250);

@@ -1,3 +1,4 @@
+using Microsoft.Playwright;
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
@@ -24,6 +25,7 @@ public sealed class EmployeeDetailsDirectEditTests(HrAdminPersonaFixture fixture
         await login.LoginAsync(LauraEmail);
 
         await empEdit.GoToAsync(AcmeId, employee.Id);
+        await Assertions.Expect(_page.GetByPlaceholder("work@company.com")).Not.ToHaveValueAsync("", new() { Timeout = 20_000 });
 
         await _page.GetByPlaceholder("Defaults to first name").FillAsync(preferredName);
 

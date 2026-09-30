@@ -29,6 +29,7 @@ public sealed class PositionProfileEditCloseBehaviorTests(HrAdminPersonaFixture 
         await ppEdit.SaveAsync();
 
         await ppList.GoToAsync(AcmeId);
+        await _page.RevealGridRowAsync(title);
         var href = await _page.Locator(".e-rowcell a").Filter(new() { HasText = title }).First.GetAttributeAsync("href");
         Assert.NotNull(href);
         await _page.GotoAsync($"{_fixture.WebBaseUrl}{href}");

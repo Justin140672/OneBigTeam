@@ -26,6 +26,7 @@ public sealed class LeavePolicyEditCloseBehaviorTests(HrAdminPersonaFixture fixt
         await polEdit.SaveAsync();
 
         await polList.GoToAsync(AcmeId);
+        await _page.RevealGridRowAsync(polName);
         var href = await _page.Locator(".e-rowcell a").Filter(new() { HasText = polName }).First.GetAttributeAsync("href");
         Assert.NotNull(href);
         await _page.GotoAsync($"{_fixture.WebBaseUrl}{href}");

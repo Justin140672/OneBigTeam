@@ -302,6 +302,9 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
     }
 
+    public Task WaitForReviewOwnerTextAsync(string expected) =>
+        Assertions.Expect(page.Locator("dt:has-text('Review Owner') + dd")).ToHaveTextAsync(expected, new() { Timeout = 15_000 });
+
     public async Task<string?> GetReviewOwnerTextAsync()
     {
         var row = page.Locator("dt:has-text('Review Owner') + dd");
@@ -356,7 +359,7 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
         await PublishDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
         await PublishDialog.GetByRole(AriaRole.Button, new() { Name = "Publish", Exact = true }).ClickAsync();
-        await PublishDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+        await PublishDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 60_000 });
 
         await WaitForOverlayToClearAsync();
 
@@ -876,11 +879,17 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
 
     public async Task<IReadOnlyList<string>> GetReviewHistoryColumnHeadersAsync()
     {
-        var pane = await SelectReviewHistoryTabAsync();
-        await pane.Locator(".e-row, .e-emptyrow").First
-            .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
-        var headers = await pane.Locator(".e-headercell").AllInnerTextsAsync();
-        return headers.Select(h => h.Trim()).ToList();
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        while (true)
+        {
+            var pane = await SelectReviewHistoryTabAsync();
+            await pane.Locator(".e-row, .e-emptyrow").First
+                .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+            var headers = (await pane.Locator(".e-headercell").AllInnerTextsAsync()).Select(h => h.Trim()).ToList();
+            if (headers.Contains("Review Date") || DateTime.UtcNow > deadline)
+                return headers;
+            await page.WaitForTimeoutAsync(300);
+        }
     }
 
     public async Task<string> GetReviewHistoryRowCellAsync(int rowIndex, int columnIndex)

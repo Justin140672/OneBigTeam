@@ -299,9 +299,21 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
     public async Task OpenToilAdjustDialogAsync(string toilLeaveTypeName = "Time Off In Lieu")
     {
         var card = page.Locator(".card").Filter(new() { HasText = "TOIL Balance" }).First;
-        await card.GetByRole(AriaRole.Button, new() { Name = "Adjust" }).ClickAsync();
-        await page.GetByRole(AriaRole.Dialog, new() { Name = $"Adjust {toilLeaveTypeName} Balance" })
-            .WaitForAsync(new() { Timeout = 10_000 });
+        var dialog = page.GetByRole(AriaRole.Dialog, new() { Name = $"Adjust {toilLeaveTypeName} Balance" });
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            var adjustButton = card.GetByRole(AriaRole.Button, new() { Name = "Adjust" });
+            await Assertions.Expect(adjustButton).ToBeEnabledAsync(new() { Timeout = 15_000 });
+            await adjustButton.ClickAsync();
+            try
+            {
+                await dialog.WaitForAsync(new() { Timeout = attempt < 3 ? 5_000 : 15_000 });
+                return;
+            }
+            catch (TimeoutException) when (attempt < 3)
+            {
+            }
+        }
     }
 
     public async Task<bool> IsAdjustDialogVisibleAsync(string leaveTypeName) =>

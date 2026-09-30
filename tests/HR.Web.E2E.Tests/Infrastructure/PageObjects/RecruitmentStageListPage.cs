@@ -24,6 +24,9 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
         const int maxAttempts = 8;
         for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
+            if (page.Url.Contains("/recruitment-stages/new"))
+                return;
+
             try
             {
                 // ClickAsync must be inside the try too — see EmployeeListPage.ClickNewEmployeeAsync's

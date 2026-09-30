@@ -143,7 +143,20 @@ public sealed class InternalVacanciesPage(IPage page, string baseUrl)
 
     public async Task SelectValidCvAsync(string fileName, byte[] bytes, string mimeType = "application/pdf")
     {
-        await SelectCvAsync(fileName, mimeType, bytes);
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (true)
+        {
+            await SelectCvAsync(fileName, mimeType, bytes);
+            try
+            {
+                await CvSelected.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 3_000 });
+                break;
+            }
+            catch (TimeoutException) when (DateTime.UtcNow < deadline)
+            {
+            }
+        }
+
         await Assertions.Expect(CvSelected).ToBeVisibleAsync(new() { Timeout = 15_000 });
         await Assertions.Expect(CvFileName).ToHaveTextAsync(fileName, new() { Timeout = 15_000 });
     }

@@ -29,6 +29,7 @@ public sealed class DepartmentPageCloseBehaviorTests(HrAdminPersonaFixture fixtu
         await deptList.GoToAsync(AcmeId);
         Assert.True(await deptList.HasDepartmentAsync(deptName));
 
+        await _page.RevealGridRowAsync(deptName);
         var cells = await _page.Locator(".e-rowcell a").Filter(new() { HasText = deptName }).First.GetAttributeAsync("href");
         Assert.NotNull(cells);
         await _page.GotoAsync($"{_fixture.WebBaseUrl}{cells}");

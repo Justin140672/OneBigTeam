@@ -118,6 +118,7 @@ public sealed class SharedCompanyDocumentAcknowledgementTests(CrossUserFixture f
 
             await _page.WaitForSelectorAsync($"text={title}", new() { Timeout = 15_000 });
 
+            await _page.RevealGridRowAsync(title);
             var href = await _page.Locator(".e-rowcell a").Filter(new() { HasText = title }).First.GetAttributeAsync("href");
             Assert.NotNull(href);
             var documentId = Guid.Parse(href!.Split('/').Last());

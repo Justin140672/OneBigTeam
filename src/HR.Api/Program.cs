@@ -294,6 +294,12 @@ await migrationRunner.RunAsync("tasks", app.Services, async sp =>
 {
 	await sp.MigrateTasksAsync();
 	await sp.SeedTasksAsync();
+	if (string.Equals(Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase))
+	{
+		await sp.SeedE2eProbationReviewTaskAsync(
+			Guid.Parse("00000000-0000-0000-0000-000000000001"),
+			Guid.Parse("30000000-0000-0000-0000-000000000008"));
+	}
 });
 
 await migrationRunner.RunAsync("onboarding", app.Services, async sp =>
@@ -315,6 +321,13 @@ await migrationRunner.RunAsync("probation", app.Services, async sp =>
 {
 	await sp.MigrateProbationAsync();
 	await sp.SeedProbationAsync();
+	if (string.Equals(Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase))
+	{
+		await sp.SeedE2eProbationReviewAsync(
+			Guid.Parse("00000000-0000-0000-0000-000000000001"),
+			Guid.Parse("3E2E0000-0000-0000-0000-000000000065"),
+			Guid.Parse("30000000-0000-0000-0000-000000000008"));
+	}
 });
 
 await migrationRunner.RunAsync("reporting", app.Services, sp => sp.MigrateReportingAsync());

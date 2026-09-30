@@ -177,7 +177,7 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
 
         foreach (var fragment in taskFragments)
         {
-            await inbox.GoToAsync(AcmeId);
+            await inbox.GoToAsync(AcmeId, lastName);
             var titles = await inbox.GetTaskTitlesAsync();
             var claimedTitle = titles.First(t =>
                 t.Contains(fragment, StringComparison.OrdinalIgnoreCase) &&

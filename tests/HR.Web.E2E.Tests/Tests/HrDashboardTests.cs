@@ -5,6 +5,7 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
+[Collection("ReportFavourites")]
 public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private const string LauraEmail = "laura.bennett@acme.example";
@@ -102,9 +103,7 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
         await login.LoginAsync(LauraEmail);
         await dashboard.GoToAsync();
 
-        var employeeNames = await dashboard.GetAttentionQueueEmployeeNamesAsync();
-        var carlos = employeeNames.First(n => n.Contains("Carlos", StringComparison.OrdinalIgnoreCase));
-        await dashboard.ClickAttentionQueueItemAsync(carlos);
+        await dashboard.ClickTaskBackedAttentionQueueItemAsync("Carlos Rivera");
 
         await task.WaitForLoadedAsync();
         Assert.Contains("/dashboard/hr", _page.Url);

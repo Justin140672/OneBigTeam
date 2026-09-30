@@ -13,10 +13,29 @@ public sealed class DataImportWizardPage(IPage page, string baseUrl)
     public async Task UploadFileAsync(string filePath)
     {
         var fileInput = page.Locator("input[type='file']");
-        await fileInput.SetInputFilesAsync(filePath);
+        var uploadButton = page.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true });
 
-        await page.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true }).ClickAsync();
+        var failures = 0;
+        var deadline = DateTime.UtcNow.AddSeconds(45);
+        while (true)
+        {
+            await fileInput.SetInputFilesAsync(filePath);
+            try
+            {
+                await Assertions.Expect(uploadButton).ToBeEnabledAsync(new() { Timeout = 3_000 });
+                break;
+            }
+            catch (PlaywrightException) when (DateTime.UtcNow < deadline)
+            {
+                if (++failures % 3 == 0)
+                {
+                    await page.ReloadAsync();
+                    await page.WaitForSelectorAsync("input[type='file']", new() { Timeout = 20_000 });
+                }
+            }
+        }
 
+        await uploadButton.ClickAsync();
         await page.GetByRole(AriaRole.Button, new() { Name = "Continue", Exact = true })
             .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
     }

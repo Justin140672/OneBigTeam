@@ -216,8 +216,18 @@ public sealed class RecruitmentDashboardPage(IPage page, string baseUrl)
     {
         await WaitForSummaryTilesLoadedAsync();
         await WaitForOverlayToClearAsync();
-        await SummaryTile(label).ClickAsync();
-        await DrillDownDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            await SummaryTile(label).ClickAsync();
+            try
+            {
+                await DrillDownDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = attempt < 3 ? 6_000 : 15_000 });
+                return;
+            }
+            catch (TimeoutException) when (attempt < 3)
+            {
+            }
+        }
     }
 
     public async Task<int> GetDrillDownRowCountAsync()
@@ -237,11 +247,29 @@ public sealed class RecruitmentDashboardPage(IPage page, string baseUrl)
         return await DrillDownDialog.Locator(".e-grid .e-row").CountAsync();
     }
 
-    public Task<bool> IsMetricDrillDownOpenAsync() => DrillDownDialog.IsVisibleAsync();
+    public Task<bool> IsMetricDrillDownOpenAsync() => DrillDownDialog.WaitUntilVisibleAsync(5_000);
 
     public async Task CloseMetricDrillDownAsync()
     {
-        await DrillDownDialog.GetByRole(AriaRole.Button, new() { Name = "Close" }).First.ClickAsync();
+        var footerClose = DrillDownDialog.Locator(".e-footer-content").GetByRole(AriaRole.Button, new() { Name = "Close" });
+        for (var attempt = 1; attempt <= 4; attempt++)
+        {
+            if (!await DrillDownDialog.IsVisibleAsync())
+                break;
+
+            try
+            {
+                await footerClose.ClickAsync(new() { Timeout = 5_000 });
+                await DrillDownDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 5_000 });
+                break;
+            }
+            catch (Exception ex) when (ex is TimeoutException or PlaywrightException)
+            {
+                if (attempt == 4)
+                    throw;
+            }
+        }
+
         await DrillDownDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 10_000 });
         await WaitForOverlayToClearAsync();
     }

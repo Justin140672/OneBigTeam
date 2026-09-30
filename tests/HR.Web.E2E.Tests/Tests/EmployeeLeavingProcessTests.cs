@@ -312,7 +312,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
 
         var started = await StartLeavingProcessViaWizardAsync(startDialog, ResignationReceivedToday, "Resignation");
 
-        Assert.True(await leavingTab.HasAmendButtonAsync(),
+        Assert.True(await leavingTab.WaitForAmendButtonAsync(),
             "Expected an 'Amend' button while the leaving process is InProgress");
         Assert.True(await leavingTab.HasCancelButtonAsync(),
             "Expected a 'Cancel Leaving Process' button while the leaving process is InProgress");

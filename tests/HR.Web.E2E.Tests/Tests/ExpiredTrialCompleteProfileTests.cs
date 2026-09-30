@@ -95,8 +95,20 @@ public sealed class ExpiredTrialCompleteProfileTests(ParallelBlankPersonaFixture
         await LoginWithDialogWatcherAsync(email);
 
         var alert = await WaitForExpiredAlertAsync();
-        await alert.GetByTestId("subscription-alert-action").FocusAsync();
-        await _page.Keyboard.PressAsync("Enter");
+        var action = _page.GetByTestId("subscription-alert-action");
+        for (var attempt = 1; attempt <= 4 && !_page.Url.Contains("/subscription"); attempt++)
+        {
+            await action.FocusAsync();
+            await Assertions.Expect(action).ToBeFocusedAsync(new() { Timeout = 3_000 });
+            await _page.Keyboard.PressAsync("Enter");
+            try
+            {
+                await _page.WaitForURLAsync(url => url.Contains("/subscription"), new() { Timeout = 5_000, WaitUntil = WaitUntilState.Commit });
+            }
+            catch (TimeoutException) when (attempt < 4)
+            {
+            }
+        }
 
         await AssertSubscriptionPageOpenedAsync();
     }
@@ -160,7 +172,16 @@ public sealed class ExpiredTrialCompleteProfileTests(ParallelBlankPersonaFixture
     private async Task AssertSubscriptionPageOpenedAsync()
     {
         await _page.WaitForURLAsync(url => url.Contains("/subscription"), new() { Timeout = 15_000 });
-        await _page.WaitForSelectorAsync(".card-header h5", new() { Timeout = 20_000 });
+        try
+        {
+            await _page.WaitForSelectorAsync(".card-header h5", new() { Timeout = 20_000 });
+        }
+        catch (TimeoutException ex)
+        {
+            var body = (await _page.Locator("body").InnerTextAsync()).Trim();
+            throw new InvalidOperationException(
+                $"Subscription page did not render its details card. url={_page.Url}; body=\"{(body.Length > 400 ? body[..400] : body)}\"", ex);
+        }
 
         var billing = new SubscriptionBillingPage(_page, _fixture.WebBaseUrl);
         Assert.True(await billing.HasStartSubscriptionButtonAsync());

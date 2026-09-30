@@ -113,8 +113,21 @@ public sealed class EmployeeCompletionDialogPage(IPage page)
 
     public async Task SaveAndWaitForCloseAsync()
     {
-        await ClickSaveAsync();
-        await Dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 20_000 });
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            if (attempt > 1 && !await Dialog.IsVisibleAsync())
+                return;
+
+            await ClickSaveAsync();
+            try
+            {
+                await Dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = attempt < 3 ? 8_000 : 20_000 });
+                return;
+            }
+            catch (TimeoutException) when (attempt < 3)
+            {
+            }
+        }
     }
 
     public async Task ClickSaveExpectingValidationFailureAsync()

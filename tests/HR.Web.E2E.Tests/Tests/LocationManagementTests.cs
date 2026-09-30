@@ -56,6 +56,7 @@ public sealed class LocationManagementTests(HrAdminPersonaFixture fixture) : Rol
         await locationEdit.SaveAsync();
 
         await locationList.GoToAsync(AcmeId);
+        await _page.RevealGridRowAsync(originalName);
         var href = await _page.Locator(".e-rowcell a").Filter(new() { HasText = originalName }).First.GetAttributeAsync("href");
         Assert.NotNull(href);
         await _page.GotoAsync($"{_fixture.WebBaseUrl}{href}");
@@ -65,6 +66,7 @@ public sealed class LocationManagementTests(HrAdminPersonaFixture fixture) : Rol
         await locationEdit.SaveAsync();
 
         await locationList.GoToAsync(AcmeId);
+        await _page.RevealGridRowAsync(updatedName);
         var updatedHref = await _page.Locator(".e-rowcell a").Filter(new() { HasText = updatedName }).First.GetAttributeAsync("href");
         Assert.NotNull(updatedHref);
         await _page.GotoAsync($"{_fixture.WebBaseUrl}{updatedHref}");

@@ -219,6 +219,7 @@ public sealed class LeaveBalanceAdjustmentTests(HrAdminPersonaFixture fixture) :
 
         await empAdmin.GoToAsync(AcmeId, freshEmployeeId);
         await empAdmin.OpenLeaveTabAsync();
+        var balanceBefore = ParseHours((await empAdmin.GetBalanceRowTextAsync("Annual Leave"))!);
 
         await empAdmin.OpenAdjustDialogAsync("Annual Leave");
 
@@ -233,8 +234,9 @@ public sealed class LeaveBalanceAdjustmentTests(HrAdminPersonaFixture fixture) :
         Assert.NotNull(error);
         Assert.Contains("below zero", error, StringComparison.OrdinalIgnoreCase);
 
+        var overshootHours = -(Math.Ceiling(balanceBefore) + 30m);
         await empAdmin.SubmitAdjustmentAsync(
-            "Annual Leave", hours: -30m, allowNegativeOverride: true);
+            "Annual Leave", hours: overshootHours, allowNegativeOverride: true);
 
         Assert.False(await empAdmin.IsAdjustDialogVisibleAsync("Annual Leave"),
             "Expected the dialog to close once the negative-balance override is checked");

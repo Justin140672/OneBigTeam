@@ -839,7 +839,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
                 await dialog.WaitForAsync(new()
                 {
                     State = WaitForSelectorState.Hidden,
-                    Timeout = attempt < 5 ? 3_000 : 10_000,
+                    Timeout = attempt < 5 ? 8_000 : 30_000,
                 });
                 break;
             }

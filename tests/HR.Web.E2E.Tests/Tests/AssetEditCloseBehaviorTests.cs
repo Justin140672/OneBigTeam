@@ -32,6 +32,7 @@ public sealed class AssetEditCloseBehaviorTests(HrAdminPersonaFixture fixture) :
         await assetEdit.SaveAsync();
 
         await assetList.GoToAsync(AcmeId);
+        await _page.RevealGridRowAsync(assetNumber);
         var href = await _page.Locator(".e-rowcell a").Filter(new() { HasText = assetNumber }).First.GetAttributeAsync("href");
         Assert.NotNull(href);
         await _page.GotoAsync($"{_fixture.WebBaseUrl}{href}");

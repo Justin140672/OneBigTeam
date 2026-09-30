@@ -58,7 +58,7 @@ public sealed class PersonalDetailsChangeRequestTests(CrossUserFixture fixture) 
 
         if (!taskVisible)
         {
-            await inbox.GoToAsync(AcmeId);
+            await inbox.GoToAsync(AcmeId, "Tom Williams");
             var inboxTitles = await inbox.GetTaskTitlesAsync();
             taskVisible = inboxTitles.Any(t =>
                 t.Contains("Tom Williams",     StringComparison.OrdinalIgnoreCase) ||

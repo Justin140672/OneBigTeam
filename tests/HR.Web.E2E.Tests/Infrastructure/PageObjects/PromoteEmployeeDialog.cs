@@ -39,11 +39,9 @@ public sealed class PromoteEmployeeDialog(IPage page)
         var field = Dialog.Locator(".col-12").Filter(new() { HasText = "New Position Profile" }).First;
         await field.Locator("span[role='combobox']").First.ClickAsync();
         await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-
-        var items = await page.Locator(".e-popup.e-ddl:visible .e-list-item").AllAsync();
-        var titles = new List<string>();
-        foreach (var item in items)
-            titles.Add((await item.TextContentAsync())?.Trim() ?? "");
+        await page.Locator(".e-popup.e-ddl:visible .e-list-item").First.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        var titles = (await page.Locator(".e-popup.e-ddl:visible .e-list-item").AllTextContentsAsync())
+            .Select(t => t.Trim()).ToList();
 
         await page.Keyboard.PressAsync("Escape");
         return titles;

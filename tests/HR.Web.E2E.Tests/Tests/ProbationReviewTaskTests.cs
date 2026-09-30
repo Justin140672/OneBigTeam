@@ -12,7 +12,7 @@ public sealed class ProbationReviewTaskTests(DavidParkPersonaFixture fixture)
     private static readonly Guid AcmeId  = Guid.Parse("00000000-0000-0000-0000-000000000001");
     private static readonly Guid DavidId = Guid.Parse("30000000-0000-0000-0000-000000000008");
 
-    private static readonly Guid TaskProbationReviewId = Guid.Parse("a0000000-0000-0000-0000-000000000005");
+    private static readonly Guid TaskProbationReviewId = Guid.Parse("a0000000-0000-0000-0000-0000000000f5");
 
     private static readonly Guid TaskQ2ReviewId = Guid.Parse("a0000000-0000-0000-0000-00000000002a");
 
@@ -60,7 +60,7 @@ public sealed class ProbationReviewTaskTests(DavidParkPersonaFixture fixture)
         await taskView.GoToAsync(AcmeId, DavidId, TaskProbationReviewId);
 
         var title = await taskView.GetTitleAsync();
-        Assert.Contains("Carlos Rivera", title, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("SeedProbationTask", title, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

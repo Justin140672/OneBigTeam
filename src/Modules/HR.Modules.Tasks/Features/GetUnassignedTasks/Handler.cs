@@ -10,13 +10,23 @@ internal sealed class GetUnassignedTasksHandler(TasksDbContext dbContext)
         GetUnassignedTasksRequest request,
         CancellationToken cancellationToken)
     {
-        var items = await dbContext.TaskItems
+        var query = dbContext.TaskItems
             .AsNoTracking()
             .Where(t => t.CompanyId == request.CompanyId
                      && t.AssignedEmployeeId == null
                      && t.AssignedUserId == null
                      && t.Status != TaskItemStatus.Completed
-                     && t.Status != TaskItemStatus.Cancelled)
+                     && t.Status != TaskItemStatus.Cancelled);
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var search = request.Search.Trim();
+            if (search.Length > 100) search = search[..100];
+            var pattern = $"%{search.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_")}%";
+            query = query.Where(t => EF.Functions.ILike(t.Title, pattern));
+        }
+
+        var items = await query
             .OrderByDescending(t => t.Priority)
             .ThenBy(t => t.DueDate == null ? 1 : 0)
             .ThenBy(t => t.DueDate)

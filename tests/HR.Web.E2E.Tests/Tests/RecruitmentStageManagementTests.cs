@@ -23,6 +23,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// "E2E Stage Reorder …" stage is still active and hasn't been moved back/deactivated yet, "Offer"
 /// can be displaced.
 /// </summary>
+[Collection("RecruitmentStageList")]
 public sealed class RecruitmentStageManagementTests(RecruiterPersonaFixture fixture) : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");

@@ -76,6 +76,9 @@ public sealed class EmployeeLeavingTab(IPage page)
         return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
     }
 
+    public Task<bool> WaitForAmendButtonAsync() =>
+        DetailsSection.GetByRole(AriaRole.Button, new() { Name = "Amend", Exact = true }).WaitUntilVisibleAsync(20_000);
+
     public Task<bool> HasAmendButtonAsync() =>
         DetailsSection.GetByRole(AriaRole.Button, new() { Name = "Amend", Exact = true }).IsVisibleAsync();
 

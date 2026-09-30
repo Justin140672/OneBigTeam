@@ -67,7 +67,7 @@ public sealed class GettingStartedAndExploreTests(HrAdminPersonaFixture fixture)
             postcode: "SW1A 1AA");
         await completionDialog.SaveAndWaitForCloseAsync();
 
-        await _page.WaitForURLAsync(new Regex("/getting-started"), new() { Timeout = 30_000 });
+        await _page.WaitForURLAsync(new Regex("/getting-started"), new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
         Assert.Contains("/getting-started", _page.Url);
     }
 
@@ -262,7 +262,7 @@ public sealed class GettingStartedAndExploreTests(HrAdminPersonaFixture fixture)
         await login.LoginAsync(TomEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/getting-started");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        await _page.WaitForURLAsync(url => !url.Contains("/getting-started"), new() { Timeout = 30_000 });
         Assert.DoesNotContain("/getting-started", _page.Url);
     }
 }

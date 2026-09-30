@@ -170,6 +170,21 @@ public sealed class HrDashboardPage(IPage page, string baseUrl)
     public async Task<bool> AttentionQueueIsAllClearAsync() =>
         await AttentionQueueWidget.Locator(".attention-queue-all-clear").IsVisibleAsync();
 
+    public async Task ClickTaskBackedAttentionQueueItemAsync(string subjectFragment)
+    {
+        await WaitForAttentionQueueLoadedAsync();
+        var taskBackedAction = page.Locator(".attention-queue-action").Filter(new()
+        {
+            HasTextRegex = new System.Text.RegularExpressions.Regex(
+                @"^\s*(Open task|Review leave request|Review probation|Complete return-to-work review|View evidence request)\s*$"),
+        });
+        await AttentionQueueWidget.Locator(".attention-queue-item")
+            .Filter(new() { HasText = subjectFragment })
+            .Filter(new() { Has = taskBackedAction })
+            .First
+            .ClickAsync();
+    }
+
     public async Task ClickAttentionQueueItemAsync(string subjectFragment)
     {
         await WaitForAttentionQueueLoadedAsync();

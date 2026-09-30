@@ -4,9 +4,10 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 public sealed class HrInboxPage(IPage page, string baseUrl)
 {
-    public async Task GoToAsync(Guid companyId)
+    public async Task GoToAsync(Guid companyId, string? search = null)
     {
-        await page.GotoAsync($"{baseUrl}/companies/{companyId}/hr/inbox");
+        var query = string.IsNullOrWhiteSpace(search) ? "" : $"?search={Uri.EscapeDataString(search)}";
+        await page.GotoAsync($"{baseUrl}/companies/{companyId}/hr/inbox{query}");
         await page.WaitForSelectorAsync(".inbox-card, .inbox-empty", new() { Timeout = 30_000 });
     }
 

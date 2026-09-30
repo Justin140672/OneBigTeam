@@ -11,7 +11,6 @@ public sealed class EmployeePromotionTabTests(HrAdminPersonaFixture fixture) : R
     private static readonly Guid SarahChen = Guid.Parse("30000000-0000-0000-0000-000000000001");
     private static readonly Guid TomWilliams = Guid.Parse("30000000-0000-0000-0000-000000000004");
     private static readonly Guid MarcusDiallo = Guid.Parse("30000000-0000-0000-0000-000000000006");
-    private static readonly Guid PriyaSharma = Guid.Parse("30000000-0000-0000-0000-000000000003");
     private static readonly Guid DavidPark = Guid.Parse("30000000-0000-0000-0000-000000000008");
 
     private const string LauraEmail = "laura.bennett@acme.example";
@@ -82,6 +81,7 @@ public sealed class EmployeePromotionTabTests(HrAdminPersonaFixture fixture) : R
     public async Task PromoteEmployeeDialog_NewPositionProfileDropdown_OnlyOffersVacantProfiles()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var vacantProfile = await E2eEmployeeApi.CreateVacantPositionProfileAsync(_fixture.ApiBaseUrl, "E2E Vacant Offer");
         var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
         var wizard = new PromoteEmployeeDialog(_page);
 
@@ -94,7 +94,7 @@ public sealed class EmployeePromotionTabTests(HrAdminPersonaFixture fixture) : R
 
         var options = await wizard.GetNewPositionProfileDropdownOptionsAsync();
 
-        Assert.Contains(options, o => o.Contains("Software Engineer") && !o.Contains("Senior"));
+        Assert.Contains(options, o => o.Contains(vacantProfile));
         Assert.DoesNotContain(options, o => o.Contains("CTO"));
     }
 
@@ -207,7 +207,8 @@ public sealed class EmployeePromotionTabTests(HrAdminPersonaFixture fixture) : R
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await empEdit.GoToAsync(AcmeId, PriyaSharma);
+        var promoEmployee = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "PromoComp", activate: true);
+        await empEdit.GoToAsync(AcmeId, promoEmployee.Id);
         await empEdit.OpenPromotionHistoryTabAsync();
         await wizard.OpenAsync();
 

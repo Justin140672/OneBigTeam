@@ -479,7 +479,7 @@ public sealed class AppSession(HrApiHttpClientFactory httpClientFactory, Employe
         {
             return await subscriptionService.GetStatusAsync();
         }
-        catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or NotSupportedException)
+        catch (Exception ex) when (ex is HttpRequestException or System.Text.Json.JsonException or NotSupportedException or TaskCanceledException)
         {
             return null;
         }

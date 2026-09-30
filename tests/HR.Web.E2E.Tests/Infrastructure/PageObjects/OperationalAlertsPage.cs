@@ -25,8 +25,16 @@ public sealed class OperationalAlertsPage(IPage page, string baseUrl)
     public async Task<bool> HasColumnHeaderAsync(string headerText)
     {
         await page.WaitForSelectorAsync(".e-grid .e-headercell", new() { Timeout = 15_000 });
-        var headers = await page.Locator(".e-grid .e-headercell .e-headertext").AllTextContentsAsync();
-        return headers.Any(h => string.Equals(h.Trim(), headerText, StringComparison.OrdinalIgnoreCase));
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (true)
+        {
+            var headers = await page.Locator(".e-grid .e-headercell .e-headertext").AllTextContentsAsync();
+            if (headers.Any(h => string.Equals(h.Trim(), headerText, StringComparison.OrdinalIgnoreCase)))
+                return true;
+            if (DateTime.UtcNow > deadline)
+                return false;
+            await Task.Delay(250);
+        }
     }
 
     private ILocator CompanyIdInput => page.Locator(".customer-search-box input");

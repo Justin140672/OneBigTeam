@@ -106,6 +106,32 @@ public static class ProbationModule
         await db.Database.MigrateAsync();
     }
 
+
+    public static async Task SeedE2eProbationReviewAsync(this IServiceProvider services, Guid companyId, Guid employeeId, Guid managerId)
+    {
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ProbationDbContext>();
+
+        var recordId = Guid.Parse("40000000-0000-0000-0000-000000000015");
+        var reviewId = Guid.Parse("50000000-0000-0000-0000-000000000105");
+        if (await db.ProbationRecords.AnyAsync(r => r.Id == recordId))
+            return;
+
+        var now = DateTimeOffset.UtcNow;
+        var today = DateOnly.FromDateTime(now.UtcDateTime);
+
+        var record = ProbationRecord.Create(
+            recordId, companyId, employeeId, managerId,
+            new DateOnly(2026, 4, 7), new DateOnly(2026, 7, 7), null, today, now);
+        record.MarkReviewDue(now);
+        db.ProbationRecords.Add(record);
+
+        db.ProbationReviews.Add(ProbationReview.Create(
+            reviewId, companyId, recordId,
+            ProbationReviewType.ManagerCheckIn, new DateOnly(2026, 5, 7), now));
+
+        await db.SaveChangesAsync();
+    }
     public static async Task SeedProbationAsync(this IServiceProvider services)
     {
         using var scope = services.CreateScope();

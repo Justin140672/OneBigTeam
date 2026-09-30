@@ -26,6 +26,7 @@ public sealed class DocumentTypeEditCloseBehaviorTests(HrAdminPersonaFixture fix
         await typeEdit.SaveAsync();
 
         await typeList.GoToAsync(AcmeId);
+        await _page.RevealGridRowAsync(typeName);
         var href = await _page.Locator(".e-rowcell a").Filter(new() { HasText = typeName }).First.GetAttributeAsync("href");
         Assert.NotNull(href);
         await _page.GotoAsync($"{_fixture.WebBaseUrl}{href}");

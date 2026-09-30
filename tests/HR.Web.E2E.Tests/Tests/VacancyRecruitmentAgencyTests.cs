@@ -77,6 +77,7 @@ public sealed class VacancyRecruitmentAgencyTests(RecruiterPersonaFixture fixtur
         await recruiterDetail.FillAgencyNameAsync(inactiveAgencyName);
         await recruiterDetail.SaveAsync();
         await recruiterList.DeactivateAsync(inactiveAgencyName);
+        await recruiterList.ShowInactiveAsync();
         Assert.False(await recruiterList.IsActiveAsync(inactiveAgencyName),
             $"Expected '{inactiveAgencyName}' to be deactivated before checking the vacancy form's dropdown");
 

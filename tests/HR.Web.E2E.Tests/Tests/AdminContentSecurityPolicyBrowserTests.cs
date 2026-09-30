@@ -80,8 +80,8 @@ public sealed class AdminContentSecurityPolicyBrowserTests(HrAdminPersonaFixture
 
         // Dropdown popup (Syncfusion popup/template rendering).
         await page.GotoAsync($"{_fixture.AdminWebBaseUrl}/admin-users");
-        var dropdown = page.Locator(".e-dropdownlist").First;
-        if (await dropdown.CountAsync() > 0)
+        var dropdown = page.Locator("span[role='combobox']").First;
+        if (await dropdown.WaitUntilVisibleAsync(10_000))
         {
             await dropdown.ClickAsync();
             await page.WaitForTimeoutAsync(750);

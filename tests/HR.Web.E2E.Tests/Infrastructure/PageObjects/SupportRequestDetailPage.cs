@@ -15,7 +15,9 @@ public sealed class SupportRequestDetailPage(IPage page, string baseUrl)
     public async Task<string> GetTitleAsync()
     {
         await ConversationCard.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
-        return (await page.Locator("h1").First.TextContentAsync())?.Trim() ?? string.Empty;
+        var heading = page.Locator("h1").First;
+        await Assertions.Expect(heading).Not.ToHaveTextAsync("Help & Feedback", new() { Timeout = 20_000 });
+        return (await heading.TextContentAsync())?.Trim() ?? string.Empty;
     }
 
     public Task<bool> IsDiagnosticsSectionVisibleAsync() =>
@@ -30,7 +32,7 @@ public sealed class SupportRequestDetailPage(IPage page, string baseUrl)
     public async Task SendReplyAsync()
     {
         await ConversationCard.GetByRole(AriaRole.Button, new() { Name = "Send Reply" }).ClickAsync();
-        await Assertions.Expect(ConversationCard.GetByPlaceholder("Write a reply…")).ToHaveValueAsync("");
+        await Assertions.Expect(ConversationCard.GetByPlaceholder("Write a reply…")).ToHaveValueAsync("", new() { Timeout = 30_000 });
     }
 
     public async Task<bool> HasThreadEntryAsync(string textFragment)

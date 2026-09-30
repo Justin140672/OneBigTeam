@@ -140,9 +140,17 @@ public sealed class DepartureFinaliserE2ETests(HrAdminPersonaFixture fixture) : 
         var finalized = await DepartureFinaliserApi.FinalizeAsync(_fixture.ApiBaseUrl, employeeId);
         Assert.True(finalized, "Expected departure finalization to succeed");
 
-        await empList.GoToAsync(AcmeId);
-        await empList.SelectStatusFilterAsync("Active");
-        Assert.False(await empList.HasEmployeeAsync(employeeName),
+        var stillListed = true;
+        for (var attempt = 1; attempt <= 8 && stillListed; attempt++)
+        {
+            await empList.GoToAsync(AcmeId);
+            await empList.SelectStatusFilterAsync("Active");
+            stillListed = await empList.HasEmployeeAsync(employeeName);
+            if (stillListed)
+                await Task.Delay(2_000);
+        }
+
+        Assert.False(stillListed,
             $"Expected {employeeName} to no longer appear in the Active-filtered employee list after departure finalization");
     }
 

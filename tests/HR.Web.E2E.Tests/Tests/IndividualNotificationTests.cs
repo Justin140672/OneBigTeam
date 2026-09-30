@@ -27,7 +27,7 @@ public sealed class IndividualNotificationTests(SarahChenPersonaFixture fixture)
         var titles = await notif.GetNotificationTitlesAsync();
         Assert.True(titles.Count > 0, "Expected at least one notification in the panel");
 
-        await notif.ClickNotificationAsync(titles[0]);
+        await notif.ClickNotificationAsync(titles.First(t => t.Contains("Review Q2 performance reports", StringComparison.OrdinalIgnoreCase)));
 
         await taskView.WaitForLoadedAsync();
         Assert.NotEmpty(await taskView.GetTitleAsync());

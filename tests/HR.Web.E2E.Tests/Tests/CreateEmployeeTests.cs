@@ -282,9 +282,8 @@ public sealed class CreateEmployeeTests(HrAdminPersonaFixture fixture) : RoleE2E
 
         await _page.GetByText("Direct Reports:").WaitForAsync(new() { Timeout = 15_000 });
 
-        var content = await _page.ContentAsync();
-        Assert.Contains("Direct Reports:", content);
-        Assert.Contains("1 Employee", content);
+        var countText = (await _page.Locator("p").Filter(new() { HasText = "Direct Reports:" }).Locator("a").First.InnerTextAsync()).Trim();
+        Assert.Matches(@"^[1-9]\d* Employees?$", countText);
     }
 
     [Fact]

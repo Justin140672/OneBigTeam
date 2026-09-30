@@ -26,8 +26,21 @@ internal static class PersonaLoginCache
 
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> _refreshGates = new();
 
-    private static readonly TimeSpan _recentFailureCooldown = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan _recentFailureCooldown = TimeSpan.FromSeconds(120);
     private static readonly ConcurrentDictionary<string, (DateTime FailedAtUtc, ExceptionDispatchInfo Failure)> _recentFailures = new();
+
+    private static bool TryGetRecentFailure(string personaEmail, out ExceptionDispatchInfo failure)
+    {
+        if (_recentFailures.TryGetValue(personaEmail, out var recent) &&
+            DateTime.UtcNow - recent.FailedAtUtc < _recentFailureCooldown)
+        {
+            failure = recent.Failure;
+            return true;
+        }
+
+        failure = null!;
+        return false;
+    }
 
     public static Task<BrowserNewContextOptions> GetOrLoginAsync(AppFixture app, string personaEmail) =>
         GetOrLoginAsync(app.Browser, app.WebBaseUrl, personaEmail);
@@ -49,6 +62,12 @@ internal static class PersonaLoginCache
         IBrowser browser, string baseUrl, string personaEmail)
     {
         var alreadyCached = _cache.ContainsKey(personaEmail);
+        if (!alreadyCached && TryGetRecentFailure(personaEmail, out var recentFailure))
+        {
+            E2eDiag.Log("PersonaLoginCache", $"{personaEmail}: bootstrap login failed recently; rethrowing without a new attempt");
+            recentFailure.Throw();
+        }
+
         var entry = _cache.GetOrAdd(
             personaEmail,
             email => new Lazy<Task<BrowserNewContextOptions>>(
@@ -78,13 +97,12 @@ internal static class PersonaLoginCache
         gateWait.Dispose();
         try
         {
-            if (_recentFailures.TryGetValue(personaEmail, out var recent) &&
-                DateTime.UtcNow - recent.FailedAtUtc < _recentFailureCooldown)
+            if (TryGetRecentFailure(personaEmail, out var recentFailure))
             {
                 E2eDiag.Log("PersonaLoginCache",
-                    $"{personaEmail}: short-circuiting — another caller's relogin failed {(DateTime.UtcNow - recent.FailedAtUtc).TotalSeconds:F1}s ago " +
-                    $"(within {_recentFailureCooldown.TotalSeconds:F0}s cooldown); rethrowing that failure instead of repeating a doomed ~275s attempt");
-                recent.Failure.Throw();
+                    $"{personaEmail}: short-circuiting — a bootstrap login failed within the last {_recentFailureCooldown.TotalSeconds:F0}s; " +
+                    "rethrowing that failure instead of repeating a doomed attempt");
+                recentFailure.Throw();
             }
 
             if (staleEntry is Lazy<Task<BrowserNewContextOptions>> typedStaleEntry)
@@ -93,17 +111,8 @@ internal static class PersonaLoginCache
                     .Remove(new KeyValuePair<string, Lazy<Task<BrowserNewContextOptions>>>(personaEmail, typedStaleEntry));
             }
 
-            try
-            {
-                var (options, _) = await GetOrLoginWithEntryAsync(browser, baseUrl, personaEmail);
-                _recentFailures.TryRemove(personaEmail, out _);
-                return options;
-            }
-            catch (Exception ex)
-            {
-                _recentFailures[personaEmail] = (DateTime.UtcNow, ExceptionDispatchInfo.Capture(ex));
-                throw;
-            }
+            var (options, _) = await GetOrLoginWithEntryAsync(browser, baseUrl, personaEmail);
+            return options;
         }
         finally
         {
@@ -205,7 +214,7 @@ internal static class PersonaLoginCache
         }
         catch (TimeoutException)
         {
-            E2eDiag.Log("PersonaLoginCache", "TryApplyStorageStateAsync: 10s app-shell wait TIMED OUT — treating cached session as stale (may be a false negative under load, not an actually-stale session)");
+            E2eDiag.Log("PersonaLoginCache", $"TryApplyStorageStateAsync: 10s app-shell wait TIMED OUT at url={page.Url} — treating cached session as stale (may be a false negative under load, not an actually-stale session)");
             return false;
         }
         finally
@@ -222,7 +231,7 @@ internal static class PersonaLoginCache
         gateWait.Dispose();
         try
         {
-            const int maxAttempts = 5;
+            const int maxAttempts = 3;
             Exception? lastError = null;
             for (var attempt = 1; attempt <= maxAttempts; attempt++)
             {
@@ -238,6 +247,7 @@ internal static class PersonaLoginCache
                     var storageState = await bootstrapContext.StorageStateAsync();
                     await page.CloseAsync();
 
+                    _recentFailures.TryRemove(personaEmail, out _);
                     return E2eBrowserContextOptions.Create(storageState);
                 }
                 catch (Exception ex)
@@ -245,14 +255,15 @@ internal static class PersonaLoginCache
                     lastError = ex;
                     E2eDiag.Log("PersonaLoginCache", $"{personaEmail}: attempt {attempt}/{maxAttempts} FAILED — {ex.GetType().Name}: {ex.Message}");
                     if (attempt < maxAttempts)
-                        await Task.Delay(TimeSpan.FromSeconds(5 * attempt));
+                        await Task.Delay(TimeSpan.FromSeconds(3 * attempt));
                 }
             }
 
-            throw new InvalidOperationException(
-                $"E2E login for '{personaEmail}' failed after {maxAttempts} attempts (see inner exception — " +
-                "likely the login page/app-shell not loading in time under load, not a Supabase auth failure).",
+            var failure = new InvalidOperationException(
+                $"E2E login for '{personaEmail}' failed after {maxAttempts} attempts (see inner exception for the page state at the last timeout).",
                 lastError);
+            _recentFailures[personaEmail] = (DateTime.UtcNow, ExceptionDispatchInfo.Capture(failure));
+            throw failure;
         }
         finally
         {

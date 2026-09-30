@@ -171,7 +171,7 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
         await login.LoginAsync(HrAdminEmail);
 
         await list.GoToAsync(AcmeId);
-        await list.OpenUserDetailAsync("David Park");
+        await list.OpenUserDetailAsync("Nina Patel");
 
         var detail = new UserDetailPage(_page, _fixture.WebBaseUrl);
 
@@ -211,6 +211,13 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
         await detail.OpenManageRolesDialogAsync();
         await detail.ToggleRolesAndSaveAsync(["Manager"]);
         Assert.DoesNotContain("Manager", await detail.GetRoleNamesAsync());
+
+        if (neededPreCleanup)
+        {
+            await detail.OpenManageRolesDialogAsync();
+            await detail.ToggleRolesAndSaveAsync(["Manager"]);
+            Assert.Contains("Manager", await detail.GetRoleNamesAsync());
+        }
     }
 
     [Fact]
@@ -223,7 +230,7 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
         await login.LoginAsync(HrAdminEmail);
 
         await list.GoToAsync(AcmeId);
-        await list.OpenUserDetailAsync("Marcus Diallo");
+        await list.OpenUserDetailAsync("Nina Patel");
 
         var detail = new UserDetailPage(_page, _fixture.WebBaseUrl);
         var rolesBefore = await detail.GetRoleNamesAsync();
@@ -235,7 +242,11 @@ public sealed class UserAdministrationManagementTests(HrAdminPersonaFixture fixt
 
         var rolesAfter = await detail.GetRoleNamesAsync();
         Assert.NotEqual(rolesBefore.OrderBy(r => r), rolesAfter.OrderBy(r => r));
-        Assert.Contains("Manager", rolesAfter);
+        Assert.Equal(!rolesBefore.Contains("Manager"), rolesAfter.Contains("Manager"));
+
+        await detail.OpenManageRolesDialogAsync();
+        await detail.ToggleRolesAndSaveAsync(["Manager"]);
+        Assert.Equal(rolesBefore.Contains("Manager"), (await detail.GetRoleNamesAsync()).Contains("Manager"));
     }
 
     [Fact]

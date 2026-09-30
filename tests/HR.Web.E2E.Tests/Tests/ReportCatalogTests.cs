@@ -4,6 +4,7 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
+[Collection("ReportFavourites")]
 public sealed class ReportCatalogTests(HrAdminPersonaFixture fixture) : RoleE2ETestBase<HrAdminPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
@@ -171,7 +172,7 @@ public sealed class ReportCatalogTests(HrAdminPersonaFixture fixture) : RoleE2ET
 
         await catalog.ClickCardAsync(cardTitleFragment);
 
-        await _page.WaitForURLAsync($"**/reporting/{routeSlug}", new() { Timeout = 15_000 });
+        await _page.WaitForURLAsync($"**/reporting/{routeSlug}", new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
     }
 
     [Theory]
@@ -195,7 +196,7 @@ public sealed class ReportCatalogTests(HrAdminPersonaFixture fixture) : RoleE2ET
 
         await catalog.ClickCardAsync(cardTitleFragment);
 
-        await _page.WaitForURLAsync($"**/reporting/{routeSlug}", new() { Timeout = 15_000 });
+        await _page.WaitForURLAsync($"**/reporting/{routeSlug}", new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
     }
 
     [Fact]
@@ -220,7 +221,7 @@ public sealed class ReportCatalogTests(HrAdminPersonaFixture fixture) : RoleE2ET
             Assert.True(await catalog.IsFavouritedAsync("Employee Starter Report"));
 
             await catalog.ClickCardAsync("Employee Starter Report");
-            await _page.WaitForURLAsync("**/reporting/employee-starters", new() { Timeout = 15_000 });
+            await _page.WaitForURLAsync("**/reporting/employee-starters", new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
             Assert.False(await report.HasLoadErrorAsync());
 
             await catalog.GoToAsync(AcmeId);

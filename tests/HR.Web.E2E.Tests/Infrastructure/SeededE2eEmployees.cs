@@ -109,6 +109,8 @@ public static class SeededE2eEmployees
 
     public static readonly Pooled QuickInvite = P(64, "SeedQuickInvite");
 
+    public static readonly Pooled ProbationTask = P(65, "SeedProbationTask");
+
     public static IEnumerable<Pooled> All()
     {
         yield return ProfileViewEditMode;
@@ -131,5 +133,6 @@ public static class SeededE2eEmployees
         foreach (var p in BulkInvite) yield return p;
         yield return CompensationEdit;
         yield return QuickInvite;
+        yield return ProbationTask;
     }
 }

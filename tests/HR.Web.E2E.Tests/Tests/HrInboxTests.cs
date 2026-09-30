@@ -35,7 +35,7 @@ public sealed class HrInboxTests(CrossUserFixture fixture) : RoleE2ETestBase<Cro
 
         await login.SwitchAccountAsync(LauraEmail);
 
-        await inbox.GoToAsync(AcmeId);
+        await inbox.GoToAsync(AcmeId, "Tom Williams");
 
         Assert.False(await inbox.IsEmptyAsync(),
             "HR inbox should not be empty after Tom submitted a personal-details change request");

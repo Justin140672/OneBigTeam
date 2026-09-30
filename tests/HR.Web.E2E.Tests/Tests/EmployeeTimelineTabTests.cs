@@ -159,13 +159,15 @@ public sealed class EmployeeTimelineTabTests(HrAdminPersonaFixture fixture) : Ro
         var wizard = new PromoteEmployeeDialog(_page);
         var timeline = new EmployeeTimelineTab(_page);
 
+        var targetProfile = await E2eEmployeeApi.CreateVacantPositionProfileAsync(_fixture.ApiBaseUrl, "E2E Software Engineer TL");
+
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
         await empEdit.GoToAsync(AcmeId, TomWilliams);
         await empEdit.OpenPromotionHistoryTabAsync();
         await wizard.OpenAsync();
-        await wizard.SelectNewPositionProfileAsync("HR Manager");
+        await wizard.SelectNewPositionProfileAsync(targetProfile);
         await wizard.FillEffectiveDateAsync(DateTime.Today.AddDays(-1).ToString("dd/MM/yyyy"));
         await wizard.FillReasonAsync("Timeline View Details check");
         await wizard.ClickNextAsync();
@@ -175,10 +177,10 @@ public sealed class EmployeeTimelineTabTests(HrAdminPersonaFixture fixture) : Ro
         Assert.False(await wizard.IsVisibleAsync());
 
         await timeline.OpenAsync();
-        Assert.True(await timeline.EntryHasViewDetailsLinkAsync("HR Manager"),
+        Assert.True(await timeline.EntryHasViewDetailsLinkAsync(targetProfile),
             "Expected 'View details' on the promotion entry for the HR admin viewer");
 
-        await timeline.ClickViewDetailsAsync("HR Manager");
+        await timeline.ClickViewDetailsAsync(targetProfile);
         await _page.WaitForSelectorAsync("[data-testid='promote-employee-btn']", new() { Timeout = 15_000 });
         Assert.True(await EmployeeEditPage.SectionTab(_page, "Promotion History")
             .GetAttributeAsync("aria-selected") == "true");
@@ -191,7 +193,7 @@ public sealed class EmployeeTimelineTabTests(HrAdminPersonaFixture fixture) : Ro
         await profile.GoToAsync(AcmeId, TomWilliams);
         await timeline.OpenAsync();
 
-        Assert.False(await timeline.EntryHasViewDetailsLinkAsync("HR Manager"),
+        Assert.False(await timeline.EntryHasViewDetailsLinkAsync(targetProfile),
             "Did not expect 'View details' on the promotion entry from the self-service profile, " +
             "since MyProfile.razor only wires OnNavigateToDocuments/OnNavigateToAcknowledgements");
     }

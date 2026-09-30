@@ -22,6 +22,7 @@ namespace HR.Web.E2E.Tests.Tests;
 ///
 /// Uses Marcus Diallo (Recruiter role) — recruitment:manage is Recruiter-only.
 /// </summary>
+[Collection("RecruitmentStageList")]
 public sealed class RecruitmentStageEditConcurrencyConflictTests(RecruiterPersonaFixture fixture)
     : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {

@@ -128,6 +128,8 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
         Assert.True(await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Offboarding"),
             "Expected the Offboarding tab to be visible once started");
 
+        var employeeLastName = SeededE2eEmployees.LifecycleTabVisibility[1].LastName;
+
         string[] taskFragments =
         [
             "Review outstanding documents for employee exit",
@@ -139,13 +141,13 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
 
         foreach (var fragment in taskFragments)
         {
-            await inbox.GoToAsync(AcmeId);
+            await inbox.GoToAsync(AcmeId, employeeLastName);
             var matchCount = (await inbox.GetTaskTitlesAsync())
                 .Count(t => t.Contains(fragment, StringComparison.OrdinalIgnoreCase));
 
             for (var i = 0; i < matchCount; i++)
             {
-                await inbox.GoToAsync(AcmeId);
+                await inbox.GoToAsync(AcmeId, employeeLastName);
                 var titles = await inbox.GetTaskTitlesAsync();
                 var claimedTitle = titles.First(t => t.Contains(fragment, StringComparison.OrdinalIgnoreCase));
                 await inbox.ClaimAsync(claimedTitle);

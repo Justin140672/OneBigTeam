@@ -115,7 +115,7 @@ public sealed class CompanyAdministratorAccessTests(HrAdminPersonaFixture fixtur
         await login.LoginAsync(CompanyAdminEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/hr-settings");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        await _page.WaitForURLAsync(url => !url.Split('?')[0].TrimEnd('/').EndsWith($"/companies/{AcmeId}/hr-settings", StringComparison.OrdinalIgnoreCase), new() { Timeout = 30_000 });
 
         var finalUrl = _page.Url;
         Assert.False(finalUrl.TrimEnd('/').EndsWith($"/companies/{AcmeId}/hr-settings", StringComparison.OrdinalIgnoreCase),

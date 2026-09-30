@@ -15,8 +15,7 @@ public sealed class AssetCategoryListPage(IPage page, string baseUrl)
 
     public async Task ClickNewAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
-        await page.WaitForURLAsync("**/asset-categories/new**", new() { Timeout = 30_000 });
+        await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickUntilUrlAsync(page, u => u.Contains("/asset-categories/new"));
     }
 
     public async Task<bool> HasItemAsync(string nameFragment) =>

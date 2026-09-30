@@ -26,6 +26,7 @@ public sealed class AssetCategoryEditCloseBehaviorTests(HrAdminPersonaFixture fi
         await catEdit.SaveAsync();
 
         await catList.GoToAsync(AcmeId);
+        await _page.RevealGridRowAsync(catName);
         var href = await _page.Locator(".e-rowcell a").Filter(new() { HasText = catName }).First.GetAttributeAsync("href");
         Assert.NotNull(href);
         await _page.GotoAsync($"{_fixture.WebBaseUrl}{href}");

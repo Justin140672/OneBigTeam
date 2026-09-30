@@ -66,12 +66,16 @@ public sealed class TaskService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
-    public async Task<UnassignedTaskListResponse?> GetUnassignedTasksAsync(Guid companyId, CancellationToken cancellationToken = default)
+    public async Task<UnassignedTaskListResponse?> GetUnassignedTasksAsync(Guid companyId, string? search = null, CancellationToken cancellationToken = default)
     {
         try
         {
+            var url = $"api/companies/{companyId}/tasks/unassigned";
+            if (!string.IsNullOrWhiteSpace(search))
+                url += $"?search={Uri.EscapeDataString(search)}";
+
             return await Http.GetFromJsonAsync<UnassignedTaskListResponse>(
-                $"api/companies/{companyId}/tasks/unassigned", HrApiJsonOptions.Default, cancellationToken);
+                url, HrApiJsonOptions.Default, cancellationToken);
         }
         catch { return null; }
     }
