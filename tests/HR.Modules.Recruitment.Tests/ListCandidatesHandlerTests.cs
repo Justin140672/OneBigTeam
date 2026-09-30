@@ -16,8 +16,8 @@ public class ListCandidatesHandlerTests
         var companyId = Guid.NewGuid();
 
         db.Candidates.AddRange(
-            Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now),
-            Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now));
+            Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now),
+            Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, Now));
         await db.SaveChangesAsync();
 
         var result = await new ListCandidatesHandler(db).HandleAsync(
@@ -36,8 +36,8 @@ public class ListCandidatesHandlerTests
         var companyId = Guid.NewGuid();
 
         db.Candidates.AddRange(
-            Candidate.Create(Guid.NewGuid(), companyId, "Zoe", "Adams", "zoe.adams@example.com", null, null, Now),
-            Candidate.Create(Guid.NewGuid(), companyId, "Amy", "Baker", "amy.baker@example.com", null, null, Now));
+            Candidate.Create(Guid.NewGuid(), companyId, "Zoe", "Adams", "zoe.adams@example.com", null, Now),
+            Candidate.Create(Guid.NewGuid(), companyId, "Amy", "Baker", "amy.baker@example.com", null, Now));
         await db.SaveChangesAsync();
 
         var result = await new ListCandidatesHandler(db).HandleAsync(
@@ -55,8 +55,8 @@ public class ListCandidatesHandlerTests
         var companyId = Guid.NewGuid();
 
         db.Candidates.AddRange(
-            Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now),
-            Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now));
+            Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now),
+            Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, Now));
         await db.SaveChangesAsync();
 
         var result = await new ListCandidatesHandler(db).HandleAsync(
@@ -75,7 +75,7 @@ public class ListCandidatesHandlerTests
 
         for (var i = 0; i < 5; i++)
         {
-            db.Candidates.Add(Candidate.Create(Guid.NewGuid(), companyId, $"First{i}", $"Last{i}", $"candidate{i}@example.com", null, null, Now));
+            db.Candidates.Add(Candidate.Create(Guid.NewGuid(), companyId, $"First{i}", $"Last{i}", $"candidate{i}@example.com", null, Now));
         }
         await db.SaveChangesAsync();
 
@@ -95,8 +95,8 @@ public class ListCandidatesHandlerTests
         await using var db = BuildContext();
 
         db.Candidates.AddRange(
-            Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, null, Now),
-            Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Liam", "Turner", "liam.turner@example.com", null, null, Now));
+            Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, Now),
+            Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Liam", "Turner", "liam.turner@example.com", null, Now));
         await db.SaveChangesAsync();
 
         var result = await new ListCandidatesHandler(db).HandleAsync(
@@ -111,8 +111,8 @@ public class ListCandidatesHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var activeCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var inactiveCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        var activeCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
+        var inactiveCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, Now);
         inactiveCandidate.Deactivate(Guid.NewGuid(), "No longer available", Now);
         db.Candidates.AddRange(activeCandidate, inactiveCandidate);
         await db.SaveChangesAsync();
@@ -130,8 +130,8 @@ public class ListCandidatesHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var activeCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var inactiveCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        var activeCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
+        var inactiveCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, Now);
         inactiveCandidate.Deactivate(Guid.NewGuid(), "No longer available", Now);
         db.Candidates.AddRange(activeCandidate, inactiveCandidate);
         await db.SaveChangesAsync();

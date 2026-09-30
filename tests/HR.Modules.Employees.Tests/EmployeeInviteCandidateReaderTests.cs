@@ -20,7 +20,7 @@ public class EmployeeInviteCandidateReaderTests
     {
         var profile = PositionProfile.Create(
             Guid.NewGuid(), companyId, departmentId: Guid.NewGuid(), locationId: Guid.NewGuid(), title,
-            description: null, probationMonthsOverride: null, workingDaysOverride: null,
+            probationMonthsOverride: null, workingDaysOverride: null,
             hoursPerDayOverride: null, salaryMin: null, salaryMax: null, salaryType: null,
             defaultLeavePolicyId: Guid.NewGuid(), Now);
         db.PositionProfiles.Add(profile);

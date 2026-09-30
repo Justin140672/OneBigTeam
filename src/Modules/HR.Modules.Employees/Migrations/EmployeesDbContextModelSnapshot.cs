@@ -1275,11 +1275,6 @@ namespace HR.Modules.Employees.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("department_id");
 
-                    b.Property<string>("Description")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)")
-                        .HasColumnName("description");
-
                     b.Property<decimal?>("HoursPerDayOverride")
                         .HasPrecision(4, 2)
                         .HasColumnType("numeric(4,2)")

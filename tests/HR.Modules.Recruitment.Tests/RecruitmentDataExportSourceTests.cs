@@ -39,7 +39,7 @@ public class RecruitmentDataExportSourceTests
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var vacancyA = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
         var vacancyB = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var cv = CandidateDocument.Create(
             Guid.NewGuid(), companyId, candidate.Id, "CV", "cv.pdf", 2048, "application/pdf", "key", Guid.NewGuid(), Now, CandidateDocumentKind.Cv);
         var withCv = Application.Create(Guid.NewGuid(), companyId, vacancyA.Id, candidate.Id, stages.CvReview.Id, null, Now);
@@ -72,7 +72,7 @@ public class RecruitmentDataExportSourceTests
         var otherCompanyId = Guid.NewGuid();
         var stages = RecruitmentStageTestData.AddDefaultStages(db, otherCompanyId, Now);
         var vacancy = Vacancy.Create(Guid.NewGuid(), otherCompanyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), otherCompanyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), otherCompanyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var cv = CandidateDocument.Create(
             Guid.NewGuid(), otherCompanyId, candidate.Id, "CV", "cv.pdf", 2048, "application/pdf", "key", Guid.NewGuid(), Now, CandidateDocumentKind.Cv);
         var application = Application.Create(Guid.NewGuid(), otherCompanyId, vacancy.Id, candidate.Id, stages.CvReview.Id, null, Now);

@@ -32,7 +32,7 @@ public class UpdatePositionProfileConcurrencyHandlerTests
         var locationType = LocationType.Create(Guid.NewGuid(), companyId, "Office", null, now);
         var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "London", null, now);
         var profile = PositionProfile.Create(
-            Guid.NewGuid(), companyId, department.Id, location.Id, "Original Title", null, null, null, null, null, null, null, Guid.NewGuid(), now);
+            Guid.NewGuid(), companyId, department.Id, location.Id, "Original Title", null, null, null, null, null, null, Guid.NewGuid(), now);
         seed.Departments.Add(department);
         seed.LocationTypes.Add(locationType);
         seed.Locations.Add(location);
@@ -60,7 +60,7 @@ public class UpdatePositionProfileConcurrencyHandlerTests
     {
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
         var profile = PositionProfile.Create(
-            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "T", null, null, null, null, null, null, null, Guid.NewGuid(), now);
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "T", null, null, null, null, null, null, Guid.NewGuid(), now);
         Assert.Equal(1, profile.Version);
 
         profile.IncrementVersion();

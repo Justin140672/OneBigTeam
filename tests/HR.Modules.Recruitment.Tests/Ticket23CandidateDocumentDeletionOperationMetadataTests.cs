@@ -58,7 +58,7 @@ public class Ticket23CandidateDocumentDeletionOperationMetadataTests
 
 
     private static Candidate CreateCandidateUpdatedAt(Guid companyId, DateTimeOffset updatedAt) =>
-        Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, updatedAt);
+        Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, updatedAt);
 
     private static PurgeEligibleCandidatesHandler BuildHandler(
         RecruitmentDbContext db, Hangfire.IBackgroundJobClient? jobClient, IExecutionContextAccessor? accessor) =>

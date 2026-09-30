@@ -73,7 +73,7 @@ public class ListVacanciesEndpointTests
             var department = Department.Create(departmentId, companyId, "Engineering", null, Now);
             var positionProfile = PositionProfile.Create(
                 Guid.NewGuid(), companyId, departmentId, locationId: Guid.NewGuid(), "Backend Engineer",
-                description: "Owns the payments platform", probationMonthsOverride: null,
+                probationMonthsOverride: null,
                 workingDaysOverride: null, hoursPerDayOverride: null, salaryMin: null, salaryMax: null,
                 salaryType: null, defaultLeavePolicyId: Guid.NewGuid(), Now);
             employeesDb.Departments.Add(department);
@@ -141,7 +141,7 @@ public class ListVacanciesEndpointTests
             var employeesDb = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
             var positionProfile = PositionProfile.Create(
                 Guid.NewGuid(), companyId, Guid.NewGuid(), locationId: Guid.NewGuid(), "Legacy Support Engineer",
-                description: null, probationMonthsOverride: null, workingDaysOverride: null,
+                probationMonthsOverride: null, workingDaysOverride: null,
                 hoursPerDayOverride: null, salaryMin: null, salaryMax: null, salaryType: null,
                 defaultLeavePolicyId: Guid.NewGuid(), Now);
             positionProfile.Deactivate(Now);
@@ -230,8 +230,7 @@ public class ListVacanciesEndpointTests
             var employeesDb = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
             var otherDepartment = Department.Create(Guid.NewGuid(), companyId, $"Dept-{Guid.NewGuid():N}", null, Now);
             var otherProfile = PositionProfile.Create(
-                Guid.NewGuid(), companyId, otherDepartment.Id, locationId: Guid.NewGuid(), "Other Role", description: null,
-                probationMonthsOverride: null, workingDaysOverride: null, hoursPerDayOverride: null,
+                Guid.NewGuid(), companyId, otherDepartment.Id, locationId: Guid.NewGuid(), "Other Role", probationMonthsOverride: null, workingDaysOverride: null, hoursPerDayOverride: null,
                 salaryMin: null, salaryMax: null, salaryType: null, defaultLeavePolicyId: Guid.NewGuid(), Now);
             employeesDb.Departments.Add(otherDepartment);
             employeesDb.PositionProfiles.Add(otherProfile);

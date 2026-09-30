@@ -68,10 +68,10 @@ public class GetCandidatesInProgressMetricEndpointTests
             var task = RecruitmentStage.Create(Guid.NewGuid(), companyId, "Take-home", 1, false, RecruitmentStageTerminalOutcome.None, Now);
             var placed = RecruitmentStage.Create(Guid.NewGuid(), companyId, "Placed", 2, true, RecruitmentStageTerminalOutcome.Hired, Now);
             var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "SRE", null, Guid.NewGuid(), Now);
-            var c1 = Candidate.Create(Guid.NewGuid(), companyId, "Ana", "Ng", $"ana.{Guid.NewGuid():N}@example.com", null, null, Now);
-            var c2 = Candidate.Create(Guid.NewGuid(), companyId, "Bo", "Li", $"bo.{Guid.NewGuid():N}@example.com", null, null, Now);
-            var c3 = Candidate.Create(Guid.NewGuid(), companyId, "Cy", "Fox", $"cy.{Guid.NewGuid():N}@example.com", null, null, Now);
-            var c4 = Candidate.Create(Guid.NewGuid(), companyId, "Di", "Ma", $"di.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var c1 = Candidate.Create(Guid.NewGuid(), companyId, "Ana", "Ng", $"ana.{Guid.NewGuid():N}@example.com", null, Now);
+            var c2 = Candidate.Create(Guid.NewGuid(), companyId, "Bo", "Li", $"bo.{Guid.NewGuid():N}@example.com", null, Now);
+            var c3 = Candidate.Create(Guid.NewGuid(), companyId, "Cy", "Fox", $"cy.{Guid.NewGuid():N}@example.com", null, Now);
+            var c4 = Candidate.Create(Guid.NewGuid(), companyId, "Di", "Ma", $"di.{Guid.NewGuid():N}@example.com", null, Now);
             var withdrawn = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, c3.Id, screen.Id, null, Now);
             withdrawn.Withdraw(Now);
             db.RecruitmentStages.AddRange(screen, task, placed);
@@ -105,7 +105,7 @@ public class GetCandidatesInProgressMetricEndpointTests
             var stages = RecruitmentStageSeeder.BuildDefaultStages(otherCompanyId, Now).ToList();
             var cv = stages.Single(s => s.Name == "CV Review");
             var vacancy = Vacancy.Create(Guid.NewGuid(), otherCompanyId, Guid.NewGuid(), "SRE", null, Guid.NewGuid(), Now);
-            var cand = Candidate.Create(Guid.NewGuid(), otherCompanyId, "Fi", "Su", $"fi.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var cand = Candidate.Create(Guid.NewGuid(), otherCompanyId, "Fi", "Su", $"fi.{Guid.NewGuid():N}@example.com", null, Now);
             db.RecruitmentStages.AddRange(stages);
             db.Vacancies.Add(vacancy);
             db.Candidates.Add(cand);

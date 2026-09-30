@@ -44,7 +44,7 @@ public class ListUsersHandlerTests(IdentityDatabaseFixture fixture)
         var positionReader = new FakePositionProfileReader(
             summaries: new Dictionary<Guid, PositionProfileSummary>
             {
-                [positionProfileId] = new PositionProfileSummary(positionProfileId, "Finance Assistant", null, null, true, null, null),
+                [positionProfileId] = new PositionProfileSummary(positionProfileId, "Finance Assistant", null, true, null, null),
             });
 
         var result = await BuildHandler(audienceReader, positionReader).HandleAsync(Request(companyId), CancellationToken.None);

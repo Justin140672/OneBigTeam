@@ -28,7 +28,7 @@ public class RecruitmentReportReaderGetSummaryAsyncTests
     private static Candidate SeedCandidate(RecruitmentDbContext db, Guid companyId, int seed)
     {
         var candidate = Candidate.Create(
-            Guid.NewGuid(), companyId, "First", $"Last{seed}", $"candidate{seed}.{Guid.NewGuid():N}@example.com", null, null, Now);
+            Guid.NewGuid(), companyId, "First", $"Last{seed}", $"candidate{seed}.{Guid.NewGuid():N}@example.com", null, Now);
         db.Candidates.Add(candidate);
         return candidate;
     }
@@ -155,7 +155,7 @@ public class RecruitmentReportReaderGetSummaryAsyncTests
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
             [positionProfileId] = new(
-                positionProfileId, "Software Engineer", Guid.NewGuid(), null, true, null, null, "Engineering"),
+                positionProfileId, "Software Engineer", Guid.NewGuid(), true, null, null, "Engineering"),
         };
         var reader = new RecruitmentReportReader(db, new FakePositionProfileReader(summaries: summaries));
 

@@ -43,7 +43,7 @@ public class OnEmployeePositionChangedHandlerTests(IdentityDatabaseFixture fixtu
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [newPositionId] = new(newPositionId, "Senior Developer", null, null, true, null, null),
+            [newPositionId] = new(newPositionId, "Senior Developer", null, true, null, null),
         };
         var reader = new FakePositionProfileReader(summaries: summaries);
         var audienceReader = new FakeEmployeeAudienceReader(
@@ -94,7 +94,7 @@ public class OnEmployeePositionChangedHandlerTests(IdentityDatabaseFixture fixtu
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [originalPositionId] = new(originalPositionId, "Developer", null, null, true, null, null),
+            [originalPositionId] = new(originalPositionId, "Developer", null, true, null, null),
         };
         var reader = new FakePositionProfileReader(summaries: summaries);
         var audienceReader = new FakeEmployeeAudienceReader(
@@ -169,7 +169,7 @@ public class OnEmployeePositionChangedHandlerTests(IdentityDatabaseFixture fixtu
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [positionB] = new(positionB, "Position B", null, null, true, null, null),
+            [positionB] = new(positionB, "Position B", null, true, null, null),
         };
         var reader = new FakePositionProfileReader(summaries: summaries);
         var audienceReader = new FakeEmployeeAudienceReader(
@@ -212,7 +212,7 @@ public class OnEmployeePositionChangedHandlerTests(IdentityDatabaseFixture fixtu
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [newPositionId] = new(newPositionId, "New Position", null, null, true, null, null),
+            [newPositionId] = new(newPositionId, "New Position", null, true, null, null),
         };
         var reader = new FakePositionProfileReader(summaries: summaries);
         var audienceReader = new FakeEmployeeAudienceReader([employeeId]);

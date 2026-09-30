@@ -280,9 +280,10 @@
                         : null;
 
                     _positionProfiles.Add(new PositionProfileListItemModel(
-                        profile.Id, departmentName, profile.Title, profile.Description,
+                        profile.Id, departmentName, profile.Title,
                         profile.IsActive, profile.SalaryMin, profile.SalaryMax, profile.SalaryType,
-                        profile.NoticePeriodUnitOverride, profile.NoticePeriodLengthOverride));
+                        profile.NoticePeriodUnitOverride, profile.NoticePeriodLengthOverride,
+                        _locations.FirstOrDefault(l => l.Id == profile.LocationId)?.Name));
                 }
             }
 
@@ -421,7 +422,7 @@
                                             Placeholder="Select position profile"
                                             AllowFiltering="true"
                                             Enabled="@CanEditPositionProfile">
-                                <DropDownListFieldSettings Value="Id" Text="Title" />
+                                <DropDownListFieldSettings Value="Id" Text="DisplayLabel" />
                                 <DropDownListEvents TItem="PositionProfileListItemModel" TValue="Guid?" ValueChange="OnPositionProfileChanged" />
                             </SfDropDownList>
                             <ValidationMessage For="@(() => Model.PositionProfileId)" />
@@ -506,8 +507,6 @@
                                 <dd class="col-7">@(LinkedProfileDepartmentName ?? "None")</dd>
                                 <dt class="col-5 text-muted fw-normal">Location</dt>
                                 <dd class="col-7">@(_vacancy.EffectiveLocation ?? "None")</dd>
-                                <dt class="col-5 text-muted fw-normal">Description</dt>
-                                <dd class="col-7">@(string.IsNullOrWhiteSpace(_vacancy.PositionProfileDescription) ? "—" : _vacancy.PositionProfileDescription)</dd>
                             </dl>
                         }
                     </div>
@@ -570,7 +569,7 @@
                                         Label="Advertise this vacancy to employees"
                                         @bind-Checked="Model.IsAdvertisedInternally"
                                         Disabled="@IsViewMode" />
-                            <div class="form-text">Shows the vacancy in the internal vacancy list on employees' My Profile while it is open.</div>
+                            <div class="form-text">Shows the vacancy in the internal vacancy list</div>
                         </div>
                     </div>
                 </div>

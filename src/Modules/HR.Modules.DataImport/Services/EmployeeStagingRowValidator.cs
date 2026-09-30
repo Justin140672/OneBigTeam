@@ -56,6 +56,7 @@ internal sealed class EmployeeStagingRowValidator(
         var employmentTypeIdByRow = new Dictionary<int, Guid?>();
         var positionProfileIdByRow = new Dictionary<int, Guid?>();
         var existingEmployeeIdToUpdateByRow = new Dictionary<int, Guid?>();
+        var claimedPositionProfileIds = new HashSet<Guid>();
 
         var hasCompensationColumns = CompensationFields.Any(mappedFields.Contains);
         var hasLeaveColumns = LeaveFields.Any(mappedFields.Contains);
@@ -110,7 +111,7 @@ internal sealed class EmployeeStagingRowValidator(
                 ValidateWorkingPatternFields(row, rowErrors);
 
             var (departmentId, locationId, employmentTypeId, positionProfileId) =
-                await ResolveLookupsAsync(companyId, row, rowErrors, rowWarnings, cancellationToken);
+                await ResolveLookupsAsync(companyId, row, existingEmployeeIdToUpdate, claimedPositionProfileIds, rowErrors, rowWarnings, cancellationToken);
 
             departmentIdByRow[row.RowNumber] = departmentId;
             locationIdByRow[row.RowNumber] = locationId;
@@ -134,6 +135,8 @@ internal sealed class EmployeeStagingRowValidator(
     private async Task<(Guid? DepartmentId, Guid? LocationId, Guid? EmploymentTypeId, Guid? PositionProfileId)> ResolveLookupsAsync(
         Guid companyId,
         ParsedImportRow row,
+        Guid? existingEmployeeIdToUpdate,
+        HashSet<Guid> claimedPositionProfileIds,
         List<string> rowErrors,
         List<string> rowWarnings,
         CancellationToken cancellationToken)
@@ -176,7 +179,11 @@ internal sealed class EmployeeStagingRowValidator(
         var positionProfileTitle = GetField(row, "PositionProfileTitle");
         if (!string.IsNullOrWhiteSpace(positionProfileTitle))
         {
-            positionProfileId = await lookupResolver.TryFindPositionProfileAsync(companyId, positionProfileTitle, cancellationToken);
+            positionProfileId = await lookupResolver.TryFindPositionProfileAsync(
+                companyId, positionProfileTitle, departmentId, locationId, claimedPositionProfileIds, existingEmployeeIdToUpdate, cancellationToken);
+
+            if (positionProfileId is { } claimedId)
+                claimedPositionProfileIds.Add(claimedId);
 
             if (positionProfileId is null)
             {

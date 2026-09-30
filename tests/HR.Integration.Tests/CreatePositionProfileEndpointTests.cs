@@ -112,8 +112,8 @@ public class CreatePositionProfileEndpointTests
             departmentId,
             locationId,
             defaultLeavePolicyId = leavePolicyId,
-            title = "Software Developer",
-            description = "Builds features"
+            title = "Software Developer"
+
         });
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -127,7 +127,6 @@ public class CreatePositionProfileEndpointTests
         Assert.Equal(locationId, payload.LocationId);
         Assert.Equal(leavePolicyId, payload.DefaultLeavePolicyId);
         Assert.Equal("Software Developer", payload.Title);
-        Assert.Equal("Builds features", payload.Description);
         Assert.True(payload.IsActive);
     }
 
@@ -155,7 +154,7 @@ public class CreatePositionProfileEndpointTests
     }
 
     [Fact]
-    public async Task Post_PositionProfiles_Returns_Conflict_For_Duplicate_Title()
+    public async Task Post_PositionProfiles_Allows_Duplicate_Title()
     {
         var companyId = Guid.NewGuid();
         using var client = await AuthenticatedClient(companyId);
@@ -180,7 +179,10 @@ public class CreatePositionProfileEndpointTests
             title = "Recruiter"
         });
 
-        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+        var firstId = (await first.Content.ReadFromJsonAsync<PositionProfilePayload>())!.Id;
+        var secondId = (await second.Content.ReadFromJsonAsync<PositionProfilePayload>())!.Id;
+        Assert.NotEqual(firstId, secondId);
     }
 
     [Fact]
@@ -392,7 +394,6 @@ public class CreatePositionProfileEndpointTests
         Guid DepartmentId,
         Guid LocationId,
         string Title,
-        string? Description,
         Guid DefaultLeavePolicyId,
         bool IsActive,
         DateTimeOffset CreatedAt,

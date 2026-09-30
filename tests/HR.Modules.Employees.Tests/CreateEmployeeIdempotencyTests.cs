@@ -153,7 +153,7 @@ public class CreateEmployeeIdempotencyTests
         var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "Head Office", null, Now);
         var positionProfile = PositionProfile.Create(
             Guid.NewGuid(), companyId, department.Id, location.Id, "Developer",
-            null, null, null, null, null, null, null, Guid.NewGuid(), Now);
+            null, null, null, null, null, null, Guid.NewGuid(), Now);
         var employmentType = EmploymentType.Create(Guid.NewGuid(), companyId, "Permanent", null, Now);
 
         context.Departments.Add(department);

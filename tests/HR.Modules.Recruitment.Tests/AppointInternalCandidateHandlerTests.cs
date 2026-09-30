@@ -85,7 +85,7 @@ public class AppointInternalCandidateHandlerTests
 
         var candidate = linkCandidateToEmployee
             ? Candidate.CreateForEmployee(Guid.NewGuid(), companyId, employeeId, "Priya", "Shah", $"priya.{Guid.NewGuid():N}@acme.example", null, Now.AddDays(-20))
-            : Candidate.Create(Guid.NewGuid(), companyId, "Priya", "Shah", $"priya.{Guid.NewGuid():N}@acme.example", null, null, Now.AddDays(-20));
+            : Candidate.Create(Guid.NewGuid(), companyId, "Priya", "Shah", $"priya.{Guid.NewGuid():N}@acme.example", null, Now.AddDays(-20));
         var application = Application.Create(
             Guid.NewGuid(), companyId, vacancy.Id, candidate.Id,
             (stage ?? (s => s.Offer))(stages).Id, null, Now.AddDays(-20), source);
@@ -107,7 +107,7 @@ public class AppointInternalCandidateHandlerTests
                 FakeEmployeeApplicantReader.Profile(companyId, employeeId, state: employmentState)),
             ProfileReader = new FakePositionProfileReader(summaries: new Dictionary<Guid, PositionProfileSummary>
             {
-                [positionProfileId] = new(positionProfileId, "Engineering Manager", departmentId, null, true, locationId, "London"),
+                [positionProfileId] = new(positionProfileId, "Engineering Manager", departmentId, true, locationId, "London"),
             }),
         };
 
@@ -602,7 +602,7 @@ public class AppointInternalCandidateHandlerTests
         var profileId = h.Vacancy.PositionProfileId;
         h.ProfileReader = new FakePositionProfileReader(summaries: new Dictionary<Guid, PositionProfileSummary>
         {
-            [profileId] = new(profileId, "Engineering Manager", null, null, true, h.LocationId, "London"),
+            [profileId] = new(profileId, "Engineering Manager", null, true, h.LocationId, "London"),
         });
 
         var result = await h.Handler().HandleAsync(h.Request(), Guid.NewGuid(), CancellationToken.None);
@@ -617,7 +617,7 @@ public class AppointInternalCandidateHandlerTests
         var profileId = h.Vacancy.PositionProfileId;
         h.ProfileReader = new FakePositionProfileReader(summaries: new Dictionary<Guid, PositionProfileSummary>
         {
-            [profileId] = new(profileId, "Engineering Manager", h.DepartmentId, null, true, null, null),
+            [profileId] = new(profileId, "Engineering Manager", h.DepartmentId, true, null, null),
         });
 
         var result = await h.Handler().HandleAsync(h.Request(), Guid.NewGuid(), CancellationToken.None);

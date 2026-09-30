@@ -448,7 +448,7 @@ internal sealed class ApplyForInternalVacancyHandler(
     }
 
     private static CandidateAuditSnapshot Snapshot(Candidate candidate) =>
-        new(candidate.FirstName, candidate.LastName, candidate.Email, candidate.Phone, candidate.ResumeUrl);
+        new(candidate.FirstName, candidate.LastName, candidate.Email, candidate.Phone);
 
     private async Task AcquireEmployeeLockAsync(Guid companyId, Guid employeeId, CancellationToken cancellationToken)
     {

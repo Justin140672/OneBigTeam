@@ -223,7 +223,7 @@ public sealed class VacancyManagementTests(CrossUserFixture fixture) : RoleE2ETe
 
         Assert.True(await vacancyDetail.IsPositionProfileDisabledAsync(),
             "Expected the Position Profile dropdown to be disabled once the vacancy has an application");
-        Assert.Equal(profileTitle, await vacancyDetail.GetSelectedPositionProfileTextAsync());
+        Assert.StartsWith(profileTitle, await vacancyDetail.GetSelectedPositionProfileTextAsync());
 
         Assert.True(await vacancyDetail.HasRecruitmentAdvertDetailsHeaderAsync(),
             "Expected the vacancy's own details card to be headed 'Recruitment Advert Details'");

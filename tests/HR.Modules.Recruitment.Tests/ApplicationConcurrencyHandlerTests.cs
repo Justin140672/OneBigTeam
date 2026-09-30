@@ -37,7 +37,7 @@ public class ApplicationConcurrencyHandlerTests
         await using var seed = new RecruitmentDbContext(Options(dbName));
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, positionProfileId, "Senior Software Engineer", null, Guid.NewGuid(), Now);
         var stages = RecruitmentStageTestData.AddDefaultStages(seed, companyId, Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", "+44 7700 900001", null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", "+44 7700 900001", Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, currentStage(stages).Id, null, Now);
         seed.Vacancies.Add(vacancy);
         seed.Candidates.Add(candidate);
@@ -175,7 +175,7 @@ public class ApplicationConcurrencyHandlerTests
         locationId = Guid.NewGuid();
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [positionProfileId] = new(positionProfileId, "Senior Software Engineer", departmentId, null, true, locationId, "London"),
+            [positionProfileId] = new(positionProfileId, "Senior Software Engineer", departmentId, true, locationId, "London"),
         };
         return new FakePositionProfileReader(summaries: summaries);
     }

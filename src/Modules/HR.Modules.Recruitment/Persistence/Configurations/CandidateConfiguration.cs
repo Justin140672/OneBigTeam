@@ -44,10 +44,6 @@ internal sealed class CandidateConfiguration : IEntityTypeConfiguration<Candidat
             .HasColumnName("phone")
             .HasMaxLength(30);
 
-        builder.Property(c => c.ResumeUrl)
-            .HasColumnName("resume_url")
-            .HasMaxLength(500);
-
         builder.Property(c => c.EmployeeId)
             .HasColumnName("employee_id");
 

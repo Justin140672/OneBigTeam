@@ -31,7 +31,7 @@ public class ReactivateCandidateHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         db.Candidates.Add(candidate);
         await db.SaveChangesAsync();
 
@@ -50,7 +50,7 @@ public class ReactivateCandidateHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var deactivatedBy = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         candidate.Deactivate(deactivatedBy, "No longer available", Now);
         db.Candidates.Add(candidate);
         await db.SaveChangesAsync();
@@ -79,7 +79,7 @@ public class ReactivateCandidateHandlerTests
         await using var db = BuildContext();
         var auditPublisher = new FakeAuditPublisher();
         var companyId = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         candidate.Deactivate(Guid.NewGuid(), "No longer available", Now);
         db.Candidates.Add(candidate);
         await db.SaveChangesAsync();

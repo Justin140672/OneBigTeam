@@ -176,7 +176,7 @@ public class ListEmployeesFilterTests
         Department.Create(id, companyId, name, null, Now);
 
     private static PositionProfile MakePositionProfile(Guid id, Guid companyId, Guid deptId, Guid locId, string title) =>
-        PositionProfile.Create(id, companyId, deptId, locId, title, null, null, null, null, null, null, null, Guid.NewGuid(), Now);
+        PositionProfile.Create(id, companyId, deptId, locId, title, null, null, null, null, null, null, Guid.NewGuid(), Now);
 
     private static EmployeesDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<EmployeesDbContext>()

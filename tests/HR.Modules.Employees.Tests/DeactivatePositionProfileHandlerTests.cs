@@ -18,8 +18,7 @@ public class DeactivatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var positionProfile = PositionProfile.Create(
-            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Software Developer", null,
-            probationMonthsOverride: null, workingDaysOverride: null, hoursPerDayOverride: null,
+            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Software Developer", probationMonthsOverride: null, workingDaysOverride: null, hoursPerDayOverride: null,
             salaryMin: null, salaryMax: null, salaryType: null, defaultLeavePolicyId: Guid.NewGuid(), FixedOffset);
         context.PositionProfiles.Add(positionProfile);
         await context.SaveChangesAsync();
@@ -56,8 +55,7 @@ public class DeactivatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var positionProfile = PositionProfile.Create(
-            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Software Developer", null,
-            probationMonthsOverride: null, workingDaysOverride: null, hoursPerDayOverride: null,
+            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Software Developer", probationMonthsOverride: null, workingDaysOverride: null, hoursPerDayOverride: null,
             salaryMin: null, salaryMax: null, salaryType: null, defaultLeavePolicyId: Guid.NewGuid(), FixedOffset);
         positionProfile.Deactivate(FixedOffset);
         context.PositionProfiles.Add(positionProfile);
@@ -78,8 +76,7 @@ public class DeactivatePositionProfileHandlerTests
     {
         await using var context = BuildContext();
         var positionProfile = PositionProfile.Create(
-            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Software Developer", null,
-            probationMonthsOverride: null, workingDaysOverride: null, hoursPerDayOverride: null,
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Software Developer", probationMonthsOverride: null, workingDaysOverride: null, hoursPerDayOverride: null,
             salaryMin: null, salaryMax: null, salaryType: null, defaultLeavePolicyId: Guid.NewGuid(), FixedOffset);
         context.PositionProfiles.Add(positionProfile);
         await context.SaveChangesAsync();
@@ -100,8 +97,7 @@ public class DeactivatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var positionProfile = PositionProfile.Create(
-            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Software Developer", null,
-            probationMonthsOverride: null, workingDaysOverride: null, hoursPerDayOverride: null,
+            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Software Developer", probationMonthsOverride: null, workingDaysOverride: null, hoursPerDayOverride: null,
             salaryMin: null, salaryMax: null, salaryType: null, defaultLeavePolicyId: Guid.NewGuid(), FixedOffset);
         context.PositionProfiles.Add(positionProfile);
 
@@ -133,8 +129,7 @@ public class DeactivatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var positionProfile = PositionProfile.Create(
-            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Software Developer", null,
-            probationMonthsOverride: null, workingDaysOverride: null, hoursPerDayOverride: null,
+            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Software Developer", probationMonthsOverride: null, workingDaysOverride: null, hoursPerDayOverride: null,
             salaryMin: null, salaryMax: null, salaryType: null, defaultLeavePolicyId: Guid.NewGuid(), FixedOffset);
         context.PositionProfiles.Add(positionProfile);
 
@@ -164,8 +159,7 @@ public class DeactivatePositionProfileHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var positionProfile = PositionProfile.Create(
-            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Software Developer", null,
-            probationMonthsOverride: null, workingDaysOverride: null, hoursPerDayOverride: null,
+            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Software Developer", probationMonthsOverride: null, workingDaysOverride: null, hoursPerDayOverride: null,
             salaryMin: null, salaryMax: null, salaryType: null, defaultLeavePolicyId: Guid.NewGuid(), FixedOffset);
         context.PositionProfiles.Add(positionProfile);
         await context.SaveChangesAsync();

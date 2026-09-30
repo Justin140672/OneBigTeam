@@ -46,8 +46,7 @@ public class PositionRoleSyncRecoveryIntegrationTests
         var now = DateTimeOffset.UtcNow;
 
         var positionProfile = PositionProfile.Create(
-            Guid.NewGuid(), companyId, referenceData.DepartmentId, referenceData.LocationId, title, null,
-            probationMonthsOverride: null, workingDaysOverride: null, hoursPerDayOverride: null,
+            Guid.NewGuid(), companyId, referenceData.DepartmentId, referenceData.LocationId, title, probationMonthsOverride: null, workingDaysOverride: null, hoursPerDayOverride: null,
             salaryMin: null, salaryMax: null, salaryType: null, defaultLeavePolicyId: Guid.NewGuid(), now);
 
         db.PositionProfiles.Add(positionProfile);

@@ -64,8 +64,8 @@ public class GetRecruitmentKanbanHandlerTests
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
-        var candidate1 = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var candidate2 = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        var candidate1 = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
+        var candidate2 = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, Now);
         var applied = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate1.Id, stages.ApplicationReceived.Id, null, Now);
         var cvReview = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate2.Id, stages.CvReview.Id, null, Now);
         db.Vacancies.Add(vacancy);
@@ -95,7 +95,7 @@ public class GetRecruitmentKanbanHandlerTests
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
         application.Withdraw(Now);
         db.Vacancies.Add(vacancy);
@@ -124,7 +124,7 @@ public class GetRecruitmentKanbanHandlerTests
         db.Vacancies.Add(vacancy);
         for (var i = 0; i < 3; i++)
         {
-            var candidate = Candidate.Create(Guid.NewGuid(), companyId, "First" + i, "Last" + i, $"candidate{i}@example.com", null, null, Now);
+            var candidate = Candidate.Create(Guid.NewGuid(), companyId, "First" + i, "Last" + i, $"candidate{i}@example.com", null, Now);
             var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now.AddMinutes(i));
             db.Candidates.Add(candidate);
             db.Applications.Add(application);
@@ -148,8 +148,8 @@ public class GetRecruitmentKanbanHandlerTests
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
-        var candidateLater = Candidate.Create(Guid.NewGuid(), companyId, "Later", "Candidate", "later@example.com", null, null, Now);
-        var candidateEarlier = Candidate.Create(Guid.NewGuid(), companyId, "Earlier", "Candidate", "earlier@example.com", null, null, Now);
+        var candidateLater = Candidate.Create(Guid.NewGuid(), companyId, "Later", "Candidate", "later@example.com", null, Now);
+        var candidateEarlier = Candidate.Create(Guid.NewGuid(), companyId, "Earlier", "Candidate", "earlier@example.com", null, Now);
         var applicationLater = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidateLater.Id, stages.ApplicationReceived.Id, null, Now.AddDays(2));
         var applicationEarlier = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidateEarlier.Id, stages.ApplicationReceived.Id, null, Now.AddDays(1));
         db.Vacancies.Add(vacancy);
@@ -176,7 +176,7 @@ public class GetRecruitmentKanbanHandlerTests
         var recruiterId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now, recruiterId);
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);

@@ -35,7 +35,7 @@ internal static class RecruitmentTestSeeder
         var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
         var candidate = Candidate.Create(
             Guid.NewGuid(), companyId, firstName, lastName,
-            email ?? $"{firstName.ToLowerInvariant()}.{Guid.NewGuid():N}@example.com", null, null, now);
+            email ?? $"{firstName.ToLowerInvariant()}.{Guid.NewGuid():N}@example.com", null, now);
         db.Candidates.Add(candidate);
         await db.SaveChangesAsync();
         return candidate.Id;
@@ -80,7 +80,7 @@ internal static class RecruitmentTestSeeder
             Guid.NewGuid(), companyId, positionProfileId ?? Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), now);
         var candidate = Candidate.Create(
             Guid.NewGuid(), companyId, candidateFirstName, candidateLastName,
-            $"{candidateFirstName.ToLowerInvariant()}.{Guid.NewGuid():N}@example.com", null, null, now);
+            $"{candidateFirstName.ToLowerInvariant()}.{Guid.NewGuid():N}@example.com", null, now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, cvReviewStageId, null, now);
 
         db.Vacancies.Add(vacancy);

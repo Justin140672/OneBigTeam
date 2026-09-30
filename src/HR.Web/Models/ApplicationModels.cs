@@ -154,7 +154,6 @@ public record CreateCandidateApplicationRequest(
     string LastName,
     string Email,
     string? Phone,
-    string? ResumeUrl,
     string? Notes,
     string? Source,
     Guid? SourceExternalRecruiterId);

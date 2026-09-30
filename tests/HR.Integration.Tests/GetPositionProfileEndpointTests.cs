@@ -207,7 +207,6 @@ public class GetPositionProfileEndpointTests
         Guid CompanyId,
         Guid? DepartmentId,
         string Title,
-        string? Description,
         bool IsActive,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt,

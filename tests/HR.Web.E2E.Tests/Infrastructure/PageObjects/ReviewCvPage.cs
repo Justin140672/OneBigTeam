@@ -17,7 +17,7 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 /// review-cv-no-submitted-cv / review-cv-current-file-name for the submitted-vs-current CV panel.
 /// Ticket 2 replaced the old candidate-only "Upload a CV" box with the application-scoped section
 /// review-cv-application-actions (review-cv-replace-file-input / review-cv-replace-submit /
-/// review-cv-use-current / review-cv-manage-candidate-cvs) plus review-cv-legacy-link.
+/// review-cv-use-current / review-cv-manage-candidate-cvs).
 /// </summary>
 public sealed class ReviewCvPage(IPage page, string baseUrl)
 {
@@ -110,7 +110,6 @@ public sealed class ReviewCvPage(IPage page, string baseUrl)
     private ILocator CurrentFileName     => Root.Locator("[data-testid='review-cv-current-file-name']");
     private ILocator NoSubmittedCvBanner => Root.Locator("[data-testid='review-cv-no-submitted-cv']");
     private ILocator NoCvMessage         => Root.GetByText("No CV has been uploaded for this candidate.");
-    private ILocator LegacyLink          => Root.Locator("[data-testid='review-cv-legacy-link']");
 
     // Internal recruitment Ticket 2: application-scoped CV actions section (hidden when withdrawn).
     public const string ReplaceHeading = "Replace CV for this application";
@@ -147,7 +146,6 @@ public sealed class ReviewCvPage(IPage page, string baseUrl)
 
     public Task<bool> IsNoCvMessageVisibleAsync() => NoCvMessage.IsVisibleAsync();
 
-    public Task<bool> IsLegacyLinkVisibleAsync() => LegacyLink.IsVisibleAsync();
 
     public Task<bool> IsApplicationCvActionsVisibleAsync() => ApplicationActions.IsVisibleAsync();
 

@@ -83,31 +83,6 @@ public class UpdatePositionProfileValidatorTests
     }
 
     [Fact]
-    public void Validate_Fails_When_Description_Exceeds_2000_Characters()
-    {
-        var v = new UpdatePositionProfileValidator();
-        var result = v.Validate(ValidRequest() with { Description = new string('D', 2001) });
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdatePositionProfileRequest.Description));
-    }
-
-    [Fact]
-    public void Validate_Passes_When_Description_Is_Null()
-    {
-        var v = new UpdatePositionProfileValidator();
-        var result = v.Validate(ValidRequest() with { Description = null });
-        Assert.True(result.IsValid);
-    }
-
-    [Fact]
-    public void Validate_Passes_When_Description_Is_At_Max_Length()
-    {
-        var v = new UpdatePositionProfileValidator();
-        var result = v.Validate(ValidRequest() with { Description = new string('D', 2000) });
-        Assert.True(result.IsValid);
-    }
-
-    [Fact]
     public void Validate_Passes_For_Valid_Minimal_Request()
     {
         var v = new UpdatePositionProfileValidator();
@@ -120,8 +95,7 @@ public class UpdatePositionProfileValidatorTests
         var v = new UpdatePositionProfileValidator();
         var result = v.Validate(ValidRequest() with
         {
-            DepartmentId = Guid.NewGuid(),
-            Description = "Builds and maintains the core platform."
+            DepartmentId = Guid.NewGuid()
         });
         Assert.True(result.IsValid);
     }

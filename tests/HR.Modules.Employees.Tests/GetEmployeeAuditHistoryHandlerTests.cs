@@ -279,7 +279,7 @@ public class GetEmployeeAuditHistoryHandlerTests
         var employeeId = Guid.NewGuid();
 
         var positionProfile = PositionProfile.Create(
-            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Engineering Manager", null, null, null, null, null, null, null, Guid.NewGuid(), Now);
+            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Engineering Manager", null, null, null, null, null, null, Guid.NewGuid(), Now);
         context.PositionProfiles.Add(positionProfile);
         await context.SaveChangesAsync();
 

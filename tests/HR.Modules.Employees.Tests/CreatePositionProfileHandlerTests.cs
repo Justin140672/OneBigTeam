@@ -85,7 +85,7 @@ public class CreatePositionProfileHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Returns_Conflict_When_Title_Already_Exists()
+    public async Task HandleAsync_Allows_Duplicate_Title_Department_And_Location()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
@@ -93,7 +93,7 @@ public class CreatePositionProfileHandlerTests
         var (department, location) = await SeedDepartmentAndLocationAsync(context, companyId);
 
         context.PositionProfiles.Add(
-            PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Software Developer", null, null, null, null, null, null, null, Guid.NewGuid(), now));
+            PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Software Developer", null, null, null, null, null, null, Guid.NewGuid(), now));
         await context.SaveChangesAsync();
 
         var auditPublisher = new FakeAuditPublisher();
@@ -111,9 +111,9 @@ public class CreatePositionProfileHandlerTests
             Guid.NewGuid(),
             CancellationToken.None);
 
-        Assert.True(result.IsFailure);
-        Assert.Equal("conflict", result.Error.Code);
-        Assert.Empty(auditPublisher.Published);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, await context.PositionProfiles.CountAsync(p => p.CompanyId == companyId && p.Title == "Software Developer"));
+        Assert.NotEqual(Guid.Empty, result.Value!.Id);
     }
 
     [Fact]
@@ -207,7 +207,7 @@ public class CreatePositionProfileHandlerTests
         var (departmentB, locationB) = await SeedDepartmentAndLocationAsync(context, companyB);
 
         context.PositionProfiles.Add(
-            PositionProfile.Create(Guid.NewGuid(), companyA, departmentA.Id, locationA.Id, "Software Developer", null, null, null, null, null, null, null, Guid.NewGuid(), now));
+            PositionProfile.Create(Guid.NewGuid(), companyA, departmentA.Id, locationA.Id, "Software Developer", null, null, null, null, null, null, Guid.NewGuid(), now));
         await context.SaveChangesAsync();
 
         var handler = new CreatePositionProfileHandler(context, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(), new FakeAuditPublisher(), new NoOpIntegrationEventPublisher());
@@ -492,7 +492,6 @@ public class CreatePositionProfileHandlerTests
                 LocationId = location.Id,
                 DefaultLeavePolicyId = defaultLeavePolicyId,
                 Title = "Software Developer",
-                Description = "Builds things",
                 WorkingDaysOverride = WorkingDays.Monday | WorkingDays.Tuesday,
                 HoursPerDayOverride = 7.5m,
                 SalaryMin = 40000,
@@ -513,7 +512,6 @@ public class CreatePositionProfileHandlerTests
         Assert.Equal(department.Id, auditEvent.After.DepartmentId);
         Assert.Equal(location.Id, auditEvent.After.LocationId);
         Assert.Equal("Software Developer", auditEvent.After.Title);
-        Assert.Equal("Builds things", auditEvent.After.Description);
         Assert.Equal(WorkingDays.Monday | WorkingDays.Tuesday, auditEvent.After.WorkingDaysOverride);
         Assert.Equal(7.5m, auditEvent.After.HoursPerDayOverride);
         Assert.Equal(NoticePeriodUnit.Weeks, auditEvent.After.NoticePeriodUnitOverride);

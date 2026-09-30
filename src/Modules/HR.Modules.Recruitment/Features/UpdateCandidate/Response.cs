@@ -7,7 +7,6 @@ internal sealed record UpdateCandidateResponse(
     string LastName,
     string Email,
     string? Phone,
-    string? ResumeUrl,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     int Version);

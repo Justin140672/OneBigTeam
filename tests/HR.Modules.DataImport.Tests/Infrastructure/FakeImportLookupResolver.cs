@@ -8,7 +8,7 @@ internal sealed class FakeImportLookupResolver : IImportLookupResolver
     private readonly Dictionary<(Guid CompanyId, string NormalizedName), Guid> _departments = new();
     private readonly Dictionary<(Guid CompanyId, string NormalizedName), Guid> _employmentTypes = new();
     private readonly Dictionary<(Guid CompanyId, string NormalizedName), Guid> _locations = new();
-    private readonly Dictionary<(Guid CompanyId, string NormalizedName), Guid> _positionProfiles = new();
+    private readonly Dictionary<(Guid CompanyId, string NormalizedName), List<Guid>> _positionProfiles = new();
 
     public void SeedExistingDepartment(Guid companyId, string name, Guid id) =>
         _departments[Key(companyId, name)] = id;
@@ -20,7 +20,7 @@ internal sealed class FakeImportLookupResolver : IImportLookupResolver
         _locations[Key(companyId, name)] = id;
 
     public void SeedExistingPositionProfile(Guid companyId, string title, Guid id) =>
-        _positionProfiles[Key(companyId, title)] = id;
+        AddProfile(Key(companyId, title), id);
 
     public Task<ImportLookupResult> GetOrCreateDepartmentAsync(Guid companyId, string name, CancellationToken cancellationToken) =>
         Task.FromResult(GetOrCreate(_departments, companyId, name));
@@ -32,18 +32,19 @@ internal sealed class FakeImportLookupResolver : IImportLookupResolver
         Task.FromResult(GetOrCreate(_locations, companyId, name));
 
     public Task<PositionProfileImportLookupResult> GetOrCreatePositionProfileAsync(
-        Guid companyId, string title, Guid? departmentId, Guid? locationId, CancellationToken cancellationToken)
+        Guid companyId, string title, Guid? departmentId, Guid? locationId,
+        IReadOnlySet<Guid> excludedProfileIds, Guid? allowedEmployeeId, CancellationToken cancellationToken)
     {
         var key = Key(companyId, title);
 
-        if (_positionProfiles.TryGetValue(key, out var existingId))
+        if (FindProfile(key, excludedProfileIds) is { } existingId)
             return Task.FromResult(new PositionProfileImportLookupResult(existingId, WasCreated: false, Skipped: false));
 
         if (departmentId is null || locationId is null)
             return Task.FromResult(new PositionProfileImportLookupResult(Id: null, WasCreated: false, Skipped: true));
 
         var newId = Guid.NewGuid();
-        _positionProfiles[key] = newId;
+        AddProfile(key, newId);
         return Task.FromResult(new PositionProfileImportLookupResult(newId, WasCreated: true, Skipped: false));
     }
 
@@ -69,9 +70,24 @@ internal sealed class FakeImportLookupResolver : IImportLookupResolver
     public Task<Guid?> TryFindLocationAsync(Guid companyId, string name, CancellationToken cancellationToken) =>
         Task.FromResult(_locations.TryGetValue(Key(companyId, name), out var id) ? (Guid?)id : null);
 
-    public Task<Guid?> TryFindPositionProfileAsync(Guid companyId, string title, CancellationToken cancellationToken) =>
-        Task.FromResult(_positionProfiles.TryGetValue(Key(companyId, title), out var id) ? (Guid?)id : null);
+    public Task<Guid?> TryFindPositionProfileAsync(
+        Guid companyId, string title, Guid? departmentId, Guid? locationId,
+        IReadOnlySet<Guid> excludedProfileIds, Guid? allowedEmployeeId, CancellationToken cancellationToken) =>
+        Task.FromResult(FindProfile(Key(companyId, title), excludedProfileIds));
 
     private static (Guid CompanyId, string NormalizedName) Key(Guid companyId, string name) =>
         (companyId, name.Trim().ToLowerInvariant());
+
+    private void AddProfile((Guid CompanyId, string NormalizedName) key, Guid id)
+    {
+        if (!_positionProfiles.TryGetValue(key, out var list))
+            _positionProfiles[key] = list = [];
+
+        list.Add(id);
+    }
+
+    private Guid? FindProfile((Guid CompanyId, string NormalizedName) key, IReadOnlySet<Guid> excluded) =>
+        _positionProfiles.TryGetValue(key, out var list)
+            ? list.Where(id => !excluded.Contains(id)).Select(id => (Guid?)id).FirstOrDefault()
+            : null;
 }

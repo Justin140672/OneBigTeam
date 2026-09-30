@@ -488,10 +488,10 @@ public static class RecruitmentModule
         if (!await db.Candidates.AnyAsync(c => c.CompanyId == acmeId))
         {
             db.Candidates.AddRange(
-                Candidate.Create(acmeEmmaId,   acmeId, "Emma",   "Clarke", "emma.clarke@example.com",  "+44 7700 900001", null, now),
-                Candidate.Create(acmeLiamId,   acmeId, "Liam",   "Turner", "liam.turner@example.com",  "+44 7700 900002", null, now),
-                Candidate.Create(acmeNoahId,   acmeId, "Noah",   "Patel",  "noah.patel@example.com",   "+44 7700 900003", null, now),
-                Candidate.Create(acmeOliviaId, acmeId, "Olivia", "Grant",  "olivia.grant@example.com", "+44 7700 900004", null, now));
+                Candidate.Create(acmeEmmaId,   acmeId, "Emma",   "Clarke", "emma.clarke@example.com",  "+44 7700 900001", now),
+                Candidate.Create(acmeLiamId,   acmeId, "Liam",   "Turner", "liam.turner@example.com",  "+44 7700 900002", now),
+                Candidate.Create(acmeNoahId,   acmeId, "Noah",   "Patel",  "noah.patel@example.com",   "+44 7700 900003", now),
+                Candidate.Create(acmeOliviaId, acmeId, "Olivia", "Grant",  "olivia.grant@example.com", "+44 7700 900004", now));
 
             await db.SaveChangesAsync();
         }
@@ -541,8 +541,8 @@ public static class RecruitmentModule
         if (!await db.Candidates.AnyAsync(c => c.CompanyId == betaCorpId))
         {
             db.Candidates.AddRange(
-                Candidate.Create(betaSophieId, betaCorpId, "Sophie", "Bennett", "sophie.bennett@example.com", "+44 7700 900011", null, now),
-                Candidate.Create(betaEthanId,  betaCorpId, "Ethan",  "Wright",  "ethan.wright@example.com",   "+44 7700 900012", null, now));
+                Candidate.Create(betaSophieId, betaCorpId, "Sophie", "Bennett", "sophie.bennett@example.com", "+44 7700 900011", now),
+                Candidate.Create(betaEthanId,  betaCorpId, "Ethan",  "Wright",  "ethan.wright@example.com",   "+44 7700 900012", now));
 
             await db.SaveChangesAsync();
         }

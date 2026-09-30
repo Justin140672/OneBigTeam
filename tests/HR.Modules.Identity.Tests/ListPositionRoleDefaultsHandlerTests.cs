@@ -34,8 +34,8 @@ public class ListPositionRoleDefaultsHandlerTests(IdentityDatabaseFixture fixtur
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [configuredPositionId] = new(configuredPositionId, "Software Developer", null, null, true, null, null),
-            [unconfiguredPositionId] = new(unconfiguredPositionId, "Office Manager", null, null, true, null, null),
+            [configuredPositionId] = new(configuredPositionId, "Software Developer", null, true, null, null),
+            [unconfiguredPositionId] = new(unconfiguredPositionId, "Office Manager", null, true, null, null),
         };
         var reader = new FakePositionProfileReader(
             allActiveIds: [configuredPositionId, unconfiguredPositionId],

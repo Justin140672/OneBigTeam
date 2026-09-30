@@ -86,7 +86,7 @@ public class ReconcilePositionRoleAssignmentsTests(IdentityDatabaseFixture fixtu
             companyId, new Dictionary<Guid, EmployeeAudienceProfile> { [employeeId] = new(null, null, positionId) });
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [positionId] = new(positionId, "Backfilled Position", null, null, true, null, null),
+            [positionId] = new(positionId, "Backfilled Position", null, true, null, null),
         };
         var positionReader = new FakePositionProfileReader(summaries: summaries);
 
@@ -155,7 +155,7 @@ public class ReconcilePositionRoleAssignmentsTests(IdentityDatabaseFixture fixtu
         });
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [sharedPositionId] = new(sharedPositionId, "Company B Role", null, null, true, null, null),
+            [sharedPositionId] = new(sharedPositionId, "Company B Role", null, true, null, null),
         };
         var positionReader = new FakePositionProfileReader(summaries: summaries);
 

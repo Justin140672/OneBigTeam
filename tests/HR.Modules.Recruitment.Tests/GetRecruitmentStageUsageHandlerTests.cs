@@ -50,7 +50,7 @@ public class GetRecruitmentStageUsageHandlerTests
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
         vacancy.Open(Now, DateOnly.FromDateTime(Now.UtcDateTime));
         vacancy.Close(Now, DateOnly.FromDateTime(Now.UtcDateTime));
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Offer.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -88,7 +88,7 @@ public class GetRecruitmentStageUsageHandlerTests
             vacancy.Open(Now, DateOnly.FromDateTime(Now.UtcDateTime));
         if (status == VacancyStatus.OnHold)
             vacancy.Hold(Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Offer.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -112,7 +112,7 @@ public class GetRecruitmentStageUsageHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         db.Candidates.Add(candidate);
 
         for (var i = 0; i < 7; i++)
@@ -141,7 +141,7 @@ public class GetRecruitmentStageUsageHandlerTests
         var companyId = Guid.NewGuid();
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), null, null, Guid.NewGuid(), Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Offer.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);

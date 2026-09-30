@@ -115,10 +115,6 @@
                                     <label class="form-label">Phone</label>
                                     <HrTextBox @bind-Value="Model.Phone" Placeholder="e.g. 07700 900000" />
                                 </div>
-                                <div class="col-12">
-                                    <label class="form-label">Legacy resume URL</label>
-                                    <HrTextBox @bind-Value="Model.ResumeUrl" Placeholder="Link to CV / resume" />
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -229,14 +225,6 @@
                                         </li>
                                     }
                                 </ul>
-                            }
-
-                            @if (!string.IsNullOrWhiteSpace(_candidate.ResumeUrl))
-                            {
-                                <p data-testid="candidate-cv-legacy-link">
-                                    <a href="@_candidate.ResumeUrl" target="_blank" rel="noopener">Legacy CV link</a>
-                                    <span class="text-muted small"> (legacy link recorded on the candidate record — not an uploaded document)</span>
-                                </p>
                             }
 
                             @if (CanUploadCv)

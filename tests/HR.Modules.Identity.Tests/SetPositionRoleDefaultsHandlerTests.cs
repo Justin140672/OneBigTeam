@@ -23,7 +23,7 @@ public class SetPositionRoleDefaultsHandlerTests(IdentityDatabaseFixture fixture
         var db = fixture.BuildContext();
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [positionProfileId] = new(positionProfileId, title, null, null, true, null, null),
+            [positionProfileId] = new(positionProfileId, title, null, true, null, null),
         };
         var reader = new FakePositionProfileReader(
             exists: profileExists,

@@ -440,7 +440,6 @@ internal sealed record PositionProfileSnapshot(
     Guid DepartmentId,
     Guid LocationId,
     string Title,
-    string? Description,
     int? ProbationMonthsOverride,
     WorkingDays? WorkingDaysOverride,
     decimal? HoursPerDayOverride,

@@ -24,7 +24,7 @@ public class UpdateCandidateConcurrencyHandlerTests
         var dbName = Guid.NewGuid().ToString("N");
         var companyId = Guid.NewGuid();
         await using var seed = new RecruitmentDbContext(Options(dbName));
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         seed.Candidates.Add(candidate);
         await seed.SaveChangesAsync();
         return (dbName, companyId, candidate.Id);

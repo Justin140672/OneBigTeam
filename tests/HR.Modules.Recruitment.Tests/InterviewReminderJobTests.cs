@@ -26,7 +26,7 @@ public class InterviewReminderJobTests
         var companyId = Guid.NewGuid();
         var interviewerId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now);
         var interview = Interview.Create(Guid.NewGuid(), companyId, application.Id, interviewerId, scheduledAt, 30, "Remote", Now);
 

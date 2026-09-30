@@ -99,7 +99,7 @@ public class CreateEmployeeHandlerTests
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
         var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
-        var positionProfile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, Guid.NewGuid(), "Developer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
+        var positionProfile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, Guid.NewGuid(), "Developer", null, null, null, null, null, null, Guid.NewGuid(), now);
         var manager = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane.manager@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         context.Departments.Add(department);
         context.PositionProfiles.Add(positionProfile);
@@ -379,7 +379,7 @@ public class CreateEmployeeHandlerTests
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Developer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Developer", null, null, null, null, null, null, Guid.NewGuid(), now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -697,7 +697,7 @@ public class CreateEmployeeHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Senior Dev", null, 3, null, null, null, null, null, Guid.NewGuid(), now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Senior Dev", 3, null, null, null, null, null, Guid.NewGuid(), now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -772,7 +772,7 @@ public class CreateEmployeeHandlerTests
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
         var leavePolicyId = Guid.NewGuid();
 
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Senior Dev", null, null, null, null, null, null, null, leavePolicyId, now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Senior Dev", null, null, null, null, null, null, leavePolicyId, now);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();
 
@@ -1410,7 +1410,7 @@ public class CreateEmployeeHandlerTests
         var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "Head Office", null, now);
         var positionProfile = PositionProfile.Create(
             Guid.NewGuid(), companyId, department.Id, location.Id, "Developer",
-            null, null, null, null, null, null, null, Guid.NewGuid(), now);
+            null, null, null, null, null, null, Guid.NewGuid(), now);
         var employmentType = EmploymentType.Create(Guid.NewGuid(), companyId, "Permanent", null, now);
 
         context.Departments.Add(department);

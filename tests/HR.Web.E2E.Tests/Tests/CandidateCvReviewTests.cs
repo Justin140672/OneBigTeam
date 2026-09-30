@@ -171,8 +171,6 @@ public sealed class CandidateCvReviewTests(RecruiterPersonaFixture fixture) : Ro
         Assert.Equal("Upload CV", await review.GetReplaceSubmitTextAsync());
         Assert.False(await review.IsUseCurrentCvVisibleAsync(),
             "'Use candidate's current CV' must not be offered when the candidate has no CV");
-        Assert.False(await review.IsLegacyLinkVisibleAsync(),
-            "The legacy CV link only shows when the candidate has a ResumeUrl");
     }
 
     [Fact]

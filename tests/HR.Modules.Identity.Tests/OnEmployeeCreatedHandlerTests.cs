@@ -46,7 +46,7 @@ public class OnEmployeeCreatedHandlerTests(IdentityDatabaseFixture fixture)
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [positionProfileId] = new(positionProfileId, "Software Developer", null, null, true, null, null),
+            [positionProfileId] = new(positionProfileId, "Software Developer", null, true, null, null),
         };
         var reader = new FakePositionProfileReader(summaries: summaries);
 
@@ -77,7 +77,7 @@ public class OnEmployeeCreatedHandlerTests(IdentityDatabaseFixture fixture)
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [positionProfileId] = new(positionProfileId, "Software Developer", null, null, true, null, null),
+            [positionProfileId] = new(positionProfileId, "Software Developer", null, true, null, null),
         };
         var reader = new FakePositionProfileReader(summaries: summaries);
 

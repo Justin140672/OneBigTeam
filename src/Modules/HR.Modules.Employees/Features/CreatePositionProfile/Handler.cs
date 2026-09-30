@@ -82,19 +82,6 @@ internal sealed class CreatePositionProfileHandler
                 Error.NotFound($"Location '{request.LocationId}' was not found."));
         }
 
-        var titleExists = await _dbContext.PositionProfiles
-            .AnyAsync(
-                p => p.CompanyId == request.CompanyId &&
-                     p.Title == request.Title.Trim() &&
-                     p.IsActive,
-                cancellationToken);
-
-        if (titleExists)
-        {
-            return Result.Failure<CreatePositionProfileResponse>(
-                Error.Conflict($"An active position profile titled '{request.Title.Trim()}' already exists in this company."));
-        }
-
         var leavePolicyExists = await _leavePolicyReader.ExistsAsync(
             request.CompanyId, request.DefaultLeavePolicyId, cancellationToken);
 
@@ -128,7 +115,6 @@ internal sealed class CreatePositionProfileHandler
             request.DepartmentId,
             request.LocationId,
             request.Title.Trim(),
-            string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
             request.ProbationMonthsOverride,
             request.WorkingDaysOverride,
             request.HoursPerDayOverride,
@@ -149,7 +135,6 @@ internal sealed class CreatePositionProfileHandler
             profile.DepartmentId,
             profile.LocationId,
             profile.Title,
-            profile.Description,
             profile.ProbationMonthsOverride,
             profile.WorkingDaysOverride,
             profile.HoursPerDayOverride,
@@ -186,7 +171,6 @@ internal sealed class CreatePositionProfileHandler
                     profile.DepartmentId,
                     profile.LocationId,
                     profile.Title,
-                    profile.Description,
                     profile.ProbationMonthsOverride,
                     profile.WorkingDaysOverride,
                     profile.HoursPerDayOverride,

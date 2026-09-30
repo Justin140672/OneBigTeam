@@ -26,8 +26,8 @@ public class EmployeePromotedHandlerTests
         context.LocationTypes.Add(locationType);
         context.Locations.Add(location);
 
-        var previousPosition = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
-        var newPosition = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Senior Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
+        var previousPosition = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Engineer", null, null, null, null, null, null, Guid.NewGuid(), now);
+        var newPosition = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Senior Engineer", null, null, null, null, null, null, Guid.NewGuid(), now);
         context.PositionProfiles.AddRange(previousPosition, newPosition);
         await context.SaveChangesAsync();
 
@@ -81,8 +81,8 @@ public class EmployeePromotedHandlerTests
         await using var context = BuildContext();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
         var companyId = Guid.NewGuid();
-        var previousPosition = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
-        var newPosition = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Engineering Manager", null, null, null, null, null, null, null, Guid.NewGuid(), now);
+        var previousPosition = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Engineer", null, null, null, null, null, null, Guid.NewGuid(), now);
+        var newPosition = PositionProfile.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Engineering Manager", null, null, null, null, null, null, Guid.NewGuid(), now);
         context.PositionProfiles.AddRange(previousPosition, newPosition);
         var employeeId = Guid.NewGuid();
         var effectiveDate = new DateOnly(2026, 8, 1);

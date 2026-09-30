@@ -300,13 +300,6 @@
                                 <div class="text-danger small mt-1" data-testid="new-candidate-cv-error">@_newCvError</div>
                             }
                         </div>
-                        <div class="col-12">
-                            <label class="form-label" for="new-candidate-resume-url">Legacy resume URL (optional)</label>
-                            <HrTextBox ID="new-candidate-resume-url" @bind-Value="_addModel.ResumeUrl" Maxlength="500"
-                                       Placeholder="https://…" data-testid="new-candidate-resume-url" />
-                            <div class="form-text">Legacy link to a CV hosted elsewhere. Prefer uploading the CV file above.</div>
-                            <ValidationMessage For="@(() => _addModel.ResumeUrl)" />
-                        </div>
                     </div>
                 }
                 <div class="mb-3" data-testid="add-application-source-field">
@@ -1055,7 +1048,6 @@
         public string? Phone { get; set; }
 
         [MaxLength(500, ErrorMessage = "Resume URL cannot exceed 500 characters.")]
-        public string? ResumeUrl { get; set; }
 
         public string Source { get; set; } = "Unspecified";
 
@@ -1393,7 +1385,6 @@
         _addModel.LastName = null;
         _addModel.Email = null;
         _addModel.Phone = null;
-        _addModel.ResumeUrl = null;
         _addModel.Notes = null;
         _addModel.Source = "Unspecified";
         _addModel.SourceRecruiterId = null;
@@ -1571,7 +1562,6 @@
                     FormText.Required(_addModel.LastName!),
                     FormText.Required(_addModel.Email!),
                     FormText.Optional(_addModel.Phone),
-                    FormText.Optional(_addModel.ResumeUrl),
                     FormText.Optional(_addModel.Notes),
                     source,
                     sourceExternalRecruiterId);

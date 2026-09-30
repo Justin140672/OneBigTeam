@@ -46,7 +46,6 @@ internal sealed class CreateCandidateHandler(
                 request.LastName,
                 email,
                 request.Phone,
-                request.ResumeUrl,
                 now);
 
             db.Candidates.Add(candidate);
@@ -75,7 +74,6 @@ internal sealed class CreateCandidateHandler(
             candidate.LastName,
             candidate.Email,
             candidate.Phone,
-            candidate.ResumeUrl,
             candidate.CreatedAt,
             candidate.UpdatedAt));
     }

@@ -74,7 +74,7 @@ internal static class StagingEmployeesSeeder
             positions[position.Name] = (id, departmentId);
             db.PositionProfiles.Add(PositionProfile.Create(
                 id, companyId, departmentId, officeId, position.Name,
-                null, null, null, null, null, null, null, leavePolicyId, now));
+                null, null, null, null, null, null, leavePolicyId, now));
         }
 
         var hrManagerId = EmployeeId(4);

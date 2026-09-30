@@ -53,7 +53,6 @@ internal sealed class GetPositionProfileHandler
             profile.DepartmentId,
             profile.LocationId,
             profile.Title,
-            profile.Description,
             profile.ProbationMonthsOverride,
             profile.WorkingDaysOverride,
             profile.HoursPerDayOverride,

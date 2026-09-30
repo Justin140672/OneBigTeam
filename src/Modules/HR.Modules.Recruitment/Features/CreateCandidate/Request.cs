@@ -7,5 +7,4 @@ internal sealed record CreateCandidateRequest
     public string LastName { get; init; } = string.Empty;
     public string Email { get; init; } = string.Empty;
     public string? Phone { get; init; }
-    public string? ResumeUrl { get; init; }
 }

@@ -38,7 +38,7 @@ public class SetApplicationCvHandlerTests
 
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, SeededAt);
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), SeededAt);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, SeededAt);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, SeededAt);
         var cv1 = Cv(companyId, candidate.Id, "cv-v1.pdf", SeededAt);
         var cv2 = Cv(companyId, candidate.Id, "cv-v2.pdf", SeededAt.AddDays(1));
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.CvReview.Id, null, SeededAt);

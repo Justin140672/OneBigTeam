@@ -43,7 +43,7 @@ public class PurgeEligibleCandidatesEndpointTests
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
         var oldEnough = Now.AddDays(-731);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, oldEnough);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, oldEnough);
         db.Candidates.Add(candidate);
         await db.SaveChangesAsync();
         return candidate.Id;
@@ -53,7 +53,7 @@ public class PurgeEligibleCandidatesEndpointTests
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Olivia", "Grant", $"olivia.{Guid.NewGuid():N}@example.com", null, null, Now.AddDays(-10));
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Olivia", "Grant", $"olivia.{Guid.NewGuid():N}@example.com", null, Now.AddDays(-10));
         db.Candidates.Add(candidate);
         await db.SaveChangesAsync();
         return candidate.Id;

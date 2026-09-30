@@ -118,15 +118,13 @@ internal sealed class ImportLookupResolver(
     }
 
     public async Task<PositionProfileImportLookupResult> GetOrCreatePositionProfileAsync(
-        Guid companyId, string title, Guid? departmentId, Guid? locationId, CancellationToken cancellationToken)
+        Guid companyId, string title, Guid? departmentId, Guid? locationId,
+        IReadOnlySet<Guid> excludedProfileIds, Guid? allowedEmployeeId, CancellationToken cancellationToken)
     {
         var trimmed = title.Trim();
 
-        var existing = await dbContext.PositionProfiles
-            .AsNoTracking()
-            .Where(p => p.CompanyId == companyId && p.Title.ToLower() == trimmed.ToLower())
-            .Select(p => (Guid?)p.Id)
-            .FirstOrDefaultAsync(cancellationToken);
+        var existing = await TryFindPositionProfileAsync(
+            companyId, trimmed, departmentId, locationId, excludedProfileIds, allowedEmployeeId, cancellationToken);
 
         if (existing is not null)
             return new PositionProfileImportLookupResult(existing.Value, WasCreated: false, Skipped: false);
@@ -143,7 +141,6 @@ internal sealed class ImportLookupResolver(
             departmentId.Value,
             locationId.Value,
             trimmed,
-            description: null,
             probationMonthsOverride: null,
             workingDaysOverride: null,
             hoursPerDayOverride: null,
@@ -204,13 +201,30 @@ internal sealed class ImportLookupResolver(
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    public async Task<Guid?> TryFindPositionProfileAsync(Guid companyId, string title, CancellationToken cancellationToken)
+    public async Task<Guid?> TryFindPositionProfileAsync(
+        Guid companyId, string title, Guid? departmentId, Guid? locationId,
+        IReadOnlySet<Guid> excludedProfileIds, Guid? allowedEmployeeId, CancellationToken cancellationToken)
     {
+        if (departmentId is null || locationId is null)
+            return null;
+
         var trimmed = title.Trim();
+        var excluded = excludedProfileIds.ToList();
 
         return await dbContext.PositionProfiles
             .AsNoTracking()
-            .Where(p => p.CompanyId == companyId && p.Title.ToLower() == trimmed.ToLower())
+            .Where(p => p.CompanyId == companyId
+                && p.IsActive
+                && p.DepartmentId == departmentId
+                && p.LocationId == locationId
+                && p.Title.ToLower() == trimmed.ToLower()
+                && !excluded.Contains(p.Id)
+                && !dbContext.Employees.Any(e =>
+                    e.CompanyId == companyId
+                    && e.PositionProfileId == p.Id
+                    && e.Status != EmploymentStatus.FormerEmployee
+                    && (allowedEmployeeId == null || e.Id != allowedEmployeeId)))
+            .OrderBy(p => p.CreatedAt)
             .Select(p => (Guid?)p.Id)
             .FirstOrDefaultAsync(cancellationToken);
     }

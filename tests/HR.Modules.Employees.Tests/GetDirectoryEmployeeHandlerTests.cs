@@ -30,7 +30,7 @@ public class GetDirectoryEmployeeHandlerTests
         var locationType = LocationType.Create(Guid.NewGuid(), companyId, "Office", null, Now);
         var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "Head Office", null, Now);
         var profile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, Guid.NewGuid(),
-            "Software Developer", null, null, null, null, null, null, null, Guid.NewGuid(), Now);
+            "Software Developer", null, null, null, null, null, null, Guid.NewGuid(), Now);
         var manager = NewEmployee(companyId, "Jane", "Manager", "jane@example.com");
         manager.Activate(Now);
         context.Departments.Add(department);

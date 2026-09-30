@@ -110,7 +110,6 @@ public sealed class AddCandidateDialog(IPage page)
     public Task FillLastNameAsync(string value) => FillAsync("new-candidate-last-name", value);
     public Task FillEmailAsync(string value) => FillAsync("new-candidate-email", value);
     public Task FillPhoneAsync(string value) => FillAsync("new-candidate-phone", value);
-    public Task FillResumeUrlAsync(string value) => FillAsync("new-candidate-resume-url", value);
 
     public async Task FillNewCandidateAsync(string firstName, string lastName, string email)
     {

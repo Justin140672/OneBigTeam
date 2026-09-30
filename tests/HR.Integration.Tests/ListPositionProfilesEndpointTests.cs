@@ -210,6 +210,46 @@ public class ListPositionProfilesEndpointTests
         Assert.Empty(payload!.Items);
     }
 
+    [Fact]
+    public async Task Get_PositionProfiles_Returns_LocationName_And_Duplicate_Titles_As_Separate_Items()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await AdminClient(companyId);
+        var (departmentId, _, leavePolicyId) = await SeedReferenceDataAsync(client, companyId);
+
+        var locationTypeResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/location-types", new { companyId, name = $"Type {Guid.NewGuid():N}" });
+        locationTypeResponse.EnsureSuccessStatusCode();
+        var locationType = await locationTypeResponse.Content.ReadFromJsonAsync<IdPayload>();
+        var locationName = $"Leeds {Guid.NewGuid():N}";
+        var locationResponse = await client.PostAsJsonAsync($"/api/companies/{companyId}/locations", new { companyId, name = locationName, locationTypeId = locationType!.Id });
+        locationResponse.EnsureSuccessStatusCode();
+        var locationId = (await locationResponse.Content.ReadFromJsonAsync<IdPayload>())!.Id;
+
+        var ids = new List<Guid>();
+        for (var i = 0; i < 2; i++)
+        {
+            var create = await client.PostAsJsonAsync($"/api/companies/{companyId}/position-profiles", new
+            {
+                companyId,
+                departmentId,
+                locationId,
+                defaultLeavePolicyId = leavePolicyId,
+                title = "Analyst"
+            });
+            Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+            ids.Add((await create.Content.ReadFromJsonAsync<IdPayload>())!.Id);
+        }
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/position-profiles");
+        response.EnsureSuccessStatusCode();
+        var payload = await response.Content.ReadFromJsonAsync<PositionProfilesListPayload>();
+
+        Assert.NotNull(payload);
+        Assert.Equal(2, payload!.Items.Count(i => i.Title == "Analyst"));
+        Assert.All(payload.Items, i => Assert.Equal(locationName, i.LocationName));
+        Assert.Equal(ids.Order(), payload.Items.Select(i => i.Id).Order());
+    }
+
     private sealed record IdPayload(Guid Id);
 
     private sealed record PositionProfilesListPayload(IReadOnlyList<PositionProfileItem> Items);
@@ -218,8 +258,8 @@ public class ListPositionProfilesEndpointTests
         Guid Id,
         string? DepartmentName,
         string Title,
-        string? Description,
         bool IsActive,
         string? NoticePeriodUnitOverride,
-        int? NoticePeriodLengthOverride);
+        int? NoticePeriodLengthOverride,
+        string? LocationName = null);
 }

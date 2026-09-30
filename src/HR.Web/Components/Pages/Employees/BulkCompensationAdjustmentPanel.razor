@@ -96,7 +96,7 @@
                         <Template>
                             @{
                                 var row = (context as PreviewRow)!;
-                                <SfNumericTextBox TValue="decimal" Value="@row.ProposedSalary" Min="0" ShowSpinButton="false"
+                                <SfNumericTextBox TValue="decimal" Value="@row.ProposedSalary" Min="0" ShowSpinButton="false" Format="#,##0.##"
                                                   ValueChanged="@(v => OnProposedSalaryChanged(row, v))" />
                             }
                         </Template>

@@ -9,10 +9,10 @@ internal sealed record PositionProfileListItem(
     Guid Id,
     string? DepartmentName,
     string Title,
-    string? Description,
     bool IsActive,
     decimal? SalaryMin,
     decimal? SalaryMax,
     string? SalaryType,
     NoticePeriodUnit? NoticePeriodUnitOverride,
-    int? NoticePeriodLengthOverride);
+    int? NoticePeriodLengthOverride,
+    string? LocationName = null);

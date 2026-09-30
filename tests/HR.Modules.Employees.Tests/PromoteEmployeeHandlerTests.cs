@@ -607,7 +607,7 @@ public class PromoteEmployeeHandlerTests
         var newDepartmentId = Guid.NewGuid();
         var newProfile = PositionProfile.Create(
             Guid.NewGuid(), companyId, newDepartmentId, Guid.NewGuid(), "Engineering Manager",
-            null, null, null, null, null, null, null, Guid.NewGuid(), Now);
+            null, null, null, null, null, null, Guid.NewGuid(), Now);
         context.Employees.Add(employee);
         context.PositionProfiles.Add(newProfile);
         await context.SaveChangesAsync();
@@ -638,7 +638,7 @@ public class PromoteEmployeeHandlerTests
         var newDepartmentId = Guid.NewGuid();
         var newProfile = PositionProfile.Create(
             Guid.NewGuid(), companyId, newDepartmentId, Guid.NewGuid(), "Engineering Manager",
-            null, null, null, null, null, null, null, Guid.NewGuid(), Now);
+            null, null, null, null, null, null, Guid.NewGuid(), Now);
         context.Employees.Add(employee);
         context.PositionProfiles.Add(newProfile);
         await context.SaveChangesAsync();
@@ -660,7 +660,7 @@ public class PromoteEmployeeHandlerTests
         var originalDepartmentId = employee.DepartmentId;
         var foreignProfile = PositionProfile.Create(
             Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Foreign Role",
-            null, null, null, null, null, null, null, Guid.NewGuid(), Now);
+            null, null, null, null, null, null, Guid.NewGuid(), Now);
         context.Employees.Add(employee);
         context.PositionProfiles.Add(foreignProfile);
         await context.SaveChangesAsync();

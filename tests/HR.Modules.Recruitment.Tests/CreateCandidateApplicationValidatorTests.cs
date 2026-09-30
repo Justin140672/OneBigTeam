@@ -18,7 +18,6 @@ public class CreateCandidateApplicationValidatorTests
         string lastName = "Clarke",
         string email = "emma.clarke@example.com",
         string? phone = null,
-        string? resumeUrl = null,
         string? notes = null,
         ApplicationSource? source = null,
         Guid? recruiterId = null) =>
@@ -30,7 +29,6 @@ public class CreateCandidateApplicationValidatorTests
             LastName                  = lastName,
             Email                     = email,
             Phone                     = phone,
-            ResumeUrl                 = resumeUrl,
             Notes                     = notes,
             Source                    = source,
             SourceExternalRecruiterId = recruiterId,
@@ -55,7 +53,6 @@ public class CreateCandidateApplicationValidatorTests
     {
         var result = _validator.Validate(Valid(
             phone: "07700 900123",
-            resumeUrl: "https://example.com/cv.pdf",
             notes: "Referred by the hiring manager.",
             source: ApplicationSource.Referral));
 
@@ -232,23 +229,6 @@ public class CreateCandidateApplicationValidatorTests
     }
 
 
-    [Fact]
-    public void Validate_Passes_When_ResumeUrl_Is_Exactly_500_Characters()
-    {
-        var result = _validator.Validate(Valid(resumeUrl: new string('u', 500)));
-
-        Assert.True(result.IsValid);
-    }
-
-    [Fact]
-    public void Validate_Fails_When_ResumeUrl_Exceeds_500_Characters()
-    {
-        var result = _validator.Validate(Valid(resumeUrl: new string('u', 501)));
-
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateCandidateApplicationRequest.ResumeUrl));
-    }
-
 
     [Fact]
     public void Validate_Passes_When_Notes_Is_Exactly_2000_Characters()
@@ -380,7 +360,6 @@ public class CreateCandidateApplicationValidatorTests
     {
         var result = _validator.Validate(Valid(
             phone: "07700 900123",
-            resumeUrl: "https://example.com/cv.pdf",
             notes: "Referred by the hiring manager.",
             source: ApplicationSource.Internal));
 

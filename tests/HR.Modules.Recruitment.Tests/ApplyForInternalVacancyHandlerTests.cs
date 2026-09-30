@@ -572,7 +572,7 @@ public class ApplyForInternalVacancyHandlerTests
         var employeeId = Guid.NewGuid();
         var h = BuildHarness(db, new FakeEmployeeApplicantReader(FakeEmployeeApplicantReader.Profile(companyId, employeeId)));
         var (vacancy, stages) = await SeedCompanyAsync(db, companyId);
-        var hired = Candidate.Create(Guid.NewGuid(), companyId, "Priya", "Shah", "priya.personal@example.com", null, null, Now.AddDays(-60));
+        var hired = Candidate.Create(Guid.NewGuid(), companyId, "Priya", "Shah", "priya.personal@example.com", null, Now.AddDays(-60));
         hired.LinkToEmployee(employeeId, Now.AddDays(-30));
         db.Candidates.Add(hired);
         db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, vacancy.Id, hired.Id, stages.Hired.Id, null, Now.AddDays(-60), ApplicationSource.JobBoard));
@@ -698,7 +698,7 @@ public class ApplyForInternalVacancyHandlerTests
         var (vacancy, stages) = await SeedCompanyAsync(db, companyId);
 
         var hireVacancy = await AddVacancyAsync(db, OpenAdvertised(companyId, "Original Role"));
-        var hired = Candidate.Create(Guid.NewGuid(), companyId, "Priya", "Shah", "priya.personal@example.com", null, "https://example.com/old-cv.pdf", Now.AddDays(-400));
+        var hired = Candidate.Create(Guid.NewGuid(), companyId, "Priya", "Shah", "priya.personal@example.com", null, Now.AddDays(-400));
         hired.LinkToEmployee(employeeId, Now.AddDays(-365));
         db.Candidates.Add(hired);
         db.Applications.Add(Application.Create(Guid.NewGuid(), companyId, hireVacancy.Id, hired.Id, stages.Hired.Id, null, Now.AddDays(-400), ApplicationSource.JobBoard));
@@ -712,7 +712,6 @@ public class ApplyForInternalVacancyHandlerTests
         var candidate = await db.Candidates.AsNoTracking().SingleAsync();
         Assert.Equal(hired.Id, candidate.Id);
         Assert.Equal("priya.shah@acme.example", candidate.Email);
-        Assert.Equal("https://example.com/old-cv.pdf", candidate.ResumeUrl);
         Assert.Equal(2, await db.Applications.CountAsync(a => a.CandidateId == hired.Id));
 
         var submitted = Assert.Single(h.Audit.Published.OfType<InternalApplicationSubmittedAuditEvent>());
@@ -731,7 +730,7 @@ public class ApplyForInternalVacancyHandlerTests
             companyId, employeeId, "Priya", "Shah", "priya.shah@acme.example", "07700 900456")));
         var (vacancy, _) = await SeedCompanyAsync(db, companyId);
 
-        var linked = Candidate.Create(Guid.NewGuid(), companyId, "Priya", "Shah", "priya.shah@acme.example", "07700 900456", null, Now.AddDays(-400));
+        var linked = Candidate.Create(Guid.NewGuid(), companyId, "Priya", "Shah", "priya.shah@acme.example", "07700 900456", Now.AddDays(-400));
         linked.LinkToEmployee(employeeId, Now.AddDays(-365));
         linked.Deactivate(Guid.NewGuid(), "Hired", Now.AddDays(-360));
         db.Candidates.Add(linked);
@@ -789,7 +788,7 @@ public class ApplyForInternalVacancyHandlerTests
         var h = BuildHarness(db, new FakeEmployeeApplicantReader(FakeEmployeeApplicantReader.Profile(
             companyId, employeeId, workEmail: "priya.shah@acme.example")));
         var (vacancy, _) = await SeedCompanyAsync(db, companyId);
-        var external = Candidate.Create(Guid.NewGuid(), companyId, "P", "Shah", "  PRIYA.Shah@Acme.EXAMPLE ", "0111", null, Now.AddDays(-100));
+        var external = Candidate.Create(Guid.NewGuid(), companyId, "P", "Shah", "  PRIYA.Shah@Acme.EXAMPLE ", "0111", Now.AddDays(-100));
         db.Candidates.Add(external);
         await db.SaveChangesAsync();
 
@@ -818,7 +817,7 @@ public class ApplyForInternalVacancyHandlerTests
             companyId, employeeId, workEmail: "priya.new@acme.example")));
         var (vacancy, _) = await SeedCompanyAsync(db, companyId);
         var linked = Candidate.CreateForEmployee(Guid.NewGuid(), companyId, employeeId, "Priya", "Shah", "priya.old@acme.example", null, Now.AddDays(-30));
-        var external = Candidate.Create(Guid.NewGuid(), companyId, "Other", "Person", "priya.new@acme.example", null, null, Now.AddDays(-20));
+        var external = Candidate.Create(Guid.NewGuid(), companyId, "Other", "Person", "priya.new@acme.example", null, Now.AddDays(-20));
         db.Candidates.AddRange(linked, external);
         await db.SaveChangesAsync();
 
@@ -838,7 +837,7 @@ public class ApplyForInternalVacancyHandlerTests
         var h = BuildHarness(db, new FakeEmployeeApplicantReader(FakeEmployeeApplicantReader.Profile(
             companyId, employeeId, workEmail: "priya.shah@acme.example")));
         var (vacancy, _) = await SeedCompanyAsync(db, companyId);
-        db.Candidates.Add(Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Priya", "Shah", "priya.shah@acme.example", null, null, Now.AddDays(-10)));
+        db.Candidates.Add(Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Priya", "Shah", "priya.shah@acme.example", null, Now.AddDays(-10)));
         await db.SaveChangesAsync();
 
         var result = await h.Handler.HandleAsync(Request(companyId, vacancy.Id), employeeId, CancellationToken.None);

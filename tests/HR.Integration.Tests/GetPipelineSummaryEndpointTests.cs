@@ -104,9 +104,9 @@ public class GetPipelineSummaryEndpointTests
             var applicationReceivedStageId = seeded.Single(s => s.Name == "Application Received").Id;
             var hiredStageId = seeded.Single(s => s.Name == "Hired").Id;
 
-            var candidate1 = Candidate.Create(Guid.NewGuid(), companyId, "First", "Last1", $"c1.{Guid.NewGuid():N}@example.com", null, null, Now);
-            var candidate2 = Candidate.Create(Guid.NewGuid(), companyId, "First", "Last2", $"c2.{Guid.NewGuid():N}@example.com", null, null, Now);
-            var candidate3 = Candidate.Create(Guid.NewGuid(), companyId, "First", "Last3", $"c3.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var candidate1 = Candidate.Create(Guid.NewGuid(), companyId, "First", "Last1", $"c1.{Guid.NewGuid():N}@example.com", null, Now);
+            var candidate2 = Candidate.Create(Guid.NewGuid(), companyId, "First", "Last2", $"c2.{Guid.NewGuid():N}@example.com", null, Now);
+            var candidate3 = Candidate.Create(Guid.NewGuid(), companyId, "First", "Last3", $"c3.{Guid.NewGuid():N}@example.com", null, Now);
             db.Candidates.AddRange(candidate1, candidate2, candidate3);
 
             var applied = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate1.Id, applicationReceivedStageId, null, Now);
@@ -146,7 +146,7 @@ public class GetPipelineSummaryEndpointTests
             var applicationReceivedStageId = seeded.Single(s => s.Name == "Application Received").Id;
 
             var otherVacancy = Vacancy.Create(Guid.NewGuid(), otherCompanyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
-            var otherCandidate = Candidate.Create(Guid.NewGuid(), otherCompanyId, "First", "Last", $"c.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var otherCandidate = Candidate.Create(Guid.NewGuid(), otherCompanyId, "First", "Last", $"c.{Guid.NewGuid():N}@example.com", null, Now);
             db.Vacancies.Add(otherVacancy);
             db.Candidates.Add(otherCandidate);
             db.Applications.Add(Application.Create(Guid.NewGuid(), otherCompanyId, otherVacancy.Id, otherCandidate.Id, applicationReceivedStageId, null, Now));

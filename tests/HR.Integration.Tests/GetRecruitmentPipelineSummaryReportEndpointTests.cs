@@ -51,9 +51,9 @@ public class GetRecruitmentPipelineSummaryReportEndpointTests
         closedVacancy.Close(now, new DateOnly(2026, 2, 1));
         db.Vacancies.Add(closedVacancy);
 
-        var candidateA = Candidate.Create(Guid.NewGuid(), companyId, "First", "LastA", $"a.{Guid.NewGuid():N}@example.com", null, null, now);
-        var candidateB = Candidate.Create(Guid.NewGuid(), companyId, "First", "LastB", $"b.{Guid.NewGuid():N}@example.com", null, null, now);
-        var candidateC = Candidate.Create(Guid.NewGuid(), companyId, "First", "LastC", $"c.{Guid.NewGuid():N}@example.com", null, null, now);
+        var candidateA = Candidate.Create(Guid.NewGuid(), companyId, "First", "LastA", $"a.{Guid.NewGuid():N}@example.com", null, now);
+        var candidateB = Candidate.Create(Guid.NewGuid(), companyId, "First", "LastB", $"b.{Guid.NewGuid():N}@example.com", null, now);
+        var candidateC = Candidate.Create(Guid.NewGuid(), companyId, "First", "LastC", $"c.{Guid.NewGuid():N}@example.com", null, now);
         db.Candidates.AddRange(candidateA, candidateB, candidateC);
 
         db.Applications.AddRange(

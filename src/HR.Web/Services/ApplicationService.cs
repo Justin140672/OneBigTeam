@@ -108,7 +108,6 @@ public sealed class ApplicationService(HrApiHttpClientFactory httpClientFactory)
         AddFormField(content, "LastName", FormText.Optional(request.LastName));
         AddFormField(content, "Email", FormText.Optional(request.Email));
         AddFormField(content, "Phone", FormText.Optional(request.Phone));
-        AddFormField(content, "ResumeUrl", FormText.Optional(request.ResumeUrl));
         AddFormField(content, "Notes", FormText.Optional(request.Notes));
         AddFormField(content, "Source", FormText.Optional(request.Source));
         AddFormField(content, "SourceExternalRecruiterId", request.SourceExternalRecruiterId?.ToString());

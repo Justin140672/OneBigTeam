@@ -89,8 +89,8 @@ public class ListVacanciesHandlerTests
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [sharedProfileId] = new(sharedProfileId, "Shared Profile Title", sharedProfileDepartmentId, "Shared description", true, null, null),
-            [otherProfileId] = new(otherProfileId, "Other Profile Title", otherProfileDepartmentId, "Other description", true, null, null),
+            [sharedProfileId] = new(sharedProfileId, "Shared Profile Title", sharedProfileDepartmentId, true, null, null),
+            [otherProfileId] = new(otherProfileId, "Other Profile Title", otherProfileDepartmentId, true, null, null),
         };
 
         var result = await new ListVacanciesHandler(db, new FakePositionProfileReader(summaries: summaries)).HandleAsync(
@@ -148,7 +148,7 @@ public class ListVacanciesHandlerTests
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [positionProfileId] = new(positionProfileId, "Deactivated Profile Title", profileDepartmentId, "Deactivated profile description", false, null, null),
+            [positionProfileId] = new(positionProfileId, "Deactivated Profile Title", profileDepartmentId, false, null, null),
         };
 
         var result = await new ListVacanciesHandler(db, new FakePositionProfileReader(summaries: summaries)).HandleAsync(
@@ -183,9 +183,9 @@ public class ListVacanciesHandlerTests
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
             [profileWithAdvertOverrideId] = new(
-                profileWithAdvertOverrideId, "Profile Title A", null, null, true, Guid.NewGuid(), "Profile Location A"),
+                profileWithAdvertOverrideId, "Profile Title A", null, true, Guid.NewGuid(), "Profile Location A"),
             [profileWithoutAdvertOverrideId] = new(
-                profileWithoutAdvertOverrideId, "Profile Title B", null, null, true, Guid.NewGuid(), "Profile Location B"),
+                profileWithoutAdvertOverrideId, "Profile Title B", null, true, Guid.NewGuid(), "Profile Location B"),
         };
 
         var result = await new ListVacanciesHandler(db, new FakePositionProfileReader(summaries: summaries)).HandleAsync(

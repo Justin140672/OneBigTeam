@@ -106,7 +106,7 @@ public sealed class VacancyPositionProfileDefaultsTests(CrossUserFixture fixture
         await vacancyDetail.OpenPositionProfileDropdownAsync();
         var options = await vacancyDetail.GetPositionProfileDropdownOptionsAsync();
 
-        Assert.Contains(activeProfileTitle, options);
-        Assert.DoesNotContain(inactiveProfileTitle, options);
+        Assert.Contains(options, o => o.StartsWith(activeProfileTitle));
+        Assert.DoesNotContain(options, o => o.Contains(inactiveProfileTitle));
     }
 }

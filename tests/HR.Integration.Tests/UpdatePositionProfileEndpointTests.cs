@@ -134,8 +134,8 @@ public class UpdatePositionProfileEndpointTests
                 departmentId,
                 locationId,
                 defaultLeavePolicyId = leavePolicyId,
-                title = "Updated Title",
-                description = "Now with description"
+                title = "Updated Title"
+
             });
 
         Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
@@ -143,7 +143,6 @@ public class UpdatePositionProfileEndpointTests
         var payload = await updateResponse.Content.ReadFromJsonAsync<UpdatedPositionProfilePayload>();
         Assert.NotNull(payload);
         Assert.Equal("Updated Title", payload!.Title);
-        Assert.Equal("Now with description", payload.Description);
         Assert.Equal(departmentId, payload.DepartmentId);
         Assert.Equal(locationId, payload.LocationId);
         Assert.Equal(leavePolicyId, payload.DefaultLeavePolicyId);
@@ -172,7 +171,7 @@ public class UpdatePositionProfileEndpointTests
     }
 
     [Fact]
-    public async Task Put_PositionProfile_Returns_Conflict_For_Duplicate_Title()
+    public async Task Put_PositionProfile_Allows_Renaming_To_Existing_Title()
     {
         var companyId = Guid.NewGuid();
         using var client = await AuthenticatedClient(companyId);
@@ -193,7 +192,7 @@ public class UpdatePositionProfileEndpointTests
                 title = "Profile A"
             });
 
-        Assert.Equal(HttpStatusCode.Conflict, updateResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, updateResponse.StatusCode);
     }
 
     [Fact]
@@ -419,7 +418,6 @@ public class UpdatePositionProfileEndpointTests
         Guid DepartmentId,
         Guid LocationId,
         string Title,
-        string? Description,
         Guid DefaultLeavePolicyId,
         bool IsActive,
         DateTimeOffset CreatedAt);
@@ -430,7 +428,6 @@ public class UpdatePositionProfileEndpointTests
         Guid DepartmentId,
         Guid LocationId,
         string Title,
-        string? Description,
         Guid DefaultLeavePolicyId,
         bool IsActive,
         DateTimeOffset UpdatedAt,

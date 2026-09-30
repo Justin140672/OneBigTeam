@@ -44,13 +44,16 @@ internal sealed class ListPositionProfilesHandler
                     x.Profile.Id,
                     dept == null ? null : dept.Name,
                     x.Profile.Title,
-                    x.Profile.Description,
                     x.Profile.IsActive,
                     x.Profile.SalaryMin,
                     x.Profile.SalaryMax,
                     x.Profile.SalaryType == null ? null : x.Profile.SalaryType.Value.ToString(),
                     x.Profile.NoticePeriodUnitOverride,
-                    x.Profile.NoticePeriodLengthOverride))
+                    x.Profile.NoticePeriodLengthOverride,
+                    _dbContext.Locations
+                        .Where(l => l.Id == x.Profile.LocationId && l.CompanyId == x.Profile.CompanyId)
+                        .Select(l => l.Name)
+                        .FirstOrDefault()))
             .ToListAsync(cancellationToken);
 
         return Result.Success(new ListPositionProfilesResponse(items));

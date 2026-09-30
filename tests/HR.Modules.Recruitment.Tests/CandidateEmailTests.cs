@@ -50,7 +50,7 @@ public class CandidateEmailTests
     [Fact]
     public void Create_Sets_NormalisedEmail_While_Email_Keeps_Original_Case_Trimmed()
     {
-        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "  Emma.Clarke@Example.COM \t", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "  Emma.Clarke@Example.COM \t", null, Now);
 
         Assert.Equal("Emma.Clarke@Example.COM", candidate.Email);
         Assert.Equal("emma.clarke@example.com", candidate.NormalisedEmail);
@@ -59,9 +59,9 @@ public class CandidateEmailTests
     [Fact]
     public void UpdateDetails_Refreshes_NormalisedEmail()
     {
-        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, Now);
 
-        candidate.UpdateDetails("Emma", "Clarke", " Emma.Clarke-Smith@EXAMPLE.com ", null, null, Now.AddMinutes(1));
+        candidate.UpdateDetails("Emma", "Clarke", " Emma.Clarke-Smith@EXAMPLE.com ", null, Now.AddMinutes(1));
 
         Assert.Equal("Emma.Clarke-Smith@EXAMPLE.com", candidate.Email);
         Assert.Equal("emma.clarke-smith@example.com", candidate.NormalisedEmail);
@@ -70,9 +70,9 @@ public class CandidateEmailTests
     [Fact]
     public void UpdateDetails_Case_Only_Change_Keeps_NormalisedEmail_And_Updates_Email_Display()
     {
-        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, Now);
 
-        candidate.UpdateDetails("Emma", "Clarke", "Emma.Clarke@Example.com", null, null, Now.AddMinutes(1));
+        candidate.UpdateDetails("Emma", "Clarke", "Emma.Clarke@Example.com", null, Now.AddMinutes(1));
 
         Assert.Equal("Emma.Clarke@Example.com", candidate.Email);
         Assert.Equal("emma.clarke@example.com", candidate.NormalisedEmail);
@@ -82,7 +82,7 @@ public class CandidateEmailTests
     public void Purge_Sets_NormalisedEmail_To_Purged_Placeholder()
     {
         var id = Guid.NewGuid();
-        var candidate = Candidate.Create(id, Guid.NewGuid(), "Emma", "Clarke", "Emma.Clarke@Example.com", null, null, Now);
+        var candidate = Candidate.Create(id, Guid.NewGuid(), "Emma", "Clarke", "Emma.Clarke@Example.com", null, Now);
 
         candidate.Purge(Guid.NewGuid(), Now.AddDays(400));
 

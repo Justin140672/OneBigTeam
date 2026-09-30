@@ -297,7 +297,7 @@ public class SearchEmployeeDirectoryHandlerTests
         var companyId = Guid.NewGuid();
 
         var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, Now);
-        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, Guid.NewGuid(), "Senior Developer", null, null, null, null, null, null, null, Guid.NewGuid(), Now);
+        var profile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, Guid.NewGuid(), "Senior Developer", null, null, null, null, null, null, Guid.NewGuid(), Now);
         context.Departments.Add(department);
         context.PositionProfiles.Add(profile);
         await context.SaveChangesAsync();

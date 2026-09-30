@@ -31,7 +31,6 @@ public record GetCandidateResponse(
     string LastName,
     string Email,
     string? Phone,
-    string? ResumeUrl,
     Guid? EmployeeId,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
@@ -75,8 +74,7 @@ public record CreateCandidateRequest(
     string FirstName,
     string LastName,
     string Email,
-    string? Phone,
-    string? ResumeUrl);
+    string? Phone);
 
 public record CreateCandidateResponse(
     Guid Id,
@@ -85,7 +83,6 @@ public record CreateCandidateResponse(
     string LastName,
     string Email,
     string? Phone,
-    string? ResumeUrl,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
@@ -97,7 +94,6 @@ public record UpdateCandidateRequest(
     string LastName,
     string Email,
     string? Phone,
-    string? ResumeUrl,
     // Ticket 2: optimistic-concurrency token loaded before editing.
     int? ExpectedVersion = null);
 
@@ -108,7 +104,6 @@ public record UpdateCandidateResponse(
     string LastName,
     string Email,
     string? Phone,
-    string? ResumeUrl,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     int Version = 0);
@@ -173,5 +168,4 @@ public sealed class CandidateEditModel : IHasVersion
     [EmailAddress(ErrorMessage = "Enter a valid email address.")]
     public string Email { get; set; } = string.Empty;
     public string? Phone { get; set; }
-    public string? ResumeUrl { get; set; }
 }

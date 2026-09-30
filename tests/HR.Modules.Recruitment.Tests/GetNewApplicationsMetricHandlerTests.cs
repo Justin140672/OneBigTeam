@@ -174,7 +174,7 @@ public class GetNewApplicationsMetricHandlerTests
         for (var i = 0; i < candidateCount; i++)
         {
             candidates.Add(Candidate.Create(
-                Guid.NewGuid(), companyId, "First", $"Last{i}", $"candidate{i}.{Guid.NewGuid():N}@example.com", null, null, Now));
+                Guid.NewGuid(), companyId, "First", $"Last{i}", $"candidate{i}.{Guid.NewGuid():N}@example.com", null, Now));
         }
         db.Candidates.AddRange(candidates);
         return (vacancy, candidates);

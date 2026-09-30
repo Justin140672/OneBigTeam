@@ -267,8 +267,7 @@ internal sealed record CandidateAuditSnapshot(
     string FirstName,
     string LastName,
     string Email,
-    string? Phone,
-    string? ResumeUrl);
+    string? Phone);
 
 internal sealed record CandidateUpdatedAuditEvent(
     Guid CompanyId,

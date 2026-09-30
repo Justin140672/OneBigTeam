@@ -89,7 +89,7 @@ public class EmployeeInternalAppointmentServiceTests
     }
 
     private static PositionProfile NewProfile(Guid companyId, string title, Guid departmentId, Guid locationId) =>
-        PositionProfile.Create(Guid.NewGuid(), companyId, departmentId, locationId, title, null, null, null, null, null, null, null, Guid.NewGuid(), Now.AddYears(-1));
+        PositionProfile.Create(Guid.NewGuid(), companyId, departmentId, locationId, title, null, null, null, null, null, null, Guid.NewGuid(), Now.AddYears(-1));
 
     private static async Task<Harness> SeedAsync(Action<Harness>? configure = null)
     {

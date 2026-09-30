@@ -47,6 +47,7 @@ public class ValidateImportSessionHandlerTests
         resolver.SeedExistingEmploymentType(companyId, "Permanent", Guid.NewGuid());
         resolver.SeedExistingLocation(companyId, "London", Guid.NewGuid());
         resolver.SeedExistingPositionProfile(companyId, "Developer", Guid.NewGuid());
+        resolver.SeedExistingPositionProfile(companyId, "Developer", Guid.NewGuid());
         return resolver;
     }
 

@@ -57,7 +57,7 @@ public class PositionProfileService(HrApiHttpClientFactory httpClientFactory)
         if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
         {
             var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
-            return (null, body?.Error ?? "A position profile with that title already exists.");
+            return (null, body?.Error ?? "A conflict occurred.");
         }
 
         return (null, "Failed to create position profile.");

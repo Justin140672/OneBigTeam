@@ -47,8 +47,6 @@
                             <div class="card-body">
                                 <HrTextField Label="Title" Required="true" @bind-Value="Model.Title"
                                              Placeholder="e.g. Senior Software Engineer" />
-                                <HrTextField Label="Description" @bind-Value="Model.Description" Multiline="true" FieldClass="position-profile-description"
-                                             Placeholder="Optional description" />
                                 <HrDropDownField TValue="Guid?" TItem="DepartmentListItemModel" Label="Department" Required="true"
                                                  DataSource="@_departments" ValueField="Id" TextField="Name"
                                                  @bind-Value="Model.DepartmentId" Placeholder="Select department" />
@@ -91,8 +89,6 @@
                                                 <div class="card-body @(IsViewMode ? "view-mode" : "")">
                                                     <HrTextField Label="Title" Required="true" @bind-Value="Model.Title"
                                                                  Placeholder="e.g. Senior Software Engineer" />
-                                                    <HrTextField Label="Description" @bind-Value="Model.Description" Multiline="true" FieldClass="position-profile-description"
-                                                                 Placeholder="Optional description" />
                                                     <HrDropDownField TValue="Guid?" TItem="DepartmentListItemModel" Label="Department" Required="true"
                                                                      DataSource="@_departments" ValueField="Id" TextField="Name"
                                                                      @bind-Value="Model.DepartmentId" Placeholder="Select department" />
@@ -261,7 +257,6 @@
             if (profile is not null)
             {
                 Model.Title = profile.Title;
-                Model.Description = profile.Description;
                 Model.DepartmentId = profile.DepartmentId;
                 Model.LocationId = profile.LocationId;
                 Model.ProbationMonthsOverride = profile.ProbationMonthsOverride;
@@ -340,7 +335,6 @@
                 Model.DepartmentId!.Value,
                 Model.LocationId!.Value,
                 FormText.Required(Model.Title),
-                FormText.Optional(Model.Description),
                 Model.ProbationMonthsOverride,
                 workingDaysOverride,
                 hoursPerDayOverride,
@@ -363,7 +357,6 @@
                 Model.DepartmentId!.Value,
                 Model.LocationId!.Value,
                 FormText.Required(Model.Title),
-                FormText.Optional(Model.Description),
                 Model.ProbationMonthsOverride,
                 workingDaysOverride,
                 hoursPerDayOverride,
@@ -411,11 +404,11 @@
                 <label class="form-label" id="pp-salary-range-label">Salary Range <span class="text-muted small">(guidance only)</span></label>
                 <div class="row g-2" role="group" aria-labelledby="pp-salary-range-label">
                     <div class="col-4">
-                        <SfNumericTextBox TValue="decimal?" @bind-Value="Model.SalaryMin" Placeholder="Min" ShowSpinButton="false" Format="0"
+                        <SfNumericTextBox TValue="decimal?" @bind-Value="Model.SalaryMin" Placeholder="Min" ShowSpinButton="false" Format="N0"
                                           HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Salary range minimum" })" />
                     </div>
                     <div class="col-4">
-                        <SfNumericTextBox TValue="decimal?" @bind-Value="Model.SalaryMax" Placeholder="Max" ShowSpinButton="false" Format="0"
+                        <SfNumericTextBox TValue="decimal?" @bind-Value="Model.SalaryMax" Placeholder="Max" ShowSpinButton="false" Format="N0"
                                           HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Salary range maximum" })" />
                     </div>
                     <div class="col-4">

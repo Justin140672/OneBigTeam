@@ -41,7 +41,7 @@ public class GetInterviewsRequiringActionMetricEndpointTests
     private static (Vacancy Vacancy, Candidate Candidate, Application Application) Graph(RecruitmentDbContext db, Guid companyId, Guid stageId)
     {
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "QA Engineer", null, Guid.NewGuid(), Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Ana", "Ng", $"ana.{Guid.NewGuid():N}@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Ana", "Ng", $"ana.{Guid.NewGuid():N}@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stageId, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);

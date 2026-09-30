@@ -11,7 +11,6 @@ internal sealed record UpdatePositionProfileResponse(
     Guid DepartmentId,
     Guid LocationId,
     string Title,
-    string? Description,
     int? ProbationMonthsOverride,
     WorkingDays? WorkingDaysOverride,
     decimal? HoursPerDayOverride,

@@ -49,7 +49,7 @@ public class MoveApplicationStageEndpointTests
         var hiredStageId = stages.Single(s => s.Name == "Hired").Id;
 
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, positionProfileId, "Backend Engineer", null, Guid.NewGuid(), Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, applicationReceivedStageId, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);

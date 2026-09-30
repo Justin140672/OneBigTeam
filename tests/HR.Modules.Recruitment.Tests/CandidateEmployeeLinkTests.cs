@@ -97,7 +97,6 @@ public class CandidateEmployeeLinkTests
         Assert.Equal("Shah", candidate.LastName);
         Assert.Equal("Priya.Shah@Acme.example", candidate.Email);
         Assert.Equal("07700 900456", candidate.Phone);
-        Assert.Null(candidate.ResumeUrl);
         Assert.True(candidate.IsActive);
         Assert.Null(candidate.PurgedAt);
         Assert.Equal(1, candidate.Version);
@@ -269,21 +268,9 @@ public class CandidateEmployeeLinkTests
     }
 
     [Fact]
-    public void SyncEmployeeIdentity_Leaves_ResumeUrl_Untouched()
-    {
-        var employeeId = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Priya", "Shah", "priya.shah@acme.example", null, "https://example.com/cv.pdf", Now);
-        candidate.LinkToEmployee(employeeId, Now);
-
-        candidate.SyncEmployeeIdentity(employeeId, "Priya", "Shah-Patel", "priya.shah@acme.example", null, Now.AddDays(1));
-
-        Assert.Equal("https://example.com/cv.pdf", candidate.ResumeUrl);
-    }
-
-    [Fact]
     public void SyncEmployeeIdentity_Throws_When_Candidate_Not_Linked()
     {
-        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Priya", "Shah", "priya.shah@acme.example", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Priya", "Shah", "priya.shah@acme.example", null, Now);
 
         Assert.Throws<InvalidOperationException>(() => candidate.SyncEmployeeIdentity(
             Guid.NewGuid(), "Priya", "Shah", "priya.shah@acme.example", null, Now.AddDays(1)));

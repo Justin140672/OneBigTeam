@@ -32,9 +32,5 @@ internal sealed class UpdateCandidateValidator : AbstractValidator<UpdateCandida
         RuleFor(r => r.Phone)
             .MaximumLength(30)
             .When(r => !string.IsNullOrWhiteSpace(r.Phone));
-
-        RuleFor(r => r.ResumeUrl)
-            .MaximumLength(500)
-            .When(r => !string.IsNullOrWhiteSpace(r.ResumeUrl));
     }
 }

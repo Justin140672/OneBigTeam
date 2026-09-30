@@ -18,7 +18,7 @@ public class CandidateServiceTests
     [Fact]
     public async Task UpdateAsync_Returns_Ok_When_Api_Returns_Success()
     {
-        var response = new UpdateCandidateResponse(Guid.NewGuid(), Guid.NewGuid(), "Jane", "Doe", "jane@example.com", null, null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, Version: 2);
+        var response = new UpdateCandidateResponse(Guid.NewGuid(), Guid.NewGuid(), "Jane", "Doe", "jane@example.com", null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, Version: 2);
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, response));
         var service = new CandidateService(factory);
 
@@ -93,11 +93,11 @@ public class CandidateServiceTests
     [Fact]
     public async Task CreateCandidateAsync_Returns_Result_When_Api_Returns_Created()
     {
-        var response = new CreateCandidateResponse(Guid.NewGuid(), Guid.NewGuid(), "Jane", "Doe", "jane@example.com", null, null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        var response = new CreateCandidateResponse(Guid.NewGuid(), Guid.NewGuid(), "Jane", "Doe", "jane@example.com", null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.Created, response));
         var service = new CandidateService(factory);
 
-        var (created, error) = await service.CreateCandidateAsync(Guid.NewGuid(), new CreateCandidateRequest(Guid.NewGuid(), "Jane", "Doe", "jane@example.com", null, null));
+        var (created, error) = await service.CreateCandidateAsync(Guid.NewGuid(), new CreateCandidateRequest(Guid.NewGuid(), "Jane", "Doe", "jane@example.com", null));
 
         Assert.NotNull(created);
         Assert.Null(error);
@@ -109,7 +109,7 @@ public class CandidateServiceTests
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.BadRequest, new { error = "'not-an-email' is not a valid email address." }));
         var service = new CandidateService(factory);
 
-        var (created, error) = await service.CreateCandidateAsync(Guid.NewGuid(), new CreateCandidateRequest(Guid.NewGuid(), "Jane", "Doe", "not-an-email", null, null));
+        var (created, error) = await service.CreateCandidateAsync(Guid.NewGuid(), new CreateCandidateRequest(Guid.NewGuid(), "Jane", "Doe", "not-an-email", null));
 
         Assert.Null(created);
         Assert.Equal("'not-an-email' is not a valid email address.", error);
@@ -144,7 +144,7 @@ public class CandidateServiceTests
     [Fact]
     public async Task GetCandidateAsync_Returns_Value_When_Api_Returns_Ok()
     {
-        var response = new GetCandidateResponse(Guid.NewGuid(), Guid.NewGuid(), "Jane", "Doe", "jane@example.com", null, null, null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
+        var response = new GetCandidateResponse(Guid.NewGuid(), Guid.NewGuid(), "Jane", "Doe", "jane@example.com", null, null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, response));
         var service = new CandidateService(factory);
 

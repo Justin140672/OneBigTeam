@@ -29,10 +29,6 @@ internal sealed class CreateCandidateApplicationValidator : AbstractValidator<Cr
             .MaximumLength(30)
             .When(r => !string.IsNullOrWhiteSpace(r.Phone));
 
-        RuleFor(r => r.ResumeUrl)
-            .MaximumLength(500)
-            .When(r => !string.IsNullOrWhiteSpace(r.ResumeUrl));
-
         RuleFor(r => r.Notes)
             .MaximumLength(2000)
             .When(r => !string.IsNullOrWhiteSpace(r.Notes));

@@ -31,7 +31,7 @@ public class GetInternalVacancyHandlerTests
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [positionProfileId] = new(positionProfileId, "Profile Title", null, "Profile description", true, null, "HQ", "Ops"),
+            [positionProfileId] = new(positionProfileId, "Profile Title", null, true, null, "HQ", "Ops"),
         };
 
         var result = await new GetInternalVacancyHandler(db, new FakePositionProfileReader(summaries: summaries)).HandleAsync(
@@ -47,7 +47,7 @@ public class GetInternalVacancyHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Description_Falls_Back_To_PositionProfile_Description()
+    public async Task HandleAsync_Description_Is_Null_When_Advert_Has_No_Description()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
@@ -58,14 +58,14 @@ public class GetInternalVacancyHandlerTests
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [positionProfileId] = new(positionProfileId, "Profile Title", null, "Profile description", true, null, null, null),
+            [positionProfileId] = new(positionProfileId, "Profile Title", null, true, null, null, null),
         };
 
         var result = await new GetInternalVacancyHandler(db, new FakePositionProfileReader(summaries: summaries)).HandleAsync(
             new GetInternalVacancyRequest { CompanyId = companyId, VacancyId = vacancy.Id }, CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal("Profile description", result.Value!.Description);
+        Assert.Null(result.Value!.Description);
     }
 
     [Theory]

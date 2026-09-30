@@ -252,7 +252,7 @@ public class UpdateVacancyEndpointTests
         var employeesDb = scope.ServiceProvider.GetRequiredService<HR.Modules.Employees.Persistence.EmployeesDbContext>();
         var positionProfile = HR.Modules.Employees.Domain.PositionProfile.Create(
             Guid.NewGuid(), companyId, departmentId: Guid.NewGuid(), locationId: Guid.NewGuid(), "Support Engineer",
-            description: null, probationMonthsOverride: null, workingDaysOverride: null,
+            probationMonthsOverride: null, workingDaysOverride: null,
             hoursPerDayOverride: null, salaryMin: null, salaryMax: null, salaryType: null,
             defaultLeavePolicyId: Guid.NewGuid(), Now);
         employeesDb.PositionProfiles.Add(positionProfile);
@@ -264,7 +264,7 @@ public class UpdateVacancyEndpointTests
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Jane", "Doe", $"jane.doe.{Guid.NewGuid():N}@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Jane", "Doe", $"jane.doe.{Guid.NewGuid():N}@example.com", null, Now);
         db.Candidates.Add(candidate);
         var stages = HR.Modules.Recruitment.Services.RecruitmentStageSeeder.BuildDefaultStages(companyId, Now);
         db.RecruitmentStages.AddRange(stages);

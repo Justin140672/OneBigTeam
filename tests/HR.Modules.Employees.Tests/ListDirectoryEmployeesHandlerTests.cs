@@ -97,7 +97,7 @@ public class ListDirectoryEmployeesHandlerTests
 
         var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, Now);
         var profile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, Guid.NewGuid(),
-            "Software Developer", null, null, null, null, null, null, null, Guid.NewGuid(), Now);
+            "Software Developer", null, null, null, null, null, null, Guid.NewGuid(), Now);
         context.Departments.Add(department);
         context.PositionProfiles.Add(profile);
 
@@ -195,7 +195,7 @@ public class ListDirectoryEmployeesHandlerTests
         var locationType = LocationType.Create(Guid.NewGuid(), companyId, "Office", null, Now);
         var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "Head Office", null, Now);
         var profile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, Guid.NewGuid(),
-            "Software Developer", null, null, null, null, null, null, null, Guid.NewGuid(), Now);
+            "Software Developer", null, null, null, null, null, null, Guid.NewGuid(), Now);
         context.Departments.Add(department);
         context.LocationTypes.Add(locationType);
         context.Locations.Add(location);

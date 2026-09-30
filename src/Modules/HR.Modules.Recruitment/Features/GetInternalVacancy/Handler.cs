@@ -31,7 +31,7 @@ internal sealed class GetInternalVacancyHandler(RecruitmentDbContext db, IPositi
         return Result.Success(new GetInternalVacancyResponse(
             vacancy.Id,
             vacancy.AdvertTitle ?? positionProfile?.Title ?? "(untitled)",
-            vacancy.AdvertDescription ?? positionProfile?.Description,
+            vacancy.AdvertDescription,
             positionProfile?.DepartmentName,
             positionProfile?.LocationName,
             null,

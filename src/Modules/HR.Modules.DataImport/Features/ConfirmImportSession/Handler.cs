@@ -124,6 +124,11 @@ internal sealed class ConfirmImportSessionHandler(
                 confirmed.RowNumber, confirmed.CreatedEmployeeId.Value, confirmed.EmployeeNumber ?? string.Empty));
         }
 
+        var claimedPositionProfileIds = stagingRows
+            .Where(r => r.CreatedEmployeeId is null && r.PositionProfileId is not null)
+            .Select(r => r.PositionProfileId!.Value)
+            .ToHashSet();
+
         foreach (var row in stagingRows)
         {
             try
@@ -157,12 +162,14 @@ internal sealed class ConfirmImportSessionHandler(
                     else
                     {
                         var positionProfileResult = await lookupResolver.GetOrCreatePositionProfileAsync(
-                            request.CompanyId, GetRequired(fields, "PositionProfileTitle"), departmentId, locationId, cancellationToken);
+                            request.CompanyId, GetRequired(fields, "PositionProfileTitle"), departmentId, locationId,
+                            claimedPositionProfileIds, row.ExistingEmployeeIdToUpdate, cancellationToken);
 
                         if (positionProfileResult.Skipped || positionProfileResult.Id is null)
                             throw new InvalidOperationException($"Position Profile '{GetRequired(fields, "PositionProfileTitle")}' could not be created.");
 
                         positionProfileId = positionProfileResult.Id.Value;
+                        claimedPositionProfileIds.Add(positionProfileId);
                     }
 
                     var createRequest = new EmployeeImportCreateRequest(

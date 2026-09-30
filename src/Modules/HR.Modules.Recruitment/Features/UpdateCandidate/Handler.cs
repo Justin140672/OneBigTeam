@@ -46,15 +46,13 @@ internal sealed class UpdateCandidateHandler(RecruitmentDbContext db, IClock clo
             candidate.FirstName,
             candidate.LastName,
             candidate.Email,
-            candidate.Phone,
-            candidate.ResumeUrl);
+            candidate.Phone);
 
         candidate.UpdateDetails(
             request.FirstName,
             request.LastName,
             newEmail,
             request.Phone,
-            request.ResumeUrl,
             now);
 
         Result saveResult;
@@ -78,8 +76,7 @@ internal sealed class UpdateCandidateHandler(RecruitmentDbContext db, IClock clo
             candidate.FirstName,
             candidate.LastName,
             candidate.Email,
-            candidate.Phone,
-            candidate.ResumeUrl);
+            candidate.Phone);
 
         await auditPublisher.PublishAsync(
             new CandidateUpdatedAuditEvent(candidate.CompanyId, candidate.Id, before, after, now),
@@ -92,7 +89,6 @@ internal sealed class UpdateCandidateHandler(RecruitmentDbContext db, IClock clo
             candidate.LastName,
             candidate.Email,
             candidate.Phone,
-            candidate.ResumeUrl,
             candidate.CreatedAt,
             candidate.UpdatedAt,
             candidate.Version));

@@ -165,7 +165,7 @@ internal static class InternalAppointmentTestSeeder
 
         var candidate = source == ApplicationSource.Internal
             ? Candidate.CreateForEmployee(Guid.NewGuid(), companyId, world.EmployeeId, "Priya", "Shah", world.WorkEmail, null, now.AddDays(-14))
-            : Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, now.AddDays(-14));
+            : Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, now.AddDays(-14));
 
         var application = Application.Create(
             Guid.NewGuid(), companyId, vacancyId, candidate.Id, offer.Id, null, now.AddDays(-14), source);

@@ -130,7 +130,6 @@ public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
             LastName = response.LastName,
             Email = response.Email,
             Phone = response.Phone,
-            ResumeUrl = response.ResumeUrl,
             Version = response.Version,
         };
     }
@@ -144,7 +143,6 @@ public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
         var request = new UpdateCandidateRequest(
             companyId, id, FormText.Required(model.FirstName), FormText.Required(model.LastName), FormText.Required(model.Email),
             FormText.Optional(model.Phone),
-            FormText.Optional(model.ResumeUrl),
             expectedVersion);
 
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/candidates/{id}", request);
@@ -165,8 +163,7 @@ public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
     {
         var request = new CreateCandidateRequest(
             companyId, FormText.Required(model.FirstName), FormText.Required(model.LastName), FormText.Required(model.Email),
-            FormText.Optional(model.Phone),
-            FormText.Optional(model.ResumeUrl));
+            FormText.Optional(model.Phone));
 
         var (created, error) = await CreateCandidateAsync(companyId, request);
         return (created is null ? null : model, error);
@@ -176,8 +173,7 @@ public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
     {
         var request = new UpdateCandidateRequest(
             companyId, id, FormText.Required(model.FirstName), FormText.Required(model.LastName), FormText.Required(model.Email),
-            FormText.Optional(model.Phone),
-            FormText.Optional(model.ResumeUrl));
+            FormText.Optional(model.Phone));
 
         var (updated, error) = await UpdateCandidateAsync(companyId, id, request);
         return (updated is null ? null : model, error);

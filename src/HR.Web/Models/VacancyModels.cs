@@ -48,7 +48,6 @@ public record GetVacancyResponse(
     DateTimeOffset UpdatedAt,
     string? PositionProfileTitle,
     Guid? PositionProfileDepartmentId,
-    string? PositionProfileDescription,
     bool? PositionProfileIsActive,
     string EffectiveTitle,
     string? EffectiveLocation,

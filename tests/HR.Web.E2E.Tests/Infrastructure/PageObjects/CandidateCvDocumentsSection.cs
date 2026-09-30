@@ -10,7 +10,7 @@ namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 ///
 /// Stable hooks are the data-testid attributes on the card: candidate-cv-card / candidate-cv-row
 /// (newest first) / candidate-cv-current-badge (newest row only) / candidate-cv-referenced
-/// ("Submitted with N application(s)") / candidate-cv-empty / candidate-cv-legacy-link /
+/// ("Submitted with N application(s)") / candidate-cv-empty /
 /// candidate-cv-file-input / candidate-cv-upload / candidate-cv-success / candidate-cv-error.
 /// The "Current CV" badge also carries Bootstrap's bg-success class, so it is always located by its
 /// data-testid, never by .badge.bg-success.
@@ -25,7 +25,6 @@ public sealed class CandidateCvDocumentsSection(IPage page)
     private ILocator Rows         => Card.Locator("[data-testid='candidate-cv-row']");
     private ILocator CurrentBadges => Card.Locator("[data-testid='candidate-cv-current-badge']");
     private ILocator EmptyState   => Card.Locator("[data-testid='candidate-cv-empty']");
-    private ILocator LegacyLink   => Card.Locator("[data-testid='candidate-cv-legacy-link']");
     private ILocator FileInput    => Card.Locator("input[type='file'][data-testid='candidate-cv-file-input']");
     private ILocator UploadButton => Card.Locator("[data-testid='candidate-cv-upload']");
     private ILocator SuccessAlert => Card.Locator("[data-testid='candidate-cv-success']");
@@ -36,7 +35,6 @@ public sealed class CandidateCvDocumentsSection(IPage page)
 
     public Task<bool> IsEmptyStateVisibleAsync() => EmptyState.IsVisibleAsync();
 
-    public Task<bool> IsLegacyLinkVisibleAsync() => LegacyLink.IsVisibleAsync();
 
     public Task ExpectRowCountAsync(int expected) =>
         Assertions.Expect(Rows).ToHaveCountAsync(expected, new() { Timeout = 15_000 });

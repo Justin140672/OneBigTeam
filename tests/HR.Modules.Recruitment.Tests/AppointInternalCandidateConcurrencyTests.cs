@@ -84,7 +84,7 @@ public class AppointInternalCandidateConcurrencyTests(RecruitmentDatabaseFixture
             new FakeEmployeeApplicantReader(FakeEmployeeApplicantReader.Profile(companyId, employeeId)),
             new FakePositionProfileReader(summaries: new Dictionary<Guid, PositionProfileSummary>
             {
-                [positionProfileId] = new(positionProfileId, "Engineering Manager", Guid.NewGuid(), null, true, Guid.NewGuid(), "London"),
+                [positionProfileId] = new(positionProfileId, "Engineering Manager", Guid.NewGuid(), true, Guid.NewGuid(), "London"),
             }),
             service);
     }

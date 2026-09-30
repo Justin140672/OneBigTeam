@@ -90,14 +90,14 @@ public class InternalApplicationIdentificationEndpointTests
             Guid.NewGuid(), companyId, internalEmployeeId, "Priya", "Shah", $"priya.{Guid.NewGuid():N}@acme.example", null, now);
         var internalApp = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, internalCandidate.Id, cvReview.Id, null, now, ApplicationSource.Internal);
 
-        var directCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, now);
+        var directCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, now);
         var directApp = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, directCandidate.Id, cvReview.Id, null, now.AddSeconds(1), ApplicationSource.Direct);
 
-        var legacyCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Noah", "Patel", $"noah.{Guid.NewGuid():N}@example.com", null, null, now);
+        var legacyCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Noah", "Patel", $"noah.{Guid.NewGuid():N}@example.com", null, now);
         var legacyApp = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, legacyCandidate.Id, received.Id, null, now.AddSeconds(2));
 
         var hiredEmployeeId = Guid.NewGuid();
-        var hiredCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", $"liam.{Guid.NewGuid():N}@example.com", null, null, now);
+        var hiredCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", $"liam.{Guid.NewGuid():N}@example.com", null, now);
         hiredCandidate.LinkToEmployee(hiredEmployeeId, now);
         var hiredApp = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, hiredCandidate.Id, hired.Id, null, now.AddSeconds(3), ApplicationSource.Direct);
 

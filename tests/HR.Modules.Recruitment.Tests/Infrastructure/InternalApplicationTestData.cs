@@ -49,7 +49,7 @@ internal static class InternalApplicationTestData
     {
         var candidate = Candidate.Create(
             Guid.NewGuid(), companyId, firstName, lastName,
-            $"{firstName.ToLowerInvariant()}.{Guid.NewGuid():N}@example.com", null, null, now);
+            $"{firstName.ToLowerInvariant()}.{Guid.NewGuid():N}@example.com", null, now);
         var application = Application.Create(
             Guid.NewGuid(), companyId, vacancyId, candidate.Id, stageId, null, now, source,
             source == ApplicationSource.ExternalRecruiter ? Guid.NewGuid() : null);

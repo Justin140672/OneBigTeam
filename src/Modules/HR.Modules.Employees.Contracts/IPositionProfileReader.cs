@@ -2,8 +2,8 @@ namespace HR.Modules.Employees.Contracts;
 
 /// <summary>
 /// A position profile's canonical role information, as owned by HR.Modules.Employees. Used by
-/// consumers (e.g. Recruitment's Vacancy details) that need to display the profile's own title,
-/// department and description as the authoritative source, distinct from any consumer-local
+/// consumers (e.g. Recruitment's Vacancy details) that need to display the profile's own title
+/// and department as the authoritative source, distinct from any consumer-local
 /// override fields. Deliberately not filtered by <see cref="IsActive"/> at the query level — unlike
 /// <see cref="IPositionProfileReader.ExistsAsync"/>/<see cref="IPositionProfileReader.GetDepartmentIdAsync"/>,
 /// which are used for create-time validation and must only match active profiles, a read-time summary
@@ -14,7 +14,6 @@ public sealed record PositionProfileSummary(
     Guid Id,
     string Title,
     Guid? DepartmentId,
-    string? Description,
     bool IsActive,
     Guid? LocationId,
     string? LocationName,

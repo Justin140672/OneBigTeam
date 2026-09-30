@@ -251,7 +251,7 @@ public class ApplyForInternalVacancyConcurrencyTests(RecruitmentDatabaseFixture 
 
         await using (var db = fixture.BuildContext())
         {
-            var second = Candidate.Create(Guid.NewGuid(), companyId, "Priya", "Shah", $"priya.personal.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var second = Candidate.Create(Guid.NewGuid(), companyId, "Priya", "Shah", $"priya.personal.{Guid.NewGuid():N}@example.com", null, Now);
             second.LinkToEmployee(employeeId, Now);
             db.Candidates.Add(second);
 
@@ -275,9 +275,9 @@ public class ApplyForInternalVacancyConcurrencyTests(RecruitmentDatabaseFixture 
         await using (var db = fixture.BuildContext())
         {
             db.Candidates.AddRange(
-                Candidate.Create(Guid.NewGuid(), companyId, "Ann", "One", $"ann.{Guid.NewGuid():N}@example.com", null, null, Now),
-                Candidate.Create(Guid.NewGuid(), companyId, "Ben", "Two", $"ben.{Guid.NewGuid():N}@example.com", null, null, Now),
-                Candidate.Create(Guid.NewGuid(), companyId, "Cat", "Three", $"cat.{Guid.NewGuid():N}@example.com", null, null, Now));
+                Candidate.Create(Guid.NewGuid(), companyId, "Ann", "One", $"ann.{Guid.NewGuid():N}@example.com", null, Now),
+                Candidate.Create(Guid.NewGuid(), companyId, "Ben", "Two", $"ben.{Guid.NewGuid():N}@example.com", null, Now),
+                Candidate.Create(Guid.NewGuid(), companyId, "Cat", "Three", $"cat.{Guid.NewGuid():N}@example.com", null, Now));
             await db.SaveChangesAsync();
         }
 

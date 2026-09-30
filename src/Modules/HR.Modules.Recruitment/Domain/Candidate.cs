@@ -26,7 +26,6 @@ internal sealed class Candidate : HR.SharedKernel.IVersionedAggregate
     public string NormalisedEmail { get; private set; } = string.Empty;
 
     public string? Phone { get; private set; }
-    public string? ResumeUrl { get; private set; }
     public Guid? EmployeeId { get; private set; }
     public bool IsActive { get; private set; } = true;
     public DateTimeOffset? DeactivatedAt { get; private set; }
@@ -48,7 +47,6 @@ internal sealed class Candidate : HR.SharedKernel.IVersionedAggregate
         string lastName,
         string email,
         string? phone,
-        string? resumeUrl,
         DateTimeOffset now) => new()
     {
         Id         = id,
@@ -57,7 +55,6 @@ internal sealed class Candidate : HR.SharedKernel.IVersionedAggregate
         LastName   = lastName.Trim(),
         Email      = email.Trim(),
         Phone      = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim(),
-        ResumeUrl  = string.IsNullOrWhiteSpace(resumeUrl) ? null : resumeUrl.Trim(),
         IsActive   = true,
         Version    = 1,
         CreatedAt  = now,
@@ -69,14 +66,12 @@ internal sealed class Candidate : HR.SharedKernel.IVersionedAggregate
         string lastName,
         string email,
         string? phone,
-        string? resumeUrl,
         DateTimeOffset now)
     {
         FirstName = firstName.Trim();
         LastName  = lastName.Trim();
         Email     = email.Trim();
         Phone     = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();
-        ResumeUrl = string.IsNullOrWhiteSpace(resumeUrl) ? null : resumeUrl.Trim();
         UpdatedAt = now;
     }
 
@@ -140,7 +135,7 @@ internal sealed class Candidate : HR.SharedKernel.IVersionedAggregate
         if (violation is not null)
             throw new InvalidOperationException(violation);
 
-        var candidate = Create(id, companyId, firstName, lastName, workEmail, NormalisePhone(phone), null, now);
+        var candidate = Create(id, companyId, firstName, lastName, workEmail, NormalisePhone(phone), now);
         candidate.EmployeeId = employeeId;
         return candidate;
     }
@@ -149,7 +144,7 @@ internal sealed class Candidate : HR.SharedKernel.IVersionedAggregate
     /// Internal recruitment Ticket 4: refreshes an employee-linked candidate's name, email and phone
     /// from the authoritative Employee record when the employee applies again. Returns true when
     /// anything changed. Never repurposes a candidate: throws if it is not linked to
-    /// <paramref name="employeeId"/> or has been purged. The CV/resume link is left untouched.
+    /// <paramref name="employeeId"/> or has been purged.
     /// </summary>
     public bool SyncEmployeeIdentity(
         Guid employeeId,
@@ -218,7 +213,7 @@ internal sealed class Candidate : HR.SharedKernel.IVersionedAggregate
     }
 
     /// <summary>
-    /// SET-05: redacts this candidate's personal data (name/email/phone/resume) once the company's
+    /// SET-05: redacts this candidate's personal data (name/email/phone) once the company's
     /// candidate-retention window has elapsed, per the explicit, separately-authorised
     /// PurgeEligibleCandidates action (mirrors Documents' PurgeEligibleArchivedEmployeeDocuments —
     /// see DOC-04). This is deliberately never triggered automatically by changing
@@ -234,7 +229,6 @@ internal sealed class Candidate : HR.SharedKernel.IVersionedAggregate
         LastName   = "[purged]";
         Email      = $"purged-{Id:N}@purged.invalid";
         Phone      = null;
-        ResumeUrl  = null;
         PurgedAt       = now;
         PurgedByUserId = purgedByUserId;
         UpdatedAt      = now;

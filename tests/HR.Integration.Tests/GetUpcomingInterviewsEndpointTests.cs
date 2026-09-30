@@ -96,7 +96,7 @@ public class GetUpcomingInterviewsEndpointTests
         {
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
             var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
-            var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, Now);
             var stages = RecruitmentStageSeeder.BuildDefaultStages(companyId, Now);
             var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages[0].Id, null, Now);
             var futureInterview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(2), 30, "Room 1", Now);
@@ -143,7 +143,7 @@ public class GetUpcomingInterviewsEndpointTests
         {
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
             var vacancy = Vacancy.Create(Guid.NewGuid(), otherCompanyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
-            var candidate = Candidate.Create(Guid.NewGuid(), otherCompanyId, "Nina", "Patel", $"nina.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var candidate = Candidate.Create(Guid.NewGuid(), otherCompanyId, "Nina", "Patel", $"nina.{Guid.NewGuid():N}@example.com", null, Now);
             var stages = RecruitmentStageSeeder.BuildDefaultStages(otherCompanyId, Now);
             var application = Application.Create(Guid.NewGuid(), otherCompanyId, vacancy.Id, candidate.Id, stages[0].Id, null, Now);
             db.RecruitmentStages.AddRange(stages);

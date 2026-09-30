@@ -10,6 +10,7 @@ public class ImportLookupResolverTests
 {
     private static readonly DateTime FixedUtcNow = new(2026, 6, 8, 10, 0, 0, DateTimeKind.Utc);
     private static readonly DateTimeOffset Now = new(FixedUtcNow, TimeSpan.Zero);
+    private static readonly IReadOnlySet<Guid> NoClaims = new HashSet<Guid>();
 
     private static EmployeesDbContext BuildContext()
     {
@@ -154,21 +155,23 @@ public class ImportLookupResolverTests
     }
 
     [Fact]
-    public async Task GetOrCreatePositionProfileAsync_Returns_Existing_Profile_By_Title_Case_Insensitively_Regardless_Of_Department_Or_Location()
+    public async Task GetOrCreatePositionProfileAsync_Returns_Existing_Profile_By_Title_Case_Insensitively_For_Same_Department_And_Location()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
+        var deptId = Guid.NewGuid();
+        var locId = Guid.NewGuid();
 
         var existingProfile = PositionProfile.Create(
-            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), "Software Developer",
-            null, null, null, null, null, null, null, Guid.NewGuid(), Now);
+            Guid.NewGuid(), companyId, deptId, locId, "Software Developer",
+            null, null, null, null, null, null, Guid.NewGuid(), Now);
         db.PositionProfiles.Add(existingProfile);
         await db.SaveChangesAsync();
 
         var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await resolver.GetOrCreatePositionProfileAsync(
-            companyId, "  SOFTWARE DEVELOPER  ", departmentId: Guid.NewGuid(), locationId: Guid.NewGuid(), CancellationToken.None);
+            companyId, "  SOFTWARE DEVELOPER  ", departmentId: deptId, locationId: locId, NoClaims, null, CancellationToken.None);
 
         Assert.False(result.WasCreated);
         Assert.False(result.Skipped);
@@ -190,7 +193,7 @@ public class ImportLookupResolverTests
         var locationId = Guid.NewGuid();
 
         var result = await resolver.GetOrCreatePositionProfileAsync(
-            companyId, "Software Developer", departmentId, locationId, CancellationToken.None);
+            companyId, "Software Developer", departmentId, locationId, NoClaims, null, CancellationToken.None);
 
         Assert.True(result.WasCreated);
         Assert.False(result.Skipped);
@@ -221,7 +224,7 @@ public class ImportLookupResolverTests
         var locationId = hasLocation ? Guid.NewGuid() : (Guid?)null;
 
         var result = await resolver.GetOrCreatePositionProfileAsync(
-            companyId, "Software Developer", departmentId, locationId, CancellationToken.None);
+            companyId, "Software Developer", departmentId, locationId, NoClaims, null, CancellationToken.None);
 
         Assert.True(result.Skipped);
         Assert.Null(result.Id);
@@ -297,14 +300,14 @@ public class ImportLookupResolverTests
 
         var existingInCompanyA = PositionProfile.Create(
             Guid.NewGuid(), companyA, Guid.NewGuid(), Guid.NewGuid(), "Software Developer",
-            null, null, null, null, null, null, null, Guid.NewGuid(), Now);
+            null, null, null, null, null, null, Guid.NewGuid(), Now);
         db.PositionProfiles.Add(existingInCompanyA);
         await db.SaveChangesAsync();
 
         var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
 
         var result = await resolver.GetOrCreatePositionProfileAsync(
-            companyB, "Software Developer", Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
+            companyB, "Software Developer", Guid.NewGuid(), Guid.NewGuid(), NoClaims, null, CancellationToken.None);
 
         Assert.True(result.Skipped);
         Assert.False(result.WasCreated);
@@ -312,5 +315,121 @@ public class ImportLookupResolverTests
         Assert.NotEqual(existingInCompanyA.Id, result.Id);
 
         Assert.Single(await db.PositionProfiles.ToListAsync());
+    }
+
+    private static PositionProfile NewProfile(Guid companyId, Guid deptId, Guid locId, string title = "Software Developer") =>
+        PositionProfile.Create(
+            Guid.NewGuid(), companyId, deptId, locId, title,
+            null, null, null, null, null, null, Guid.NewGuid(), Now);
+
+    private static Employee NewEmployee(Guid companyId, Guid profileId) =>
+        Employee.Create(
+            Guid.NewGuid(), companyId, "Alice", "Smith", $"{Guid.NewGuid():N}@example.com", DateOnly.FromDateTime(FixedUtcNow),
+            hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", Guid.NewGuid().ToString("N")[..8],
+            Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), profileId, Now);
+
+    [Fact]
+    public async Task TryFindPositionProfileAsync_Skips_Profile_With_Employee_And_Prefers_Unoccupied_Duplicate()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var deptId = Guid.NewGuid();
+        var locId = Guid.NewGuid();
+        var occupied = NewProfile(companyId, deptId, locId);
+        var free = NewProfile(companyId, deptId, locId);
+        db.PositionProfiles.AddRange(occupied, free);
+        db.Employees.Add(NewEmployee(companyId, occupied.Id));
+        await db.SaveChangesAsync();
+
+        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+
+        var found = await resolver.TryFindPositionProfileAsync(
+            companyId, "software developer", deptId, locId, NoClaims, null, CancellationToken.None);
+
+        Assert.Equal(free.Id, found);
+    }
+
+    [Fact]
+    public async Task TryFindPositionProfileAsync_Does_Not_Return_Claimed_Profile()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var deptId = Guid.NewGuid();
+        var locId = Guid.NewGuid();
+        var first = NewProfile(companyId, deptId, locId);
+        var second = NewProfile(companyId, deptId, locId);
+        db.PositionProfiles.AddRange(first, second);
+        await db.SaveChangesAsync();
+
+        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+        var claimed = new HashSet<Guid>();
+
+        var a = await resolver.TryFindPositionProfileAsync(companyId, "Software Developer", deptId, locId, claimed, null, CancellationToken.None);
+        claimed.Add(a!.Value);
+        var b = await resolver.TryFindPositionProfileAsync(companyId, "Software Developer", deptId, locId, claimed, null, CancellationToken.None);
+        claimed.Add(b!.Value);
+        var c = await resolver.TryFindPositionProfileAsync(companyId, "Software Developer", deptId, locId, claimed, null, CancellationToken.None);
+
+        Assert.NotEqual(a, b);
+        Assert.Null(c);
+    }
+
+    [Fact]
+    public async Task TryFindPositionProfileAsync_Requires_Matching_Department_And_Location()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var deptId = Guid.NewGuid();
+        var locId = Guid.NewGuid();
+        db.PositionProfiles.Add(NewProfile(companyId, deptId, locId));
+        await db.SaveChangesAsync();
+
+        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+
+        Assert.Null(await resolver.TryFindPositionProfileAsync(companyId, "Software Developer", Guid.NewGuid(), locId, NoClaims, null, CancellationToken.None));
+        Assert.Null(await resolver.TryFindPositionProfileAsync(companyId, "Software Developer", deptId, Guid.NewGuid(), NoClaims, null, CancellationToken.None));
+        Assert.Null(await resolver.TryFindPositionProfileAsync(companyId, "Software Developer", null, locId, NoClaims, null, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task TryFindPositionProfileAsync_Allows_Profile_Held_By_Employee_Being_Updated()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var deptId = Guid.NewGuid();
+        var locId = Guid.NewGuid();
+        var profile = NewProfile(companyId, deptId, locId);
+        var employee = NewEmployee(companyId, profile.Id);
+        db.PositionProfiles.Add(profile);
+        db.Employees.Add(employee);
+        await db.SaveChangesAsync();
+
+        var resolver = new ImportLookupResolver(db, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader());
+
+        Assert.Null(await resolver.TryFindPositionProfileAsync(companyId, "Software Developer", deptId, locId, NoClaims, null, CancellationToken.None));
+        Assert.Equal(profile.Id, await resolver.TryFindPositionProfileAsync(companyId, "Software Developer", deptId, locId, NoClaims, employee.Id, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task GetOrCreatePositionProfileAsync_Creates_New_Duplicate_When_Only_Match_Is_Occupied()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var deptId = Guid.NewGuid();
+        var locId = Guid.NewGuid();
+        var occupied = NewProfile(companyId, deptId, locId);
+        db.PositionProfiles.Add(occupied);
+        db.Employees.Add(NewEmployee(companyId, occupied.Id));
+        await db.SaveChangesAsync();
+
+        var resolver = new ImportLookupResolver(
+            db, new FakeClock(FixedUtcNow), new FakeLeavePolicyReader(defaultLeavePolicyId: Guid.NewGuid()));
+
+        var result = await resolver.GetOrCreatePositionProfileAsync(
+            companyId, "Software Developer", deptId, locId, NoClaims, null, CancellationToken.None);
+
+        Assert.True(result.WasCreated);
+        Assert.NotEqual(occupied.Id, result.Id);
+        Assert.Equal(2, await db.PositionProfiles.CountAsync());
     }
 }

@@ -46,7 +46,6 @@ internal sealed class GetVacancyHandler(RecruitmentDbContext db, IPositionProfil
             vacancy.UpdatedAt,
             positionProfile?.Title,
             positionProfile?.DepartmentId,
-            positionProfile?.Description,
             positionProfile?.IsActive,
             vacancy.AdvertTitle ?? positionProfile?.Title ?? "(untitled)",
             positionProfile?.LocationName,

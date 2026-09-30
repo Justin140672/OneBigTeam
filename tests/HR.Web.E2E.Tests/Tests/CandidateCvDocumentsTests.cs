@@ -36,7 +36,6 @@ public sealed class CandidateCvDocumentsTests(RecruiterPersonaFixture fixture) :
         Assert.True(await cvs.IsEmptyStateVisibleAsync(), "Expected the empty state for a candidate with no CVs");
         await cvs.ExpectRowCountAsync(0);
         Assert.Equal(CandidateCvDocumentsSection.UploadButtonText, await cvs.GetUploadButtonTextAsync());
-        Assert.False(await cvs.IsLegacyLinkVisibleAsync(), "No legacy link without a ResumeUrl");
 
         var fileName = $"e2e-first-cv-{Guid.NewGuid():N}.pdf";
         await cvs.UploadCvAsync(fileName, CandidateCvApi.BuildTestPdf());

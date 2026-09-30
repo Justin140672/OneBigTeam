@@ -43,7 +43,7 @@ public class UploadCandidateDocumentHandlerTests
 
     private static async Task<Candidate> SeedCandidate(RecruitmentDbContext db, Guid companyId, Guid? id = null)
     {
-        var candidate = Candidate.Create(id ?? Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(id ?? Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         db.Candidates.Add(candidate);
         await db.SaveChangesAsync();
         return candidate;
@@ -225,7 +225,7 @@ public class UploadCandidateDocumentHandlerTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
         await using var db = new ThrowOnceRecruitmentDbContext(options);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         db.Candidates.Add(candidate);
         await db.BaseSaveChangesAsync();
 
@@ -257,7 +257,7 @@ public class UploadCandidateDocumentHandlerTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
         await using var db = new CancellingOnSaveRecruitmentDbContext(options, requestCts);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         db.Candidates.Add(candidate);
         await db.BaseSaveChangesAsync();
 
@@ -287,7 +287,7 @@ public class UploadCandidateDocumentHandlerTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
         await using var db = new ThrowOnceRecruitmentDbContext(options);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         db.Candidates.Add(candidate);
         await db.BaseSaveChangesAsync();
 
@@ -332,7 +332,7 @@ public class UploadCandidateDocumentHandlerTests
             .UseInMemoryDatabase(Guid.NewGuid().ToString("N"))
             .Options;
         await using var db = new ThrowOnceRecruitmentDbContext(options, throwFromCallNumber: 2);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         db.Candidates.Add(candidate);
         await db.BaseSaveChangesAsync();
 

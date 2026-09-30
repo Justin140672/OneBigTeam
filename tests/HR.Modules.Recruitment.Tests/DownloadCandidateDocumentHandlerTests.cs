@@ -21,7 +21,7 @@ public class DownloadCandidateDocumentHandlerTests
         await using var db = BuildContext();
         var storage = new FakeCandidateDocumentStorageService();
         var companyId = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var document = CandidateDocument.Create(Guid.NewGuid(), companyId, candidate.Id, "Resume", "resume.pdf", 1024, "application/pdf", "storage/key/resume.pdf", Guid.NewGuid(), Now);
         document.BeginScanAttempt(Now);
         document.MarkScanClean(Now);
@@ -51,7 +51,7 @@ public class DownloadCandidateDocumentHandlerTests
         await using var db = BuildContext();
         var storage = new FakeCandidateDocumentStorageService();
         var companyId = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var document = CandidateDocument.Create(Guid.NewGuid(), companyId, candidate.Id, "Resume", "resume.pdf", 1024, "application/pdf", "storage/key/resume.pdf", Guid.NewGuid(), Now);
         DriveTo(document, status);
         db.Candidates.Add(candidate);
@@ -106,7 +106,7 @@ public class DownloadCandidateDocumentHandlerTests
         await using var db = BuildContext();
         var storage = new FakeCandidateDocumentStorageService();
         var companyId = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var document = CandidateDocument.Create(Guid.NewGuid(), companyId, candidate.Id, "Resume", "resume.pdf", 1024, "application/pdf", "k", Guid.NewGuid(), Now);
         DriveTo(document, CandidateDocumentScanStatus.Infected);
         db.Candidates.Add(candidate);
@@ -170,8 +170,8 @@ public class DownloadCandidateDocumentHandlerTests
         await using var db = BuildContext();
         var storage = new FakeCandidateDocumentStorageService();
         var companyId = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var otherCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
+        var otherCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, Now);
         var document = CandidateDocument.Create(Guid.NewGuid(), companyId, candidate.Id, "Resume", "resume.pdf", 1024, "application/pdf", "key", Guid.NewGuid(), Now);
         db.Candidates.AddRange(candidate, otherCandidate);
         db.CandidateDocuments.Add(document);

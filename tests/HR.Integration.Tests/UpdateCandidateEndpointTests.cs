@@ -40,7 +40,7 @@ public class UpdateCandidateEndpointTests
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", email, null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", email, null, Now);
         db.Candidates.Add(candidate);
         await db.SaveChangesAsync();
         return candidate.Id;
@@ -220,5 +220,5 @@ public class UpdateCandidateEndpointTests
     }
 
     private sealed record CandidatePayload(
-        Guid Id, Guid CompanyId, string FirstName, string LastName, string Email, string? Phone, string? ResumeUrl);
+        Guid Id, Guid CompanyId, string FirstName, string LastName, string Email, string? Phone);
 }

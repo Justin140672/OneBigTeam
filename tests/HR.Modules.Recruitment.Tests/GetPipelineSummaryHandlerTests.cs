@@ -134,7 +134,7 @@ public class GetPipelineSummaryHandlerTests
         for (var i = 0; i < candidateCount; i++)
         {
             var candidate = Candidate.Create(
-                Guid.NewGuid(), companyId, "First", $"Last{i}", $"candidate{i}.{Guid.NewGuid():N}@example.com", null, null, Now);
+                Guid.NewGuid(), companyId, "First", $"Last{i}", $"candidate{i}.{Guid.NewGuid():N}@example.com", null, Now);
             candidates.Add(candidate);
         }
         db.Candidates.AddRange(candidates);

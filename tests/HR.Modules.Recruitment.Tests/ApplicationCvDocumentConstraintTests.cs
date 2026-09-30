@@ -46,7 +46,7 @@ public class ApplicationCvDocumentConstraintTests(RecruitmentDatabaseFixture fix
 
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, seededAt);
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), seededAt);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, seededAt);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, seededAt);
         var cv1 = Document(companyId, candidate.Id, "cv-v1.pdf", seededAt);
         var cv2 = Document(companyId, candidate.Id, "cv-v2.pdf", seededAt.AddMinutes(5));
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.CvReview.Id, null, seededAt);
@@ -74,7 +74,7 @@ public class ApplicationCvDocumentConstraintTests(RecruitmentDatabaseFixture fix
     private async Task<Guid> SeedCandidateAsync(Guid companyId)
     {
         await using var db = fixture.BuildContext();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", $"liam.{Guid.NewGuid():N}@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", $"liam.{Guid.NewGuid():N}@example.com", null, Now);
         db.Candidates.Add(candidate);
         await db.SaveChangesAsync();
         return candidate.Id;

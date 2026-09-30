@@ -26,12 +26,6 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
         await page.Keyboard.PressAsync("Tab");
     }
 
-    public async Task FillDescriptionAsync(string description)
-    {
-        await page.GetByPlaceholder("Optional description").FillAsync(description);
-        await page.Keyboard.PressAsync("Tab");
-    }
-
     public async Task SaveAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();

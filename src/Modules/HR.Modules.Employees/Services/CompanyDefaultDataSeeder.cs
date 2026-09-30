@@ -51,7 +51,6 @@ internal sealed class CompanyDefaultDataSeeder(
             department.Id,
             location.Id,
             "Administrator",
-            description: null,
             probationMonthsOverride: null,
             workingDaysOverride: null,
             hoursPerDayOverride: null,

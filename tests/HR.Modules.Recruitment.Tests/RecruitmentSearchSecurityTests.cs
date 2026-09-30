@@ -18,9 +18,9 @@ public class RecruitmentSearchSecurityTests
         var companyB = Guid.NewGuid();
 
         db.Candidates.AddRange(
-            Candidate.Create(Guid.NewGuid(), companyA, "Alice", "Smith", "alice@a.example", null, null, Now),
-            Candidate.Create(Guid.NewGuid(), companyA, "Bob",   "Jones", "bob@a.example",   null, null, Now),
-            Candidate.Create(Guid.NewGuid(), companyB, "Carol", "Other", "carol@b.example", null, null, Now));
+            Candidate.Create(Guid.NewGuid(), companyA, "Alice", "Smith", "alice@a.example", null, Now),
+            Candidate.Create(Guid.NewGuid(), companyA, "Bob",   "Jones", "bob@a.example",   null, Now),
+            Candidate.Create(Guid.NewGuid(), companyB, "Carol", "Other", "carol@b.example", null, Now));
         await db.SaveChangesAsync();
 
         var result = await new ListCandidatesHandler(db).HandleAsync(
@@ -39,8 +39,8 @@ public class RecruitmentSearchSecurityTests
         var companyB = Guid.NewGuid();
 
         db.Candidates.AddRange(
-            Candidate.Create(Guid.NewGuid(), companyA, "Alice", "Smith", "alice@a.example", null, null, Now),
-            Candidate.Create(Guid.NewGuid(), companyB, "Alice", "Jones", "alice@b.example", null, null, Now));
+            Candidate.Create(Guid.NewGuid(), companyA, "Alice", "Smith", "alice@a.example", null, Now),
+            Candidate.Create(Guid.NewGuid(), companyB, "Alice", "Jones", "alice@b.example", null, Now));
         await db.SaveChangesAsync();
 
         var result = await new ListCandidatesHandler(db).HandleAsync(
@@ -59,7 +59,7 @@ public class RecruitmentSearchSecurityTests
         var companyId = Guid.NewGuid();
 
         db.Candidates.Add(
-            Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@test.example", null, null, Now));
+            Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@test.example", null, Now));
         await db.SaveChangesAsync();
 
         var result = await new ListCandidatesHandler(db).HandleAsync(

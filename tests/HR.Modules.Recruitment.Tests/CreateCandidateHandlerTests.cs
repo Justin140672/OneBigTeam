@@ -129,7 +129,7 @@ public class CreateCandidateHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var existing = HR.Modules.Recruitment.Domain.Candidate.Create(
-            Guid.NewGuid(), companyId, "Ava", "Jones", "Ava.Jones@Example.com", null, null, new DateTimeOffset(FixedUtcNow));
+            Guid.NewGuid(), companyId, "Ava", "Jones", "Ava.Jones@Example.com", null, new DateTimeOffset(FixedUtcNow));
         existing.Deactivate(Guid.NewGuid(), "No longer looking", new DateTimeOffset(FixedUtcNow));
         db.Candidates.Add(existing);
         await db.SaveChangesAsync();

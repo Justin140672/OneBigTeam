@@ -186,7 +186,7 @@ public class GetManagerTeamStatusSummaryHandlerTests
 
         var profileId = Guid.NewGuid();
         context.PositionProfiles.Add(PositionProfile.Create(
-            profileId, companyId, Guid.NewGuid(), Guid.NewGuid(), "Part timer", null, null,
+            profileId, companyId, Guid.NewGuid(), Guid.NewGuid(), "Part timer", null,
             WorkingDays.Tuesday | WorkingDays.Wednesday, 7.5m, null, null, null, Guid.NewGuid(), Now));
         var member = AddEmployee(context, companyId, "Pat", "Profiled", positionProfileId: profileId);
         await context.SaveChangesAsync();

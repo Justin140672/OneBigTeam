@@ -72,23 +72,6 @@ internal sealed class UpdatePositionProfileHandler
 
         var newTitle = request.Title.Trim();
 
-        if (!string.Equals(profile.Title, newTitle, StringComparison.Ordinal))
-        {
-            var titleExists = await _dbContext.PositionProfiles
-                .AnyAsync(
-                    p => p.CompanyId == request.CompanyId &&
-                         p.Id != request.Id &&
-                         p.Title == newTitle &&
-                         p.IsActive,
-                    cancellationToken);
-
-            if (titleExists)
-            {
-                return Result.Failure<UpdatePositionProfileResponse>(
-                    Error.Conflict($"An active position profile titled '{newTitle}' already exists in this company."));
-            }
-        }
-
         var leavePolicyExists = await _leavePolicyReader.ExistsAsync(
             request.CompanyId, request.DefaultLeavePolicyId, cancellationToken);
 
@@ -120,7 +103,6 @@ internal sealed class UpdatePositionProfileHandler
             profile.DepartmentId,
             profile.LocationId,
             profile.Title,
-            profile.Description,
             profile.ProbationMonthsOverride,
             profile.WorkingDaysOverride,
             profile.HoursPerDayOverride,
@@ -137,7 +119,6 @@ internal sealed class UpdatePositionProfileHandler
             request.DepartmentId,
             request.LocationId,
             newTitle,
-            string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
             request.ProbationMonthsOverride,
             request.WorkingDaysOverride,
             request.HoursPerDayOverride,
@@ -165,7 +146,6 @@ internal sealed class UpdatePositionProfileHandler
             profile.DepartmentId,
             profile.LocationId,
             profile.Title,
-            profile.Description,
             profile.ProbationMonthsOverride,
             profile.WorkingDaysOverride,
             profile.HoursPerDayOverride,
@@ -192,7 +172,6 @@ internal sealed class UpdatePositionProfileHandler
             profile.DepartmentId,
             profile.LocationId,
             profile.Title,
-            profile.Description,
             profile.ProbationMonthsOverride,
             profile.WorkingDaysOverride,
             profile.HoursPerDayOverride,

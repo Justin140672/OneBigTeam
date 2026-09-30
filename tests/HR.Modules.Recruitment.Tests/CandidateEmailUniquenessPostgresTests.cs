@@ -29,13 +29,13 @@ public class CandidateEmailUniquenessPostgresTests(RecruitmentDatabaseFixture fi
 
         await using (var db = fixture.BuildContext())
         {
-            db.Candidates.Add(Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"{local}@example.com", null, null, Now));
+            db.Candidates.Add(Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"{local}@example.com", null, Now));
             await db.SaveChangesAsync();
         }
 
         await using (var db = fixture.BuildContext())
         {
-            db.Candidates.Add(Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"  {local.ToUpperInvariant()}@EXAMPLE.COM ", null, null, Now));
+            db.Candidates.Add(Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"  {local.ToUpperInvariant()}@EXAMPLE.COM ", null, Now));
 
             var ex = await Assert.ThrowsAsync<DbUpdateException>(() => db.SaveChangesAsync());
             Assert.True(CandidateEmailUniqueness.IsViolation(ex));
@@ -54,13 +54,13 @@ public class CandidateEmailUniquenessPostgresTests(RecruitmentDatabaseFixture fi
 
         await using (var db = fixture.BuildContext())
         {
-            db.Candidates.Add(Candidate.Create(Guid.NewGuid(), companyA, "Emma", "Clarke", email, null, null, Now));
+            db.Candidates.Add(Candidate.Create(Guid.NewGuid(), companyA, "Emma", "Clarke", email, null, Now));
             await db.SaveChangesAsync();
         }
 
         await using (var db = fixture.BuildContext())
         {
-            db.Candidates.Add(Candidate.Create(Guid.NewGuid(), companyB, "Emma", "Clarke", email.ToUpperInvariant(), null, null, Now));
+            db.Candidates.Add(Candidate.Create(Guid.NewGuid(), companyB, "Emma", "Clarke", email.ToUpperInvariant(), null, Now));
             await db.SaveChangesAsync();
         }
 
@@ -206,8 +206,8 @@ public class CandidateEmailUniquenessPostgresTests(RecruitmentDatabaseFixture fi
         for (var round = 0; round < Rounds; round++)
         {
             var companyId = Guid.NewGuid();
-            var emma = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, Now);
-            var liam = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", $"liam.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var emma = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, Now);
+            var liam = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", $"liam.{Guid.NewGuid():N}@example.com", null, Now);
             await using (var seed = fixture.BuildContext())
             {
                 seed.Candidates.AddRange(emma, liam);
@@ -247,9 +247,9 @@ public class CandidateEmailUniquenessPostgresTests(RecruitmentDatabaseFixture fi
     public async Task Update_To_Case_Variant_Of_Existing_Email_Returns_Conflict_On_Postgres()
     {
         var companyId = Guid.NewGuid();
-        var emma = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, Now);
+        var emma = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, Now);
         var local = $"taken.{Guid.NewGuid():N}";
-        var other = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", $"{local}@example.com", null, null, Now);
+        var other = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", $"{local}@example.com", null, Now);
         await using (var seed = fixture.BuildContext())
         {
             seed.Candidates.AddRange(emma, other);

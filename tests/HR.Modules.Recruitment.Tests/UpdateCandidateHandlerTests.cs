@@ -17,7 +17,7 @@ public class UpdateCandidateHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         db.Candidates.Add(candidate);
         await db.SaveChangesAsync();
 
@@ -32,7 +32,6 @@ public class UpdateCandidateHandlerTests
                 LastName    = "Clarke-Smith",
                 Email       = "emma.clarke-smith@example.com",
                 Phone       = "+44 7700 900001",
-                ResumeUrl   = "https://example.com/resume.pdf",
                 ExpectedVersion = 1,
             },
             CancellationToken.None);
@@ -41,7 +40,6 @@ public class UpdateCandidateHandlerTests
         Assert.Equal("Clarke-Smith", result.Value!.LastName);
         Assert.Equal("emma.clarke-smith@example.com", result.Value.Email);
         Assert.Equal("+44 7700 900001", result.Value.Phone);
-        Assert.Equal("https://example.com/resume.pdf", result.Value.ResumeUrl);
 
         var published = Assert.Single(auditPublisher.Published);
         var auditEvent = Assert.IsType<CandidateUpdatedAuditEvent>(published);
@@ -80,8 +78,8 @@ public class UpdateCandidateHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var emma = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var liam = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        var emma = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
+        var liam = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, Now);
         db.Candidates.AddRange(emma, liam);
         await db.SaveChangesAsync();
 
@@ -105,7 +103,7 @@ public class UpdateCandidateHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         db.Candidates.Add(candidate);
         await db.SaveChangesAsync();
 
@@ -131,7 +129,7 @@ public class UpdateCandidateHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         candidate.Purge(Guid.NewGuid(), Now);
         db.Candidates.Add(candidate);
         await db.SaveChangesAsync();
@@ -147,7 +145,6 @@ public class UpdateCandidateHandlerTests
                 LastName    = "Else",
                 Email       = "someone.else@example.com",
                 Phone       = "+44 7700 900999",
-                ResumeUrl   = "https://example.com/new-resume.pdf",
                 ExpectedVersion = candidate.Version,
             },
             CancellationToken.None);
@@ -170,7 +167,7 @@ public class UpdateCandidateHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         db.Candidates.Add(candidate);
         await db.SaveChangesAsync();
 
@@ -203,8 +200,8 @@ public class UpdateCandidateHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var emma = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var liam = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        var emma = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
+        var liam = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, Now);
         db.Candidates.AddRange(emma, liam);
         await db.SaveChangesAsync();
 
@@ -236,8 +233,8 @@ public class UpdateCandidateHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
 
-        var emma = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var otherCompanyLiam = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        var emma = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
+        var otherCompanyLiam = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Liam", "Turner", "liam.turner@example.com", null, Now);
         db.Candidates.AddRange(emma, otherCompanyLiam);
         await db.SaveChangesAsync();
 

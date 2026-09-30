@@ -94,7 +94,7 @@ public class GetRecruitmentKanbanEndpointTests
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
             var stages = RecruitmentStageSeeder.BuildDefaultStages(companyId, Now);
             var applicationReceivedStageId = stages.Single(s => s.Name == "Application Received").Id;
-            var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, Now);
             var application = Application.Create(Guid.NewGuid(), companyId, vacancyId, candidate.Id, applicationReceivedStageId, null, Now);
             db.RecruitmentStages.AddRange(stages);
             db.Candidates.Add(candidate);

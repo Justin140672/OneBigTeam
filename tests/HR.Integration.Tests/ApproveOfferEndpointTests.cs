@@ -42,7 +42,7 @@ public class ApproveOfferEndpointTests
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
         var stages = RecruitmentStageSeeder.BuildDefaultStages(companyId, Now);
         var interviewStageId = stages.Single(s => s.Name == "Interview").Id;
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, interviewStageId, null, Now);
         if (withdrawn)
             application.Withdraw(Now);

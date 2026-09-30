@@ -17,7 +17,6 @@ internal sealed class PositionProfile : IVersionedAggregate
     public Guid DepartmentId { get; private set; }
     public Guid LocationId { get; private set; }
     public string Title { get; private set; } = string.Empty;
-    public string? Description { get; private set; }
     public int? ProbationMonthsOverride { get; private set; }
     public WorkingDays? WorkingDaysOverride { get; private set; }
     public decimal? HoursPerDayOverride { get; private set; }
@@ -46,7 +45,6 @@ internal sealed class PositionProfile : IVersionedAggregate
         Guid departmentId,
         Guid locationId,
         string title,
-        string? description,
         int? probationMonthsOverride,
         WorkingDays? workingDaysOverride,
         decimal? hoursPerDayOverride,
@@ -66,7 +64,6 @@ internal sealed class PositionProfile : IVersionedAggregate
             DepartmentId = departmentId,
             LocationId = locationId,
             Title = title,
-            Description = description,
             ProbationMonthsOverride = probationMonthsOverride,
             WorkingDaysOverride = workingDaysOverride,
             HoursPerDayOverride = hoursPerDayOverride,
@@ -88,7 +85,6 @@ internal sealed class PositionProfile : IVersionedAggregate
         Guid departmentId,
         Guid locationId,
         string title,
-        string? description,
         int? probationMonthsOverride,
         WorkingDays? workingDaysOverride,
         decimal? hoursPerDayOverride,
@@ -104,7 +100,6 @@ internal sealed class PositionProfile : IVersionedAggregate
         DepartmentId = departmentId;
         LocationId = locationId;
         Title = title;
-        Description = description;
         ProbationMonthsOverride = probationMonthsOverride;
         WorkingDaysOverride = workingDaysOverride;
         HoursPerDayOverride = hoursPerDayOverride;

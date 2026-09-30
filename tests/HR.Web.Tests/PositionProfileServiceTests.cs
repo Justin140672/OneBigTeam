@@ -28,7 +28,7 @@ public class PositionProfileServiceTests
         var departmentId = Guid.NewGuid();
 
         var response = new GetPositionProfileResponse(
-            profileId, companyId, departmentId, locationId, "Senior Developer", null,
+            profileId, companyId, departmentId, locationId, "Senior Developer",
             ProbationMonthsOverride: 3,
             WorkingDaysOverride: WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday,
             HoursPerDayOverride: 6m,
@@ -80,14 +80,14 @@ public class PositionProfileServiceTests
         HttpRequestMessage? captured = null;
 
         var response = new CreatePositionProfileResponse(
-            Guid.NewGuid(), companyId, departmentId, "Senior Developer", null, true, DateTimeOffset.UtcNow);
+            Guid.NewGuid(), companyId, departmentId, "Senior Developer", true, DateTimeOffset.UtcNow);
 
         var handler = new CapturingJsonResponseHandler(HttpStatusCode.OK, response, req => captured = req);
         var factory = BuildFactory(handler);
         var service = new PositionProfileService(factory);
 
         var request = new CreatePositionProfileRequest(
-            companyId, departmentId, locationId, "Senior Developer", null,
+            companyId, departmentId, locationId, "Senior Developer",
             ProbationMonthsOverride: 3,
             WorkingDaysOverride: WorkingDays.Monday | WorkingDays.Tuesday,
             HoursPerDayOverride: 6m,
@@ -113,14 +113,14 @@ public class PositionProfileServiceTests
     [Fact]
     public async Task CreatePositionProfileAsync_Returns_Error_On_Conflict()
     {
-        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.Conflict, new { Error = "A position profile with that title already exists." }));
+        var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.Conflict, new { Error = "Conflict occurred." }));
         var service = new PositionProfileService(factory);
 
         var (created, error) = await service.CreatePositionProfileAsync(
-            Guid.NewGuid(), new CreatePositionProfileRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Duplicate", null, null, null, null, null, null, null, Guid.NewGuid(), null));
+            Guid.NewGuid(), new CreatePositionProfileRequest(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Title", null, null, null, null, null, null, Guid.NewGuid(), null));
 
         Assert.Null(created);
-        Assert.Equal("A position profile with that title already exists.", error);
+        Assert.Equal("Conflict occurred.", error);
     }
 
     [Fact]
@@ -138,7 +138,7 @@ public class PositionProfileServiceTests
         var service = new PositionProfileService(factory);
 
         var request = new UpdatePositionProfileRequest(
-            companyId, profileId, departmentId, locationId, "Senior Developer", null,
+            companyId, profileId, departmentId, locationId, "Senior Developer",
             ProbationMonthsOverride: 4,
             WorkingDaysOverride: WorkingDays.Thursday,
             HoursPerDayOverride: 8m,
@@ -169,7 +169,7 @@ public class PositionProfileServiceTests
         var response = new ListPositionProfilesResponse(
         [
             new PositionProfileListItemModel(
-                Guid.NewGuid(), "Engineering", "Senior Developer", null, true,
+                Guid.NewGuid(), "Engineering", "Senior Developer", true,
                 SalaryMin: 40000m, SalaryMax: 60000m, SalaryType: "Annual")
         ]);
 
@@ -212,5 +212,27 @@ public class PositionProfileServiceTests
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken) =>
             throw new HttpRequestException("Network failure");
+    }
+}
+
+public class PositionProfileListItemModelLabelTests
+{
+    [Fact]
+    public void DisplayLabel_Renders_Title_Department_And_Location()
+    {
+        var model = new PositionProfileListItemModel(
+            Guid.NewGuid(), "Engineering", "Developer", true, null, null, null, LocationName: "London");
+
+        Assert.Equal("Developer — Engineering — London", model.DisplayLabel);
+    }
+
+    [Fact]
+    public void DisplayLabel_Is_Identical_For_Duplicates_But_Ids_Differ()
+    {
+        var a = new PositionProfileListItemModel(Guid.NewGuid(), "Engineering", "Developer", true, null, null, null, LocationName: "London");
+        var b = a with { Id = Guid.NewGuid() };
+
+        Assert.Equal(a.DisplayLabel, b.DisplayLabel);
+        Assert.NotEqual(a.Id, b.Id);
     }
 }

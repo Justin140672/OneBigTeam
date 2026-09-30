@@ -56,7 +56,7 @@ public class CandidateDocumentScanStatusProjectionTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         db.Candidates.Add(candidate);
 
         var statuses = Enum.GetValues<CandidateDocumentScanStatus>();
@@ -85,7 +85,7 @@ public class CandidateDocumentScanStatusProjectionTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         db.Candidates.Add(candidate);
         db.CandidateDocuments.Add(NewDocument(companyId, candidate.Id, CandidateDocumentScanStatus.Pending, Now));
         await db.SaveChangesAsync();
@@ -105,7 +105,7 @@ public class CandidateDocumentScanStatusProjectionTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var submittedCv = NewDocument(companyId, candidate.Id, CandidateDocumentScanStatus.Clean, Now, CandidateDocumentKind.Cv);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
@@ -133,7 +133,7 @@ public class CandidateDocumentScanStatusProjectionTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var cv = NewDocument(companyId, candidate.Id, CandidateDocumentScanStatus.Pending, Now, CandidateDocumentKind.Cv);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
@@ -158,7 +158,7 @@ public class CandidateDocumentScanStatusProjectionTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.ApplicationReceived.Id, null, Now);
         db.Vacancies.Add(vacancy);

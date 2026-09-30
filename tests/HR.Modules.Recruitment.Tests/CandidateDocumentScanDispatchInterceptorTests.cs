@@ -84,7 +84,7 @@ public class CandidateDocumentScanDispatchInterceptorTests
     {
         var client = new RecordingBackgroundJobClient();
         await using var db = NewContext(client);
-        db.Candidates.Add(Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, null, Now));
+        db.Candidates.Add(Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, Now));
 
         await db.SaveChangesAsync();
 

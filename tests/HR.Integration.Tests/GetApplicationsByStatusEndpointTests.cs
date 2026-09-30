@@ -98,7 +98,7 @@ public class GetApplicationsByStatusEndpointTests
         {
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
             var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
-            var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, Now);
             var stages = RecruitmentStageSeeder.BuildDefaultStages(companyId, Now);
             var applicationReceivedStageId = stages.Single(s => s.Name == "Application Received").Id;
             var cvReviewStageId = stages.Single(s => s.Name == "CV Review").Id;
@@ -114,7 +114,7 @@ public class GetApplicationsByStatusEndpointTests
             db.Candidates.Add(candidate);
             db.Applications.Add(application);
 
-            var otherStageCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", $"liam.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var otherStageCandidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", $"liam.{Guid.NewGuid():N}@example.com", null, Now);
             var otherStageApplication = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, otherStageCandidate.Id, cvReviewStageId, null, Now);
             db.Candidates.Add(otherStageCandidate);
             db.Applications.Add(otherStageApplication);
@@ -148,7 +148,7 @@ public class GetApplicationsByStatusEndpointTests
         {
             var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
             var vacancy = Vacancy.Create(Guid.NewGuid(), otherCompanyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
-            var candidate = Candidate.Create(Guid.NewGuid(), otherCompanyId, "Nina", "Patel", $"nina.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var candidate = Candidate.Create(Guid.NewGuid(), otherCompanyId, "Nina", "Patel", $"nina.{Guid.NewGuid():N}@example.com", null, Now);
             var stages = RecruitmentStageSeeder.BuildDefaultStages(otherCompanyId, Now);
             otherStageId = stages.Single(s => s.Name == "Application Received").Id;
             var application = Application.Create(Guid.NewGuid(), otherCompanyId, vacancy.Id, candidate.Id, otherStageId, null, Now);

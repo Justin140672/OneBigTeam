@@ -74,7 +74,7 @@ public class GetVacancyHandlerTests
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [positionProfileId] = new(positionProfileId, "Some Title", departmentId, "Some description", true, null, null),
+            [positionProfileId] = new(positionProfileId, "Some Title", departmentId, true, null, null),
         };
 
         var result = await new GetVacancyHandler(db, new FakePositionProfileReader(summaries: summaries)).HandleAsync(
@@ -84,7 +84,6 @@ public class GetVacancyHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal("Some Title", result.Value!.PositionProfileTitle);
         Assert.Equal(departmentId, result.Value.PositionProfileDepartmentId);
-        Assert.Equal("Some description", result.Value.PositionProfileDescription);
         Assert.True(result.Value.PositionProfileIsActive);
     }
 
@@ -106,7 +105,6 @@ public class GetVacancyHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Null(result.Value!.PositionProfileTitle);
         Assert.Null(result.Value.PositionProfileDepartmentId);
-        Assert.Null(result.Value.PositionProfileDescription);
         Assert.Null(result.Value.PositionProfileIsActive);
     }
 
@@ -124,7 +122,7 @@ public class GetVacancyHandlerTests
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [positionProfileId] = new(positionProfileId, "Deactivated Profile Title", profileDepartmentId, "Deactivated profile description", false, null, null),
+            [positionProfileId] = new(positionProfileId, "Deactivated Profile Title", profileDepartmentId, false, null, null),
         };
 
         var result = await new GetVacancyHandler(db, new FakePositionProfileReader(summaries: summaries)).HandleAsync(
@@ -134,7 +132,6 @@ public class GetVacancyHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal("Deactivated Profile Title", result.Value!.PositionProfileTitle);
         Assert.Equal(profileDepartmentId, result.Value.PositionProfileDepartmentId);
-        Assert.Equal("Deactivated profile description", result.Value.PositionProfileDescription);
         Assert.False(result.Value.PositionProfileIsActive);
         Assert.Equal("Backend Engineer", result.Value.AdvertTitle);
         Assert.Equal("Vacancy's own description", result.Value.AdvertDescription);
@@ -159,7 +156,6 @@ public class GetVacancyHandlerTests
         Assert.Equal(positionProfileId, result.Value!.PositionProfileId);
         Assert.Null(result.Value.PositionProfileTitle);
         Assert.Null(result.Value.PositionProfileDepartmentId);
-        Assert.Null(result.Value.PositionProfileDescription);
         Assert.Null(result.Value.PositionProfileIsActive);
     }
 
@@ -176,7 +172,7 @@ public class GetVacancyHandlerTests
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [positionProfileId] = new(positionProfileId, "Position Profile Title", null, null, true, null, null),
+            [positionProfileId] = new(positionProfileId, "Position Profile Title", null, true, null, null),
         };
 
         var result = await new GetVacancyHandler(db, new FakePositionProfileReader(summaries: summaries)).HandleAsync(
@@ -200,7 +196,7 @@ public class GetVacancyHandlerTests
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [positionProfileId] = new(positionProfileId, "Position Profile Title", null, null, true, null, null),
+            [positionProfileId] = new(positionProfileId, "Position Profile Title", null, true, null, null),
         };
 
         var result = await new GetVacancyHandler(db, new FakePositionProfileReader(summaries: summaries)).HandleAsync(
@@ -242,7 +238,7 @@ public class GetVacancyHandlerTests
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [positionProfileId] = new(positionProfileId, "Title", null, null, true, Guid.NewGuid(), "Position Profile Location"),
+            [positionProfileId] = new(positionProfileId, "Title", null, true, Guid.NewGuid(), "Position Profile Location"),
         };
 
         var result = await new GetVacancyHandler(db, new FakePositionProfileReader(summaries: summaries)).HandleAsync(
@@ -266,7 +262,7 @@ public class GetVacancyHandlerTests
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [positionProfileId] = new(positionProfileId, "Title", null, null, true, null, null),
+            [positionProfileId] = new(positionProfileId, "Title", null, true, null, null),
         };
 
         var result = await new GetVacancyHandler(db, new FakePositionProfileReader(summaries: summaries)).HandleAsync(

@@ -17,7 +17,7 @@ public class GetStaleVacanciesHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = OpenVacancy(companyId, Now.AddDays(-30));
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now.AddDays(-5));
 
         db.Vacancies.Add(vacancy);
@@ -37,7 +37,7 @@ public class GetStaleVacanciesHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = OpenVacancy(companyId, Now.AddDays(-60));
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, Now);
         var lastActivity = Now.AddDays(-20);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, lastActivity);
 
@@ -80,7 +80,7 @@ public class GetStaleVacanciesHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Software Engineer", null, Guid.NewGuid(), Now.AddDays(-60));
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Noah", "Patel", "noah.patel@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Noah", "Patel", "noah.patel@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now.AddDays(-40));
 
         db.Vacancies.Add(vacancy);
@@ -100,7 +100,7 @@ public class GetStaleVacanciesHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = OpenVacancy(companyId, Now.AddDays(-60));
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Ava", "Bell", "ava.bell@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Ava", "Bell", "ava.bell@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now.AddDays(-20));
 
         db.Vacancies.Add(vacancy);
@@ -122,7 +122,7 @@ public class GetStaleVacanciesHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = OpenVacancy(companyId, Now.AddDays(-60));
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Sophie", "Wright", "sophie.wright@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Sophie", "Wright", "sophie.wright@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now.AddDays(-20));
 
         db.Vacancies.Add(vacancy);
@@ -144,7 +144,7 @@ public class GetStaleVacanciesHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = OpenVacancy(companyId, Now.AddDays(-60));
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Kai", "Reed", "kai.reed@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Kai", "Reed", "kai.reed@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now.AddDays(-40));
         var interview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(-2), 30, "Room 1", Now.AddDays(-40));
 
@@ -166,7 +166,7 @@ public class GetStaleVacanciesHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = OpenVacancy(companyId, Now.AddDays(-60));
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Mara", "Voss", "mara.voss@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Mara", "Voss", "mara.voss@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now.AddDays(-40));
         var interview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(-40), 30, "Room 1", Now.AddDays(-40));
 

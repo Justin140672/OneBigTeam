@@ -93,9 +93,9 @@ public class GetExternalRecruiterActivitySummaryHandlerTests
         var otherRecruiter = ExternalRecruiter.Create(Guid.NewGuid(), companyId, "Beta Talent", null, null, null, null, null, Now);
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
-        var candidate1 = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma@example.com", null, null, Now);
-        var candidate2 = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam@example.com", null, null, Now);
-        var candidate3 = Candidate.Create(Guid.NewGuid(), companyId, "Nina", "Patel", "nina@example.com", null, null, Now);
+        var candidate1 = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma@example.com", null, Now);
+        var candidate2 = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam@example.com", null, Now);
+        var candidate3 = Candidate.Create(Guid.NewGuid(), companyId, "Nina", "Patel", "nina@example.com", null, Now);
 
         var introducedApplication = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate1.Id, stages.ApplicationReceived.Id, null, Now, ApplicationSource.ExternalRecruiter, recruiter.Id);
         var hiredApplication = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate2.Id, stages.Hired.Id, null, Now, ApplicationSource.ExternalRecruiter, recruiter.Id);

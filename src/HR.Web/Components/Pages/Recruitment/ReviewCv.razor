@@ -168,14 +168,6 @@
                             <p class="text-muted">No CV has been uploaded for this candidate.</p>
                         }
 
-                        @if (!string.IsNullOrWhiteSpace(_legacyResumeUrl))
-                        {
-                            <p class="mt-3" data-testid="review-cv-legacy-link">
-                                <a href="@_legacyResumeUrl" target="_blank" rel="noopener">Legacy CV link</a>
-                                <span class="text-muted small"> (legacy link recorded on the candidate record)</span>
-                            </p>
-                        }
-
                         @if (_app.WithdrawnAt is null)
                         {
                             @* Internal recruitment Ticket 2: application-scoped CV actions. Uploading adds the file
@@ -245,7 +237,6 @@
     private bool _busy;
     private GetApplicationResponse? _app;
     private string? _vacancyTitle;
-    private string? _legacyResumeUrl;
     private string _notes = string.Empty;
     private string? _globalError;
     private string? _success;
@@ -311,9 +302,6 @@
             var vacancy = await VacancyService.GetVacancyAsync(CompanyId, VacancyId);
             _vacancyTitle = vacancy?.EffectiveTitle ?? vacancy?.PositionProfileTitle;
 
-            // Ticket 2: always load the candidate — the legacy link is shown whether or not a document CV exists.
-            var candidate = await CandidateService.GetCandidateAsync(CompanyId, _app.CandidateId);
-            _legacyResumeUrl = candidate?.ResumeUrl;
         }
 
         _loading = false;

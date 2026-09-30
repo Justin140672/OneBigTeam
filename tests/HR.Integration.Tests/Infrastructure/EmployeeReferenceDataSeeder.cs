@@ -24,8 +24,7 @@ internal static class EmployeeReferenceDataSeeder
         var locationType = LocationType.Create(Guid.NewGuid(), companyId, $"LocType-{Guid.NewGuid():N}", null, now);
         var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, $"Loc-{Guid.NewGuid():N}", null, now);
         var positionProfile = PositionProfile.Create(
-            Guid.NewGuid(), companyId, department.Id, location.Id, $"Role-{Guid.NewGuid():N}", null,
-            probationMonthsOverride: null, workingDaysOverride: null, hoursPerDayOverride: null,
+            Guid.NewGuid(), companyId, department.Id, location.Id, $"Role-{Guid.NewGuid():N}", probationMonthsOverride: null, workingDaysOverride: null, hoursPerDayOverride: null,
             salaryMin: null, salaryMax: null, salaryType: null, defaultLeavePolicyId: Guid.NewGuid(), now);
         var employmentType = EmploymentType.Create(Guid.NewGuid(), companyId, $"EmpType-{Guid.NewGuid():N}", null, now);
 

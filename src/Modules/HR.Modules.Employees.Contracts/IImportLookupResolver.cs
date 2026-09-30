@@ -13,7 +13,8 @@ public interface IImportLookupResolver
     Task<ImportLookupResult> GetOrCreateLocationAsync(Guid companyId, string name, CancellationToken cancellationToken);
 
     Task<PositionProfileImportLookupResult> GetOrCreatePositionProfileAsync(
-        Guid companyId, string title, Guid? departmentId, Guid? locationId, CancellationToken cancellationToken);
+        Guid companyId, string title, Guid? departmentId, Guid? locationId,
+        IReadOnlySet<Guid> excludedProfileIds, Guid? allowedEmployeeId, CancellationToken cancellationToken);
 
     Task<Guid?> TryFindDepartmentAsync(Guid companyId, string name, CancellationToken cancellationToken);
 
@@ -21,5 +22,7 @@ public interface IImportLookupResolver
 
     Task<Guid?> TryFindLocationAsync(Guid companyId, string name, CancellationToken cancellationToken);
 
-    Task<Guid?> TryFindPositionProfileAsync(Guid companyId, string title, CancellationToken cancellationToken);
+    Task<Guid?> TryFindPositionProfileAsync(
+        Guid companyId, string title, Guid? departmentId, Guid? locationId,
+        IReadOnlySet<Guid> excludedProfileIds, Guid? allowedEmployeeId, CancellationToken cancellationToken);
 }

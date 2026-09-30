@@ -26,8 +26,8 @@ public class PositionChangedHandlerTests
         context.LocationTypes.Add(locationType);
         context.Locations.Add(location);
 
-        var previousPosition = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Analyst", null, null, null, null, null, null, null, Guid.NewGuid(), now);
-        var newPosition = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Senior Analyst", null, null, null, null, null, null, null, Guid.NewGuid(), now);
+        var previousPosition = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Analyst", null, null, null, null, null, null, Guid.NewGuid(), now);
+        var newPosition = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, location.Id, "Senior Analyst", null, null, null, null, null, null, Guid.NewGuid(), now);
         context.PositionProfiles.AddRange(previousPosition, newPosition);
         await context.SaveChangesAsync();
 

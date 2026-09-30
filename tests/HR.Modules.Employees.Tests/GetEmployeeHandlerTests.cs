@@ -231,7 +231,7 @@ public class GetEmployeeHandlerTests
         var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
         var locationType = LocationType.Create(Guid.NewGuid(), companyId, "Office", null, now);
         var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "Head Office", null, now);
-        var position   = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, Guid.NewGuid(), "Senior Developer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
+        var position   = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, Guid.NewGuid(), "Senior Developer", null, null, null, null, null, null, Guid.NewGuid(), now);
         var manager    = Employee.Create(Guid.NewGuid(), companyId, "Jane", "Manager", "jane@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
         context.Departments.Add(department);
         context.LocationTypes.Add(locationType);
@@ -345,9 +345,9 @@ public class GetEmployeeHandlerTests
         var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, now);
         var locationType = LocationType.Create(Guid.NewGuid(), companyId, "Office", null, now);
         var location = Location.Create(Guid.NewGuid(), companyId, locationType.Id, "Head Office", null, now);
-        var ceoProfile      = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, Guid.NewGuid(), "CEO", null, null, null, null, null, null, null, Guid.NewGuid(), now);
-        var directorProfile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, Guid.NewGuid(), "Director", null, null, null, null, null, null, null, Guid.NewGuid(), now);
-        var managerProfile  = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, Guid.NewGuid(), "Manager", null, null, null, null, null, null, null, Guid.NewGuid(), now);
+        var ceoProfile      = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, Guid.NewGuid(), "CEO", null, null, null, null, null, null, Guid.NewGuid(), now);
+        var directorProfile = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, Guid.NewGuid(), "Director", null, null, null, null, null, null, Guid.NewGuid(), now);
+        var managerProfile  = PositionProfile.Create(Guid.NewGuid(), companyId, department.Id, Guid.NewGuid(), "Manager", null, null, null, null, null, null, Guid.NewGuid(), now);
         context.Departments.Add(department);
         context.LocationTypes.Add(locationType);
         context.Locations.Add(location);

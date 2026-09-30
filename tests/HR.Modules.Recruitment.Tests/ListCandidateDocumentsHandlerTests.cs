@@ -21,7 +21,7 @@ public class ListCandidateDocumentsHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         db.Candidates.Add(candidate);
         db.CandidateDocuments.AddRange(
             CandidateDocument.Create(Guid.NewGuid(), companyId, candidate.Id, "Resume", "resume.pdf", 1024, "application/pdf", "key1", Guid.NewGuid(), Now),
@@ -41,8 +41,8 @@ public class ListCandidateDocumentsHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var candidateA = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
-        var candidateB = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        var candidateA = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
+        var candidateB = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, Now);
         db.Candidates.AddRange(candidateA, candidateB);
         db.CandidateDocuments.Add(
             CandidateDocument.Create(Guid.NewGuid(), companyId, candidateA.Id, "Resume", "resume.pdf", 1024, "application/pdf", "key1", Guid.NewGuid(), Now));
@@ -60,7 +60,7 @@ public class ListCandidateDocumentsHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         db.Candidates.Add(candidate);
         db.CandidateDocuments.AddRange(
             CandidateDocument.Create(Guid.NewGuid(), companyId, candidate.Id, "Resume v1", "v1.pdf", 1024, "application/pdf", "key1", Guid.NewGuid(), Now),
@@ -79,7 +79,7 @@ public class ListCandidateDocumentsHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         db.Candidates.Add(candidate);
         db.CandidateDocuments.AddRange(
             CandidateDocument.Create(Guid.NewGuid(), companyId, candidate.Id, "CV", "cv.pdf", 1024, "application/pdf", "key1", Guid.NewGuid(), Now.AddMinutes(5), CandidateDocumentKind.Cv),
@@ -115,7 +115,7 @@ public class ListCandidateDocumentsHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var olderCv = Doc(companyId, candidate.Id, "cv-v1.pdf", Now);
         var newerCv = Doc(companyId, candidate.Id, "cv-v2.pdf", Now.AddDays(1));
         db.Candidates.Add(candidate);
@@ -138,7 +138,7 @@ public class ListCandidateDocumentsHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var cv = Doc(companyId, candidate.Id, "cv.pdf", Now);
         var coverLetter = Doc(companyId, candidate.Id, "cover.pdf", Now.AddDays(1), CandidateDocumentKind.Other);
         db.Candidates.Add(candidate);
@@ -159,7 +159,7 @@ public class ListCandidateDocumentsHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         db.Candidates.Add(candidate);
         db.CandidateDocuments.AddRange(
             Doc(companyId, candidate.Id, "cover.pdf", Now, CandidateDocumentKind.Other),
@@ -178,7 +178,7 @@ public class ListCandidateDocumentsHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var first = Doc(companyId, candidate.Id, "cv-a.pdf", Now);
         var second = Doc(companyId, candidate.Id, "cv-b.pdf", Now);
         db.Candidates.Add(candidate);
@@ -200,7 +200,7 @@ public class ListCandidateDocumentsHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var oldCv = Doc(companyId, candidate.Id, "cv-v1.pdf", Now);
         var newCv = Doc(companyId, candidate.Id, "cv-v2.pdf", Now.AddDays(1));
         var unreferenced = Doc(companyId, candidate.Id, "cover.pdf", Now.AddDays(2), CandidateDocumentKind.Other);
@@ -240,7 +240,7 @@ public class ListCandidateDocumentsHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Engineer", null, Guid.NewGuid(), Now);
         db.Candidates.Add(candidate);
         db.Vacancies.Add(vacancy);

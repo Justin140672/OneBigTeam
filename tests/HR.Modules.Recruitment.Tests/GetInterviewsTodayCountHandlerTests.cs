@@ -17,7 +17,7 @@ public class GetInterviewsTodayCountHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now);
         var todayMorning = new DateTimeOffset(2026, 7, 6, 9, 0, 0, TimeSpan.Zero);
         var todayEvening = new DateTimeOffset(2026, 7, 6, 16, 0, 0, TimeSpan.Zero);
@@ -43,7 +43,7 @@ public class GetInterviewsTodayCountHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now);
         var yesterday = new DateTimeOffset(2026, 7, 5, 12, 0, 0, TimeSpan.Zero);
         var tomorrow = new DateTimeOffset(2026, 7, 7, 12, 0, 0, TimeSpan.Zero);
@@ -68,7 +68,7 @@ public class GetInterviewsTodayCountHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Noah", "Patel", "noah.patel@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Noah", "Patel", "noah.patel@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now);
         var todayAfternoon = new DateTimeOffset(2026, 7, 6, 14, 0, 0, TimeSpan.Zero);
         var interview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), todayAfternoon, 30, null, Now);
@@ -93,7 +93,7 @@ public class GetInterviewsTodayCountHandlerTests
         var companyId = Guid.NewGuid();
         var otherCompanyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), otherCompanyId, Guid.NewGuid(), "Product Designer", null, Guid.NewGuid(), Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), otherCompanyId, "Olivia", "Grant", "olivia.grant@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), otherCompanyId, "Olivia", "Grant", "olivia.grant@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), otherCompanyId, vacancy.Id, candidate.Id, Guid.NewGuid(), null, Now);
         var todayAfternoon = new DateTimeOffset(2026, 7, 6, 14, 0, 0, TimeSpan.Zero);
         db.Vacancies.Add(vacancy);

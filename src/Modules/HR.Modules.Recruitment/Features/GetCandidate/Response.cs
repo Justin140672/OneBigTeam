@@ -7,7 +7,6 @@ internal sealed record GetCandidateResponse(
     string LastName,
     string Email,
     string? Phone,
-    string? ResumeUrl,
     Guid? EmployeeId,
     bool IsActive,
     DateTimeOffset? DeactivatedAt,

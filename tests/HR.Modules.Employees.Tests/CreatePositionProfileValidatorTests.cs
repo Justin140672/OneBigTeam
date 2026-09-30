@@ -54,22 +54,6 @@ public class CreatePositionProfileValidatorTests
     }
 
     [Fact]
-    public void Validate_Fails_When_Description_Exceeds_Max_Length()
-    {
-        var validator = new CreatePositionProfileValidator();
-
-        var result = validator.Validate(new CreatePositionProfileRequest
-        {
-            CompanyId = Guid.NewGuid(),
-            Title = "Software Developer",
-            Description = new string('A', 2001)
-        });
-
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreatePositionProfileRequest.Description));
-    }
-
-    [Fact]
     public void Validate_Passes_For_Valid_Request()
     {
         var validator = new CreatePositionProfileValidator();
@@ -80,8 +64,7 @@ public class CreatePositionProfileValidatorTests
             DepartmentId = Guid.NewGuid(),
             LocationId = Guid.NewGuid(),
             DefaultLeavePolicyId = Guid.NewGuid(),
-            Title = "Software Developer",
-            Description = "Builds software"
+            Title = "Software Developer"
         });
 
         Assert.True(result.IsValid);

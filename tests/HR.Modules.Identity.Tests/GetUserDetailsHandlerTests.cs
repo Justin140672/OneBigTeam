@@ -104,7 +104,7 @@ public class GetUserDetailsHandlerTests(IdentityDatabaseFixture fixture)
         var positionReader = new FakePositionProfileReader(
             summaries: new Dictionary<Guid, PositionProfileSummary>
             {
-                [positionProfileId] = new PositionProfileSummary(positionProfileId, "Senior Engineer", null, null, true, null, null),
+                [positionProfileId] = new PositionProfileSummary(positionProfileId, "Senior Engineer", null, true, null, null),
             });
 
         var result = await BuildHandler(audienceReader: audienceReader, positionProfileReader: positionReader)

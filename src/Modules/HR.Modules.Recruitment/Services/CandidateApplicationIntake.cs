@@ -16,7 +16,6 @@ internal sealed record CandidateApplicationIntakeCommand(
     string LastName,
     string Email,
     string? Phone,
-    string? ResumeUrl,
     string? Notes,
     ApplicationSource? Source,
     Guid? SourceExternalRecruiterId,
@@ -216,7 +215,6 @@ internal sealed class CandidateApplicationIntake(
             command.LastName,
             email,
             command.Phone,
-            command.ResumeUrl,
             now);
         db.Candidates.Add(candidate);
 

@@ -17,8 +17,8 @@ public class SearchApplicationsHandlerTests
         var companyId = Guid.NewGuid();
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Engineer", null, Guid.NewGuid(), Now);
-        var c1 = Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@ex.com", null, null, Now);
-        var c2 = Candidate.Create(Guid.NewGuid(), companyId, "Bob",   "Jones", "bob@ex.com",   null, null, Now);
+        var c1 = Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@ex.com", null, Now);
+        var c2 = Candidate.Create(Guid.NewGuid(), companyId, "Bob",   "Jones", "bob@ex.com",   null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.AddRange(c1, c2);
         db.Applications.AddRange(
@@ -41,8 +41,8 @@ public class SearchApplicationsHandlerTests
         var companyId = Guid.NewGuid();
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Engineer", null, Guid.NewGuid(), Now);
-        var alice = Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith",   "alice@ex.com", null, null, Now);
-        var bob   = Candidate.Create(Guid.NewGuid(), companyId, "Bob",   "Johnson", "bob@ex.com",   null, null, Now);
+        var alice = Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith",   "alice@ex.com", null, Now);
+        var bob   = Candidate.Create(Guid.NewGuid(), companyId, "Bob",   "Johnson", "bob@ex.com",   null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.AddRange(alice, bob);
         db.Applications.AddRange(
@@ -66,8 +66,8 @@ public class SearchApplicationsHandlerTests
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var vacA = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Role A", null, Guid.NewGuid(), Now);
         var vacB = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Role B", null, Guid.NewGuid(), Now);
-        var c1   = Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "a@ex.com", null, null, Now);
-        var c2   = Candidate.Create(Guid.NewGuid(), companyId, "Bob",   "Jones", "b@ex.com", null, null, Now);
+        var c1   = Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "a@ex.com", null, Now);
+        var c2   = Candidate.Create(Guid.NewGuid(), companyId, "Bob",   "Jones", "b@ex.com", null, Now);
         db.Vacancies.AddRange(vacA, vacB);
         db.Candidates.AddRange(c1, c2);
         db.Applications.AddRange(
@@ -90,8 +90,8 @@ public class SearchApplicationsHandlerTests
         var companyId = Guid.NewGuid();
         var stages  = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Engineer", null, Guid.NewGuid(), Now);
-        var c1      = Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "a@ex.com", null, null, Now);
-        var c2      = Candidate.Create(Guid.NewGuid(), companyId, "Bob",   "Jones", "b@ex.com", null, null, Now);
+        var c1      = Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "a@ex.com", null, Now);
+        var c2      = Candidate.Create(Guid.NewGuid(), companyId, "Bob",   "Jones", "b@ex.com", null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.AddRange(c1, c2);
         db.Applications.AddRange(
@@ -114,8 +114,8 @@ public class SearchApplicationsHandlerTests
         var companyId = Guid.NewGuid();
         var stages    = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var vacancy   = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Engineer", null, Guid.NewGuid(), Now);
-        var c1        = Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "a@ex.com", null, null, Now);
-        var c2        = Candidate.Create(Guid.NewGuid(), companyId, "Bob",   "Jones", "b@ex.com", null, null, Now);
+        var c1        = Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "a@ex.com", null, Now);
+        var c2        = Candidate.Create(Guid.NewGuid(), companyId, "Bob",   "Jones", "b@ex.com", null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.AddRange(c1, c2);
         db.Applications.AddRange(
@@ -141,8 +141,8 @@ public class SearchApplicationsHandlerTests
         var stagesB  = RecruitmentStageTestData.AddDefaultStages(db, companyB, Now);
         var vacA     = Vacancy.Create(Guid.NewGuid(), companyA, Guid.NewGuid(), "Job A", null, Guid.NewGuid(), Now);
         var vacB     = Vacancy.Create(Guid.NewGuid(), companyB, Guid.NewGuid(), "Job B", null, Guid.NewGuid(), Now);
-        var cA       = Candidate.Create(Guid.NewGuid(), companyA, "Alice", "Smith", "a@ex.com", null, null, Now);
-        var cB       = Candidate.Create(Guid.NewGuid(), companyB, "Bob",   "Jones", "b@ex.com", null, null, Now);
+        var cA       = Candidate.Create(Guid.NewGuid(), companyA, "Alice", "Smith", "a@ex.com", null, Now);
+        var cB       = Candidate.Create(Guid.NewGuid(), companyB, "Bob",   "Jones", "b@ex.com", null, Now);
         db.Vacancies.AddRange(vacA, vacB);
         db.Candidates.AddRange(cA, cB);
         db.Applications.AddRange(
@@ -166,7 +166,7 @@ public class SearchApplicationsHandlerTests
         var stages    = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var vacancy   = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Engineer", null, Guid.NewGuid(), Now);
         var candidates = Enumerable.Range(1, 5)
-            .Select(i => Candidate.Create(Guid.NewGuid(), companyId, $"Candidate{i}", "Test", $"c{i}@ex.com", null, null, Now))
+            .Select(i => Candidate.Create(Guid.NewGuid(), companyId, $"Candidate{i}", "Test", $"c{i}@ex.com", null, Now))
             .ToList();
         db.Vacancies.Add(vacancy);
         db.Candidates.AddRange(candidates);
@@ -321,8 +321,8 @@ public class SearchApplicationsHandlerTests
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var vacA = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Role A", null, Guid.NewGuid(), Now);
         var vacB = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Role B", null, Guid.NewGuid(), Now);
-        var alice = Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@ex.com", null, null, Now);
-        var bob   = Candidate.Create(Guid.NewGuid(), companyId, "Bob",   "Jones", "bob@ex.com",   null, null, Now);
+        var alice = Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@ex.com", null, Now);
+        var bob   = Candidate.Create(Guid.NewGuid(), companyId, "Bob",   "Jones", "bob@ex.com",   null, Now);
         var aliceA = Application.Create(Guid.NewGuid(), companyId, vacA.Id, alice.Id, stages.ApplicationReceived.Id, null, Now);
         var aliceB = Application.Create(Guid.NewGuid(), companyId, vacB.Id, alice.Id, stages.CvReview.Id, null, Now.AddMinutes(1));
         db.Vacancies.AddRange(vacA, vacB);
@@ -352,7 +352,7 @@ public class SearchApplicationsHandlerTests
         var companyB = Guid.NewGuid();
         var stagesB  = RecruitmentStageTestData.AddDefaultStages(db, companyB, Now);
         var vacB     = Vacancy.Create(Guid.NewGuid(), companyB, Guid.NewGuid(), "Job B", null, Guid.NewGuid(), Now);
-        var cB       = Candidate.Create(Guid.NewGuid(), companyB, "Bob", "Jones", "b@ex.com", null, null, Now);
+        var cB       = Candidate.Create(Guid.NewGuid(), companyB, "Bob", "Jones", "b@ex.com", null, Now);
         db.Vacancies.Add(vacB);
         db.Candidates.Add(cB);
         db.Applications.Add(Application.Create(Guid.NewGuid(), companyB, vacB.Id, cB.Id, stagesB.ApplicationReceived.Id, null, Now));
@@ -390,8 +390,8 @@ public class SearchApplicationsHandlerTests
         var companyId = Guid.NewGuid();
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Engineer", null, Guid.NewGuid(), Now);
-        var c1 = Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@ex.com", null, null, Now);
-        var c2 = Candidate.Create(Guid.NewGuid(), companyId, "Bob",   "Jones", "bob@ex.com",   null, null, Now);
+        var c1 = Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@ex.com", null, Now);
+        var c2 = Candidate.Create(Guid.NewGuid(), companyId, "Bob",   "Jones", "bob@ex.com",   null, Now);
         var active    = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, c1.Id, stages.CvReview.Id, null, Now);
         var withdrawn = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, c2.Id, stages.Interview.Id, null, Now);
         withdrawn.Withdraw(Now);
@@ -422,7 +422,7 @@ public class SearchApplicationsHandlerTests
         RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var otherStages = RecruitmentStageTestData.AddDefaultStages(db, otherCompanyId, Now);
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Engineer", null, Guid.NewGuid(), Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@ex.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice@ex.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, otherStages.CvReview.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);

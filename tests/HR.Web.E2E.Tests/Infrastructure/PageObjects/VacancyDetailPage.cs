@@ -219,12 +219,6 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         return (await dd.TextContentAsync())?.Trim();
     }
 
-    public async Task<string?> GetLinkedPositionProfileDescriptionAsync()
-    {
-        var dd = LinkedPositionProfileCard.Locator("dt:has-text('Description') + dd");
-        return (await dd.TextContentAsync())?.Trim();
-    }
-
     public Task<bool> IsLinkedPositionProfileInactiveBadgeVisibleAsync() =>
         LinkedPositionProfileCard.GetByText("Inactive", new() { Exact = true }).IsVisibleAsync();
 

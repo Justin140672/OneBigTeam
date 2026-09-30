@@ -8,7 +8,6 @@ internal sealed record UpdateCandidateRequest
     public string LastName { get; init; } = string.Empty;
     public string Email { get; init; } = string.Empty;
     public string? Phone { get; init; }
-    public string? ResumeUrl { get; init; }
 
     // Ticket 2 (optimistic concurrency) — see UpdateEmployeeProfileRequest.ExpectedVersion.
     public int? ExpectedVersion { get; init; }

@@ -24,7 +24,6 @@ internal sealed class CreateCandidateApplicationHandler(CandidateApplicationInta
                 request.LastName,
                 request.Email,
                 request.Phone,
-                request.ResumeUrl,
                 request.Notes,
                 request.Source,
                 request.SourceExternalRecruiterId,

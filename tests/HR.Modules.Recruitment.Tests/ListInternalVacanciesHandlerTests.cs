@@ -76,7 +76,7 @@ public class ListInternalVacanciesHandlerTests
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [ppWithTitle] = new(ppWithTitle, "Profile Title", null, null, true, null, "Head Office", "Engineering"),
+            [ppWithTitle] = new(ppWithTitle, "Profile Title", null, true, null, "Head Office", "Engineering"),
         };
 
         var result = await new ListInternalVacanciesHandler(db, new FakePositionProfileReader(summaries: summaries)).HandleAsync(
@@ -101,7 +101,7 @@ public class ListInternalVacanciesHandlerTests
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [positionProfileId] = new(positionProfileId, "Role", null, null, true, Guid.NewGuid(), "Bristol Office", "Finance"),
+            [positionProfileId] = new(positionProfileId, "Role", null, true, Guid.NewGuid(), "Bristol Office", "Finance"),
         };
 
         var result = await new ListInternalVacanciesHandler(db, new FakePositionProfileReader(summaries: summaries)).HandleAsync(
@@ -128,8 +128,8 @@ public class ListInternalVacanciesHandlerTests
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [ppEng] = new(ppEng, "Backend Engineer", null, null, true, null, null, "Engineering"),
-            [ppFin] = new(ppFin, "Accountant", null, null, true, null, null, "Finance"),
+            [ppEng] = new(ppEng, "Backend Engineer", null, true, null, null, "Engineering"),
+            [ppFin] = new(ppFin, "Accountant", null, true, null, null, "Finance"),
         };
         var reader = new FakePositionProfileReader(summaries: summaries);
 
@@ -201,7 +201,7 @@ public class ListInternalVacanciesHandlerTests
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var vacancy = OpenAdvertised(companyId, Guid.NewGuid(), "Role");
-        var hired = Candidate.Create(Guid.NewGuid(), companyId, "Priya", "Shah", "priya.personal@example.com", null, null, Now);
+        var hired = Candidate.Create(Guid.NewGuid(), companyId, "Priya", "Shah", "priya.personal@example.com", null, Now);
         hired.LinkToEmployee(employeeId, Now);
 
         db.Vacancies.Add(vacancy);
@@ -249,7 +249,7 @@ public class ListInternalVacanciesHandlerTests
         var colleagueVacancy = OpenAdvertised(companyId, Guid.NewGuid(), "Colleague Role");
         var externalVacancy = OpenAdvertised(companyId, Guid.NewGuid(), "External Role");
         var colleague = Candidate.CreateForEmployee(Guid.NewGuid(), companyId, colleagueId, "Tom", "Baker", "tom.baker@acme.example", null, Now);
-        var external = Candidate.Create(Guid.NewGuid(), companyId, "Priya", "Shah", "priya.shah@acme.example", null, null, Now);
+        var external = Candidate.Create(Guid.NewGuid(), companyId, "Priya", "Shah", "priya.shah@acme.example", null, Now);
 
         db.Vacancies.AddRange(colleagueVacancy, externalVacancy);
         db.Candidates.AddRange(colleague, external);

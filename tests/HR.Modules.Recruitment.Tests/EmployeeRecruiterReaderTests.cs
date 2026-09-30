@@ -31,7 +31,7 @@ public class EmployeeRecruiterReaderTests
         Guid? assignedRecruiterId,
         Guid stageId)
     {
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith", $"alice{Guid.NewGuid():N}@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith", $"alice{Guid.NewGuid():N}@example.com", null, Now);
         candidate.LinkToEmployee(employeeId, Now);
 
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Engineer", null, hiringManagerId, Now, assignedRecruiterId);
@@ -215,7 +215,7 @@ public class EmployeeRecruiterReaderTests
             Guid.NewGuid(), companyId, "Later Agency", null, null, null, null, null, Now);
         db.ExternalRecruiters.AddRange(earlierRecruiter, laterRecruiter);
 
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice.twice@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Alice", "Smith", "alice.twice@example.com", null, Now);
         candidate.LinkToEmployee(employeeId, Now);
         var laterVacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Later", null, Guid.NewGuid(), Now, laterRecruiter.Id);
         var earlierVacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Earlier", null, Guid.NewGuid(), Now, earlierRecruiter.Id);

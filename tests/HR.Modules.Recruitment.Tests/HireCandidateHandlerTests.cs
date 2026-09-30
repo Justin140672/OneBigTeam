@@ -38,7 +38,7 @@ public class HireCandidateHandlerTests
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [positionProfileId] = new(positionProfileId, "Senior Software Engineer", departmentId, null, true, locationId, "London"),
+            [positionProfileId] = new(positionProfileId, "Senior Software Engineer", departmentId, true, locationId, "London"),
         };
 
         return (db, companyId, vacancy, departmentId, locationId, new FakePositionProfileReader(summaries: summaries), stages);
@@ -50,7 +50,7 @@ public class HireCandidateHandlerTests
         await using var db = BuildContext();
         var provisioning = new FakeEmployeeProvisioningService();
         var (_, companyId, vacancy, departmentId, locationId, reader, stages) = SeedVacancyWithResolvableProfile(db);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", "+44 7700 900001", null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", "+44 7700 900001", Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Offer.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -96,7 +96,7 @@ public class HireCandidateHandlerTests
         var provisioning = new FakeEmployeeProvisioningService();
         var eventPublisher = new FakeIntegrationEventPublisher();
         var (_, companyId, vacancy, _, _, reader, stages) = SeedVacancyWithResolvableProfile(db);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", "+44 7700 900001", null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", "+44 7700 900001", Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Offer.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -124,7 +124,7 @@ public class HireCandidateHandlerTests
         await using var db = BuildContext();
         var eventPublisher = new FakeIntegrationEventPublisher();
         var (_, companyId, vacancy, _, _, reader, stages) = SeedVacancyWithResolvableProfile(db);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Offer.Id, null, Now);
         application.Withdraw(Now);
         db.Vacancies.Add(vacancy);
@@ -159,7 +159,7 @@ public class HireCandidateHandlerTests
     {
         await using var db = BuildContext();
         var (_, companyId, vacancy, _, _, reader, stages) = SeedVacancyWithResolvableProfile(db);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Rejected.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -179,7 +179,7 @@ public class HireCandidateHandlerTests
         await using var db = BuildContext();
         var (_, companyId, vacancy, _, _, reader, stages) = SeedVacancyWithResolvableProfile(db);
         stages.Hired.SetActiveStatus(false, Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Liam", "Turner", "liam.turner@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Offer.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -198,7 +198,7 @@ public class HireCandidateHandlerTests
     {
         await using var db = BuildContext();
         var (_, companyId, vacancy, _, _, reader, stages) = SeedVacancyWithResolvableProfile(db);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Olivia", "Grant", "olivia.grant@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Olivia", "Grant", "olivia.grant@example.com", null, Now);
         candidate.LinkToEmployee(Guid.NewGuid(), Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Offer.Id, null, Now);
         db.Vacancies.Add(vacancy);
@@ -219,7 +219,7 @@ public class HireCandidateHandlerTests
         await using var db = BuildContext();
         var provisioning = new FakeEmployeeProvisioningService(Result.Failure<Guid>(Error.Conflict("Work email already exists.")));
         var (_, companyId, vacancy, _, _, reader, stages) = SeedVacancyWithResolvableProfile(db);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Noah", "Patel", "noah.patel@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Noah", "Patel", "noah.patel@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Offer.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -246,7 +246,7 @@ public class HireCandidateHandlerTests
         var companyId = Guid.NewGuid();
         var vacancyId = Guid.NewGuid();
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Ivy", "Wren", "ivy.wren@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Ivy", "Wren", "ivy.wren@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancyId, candidate.Id, stages.Offer.Id, null, Now);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -266,7 +266,7 @@ public class HireCandidateHandlerTests
         var companyId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Zara", "Osei", "zara.osei@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Zara", "Osei", "zara.osei@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Offer.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -288,7 +288,7 @@ public class HireCandidateHandlerTests
         var positionProfileId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, positionProfileId, "Backend Engineer", null, Guid.NewGuid(), Now);
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Milo", "Adeyemi", "milo.adeyemi@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Milo", "Adeyemi", "milo.adeyemi@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Offer.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -297,7 +297,7 @@ public class HireCandidateHandlerTests
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [positionProfileId] = new(positionProfileId, "Backend Engineer", null, null, true, Guid.NewGuid(), "London"),
+            [positionProfileId] = new(positionProfileId, "Backend Engineer", null, true, Guid.NewGuid(), "London"),
         };
 
         var result = await handler(db, positionProfileReader: new FakePositionProfileReader(summaries: summaries)).HandleAsync(
@@ -315,7 +315,7 @@ public class HireCandidateHandlerTests
         var positionProfileId = Guid.NewGuid();
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, positionProfileId, "Backend Engineer", null, Guid.NewGuid(), Now);
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Nadia", "Farouk", "nadia.farouk@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Nadia", "Farouk", "nadia.farouk@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Offer.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -324,7 +324,7 @@ public class HireCandidateHandlerTests
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [positionProfileId] = new(positionProfileId, "Backend Engineer", Guid.NewGuid(), null, true, null, null),
+            [positionProfileId] = new(positionProfileId, "Backend Engineer", Guid.NewGuid(), true, null, null),
         };
 
         var result = await handler(db, positionProfileReader: new FakePositionProfileReader(summaries: summaries)).HandleAsync(
@@ -340,7 +340,7 @@ public class HireCandidateHandlerTests
         SeedOfferStageApplication(RecruitmentDbContext db)
     {
         var (_, companyId, vacancy, _, _, reader, stages) = SeedVacancyWithResolvableProfile(db);
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", "+44 7700 900001", null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", "+44 7700 900001", Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Offer.Id, null, Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);

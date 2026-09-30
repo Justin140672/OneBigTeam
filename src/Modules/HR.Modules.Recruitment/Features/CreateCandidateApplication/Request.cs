@@ -17,7 +17,6 @@ internal sealed class CreateCandidateApplicationRequest
     public string LastName { get; init; } = string.Empty;
     public string Email { get; init; } = string.Empty;
     public string? Phone { get; init; }
-    public string? ResumeUrl { get; init; }
 
     public string? Notes { get; init; }
     public ApplicationSource? Source { get; init; }

@@ -14,7 +14,7 @@ public class GetCandidateHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         db.Candidates.Add(candidate);
         await db.SaveChangesAsync();
 
@@ -44,7 +44,7 @@ public class GetCandidateHandlerTests
     public async Task HandleAsync_Returns_NotFound_When_Candidate_Belongs_To_Different_Company()
     {
         await using var db = BuildContext();
-        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Liam", "Turner", "liam.turner@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Liam", "Turner", "liam.turner@example.com", null, Now);
         db.Candidates.Add(candidate);
         await db.SaveChangesAsync();
 

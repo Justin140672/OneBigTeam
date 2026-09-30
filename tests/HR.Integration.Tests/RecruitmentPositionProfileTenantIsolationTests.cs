@@ -74,7 +74,7 @@ public class RecruitmentPositionProfileTenantIsolationTests
             var vacancyA = Vacancy.Create(
                 Guid.NewGuid(), companyA, referenceDataA.PositionProfileId, "Company A Role", null, Guid.NewGuid(), Now);
             var candidateA = Candidate.Create(
-                Guid.NewGuid(), companyA, "Ada", "Lovelace", $"ada.{Guid.NewGuid():N}@example.com", null, null, Now);
+                Guid.NewGuid(), companyA, "Ada", "Lovelace", $"ada.{Guid.NewGuid():N}@example.com", null, Now);
             var stages = RecruitmentStageSeeder.BuildDefaultStages(companyA, Now);
             var offerStageId = stages.Single(s => s.Name == "Offer").Id;
             var applicationA = Application.Create(Guid.NewGuid(), companyA, vacancyA.Id, candidateA.Id, offerStageId, null, Now);

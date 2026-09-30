@@ -15,7 +15,7 @@ public class PurgeEligibleCandidatesHandlerTests
 
     private static Candidate CreateCandidateUpdatedAt(Guid companyId, DateTimeOffset updatedAt)
     {
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, null, updatedAt);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", $"emma.{Guid.NewGuid():N}@example.com", null, updatedAt);
         return candidate;
     }
 

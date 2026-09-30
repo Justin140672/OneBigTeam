@@ -9,34 +9,32 @@ public class CandidateTests
     [Fact]
     public void Create_Trims_And_Normalises_Optional_Fields()
     {
-        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), " Emma ", " Clarke ", " emma.clarke@example.com ", "  ", "   ", Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), " Emma ", " Clarke ", " emma.clarke@example.com ", "  ", Now);
 
         Assert.Equal("Emma", candidate.FirstName);
         Assert.Equal("Clarke", candidate.LastName);
         Assert.Equal("emma.clarke@example.com", candidate.Email);
         Assert.Null(candidate.Phone);
-        Assert.Null(candidate.ResumeUrl);
     }
 
     [Fact]
     public void UpdateDetails_Overwrites_Fields_And_UpdatedAt()
     {
-        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var later = Now.AddDays(1);
 
-        candidate.UpdateDetails("Emma", "Clarke-Smith", "emma.clarke-smith@example.com", "+44 7700 900001", "https://example.com/resume.pdf", later);
+        candidate.UpdateDetails("Emma", "Clarke-Smith", "emma.clarke-smith@example.com", "+44 7700 900001", later);
 
         Assert.Equal("Clarke-Smith", candidate.LastName);
         Assert.Equal("emma.clarke-smith@example.com", candidate.Email);
         Assert.Equal("+44 7700 900001", candidate.Phone);
-        Assert.Equal("https://example.com/resume.pdf", candidate.ResumeUrl);
         Assert.Equal(later, candidate.UpdatedAt);
     }
 
     [Fact]
     public void LinkToEmployee_Sets_EmployeeId()
     {
-        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var employeeId = Guid.NewGuid();
 
         candidate.LinkToEmployee(employeeId, Now);
@@ -47,7 +45,7 @@ public class CandidateTests
     [Fact]
     public void LinkToEmployee_When_Already_Linked_Throws()
     {
-        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         candidate.LinkToEmployee(Guid.NewGuid(), Now);
 
         Assert.Throws<InvalidOperationException>(() => candidate.LinkToEmployee(Guid.NewGuid(), Now));
@@ -56,7 +54,7 @@ public class CandidateTests
     [Fact]
     public void Deactivate_Sets_IsActive_False_And_Deactivation_Fields()
     {
-        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var deactivatedBy = Guid.NewGuid();
         var later = Now.AddDays(1);
 
@@ -72,7 +70,7 @@ public class CandidateTests
     [Fact]
     public void Deactivate_When_Already_Inactive_Throws()
     {
-        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         candidate.Deactivate(Guid.NewGuid(), "No longer available", Now);
 
         Assert.Throws<InvalidOperationException>(() => candidate.Deactivate(Guid.NewGuid(), "Another reason", Now.AddDays(1)));
@@ -81,7 +79,7 @@ public class CandidateTests
     [Fact]
     public void Reactivate_Sets_IsActive_True_And_Reactivation_Fields()
     {
-        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         candidate.Deactivate(Guid.NewGuid(), "No longer available", Now);
         var reactivatedBy = Guid.NewGuid();
         var later = Now.AddDays(2);
@@ -97,7 +95,7 @@ public class CandidateTests
     [Fact]
     public void Reactivate_When_Already_Active_Throws()
     {
-        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, Now);
 
         Assert.Throws<InvalidOperationException>(() => candidate.Reactivate(Guid.NewGuid(), Now));
     }
@@ -105,7 +103,7 @@ public class CandidateTests
     [Fact]
     public void Reactivate_Does_Not_Clear_Prior_Deactivation_History_Fields()
     {
-        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var deactivatedBy = Guid.NewGuid();
         candidate.Deactivate(deactivatedBy, "No longer available", Now);
 
@@ -120,7 +118,7 @@ public class CandidateTests
     [Fact]
     public void Purge_Redacts_Personal_Data_Fields()
     {
-        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", "+44 7700 900001", "https://example.com/resume.pdf", Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", "+44 7700 900001", Now);
         var purgedBy = Guid.NewGuid();
         var later = Now.AddDays(1);
 
@@ -130,7 +128,6 @@ public class CandidateTests
         Assert.Equal("[purged]", candidate.LastName);
         Assert.Equal($"purged-{candidate.Id:N}@purged.invalid", candidate.Email);
         Assert.Null(candidate.Phone);
-        Assert.Null(candidate.ResumeUrl);
         Assert.Equal(later, candidate.PurgedAt);
         Assert.Equal(purgedBy, candidate.PurgedByUserId);
         Assert.Equal(later, candidate.UpdatedAt);
@@ -139,7 +136,7 @@ public class CandidateTests
     [Fact]
     public void Create_Defaults_PurgedAt_And_PurgedByUserId_To_Null()
     {
-        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, Now);
 
         Assert.Null(candidate.PurgedAt);
         Assert.Null(candidate.PurgedByUserId);
@@ -148,7 +145,7 @@ public class CandidateTests
     [Fact]
     public void Purge_When_Already_Purged_Throws()
     {
-        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, null, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), Guid.NewGuid(), "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         candidate.Purge(Guid.NewGuid(), Now);
 
         Assert.Throws<InvalidOperationException>(() => candidate.Purge(Guid.NewGuid(), Now.AddDays(1)));

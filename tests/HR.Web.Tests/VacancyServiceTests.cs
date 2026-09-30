@@ -106,7 +106,7 @@ public class VacancyServiceTests
     [Fact]
     public async Task GetVacancyAsync_Returns_Value_When_Api_Returns_Ok()
     {
-        var response = new GetVacancyResponse(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Software Engineer", null, "Open", Guid.NewGuid(), null, null, null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, null, null, null, "Software Engineer", null, 0, true);
+        var response = new GetVacancyResponse(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), "Software Engineer", null, "Open", Guid.NewGuid(), null, null, null, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow, null, null, null, "Software Engineer", null, 0, true);
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.OK, response));
         var service = new VacancyService(factory);
 

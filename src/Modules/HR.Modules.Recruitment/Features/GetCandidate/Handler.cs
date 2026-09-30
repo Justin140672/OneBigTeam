@@ -27,7 +27,6 @@ internal sealed class GetCandidateHandler(RecruitmentDbContext db)
             candidate.LastName,
             candidate.Email,
             candidate.Phone,
-            candidate.ResumeUrl,
             candidate.EmployeeId,
             candidate.IsActive,
             candidate.DeactivatedAt,

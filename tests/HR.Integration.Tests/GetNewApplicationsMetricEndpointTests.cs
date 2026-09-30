@@ -68,9 +68,9 @@ public class GetNewApplicationsMetricEndpointTests
             var received = stages.Single(s => s.Name == "Application Received");
             var hired = stages.Single(s => s.Name == "Hired");
             var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
-            var c1 = Candidate.Create(Guid.NewGuid(), companyId, "Ana", "Ng", $"ana.{Guid.NewGuid():N}@example.com", null, null, Now);
-            var c2 = Candidate.Create(Guid.NewGuid(), companyId, "Bo", "Li", $"bo.{Guid.NewGuid():N}@example.com", null, null, Now);
-            var c3 = Candidate.Create(Guid.NewGuid(), companyId, "Cy", "Fox", $"cy.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var c1 = Candidate.Create(Guid.NewGuid(), companyId, "Ana", "Ng", $"ana.{Guid.NewGuid():N}@example.com", null, Now);
+            var c2 = Candidate.Create(Guid.NewGuid(), companyId, "Bo", "Li", $"bo.{Guid.NewGuid():N}@example.com", null, Now);
+            var c3 = Candidate.Create(Guid.NewGuid(), companyId, "Cy", "Fox", $"cy.{Guid.NewGuid():N}@example.com", null, Now);
             var withdrawn = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, c2.Id, received.Id, null, Now);
             withdrawn.Withdraw(Now);
             db.RecruitmentStages.AddRange(stages);
@@ -103,8 +103,8 @@ public class GetNewApplicationsMetricEndpointTests
             var screen = RecruitmentStage.Create(Guid.NewGuid(), companyId, "Screening", 2, false, RecruitmentStageTerminalOutcome.None, Now);
             var shortlist = RecruitmentStage.Create(Guid.NewGuid(), companyId, "Shortlisted", 1, false, RecruitmentStageTerminalOutcome.None, Now);
             var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Data Analyst", null, Guid.NewGuid(), Now);
-            var c1 = Candidate.Create(Guid.NewGuid(), companyId, "Di", "Ma", $"di.{Guid.NewGuid():N}@example.com", null, null, Now);
-            var c2 = Candidate.Create(Guid.NewGuid(), companyId, "Ed", "Ro", $"ed.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var c1 = Candidate.Create(Guid.NewGuid(), companyId, "Di", "Ma", $"di.{Guid.NewGuid():N}@example.com", null, Now);
+            var c2 = Candidate.Create(Guid.NewGuid(), companyId, "Ed", "Ro", $"ed.{Guid.NewGuid():N}@example.com", null, Now);
             db.RecruitmentStages.AddRange(screen, shortlist);
             db.Vacancies.Add(vacancy);
             db.Candidates.AddRange(c1, c2);
@@ -135,7 +135,7 @@ public class GetNewApplicationsMetricEndpointTests
             var stages = RecruitmentStageSeeder.BuildDefaultStages(otherCompanyId, Now).ToList();
             var received = stages.Single(s => s.Name == "Application Received");
             var vacancy = Vacancy.Create(Guid.NewGuid(), otherCompanyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
-            var cand = Candidate.Create(Guid.NewGuid(), otherCompanyId, "Fi", "Su", $"fi.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var cand = Candidate.Create(Guid.NewGuid(), otherCompanyId, "Fi", "Su", $"fi.{Guid.NewGuid():N}@example.com", null, Now);
             db.RecruitmentStages.AddRange(stages);
             db.Vacancies.Add(vacancy);
             db.Candidates.Add(cand);

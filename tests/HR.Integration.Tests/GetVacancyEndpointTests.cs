@@ -72,7 +72,7 @@ public class GetVacancyEndpointTests
             var department = Department.Create(departmentId, companyId, "Engineering", null, Now);
             var positionProfile = PositionProfile.Create(
                 Guid.NewGuid(), companyId, departmentId, locationId: Guid.NewGuid(), "Backend Engineer",
-                description: "Owns the payments platform", probationMonthsOverride: null,
+                probationMonthsOverride: null,
                 workingDaysOverride: null, hoursPerDayOverride: null, salaryMin: null, salaryMax: null,
                 salaryType: null, defaultLeavePolicyId: Guid.NewGuid(), Now);
             employeesDb.Departments.Add(department);
@@ -96,7 +96,6 @@ public class GetVacancyEndpointTests
         Assert.Equal(positionProfileId, payload.PositionProfileId);
         Assert.Equal("Backend Engineer", payload.PositionProfileTitle);
         Assert.Equal(departmentId, payload.PositionProfileDepartmentId);
-        Assert.Equal("Owns the payments platform", payload.PositionProfileDescription);
         Assert.True(payload.PositionProfileIsActive);
     }
 
@@ -113,7 +112,7 @@ public class GetVacancyEndpointTests
             var employeesDb = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
             var positionProfile = PositionProfile.Create(
                 Guid.NewGuid(), companyId, Guid.NewGuid(), locationId: Guid.NewGuid(), "Legacy Support Engineer",
-                description: "Legacy on-call support", probationMonthsOverride: null,
+                probationMonthsOverride: null,
                 workingDaysOverride: null, hoursPerDayOverride: null, salaryMin: null, salaryMax: null,
                 salaryType: null, defaultLeavePolicyId: Guid.NewGuid(), Now);
             positionProfile.Deactivate(Now);
@@ -134,7 +133,6 @@ public class GetVacancyEndpointTests
         var payload = await response.Content.ReadFromJsonAsync<VacancyPayload>();
         Assert.NotNull(payload);
         Assert.Equal("Legacy Support Engineer", payload!.PositionProfileTitle);
-        Assert.Equal("Legacy on-call support", payload.PositionProfileDescription);
         Assert.False(payload.PositionProfileIsActive);
     }
 
@@ -209,7 +207,7 @@ public class GetVacancyEndpointTests
             var recruitmentDb = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
             var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, referenceData.PositionProfileId, "Backend Engineer", null, Guid.NewGuid(), Now);
             recruitmentDb.Vacancies.Add(vacancy);
-            var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Jane", "Doe", $"jane.doe.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Jane", "Doe", $"jane.doe.{Guid.NewGuid():N}@example.com", null, Now);
             recruitmentDb.Candidates.Add(candidate);
             var stages = HR.Modules.Recruitment.Services.RecruitmentStageSeeder.BuildDefaultStages(companyId, Now);
             recruitmentDb.RecruitmentStages.AddRange(stages);
@@ -235,7 +233,6 @@ public class GetVacancyEndpointTests
         string? AdvertDescription,
         string? PositionProfileTitle,
         Guid? PositionProfileDepartmentId,
-        string? PositionProfileDescription,
         bool? PositionProfileIsActive,
         string EffectiveTitle,
         string? EffectiveLocation,

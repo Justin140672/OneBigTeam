@@ -14,7 +14,6 @@ public sealed class VacancyLinkedPositionProfileTests(CrossUserFixture fixture) 
     public async Task ViewingVacancy_ShowsLinkedPositionProfileDetails_SourcedFromProfileNotVacancy()
     {
         var profileTitle = $"E2E Linked Profile {Guid.NewGuid().ToString("N")[..8]}";
-        var profileDescription = $"E2E profile description {Guid.NewGuid():N}";
         var vacancyTitle = $"E2E Vacancy {Guid.NewGuid().ToString("N")[..8]}";
 
         var login         = new LoginPage(_page, _fixture.WebBaseUrl);
@@ -32,7 +31,6 @@ public sealed class VacancyLinkedPositionProfileTests(CrossUserFixture fixture) 
         await ppEdit.SelectDepartmentAsync("Engineering");
         await ppEdit.SelectLocationAsync("London Office");
         await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
-        await ppEdit.FillDescriptionAsync(profileDescription);
         await ppEdit.SaveAsync();
 
         Assert.True(await ppList.HasPositionProfileAsync(profileTitle),
@@ -55,7 +53,6 @@ public sealed class VacancyLinkedPositionProfileTests(CrossUserFixture fixture) 
 
         Assert.Equal(profileTitle, await vacancyDetail.GetLinkedPositionProfileTitleAsync());
         Assert.Contains("Engineering", await vacancyDetail.GetLinkedPositionProfileDepartmentAsync() ?? string.Empty);
-        Assert.Equal(profileDescription, await vacancyDetail.GetLinkedPositionProfileDescriptionAsync());
 
         Assert.NotEqual(vacancyTitle, await vacancyDetail.GetLinkedPositionProfileTitleAsync());
         Assert.Equal(vacancyTitle, await vacancyDetail.GetTitleAsync());
@@ -88,7 +85,6 @@ public sealed class VacancyLinkedPositionProfileTests(CrossUserFixture fixture) 
     public async Task ViewingVacancy_WithDeactivatedLinkedProfile_ShowsInactiveIndicator()
     {
         var profileTitle = $"E2E Deactivated Linked Profile {Guid.NewGuid().ToString("N")[..8]}";
-        var profileDescription = $"E2E profile description {Guid.NewGuid():N}";
         var vacancyTitle = $"E2E Vacancy {Guid.NewGuid().ToString("N")[..8]}";
 
         var login         = new LoginPage(_page, _fixture.WebBaseUrl);
@@ -106,7 +102,6 @@ public sealed class VacancyLinkedPositionProfileTests(CrossUserFixture fixture) 
         await ppEdit.SelectDepartmentAsync("Engineering");
         await ppEdit.SelectLocationAsync("London Office");
         await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
-        await ppEdit.FillDescriptionAsync(profileDescription);
         await ppEdit.SaveAsync();
 
         Assert.True(await ppList.HasPositionProfileAsync(profileTitle),
@@ -133,7 +128,6 @@ public sealed class VacancyLinkedPositionProfileTests(CrossUserFixture fixture) 
             "Expected the 'Linked Position Profile' card to render for an existing vacancy");
         Assert.Equal(profileTitle, await vacancyDetail.GetLinkedPositionProfileTitleAsync());
         Assert.Contains("Engineering", await vacancyDetail.GetLinkedPositionProfileDepartmentAsync() ?? string.Empty);
-        Assert.Equal(profileDescription, await vacancyDetail.GetLinkedPositionProfileDescriptionAsync());
 
         Assert.True(await vacancyDetail.IsLinkedPositionProfileInactiveBadgeVisibleAsync(),
             "Expected an 'Inactive' indicator for a deactivated linked position profile");

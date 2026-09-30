@@ -105,7 +105,7 @@ public class CreateCandidateApplicationHandlerTests
         RecruitmentDbContext db, Guid companyId, string email, bool active = true, DateTimeOffset? createdAt = null,
         string firstName = "Existing", string lastName = "Person")
     {
-        var candidate = Candidate.Create(Guid.NewGuid(), companyId, firstName, lastName, email, null, null, createdAt ?? Now.AddDays(-10));
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, firstName, lastName, email, null, createdAt ?? Now.AddDays(-10));
         if (!active)
             candidate.Deactivate(Guid.NewGuid(), "No longer looking", Now.AddDays(-5));
         db.Candidates.Add(candidate);

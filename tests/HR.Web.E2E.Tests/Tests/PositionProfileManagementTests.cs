@@ -45,7 +45,6 @@ public sealed class PositionProfileManagementTests(HrAdminPersonaFixture fixture
         await ppList.ClickNewPositionProfileAsync();
 
         await ppEdit.FillTitleAsync(profileTitle);
-        await ppEdit.FillDescriptionAsync("Created by E2E test");
         await ppEdit.SelectDepartmentAsync("Engineering");
         await ppEdit.SelectLocationAsync("London Office");
         await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
@@ -53,6 +52,35 @@ public sealed class PositionProfileManagementTests(HrAdminPersonaFixture fixture
 
         Assert.True(await ppList.HasPositionProfileAsync(profileTitle),
             $"Expected the new position profile '{profileTitle}' to appear in the list");
+    }
+
+    [Fact]
+    public async Task CreatePositionProfile_WithDuplicateTitle_CreatesSeparateProfile()
+    {
+        var profileTitle = $"E2E Dup Role {Guid.NewGuid().ToString("N")[..8]}";
+
+        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
+        var ppList   = new PositionProfileListPage(_page, _fixture.WebBaseUrl);
+        var ppEdit   = new PositionProfileEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        for (var i = 0; i < 2; i++)
+        {
+            await ppList.GoToAsync(AcmeId);
+            await ppList.ClickNewPositionProfileAsync();
+            await ppEdit.FillTitleAsync(profileTitle);
+            await ppEdit.SelectDepartmentAsync("Engineering");
+            await ppEdit.SelectLocationAsync("London Office");
+            await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
+            await ppEdit.SaveAsync();
+        }
+
+        await ppList.GoToAsync(AcmeId);
+
+        Assert.True(await ppList.HasPositionProfileAsync(profileTitle),
+            $"Expected the duplicate-titled position profile '{profileTitle}' to appear in the list");
     }
 
     [Fact]

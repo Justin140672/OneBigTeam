@@ -68,7 +68,7 @@ public class GetOffersAwaitingResponseMetricEndpointTests
             var s1 = RecruitmentStage.Create(Guid.NewGuid(), companyId, "Screening", 1, false, RecruitmentStageTerminalOutcome.None, Now);
             var s2 = RecruitmentStage.Create(Guid.NewGuid(), companyId, "Final panel", 2, false, RecruitmentStageTerminalOutcome.None, Now);
             var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "PM", null, Guid.NewGuid(), Now);
-            var cand = Candidate.Create(Guid.NewGuid(), companyId, "Ana", "Ng", $"ana.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var cand = Candidate.Create(Guid.NewGuid(), companyId, "Ana", "Ng", $"ana.{Guid.NewGuid():N}@example.com", null, Now);
             db.RecruitmentStages.AddRange(s1, s2);
             db.Vacancies.Add(vacancy);
             db.Candidates.Add(cand);
@@ -97,10 +97,10 @@ public class GetOffersAwaitingResponseMetricEndpointTests
             var written = RecruitmentStage.Create(Guid.NewGuid(), companyId, "Written offer", 5, false, RecruitmentStageTerminalOutcome.None, Now, RecruitmentStagePurpose.Offer);
             var interview = RecruitmentStage.Create(Guid.NewGuid(), companyId, "Interview", 3, false, RecruitmentStageTerminalOutcome.None, Now, RecruitmentStagePurpose.Interview);
             var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "PM", null, Guid.NewGuid(), Now);
-            var c1 = Candidate.Create(Guid.NewGuid(), companyId, "Ana", "Ng", $"ana.{Guid.NewGuid():N}@example.com", null, null, Now);
-            var c2 = Candidate.Create(Guid.NewGuid(), companyId, "Bo", "Li", $"bo.{Guid.NewGuid():N}@example.com", null, null, Now);
-            var c3 = Candidate.Create(Guid.NewGuid(), companyId, "Cy", "Fox", $"cy.{Guid.NewGuid():N}@example.com", null, null, Now);
-            var c4 = Candidate.Create(Guid.NewGuid(), companyId, "Di", "Ma", $"di.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var c1 = Candidate.Create(Guid.NewGuid(), companyId, "Ana", "Ng", $"ana.{Guid.NewGuid():N}@example.com", null, Now);
+            var c2 = Candidate.Create(Guid.NewGuid(), companyId, "Bo", "Li", $"bo.{Guid.NewGuid():N}@example.com", null, Now);
+            var c3 = Candidate.Create(Guid.NewGuid(), companyId, "Cy", "Fox", $"cy.{Guid.NewGuid():N}@example.com", null, Now);
+            var c4 = Candidate.Create(Guid.NewGuid(), companyId, "Di", "Ma", $"di.{Guid.NewGuid():N}@example.com", null, Now);
             var withdrawn = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, c3.Id, written.Id, null, Now);
             withdrawn.Withdraw(Now);
             db.RecruitmentStages.AddRange(verbal, written, interview);
@@ -135,7 +135,7 @@ public class GetOffersAwaitingResponseMetricEndpointTests
             var stages = RecruitmentStageSeeder.BuildDefaultStages(otherCompanyId, Now).ToList();
             var offer = stages.Single(s => s.Name == "Offer");
             var vacancy = Vacancy.Create(Guid.NewGuid(), otherCompanyId, Guid.NewGuid(), "PM", null, Guid.NewGuid(), Now);
-            var cand = Candidate.Create(Guid.NewGuid(), otherCompanyId, "Fi", "Su", $"fi.{Guid.NewGuid():N}@example.com", null, null, Now);
+            var cand = Candidate.Create(Guid.NewGuid(), otherCompanyId, "Fi", "Su", $"fi.{Guid.NewGuid():N}@example.com", null, Now);
             db.RecruitmentStages.AddRange(stages);
             db.Vacancies.Add(vacancy);
             db.Candidates.Add(cand);

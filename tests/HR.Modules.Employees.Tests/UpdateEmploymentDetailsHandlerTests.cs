@@ -424,7 +424,7 @@ public class UpdateEmploymentDetailsHandlerTests
         context.LocationTypes.Add(locationType);
         var newLocation = Location.Create(newLocationId, companyId, locationType.Id, "Remote", null, now);
         context.Locations.Add(newLocation);
-        var newPosition = PositionProfile.Create(newPositionId, companyId, newDept.Id, newLocationId, "Senior Engineer", null, null, null, null, null, null, null, Guid.NewGuid(), now);
+        var newPosition = PositionProfile.Create(newPositionId, companyId, newDept.Id, newLocationId, "Senior Engineer", null, null, null, null, null, null, Guid.NewGuid(), now);
         context.PositionProfiles.Add(newPosition);
         await context.SaveChangesAsync();
 

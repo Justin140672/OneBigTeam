@@ -132,7 +132,7 @@ public class CloseVacancyHandlerTests
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [positionProfileId] = new(positionProfileId, "Position Profile Title", null, null, true, null, null),
+            [positionProfileId] = new(positionProfileId, "Position Profile Title", null, true, null, null),
         };
         var auditPublisher = new FakeAuditPublisher();
 

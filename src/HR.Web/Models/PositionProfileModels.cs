@@ -13,13 +13,16 @@ public record PositionProfileListItemModel(
     Guid Id,
     string? DepartmentName,
     string Title,
-    string? Description,
     bool IsActive,
     decimal? SalaryMin,
     decimal? SalaryMax,
     string? SalaryType,
     NoticePeriodUnit? NoticePeriodUnitOverride = null,
-    int? NoticePeriodLengthOverride = null);
+    int? NoticePeriodLengthOverride = null,
+    string? LocationName = null)
+{
+    public string DisplayLabel => $"{Title} — {DepartmentName ?? "—"} — {LocationName ?? "—"}";
+}
 
 
 public record GetPositionProfileResponse(
@@ -28,7 +31,6 @@ public record GetPositionProfileResponse(
     Guid DepartmentId,
     Guid LocationId,
     string Title,
-    string? Description,
     int? ProbationMonthsOverride,
     WorkingDays? WorkingDaysOverride,
     decimal? HoursPerDayOverride,
@@ -75,7 +77,6 @@ public sealed class PositionProfileEditModel
 {
     [Required(ErrorMessage = "Title is required.")]
     public string Title { get; set; } = string.Empty;
-    public string? Description { get; set; }
     [Required(ErrorMessage = "Department is required.")]
     public Guid? DepartmentId { get; set; }
     [Required(ErrorMessage = "Location is required.")]
@@ -106,7 +107,6 @@ public record CreatePositionProfileRequest(
     Guid DepartmentId,
     Guid LocationId,
     string Title,
-    string? Description,
     int? ProbationMonthsOverride,
     WorkingDays? WorkingDaysOverride,
     decimal? HoursPerDayOverride,
@@ -123,7 +123,6 @@ public record CreatePositionProfileResponse(
     Guid CompanyId,
     Guid DepartmentId,
     string Title,
-    string? Description,
     bool IsActive,
     DateTimeOffset CreatedAt);
 
@@ -209,7 +208,6 @@ public record UpdatePositionProfileRequest(
     Guid DepartmentId,
     Guid LocationId,
     string Title,
-    string? Description,
     int? ProbationMonthsOverride,
     WorkingDays? WorkingDaysOverride,
     decimal? HoursPerDayOverride,
@@ -228,7 +226,6 @@ public record UpdatePositionProfileResponse(
     Guid CompanyId,
     Guid DepartmentId,
     string Title,
-    string? Description,
     bool IsActive,
     DateTimeOffset UpdatedAt,
     int Version = 0);

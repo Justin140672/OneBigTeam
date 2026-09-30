@@ -164,7 +164,7 @@
                                                     @bind-Value="Model.PositionProfileId"
                                                     Placeholder="None"
                                                     AllowFiltering="true">
-                                        <DropDownListFieldSettings Value="Id" Text="Title" />
+                                        <DropDownListFieldSettings Value="Id" Text="DisplayLabel" />
                                         <DropDownListEvents TItem="PositionProfileListItemModel" TValue="Guid?"
                                                             ValueChange="OnPositionProfileChanged"
                                                             Filtering="OnPositionProfileFilteringAsync" />
@@ -1004,10 +1004,11 @@
                 if (currentProfile is not null)
                 {
                     _positionProfiles.Add(new PositionProfileListItemModel(
-                        currentProfile.Id, DepartmentName: null, currentProfile.Title, currentProfile.Description,
+                        currentProfile.Id, _departments.FirstOrDefault(d => d.Id == currentProfile.DepartmentId)?.Name, currentProfile.Title,
                         currentProfile.IsActive, currentProfile.SalaryMin, currentProfile.SalaryMax,
                         currentProfile.SalaryType, currentProfile.NoticePeriodUnitOverride,
-                        currentProfile.NoticePeriodLengthOverride));
+                        currentProfile.NoticePeriodLengthOverride,
+                        _locations.FirstOrDefault(l => l.Id == currentProfile.LocationId)?.Name));
                 }
             }
         }

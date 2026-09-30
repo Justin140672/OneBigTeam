@@ -176,7 +176,7 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
             companyId, new Dictionary<Guid, EmployeeAudienceProfile> { [employeeId] = new(null, null, currentPositionId) });
         var positionReader = new FakePositionProfileReader(summaries: new Dictionary<Guid, PositionProfileSummary>
         {
-            [currentPositionId] = new(currentPositionId, "Current Position", null, null, true, null, null),
+            [currentPositionId] = new(currentPositionId, "Current Position", null, true, null, null),
         });
 
         await using var db = fixture.BuildContext();
@@ -219,7 +219,7 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
             companyId, new Dictionary<Guid, EmployeeAudienceProfile> { [employeeId] = new(null, null, currentPositionId) });
         var positionReader = new FakePositionProfileReader(summaries: new Dictionary<Guid, PositionProfileSummary>
         {
-            [currentPositionId] = new(currentPositionId, "Current", null, null, true, null, null),
+            [currentPositionId] = new(currentPositionId, "Current", null, true, null, null),
         });
 
         await using var db = fixture.BuildContext();
@@ -334,7 +334,7 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
         {
             var resolvedReader = new FakePositionProfileReader(summaries: new Dictionary<Guid, PositionProfileSummary>
             {
-                [newPositionId] = new(newPositionId, "New Position", null, null, true, null, null),
+                [newPositionId] = new(newPositionId, "New Position", null, true, null, null),
             });
             var service2 = BuildService(db2, audienceReader, resolvedReader);
             await service2.ReconcileAllCompaniesAsync(CancellationToken.None);
@@ -393,7 +393,7 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
         {
             var resolvedReader = new FakePositionProfileReader(summaries: new Dictionary<Guid, PositionProfileSummary>
             {
-                [throwingPositionId] = new(throwingPositionId, "Resolved Position", null, null, true, null, null),
+                [throwingPositionId] = new(throwingPositionId, "Resolved Position", null, true, null, null),
             });
             var service = BuildService(db, audienceReader, resolvedReader);
             await service.ReconcileAllCompaniesAsync(CancellationToken.None);
@@ -455,7 +455,7 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
         {
             var resolvedReader = new FakePositionProfileReader(summaries: new Dictionary<Guid, PositionProfileSummary>
             {
-                [currentPositionId] = new(currentPositionId, "Current Position", null, null, true, null, null),
+                [currentPositionId] = new(currentPositionId, "Current Position", null, true, null, null),
             });
             var service = BuildService(db, audienceReader, resolvedReader);
             await service.ReconcileAllCompaniesAsync(CancellationToken.None);
@@ -500,8 +500,8 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
         {
-            [healthyPositionId] = new(healthyPositionId, "Healthy Position", null, null, true, null, null),
-            [otherCompanyPositionId] = new(otherCompanyPositionId, "Other Company Position", null, null, true, null, null),
+            [healthyPositionId] = new(healthyPositionId, "Healthy Position", null, true, null, null),
+            [otherCompanyPositionId] = new(otherCompanyPositionId, "Other Company Position", null, true, null, null),
         };
         var positionReader = new ThrowingPositionProfileReader(failingPositionId, summaries);
 
@@ -544,7 +544,7 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
             companyId, new Dictionary<Guid, EmployeeAudienceProfile> { [employeeId] = new(null, null, currentPositionId) });
         var positionReader = new FakePositionProfileReader(summaries: new Dictionary<Guid, PositionProfileSummary>
         {
-            [currentPositionId] = new(currentPositionId, "Current Position", null, null, true, null, null),
+            [currentPositionId] = new(currentPositionId, "Current Position", null, true, null, null),
         });
 
         await using var db = fixture.BuildContext();
@@ -585,7 +585,7 @@ public class PositionRoleReconciliationServiceTests(IdentityDatabaseFixture fixt
             companyId, new Dictionary<Guid, EmployeeAudienceProfile> { [employeeId] = new(null, null, currentPositionId) });
         var positionReader = new FakePositionProfileReader(summaries: new Dictionary<Guid, PositionProfileSummary>
         {
-            [currentPositionId] = new(currentPositionId, "Current", null, null, true, null, null),
+            [currentPositionId] = new(currentPositionId, "Current", null, true, null, null),
         });
 
         await using var db = fixture.BuildContext();
