@@ -418,6 +418,15 @@ public static class RecruitmentModule
         await db.Database.MigrateAsync();
     }
 
+    public static async Task SeedStagingRecruitmentAsync(
+        this IServiceProvider services,
+        IReadOnlyDictionary<string, Guid> positionProfileIdsByName,
+        IReadOnlyDictionary<string, Guid> employeeIdsByName)
+    {
+        using var scope = services.CreateScope();
+        await StagingRecruitmentSeeder.SeedAsync(scope.ServiceProvider, positionProfileIdsByName, employeeIdsByName);
+    }
+
     public static async Task SeedRecruitmentAsync(this IServiceProvider services)
     {
         using var scope = services.CreateScope();

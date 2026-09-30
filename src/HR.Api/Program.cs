@@ -210,19 +210,31 @@ builder.Services.AddHealthChecks()
 		failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Unhealthy,
 		tags: ["ready", "critical"]);
 
+var stagingSeedOptions = builder.Configuration.GetSection(StagingSeedOptions.SectionName).Get<StagingSeedOptions>()
+	?? new StagingSeedOptions();
+var runStagingSeed = builder.Environment.IsStaging() && stagingSeedOptions.Enabled;
+if (runStagingSeed)
+{
+	stagingSeedOptions.ValidateOrThrow();
+}
+
 var app = builder.Build();
 
 var migrationRunner = app.Services.GetRequiredService<StartupMigrationRunner>();
+var seedDevCompanies = app.Environment.IsDevelopment();
 
 await migrationRunner.RunAsync("companies", app.Services, async sp =>
 {
-	await sp.MigrateAndSeedCoreApplicationAsync();
+	await sp.MigrateAndSeedCoreApplicationAsync(seedDevCompanies);
 });
 
 await migrationRunner.RunAsync("companyOnboarding", app.Services, async sp =>
 {
 	await sp.MigrateCompanyOnboardingAsync();
-	await sp.SeedCompanyOnboardingAsync();
+	if (seedDevCompanies)
+	{
+		await sp.SeedCompanyOnboardingAsync();
+	}
 });
 
 await migrationRunner.RunAsync("dataImport", app.Services, sp => sp.MigrateDataImportAsync());
@@ -236,7 +248,7 @@ await migrationRunner.RunAsync("employees", app.Services, async sp =>
 	// real environment.
 	var seedE2eTestPool = string.Equals(
 		Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase);
-	await sp.SeedEmployeesAsync(includeE2eTestPool: seedE2eTestPool);
+	await sp.SeedEmployeesAsync(includeE2eTestPool: seedE2eTestPool, includeDevCompanies: seedDevCompanies);
 });
 
 await migrationRunner.RunAsync("identity", app.Services, async sp =>
@@ -265,13 +277,19 @@ await migrationRunner.RunAsync("audit", app.Services, sp => sp.MigrateAuditAsync
 await migrationRunner.RunAsync("documents", app.Services, async sp =>
 {
 	await sp.MigrateDocumentsAsync();
-	await sp.SeedDocumentsAsync();
+	if (seedDevCompanies)
+	{
+		await sp.SeedDocumentsAsync();
+	}
 });
 
 await migrationRunner.RunAsync("leave", app.Services, async sp =>
 {
 	await sp.MigrateLeaveAsync();
-	await sp.SeedLeaveAsync();
+	if (seedDevCompanies)
+	{
+		await sp.SeedLeaveAsync();
+	}
 });
 
 await migrationRunner.RunAsync("marketing", app.Services, async sp =>
@@ -283,7 +301,10 @@ await migrationRunner.RunAsync("marketing", app.Services, async sp =>
 await migrationRunner.RunAsync("notifications", app.Services, async sp =>
 {
 	await sp.MigrateNotificationsAsync();
-	await sp.SeedNotificationsAsync();
+	if (seedDevCompanies)
+	{
+		await sp.SeedNotificationsAsync();
+	}
 	if (string.Equals(Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase))
 	{
 		await sp.SeedE2eOperationalAlertsAsync();
@@ -293,7 +314,10 @@ await migrationRunner.RunAsync("notifications", app.Services, async sp =>
 await migrationRunner.RunAsync("tasks", app.Services, async sp =>
 {
 	await sp.MigrateTasksAsync();
-	await sp.SeedTasksAsync();
+	if (seedDevCompanies)
+	{
+		await sp.SeedTasksAsync();
+	}
 	if (string.Equals(Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase))
 	{
 		await sp.SeedE2eProbationReviewTaskAsync(
@@ -320,7 +344,10 @@ await migrationRunner.RunAsync("offboarding", app.Services, sp => sp.MigrateOffb
 await migrationRunner.RunAsync("probation", app.Services, async sp =>
 {
 	await sp.MigrateProbationAsync();
-	await sp.SeedProbationAsync();
+	if (seedDevCompanies)
+	{
+		await sp.SeedProbationAsync();
+	}
 	if (string.Equals(Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase))
 	{
 		await sp.SeedE2eProbationReviewAsync(
@@ -335,26 +362,52 @@ await migrationRunner.RunAsync("reporting", app.Services, sp => sp.MigrateReport
 await migrationRunner.RunAsync("assets", app.Services, async sp =>
 {
 	await sp.MigrateAssetsAsync();
-	await sp.SeedAssetsAsync();
+	if (seedDevCompanies)
+	{
+		await sp.SeedAssetsAsync();
+	}
 });
 
 await migrationRunner.RunAsync("sickness", app.Services, async sp =>
 {
 	await sp.MigrateSicknessAsync();
-	await sp.SeedSicknessAsync();
+	if (seedDevCompanies)
+	{
+		await sp.SeedSicknessAsync();
+	}
 });
 
 await migrationRunner.RunAsync("support", app.Services, async sp =>
 {
 	await sp.MigrateSupportAsync();
-	await sp.SeedSupportAsync();
+	if (seedDevCompanies)
+	{
+		await sp.SeedSupportAsync();
+	}
 });
 
 await migrationRunner.RunAsync("recruitment", app.Services, async sp =>
 {
 	await sp.MigrateRecruitmentAsync();
-	await sp.SeedRecruitmentAsync();
+	if (seedDevCompanies)
+	{
+		await sp.SeedRecruitmentAsync();
+	}
 });
+
+if (runStagingSeed)
+{
+	await migrationRunner.RunAsync("stagingSeed", app.Services, async sp =>
+	{
+		await sp.SeedStagingCompanyAsync(stagingSeedOptions);
+		await sp.SeedStagingEmployeesAsync(stagingSeedOptions);
+		await sp.SeedStagingLeaveAsync(EmployeesModule.GetStagingSeedLeaveEnrolments());
+		await sp.SeedStagingRecruitmentAsync(
+			EmployeesModule.GetStagingSeedPositionProfileIds(), EmployeesModule.GetStagingSeedEmployeeIds());
+		await sp.SeedStagingUsersAsync(stagingSeedOptions, EmployeesModule.GetStagingSeedIdentities(stagingSeedOptions));
+		await sp.ReconcilePositionRoleAssignmentsAsync();
+	});
+}
 
 app.MapGet("/health/startup-migrations", (HttpContext httpContext) => migrationRunner.ToHealthResult(httpContext));
 

@@ -449,6 +449,15 @@ public static class IdentityModule
         await db.SaveChangesAsync();
     }
 
+    public static async Task SeedStagingUsersAsync(
+        this IServiceProvider services,
+        StagingSeedOptions options,
+        IEnumerable<(Guid Id, Guid CompanyId, string Email, string FirstName, string LastName)> employees)
+    {
+        using var scope = services.CreateScope();
+        await StagingUsersSeeder.SeedAsync(scope.ServiceProvider, options, employees);
+    }
+
     public static async Task SeedPlatformAdministratorsFromConfigAsync(
         this IServiceProvider services, IConfiguration configuration)
     {

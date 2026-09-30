@@ -513,7 +513,37 @@ public static class EmployeesModule
             d.Mgr));
     }
 
-    public static async Task SeedEmployeesAsync(this IServiceProvider services, bool includeE2eTestPool = false)
+    public static IReadOnlyList<(Guid Id, Guid CompanyId, string Email, string FirstName, string LastName)> GetStagingSeedIdentities(
+        StagingSeedOptions options) =>
+        StagingOrgDefinition.Employees
+            .Select(e => (
+                StagingEmployeesSeeder.EmployeeId(e.Number),
+                StagingSeedOptions.CompanyId,
+                StagingOrgDefinition.EmailFor(e, options.ResolvedEmailDomain),
+                e.FirstName,
+                e.LastName))
+            .ToList();
+
+    public static IReadOnlyDictionary<string, Guid> GetStagingSeedPositionProfileIds() =>
+        StagingOrgDefinition.Positions.ToDictionary(p => p.Name, p => StagingEmployeesSeeder.PositionProfileId(p.Number));
+
+    public static IReadOnlyDictionary<string, Guid> GetStagingSeedEmployeeIds() =>
+        StagingOrgDefinition.Employees.ToDictionary(
+            e => $"{e.FirstName} {e.LastName}", e => StagingEmployeesSeeder.EmployeeId(e.Number));
+
+    public static IReadOnlyList<(Guid EmployeeId, DateOnly StartDate)> GetStagingSeedLeaveEnrolments() =>
+        StagingOrgDefinition.Employees
+            .Select(e => (StagingEmployeesSeeder.EmployeeId(e.Number), e.StartDate))
+            .ToList();
+
+    public static async Task SeedStagingEmployeesAsync(this IServiceProvider services, StagingSeedOptions options)
+    {
+        using var scope = services.CreateScope();
+        await StagingEmployeesSeeder.SeedAsync(scope.ServiceProvider, options);
+    }
+
+    public static async Task SeedEmployeesAsync(
+        this IServiceProvider services, bool includeE2eTestPool = false, bool includeDevCompanies = true)
     {
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
@@ -545,10 +575,15 @@ public static class EmployeesModule
             await db.SaveChangesAsync();
         }
 
+        if (!includeDevCompanies)
+        {
+            return;
+        }
+
         var acmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
         if (!await db.Employees.AnyAsync(e => e.CompanyId == acmeId))
         {
-            var etPermId      = Guid.Parse("40000000-0000-0000-0000-000000000001");
+            var etPermId     = Guid.Parse("40000000-0000-0000-0000-000000000001");
             var etFixedTermId = Guid.Parse("40000000-0000-0000-0000-000000000002");
             var etContractId  = Guid.Parse("40000000-0000-0000-0000-000000000003");
             var etCasualId    = Guid.Parse("40000000-0000-0000-0000-000000000004");

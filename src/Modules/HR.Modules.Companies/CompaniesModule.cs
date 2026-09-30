@@ -125,13 +125,24 @@ public static class CompaniesModule
         await db.Database.MigrateAsync();
     }
 
-    public static async Task MigrateAndSeedCoreApplicationAsync(this IServiceProvider services)
+    public static async Task MigrateAndSeedCoreApplicationAsync(
+        this IServiceProvider services, bool seedDevCompanies = true)
     {
         await services.MigratePlatformAsync();
 
         await services.MigrateCompaniesAsync();
 
-        await services.SeedCompaniesAsync();
+        if (seedDevCompanies)
+        {
+            await services.SeedCompaniesAsync();
+        }
+    }
+
+    public static async Task SeedStagingCompanyAsync(this IServiceProvider services, StagingSeedOptions options)
+    {
+        using var scope = services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+        await Services.StagingCompanySeeder.SeedAsync(db, options, DateTimeOffset.UtcNow);
     }
 
     public static async Task SeedCompaniesAsync(this IServiceProvider services)

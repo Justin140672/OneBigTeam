@@ -185,6 +185,14 @@ services.AddScoped<IIntegrationEventHandler<EmployeeCreatedIntegrationEvent>, Em
         await db.Database.MigrateAsync();
     }
 
+    public static async Task SeedStagingLeaveAsync(
+        this IServiceProvider services,
+        IEnumerable<(Guid EmployeeId, DateOnly StartDate)> employees)
+    {
+        using var scope = services.CreateScope();
+        await StagingLeaveSeeder.SeedAsync(scope.ServiceProvider, employees);
+    }
+
     public static async Task SeedLeaveAsync(this IServiceProvider services)
     {
         using var scope = services.CreateScope();
