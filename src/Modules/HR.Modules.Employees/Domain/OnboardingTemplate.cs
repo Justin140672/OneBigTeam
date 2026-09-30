@@ -15,6 +15,7 @@ internal sealed class OnboardingTemplate : IVersionedAggregate
     public string Name { get; private set; } = string.Empty;
     public string? Description { get; private set; }
     public bool IsActive { get; private set; }
+    public bool IsDefault { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -30,7 +31,8 @@ internal sealed class OnboardingTemplate : IVersionedAggregate
         Guid companyId,
         string name,
         string? description,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        bool isDefault = false)
     {
         return new OnboardingTemplate
         {
@@ -39,6 +41,7 @@ internal sealed class OnboardingTemplate : IVersionedAggregate
             Name = name,
             Description = description,
             IsActive = true,
+            IsDefault = isDefault,
             Version = 1,
             CreatedAt = now,
             UpdatedAt = now,
@@ -55,6 +58,18 @@ internal sealed class OnboardingTemplate : IVersionedAggregate
     public void Deactivate(DateTimeOffset now)
     {
         IsActive = false;
+        UpdatedAt = now;
+    }
+
+    public void MarkAsDefault(DateTimeOffset now)
+    {
+        IsDefault = true;
+        UpdatedAt = now;
+    }
+
+    public void UnmarkAsDefault(DateTimeOffset now)
+    {
+        IsDefault = false;
         UpdatedAt = now;
     }
 

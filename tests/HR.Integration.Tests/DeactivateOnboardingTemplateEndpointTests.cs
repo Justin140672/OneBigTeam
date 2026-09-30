@@ -95,6 +95,7 @@ public class DeactivateOnboardingTemplateEndpointTests
     {
         var companyId = Guid.NewGuid();
         using var client = await AdminClient(companyId);
+        await CreateTemplateAsync(client, companyId, "Baseline Default Onboarding");
         var template = await CreateTemplateAsync(client, companyId);
 
         var response = await client.DeleteAsync(
@@ -104,10 +105,29 @@ public class DeactivateOnboardingTemplateEndpointTests
     }
 
     [Fact]
+    public async Task Delete_OnboardingTemplate_Returns_BadRequest_When_Template_Is_Default()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await AdminClient(companyId);
+        var template = await CreateTemplateAsync(client, companyId);
+        Assert.True(template.IsDefault);
+
+        var response = await client.DeleteAsync(
+            $"/api/companies/{companyId}/onboarding-templates/{template.Id}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        var list = await client.GetFromJsonAsync<ListOnboardingTemplatesPayload>(
+            $"/api/companies/{companyId}/onboarding-templates");
+        Assert.Contains(list!.Items, t => t.Id == template.Id && t.IsActive && t.IsDefault);
+    }
+
+    [Fact]
     public async Task Delete_OnboardingTemplate_Deactivates_The_Template()
     {
         var companyId = Guid.NewGuid();
         using var client = await AdminClient(companyId);
+        await CreateTemplateAsync(client, companyId, "Baseline Default Onboarding");
         var template = await CreateTemplateAsync(client, companyId);
 
         var deleteResponse = await client.DeleteAsync(
@@ -126,6 +146,7 @@ public class DeactivateOnboardingTemplateEndpointTests
     {
         var companyId = Guid.NewGuid();
         using var client = await AdminClient(companyId);
+        await CreateTemplateAsync(client, companyId, "Baseline Default Onboarding");
         var template = await CreateTemplateAsync(client, companyId);
 
         var firstDelete = await client.DeleteAsync(
@@ -160,6 +181,7 @@ public class DeactivateOnboardingTemplateEndpointTests
         string Name,
         string? Description,
         bool IsActive,
+        bool IsDefault,
         DateTimeOffset CreatedAt);
 
     private sealed record ListOnboardingTemplatesPayload(List<OnboardingTemplateListItemPayload> Items);
@@ -169,5 +191,6 @@ public class DeactivateOnboardingTemplateEndpointTests
         string Name,
         string? Description,
         bool IsActive,
-        int TaskCount);
+        int TaskCount,
+        bool IsDefault = false);
 }

@@ -50,12 +50,16 @@ internal sealed class CreateOnboardingTemplateHandler(EmployeesDbContext dbConte
 
         var now = clock.UtcNowOffset();
 
+        var hasDefault = await dbContext.OnboardingTemplates
+            .AnyAsync(t => t.CompanyId == request.CompanyId && t.IsDefault, cancellationToken);
+
         var template = OnboardingTemplate.Create(
             Guid.NewGuid(),
             request.CompanyId,
             newName,
             string.IsNullOrWhiteSpace(request.Description) ? null : request.Description.Trim(),
-            now);
+            now,
+            !hasDefault);
 
         dbContext.OnboardingTemplates.Add(template);
 
@@ -65,6 +69,7 @@ internal sealed class CreateOnboardingTemplateHandler(EmployeesDbContext dbConte
             template.Name,
             template.Description,
             template.IsActive,
+            template.IsDefault,
             template.CreatedAt);
 
         if (request.IdempotencyKey is { } key)

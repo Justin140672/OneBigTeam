@@ -147,6 +147,16 @@ public sealed class PositionProfileEditPage(IPage page, string baseUrl)
     public Task ClearOnboardingTemplateAsync() =>
         DropDownSelector.SelectAsync(page, page.Locator(".hr-field", new PageLocatorOptions { HasText = "Onboarding Template" }), "None");
 
+    public Task ExpectOnboardingTemplateSelectedAsync(string name) =>
+        Assertions.Expect(page.Locator(".hr-field", new PageLocatorOptions { HasText = "Onboarding Template" })
+                .Locator(".e-input-group input").First)
+            .ToHaveValueAsync(name, new() { Timeout = 15_000 });
+
+    public Task ExpectDefaultLeavePolicySelectedAsync(string name) =>
+        Assertions.Expect(page.Locator(".hr-field", new PageLocatorOptions { HasText = "Default Leave Policy" })
+                .Locator(".e-input-group input").First)
+            .ToHaveValueAsync(name, new() { Timeout = 15_000 });
+
     public async Task<string?> GetSelectedOnboardingTemplateTextAsync()
     {
         var field = page.Locator(".hr-field", new PageLocatorOptions { HasText = "Onboarding Template" });

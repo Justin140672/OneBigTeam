@@ -1,3 +1,4 @@
+using HR.SharedKernel.Http;
 using HR.Web.Models;
 
 namespace HR.Web.Services;
@@ -113,6 +114,14 @@ public class OnboardingTemplateService(HrApiHttpClientFactory httpClientFactory)
 
         var body = await response.Content.ReadFromJsonAsync<ErrorEnvelope>();
         return body?.Error ?? "Failed to deactivate onboarding template.";
+    }
+
+    public async Task<string?> SetDefaultAsync(Guid companyId, Guid id)
+    {
+        var response = await Http.PostAsJsonAsync(
+            $"api/companies/{companyId}/onboarding-templates/{id}/set-default", new { });
+        var result = await ApiResponseReader.ReadNoContentAsync(response);
+        return result.Success ? null : (result.DisplayMessage ?? "Failed to set default onboarding template.");
     }
 
     private sealed record ErrorEnvelope(string? Error, string? Code = null);

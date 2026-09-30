@@ -72,6 +72,7 @@ using HR.Modules.Employees.Features.GetOnboardingTemplate;
 using HR.Modules.Employees.Features.ListOnboardingTemplates;
 using HR.Modules.Employees.Features.UpdateOnboardingTemplate;
 using HR.Modules.Employees.Features.DeactivateOnboardingTemplate;
+using HR.Modules.Employees.Features.SetDefaultOnboardingTemplate;
 using HR.Modules.Employees.Features.CreateLocationType;
 using HR.Modules.Employees.Features.UpdateLocationType;
 using HR.Modules.Employees.Features.DeactivateLocationType;
@@ -348,6 +349,8 @@ public static class EmployeesModule
         services.AddScoped<IValidator<UpdateOnboardingTemplateRequest>, UpdateOnboardingTemplateValidator>();
 
         services.AddScoped<DeactivateOnboardingTemplateHandler>();
+        services.AddScoped<SetDefaultOnboardingTemplateHandler>();
+        services.AddScoped<IValidator<SetDefaultOnboardingTemplateRequest>, SetDefaultOnboardingTemplateValidator>();
 
         services.AddScoped<CreateLocationTypeHandler>();
         services.AddScoped<IValidator<CreateLocationTypeRequest>, CreateLocationTypeValidator>();

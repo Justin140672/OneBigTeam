@@ -6,4 +6,5 @@ internal sealed record CreateOnboardingTemplateResponse(
     string Name,
     string? Description,
     bool IsActive,
+    bool IsDefault,
     DateTimeOffset CreatedAt);

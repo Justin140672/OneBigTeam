@@ -65,6 +65,46 @@ public sealed class OnboardingTemplateListPage(IPage page, string baseUrl)
         return await row.Locator(".badge.bg-success").IsVisibleAsync();
     }
 
+    public async Task ExpectDefaultBadgeAsync(string nameFragment, bool expected)
+    {
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await page.RevealGridRowAsync(nameFragment);
+
+        var badge = page.Locator(".e-row")
+            .Filter(new() { HasText = nameFragment })
+            .First
+            .Locator(".badge:has-text('Default')");
+
+        if (expected)
+            await Assertions.Expect(badge).ToBeVisibleAsync(new() { Timeout = 15_000 });
+        else
+            await Assertions.Expect(badge).ToBeHiddenAsync(new() { Timeout = 15_000 });
+    }
+
+    public async Task SetAsDefaultAsync(string nameFragment)
+    {
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        await page.RevealGridRowAsync(nameFragment);
+
+        var row = page.Locator(".e-row")
+            .Filter(new() { HasText = nameFragment })
+            .First;
+        await row.ClickAsync();
+
+        var btn = page.GetByRole(AriaRole.Button, new() { Name = "Set as Default" });
+        await btn.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await btn.ClickAsync();
+
+        await page.WaitForSpinnerToClearAsync();
+    }
+
+    public async Task<string> WaitForActionErrorAsync()
+    {
+        var alert = page.Locator(".alert-danger").First;
+        await Assertions.Expect(alert).ToBeVisibleAsync(new() { Timeout = 15_000 });
+        return (await alert.InnerTextAsync()).Trim();
+    }
+
     public async Task ShowInactiveAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Show Inactive" }).ClickAsync();

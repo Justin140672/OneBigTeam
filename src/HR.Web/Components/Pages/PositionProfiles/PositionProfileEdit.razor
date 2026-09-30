@@ -247,7 +247,15 @@
 
         Model.OnboardingTemplateId ??= Guid.Empty;
 
-        if (!IsNew)
+        if (IsNew)
+        {
+            Model.DefaultLeavePolicyId ??= _leavePolicies.FirstOrDefault(p => p.IsDefault)?.Id;
+
+            var defaultTemplate = _onboardingTemplates.FirstOrDefault(t => t.IsDefault && t.IsActive);
+            if (defaultTemplate is not null && Model.OnboardingTemplateId == Guid.Empty)
+                Model.OnboardingTemplateId = defaultTemplate.Id;
+        }
+        else
         {
             var profile = await PositionProfileService.GetPositionProfileAsync(CompanyId, Id!.Value);
             if (profile is not null)

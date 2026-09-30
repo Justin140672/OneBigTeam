@@ -42,6 +42,7 @@ internal sealed class GetOnboardingTemplateHandler(EmployeesDbContext dbContext)
             template.Name,
             template.Description,
             template.IsActive,
+            template.IsDefault,
             template.CreatedAt,
             template.UpdatedAt,
             template.Version,

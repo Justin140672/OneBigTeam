@@ -33,6 +33,30 @@ public class DeactivateOnboardingTemplateHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Rejects_Deactivating_The_Default_Template()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        var template = OnboardingTemplate.Create(Guid.NewGuid(), companyId, "Standard Onboarding", null, now, isDefault: true);
+        context.OnboardingTemplates.Add(template);
+        await context.SaveChangesAsync();
+
+        var handler = new DeactivateOnboardingTemplateHandler(context, new FakeClock(FixedUtcNow));
+        var result = await handler.HandleAsync(
+            new DeactivateOnboardingTemplateRequest { CompanyId = companyId, Id = template.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+
+        var saved = await context.OnboardingTemplates.SingleAsync();
+        Assert.True(saved.IsActive);
+        Assert.True(saved.IsDefault);
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Template_Does_Not_Exist()
     {
         await using var context = BuildContext();

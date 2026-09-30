@@ -33,6 +33,11 @@ internal sealed class OnboardingTemplateConfiguration : IEntityTypeConfiguration
             .HasColumnName("is_active")
             .IsRequired();
 
+        builder.Property(t => t.IsDefault)
+            .HasColumnName("is_default")
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Property(t => t.Version)
             .HasColumnName("version")
             .IsRequired()
@@ -49,6 +54,11 @@ internal sealed class OnboardingTemplateConfiguration : IEntityTypeConfiguration
 
         builder.HasIndex(t => t.CompanyId);
         builder.HasIndex(t => new { t.CompanyId, t.Name }).IsUnique();
+
+        builder.HasIndex(t => t.CompanyId)
+            .IsUnique()
+            .HasFilter("is_default")
+            .HasDatabaseName("ix_onboarding_templates_company_id_is_default");
 
         builder.HasMany(t => t.Tasks)
             .WithOne()

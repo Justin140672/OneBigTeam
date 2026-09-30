@@ -9,6 +9,7 @@ public sealed class OnboardingTemplateManagementTests(HrAdminPersonaFixture fixt
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");
 
     private const string LauraEmail = "laura.bennett@acme.example";
+    private const string SeededTemplateName = "Standard Onboarding";
 
     [Fact]
     public async Task EditOnboardingTemplate_PersistsAcrossReload()
@@ -20,9 +21,12 @@ public sealed class OnboardingTemplateManagementTests(HrAdminPersonaFixture fixt
 
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var templateEdit = new OnboardingTemplateEditPage(_page, _fixture.WebBaseUrl);
+        var templateList = new OnboardingTemplateListPage(_page, _fixture.WebBaseUrl);
 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
+
+        await templateList.GoToAsync(AcmeId);
 
         await templateEdit.GoToNewAsync(AcmeId);
         await templateEdit.FillNameAsync(originalName);
@@ -68,6 +72,8 @@ public sealed class OnboardingTemplateManagementTests(HrAdminPersonaFixture fixt
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
+        await templateList.GoToAsync(AcmeId);
+
         await templateEdit.GoToNewAsync(AcmeId);
         await templateEdit.FillNameAsync(templateName);
         await templateEdit.SaveAsync();
@@ -83,5 +89,117 @@ public sealed class OnboardingTemplateManagementTests(HrAdminPersonaFixture fixt
 
         Assert.True(await templateList.HasItemAsync(templateName),
             "Expected deactivated template to appear when 'Show inactive' is enabled");
+    }
+
+    [Fact]
+    public async Task OnboardingTemplateList_ShowsDefaultBadgeForSeededTemplate()
+    {
+        var login        = new LoginPage(_page, _fixture.WebBaseUrl);
+        var templateList = new OnboardingTemplateListPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await templateList.GoToAsync(AcmeId);
+
+        await templateList.ExpectDefaultBadgeAsync(SeededTemplateName, expected: true);
+    }
+
+    [Fact]
+    public async Task SetAsDefault_SwitchesDefaultBadgeToSelectedTemplate()
+    {
+        var templateName = $"E2E Onboarding Default {Guid.NewGuid().ToString("N")[..8]}";
+
+        var login        = new LoginPage(_page, _fixture.WebBaseUrl);
+        var templateList = new OnboardingTemplateListPage(_page, _fixture.WebBaseUrl);
+        var templateEdit = new OnboardingTemplateEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await templateList.GoToAsync(AcmeId);
+
+        await templateEdit.GoToNewAsync(AcmeId);
+        await templateEdit.FillNameAsync(templateName);
+        await templateEdit.SaveAsync();
+
+        try
+        {
+            await templateList.GoToAsync(AcmeId);
+            await templateList.ExpectDefaultBadgeAsync(templateName, expected: false);
+
+            await templateList.SetAsDefaultAsync(templateName);
+
+            await templateList.ExpectDefaultBadgeAsync(templateName, expected: true);
+            await templateList.ExpectDefaultBadgeAsync(SeededTemplateName, expected: false);
+        }
+        finally
+        {
+            await templateList.GoToAsync(AcmeId);
+            await templateList.SetAsDefaultAsync(SeededTemplateName);
+            await templateList.ExpectDefaultBadgeAsync(SeededTemplateName, expected: true);
+        }
+    }
+
+    [Fact]
+    public async Task DeactivateDefaultTemplate_IsRejectedAndTemplateStaysActive()
+    {
+        var login        = new LoginPage(_page, _fixture.WebBaseUrl);
+        var templateList = new OnboardingTemplateListPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await templateList.GoToAsync(AcmeId);
+        await templateList.ExpectDefaultBadgeAsync(SeededTemplateName, expected: true);
+
+        await templateList.DeactivateAsync(SeededTemplateName);
+
+        var error = await templateList.WaitForActionErrorAsync();
+        Assert.Contains("default onboarding template", error);
+
+        await templateList.GoToAsync(AcmeId);
+        Assert.True(await templateList.IsActiveAsync(SeededTemplateName),
+            "Expected the default template to remain active after the rejected deactivation");
+    }
+
+    [Fact]
+    public async Task NewPositionProfile_PreselectsDefaultOnboardingTemplate()
+    {
+        var templateName = $"E2E Onboarding Preselect {Guid.NewGuid().ToString("N")[..8]}";
+
+        var login        = new LoginPage(_page, _fixture.WebBaseUrl);
+        var templateList = new OnboardingTemplateListPage(_page, _fixture.WebBaseUrl);
+        var templateEdit = new OnboardingTemplateEditPage(_page, _fixture.WebBaseUrl);
+        var ppEdit       = new PositionProfileEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await templateList.GoToAsync(AcmeId);
+        await templateList.ExpectDefaultBadgeAsync(SeededTemplateName, expected: true);
+
+        await ppEdit.GoToNewAsync(AcmeId);
+        await ppEdit.ExpectOnboardingTemplateSelectedAsync(SeededTemplateName);
+
+        await templateEdit.GoToNewAsync(AcmeId);
+        await templateEdit.FillNameAsync(templateName);
+        await templateEdit.SaveAsync();
+
+        try
+        {
+            await templateList.GoToAsync(AcmeId);
+            await templateList.SetAsDefaultAsync(templateName);
+            await templateList.ExpectDefaultBadgeAsync(templateName, expected: true);
+
+            await ppEdit.GoToNewAsync(AcmeId);
+            await ppEdit.ExpectOnboardingTemplateSelectedAsync(templateName);
+        }
+        finally
+        {
+            await templateList.GoToAsync(AcmeId);
+            await templateList.SetAsDefaultAsync(SeededTemplateName);
+            await templateList.ExpectDefaultBadgeAsync(SeededTemplateName, expected: true);
+        }
     }
 }

@@ -90,6 +90,36 @@ public class ListOnboardingTemplatesEndpointTests
     }
 
     [Fact]
+    public async Task Get_OnboardingTemplates_Marks_Seeded_Standard_Onboarding_As_Default()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await AdminClient(companyId);
+
+        var payload = await client.GetFromJsonAsync<ListOnboardingTemplatesPayload>(
+            $"/api/companies/{companyId}/onboarding-templates");
+
+        var item = Assert.Single(payload!.Items);
+        Assert.Equal("Standard Onboarding", item.Name);
+        Assert.True(item.IsDefault);
+    }
+
+    [Fact]
+    public async Task Get_OnboardingTemplates_Marks_Only_First_Created_Template_As_Default()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await AdminClient(companyId);
+
+        var first = await CreateTemplateAsync(client, companyId, "First Onboarding");
+        var second = await CreateTemplateAsync(client, companyId, "Second Onboarding");
+
+        var payload = await client.GetFromJsonAsync<ListOnboardingTemplatesPayload>(
+            $"/api/companies/{companyId}/onboarding-templates");
+
+        Assert.True(payload!.Items.Single(i => i.Id == first.Id).IsDefault);
+        Assert.False(payload.Items.Single(i => i.Id == second.Id).IsDefault);
+    }
+
+    [Fact]
     public async Task Get_OnboardingTemplates_Excludes_Inactive_Templates_By_Default()
     {
         var companyId = Guid.NewGuid();
@@ -170,5 +200,6 @@ public class ListOnboardingTemplatesEndpointTests
         string Name,
         string? Description,
         bool IsActive,
-        int TaskCount);
+        int TaskCount,
+        bool IsDefault = false);
 }

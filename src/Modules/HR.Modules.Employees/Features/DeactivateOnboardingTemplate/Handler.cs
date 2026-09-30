@@ -20,6 +20,12 @@ internal sealed class DeactivateOnboardingTemplateHandler(EmployeesDbContext dbC
         if (template is null)
             return Result.Failure(Error.NotFound($"Onboarding template '{request.Id}' was not found."));
 
+        if (template.IsDefault)
+        {
+            return Result.Failure(Error.Validation(
+                $"Cannot deactivate '{template.Name}' because it is the default onboarding template. Set a different template as the default first."));
+        }
+
         var activeAssignmentCount = await dbContext.PositionProfileOnboardingTemplates
             .CountAsync(
                 t => t.OnboardingTemplateId == request.Id

@@ -30,6 +30,7 @@ internal sealed class ListOnboardingTemplatesHandler(
                 t.Name,
                 t.Description,
                 t.IsActive,
+                t.IsDefault,
                 t.Tasks.Count(task => task.IsActive),
                 t.Version))
             .ToListAsync(cancellationToken);

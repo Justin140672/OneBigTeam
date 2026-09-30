@@ -42,6 +42,12 @@
                         @{
                             var row = (context as OnboardingTemplateListItemModel)!;
                             <a href="/companies/@CompanyId/onboarding-templates/@row.Id">@row.Name</a>
+                            @if (row.IsDefault)
+                            {
+                                <span class="badge bg-primary ms-1" title="Default template">
+                                    <i class="fa-solid fa-star"></i> Default
+                                </span>
+                            }
                         }
                     </Template>
                 </GridColumn>
@@ -80,6 +86,13 @@
     protected override void ConfigureToolbar()
     {
         AddToolbarAction(
+            id:      "hr-set-default",
+            text:    "Set as Default",
+            icon:    "fa-solid fa-star",
+            onClick: SetDefaultAsync,
+            tooltip: "Set as the company's default onboarding template");
+
+        AddToolbarAction(
             id:      "hr-delete",
             text:    "Delete",
             icon:    "fa-solid fa-trash",
@@ -105,6 +118,16 @@
 
     private OnboardingTemplateListItemModel? _deactivateTarget;
     private bool _deactivating;
+
+    private async Task SetDefaultAsync(OnboardingTemplateListItemModel item)
+    {
+        ClearActionError();
+        var error = await OnboardingTemplateService.SetDefaultAsync(CompanyId, item.Id);
+        if (error is not null)
+            SetActionError(error);
+        else
+            await LoadAsync();
+    }
 
     private async Task ConfirmDeactivateAsync()
     {

@@ -129,6 +129,8 @@ public sealed class PositionProfileManagementTests(HrAdminPersonaFixture fixture
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
+        await new OnboardingTemplateListPage(_page, _fixture.WebBaseUrl).GoToAsync(AcmeId);
+
         await templateEdit.GoToNewAsync(AcmeId);
         await templateEdit.FillNameAsync(templateName);
         await templateEdit.SaveAsync();

@@ -45,6 +45,29 @@ public class ListOnboardingTemplatesHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Exposes_IsDefault_On_List_Items()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        context.OnboardingTemplates.AddRange(
+            OnboardingTemplate.Create(Guid.NewGuid(), companyId, "A Template", null, Now, isDefault: true),
+            OnboardingTemplate.Create(Guid.NewGuid(), companyId, "B Template", null, Now));
+        await context.SaveChangesAsync();
+
+        var handler = new ListOnboardingTemplatesHandler(
+            context,
+            new HR.Modules.Employees.Services.OnboardingTemplateSeeder(context),
+            new HR.Modules.Employees.Tests.Infrastructure.FakeClock(Now.UtcDateTime));
+        var result = await handler.HandleAsync(
+            new ListOnboardingTemplatesRequest { CompanyId = companyId },
+            CancellationToken.None);
+
+        Assert.True(result.Value!.Items.Single(i => i.Name == "A Template").IsDefault);
+        Assert.False(result.Value.Items.Single(i => i.Name == "B Template").IsDefault);
+    }
+
+    [Fact]
     public async Task HandleAsync_Includes_Inactive_Templates_When_Requested()
     {
         await using var context = BuildContext();

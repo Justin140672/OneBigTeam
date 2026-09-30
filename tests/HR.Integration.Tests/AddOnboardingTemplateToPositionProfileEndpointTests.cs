@@ -155,6 +155,7 @@ public class AddOnboardingTemplateToPositionProfileEndpointTests
         using var client = await AdminClient(companyId);
 
         var profileId = await CreatePositionProfileAsync(client, companyId, "Operations Lead");
+        await CreateOnboardingTemplateAsync(client, companyId, "Default Onboarding");
         var templateId = await CreateOnboardingTemplateAsync(client, companyId, "Retired Onboarding");
 
         var deactivateResponse = await client.DeleteAsync(

@@ -11,7 +11,8 @@ public record OnboardingTemplateListItemModel(
     string? Description,
     bool IsActive,
     int TaskCount,
-    int Version = 0);
+    int Version = 0,
+    bool IsDefault = false);
 
 
 public record GetOnboardingTemplateResponse(
@@ -23,7 +24,8 @@ public record GetOnboardingTemplateResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     IReadOnlyList<OnboardingTemplateTaskModel> Tasks,
-    int Version = 0);
+    int Version = 0,
+    bool IsDefault = false);
 
 public record OnboardingTemplateTaskModel(
     Guid Id,

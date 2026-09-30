@@ -36,6 +36,44 @@ public class CreateOnboardingTemplateHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Marks_First_Template_As_Default()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var handler = new CreateOnboardingTemplateHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(
+            new CreateOnboardingTemplateRequest { CompanyId = companyId, Name = "First" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value!.IsDefault);
+        Assert.True((await context.OnboardingTemplates.SingleAsync()).IsDefault);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Mark_Subsequent_Template_As_Default_When_Company_Has_Default()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        context.OnboardingTemplates.Add(
+            OnboardingTemplate.Create(Guid.NewGuid(), companyId, "Existing", null, now, isDefault: true));
+        await context.SaveChangesAsync();
+
+        var handler = new CreateOnboardingTemplateHandler(context, new FakeClock(FixedUtcNow));
+
+        var result = await handler.HandleAsync(
+            new CreateOnboardingTemplateRequest { CompanyId = companyId, Name = "Second" },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(result.Value!.IsDefault);
+        Assert.Single(await context.OnboardingTemplates.Where(t => t.IsDefault).ToListAsync());
+    }
+
+    [Fact]
     public async Task HandleAsync_Returns_Conflict_When_Name_Already_Exists()
     {
         await using var context = BuildContext();

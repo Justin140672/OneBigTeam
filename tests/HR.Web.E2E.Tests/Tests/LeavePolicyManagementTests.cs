@@ -115,6 +115,29 @@ public sealed class LeavePolicyManagementTests(HrAdminPersonaFixture fixture) : 
     }
 
     [Fact]
+    public async Task NewPositionProfile_PreselectsDefaultLeavePolicy()
+    {
+        var name = $"E2E Preselect {Guid.NewGuid().ToString("N")[..8]}";
+
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var polList = new LeavePolicyListPage(_page, _fixture.WebBaseUrl);
+        var polEdit = new LeavePolicyEditPage(_page, _fixture.WebBaseUrl);
+        var ppEdit  = new PositionProfileEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await polList.GoToAsync(AcmeId);
+        await polList.ClickNewAsync();
+        await polEdit.FillNameAsync(name);
+        await polEdit.SetIsDefaultAsync(true);
+        await polEdit.SaveAsync();
+
+        await ppEdit.GoToNewAsync(AcmeId);
+        await ppEdit.ExpectDefaultLeavePolicySelectedAsync(name);
+    }
+
+    [Fact]
     public async Task SetAsDefaultToolbarAction_SwapsDefaultBadgeToSelectedPolicy()
     {
         var suffix = Guid.NewGuid().ToString("N")[..8];

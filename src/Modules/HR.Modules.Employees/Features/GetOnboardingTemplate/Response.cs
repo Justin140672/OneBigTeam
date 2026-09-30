@@ -9,6 +9,7 @@ internal sealed record GetOnboardingTemplateResponse(
     string Name,
     string? Description,
     bool IsActive,
+    bool IsDefault,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
     int Version,

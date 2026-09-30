@@ -19,7 +19,7 @@ internal sealed class OnboardingTemplateSeeder(EmployeesDbContext db)
 
         var template = OnboardingTemplate.Create(
             Guid.NewGuid(), companyId, "Standard Onboarding",
-            "Default new-starter checklist covering the essentials for a new hire's first two weeks.", now);
+            "Default new-starter checklist covering the essentials for a new hire's first two weeks.", now, isDefault: true);
 
         template.AddTask(Guid.NewGuid(), "Send welcome email", "Introduce the company, share first-day logistics.", TaskPriority.High, OnboardingTemplateTaskAssignTo.Manager, 0, 1, now);
         template.AddTask(Guid.NewGuid(), "Prepare workstation and equipment", "Laptop, accounts, desk setup ready before day one.", TaskPriority.High, OnboardingTemplateTaskAssignTo.Manager, 0, 2, now);

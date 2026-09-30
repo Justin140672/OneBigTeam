@@ -24,6 +24,7 @@ public class OnboardingTemplateSeederTests
 
         var template = Assert.Single(templates);
         Assert.Equal("Standard Onboarding", template.Name);
+        Assert.True(template.IsDefault);
         Assert.NotEmpty(template.Tasks);
         Assert.Equal(7, template.Tasks.Count);
     }
