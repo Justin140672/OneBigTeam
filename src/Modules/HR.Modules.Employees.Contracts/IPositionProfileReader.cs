@@ -18,7 +18,10 @@ public sealed record PositionProfileSummary(
     bool IsActive,
     Guid? LocationId,
     string? LocationName,
-    string? DepartmentName = null);
+    string? DepartmentName = null,
+    decimal? SalaryMin = null,
+    decimal? SalaryMax = null,
+    string? SalaryType = null);
 
 /// <summary>
 /// A position profile's employment defaults, as owned by HR.Modules.Employees. Surfaced as read-only

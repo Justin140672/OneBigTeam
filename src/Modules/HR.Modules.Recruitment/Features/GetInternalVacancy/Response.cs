@@ -8,4 +8,7 @@ internal sealed record GetInternalVacancyResponse(
     string? Location,
     string? EmploymentType,
     DateOnly? ClosingDate,
-    DateOnly? OpenedAt);
+    DateOnly? OpenedAt,
+    decimal? SalaryMin = null,
+    decimal? SalaryMax = null,
+    string? SalaryType = null);

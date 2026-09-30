@@ -1899,11 +1899,6 @@ html[data-theme="dark"] .chart-tile .e-accumulationchart text {
 /* Thin visual separator between the personal-information cards and the Users & Access
    section on the employee Details tab (AC9 — kept structurally distinct without adding a
    new top-level tab, since this page's tab indices are hand-computed elsewhere in the file). */
-.position-profile-description textarea {
-    min-height: 240px;
-    resize: vertical;
-}
-
 /* ══════════════════════════════════════════════════════════════════════════
    DSH-07 — dashboard accessibility & responsive behaviour
    ══════════════════════════════════════════════════════════════════════════ */
@@ -2085,4 +2080,24 @@ html[data-theme="dark"] .chart-tile .e-accumulationchart text {
         width: 92vw !important;
         max-width: 92vw !important;
     }
+}
+
+/* Internal vacancy details dialog: constrained to the viewport so the body scrolls and the footer
+   actions stay visible. */
+.vacancy-detail-dialog.e-dialog {
+    max-width: 95vw !important;
+    max-height: 90vh !important;
+    display: flex;
+    flex-direction: column;
+}
+
+.vacancy-detail-dialog.e-dialog .e-dlg-content {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.vacancy-detail-dialog.e-dialog .e-dlg-header {
+    white-space: normal;
+    overflow-wrap: anywhere;
 }

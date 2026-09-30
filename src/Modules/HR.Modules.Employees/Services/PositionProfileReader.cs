@@ -66,7 +66,8 @@ internal sealed class PositionProfileReader(EmployeesDbContext dbContext)
                 join d in dbContext.Departments.AsNoTracking() on p.DepartmentId equals d.Id into departments
                 from department in departments.DefaultIfEmpty()
                 select new PositionProfileSummary(
-                    p.Id, p.Title, p.DepartmentId, p.Description, p.IsActive, p.LocationId, location.Name, department.Name))
+                    p.Id, p.Title, p.DepartmentId, p.Description, p.IsActive, p.LocationId, location.Name, department.Name,
+                    p.SalaryMin, p.SalaryMax, p.SalaryType == null ? null : p.SalaryType.ToString()))
             .FirstOrDefaultAsync(cancellationToken);
     }
 
@@ -84,7 +85,8 @@ internal sealed class PositionProfileReader(EmployeesDbContext dbContext)
                 join d in dbContext.Departments.AsNoTracking() on p.DepartmentId equals d.Id into departments
                 from department in departments.DefaultIfEmpty()
                 select new PositionProfileSummary(
-                    p.Id, p.Title, p.DepartmentId, p.Description, p.IsActive, p.LocationId, location.Name, department.Name))
+                    p.Id, p.Title, p.DepartmentId, p.Description, p.IsActive, p.LocationId, location.Name, department.Name,
+                    p.SalaryMin, p.SalaryMax, p.SalaryType == null ? null : p.SalaryType.ToString()))
             .ToListAsync(cancellationToken);
     }
 

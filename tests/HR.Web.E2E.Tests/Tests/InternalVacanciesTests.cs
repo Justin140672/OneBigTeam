@@ -118,6 +118,73 @@ public sealed class InternalVacanciesTests(CrossUserFixture fixture) : RoleE2ETe
     }
 
     [Fact]
+    public async Task PlainEmployee_Card_ShowsTitleAndMetadata_AndDialogSalaryMatchesCard()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        await EnsureSeededVacancyAdvertisedInternallyAsync(login);
+
+        var internalVacancies = new InternalVacanciesPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+
+        await internalVacancies.GoToAsync(AcmeId);
+
+        var meta = await internalVacancies.GetCardMetaAsync(SeededVacancyTitle);
+        Assert.False(string.IsNullOrWhiteSpace(meta));
+        Assert.DoesNotContain("—", meta);
+
+        var cardSalary = await internalVacancies.GetCardSalaryAsync(SeededVacancyTitle);
+        if (cardSalary is not null)
+            Assert.Matches(@"^(From |Up to )?£[d,]+(–£[d,]+)? per (year|hour|day)$", cardSalary);
+
+        await internalVacancies.OpenCardAsync(SeededVacancyTitle);
+
+        Assert.Equal(cardSalary, await internalVacancies.GetDetailSalaryAsync());
+    }
+
+    [Fact]
+    public async Task PlainEmployee_DetailDialog_UsesVacancyTitleAsHeading_AndAboutTheRoleSection()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        await EnsureSeededVacancyAdvertisedInternallyAsync(login);
+
+        var internalVacancies = new InternalVacanciesPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+
+        await internalVacancies.GoToAsync(AcmeId);
+        await internalVacancies.OpenCardAsync(SeededVacancyTitle);
+
+        Assert.Equal(SeededVacancyTitle, await internalVacancies.GetDetailTitleAsync());
+        Assert.Equal("About the role", await internalVacancies.GetDetailDescriptionHeadingAsync());
+        Assert.Equal("pre-line", await internalVacancies.GetDetailDescriptionWhiteSpaceAsync());
+    }
+
+    [Fact]
+    public async Task PlainEmployee_DetailDialog_KeepsActionsVisibleOnSmallViewport()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        await EnsureSeededVacancyAdvertisedInternallyAsync(login);
+
+        var internalVacancies = new InternalVacanciesPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+
+        await internalVacancies.GoToAsync(AcmeId);
+        await _page.SetViewportSizeAsync(390, 600);
+        await internalVacancies.OpenCardAsync(SeededVacancyTitle);
+
+        Assert.True(await internalVacancies.AreDetailActionsWithinViewportAsync(),
+            "Expected the Close action to remain inside the viewport while the dialog body scrolls");
+    }
+
+    [Fact]
     public async Task PlainEmployee_NavigatingDirectlyToInternalVacancies_IsNotRedirectedToAccessDenied()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);

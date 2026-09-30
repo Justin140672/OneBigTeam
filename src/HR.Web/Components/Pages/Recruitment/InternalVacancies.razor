@@ -1,5 +1,7 @@
 @page "/companies/{CompanyId:guid}/internal-vacancies"
 @rendermode InteractiveServer
+@using System.Globalization
+@using HR.Web.Services
 @inject AppSession Session
 @inject NavigationManager Navigation
 @inject InternalVacancyService InternalVacancyService
@@ -44,9 +46,14 @@
                          @onclick="@(() => OpenDetailAsync(vacancy))"
                          @onkeydown="@(e => OnCardKeyDown(e, vacancy))">
                         <span class="vacancy-card-title">@vacancy.Title</span>
-                        <span class="vacancy-card-meta">
-                            @(vacancy.DepartmentName ?? "—") · @(vacancy.Location ?? "—")
-                        </span>
+                        @if (CardMeta(vacancy) is { } meta)
+                        {
+                            <span class="vacancy-card-meta" data-testid="internal-vacancy-card-meta">@meta</span>
+                        }
+                        @if (SalaryText(vacancy.SalaryMin, vacancy.SalaryMax, vacancy.SalaryType) is { } cardSalary)
+                        {
+                            <span class="vacancy-card-salary" data-testid="internal-vacancy-card-salary">@cardSalary</span>
+                        }
                         @if (vacancy.ClosingDate is not null)
                         {
                             <span class="vacancy-card-closing">Closes @vacancy.ClosingDate.Value.ToString("d MMMM yyyy")</span>
@@ -64,11 +71,11 @@
         }
     </div>
 
-    <SfDialog Visible="_detailVisible" IsModal="true" Width="520px" ShowCloseIcon="true"
+    <SfDialog Visible="_detailVisible" IsModal="true" Width="760px" ShowCloseIcon="true"
               CssClass="vacancy-detail-dialog">
         <DialogEvents OnClose="OnDialogClosing" Closed="OnDialogClosed" />
         <DialogTemplates>
-            <Header>@(_mode == DialogMode.Apply ? "Apply for this vacancy" : "Vacancy")</Header>
+            <Header>@(_mode == DialogMode.Apply ? "Apply for this vacancy" : _detail?.Title ?? _openedTitle ?? "Vacancy")</Header>
             <Content>
                 @if (_detailLoading)
                 {
@@ -152,18 +159,22 @@
                     }
 
                     <div class="vacancy-detail" data-testid="internal-vacancy-detail">
-                        <div class="vacancy-detail-title">@_detail.Title</div>
                         @if (_openedHasApplied)
                         {
                             <div class="vacancy-applied-status" data-testid="internal-vacancy-applied-state">
                                 <i class="fa-solid fa-circle-check" aria-hidden="true"></i> Applied
                             </div>
                         }
-                        <dl class="vacancy-detail-dl">
+                        <dl class="vacancy-detail-dl vacancy-detail-meta">
                             <dt>Department</dt>
                             <dd>@(_detail.DepartmentName ?? "—")</dd>
                             <dt>Location</dt>
                             <dd>@(_detail.Location ?? "—")</dd>
+                            @if (SalaryText(_detail.SalaryMin, _detail.SalaryMax, _detail.SalaryType) is { } detailSalary)
+                            {
+                                <dt>Salary</dt>
+                                <dd data-testid="internal-vacancy-detail-salary">@detailSalary</dd>
+                            }
                             @if (!string.IsNullOrWhiteSpace(_detail.EmploymentType))
                             {
                                 <dt>Employment Type</dt>
@@ -175,7 +186,7 @@
                                 <dd>@_detail.ClosingDate.Value.ToString("d MMMM yyyy")</dd>
                             }
                         </dl>
-                        <div class="vacancy-detail-description-label">Description</div>
+                        <h3 class="vacancy-detail-description-label">About the role</h3>
                         <div class="vacancy-detail-description">@(string.IsNullOrWhiteSpace(_detail.Description) ? "—" : _detail.Description)</div>
                         @if (!_openedHasApplied && !CanApply)
                         {
@@ -254,6 +265,7 @@
     private InternalVacancyDetail? _detail;
     private Guid? _openedVacancyId;
     private bool _openedHasApplied;
+    private string? _openedTitle;
 
     private DialogMode _mode = DialogMode.Details;
     private ApplyNotice _notice = ApplyNotice.None;
@@ -357,6 +369,7 @@
         _detail = null;
         _openedVacancyId = vacancy.Id;
         _openedHasApplied = vacancy.HasApplied;
+        _openedTitle = vacancy.Title;
         _detailVisible = true;
         _detailLoading = true;
         _detail = await InternalVacancyService.GetAsync(CompanyId, vacancy.Id);
@@ -519,6 +532,16 @@
         _openedVacancyId = null;
         _openedHasApplied = false;
     }
+
+    private static string? CardMeta(InternalVacancyListItem vacancy)
+    {
+        var parts = new[] { vacancy.DepartmentName, vacancy.Location }
+            .Where(p => !string.IsNullOrWhiteSpace(p));
+        return parts.Any() ? string.Join(" · ", parts) : null;
+    }
+
+    private string? SalaryText(decimal? min, decimal? max, string? salaryType) =>
+        SalaryRangeFormatter.Format(min, max, salaryType, CultureInfo.GetCultureInfo(Session.Locale));
 
     private static string FormatFileSize(long bytes) =>
         bytes < 1024 ? $"{bytes} B"

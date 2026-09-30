@@ -61,7 +61,38 @@ public sealed class InternalVacanciesPage(IPage page, string baseUrl)
         page.Locator(DetailSelector).WaitUntilVisibleAsync();
 
     public async Task<string?> GetDetailTitleAsync() =>
-        (await page.Locator($"{DetailSelector} .vacancy-detail-title").TextContentAsync())?.Trim();
+        (await DetailDialog.Locator(".e-dlg-header").TextContentAsync())?.Trim();
+
+    public async Task<string?> GetCardMetaAsync(string title) =>
+        (await Card(title).Locator("[data-testid='internal-vacancy-card-meta']").TextContentAsync())?.Trim();
+
+    public async Task<string?> GetCardSalaryAsync(string title)
+    {
+        var salary = Card(title).Locator("[data-testid='internal-vacancy-card-salary']");
+        return await salary.CountAsync() == 0 ? null : (await salary.TextContentAsync())?.Trim();
+    }
+
+    public async Task<string?> GetDetailSalaryAsync()
+    {
+        var salary = ByTestId("internal-vacancy-detail-salary");
+        return await salary.CountAsync() == 0 ? null : (await salary.TextContentAsync())?.Trim();
+    }
+
+    public async Task<string?> GetDetailDescriptionHeadingAsync() =>
+        (await page.Locator($"{DetailSelector} .vacancy-detail-description-label").TextContentAsync())?.Trim();
+
+    public Task<string> GetDetailDescriptionWhiteSpaceAsync() =>
+        page.Locator($"{DetailSelector} .vacancy-detail-description")
+            .EvaluateAsync<string>("e => getComputedStyle(e).whiteSpace");
+
+    public Task<bool> AreDetailActionsWithinViewportAsync() =>
+        page.EvaluateAsync<bool>(
+            @"() => {
+                const b = document.querySelector('[data-testid=""internal-vacancy-close""]');
+                if (!b) return false;
+                const r = b.getBoundingClientRect();
+                return r.top >= 0 && r.bottom <= window.innerHeight;
+            }");
 
     public async Task<string?> GetDetailDescriptionAsync() =>
         (await page.Locator($"{DetailSelector} .vacancy-detail-description").TextContentAsync())?.Trim();

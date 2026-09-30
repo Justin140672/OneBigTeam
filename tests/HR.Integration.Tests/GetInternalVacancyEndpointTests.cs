@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text.Json;
 using HR.Integration.Tests.Infrastructure;
+using HR.Modules.Employees.Domain;
+using HR.Modules.Employees.Persistence;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
@@ -74,6 +76,51 @@ public class GetInternalVacancyEndpointTests
         foreach (var forbidden in new[] { "hiringManagerId", "assignedRecruiterId", "applicationCount", "candidate", "notes" })
             Assert.DoesNotContain(doc.RootElement.EnumerateObject(), p => string.Equals(p.Name, forbidden, StringComparison.OrdinalIgnoreCase));
     }
+
+    [Theory]
+    [InlineData(45000, 55000, true)]
+    [InlineData(45000, null, true)]
+    [InlineData(null, 55000, true)]
+    [InlineData(null, null, false)]
+    public async Task Get_InternalVacancy_Returns_Salary_From_Linked_PositionProfile(int? min, int? max, bool hasType)
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await AuthenticatedClient(companyId);
+        Guid vacancyId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var employeesDb = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
+            var profile = PositionProfile.Create(
+                Guid.NewGuid(), companyId, Guid.NewGuid(), locationId: Guid.NewGuid(), "Salaried Role",
+                probationMonthsOverride: null, workingDaysOverride: null, hoursPerDayOverride: null,
+                salaryMin: min, salaryMax: max, salaryType: hasType ? SalaryType.Annual : null,
+                defaultLeavePolicyId: Guid.NewGuid(), Now);
+            employeesDb.PositionProfiles.Add(profile);
+            await employeesDb.SaveChangesAsync();
+
+            var recruitmentDb = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+            var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, profile.Id, "Salaried Role", "A description", Guid.NewGuid(), Now,
+                assignedRecruiterId: null, isAdvertisedInternally: true);
+            vacancy.Open(Now, DateOnly.FromDateTime(Now.UtcDateTime));
+            recruitmentDb.Vacancies.Add(vacancy);
+            await recruitmentDb.SaveChangesAsync();
+            vacancyId = vacancy.Id;
+        }
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/internal-vacancies/{vacancyId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal(min, ReadDecimal(doc.RootElement, "salaryMin"));
+        Assert.Equal(max, ReadDecimal(doc.RootElement, "salaryMax"));
+        Assert.Equal(hasType ? "Annual" : null, ReadString(doc.RootElement, "salaryType"));
+    }
+
+    private static decimal? ReadDecimal(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.Number ? p.GetDecimal() : null;
+
+    private static string? ReadString(JsonElement element, string name) =>
+        element.TryGetProperty(name, out var p) && p.ValueKind == JsonValueKind.String ? p.GetString() : null;
 
     [Fact]
     public async Task Get_InternalVacancy_Returns_NotFound_For_Draft_Vacancy()

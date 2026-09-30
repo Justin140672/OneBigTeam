@@ -54,7 +54,10 @@ internal sealed class ListInternalVacanciesHandler(RecruitmentDbContext db, IPos
                     positionProfile?.DepartmentName,
                     positionProfile?.LocationName,
                     null,
-                    appliedVacancyIds.Contains(v.Id));
+                    appliedVacancyIds.Contains(v.Id),
+                    positionProfile?.SalaryMin,
+                    positionProfile?.SalaryMax,
+                    positionProfile?.SalaryType);
             })
             .ToList();
 

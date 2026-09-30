@@ -9,7 +9,10 @@ public record InternalVacancyListItem(
     string? DepartmentName,
     string? Location,
     DateOnly? ClosingDate,
-    bool HasApplied = false);
+    bool HasApplied = false,
+    decimal? SalaryMin = null,
+    decimal? SalaryMax = null,
+    string? SalaryType = null);
 
 public record InternalVacancyDetail(
     Guid Id,
@@ -19,7 +22,10 @@ public record InternalVacancyDetail(
     string? Location,
     string? EmploymentType,
     DateOnly? ClosingDate,
-    DateOnly? OpenedAt);
+    DateOnly? OpenedAt,
+    decimal? SalaryMin = null,
+    decimal? SalaryMax = null,
+    string? SalaryType = null);
 
 public enum InternalVacancyApplyOutcome
 {

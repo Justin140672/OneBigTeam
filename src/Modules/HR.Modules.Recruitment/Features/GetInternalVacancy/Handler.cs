@@ -36,6 +36,9 @@ internal sealed class GetInternalVacancyHandler(RecruitmentDbContext db, IPositi
             positionProfile?.LocationName,
             null,
             null,
-            vacancy.OpenedAt));
+            vacancy.OpenedAt,
+            positionProfile?.SalaryMin,
+            positionProfile?.SalaryMax,
+            positionProfile?.SalaryType));
     }
 }

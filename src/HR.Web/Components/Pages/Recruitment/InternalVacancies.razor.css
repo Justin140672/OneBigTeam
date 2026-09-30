@@ -24,7 +24,7 @@
     background: #fff;
     border: 1px solid #e5e7eb;
     border-radius: 12px;
-    padding: 16px;
+    padding: 14px 16px;
     box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
     cursor: pointer;
     transition: box-shadow 0.15s, transform 0.15s;
@@ -34,18 +34,32 @@
 .vacancy-card:focus-visible {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
     transform: translateY(-1px);
+    border-color: var(--hr-color-primary);
     outline: none;
 }
 
+.vacancy-card:focus-visible {
+    outline: 2px solid var(--hr-color-primary);
+    outline-offset: 2px;
+}
+
 .vacancy-card-title {
-    font-size: 0.95rem;
+    font-size: 1rem;
+    line-height: 1.3;
+    overflow-wrap: anywhere;
     font-weight: 600;
     color: #111827;
 }
 
 .vacancy-card-meta {
-    font-size: 0.8rem;
+    font-size: 0.82rem;
     color: #6b7280;
+}
+
+.vacancy-card-salary {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #111827;
 }
 
 .vacancy-card-closing {
@@ -101,20 +115,25 @@
     word-break: break-word;
 }
 
+.vacancy-detail-meta {
+    padding-bottom: 16px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid #e5e7eb;
+}
+
 .vacancy-detail-description-label {
-    font-size: 0.78rem;
-    font-weight: 500;
-    color: #6b7280;
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-    margin-bottom: 6px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #111827;
+    margin: 0 0 8px;
 }
 
 .vacancy-detail-description {
-    font-size: 0.875rem;
+    font-size: 0.925rem;
+    line-height: 1.6;
     color: #111827;
-    white-space: pre-wrap;
-    word-break: break-word;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
 }
 
 /* ── Applied state ───────────────────────────────────── */
@@ -242,6 +261,8 @@ html[data-theme="dark"] .vacancy-card {
 }
 
 html[data-theme="dark"] .vacancy-card-title,
+html[data-theme="dark"] .vacancy-card-salary,
+html[data-theme="dark"] .vacancy-detail-description-label,
 html[data-theme="dark"] .vacancy-detail-title,
 html[data-theme="dark"] .vacancy-detail-dl dd,
 html[data-theme="dark"] .vacancy-detail-description,
@@ -270,6 +291,10 @@ html[data-theme="dark"] .vacancy-apply-success {
     border-color: #166534;
     border-left-color: #22c55e;
     color: #bbf7d0;
+}
+
+html[data-theme="dark"] .vacancy-detail-meta {
+    border-bottom-color: var(--hr-gray-700);
 }
 
 html[data-theme="dark"] .vacancy-apply-identity {
