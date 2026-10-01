@@ -48,14 +48,14 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
 
     public async Task SaveNewCandidateAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+        await page.GetByRole(AriaRole.Button, new() { NameRegex = new System.Text.RegularExpressions.Regex("^(Save|Add)$") }).ClickAsync();
         await page.WaitForURLAsync("**/candidates", new() { Timeout = 30_000 });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
 
     public async Task SaveNewCandidateAndWaitForUrlAsync(string urlGlob)
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+        await page.GetByRole(AriaRole.Button, new() { NameRegex = new System.Text.RegularExpressions.Regex("^(Save|Add)$") }).ClickAsync();
         await page.WaitForURLAsync(urlGlob, new() { Timeout = 30_000 });
     }
 
@@ -122,7 +122,7 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
 
     public async Task SaveAndWaitForListAsync()
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+        await page.GetByRole(AriaRole.Button, new() { NameRegex = new System.Text.RegularExpressions.Regex("^(Save|Add)$") }).ClickAsync();
         await page.WaitForURLAsync("**/candidates", new() { Timeout = 30_000 });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
@@ -153,7 +153,7 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
     private ILocator UnsavedChangesDialog => page.Locator("[role='dialog']:has-text('Unsaved Changes')");
 
     public Task ClickCloseAsync() =>
-        page.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
+        page.GetByRole(AriaRole.Button, new() { NameRegex = new System.Text.RegularExpressions.Regex("^(Close|Cancel)$") }).ClickAsync();
 
     public Task<bool> IsUnsavedChangesDialogVisibleAsync() =>
         UnsavedChangesDialog.WaitUntilVisibleAsync();
