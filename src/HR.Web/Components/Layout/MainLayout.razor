@@ -110,7 +110,7 @@ else
                                     }
                                 }
                             }
-                            @if (Session.IsHrAdministrator || Session.CanManageSupport)
+                            @if (_navReady && (Session.IsHrAdministrator || Session.CanManageSupport))
                             {
                                 <MenuItem Text="Support Requests" IconCss="fa-solid fa-headset" Url="@_menuItems["SupportQueue"]" />
                             }
@@ -369,6 +369,7 @@ else
     private sealed record PersonaOption(string UserId, string DisplayName);
 
     private IReadOnlyList<AdminNavSection> _adminSections = [];
+    private bool _navReady;
 
     private static string SectionIcon(AdminNavGroup group) => group switch
     {
@@ -419,6 +420,7 @@ else
 
         var companyId = Session.CompanyId;
         _adminSections = AdminNavigation.Sections(AdminNavCapabilities.From(Session), companyId);
+        _navReady = true;
         _menuItems["Employees"] = $"/companies/{companyId}/employees";
         _menuItems["Departments"] = $"/companies/{companyId}/departments";
         _menuItems["LocationTypes"] = $"/companies/{companyId}/location-types";

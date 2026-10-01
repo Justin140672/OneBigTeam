@@ -23,19 +23,22 @@ internal sealed class GetEmployeeTeamViewHandler
     private readonly IProbationStatusReader _probationStatusReader;
     private readonly IOffboardingStatusReader _offboardingStatusReader;
     private readonly EmployeesResourceAuthorizer _resourceAuthorizer;
+    private readonly IProfilePhotoReader _profilePhotoReader;
 
     public GetEmployeeTeamViewHandler(
         EmployeesDbContext dbContext,
         IOnboardingStatusReader onboardingStatusReader,
         IProbationStatusReader probationStatusReader,
         IOffboardingStatusReader offboardingStatusReader,
-        EmployeesResourceAuthorizer resourceAuthorizer)
+        EmployeesResourceAuthorizer resourceAuthorizer,
+        IProfilePhotoReader profilePhotoReader)
     {
         _dbContext = dbContext;
         _onboardingStatusReader = onboardingStatusReader;
         _probationStatusReader = probationStatusReader;
         _offboardingStatusReader = offboardingStatusReader;
         _resourceAuthorizer = resourceAuthorizer;
+        _profilePhotoReader = profilePhotoReader;
     }
 
     public async Task<Result<GetEmployeeTeamViewResponse>> HandleAsync(
@@ -125,6 +128,9 @@ internal sealed class GetEmployeeTeamViewHandler
                 p => p.CompanyId == request.CompanyId && p.EmployeeId == result.Id,
                 cancellationToken);
 
+        var photoUrls = await _profilePhotoReader.GetCurrentPhotoUrlsAsync(
+            request.CompanyId, [result.Id], cancellationToken);
+
         var showOnboardingTab = onboardingStatus is not null && onboardingStatus.Status != "Completed";
         var showProbationTab = probationStatus is not null
             && probationStatus.Status is "Active" or "ReviewDue" or "Extended";
@@ -157,7 +163,8 @@ internal sealed class GetEmployeeTeamViewHandler
             showOnboardingTab,
             showProbationTab,
             showOffboardingTab,
-            showLeavingTab));
+            showLeavingTab,
+            photoUrls.TryGetValue(result.Id, out var photoUrl) ? photoUrl : null));
     }
 
     private async Task<IReadOnlyList<ReportingChainItem>> BuildReportingChainAsync(

@@ -12,8 +12,7 @@
 <div class="container-fluid py-4">
     <h1 class="mb-1">Support Requests</h1>
     <p class="text-muted mb-3">
-        Staff queue for reviewing support requests submitted by employees of this company.
-        Ticket status can only be changed by support staff in the Admin app.
+        Review support requests submitted by HR users in this company.
     </p>
 
     @if (IsLoading)
@@ -30,6 +29,10 @@
     else if (DisplayedItems.Count == 0)
     {
         <div class="alert alert-info">No support requests to show.</div>
+        @if (!IsAddDisabled)
+        {
+            <SfButton CssClass="e-primary" IconCss="fa-solid fa-plus" Content="@AddButtonText" @onclick="@(() => Navigation.NavigateTo(GetAddUrl()!))" />
+        }
     }
     else
     {
@@ -90,7 +93,9 @@
 
     protected override bool SupportsActiveFilter => true;
 
-    protected override bool IsAddDisabled => true;
+    protected override string AddButtonText => "New request";
+
+    protected override string? GetAddUrl() => $"/companies/{CompanyId}/support";
 
     private IReadOnlyList<SupportRequestListItem> DisplayedItems =>
         ShowInactive ? Items : Items.Where(i => i.Status != ClosedStatus).ToList();

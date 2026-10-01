@@ -27,7 +27,7 @@ usability layer only and never a substitute for endpoint authorization.
 | Manager | HR (scoped) | Direct + indirect reports via manager hierarchy. |
 | Recruiter | HR (function) | Recruitment + candidate data only. |
 | HR Administrator | HR (company-wide) | Full HR/employee/leave/sickness/document administration. |
-| Company Administrator | **Company configuration only** | Company profile, branding, company settings, subscription/billing, onboarding checklist, support requests. **No HR data of any kind.** |
+| Company Administrator | **Company configuration only** | Company profile, branding, company settings, subscription/billing, onboarding checklist. **No HR data of any kind and no support-request access** unless the user also holds HR Administrator. |
 
 Combined roles are a set union (OR) of permissions. The initial company creator is granted
 `HR Administrator` as an explicit, separately-assigned exception — that is an HR Administrator,
@@ -47,7 +47,8 @@ Legend: Y = full access · S = scoped (hierarchy / self / function) · — = den
 | Company profile / branding / company settings | `company:manage` (`company.edit`) | — | — | — | — | **Y** |
 | Subscription / billing | `subscription:manage` | — | — | — | — | **Y** |
 | Getting-started / onboarding checklist | `onboarding:view` / `onboarding:manage` | — | — | — | Y | **Y** |
-| Support requests queue | `support:manage` | — | — | — | Y | **Y** |
+| Support requests — create, view own, view company queue, reply (no status changes) | `support:request` / `support:manage` | — | — | — | Y | **—** |
+| Support requests — cross-tenant view and status change (Admin Portal) | `platform:admin` (enabled Platform Administrator, no tenant role needed) | — | — | — | — | **—** |
 | HR settings (leave year, probation, salary display, reminders, recruitment settings) | `hr-settings:manage` | — | — | — | Y | **—** |
 | Employee directory — list | `employee:manage` | — | — | — | Y | **—** |
 | Employee analytics / scoped workflow summaries | `employee:read` | — | S | — | Y | **—** |
@@ -98,7 +99,13 @@ outcome in the UI, category hidden in navigation) for all of:
 - Employee documents administration
 
 They retain: company profile/branding/settings, subscription/billing, onboarding checklist,
-support requests, and their own self-service pages.
+and their own self-service pages. Support requests are no longer a Company Administrator capability.
+
+### Support requests
+
+- HR Administrator: create requests, view own submitted requests, view the company queue, reply. Cannot change status (status is read-only in HR.Web).
+- Platform Administrator (Admin Portal, cross-tenant): view requests across tenants and change status only (`PUT /api/admin/companies/{companyId}/support/requests/{id}/status`). Cannot create. No tenant role required.
+- Employee / Manager / Recruiter / Company Administrator: no support access unless the user also holds HR Administrator (union of roles). The tenant status endpoint has been removed.
 
 ### Governance exception
 

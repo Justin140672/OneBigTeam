@@ -123,6 +123,34 @@ public sealed class SupportAndFeedbackTests(HrAdminPersonaFixture fixture) : Rol
     }
 
     [Fact]
+    public async Task HrAdministrator_SeesHelpAndFeedbackNavigation()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await _page.Locator("button.help-btn").ClickAsync();
+
+        Assert.True(await _page.Locator("a.help-item", new() { HasText = "Help & Feedback" }).IsVisibleAsync(),
+            "Expected the Help & Feedback link in the help menu for an HR Administrator");
+    }
+
+    [Fact]
+    public async Task PlainEmployee_DoesNotSeeSupportNavigation()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(TomEmail);
+
+        await _page.Locator("button.notif-btn").WaitForAsync();
+
+        Assert.Equal(0, await _page.Locator("button.help-btn").CountAsync());
+        Assert.Equal(0, await _page.GetByText("Support Requests", new() { Exact = true }).CountAsync());
+    }
+
+    [Fact]
     public async Task PlainEmployee_IsRedirectedAway_FromHelpFeedbackPage()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
@@ -134,6 +162,7 @@ public sealed class SupportAndFeedbackTests(HrAdminPersonaFixture fixture) : Rol
         await WaitForUrlToStopContainingAsync("/support");
 
         var finalUrl = _page.Url;
+        Assert.Contains("/access-denied", finalUrl);
         Assert.False(finalUrl.TrimEnd('/').EndsWith("/support"),
             $"Expected a plain employee to be redirected away from the Help & Feedback page, but ended up at: {finalUrl}");
     }
@@ -161,9 +190,10 @@ public sealed class SupportAndFeedbackTests(HrAdminPersonaFixture fixture) : Rol
         await login.LoginAsync(TomEmail);
 
         await _page.GotoAsync(detailUrl);
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        await _page.WaitForURLAsync("**/access-denied", new() { Timeout = 15_000 });
 
         var finalUrl = _page.Url;
+        Assert.Contains("/access-denied", finalUrl);
         Assert.False(finalUrl == detailUrl,
             $"Expected a plain employee to be redirected away from the support request detail page, but ended up at: {finalUrl}");
     }
@@ -180,6 +210,7 @@ public sealed class SupportAndFeedbackTests(HrAdminPersonaFixture fixture) : Rol
         await WaitForUrlToStopContainingAsync("/support/admin/queue");
 
         var finalUrl = _page.Url;
+        Assert.Contains("/access-denied", finalUrl);
         Assert.False(finalUrl.Contains("/support/admin/queue"),
             $"Expected a plain employee to be redirected away from the support queue page, but ended up at: {finalUrl}");
     }

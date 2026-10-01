@@ -2,6 +2,8 @@ using HR.Modules.Identity.Authorization;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace HR.Modules.Identity.Tests;
 
@@ -14,7 +16,7 @@ public class PolicyMatrixTests(IdentityDatabaseFixture fixture)
         ["employee:read"] = [SystemRoles.Manager, SystemRoles.Recruiter, SystemRoles.HrAdministrator],
         ["company:manage"] = [SystemRoles.CompanyAdministrator],
         ["support:manage"] = [SystemRoles.HrAdministrator],
-        ["support:request"] = [SystemRoles.Employee, SystemRoles.HrAdministrator],
+        ["support:request"] = [SystemRoles.HrAdministrator],
         ["hr-settings:manage"] = [SystemRoles.HrAdministrator],
         ["users:view"] = [SystemRoles.HrAdministrator],
         ["users:manage"] = [SystemRoles.HrAdministrator],
@@ -94,6 +96,45 @@ public class PolicyMatrixTests(IdentityDatabaseFixture fixture)
             expectedAccess == actualAccess,
             $"Policy '{policyName}' access mismatch for role {RoleNames.GetValueOrDefault(roleId, roleId.ToString())}: " +
             $"expected {expectedAccess}, got {actualAccess}.");
+    }
+
+    [Fact]
+    public async Task Employee_No_Longer_Receives_Support_Request_Permission()
+    {
+        await using var db = fixture.BuildContext();
+
+        Assert.False(await db.RolePermissions.AnyAsync(rp =>
+            rp.RoleId == SystemRoles.Employee && rp.PermissionId == SystemPermissions.SupportRequest));
+        Assert.True(await db.Roles.AnyAsync(r => r.Id == SystemRoles.Employee));
+    }
+
+    [Fact]
+    public async Task Migration_Removes_Employee_Support_Request_Grant_Without_Removing_Permission_Or_Hr_Grant()
+    {
+        const string previousMigration = "20260929162926_MoveAccountStateToUserProfiles";
+
+        await using var db = fixture.BuildContext();
+        var migrator = db.GetService<IMigrator>();
+
+        try
+        {
+            await migrator.MigrateAsync(previousMigration);
+
+            Assert.True(await db.RolePermissions.AnyAsync(rp =>
+                rp.RoleId == SystemRoles.Employee && rp.PermissionId == SystemPermissions.SupportRequest));
+        }
+        finally
+        {
+            await migrator.MigrateAsync();
+        }
+
+        Assert.False(await db.RolePermissions.AnyAsync(rp =>
+            rp.RoleId == SystemRoles.Employee && rp.PermissionId == SystemPermissions.SupportRequest));
+        Assert.True(await db.Permissions.AnyAsync(p => p.Id == SystemPermissions.SupportRequest));
+        Assert.True(await db.RolePermissions.AnyAsync(rp =>
+            rp.RoleId == SystemRoles.HrAdministrator && rp.PermissionId == SystemPermissions.SupportRequest));
+        Assert.True(await db.RolePermissions.AnyAsync(rp =>
+            rp.RoleId == SystemRoles.HrAdministrator && rp.PermissionId == SystemPermissions.SupportManage));
     }
 
     [Fact]

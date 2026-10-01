@@ -145,7 +145,8 @@ public sealed record GetEmployeeTeamViewResponse(
     bool ShowOnboardingTab,
     bool ShowProbationTab,
     bool ShowOffboardingTab,
-    bool ShowLeavingTab);
+    bool ShowLeavingTab,
+    string? ProfilePhotoUrl);
 
 
 public sealed record GetMyPersonalDetailsResponse(

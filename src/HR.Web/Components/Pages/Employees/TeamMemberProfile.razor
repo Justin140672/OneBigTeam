@@ -42,8 +42,13 @@
             properties for any of that (see EmployeeModels.cs's GetEmployeeTeamViewResponse and
             26-permissions-access-ux.md's field-level access matrix).
         -->
-        <h1 class="mb-1" data-testid="team-view-name">@DisplayName(_employee)</h1>
-        <p class="text-muted mb-4" data-testid="team-view-job-title">@(_employee.PositionTitle ?? "—")</p>
+        <div class="d-flex align-items-center gap-3 mb-4">
+            <ProfilePhotoAvatar PhotoUrl="@_employee.ProfilePhotoUrl" Initials="@Initials(_employee)" SizePx="72" />
+            <div>
+                <h1 class="mb-1" data-testid="team-view-name">@DisplayName(_employee)</h1>
+                <p class="text-muted mb-0" data-testid="team-view-job-title">@(_employee.PositionTitle ?? "—")</p>
+            </div>
+        </div>
 
         <div class="row g-3" data-testid="team-view-profile">
             <div class="col-md-6">
@@ -152,6 +157,9 @@
         string.IsNullOrWhiteSpace(employee.PreferredName)
             ? $"{employee.FirstName} {employee.LastName}"
             : $"{employee.PreferredName} {employee.LastName}";
+
+    private static string Initials(GetEmployeeTeamViewResponse employee) =>
+        $"{employee.FirstName.FirstOrDefault()}{employee.LastName.FirstOrDefault()}".ToUpperInvariant();
 
     private static string StatusLabel(string status) => status switch
     {

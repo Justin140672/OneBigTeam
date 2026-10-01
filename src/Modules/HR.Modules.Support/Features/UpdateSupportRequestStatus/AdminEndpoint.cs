@@ -4,10 +4,9 @@ using Microsoft.AspNetCore.Http;
 
 namespace HR.Modules.Support.Features.UpdateSupportRequestStatus;
 
-// Ticket 17: platform-support surface for HR.Admin.Web — see ListSupportRequests/AdminEndpoint.cs
-// remarks. Reuses UpdateSupportRequestStatusHandler unchanged, so transition rules, optimistic
-// concurrency (ExpectedVersion / HTTP 409) and the HR-Administrator notification fan-out are
-// identical to the tenant "support:manage" endpoint — only the authorization gate differs.
+// The only status-transition route: platform administrators only (no tenant role can change status).
+// Transition rules, optimistic concurrency (ExpectedVersion / HTTP 409) and the HR-Administrator
+// notification fan-out live in UpdateSupportRequestStatusHandler.
 internal sealed class AdminEndpoint(UpdateSupportRequestStatusHandler handler)
     : Endpoint<UpdateSupportRequestStatusRequest, UpdateSupportRequestStatusResponse>
 {

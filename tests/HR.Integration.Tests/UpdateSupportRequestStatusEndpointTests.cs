@@ -9,31 +9,28 @@ namespace HR.Integration.Tests;
 public class UpdateSupportRequestStatusEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
-    private static readonly Guid EmployeeUserId = Guid.Parse("60000000-0000-0000-0000-000000000004");
-    private static readonly Guid AdminUserId = Guid.Parse("60000000-0000-0000-0000-000000000005");
 
     public UpdateSupportRequestStatusEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
     }
 
-    private async Task<HttpClient> EmployeeClient(Guid companyId)
+    private async Task<HttpClient> TenantClient(Guid companyId, params Guid[] roles)
     {
+        var userId = Guid.NewGuid();
         var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, EmployeeUserId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
-        await TestRoleSeeder.AssignRoleAsync(_factory, EmployeeUserId, SystemRoles.Employee, companyId);
+        foreach (var role in roles)
+            await TestRoleSeeder.AssignRoleAsync(_factory, userId, role, companyId);
         return client;
     }
 
-    private async Task<HttpClient> AdminClient(Guid companyId)
+    private async Task<HttpClient> PlatformAdminClient()
     {
-        var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
-        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
-        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.Employee, companyId);
-        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
-        return client;
+        var (_, email) = await PlatformAdministratorTestHelpers.SeedAdministratorAsync(
+            _factory, PlatformAdministratorRole.SupportStaff);
+        return PlatformAdministratorTestHelpers.ClientFor(_factory, Guid.NewGuid(), email);
     }
 
     private static MultipartFormDataContent BuildSubmission(Guid companyId, string title) => new()
@@ -46,57 +43,90 @@ public class UpdateSupportRequestStatusEndpointTests
         { new StringContent("false"), "IncludeDiagnostics" },
     };
 
+    private async Task<Guid> SubmitAsHrAsync(Guid companyId, string title)
+    {
+        using var hr = await TenantClient(companyId, SystemRoles.Employee, SystemRoles.HrAdministrator);
+        var created = await hr.PostAsync($"/api/companies/{companyId}/support/requests", BuildSubmission(companyId, title));
+        created.EnsureSuccessStatusCode();
+        return (await created.Content.ReadFromJsonAsync<SubmitPayload>())!.Id;
+    }
+
     [Fact]
-    public async Task Put_SupportRequestStatus_Returns_Unauthorized_For_Anonymous_Request()
+    public async Task Put_AdminSupportRequestStatus_Returns_Unauthorized_For_Anonymous_Request()
     {
         using var client = _factory.CreateClient();
         var response = await client.PutAsJsonAsync(
-            $"/api/companies/{Guid.NewGuid()}/support/requests/{Guid.NewGuid()}/status",
+            $"/api/admin/companies/{Guid.NewGuid()}/support/requests/{Guid.NewGuid()}/status",
             new { status = "UnderReview" });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     [Fact]
-    public async Task Put_SupportRequestStatus_Returns_Forbidden_For_Non_Staff_Employee()
+    public async Task Tenant_Status_Route_Is_Removed_For_Every_Tenant_Role_Including_HrAdministrator()
     {
         var companyId = Guid.NewGuid();
-        using var client = await EmployeeClient(companyId);
+        var id = await SubmitAsHrAsync(companyId, "Tenant status route removed");
 
-        var response = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/support/requests/{Guid.NewGuid()}/status",
-            new { companyId, id = Guid.NewGuid(), status = "UnderReview" });
+        var roleSets = new[]
+        {
+            new[] { SystemRoles.Employee },
+            new[] { SystemRoles.Employee, SystemRoles.Manager },
+            new[] { SystemRoles.Employee, SystemRoles.Recruiter },
+            new[] { SystemRoles.Employee, SystemRoles.CompanyAdministrator },
+            new[] { SystemRoles.Employee, SystemRoles.HrAdministrator },
+        };
+
+        foreach (var roles in roleSets)
+        {
+            using var client = await TenantClient(companyId, roles);
+            var response = await client.PutAsJsonAsync(
+                $"/api/companies/{companyId}/support/requests/{id}/status",
+                new { companyId, id, status = "UnderReview", expectedVersion = 1 });
+
+            Assert.True(
+                response.StatusCode is HttpStatusCode.NotFound or HttpStatusCode.MethodNotAllowed,
+                $"Expected 404/405 for roles [{string.Join(",", roles)}] but got {(int)response.StatusCode}.");
+        }
+    }
+
+    [Fact]
+    public async Task Put_AdminSupportRequestStatus_Returns_Forbidden_For_HrAdministrator()
+    {
+        var companyId = Guid.NewGuid();
+        var id = await SubmitAsHrAsync(companyId, "HR cannot change status");
+        using var hr = await TenantClient(companyId, SystemRoles.Employee, SystemRoles.HrAdministrator);
+
+        var response = await hr.PutAsJsonAsync(
+            $"/api/admin/companies/{companyId}/support/requests/{id}/status",
+            new { companyId, id, status = "UnderReview", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
 
     [Fact]
-    public async Task Put_SupportRequestStatus_Returns_NotFound_When_Request_Does_Not_Exist()
+    public async Task Put_AdminSupportRequestStatus_Returns_NotFound_When_Request_Does_Not_Exist()
     {
         var companyId = Guid.NewGuid();
-        using var client = await AdminClient(companyId);
+        using var admin = await PlatformAdminClient();
 
-        var response = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/support/requests/{Guid.NewGuid()}/status",
+        var response = await admin.PutAsJsonAsync(
+            $"/api/admin/companies/{companyId}/support/requests/{Guid.NewGuid()}/status",
             new { companyId, id = Guid.NewGuid(), status = "UnderReview", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 
     [Fact]
-    public async Task Put_SupportRequestStatus_Updates_Status_For_Staff_Admin()
+    public async Task Put_AdminSupportRequestStatus_Updates_Status_For_Platform_Administrator()
     {
         var companyId = Guid.NewGuid();
-        using var client = await AdminClient(companyId);
+        var id = await SubmitAsHrAsync(companyId, "Status update issue");
+        using var admin = await PlatformAdminClient();
 
-        var created = await client.PostAsync($"/api/companies/{companyId}/support/requests", BuildSubmission(companyId, "Status update issue"));
-        created.EnsureSuccessStatusCode();
-        var payload = await created.Content.ReadFromJsonAsync<SubmitPayload>();
-        Assert.NotNull(payload);
-
-        var response = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/support/requests/{payload!.Id}/status",
-            new { companyId, id = payload.Id, status = "UnderReview", expectedVersion = 1 });
+        var response = await admin.PutAsJsonAsync(
+            $"/api/admin/companies/{companyId}/support/requests/{id}/status",
+            new { companyId, id, status = "UnderReview", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var updated = await response.Content.ReadFromJsonAsync<StatusPayload>();
@@ -105,31 +135,25 @@ public class UpdateSupportRequestStatusEndpointTests
     }
 
     [Fact]
-    public async Task Put_SupportRequestStatus_Returns_Conflict_When_Reopening_Closed_Request_Directly_To_Submitted()
+    public async Task Put_AdminSupportRequestStatus_Returns_Conflict_When_Reopening_Closed_Request_Directly_To_Submitted()
     {
         var companyId = Guid.NewGuid();
-        using var client = await AdminClient(companyId);
+        var id = await SubmitAsHrAsync(companyId, "Closed issue");
+        using var admin = await PlatformAdminClient();
 
-        var created = await client.PostAsync($"/api/companies/{companyId}/support/requests", BuildSubmission(companyId, "Closed issue"));
-        created.EnsureSuccessStatusCode();
-        var payload = await created.Content.ReadFromJsonAsync<SubmitPayload>();
-        Assert.NotNull(payload);
-
-        // Walk the request to Closed via valid intermediate states, tracking the version returned
-        // after each successful transition (Ticket 15: ExpectedVersion is now mandatory).
         var version = 1;
         foreach (var status in new[] { "UnderReview", "Resolved", "Closed" })
         {
-            var step = await client.PutAsJsonAsync(
-                $"/api/companies/{companyId}/support/requests/{payload!.Id}/status",
-                new { companyId, id = payload.Id, status, expectedVersion = version });
+            var step = await admin.PutAsJsonAsync(
+                $"/api/admin/companies/{companyId}/support/requests/{id}/status",
+                new { companyId, id, status, expectedVersion = version });
             step.EnsureSuccessStatusCode();
             version = (await step.Content.ReadFromJsonAsync<StatusPayload>())!.Version;
         }
 
-        var response = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/support/requests/{payload!.Id}/status",
-            new { companyId, id = payload.Id, status = "Submitted", expectedVersion = version });
+        var response = await admin.PutAsJsonAsync(
+            $"/api/admin/companies/{companyId}/support/requests/{id}/status",
+            new { companyId, id, status = "Submitted", expectedVersion = version });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }

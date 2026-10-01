@@ -32,7 +32,6 @@ internal sealed class RolePermissionConfiguration : IEntityTypeConfiguration<Rol
             RolePermission.Create(SystemRoles.Employee, SystemPermissions.SelfRead),
             RolePermission.Create(SystemRoles.Employee, SystemPermissions.SelfEdit),
             RolePermission.Create(SystemRoles.Employee, SystemPermissions.LeaveRequest),
-            RolePermission.Create(SystemRoles.Employee, SystemPermissions.SupportRequest),
             RolePermission.Create(SystemRoles.Employee, SystemPermissions.DocumentRead),
 
             RolePermission.Create(SystemRoles.Manager, SystemPermissions.SelfRead),

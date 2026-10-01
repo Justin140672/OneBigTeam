@@ -8,29 +8,34 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
-// Ticket 15 (optimistic concurrency rollout): SupportRequest.Version coverage for
-// PUT .../support/requests/{id}/status, against the real Postgres-backed ApiWebApplicationFactory.
-// Follows UpdateAssetCategoryConcurrencyEndpointTests for the two-client racing pattern, and
-// UpdateSupportRequestStatusEndpointTests for support-specific auth/seeding helpers.
+// Optimistic concurrency coverage for PUT /api/admin/companies/{companyId}/support/requests/{id}/status
+// (platform administrators only), against the real Postgres-backed ApiWebApplicationFactory.
 [Collection("Integration")]
 public class UpdateSupportRequestStatusConcurrencyEndpointTests
 {
     private readonly ApiWebApplicationFactory _factory;
-    private static readonly Guid AdminUserId = Guid.Parse("60000000-0000-0000-0000-000000000010");
 
     public UpdateSupportRequestStatusConcurrencyEndpointTests(ApiWebApplicationFactory factory)
     {
         _factory = factory;
     }
 
-    private async Task<HttpClient> AdminClient(Guid companyId)
+    private async Task<HttpClient> HrClient(Guid companyId)
     {
+        var userId = Guid.NewGuid();
         var client = _factory.CreateClient();
-        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, AdminUserId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
-        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.Employee, companyId);
-        await TestRoleSeeder.AssignRoleAsync(_factory, AdminUserId, SystemRoles.HrAdministrator, companyId);
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Employee, companyId);
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator, companyId);
         return client;
+    }
+
+    private async Task<HttpClient> PlatformAdminClient()
+    {
+        var (_, email) = await PlatformAdministratorTestHelpers.SeedAdministratorAsync(
+            _factory, PlatformAdministratorRole.SupportStaff);
+        return PlatformAdministratorTestHelpers.ClientFor(_factory, Guid.NewGuid(), email);
     }
 
     private static MultipartFormDataContent BuildSubmission(Guid companyId, string title) => new()
@@ -46,9 +51,10 @@ public class UpdateSupportRequestStatusConcurrencyEndpointTests
     private async Task<(HttpClient Client, Guid CompanyId, Guid Id, int Version)> CreateRequestAsync()
     {
         var companyId = Guid.NewGuid();
-        var client = await AdminClient(companyId);
+        using var hr = await HrClient(companyId);
+        var client = await PlatformAdminClient();
 
-        var created = await client.PostAsync($"/api/companies/{companyId}/support/requests", BuildSubmission(companyId, "Concurrency test issue"));
+        var created = await hr.PostAsync($"/api/companies/{companyId}/support/requests", BuildSubmission(companyId, "Concurrency test issue"));
         created.EnsureSuccessStatusCode();
         var payload = await created.Content.ReadFromJsonAsync<SubmitPayload>();
         var detail = await GetDetailAsync(client, companyId, payload!.Id);
@@ -58,25 +64,25 @@ public class UpdateSupportRequestStatusConcurrencyEndpointTests
 
     private static async Task<DetailPayload> GetDetailAsync(HttpClient client, Guid companyId, Guid id)
     {
-        var response = await client.GetAsync($"/api/companies/{companyId}/support/requests/{id}");
+        var response = await client.GetAsync($"/api/admin/companies/{companyId}/support/requests/{id}");
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<DetailPayload>())!;
     }
 
     [Fact]
-    public async Task Two_Admins_Second_Stale_Save_Returns_409_Concurrency_And_First_Values_Preserved()
+    public async Task Two_PlatformAdmins_Second_Stale_Save_Returns_409_Concurrency_And_First_Values_Preserved()
     {
         var (client, companyId, id, version) = await CreateRequestAsync();
 
         var editorA = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/support/requests/{id}/status",
+            $"/api/admin/companies/{companyId}/support/requests/{id}/status",
             new { companyId, id, status = "UnderReview", expectedVersion = version });
         Assert.Equal(HttpStatusCode.OK, editorA.StatusCode);
         var editorAPayload = await editorA.Content.ReadFromJsonAsync<StatusPayload>();
         Assert.Equal(version + 1, editorAPayload!.Version);
 
         var editorB = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/support/requests/{id}/status",
+            $"/api/admin/companies/{companyId}/support/requests/{id}/status",
             new { companyId, id, status = "Planned", expectedVersion = version });
 
         Assert.Equal(HttpStatusCode.Conflict, editorB.StatusCode);
@@ -92,7 +98,7 @@ public class UpdateSupportRequestStatusConcurrencyEndpointTests
         var (client, companyId, id, version) = await CreateRequestAsync();
 
         var response = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/support/requests/{id}/status",
+            $"/api/admin/companies/{companyId}/support/requests/{id}/status",
             new { companyId, id, status = "UnderReview", expectedVersion = version });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -107,12 +113,12 @@ public class UpdateSupportRequestStatusConcurrencyEndpointTests
         var (client, companyId, id, version) = await CreateRequestAsync();
 
         var legitimate = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/support/requests/{id}/status",
+            $"/api/admin/companies/{companyId}/support/requests/{id}/status",
             new { companyId, id, status = "UnderReview", expectedVersion = version });
         legitimate.EnsureSuccessStatusCode();
 
         var stale = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/support/requests/{id}/status",
+            $"/api/admin/companies/{companyId}/support/requests/{id}/status",
             new { companyId, id, status = "Planned", expectedVersion = version });
 
         Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
@@ -129,7 +135,7 @@ public class UpdateSupportRequestStatusConcurrencyEndpointTests
         var before = await GetDetailAsync(client, companyId, id);
 
         var response = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/support/requests/{id}/status",
+            $"/api/admin/companies/{companyId}/support/requests/{id}/status",
             new { companyId, id, status = "UnderReview" });
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
@@ -145,7 +151,7 @@ public class UpdateSupportRequestStatusConcurrencyEndpointTests
         var (client, companyId, id, version) = await CreateRequestAsync();
 
         var legitimate = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/support/requests/{id}/status",
+            $"/api/admin/companies/{companyId}/support/requests/{id}/status",
             new { companyId, id, status = "UnderReview", expectedVersion = version });
         legitimate.EnsureSuccessStatusCode();
 
@@ -159,9 +165,8 @@ public class UpdateSupportRequestStatusConcurrencyEndpointTests
         }
         Assert.True(notificationCountAfterLegitimateChange > 0);
 
-        // Stale write is rejected with 409 — must not touch notifications at all.
         var stale = await client.PutAsJsonAsync(
-            $"/api/companies/{companyId}/support/requests/{id}/status",
+            $"/api/admin/companies/{companyId}/support/requests/{id}/status",
             new { companyId, id, status = "Planned", expectedVersion = version });
         Assert.Equal(HttpStatusCode.Conflict, stale.StatusCode);
 
