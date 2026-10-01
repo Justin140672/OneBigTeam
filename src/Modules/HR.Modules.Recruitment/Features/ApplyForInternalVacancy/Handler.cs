@@ -138,8 +138,7 @@ internal sealed class ApplyForInternalVacancyHandler(
         if (request.CvFile is not { } cvFile)
             return ApplyForInternalVacancyResult.Failed(Error.Validation("A CV file is required to apply."));
 
-        var fileValidation = CandidateDocumentUploadStaging.ValidateFile(
-            cvFile.FileName, cvFile.ContentType, cvFile.Length, uploadOptions.Value);
+        var fileValidation = await CandidateDocumentUploadStaging.ValidateCvFileAsync(cvFile, uploadOptions.Value, cancellationToken);
         if (fileValidation.IsFailure)
             return ApplyForInternalVacancyResult.Failed(fileValidation.Error);
 

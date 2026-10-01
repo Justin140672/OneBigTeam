@@ -99,8 +99,7 @@ internal sealed class CandidateApplicationIntake(
 
         if (command.CvFile is { } cvFile)
         {
-            var fileValidation = CandidateDocumentUploadStaging.ValidateFile(
-                cvFile.FileName, cvFile.ContentType, cvFile.Length, uploadOptions.Value);
+            var fileValidation = await CandidateDocumentUploadStaging.ValidateCvFileAsync(cvFile, uploadOptions.Value, cancellationToken);
             if (fileValidation.IsFailure)
                 return CandidateApplicationIntakeOutcome.Failure(fileValidation.Error);
         }

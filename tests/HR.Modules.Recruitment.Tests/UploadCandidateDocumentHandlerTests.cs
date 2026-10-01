@@ -32,7 +32,7 @@ public class UploadCandidateDocumentHandlerTests
             NullLogger<UploadCandidateDocumentHandler>.Instance);
 
     private static IFormFile FakePdfFile(string fileName = "resume.pdf", int size = 1024) =>
-        FakeFile(fileName, "application/pdf", new byte[size]);
+        FakeFile(fileName, "application/pdf", PdfBytes.Create(size));
 
     private static IFormFile FakeFile(string fileName, string contentType, byte[] content) =>
         new FormFile(new MemoryStream(content), 0, content.Length, "File", fileName)
@@ -94,6 +94,59 @@ public class UploadCandidateDocumentHandlerTests
 
         var saved = await db.CandidateDocuments.SingleAsync();
         Assert.Equal(CandidateDocumentKind.Cv, saved.Kind);
+    }
+
+    [Theory]
+    [InlineData("resume.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")]
+    [InlineData("resume.doc", "application/msword")]
+    [InlineData("resume.pdf", "application/msword")]
+    public async Task HandleAsync_Rejects_NonPdf_Cv(string fileName, string contentType)
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var candidate = await SeedCandidate(db, companyId);
+
+        var result = await BuildHandler(db).HandleAsync(
+            new UploadCandidateDocumentRequest { CompanyId = companyId, CandidateId = candidate.Id, Title = "Resume", Kind = "Cv", File = FakeFile(fileName, contentType, PdfBytes.Create(100)) },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Contains("PDF", result.Error.Message);
+        Assert.Empty(await db.CandidateDocuments.ToListAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_Rejects_Cv_Whose_Content_Is_Not_A_Pdf()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var candidate = await SeedCandidate(db, companyId);
+
+        var result = await BuildHandler(db).HandleAsync(
+            new UploadCandidateDocumentRequest { CompanyId = companyId, CandidateId = candidate.Id, Title = "Resume", Kind = "Cv", File = FakeFile("resume.pdf", "application/pdf", new byte[100]) },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Empty(await db.CandidateDocuments.ToListAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_Still_Accepts_Docx_For_Non_Cv_Kind()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var candidate = await SeedCandidate(db, companyId);
+
+        var result = await BuildHandler(db).HandleAsync(
+            new UploadCandidateDocumentRequest { CompanyId = companyId, CandidateId = candidate.Id, Title = "Cover letter", Kind = "Other", File = FakeFile("cover.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", new byte[100]) },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
     }
 
     [Fact]

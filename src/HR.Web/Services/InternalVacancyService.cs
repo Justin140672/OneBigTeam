@@ -51,6 +51,8 @@ public class InternalVacancyService(HrApiHttpClientFactory httpClientFactory)
     {
         if (cvFile.Size > CandidateService.MaxCandidateDocumentBytes)
             return Failed("The CV file is larger than the 20 MB limit.");
+        if (!string.Equals(Path.GetExtension(cvFile.Name), ".pdf", StringComparison.OrdinalIgnoreCase) || !CandidateService.IsPdfContentType(cvFile.ContentType))
+            return Failed("The CV must be a PDF file.");
 
         using var content = new MultipartFormDataContent();
         Stream? cvStream = null;
@@ -62,7 +64,7 @@ public class InternalVacancyService(HrApiHttpClientFactory httpClientFactory)
                 cvStream = cvFile.OpenReadStream(maxAllowedSize: CandidateService.MaxCandidateDocumentBytes, cancellationToken);
                 var fileContent = new StreamContent(cvStream);
                 fileContent.Headers.ContentType = new MediaTypeHeaderValue(
-                    string.IsNullOrWhiteSpace(cvFile.ContentType) ? "application/octet-stream" : cvFile.ContentType);
+                    string.IsNullOrWhiteSpace(cvFile.ContentType) ? "application/pdf" : cvFile.ContentType);
                 content.Add(fileContent, "CvFile", cvFile.Name);
 
                 response = await Http.PostAsync(

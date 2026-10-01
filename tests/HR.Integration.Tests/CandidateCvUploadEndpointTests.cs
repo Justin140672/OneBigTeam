@@ -64,6 +64,48 @@ public class CandidateCvUploadEndpointTests
         $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}";
 
     [Fact]
+    public async Task Upload_With_Kind_Cv_Rejects_Docx()
+    {
+        var companyId = Guid.NewGuid();
+        var seeded = await RecruitmentTestSeeder.SeedApplicationAsync(_factory, companyId, Now);
+        using var client = await ClientAs(RecruiterUser, companyId);
+
+        var content = new MultipartFormDataContent
+        {
+            { new StringContent("Emma Clarke CV"), "Title" },
+            { new StringContent("Cv"), "Kind" },
+        };
+        var fileContent = new ByteArrayContent(new byte[2048]);
+        fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        content.Add(fileContent, "File", "emma-cv.docx");
+
+        var response = await client.PostAsync(UploadUrl(companyId, seeded.CandidateId), content);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Upload_With_Kind_Cv_Rejects_Pdf_Named_File_Without_Pdf_Content()
+    {
+        var companyId = Guid.NewGuid();
+        var seeded = await RecruitmentTestSeeder.SeedApplicationAsync(_factory, companyId, Now);
+        using var client = await ClientAs(RecruiterUser, companyId);
+
+        var content = new MultipartFormDataContent
+        {
+            { new StringContent("Emma Clarke CV"), "Title" },
+            { new StringContent("Cv"), "Kind" },
+        };
+        var fileContent = new ByteArrayContent(new byte[2048]);
+        fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/pdf");
+        content.Add(fileContent, "File", "emma-cv.pdf");
+
+        var response = await client.PostAsync(UploadUrl(companyId, seeded.CandidateId), content);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Upload_With_Kind_Cv_Is_Surfaced_By_Get_Application_Along_With_Review_Notes()
     {
         var companyId = Guid.NewGuid();

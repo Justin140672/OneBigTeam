@@ -17,6 +17,7 @@
 @inject UserService UserService
 @inject AppSession Session
 @inject IJSRuntime JS
+@inject NavigationManager Navigation
 
 <div data-testid="vacancy-applications-tab">
     <SelectedApplicationMarker @ref="_selectionMarker" />
@@ -172,21 +173,12 @@
                         }
                         else if (detail.Source == "ExternalRecruiter")
                         {
-                            <span>Source: External Recruiter@(detail.SourceExternalRecruiterAgencyName is null ? "" : $" ({detail.SourceExternalRecruiterAgencyName})")</span>
+                            <span>External Recruiter@(detail.SourceExternalRecruiterAgencyName is null ? "" : $" ({detail.SourceExternalRecruiterAgencyName})")</span>
                         }
                         else
                         {
-                            <span>Source: @SourceLabel(detail.Source)</span>
+                            <span>@SourceLabel(detail.Source)</span>
                         }
-                    </Template>
-                </GridColumn>
-                <GridColumn HeaderText="" Width="110">
-                    <Template>
-                        @{
-                            var row = (ApplicationListItemModel)context;
-                        }
-                        <a href="/companies/@CompanyId/vacancies/@VacancyId/applications/@row.Id/review-cv?returnUrl=@Uri.EscapeDataString($"companies/{CompanyId}/vacancies/{VacancyId}")"
-                           data-testid="review-cv-link">Review CV</a>
                     </Template>
                 </GridColumn>
             </GridColumns>
@@ -280,9 +272,9 @@
                             @* Kept rendered while a file is selected — Blazor Server streams the file from
                                this input element at submit time, so it must stay in the DOM. *@
                             <InputFile @key="_newCvInputKey" id="new-candidate-cv-input" class="form-control"
-                                       OnChange="OnNewCvSelected" accept=".pdf,.doc,.docx" disabled="@_adding"
+                                       OnChange="OnNewCvSelected" accept=".pdf,application/pdf" disabled="@_adding"
                                        data-testid="new-candidate-cv-input" />
-                            <div class="form-text">PDF, DOC or DOCX, up to 20 MB. Uploaded as the candidate's current CV and submitted with this application.</div>
+                            <div class="form-text">PDF, up to 20 MB. Uploaded as the candidate's current CV and submitted with this application.</div>
                             @if (_newCvFile is not null)
                             {
                                 <div class="add-candidate-cv-selected" data-testid="new-candidate-cv-selected">
@@ -837,7 +829,7 @@
     private IBrowserFile? _newCvFile;
     private string? _newCvError;
     private int _newCvInputKey;
-    private static readonly string[] _allowedCvExtensions = [".pdf", ".doc", ".docx"];
+    private static readonly string[] _allowedCvExtensions = [".pdf"];
 
     private DuplicateCandidateModel? _duplicateCandidate;
 
@@ -1472,8 +1464,8 @@
         var extension = Path.GetExtension(file.Name).ToLowerInvariant();
 
         string? error = null;
-        if (!_allowedCvExtensions.Contains(extension))
-            error = "The CV must be a PDF, DOC or DOCX file.";
+        if (!_allowedCvExtensions.Contains(extension) || !CandidateService.IsPdfContentType(file.ContentType))
+            error = "The CV must be a PDF file.";
         else if (file.Size > CandidateService.MaxCandidateDocumentBytes)
             error = "The CV file is larger than the 20 MB limit.";
         else if (file.Size == 0)
@@ -1898,6 +1890,7 @@
 
             var items = new List<object>
             {
+                new ItemModel { Id = "app-review-cv", Text = "Review CV", PrefixIcon = "fa-solid fa-file-lines", Disabled = !enabledPreOffer, TooltipText = "Review the CV for the selected application" },
                 new ItemModel { Id = "app-schedule", Text = "Schedule Interview", PrefixIcon = "fa-solid fa-calendar-plus", Disabled = !enabledPreOffer, TooltipText = "Schedule an interview for the selected application" },
                 new ItemModel { Id = "app-offer",     Text = "Offer",              PrefixIcon = "fa-solid fa-file-signature", Disabled = !enabledPreOffer, TooltipText = "Make an offer to the selected candidate" },
                 new ItemModel { Id = "app-offer-response", Text = "Record Offer Response", PrefixIcon = "fa-solid fa-reply", Disabled = !canRecordOfferResponse, TooltipText = "Record the candidate's response to the standing offer" },
@@ -1908,7 +1901,7 @@
 
             if (_canAppoint)
             {
-                items.Insert(4, new ItemModel { Id = "app-appoint", Text = "Appoint", PrefixIcon = "fa-solid fa-user-tie", Disabled = !CanAppoint(_selectedRow), TooltipText = "Complete internal appointment" });
+                items.Insert(5, new ItemModel { Id = "app-appoint", Text = "Appoint", PrefixIcon = "fa-solid fa-user-tie", Disabled = !CanAppoint(_selectedRow), TooltipText = "Complete internal appointment" });
             }
 
             return items;
@@ -1952,7 +1945,7 @@
         var enabled = active && !pendingInterview;
         var enabledPreOffer = enabled && !onOfferStage;
 
-        await _grid.EnableToolbarItemsAsync(["app-schedule", "app-offer", "app-reject"], enabledPreOffer);
+        await _grid.EnableToolbarItemsAsync(["app-schedule", "app-review-cv", "app-offer", "app-reject"], enabledPreOffer);
         await _grid.EnableToolbarItemsAsync(["app-hire"], CanHire(_selectedRow));
         if (_canAppoint) await _grid.EnableToolbarItemsAsync(["app-appoint"], CanAppoint(_selectedRow));
         await _grid.EnableToolbarItemsAsync(["app-withdraw"], _selectedRow is not null);
@@ -1968,6 +1961,9 @@
         {
             case "app-schedule":
                 await OpenScheduleDialog(row);
+                break;
+            case "app-review-cv":
+                Navigation.NavigateTo($"/companies/{CompanyId}/vacancies/{VacancyId}/applications/{row.Id}/review-cv?returnUrl={Uri.EscapeDataString($"companies/{CompanyId}/vacancies/{VacancyId}")}");
                 break;
             case "app-offer":
                 await OpenOfferDialog(row);

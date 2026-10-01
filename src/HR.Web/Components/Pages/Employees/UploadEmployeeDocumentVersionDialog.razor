@@ -70,7 +70,12 @@
         return Task.CompletedTask;
     }
 
-    private void OnFileSelected(InputFileChangeEventArgs e) => _selectedFile = e.File;
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        var error = UploadFileValidation.ValidateDocument(e.File);
+        GlobalError = error;
+        _selectedFile = error is null ? e.File : null;
+    }
 
     protected override string? ValidateExtra() =>
         _selectedFile is null ? "Please select a file." : null;

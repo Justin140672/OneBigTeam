@@ -176,10 +176,10 @@
                             <div class="border-top pt-3 mt-3" data-testid="review-cv-application-actions">
                                 <h6>@(HasSubmittedCv ? "Replace CV for this application" : "Upload CV for this application")</h6>
                                 <InputFile @key="_fileInputKey" class="form-control" OnChange="OnFileSelected"
-                                           accept=".pdf,.doc,.docx" data-testid="review-cv-replace-file-input" />
+                                           accept=".pdf,application/pdf" data-testid="review-cv-replace-file-input" />
                                 <div class="form-text">
                                     The file is added to the candidate's CV history and recorded as the CV for this
-                                    application only. Other applications keep their own CV. PDF, DOC or DOCX, up to 20 MB.
+                                    application only. Other applications keep their own CV. PDF, up to 20 MB.
                                 </div>
                                 <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
                                     <SfButton IsPrimary="true" Disabled="@(_busy || _selectedFile is null)" OnClick="ReplaceApplicationCvAsync"
@@ -307,7 +307,12 @@
         _loading = false;
     }
 
-    private void OnFileSelected(InputFileChangeEventArgs e) => _selectedFile = e.File;
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        var error = UploadFileValidation.Validate(e.File, [".pdf"], "PDF", CandidateService.MaxCandidateDocumentBytes)?.Replace("The file must be a PDF.", "The CV must be a PDF file.");
+        _globalError = error;
+        _selectedFile = error is null ? e.File : null;
+    }
 
     private async Task SaveNotesAsync()
     {

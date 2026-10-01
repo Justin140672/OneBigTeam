@@ -58,7 +58,7 @@ public class CreateCandidateApplicationHandlerTests
     }
 
     private static IFormFile FakeFile(string fileName, string contentType, int size) =>
-        new FormFile(new MemoryStream(new byte[size]), 0, size, "CvFile", fileName)
+        new FormFile(new MemoryStream(PdfBytes.Create(size)), 0, size, "CvFile", fileName)
         {
             Headers     = new HeaderDictionary(),
             ContentType = contentType,

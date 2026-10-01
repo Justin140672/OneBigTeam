@@ -163,4 +163,15 @@ public class CandidateServiceTests
 
         Assert.Null(result);
     }
+
+    [Theory]
+    [InlineData("application/pdf", true)]
+    [InlineData("application/pdf; charset=binary", true)]
+    [InlineData("", true)]
+    [InlineData("application/msword", false)]
+    [InlineData("application/vnd.openxmlformats-officedocument.wordprocessingml.document", false)]
+    public void IsPdfContentType_Accepts_Only_Pdf_Or_Unknown(string contentType, bool expected)
+    {
+        Assert.Equal(expected, CandidateService.IsPdfContentType(contentType));
+    }
 }

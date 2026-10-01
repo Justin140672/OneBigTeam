@@ -581,9 +581,9 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
 
     public async Task ClickReviewCvForAsync(string candidateNameFragment)
     {
-        var link = ApplicationRow(candidateNameFragment).First.Locator("[data-testid='review-cv-link']");
-        await link.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
-        await link.ClickUntilUrlAsync(page, u => u.Contains("/review-cv"));
+        await SelectApplicationRowAsync(candidateNameFragment);
+        var button = await ApplicationsToolbarButtonAsync("Review CV", reselectCandidateNameFragment: candidateNameFragment);
+        await button.ClickUntilUrlAsync(page, u => u.Contains("/review-cv"));
     }
 
     public async Task<string?> GetApplicationStatusAsync(string candidateNameFragment)

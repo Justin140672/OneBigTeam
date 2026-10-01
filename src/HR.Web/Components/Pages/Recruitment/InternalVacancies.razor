@@ -105,12 +105,12 @@
                             <label class="form-label" for="internal-apply-cv-input">CV <span aria-hidden="true">*</span><span class="visually-hidden">(required)</span></label>
                             <InputFile @key="_cvInputKey" @ref="_cvInput"
                                        id="internal-apply-cv-input" class="form-control"
-                                       accept=".pdf,.doc,.docx" OnChange="OnCvSelected" disabled="@_submitting"
+                                       accept=".pdf,application/pdf" OnChange="OnCvSelected" disabled="@_submitting"
                                        data-testid="internal-apply-cv-input"
                                        aria-required="true"
                                        aria-invalid="@(_cvError is not null ? "true" : "false")"
                                        aria-describedby="internal-apply-cv-help internal-apply-cv-error" />
-                            <div id="internal-apply-cv-help" class="form-text">PDF, DOC or DOCX, up to 20 MB.</div>
+                            <div id="internal-apply-cv-help" class="form-text">PDF, up to 20 MB.</div>
                             @if (_cvFile is not null)
                             {
                                 <div class="vacancy-apply-cv-selected" data-testid="internal-apply-cv-selected">
@@ -250,7 +250,7 @@
 
     private static readonly HashSet<string> _allowedCvExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".pdf", ".doc", ".docx"
+        ".pdf"
     };
 
     private bool _authorized;
@@ -402,8 +402,8 @@
         var extension = Path.GetExtension(file.Name).ToLowerInvariant();
 
         string? error = null;
-        if (!_allowedCvExtensions.Contains(extension))
-            error = "The CV must be a PDF, DOC or DOCX file.";
+        if (!_allowedCvExtensions.Contains(extension) || !CandidateService.IsPdfContentType(file.ContentType))
+            error = "The CV must be a PDF file.";
         else if (file.Size > CandidateService.MaxCandidateDocumentBytes)
             error = "The CV file is larger than the 20 MB limit.";
         else if (file.Size == 0)

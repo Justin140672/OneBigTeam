@@ -82,7 +82,7 @@ public sealed class CandidateCvDocumentsTests(RecruiterPersonaFixture fixture) :
     }
 
     [Fact]
-    public async Task UploadReplacement_RetainsOlderCv_NewestFirst_CurrentBadgeOnlyOnNewest()
+    public async Task UploadReplacement_ShowsOnlyTheCurrentCv()
     {
         using var api = await CandidateCvApi.CreateRecruiterApiClientAsync(_fixture.ApiBaseUrl);
         var candidateId = await CreateFreshCandidateAsync(api);
@@ -97,21 +97,20 @@ public sealed class CandidateCvDocumentsTests(RecruiterPersonaFixture fixture) :
         var v2FileName = $"e2e-cv-v2-{Guid.NewGuid():N}.pdf";
         await cvs.UploadCvAsync(v2FileName, CandidateCvApi.BuildTestPdf());
 
-        await cvs.ExpectRowCountAsync(2);
-        Assert.Equal(new[] { v2FileName, v1FileName }, await cvs.GetRowFileNamesAsync());
+        await cvs.ExpectRowCountAsync(1);
+        Assert.Equal(new[] { v2FileName }, await cvs.GetRowFileNamesAsync());
         Assert.True(await cvs.RowHasCurrentBadgeAsync(v2FileName), "The newest CV must be the 'Current CV'");
-        Assert.False(await cvs.RowHasCurrentBadgeAsync(v1FileName), "The older CV must no longer be badged as current");
         Assert.Equal(1, await cvs.GetCurrentBadgeCountAsync());
 
         cvs = await OpenCandidateCvsAsync(candidateId);
-        await cvs.ExpectRowCountAsync(2);
-        Assert.Equal(new[] { v2FileName, v1FileName }, await cvs.GetRowFileNamesAsync());
+        await cvs.ExpectRowCountAsync(1);
+        Assert.Equal(new[] { v2FileName }, await cvs.GetRowFileNamesAsync());
         Assert.Equal(1, await cvs.GetCurrentBadgeCountAsync());
         Assert.True(await cvs.RowHasCurrentBadgeAsync(v2FileName));
     }
 
     [Fact]
-    public async Task OlderCvReferencedByApplication_ShowsSubmittedWithCount_AndNoCurrentBadge()
+    public async Task ReplacingCv_ShowsOnlyCurrentCv_AndApplicationKeepsSubmittedCv()
     {
         using var api = await CandidateCvApi.CreateRecruiterApiClientAsync(_fixture.ApiBaseUrl);
         var candidateId = await CreateFreshCandidateAsync(api);
@@ -125,18 +124,14 @@ public sealed class CandidateCvDocumentsTests(RecruiterPersonaFixture fixture) :
 
         var cvs = await OpenCandidateCvsAsync(candidateId);
         await cvs.ExpectRowCountAsync(1);
-        await cvs.ExpectRowReferencedTextAsync(v1FileName, "Submitted with 1 application(s)");
         Assert.True(await cvs.RowHasCurrentBadgeAsync(v1FileName), "v1 is still the candidate's only (current) CV");
 
         var v2FileName = $"e2e-cv-v2-{Guid.NewGuid():N}.pdf";
         await cvs.UploadCvAsync(v2FileName, CandidateCvApi.BuildTestPdf());
 
-        await cvs.ExpectRowCountAsync(2);
-        Assert.Equal(new[] { v2FileName, v1FileName }, await cvs.GetRowFileNamesAsync());
-        await cvs.ExpectRowReferencedTextAsync(v1FileName, "Submitted with 1 application(s)");
-        Assert.False(await cvs.RowHasCurrentBadgeAsync(v1FileName), "The referenced older CV must not carry the 'Current CV' badge");
+        await cvs.ExpectRowCountAsync(1);
+        Assert.Equal(new[] { v2FileName }, await cvs.GetRowFileNamesAsync());
         Assert.True(await cvs.RowHasCurrentBadgeAsync(v2FileName));
-        Assert.False(await cvs.RowHasReferencedTextAsync(v2FileName), "v2 was never submitted with an application");
 
         var app = await CandidateCvApi.GetApplicationAsync(api, AcmeId, vacancyId, applicationId);
         Assert.Equal(v1DocId, app.CvDocumentId);

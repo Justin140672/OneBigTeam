@@ -102,6 +102,8 @@ public sealed class ApplicationService(HrApiHttpClientFactory httpClientFactory)
     {
         if (cvFile is not null && cvFile.Size > CandidateService.MaxCandidateDocumentBytes)
             return CreateCandidateApplicationResult.Failure("The CV file is larger than the 20 MB limit.");
+        if (cvFile is not null && (!string.Equals(Path.GetExtension(cvFile.Name), ".pdf", StringComparison.OrdinalIgnoreCase) || !CandidateService.IsPdfContentType(cvFile.ContentType)))
+            return CreateCandidateApplicationResult.Failure("The CV must be a PDF file.");
 
         using var content = new MultipartFormDataContent();
         AddFormField(content, "FirstName", FormText.Optional(request.FirstName));
@@ -120,7 +122,7 @@ public sealed class ApplicationService(HrApiHttpClientFactory httpClientFactory)
                 cvStream = cvFile.OpenReadStream(maxAllowedSize: CandidateService.MaxCandidateDocumentBytes, cancellationToken);
                 var fileContent = new StreamContent(cvStream);
                 fileContent.Headers.ContentType = new MediaTypeHeaderValue(
-                    string.IsNullOrWhiteSpace(cvFile.ContentType) ? "application/octet-stream" : cvFile.ContentType);
+                    string.IsNullOrWhiteSpace(cvFile.ContentType) ? "application/pdf" : cvFile.ContentType);
                 content.Add(fileContent, "CvFile", cvFile.Name);
             }
 

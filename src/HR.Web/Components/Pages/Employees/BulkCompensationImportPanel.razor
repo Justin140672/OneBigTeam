@@ -67,10 +67,11 @@
 
     private void OnImportFileSelected(InputFileChangeEventArgs e)
     {
-        _importFile = e.File;
+        var error = UploadFileValidation.Validate(e.File, [".xlsx"], "Excel (.xlsx) file", 10 * 1024 * 1024);
+        _importFile = error is null ? e.File : null;
         _importResult = null;
         _importRowErrors = null;
-        _globalError = null;
+        _globalError = error;
     }
 
     private async Task ImportAsync()

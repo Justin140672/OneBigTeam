@@ -105,7 +105,12 @@
         _wasOpen = IsOpen;
     }
 
-    private void OnFileSelected(InputFileChangeEventArgs e) => _selectedFile = e.File;
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        var error = UploadFileValidation.ValidateDocument(e.File);
+        _error = error;
+        _selectedFile = error is null ? e.File : null;
+    }
 
     private async Task ConfirmAsync()
     {

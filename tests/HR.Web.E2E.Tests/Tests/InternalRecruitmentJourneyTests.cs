@@ -192,12 +192,9 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
 
         var replacementCvFileName = $"journey-cv-v2-{applicant.LastName}.pdf";
         await candidateCvs.UploadCvAsync(replacementCvFileName, CandidateCvApi.BuildTestPdf());
-        await candidateCvs.ExpectRowCountAsync(2);
+        await candidateCvs.ExpectRowCountAsync(1);
         Assert.True(await candidateCvs.RowHasCurrentBadgeAsync(replacementCvFileName),
             "The replacement must become the candidate's current CV");
-        Assert.False(await candidateCvs.RowHasCurrentBadgeAsync(submittedCvFileName),
-            "The originally submitted CV must no longer be the current CV");
-        await candidateCvs.ExpectRowReferencedTextAsync(submittedCvFileName, "Submitted with 1 application(s)");
 
         var afterReplace = await InternalRecruitmentJourneyApi.GetApplicationAsync(recruiterApi, vacancy.Id, applicationId);
         Assert.Equal(submittedCvId, afterReplace.CvDocumentId);

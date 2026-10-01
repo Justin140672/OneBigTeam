@@ -263,7 +263,7 @@ public sealed class VacancyCreateCandidateTests(RecruiterPersonaFixture fixture)
 
         // Unsupported CV type is rejected client-side and not kept as the selection.
         await dialog.SetCvFileAsync($"e2e-not-a-cv-{Guid.NewGuid():N}.txt", "plain text"u8.ToArray(), "text/plain");
-        await dialog.ExpectCvErrorAsync("PDF, DOC or DOCX");
+        await dialog.ExpectCvErrorAsync("PDF file");
         await dialog.ExpectNoCvSelectedAsync();
 
         var pdfName = $"e2e-valid-cv-{Guid.NewGuid():N}.pdf";

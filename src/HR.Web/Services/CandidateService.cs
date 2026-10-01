@@ -95,12 +95,20 @@ public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
 
     public const long MaxCandidateDocumentBytes = 20 * 1024 * 1024;
 
+    public static bool IsPdfContentType(string? contentType) =>
+        string.IsNullOrWhiteSpace(contentType) ||
+        string.Equals(contentType.Split(';')[0].Trim(), "application/pdf", StringComparison.OrdinalIgnoreCase);
+
     public async Task<(UploadedCandidateDocumentModel? Document, string? Error)> UploadCandidateDocumentAsync(
         Guid companyId, Guid candidateId, string title, string kind, IBrowserFile file,
         CancellationToken cancellationToken = default)
     {
         if (file.Size > MaxCandidateDocumentBytes)
             return (null, "The file is larger than the 20 MB limit.");
+
+        if (string.Equals(kind, "Cv", StringComparison.OrdinalIgnoreCase) &&
+            (!string.Equals(Path.GetExtension(file.Name), ".pdf", StringComparison.OrdinalIgnoreCase) || !IsPdfContentType(file.ContentType)))
+            return (null, "The CV must be a PDF file.");
 
         using var content = new MultipartFormDataContent();
         content.Add(new StringContent(title), "Title");
@@ -109,7 +117,7 @@ public sealed class CandidateService(HrApiHttpClientFactory httpClientFactory)
         await using var stream = file.OpenReadStream(maxAllowedSize: MaxCandidateDocumentBytes, cancellationToken);
         var fileContent = new StreamContent(stream);
         fileContent.Headers.ContentType = new MediaTypeHeaderValue(
-            string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType);
+            string.IsNullOrWhiteSpace(file.ContentType) ? (string.Equals(kind, "Cv", StringComparison.OrdinalIgnoreCase) ? "application/pdf" : "application/octet-stream") : file.ContentType);
         content.Add(fileContent, "File", file.Name);
 
         var result = await ApiResponseReader.ExecuteAsync<UploadedCandidateDocumentModel>(

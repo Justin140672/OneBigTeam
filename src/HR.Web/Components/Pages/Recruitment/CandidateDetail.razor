@@ -127,9 +127,9 @@
                                         @* Kept rendered while a file is selected — Blazor Server streams the file from
                                            this input element at submit time, so it must stay in the DOM. *@
                                         <InputFile @key="_newCvInputKey" id="new-candidate-cv-input" class="form-control"
-                                                   OnChange="OnNewCvSelected" accept=".pdf,.doc,.docx" disabled="@Saving"
+                                                   OnChange="OnNewCvSelected" accept=".pdf,application/pdf" disabled="@Saving"
                                                    data-testid="new-candidate-cv-input" />
-                                        <div class="form-text">PDF, DOC or DOCX, up to 20 MB. Uploaded as the candidate's current CV.</div>
+                                        <div class="form-text">PDF, up to 20 MB. Uploaded as the candidate's current CV.</div>
                                         @if (_newCvFile is not null)
                                         {
                                             <div class="add-candidate-cv-selected" data-testid="new-candidate-cv-selected">
@@ -201,7 +201,7 @@
                         }
                         @if (!IsViewMode)
                         {
-                            <SfButton IsPrimary="true" Disabled="@(Saving || IsSubscriptionReadOnly)" OnClick="SaveAsync">
+                            <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
                                 @if (Saving)
                                 {
                                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>
@@ -235,7 +235,7 @@
                             {
                                 <p class="text-muted">CV documents could not be loaded.</p>
                             }
-                            else if (_cvDocuments.Count == 0)
+                            else if (CurrentCvDocument is null)
                             {
                                 <p class="text-muted" data-testid="candidate-cv-empty">No CV has been uploaded for this candidate.</p>
                             }
@@ -248,7 +248,7 @@
                                     </SfButton>
                                 </div>
                                 <ul class="list-group mb-3">
-                                    @foreach (var doc in _cvDocuments)
+                                    @foreach (var doc in new[] { CurrentCvDocument! })
                                     {
                                         <li class="list-group-item" data-testid="candidate-cv-row">
                                             <div class="d-flex flex-wrap align-items-center gap-2">
@@ -280,12 +280,6 @@
                                             <div class="small text-muted">
                                                 Uploaded @doc.CreatedAt.LocalDateTime.ToString("d MMM yyyy, HH:mm") · @FormatFileSize(doc.FileSize)
                                             </div>
-                                            @if (doc.ReferencingApplicationCount > 0)
-                                            {
-                                                <div class="small text-muted" data-testid="candidate-cv-referenced">
-                                                    Submitted with @doc.ReferencingApplicationCount application(s)
-                                                </div>
-                                            }
                                         </li>
                                     }
                                 </ul>
@@ -295,11 +289,11 @@
                             {
                                 <div class="mt-3">
                                     <InputFile @key="_cvFileInputKey" class="form-control" OnChange="OnCvFileSelected"
-                                               accept=".pdf,.doc,.docx" data-testid="candidate-cv-file-input" />
-                                    <div class="form-text">
-                                        PDF, DOC or DOCX, up to 20 MB. Uploading a replacement makes it the candidate's current CV;
-                                        earlier CVs are kept and applications continue to show the CV they were submitted with.
-                                    </div>
+                                               accept=".pdf,application/pdf" data-testid="candidate-cv-file-input" />
+                                    @if (_cvSelectionError is not null)
+                                    {
+                                        <div class="text-danger small mt-1" data-testid="candidate-cv-input-error">@_cvSelectionError</div>
+                                    }
                                     <div class="mt-2">
                                         <SfButton IsPrimary="true" Disabled="@(_cvBusy || _selectedCvFile is null)"
                                                   OnClick="UploadCvAsync" data-testid="candidate-cv-upload">
@@ -307,7 +301,7 @@
                                             {
                                                 <span class="spinner-border spinner-border-sm me-1" role="status"></span>
                                             }
-                                            @(_cvDocuments is { Count: > 0 } ? "Upload replacement CV" : "Upload CV")
+                                            @(CurrentCvDocument is not null ? "Upload replacement CV" : "Upload CV")
                                         </SfButton>
                                     </div>
                                 </div>
@@ -620,9 +614,26 @@
             ? "This file is not currently available to download."
             : "This file could not be security checked and cannot be opened. Upload it again.";
 
+    private string? _cvSelectionError;
+
+    private CandidateDocumentListItemModel? CurrentCvDocument =>
+        _cvDocuments?.FirstOrDefault(d => d.IsCurrentCv) ?? _cvDocuments?.OrderByDescending(d => d.CreatedAt).FirstOrDefault();
+
+    private static string? ValidateCvFile(IBrowserFile file)
+    {
+        if (!_allowedCvExtensions.Contains(Path.GetExtension(file.Name).ToLowerInvariant()) || !CandidateService.IsPdfContentType(file.ContentType))
+            return "The CV must be a PDF file.";
+        if (file.Size > CandidateService.MaxCandidateDocumentBytes)
+            return "The CV file is larger than the 20 MB limit.";
+        if (file.Size == 0)
+            return "The selected CV file is empty.";
+        return null;
+    }
+
     private void OnCvFileSelected(InputFileChangeEventArgs e)
     {
-        _selectedCvFile = e.File;
+        _cvSelectionError = ValidateCvFile(e.File);
+        _selectedCvFile = _cvSelectionError is null ? e.File : null;
         _cvError = null;
         _cvSuccess = null;
     }
@@ -650,12 +661,13 @@
             await LoadCvDocumentsAsync();
         }
 
+        _cvSelectionError = null;
         _selectedCvFile = null;
         _cvFileInputKey++;
         _cvBusy = false;
     }
 
-    private static readonly string[] _allowedCvExtensions = [".pdf", ".doc", ".docx"];
+    private static readonly string[] _allowedCvExtensions = [".pdf"];
     private IBrowserFile? _newCvFile;
     private string? _newCvError;
     private int _newCvInputKey;
@@ -667,8 +679,8 @@
         var extension = Path.GetExtension(file.Name).ToLowerInvariant();
 
         string? error = null;
-        if (!_allowedCvExtensions.Contains(extension))
-            error = "The CV must be a PDF, DOC or DOCX file.";
+        if (!_allowedCvExtensions.Contains(extension) || !CandidateService.IsPdfContentType(file.ContentType))
+            error = "The CV must be a PDF file.";
         else if (file.Size > CandidateService.MaxCandidateDocumentBytes)
             error = "The CV file is larger than the 20 MB limit.";
         else if (file.Size == 0)

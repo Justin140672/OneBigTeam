@@ -369,7 +369,12 @@
             Navigation.NavigateTo("/access-denied", replace: true);
     }
 
-    private void OnFileSelected(InputFileChangeEventArgs e) => _selectedFile = e.File;
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        var error = UploadFileValidation.Validate(e.File, [".xlsx"], "Excel (.xlsx) file", 20 * 1024 * 1024);
+        _globalError = error;
+        _selectedFile = error is null ? e.File : null;
+    }
 
     private async Task UploadAsync()
     {

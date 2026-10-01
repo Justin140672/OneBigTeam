@@ -72,7 +72,7 @@
                             <label class="form-label">Screenshots (optional)</label>
                             <div class="support-dropzone" @ondragover="OnDragOver" @ondragover:preventDefault="true"
                                  @ondrop="OnDropAsync" @ondrop:preventDefault="true">
-                                <InputFile OnChange="OnFilesSelected" multiple accept=".png,.jpg,.jpeg,.gif,.webp"
+                                <InputFile OnChange="OnFilesSelected" multiple accept=".png,.jpg,.jpeg,.pdf,.txt,.log"
                                            class="support-dropzone-input" />
                                 <div class="support-dropzone-label">
                                     <i class="fa-solid fa-cloud-arrow-up me-2"></i>
@@ -230,8 +230,19 @@
 
     private void OnFilesSelected(InputFileChangeEventArgs e)
     {
+        _globalError = null;
         foreach (var file in e.GetMultipleFiles(20))
+        {
+            var error = UploadFileValidation.ValidateSupportAttachment(file)
+                ?? (_selectedFiles.Count >= UploadFileValidation.SupportMaxFiles ? $"You can attach at most {UploadFileValidation.SupportMaxFiles} files." : null);
+            if (error is not null)
+            {
+                _globalError = $"{file.Name}: {error}";
+                continue;
+            }
+
             _selectedFiles.Add(file);
+        }
     }
 
     private void OnDragOver()

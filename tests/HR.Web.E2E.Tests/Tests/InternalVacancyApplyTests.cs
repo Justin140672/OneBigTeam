@@ -88,7 +88,7 @@ public sealed class InternalVacancyApplyTests(EmployeePersonaFixture fixture) : 
         await page.ClickApplyAsync();
 
         await page.SelectCvAsync("cv.txt", "text/plain", "plain text CV"u8.ToArray());
-        await page.WaitForCvErrorAsync("The CV must be a PDF, DOC or DOCX file.");
+        await page.WaitForCvErrorAsync("The CV must be a PDF file.");
         Assert.False(await page.IsCvSelectedVisibleAsync(), "A rejected .txt file must not be shown as selected.");
 
         await page.SelectCvAsync("empty.pdf", PdfMime, []);

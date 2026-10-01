@@ -85,7 +85,7 @@ public class ApplyForInternalVacancyConcurrencyTests(RecruitmentDatabaseFixture 
     }
 
     private static IFormFile FakePdf(string fileName) =>
-        new FormFile(new MemoryStream(new byte[2048]), 0, 2048, "CvFile", fileName)
+        new FormFile(new MemoryStream(PdfBytes.Create(2048)), 0, 2048, "CvFile", fileName)
         {
             Headers     = new HeaderDictionary(),
             ContentType = "application/pdf",

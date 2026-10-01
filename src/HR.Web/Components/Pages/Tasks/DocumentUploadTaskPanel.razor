@@ -98,8 +98,9 @@
 
     private void OnFileSelected(InputFileChangeEventArgs e)
     {
-        _selectedFile = e.File;
-        _fileError = null;
+        var error = UploadFileValidation.ValidateDocument(e.File);
+        _fileError = error;
+        _selectedFile = error is null ? e.File : null;
     }
 
     private async Task SubmitAsync()

@@ -145,7 +145,7 @@
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Attachments (optional)</label>
-                                <InputFile OnChange="OnReplyFilesSelected" multiple class="form-control" />
+                                <InputFile OnChange="OnReplyFilesSelected" multiple class="form-control" accept=".png,.jpg,.jpeg,.pdf,.txt,.log" />
                             </div>
                             <div class="d-flex justify-content-end">
                                 <SfButton IsPrimary="true" Disabled="@_replying" type="submit">
@@ -210,8 +210,19 @@
     private void OnReplyFilesSelected(InputFileChangeEventArgs e)
     {
         _replyFiles.Clear();
+        _replyError = null;
         foreach (var file in e.GetMultipleFiles(20))
+        {
+            var error = UploadFileValidation.ValidateSupportAttachment(file)
+                ?? (_replyFiles.Count >= UploadFileValidation.SupportMaxFiles ? $"You can attach at most {UploadFileValidation.SupportMaxFiles} files." : null);
+            if (error is not null)
+            {
+                _replyError = $"{file.Name}: {error}";
+                continue;
+            }
+
             _replyFiles.Add(file);
+        }
     }
 
     private async Task SubmitReplyAsync()

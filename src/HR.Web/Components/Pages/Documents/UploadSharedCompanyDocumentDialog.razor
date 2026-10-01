@@ -313,7 +313,12 @@
     private string? _companyDefaultAcknowledgementStatement;
     private bool _statementTouched;
 
-    private void OnFileSelected(InputFileChangeEventArgs e) => _selectedFile = e.File;
+    private void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        var error = UploadFileValidation.ValidateDocument(e.File);
+        GlobalError = error;
+        _selectedFile = error is null ? e.File : null;
+    }
 
     private async Task OnRequiresAcknowledgementChangedAsync(bool value)
     {

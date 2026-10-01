@@ -59,7 +59,13 @@ internal sealed class UploadCandidateDocumentHandler(
                 Error.Conflict("This candidate's data has been purged under the retention policy and can no longer accept new documents."));
 
         var file = request.File;
-        var validationResult = CandidateDocumentUploadStaging.ValidateFile(file.FileName, file.ContentType, file.Length, options.Value);
+        var kind = Enum.TryParse<CandidateDocumentKind>(request.Kind, ignoreCase: true, out var parsedKind)
+            ? parsedKind
+            : CandidateDocumentKind.Other;
+
+        var validationResult = kind == CandidateDocumentKind.Cv
+            ? await CandidateDocumentUploadStaging.ValidateCvFileAsync(file, options.Value, cancellationToken)
+            : CandidateDocumentUploadStaging.ValidateFile(file.FileName, file.ContentType, file.Length, options.Value);
         if (validationResult.IsFailure)
             return Result.Failure<UploadCandidateDocumentResponse>(validationResult.Error);
 
@@ -67,10 +73,6 @@ internal sealed class UploadCandidateDocumentHandler(
         var staged = await staging.ReserveAndUploadAsync(request.CompanyId, request.CandidateId, file, cancellationToken);
 
         var now = clock.UtcNowOffset();
-
-        var kind = Enum.TryParse<CandidateDocumentKind>(request.Kind, ignoreCase: true, out var parsedKind)
-            ? parsedKind
-            : CandidateDocumentKind.Other;
 
         var document = CandidateDocument.Create(
             Guid.NewGuid(),

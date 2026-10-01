@@ -117,6 +117,27 @@ internal sealed class CandidateDocumentUploadStaging(
         });
     }
 
+    internal static async Task<Result> ValidateCvFileAsync(IFormFile file, CandidateDocumentUploadOptions options, CancellationToken cancellationToken)
+    {
+        const string pdfError = "The CV must be a PDF file.";
+
+        var basic = ValidateFile(file.FileName, file.ContentType, file.Length, options);
+        if (basic.IsFailure)
+            return basic;
+
+        if (!string.Equals(Path.GetExtension(file.FileName), ".pdf", StringComparison.OrdinalIgnoreCase) ||
+            !string.Equals(file.ContentType.Split(';')[0].Trim(), "application/pdf", StringComparison.OrdinalIgnoreCase))
+            return Result.Failure(Error.Validation(pdfError));
+
+        var header = new byte[4];
+        await using var stream = file.OpenReadStream();
+        var read = await stream.ReadAtLeastAsync(header, header.Length, throwOnEndOfStream: false, cancellationToken);
+        if (read < header.Length || header[0] != (byte)'%' || header[1] != (byte)'P' || header[2] != (byte)'D' || header[3] != (byte)'F')
+            return Result.Failure(Error.Validation("The CV file is not a valid PDF."));
+
+        return Result.Success();
+    }
+
     internal static Result ValidateFile(string fileName, string contentType, long fileSize, CandidateDocumentUploadOptions options)
     {
         if (fileSize <= 0)
