@@ -39,6 +39,29 @@ public class GetRecruitmentKanbanHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Exposes_Stage_Purpose_On_Each_Column()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        stages.CvReview.UpdateDetails("Screening", false, RecruitmentStageTerminalOutcome.None, Now, RecruitmentStagePurpose.CvReview);
+        db.Vacancies.Add(vacancy);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new GetRecruitmentKanbanRequest { CompanyId = companyId, VacancyId = vacancy.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var columns = result.Value!.Columns;
+        Assert.Equal(RecruitmentStagePurpose.CvReview, columns.Single(c => c.StageId == stages.CvReview.Id).Purpose);
+        Assert.Equal("Screening", columns.Single(c => c.StageId == stages.CvReview.Id).StageName);
+        Assert.Equal(RecruitmentStagePurpose.Interview, columns.Single(c => c.StageId == stages.Interview.Id).Purpose);
+        Assert.Null(columns.Single(c => c.StageId == stages.Hired.Id).Purpose);
+    }
+
+    [Fact]
     public async Task HandleAsync_Excludes_Inactive_Stages_From_Columns()
     {
         await using var db = BuildContext();

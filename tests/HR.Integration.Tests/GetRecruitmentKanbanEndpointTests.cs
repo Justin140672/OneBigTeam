@@ -115,6 +115,10 @@ public class GetRecruitmentKanbanEndpointTests
         Assert.Equal(1, appliedColumn.Count);
         Assert.Single(appliedColumn.Candidates);
 
+        Assert.Equal("CvReview", payload.Columns.Single(c => c.StageName == "CV Review").Purpose);
+        Assert.Equal("NewApplication", appliedColumn.Purpose);
+        Assert.Null(payload.Columns.Single(c => c.StageName == "Hired").Purpose);
+
         var otherColumns = payload.Columns.Where(c => c.StageName != "Application Received");
         Assert.All(otherColumns, c =>
         {
@@ -138,6 +142,6 @@ public class GetRecruitmentKanbanEndpointTests
     }
 
     private sealed record KanbanPayload(Guid VacancyId, string VacancyTitle, List<KanbanColumnPayload> Columns);
-    private sealed record KanbanColumnPayload(Guid StageId, string StageName, bool IsTerminal, int Count, List<KanbanCandidatePayload> Candidates);
+    private sealed record KanbanColumnPayload(Guid StageId, string StageName, bool IsTerminal, int Count, List<KanbanCandidatePayload> Candidates, string? Purpose = null);
     private sealed record KanbanCandidatePayload(Guid ApplicationId, Guid CandidateId, string CandidateFirstName, string CandidateLastName);
 }

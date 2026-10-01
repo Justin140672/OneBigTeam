@@ -7,4 +7,6 @@ internal enum RecruitmentStagePurpose
     Interview,
 
     Offer,
+
+    CvReview,
 }

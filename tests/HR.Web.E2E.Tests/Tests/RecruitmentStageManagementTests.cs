@@ -165,6 +165,42 @@ public sealed class RecruitmentStageManagementTests(RecruiterPersonaFixture fixt
     }
 
     [Fact]
+    public async Task SetStagePurpose_ToCvReview_ShowsInListPurposeColumn()
+    {
+        var stageName = $"E2E Stage CvPurpose {Guid.NewGuid().ToString("N")[..8]}";
+
+        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
+        var stageList = new RecruitmentStageListPage(_page, _fixture.WebBaseUrl);
+        var stageEdit = new RecruitmentStageEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(MarcusEmail);
+
+        await stageList.GoToAsync(AcmeId);
+        await CleanupStrayStagesAsync(stageList);
+        await stageList.ClickNewAsync();
+        await stageEdit.FillNameAsync(stageName);
+        await stageEdit.SaveAsync();
+
+        try
+        {
+            await stageList.GoToAsync(AcmeId);
+            await stageList.ClickRowLinkAsync(stageName);
+            await _page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
+            await stageEdit.SelectPurposeAsync("CV review");
+            await stageEdit.SaveAsync();
+
+            await stageList.GoToAsync(AcmeId);
+            Assert.Equal("CV review", await stageList.GetPurposeAsync(stageName));
+        }
+        finally
+        {
+            await stageList.GoToAsync(AcmeId);
+            await stageList.DeactivateAsync(stageName);
+        }
+    }
+
+    [Fact]
     public async Task PurposeField_IsHiddenForTerminalStage_AndShownForNonTerminalStage()
     {
         var stageName = $"E2E Stage Purpose Term {Guid.NewGuid().ToString("N")[..8]}";

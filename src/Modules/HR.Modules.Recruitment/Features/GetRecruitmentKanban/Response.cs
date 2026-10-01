@@ -10,7 +10,8 @@ internal sealed record KanbanColumn(
     string StageName,
     bool IsTerminal,
     int Count,
-    IReadOnlyList<KanbanCandidateSummary> Candidates);
+    IReadOnlyList<KanbanCandidateSummary> Candidates,
+    Domain.RecruitmentStagePurpose? Purpose = null);
 
 internal sealed record KanbanCandidateSummary(
     Guid ApplicationId,

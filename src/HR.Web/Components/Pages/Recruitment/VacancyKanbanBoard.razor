@@ -243,6 +243,12 @@
 
     private async Task OpenCandidate(KanbanCandidateModel candidate)
     {
+        if (_columns.Any(c => c.StageId == candidate.StageId && c.Purpose == RecruitmentStagePurpose.CvReview))
+        {
+            ReviewCv(candidate);
+            return;
+        }
+
         var returnUrl = Navigation.ToBaseRelativePath(Navigation.Uri);
 
         var candidateUrl = $"/companies/{CompanyId}/candidates/{candidate.CandidateId}" +

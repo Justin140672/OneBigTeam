@@ -48,7 +48,7 @@ public class RecruitmentStageSeederTests
         Assert.Equal(RecruitmentStagePurpose.NewApplication, stages.Single(s => s.Name == "Application Received").Purpose);
         Assert.Equal(RecruitmentStagePurpose.Interview, stages.Single(s => s.Name == "Interview").Purpose);
         Assert.Equal(RecruitmentStagePurpose.Offer, stages.Single(s => s.Name == "Offer").Purpose);
-        Assert.Null(stages.Single(s => s.Name == "CV Review").Purpose);
+        Assert.Equal(RecruitmentStagePurpose.CvReview, stages.Single(s => s.Name == "CV Review").Purpose);
         Assert.Null(stages.Single(s => s.Name == "Hired").Purpose);
         Assert.Null(stages.Single(s => s.Name == "Rejected").Purpose);
     }
@@ -61,6 +61,7 @@ public class RecruitmentStageSeederTests
         Assert.Equal(RecruitmentStagePurpose.NewApplication, stages.Single(s => s.Name == "Application Received").Purpose);
         Assert.Equal(RecruitmentStagePurpose.Interview, stages.Single(s => s.Name == "Interview").Purpose);
         Assert.Equal(RecruitmentStagePurpose.Offer, stages.Single(s => s.Name == "Offer").Purpose);
+        Assert.Equal(RecruitmentStagePurpose.CvReview, stages.Single(s => s.Name == "CV Review").Purpose);
     }
 
     [Fact]

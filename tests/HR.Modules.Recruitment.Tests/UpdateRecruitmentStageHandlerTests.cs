@@ -158,7 +158,7 @@ public class UpdateRecruitmentStageHandlerTests
         Assert.Equal(companyId, updated.CompanyId);
         Assert.Equal(targetId, updated.RecruitmentStageId);
         Assert.Equal("CV Review", updated.Before.Name);
-        Assert.Null(updated.Before.Purpose);
+        Assert.Equal(RecruitmentStagePurpose.CvReview, updated.Before.Purpose);
         Assert.Equal("Screening", updated.After.Name);
         Assert.Equal(RecruitmentStagePurpose.Interview, updated.After.Purpose);
         Assert.Equal(Now, updated.OccurredAt);

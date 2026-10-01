@@ -92,7 +92,7 @@ internal sealed class GetRecruitmentKanbanHandler(RecruitmentDbContext db, IPosi
                         a.InternalEmployeeId))
                     .ToList();
 
-                return new KanbanColumn(stage.Id, stage.Name, stage.IsTerminal, summaries.Count, summaries);
+                return new KanbanColumn(stage.Id, stage.Name, stage.IsTerminal, summaries.Count, summaries, stage.Purpose);
             })
             .ToList();
 

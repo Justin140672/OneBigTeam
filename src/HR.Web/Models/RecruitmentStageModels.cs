@@ -19,6 +19,7 @@ public enum RecruitmentStagePurpose
     NewApplication,
     Interview,
     Offer,
+    CvReview,
 }
 
 public sealed record ListRecruitmentStagesResponse(IReadOnlyList<RecruitmentStageListItem> Items);

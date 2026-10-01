@@ -97,6 +97,34 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
     }
 
     [Fact]
+    public async Task ClickingCard_InCvReviewStage_OpensReviewCvWithReturnUrl()
+    {
+        var (candidateLast, kanban) = await ArrangeAppliedApplicationAsync();
+
+        await kanban.DragCardToColumnAsync(candidateLast, NonTerminalStage2);
+        Assert.True(await kanban.IsCardInColumnAsync(candidateLast, NonTerminalStage2),
+            $"Expected the card for {candidateLast} to be in the '{NonTerminalStage2}' column before clicking it");
+
+        await kanban.ClickCardAsync(candidateLast);
+
+        await _page.WaitForURLAsync(new System.Text.RegularExpressions.Regex(@"/applications/[0-9a-f-]{36}/review-cv\?returnUrl="),
+            new() { Timeout = 15_000 });
+        Assert.DoesNotMatch(@"/candidates/[0-9a-f-]{36}", _page.Url);
+    }
+
+    [Fact]
+    public async Task ClickingCard_OutsideCvReviewStage_DoesNotOpenReviewCv()
+    {
+        var (candidateLast, kanban) = await ArrangeAppliedApplicationAsync();
+
+        await kanban.ClickCardAsync(candidateLast);
+
+        await _page.WaitForURLAsync(new System.Text.RegularExpressions.Regex(@"/candidates/[0-9a-f-]{36}"),
+            new() { Timeout = 15_000 });
+        Assert.DoesNotContain("/review-cv", _page.Url);
+    }
+
+    [Fact]
     public async Task DraggingCard_MovesApplicationToTargetStage_AndPersistsAcrossReload()
     {
         var (candidateLast, kanban) = await ArrangeAppliedApplicationAsync();

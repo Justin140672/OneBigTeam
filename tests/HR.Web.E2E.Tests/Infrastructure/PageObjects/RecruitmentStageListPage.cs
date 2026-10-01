@@ -93,7 +93,7 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
         for (var i = count - 1; i >= 0; i--)
         {
             var text = (await cells.Nth(i).TextContentAsync())?.Trim();
-            if (text is "New application" or "Interview" or "Offer")
+            if (text is "New application" or "CV review" or "Interview" or "Offer")
                 return text;
             if (text == "—")
                 return "None";

@@ -11,7 +11,8 @@ public sealed record KanbanColumnModel(
     string StageName,
     bool IsTerminal,
     int Count,
-    IReadOnlyList<KanbanCandidateModel> Candidates);
+    IReadOnlyList<KanbanCandidateModel> Candidates,
+    RecruitmentStagePurpose? Purpose = null);
 
 public sealed record KanbanCandidateModel(
     Guid ApplicationId,

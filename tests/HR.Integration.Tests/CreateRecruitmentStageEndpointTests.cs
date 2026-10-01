@@ -4,6 +4,7 @@ using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
@@ -81,6 +82,25 @@ public class CreateRecruitmentStageEndpointTests
         Assert.Equal(10, payload.DisplayOrder);
         Assert.True(payload.IsActive);
         Assert.False(payload.IsTerminal);
+    }
+
+    [Fact]
+    public async Task Post_RecruitmentStages_Persists_CvReview_Purpose()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await ClientAs(RecruiterUser, companyId);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/recruitment-stages",
+            new { companyId, name = "Screening", displayOrder = 10, isTerminal = false, terminalOutcome = "None", purpose = "CvReview" });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<StagePayload>();
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+        var stage = await db.RecruitmentStages.AsNoTracking().SingleAsync(s => s.Id == payload!.Id);
+        Assert.Equal(HR.Modules.Recruitment.Domain.RecruitmentStagePurpose.CvReview, stage.Purpose);
     }
 
     [Fact]
