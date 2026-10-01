@@ -13,7 +13,8 @@ public record EmploymentTypeListItemModel(
     bool IsActive,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    int Version = 0);
+    int Version = 0,
+    bool RequiresReview = false);
 
 public record CreateEmploymentTypeRequest(Guid CompanyId, string Name, string? Description);
 

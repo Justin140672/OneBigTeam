@@ -15,7 +15,14 @@ public sealed record HrHeadcountSummaryResult(
     int FutureStarters,
     int Leavers,
     decimal TotalFte,
-    int OtherEmployees = 0);
+    int OtherEmployees = 0,
+    IReadOnlyList<HrHeadcountEmploymentTypeGroup>? EmploymentTypeBreakdown = null);
+
+public sealed record HrHeadcountEmploymentTypeGroup(
+    Guid EmploymentTypeId,
+    string Label,
+    bool IsNonCanonical,
+    int EmployeeCount);
 
 public sealed record HrHeadcountSummaryItem(
     Guid EmployeeId,
@@ -27,4 +34,5 @@ public sealed record HrHeadcountSummaryItem(
     string Status,
     DateOnly StartDate,
     DateOnly? LeavingDate,
-    decimal? Fte);
+    decimal? Fte,
+    bool EmploymentTypeNeedsReview = false);

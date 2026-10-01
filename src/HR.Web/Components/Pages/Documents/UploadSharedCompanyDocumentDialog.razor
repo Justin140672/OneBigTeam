@@ -281,9 +281,9 @@
         _departments       = departmentsTask.Result?.Items ?? [];
         _locations         = locationsTask.Result?.Items ?? [];
         _positionProfiles  = positionProfilesTask.Result?.Items.ToList() ?? [];
-        _employees          = employeesTask.Result?.Items.Select(e => new EmployeeOption(e.Id, $"{e.FirstName} {e.LastName}")).ToList() ?? [];
+        _employees          = employeesTask.Result?.Items.Select(e => new EmployeeOption(e.Id, e.FullName)).ToList() ?? [];
         _reviewOwnerOptions = (reviewOwnersTask.Result?.Items ?? [])
-            .Select(e => new ReviewOwnerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .Select(e => new ReviewOwnerOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)
             .Prepend(new ReviewOwnerOption(Guid.Empty, "Not assigned"))
             .ToList();
@@ -302,7 +302,7 @@
         var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
         if (requestId != _reviewOwnerFilterRequestId) return;
         _reviewOwnerOptions = (result?.Items ?? [])
-            .Select(e => new ReviewOwnerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .Select(e => new ReviewOwnerOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)
             .Prepend(new ReviewOwnerOption(Guid.Empty, "Not assigned"))
             .ToList();

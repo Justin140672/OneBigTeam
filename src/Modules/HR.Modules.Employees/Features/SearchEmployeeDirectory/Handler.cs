@@ -28,7 +28,9 @@ internal sealed class SearchEmployeeDirectoryHandler
             query = query.Where(e =>
                 e.FirstName.ToLower().Contains(term) ||
                 e.LastName.ToLower().Contains(term) ||
+                (e.PreferredName != null && e.PreferredName.ToLower().Contains(term)) ||
                 (e.FirstName.ToLower() + " " + e.LastName.ToLower()).Contains(term) ||
+                ((e.PreferredName ?? e.FirstName).ToLower() + " " + e.LastName.ToLower()).Contains(term) ||
                 e.WorkEmail.ToLower().Contains(term) ||
                 e.EmployeeNumber.ToLower().Contains(term));
         }
@@ -71,7 +73,8 @@ internal sealed class SearchEmployeeDirectoryHandler
                 e.EmployeeNumber,
                 positionProfileTitles.TryGetValue(e.PositionProfileId, out var ppTitle) ? ppTitle : null,
                 departmentNames.TryGetValue(e.DepartmentId, out var deptName) ? deptName : null,
-                e.Status))
+                e.Status,
+                e.PreferredName))
             .ToList();
 
         return Result.Success(new SearchEmployeeDirectoryResponse(items));

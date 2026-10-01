@@ -167,6 +167,9 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
 
         Assert.True(empEdit.IsInViewModeUrl);
         Assert.Equal(newPreferredName, await empEdit.GetTextFieldValueAsync("Preferred Name"));
+
+        await Assertions.Expect(_page.GetByRole(AriaRole.Heading, new() { Level = 1 })).ToContainTextAsync(newPreferredName);
+        await Assertions.Expect(_page.GetByTestId("legal-name")).ToContainTextAsync("Legal name:");
     }
 
 

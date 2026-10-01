@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
@@ -23,6 +24,7 @@ internal sealed class GetMyTeamHandler(
                 e.ManagerId,
                 e.FirstName,
                 e.LastName,
+                e.PreferredName,
                 e.PositionProfileId,
                 e.PhoneNumber,
                 e.WorkEmail,
@@ -33,7 +35,7 @@ internal sealed class GetMyTeamHandler(
             .Where(e => e.ManagerId is not null)
             .ToLookup(e => e.ManagerId!.Value);
 
-        var team = new List<(Guid Id, string FirstName, string LastName, Guid PositionProfileId, string? PhoneNumber, string WorkEmail)>();
+        var team = new List<(Guid Id, string FirstName, string LastName, string? PreferredName, Guid PositionProfileId, string? PhoneNumber, string WorkEmail)>();
 
         if (includeIndirect)
         {
@@ -44,7 +46,7 @@ internal sealed class GetMyTeamHandler(
                 var current = queue.Dequeue();
                 foreach (var report in byManager[current])
                 {
-                    team.Add((report.Id, report.FirstName, report.LastName, report.PositionProfileId, report.PhoneNumber, report.WorkEmail));
+                    team.Add((report.Id, report.FirstName, report.LastName, report.PreferredName, report.PositionProfileId, report.PhoneNumber, report.WorkEmail));
                     queue.Enqueue(report.Id);
                 }
             }
@@ -52,7 +54,7 @@ internal sealed class GetMyTeamHandler(
         else
         {
             foreach (var report in byManager[managerId])
-                team.Add((report.Id, report.FirstName, report.LastName, report.PositionProfileId, report.PhoneNumber, report.WorkEmail));
+                team.Add((report.Id, report.FirstName, report.LastName, report.PreferredName, report.PositionProfileId, report.PhoneNumber, report.WorkEmail));
         }
 
         var positionProfileIds = team.Select(e => e.PositionProfileId).ToHashSet();
@@ -73,7 +75,7 @@ internal sealed class GetMyTeamHandler(
             .ThenBy(e => e.FirstName)
             .Select(e => new TeamMemberItem(
                 e.Id,
-                $"{e.FirstName} {e.LastName}",
+                PersonName.Display(e.FirstName, e.LastName, e.PreferredName),
                 positionProfileTitles.TryGetValue(e.PositionProfileId, out var title) ? title : null,
                 e.PhoneNumber,
                 e.WorkEmail,

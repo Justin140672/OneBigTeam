@@ -19,7 +19,7 @@ internal sealed class ListEmploymentTypesHandler(EmployeesDbContext db)
 
         var items = await query
             .OrderBy(e => e.Name)
-            .Select(e => new EmploymentTypeItem(e.Id, e.CompanyId, e.Name, e.Description, e.IsActive, e.CreatedAt, e.UpdatedAt, e.Version))
+            .Select(e => new EmploymentTypeItem(e.Id, e.CompanyId, e.Name, e.Description, e.IsActive, e.CreatedAt, e.UpdatedAt, e.Version, e.RequiresReview))
             .ToListAsync(cancellationToken);
 
         return Result.Success(new ListEmploymentTypesResponse(items));

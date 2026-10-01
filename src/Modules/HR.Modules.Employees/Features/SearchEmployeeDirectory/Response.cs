@@ -9,4 +9,5 @@ internal sealed record SearchEmployeeDirectoryItem(
     string? EmployeeNumber,
     string? PositionProfileTitle,
     string? DepartmentName,
-    HR.Modules.Employees.Domain.EmploymentStatus Status);
+    HR.Modules.Employees.Domain.EmploymentStatus Status,
+    string? PreferredName = null);

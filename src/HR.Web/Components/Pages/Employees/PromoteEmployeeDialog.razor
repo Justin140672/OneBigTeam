@@ -287,7 +287,7 @@
         var managerResult = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
         _managerOptions = (managerResult?.Items ?? [])
             .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")
-            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .Select(e => new ManagerOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)
             .Prepend(new ManagerOption(Guid.Empty, "Not assigned"))
             .ToList();
@@ -313,7 +313,7 @@
         if (requestId != _managerFilterRequestId) return;
         _managerOptions = (result?.Items ?? [])
             .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")
-            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .Select(e => new ManagerOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)
             .Prepend(new ManagerOption(Guid.Empty, "Not assigned"))
             .ToList();

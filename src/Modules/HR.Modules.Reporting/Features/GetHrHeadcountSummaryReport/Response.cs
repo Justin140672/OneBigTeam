@@ -9,4 +9,5 @@ internal sealed record GetHrHeadcountSummaryReportResponse(
     int FutureStarters,
     int Leavers,
     decimal TotalFte,
-    int OtherEmployees = 0);
+    int OtherEmployees = 0,
+    IReadOnlyList<HrHeadcountEmploymentTypeGroup>? EmploymentTypeBreakdown = null);

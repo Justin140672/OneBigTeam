@@ -154,9 +154,7 @@
     }
 
     private static string DisplayName(GetEmployeeTeamViewResponse employee) =>
-        string.IsNullOrWhiteSpace(employee.PreferredName)
-            ? $"{employee.FirstName} {employee.LastName}"
-            : $"{employee.PreferredName} {employee.LastName}";
+        PersonName.Display(employee.FirstName, employee.LastName, employee.PreferredName);
 
     private static string Initials(GetEmployeeTeamViewResponse employee) =>
         $"{employee.FirstName.FirstOrDefault()}{employee.LastName.FirstOrDefault()}".ToUpperInvariant();

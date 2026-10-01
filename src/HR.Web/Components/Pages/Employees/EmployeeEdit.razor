@@ -285,7 +285,7 @@
     else
     {
         <div class="d-flex align-items-center gap-3 mb-1">
-            <h1 class="mb-0">@(_employee?.FirstName) @(_employee?.LastName)</h1>
+            <h1 class="mb-0">@(_employee is null ? string.Empty : PersonName.Display(_employee.FirstName, _employee.LastName, _employee.PreferredName))</h1>
             @if (_employee is not null)
             {
                 <span class="badge rounded-pill px-3 py-2 fs-6 fw-normal @StatusBadgeClass(_employee.Status)">@StatusDisplayName(_employee.Status)</span>
@@ -314,6 +314,11 @@
         @if (Session.CanManageEmployees && _employee is not null)
         {
             <EmployeeProfilePhotoHeader CompanyId="CompanyId" EmployeeId="Id!.Value" Initials="@EmployeeInitials" />
+        }
+
+        @if (_employee is not null && PersonName.IsPreferredDistinct(_employee.FirstName, _employee.PreferredName))
+        {
+            <p class="text-muted small mb-1" data-testid="legal-name">Legal name: @PersonName.Legal(_employee.FirstName, _employee.LastName)</p>
         }
 
         @if (_employee?.ManagerId is not null)
@@ -350,7 +355,7 @@
                             <div class="text-muted mb-1">↓</div>
                         }
                         <div>
-                            <span class="fw-semibold">@_employee.FirstName @_employee.LastName</span>
+                            <span class="fw-semibold">@PersonName.Display(_employee.FirstName, _employee.LastName, _employee.PreferredName)</span>
                             <span class="badge bg-secondary-subtle text-secondary-emphasis ms-1">Current Employee</span>
                         </div>
                     </div>
@@ -796,7 +801,7 @@
     [Parameter] public Guid? Id { get; set; }
 
     private bool IsNew => Id is null || Id == Guid.Empty;
-    private string PageTitle => IsNew ? "Add Employee" : $"{Model.FirstName} {Model.LastName}".Trim();
+    private string PageTitle => IsNew ? "Add Employee" : PersonName.Display(Model.FirstName, Model.LastName, Model.PreferredName);
 
     private GetEmployeeResponse? _employee;
 
@@ -1026,7 +1031,7 @@
             var managerResult = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
             _managerOptions = (managerResult?.Items ?? [])
                 .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")
-                .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+                .Select(e => new ManagerOption(e.Id, e.FullName))
                 .OrderBy(e => e.Name)
                 .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
                 .ToList();
@@ -1188,7 +1193,7 @@
         if (requestId != _managerFilterRequestId) return;
         _managerOptions = (result?.Items ?? [])
             .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")
-            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .Select(e => new ManagerOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)
             .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
             .ToList();

@@ -131,7 +131,7 @@ else
         {
             _reviews = await ProbationService.GetProbationReviewsAsync(CompanyId, _record.Id);
             var manager = await EmployeeService.GetEmployeeAsync(CompanyId, _record.ManagerEmployeeId);
-            _managerName = manager is not null ? $"{manager.FirstName} {manager.LastName}" : "—";
+            _managerName = manager is not null ? manager.FullName : "—";
         }
         _loading = false;
     }
@@ -140,7 +140,7 @@ else
     {
         _record = updated;
         var manager = await EmployeeService.GetEmployeeAsync(CompanyId, updated.ManagerEmployeeId);
-        _managerName = manager is not null ? $"{manager.FirstName} {manager.LastName}" : "—";
+        _managerName = manager is not null ? manager.FullName : "—";
     }
 
     // Ticket 18: a conflict "Reload latest values" discovered the record is now terminal
@@ -153,7 +153,7 @@ else
         _terminalWhileEditingMessage = args.Message;
         _editing = false;
         var manager = await EmployeeService.GetEmployeeAsync(CompanyId, args.Latest.ManagerEmployeeId);
-        _managerName = manager is not null ? $"{manager.FirstName} {manager.LastName}" : "—";
+        _managerName = manager is not null ? manager.FullName : "—";
     }
 
     private static string StatusLabel(string status) => status switch

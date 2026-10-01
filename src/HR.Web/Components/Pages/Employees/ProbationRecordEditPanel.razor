@@ -111,7 +111,7 @@ else
         var employees = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
         _managerOptions = (employees?.Items ?? [])
             .Where(e => e.Id != Record.EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")
-            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .Select(e => new ManagerOption(e.Id, e.FullName))
             .OrderBy(m => m.Name)
             .ToList();
 
@@ -119,7 +119,7 @@ else
         {
             var current = await EmployeeService.GetEmployeeAsync(CompanyId, Record.ManagerEmployeeId);
             if (current is not null)
-                _managerOptions.Add(new ManagerOption(current.Id, $"{current.FirstName} {current.LastName}"));
+                _managerOptions.Add(new ManagerOption(current.Id, current.FullName));
         }
     }
 
@@ -131,7 +131,7 @@ else
         if (requestId != _managerFilterRequestId) return;
         var options = (result?.Items ?? [])
             .Where(e => e.Id != Record.EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")
-            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .Select(e => new ManagerOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)
             .ToList();
         await _managerDropdown.FilterAsync(options, new Query());
@@ -198,7 +198,7 @@ else
                 {
                     var current = await EmployeeService.GetEmployeeAsync(CompanyId, latest.ManagerEmployeeId);
                     if (current is not null)
-                        _managerOptions.Add(new ManagerOption(current.Id, $"{current.FirstName} {current.LastName}"));
+                        _managerOptions.Add(new ManagerOption(current.Id, current.FullName));
                 }
 
                 await OnSaved.InvokeAsync(latest);

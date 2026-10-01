@@ -33,6 +33,11 @@ internal sealed class EmploymentTypeConfiguration : IEntityTypeConfiguration<Emp
             .HasColumnName("is_active")
             .IsRequired();
 
+        builder.Property(e => e.RequiresReview)
+            .HasColumnName("requires_review")
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Property(e => e.Version)
             .HasColumnName("version")
             .IsRequired()

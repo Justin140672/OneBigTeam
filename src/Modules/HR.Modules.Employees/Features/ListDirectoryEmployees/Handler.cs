@@ -41,6 +41,7 @@ internal sealed class ListDirectoryEmployeesHandler
                 e.FirstName.ToLower().Contains(search) ||
                 e.LastName.ToLower().Contains(search) ||
                 (e.FirstName.ToLower() + " " + e.LastName.ToLower()).Contains(search) ||
+                ((e.PreferredName ?? e.FirstName).ToLower() + " " + e.LastName.ToLower()).Contains(search) ||
                 (e.PreferredName != null && e.PreferredName.ToLower().Contains(search)) ||
                 e.WorkEmail.ToLower().Contains(search) ||
                 matchingDeptIds.Contains(e.DepartmentId) ||

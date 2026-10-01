@@ -133,7 +133,7 @@ internal sealed class GetEmployeeAuditHistoryHandler(
             : await dbContext.Employees
                 .AsNoTracking()
                 .Where(e => e.CompanyId == companyId && managerIds.Contains(e.Id))
-                .ToDictionaryAsync(e => e.Id, e => $"{e.FirstName} {e.LastName}", cancellationToken);
+                .ToDictionaryAsync(e => e.Id, e => PersonName.Display(e.FirstName, e.LastName, e.PreferredName), cancellationToken);
 
         var candidates = parsed
             .Select(p => (

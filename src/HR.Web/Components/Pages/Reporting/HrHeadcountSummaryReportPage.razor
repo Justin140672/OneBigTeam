@@ -66,6 +66,25 @@
         </div>
         <p class="text-muted small mb-3" id="headcount-definition">@TotalHeadcountDefinition</p>
 
+        @if (_employmentTypeBreakdown.Count > 0)
+        {
+            <div class="mb-3" data-testid="employment-type-breakdown">
+                <h2 class="h6">Headcount by employment type</h2>
+                <ul class="list-inline mb-1">
+                    @foreach (var group in _employmentTypeBreakdown)
+                    {
+                        <li class="list-inline-item me-3">
+                            <span>@group.Label</span>: <strong>@group.EmployeeCount</strong>
+                            @if (group.IsNonCanonical)
+                            {
+                                <span class="badge bg-warning text-dark ms-1" title="This employment type is inactive, unreviewed or no longer configured. Review it in Employment Types.">Review</span>
+                            }
+                        </li>
+                    }
+                </ul>
+            </div>
+        }
+
         <HrGrid TValue="HrHeadcountSummaryReportItemModel"
                 Toolbar="@Toolbar"
                 DataSource="@_items"
@@ -98,6 +117,7 @@
     private int _futureStarters;
     private int _leavers;
     private int _otherEmployees;
+    private List<HrHeadcountEmploymentTypeGroupModel> _employmentTypeBreakdown = [];
 
     private const string TotalHeadcountDefinition =
         "Total Headcount counts every employee record except Drafts. It equals Active Employees + Future Starters + Leavers + Suspended or Serving Notice. Draft records are excluded from the figures, the table, exports and the dashboard charts.";
@@ -148,6 +168,7 @@
             _futureStarters = response.FutureStarters;
             _leavers = response.Leavers;
             _otherEmployees = response.OtherEmployees;
+            _employmentTypeBreakdown = response.EmploymentTypeBreakdown ?? [];
             _totalFte = response.TotalFte;
         }
 

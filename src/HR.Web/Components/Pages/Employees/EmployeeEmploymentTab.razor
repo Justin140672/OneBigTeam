@@ -488,7 +488,7 @@ else
 
         _managerOptions = ((await empListTask)?.Items ?? [])
             .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")
-            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .Select(e => new ManagerOption(e.Id, e.FullName))
             .ToList();
 
         if (employee?.ManagerId is { } managerId && _managerOptions.All(m => m.Id != managerId))
@@ -509,7 +509,7 @@ else
         if (requestId != _managerFilterRequestId) return;
         _managerOptions = (result?.Items ?? [])
             .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")
-            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .Select(e => new ManagerOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)
             .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
             .ToList();

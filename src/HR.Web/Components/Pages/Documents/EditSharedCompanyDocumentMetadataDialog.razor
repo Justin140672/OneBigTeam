@@ -156,7 +156,7 @@
         _categories = (await DocumentService.ListCompanyDocumentCategoriesAsync(CompanyId))?.Items.ToList() ?? [];
 
         _reviewOwnerOptions = ((await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50))?.Items ?? [])
-            .Select(e => new ReviewOwnerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .Select(e => new ReviewOwnerOption(e.Id, e.FullName))
             .ToList();
 
         Model.ReviewOwnerEmployeeId = Guid.Empty;
@@ -192,7 +192,7 @@
         var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
         if (requestId != _reviewOwnerFilterRequestId) return;
         _reviewOwnerOptions = (result?.Items ?? [])
-            .Select(e => new ReviewOwnerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .Select(e => new ReviewOwnerOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)
             .Prepend(new ReviewOwnerOption(Guid.Empty, "Not assigned"))
             .ToList();

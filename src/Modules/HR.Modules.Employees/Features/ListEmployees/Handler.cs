@@ -43,7 +43,9 @@ internal sealed class ListEmployeesHandler
             query = query.Where(e =>
                 e.FirstName.ToLower().Contains(search) ||
                 e.LastName.ToLower().Contains(search) ||
+                (e.PreferredName != null && e.PreferredName.ToLower().Contains(search)) ||
                 (e.FirstName.ToLower() + " " + e.LastName.ToLower()).Contains(search) ||
+                ((e.PreferredName ?? e.FirstName).ToLower() + " " + e.LastName.ToLower()).Contains(search) ||
                 e.WorkEmail.ToLower().Contains(search) ||
                 e.EmployeeNumber.ToLower().Contains(search) ||
                 matchingDeptIds.Contains(e.DepartmentId) ||
@@ -116,7 +118,7 @@ internal sealed class ListEmployeesHandler
             ? await _dbContext.Employees
                 .AsNoTracking()
                 .Where(e => managerIds.Contains(e.Id))
-                .ToDictionaryAsync(e => e.Id, e => $"{e.FirstName} {e.LastName}", cancellationToken)
+                .ToDictionaryAsync(e => e.Id, e => PersonName.Display(e.FirstName, e.LastName, e.PreferredName), cancellationToken)
             : new Dictionary<Guid, string>();
 
         var employeeIds = employees.Select(e => e.Id).ToList();
@@ -148,7 +150,8 @@ internal sealed class ListEmployeesHandler
                 photoUrls.TryGetValue(e.Id, out var photoUrl) ? photoUrl : null,
                 FormatAccountStatus(accountStatuses.TryGetValue(e.Id, out var accountSummary)
                     ? accountSummary.Status
-                    : EmployeeUserAccountStatus.NoUser)))
+                    : EmployeeUserAccountStatus.NoUser),
+                e.PreferredName))
             .ToList();
 
         var totalPages = request.PageSize == 0 ? 0 : (int)Math.Ceiling((double)totalCount / request.PageSize);

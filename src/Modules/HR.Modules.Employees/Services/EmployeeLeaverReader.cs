@@ -80,7 +80,7 @@ internal sealed class EmployeeLeaverReader(
 
             items.Add(new EmployeeLeaverReportItem(
                 e.Id,
-                $"{e.FirstName} {e.LastName}",
+                PersonName.Display(e.FirstName, e.LastName, e.PreferredName),
                 e.LeavingDate,
                 offboardingDetail?.LastWorkingDay,
                 departmentNames.TryGetValue(e.DepartmentId, out var deptName) ? deptName : null,

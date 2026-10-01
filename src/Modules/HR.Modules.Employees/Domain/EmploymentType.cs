@@ -11,6 +11,7 @@ internal sealed class EmploymentType : IVersionedAggregate
     public string Name        { get; private set; } = string.Empty;
     public string? Description { get; private set; }
     public bool   IsActive    { get; private set; }
+    public bool   RequiresReview { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -32,10 +33,18 @@ internal sealed class EmploymentType : IVersionedAggregate
             UpdatedAt   = now,
         };
 
+    public static EmploymentType CreateFromImport(Guid id, Guid companyId, string name, DateTimeOffset now)
+    {
+        var employmentType = Create(id, companyId, name, null, now);
+        employmentType.RequiresReview = true;
+        return employmentType;
+    }
+
     public void Update(string name, string? description, DateTimeOffset now)
     {
         Name        = name;
         Description = description;
+        RequiresReview = false;
         UpdatedAt   = now;
     }
 

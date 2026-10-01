@@ -56,7 +56,7 @@ internal sealed class GetLeavingProcessHistoryHandler(
                 .Where(e => e.CompanyId == companyId && replacementManagerIds.Contains(e.Id))
                 .ToDictionaryAsync(
                     e => e.Id,
-                    e => $"{e.FirstName} {e.LastName}",
+                    e => PersonName.Display(e.FirstName, e.LastName, e.PreferredName),
                     cancellationToken);
 
         var items = leavingProcesses

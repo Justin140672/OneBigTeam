@@ -51,6 +51,10 @@
                         @{
                             var row = (context as EmploymentTypeListItemModel)!;
                             <ActiveStatusBadge IsActive="row.IsActive" />
+                            @if (row.RequiresReview)
+                            {
+                                <span class="badge bg-warning text-dark ms-1" title="Created automatically by a data import. Open and save it to confirm it is a valid employment type, or deactivate it.">Imported - review</span>
+                            }
                         }
                     </Template>
                 </GridColumn>

@@ -43,6 +43,7 @@ internal sealed class GetManagerTeamStatusSummaryHandler(
                 e.Id,
                 e.FirstName,
                 e.LastName,
+                e.PreferredName,
                 e.PositionProfileId,
                 e.WorkingDaysOverride,
                 e.HoursPerDayOverride,
@@ -96,7 +97,7 @@ internal sealed class GetManagerTeamStatusSummaryHandler(
 
                 return new TeamMemberStatusItem(
                     c.Id,
-                    $"{c.FirstName} {c.LastName}",
+                    PersonName.Display(c.FirstName, c.LastName, c.PreferredName),
                     jobTitles.TryGetValue(c.PositionProfileId, out var title) ? title : null,
                     onLeave,
                     sick,

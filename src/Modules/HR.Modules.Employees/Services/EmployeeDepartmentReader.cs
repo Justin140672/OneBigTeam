@@ -20,7 +20,7 @@ internal sealed class EmployeeDepartmentReader(EmployeesDbContext dbContext) : I
         var employees = await dbContext.Employees
             .AsNoTracking()
             .Where(e => e.CompanyId == companyId && ids.Contains(e.Id))
-            .Select(e => new { e.Id, e.FirstName, e.LastName, e.DepartmentId })
+            .Select(e => new { e.Id, e.FirstName, e.LastName, e.PreferredName, e.DepartmentId })
             .ToListAsync(cancellationToken);
 
         var departmentIds = employees.Select(e => e.DepartmentId).ToHashSet();
@@ -36,7 +36,7 @@ internal sealed class EmployeeDepartmentReader(EmployeesDbContext dbContext) : I
             e => e.Id,
             e => new EmployeeDepartmentInfo(
                 e.Id,
-                $"{e.FirstName} {e.LastName}",
+                PersonName.Display(e.FirstName, e.LastName, e.PreferredName),
                 e.DepartmentId,
                 departmentNames.TryGetValue(e.DepartmentId, out var name) ? name : null));
     }

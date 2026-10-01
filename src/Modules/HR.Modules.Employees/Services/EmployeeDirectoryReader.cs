@@ -105,14 +105,14 @@ internal sealed class EmployeeDirectoryReader(EmployeesDbContext dbContext) : IE
             ? await dbContext.Employees
                 .AsNoTracking()
                 .Where(e => managerIds.Contains(e.Id))
-                .ToDictionaryAsync(e => e.Id, e => $"{e.FirstName} {e.LastName}", cancellationToken)
+                .ToDictionaryAsync(e => e.Id, e => PersonName.Display(e.FirstName, e.LastName, e.PreferredName), cancellationToken)
             : new Dictionary<Guid, string>();
 
         var items = employees
             .Select(e => new EmployeeDirectoryReportItem(
                 e.Id,
                 e.EmployeeNumber,
-                $"{e.FirstName} {e.LastName}",
+                PersonName.Display(e.FirstName, e.LastName, e.PreferredName),
                 departmentNames.TryGetValue(e.DepartmentId, out var deptName) ? deptName : null,
                 positionProfileTitles.TryGetValue(e.PositionProfileId, out var posTitle) ? posTitle : null,
                 e.ManagerId is not null && managerNames.TryGetValue(e.ManagerId.Value, out var mgrName) ? mgrName : null,

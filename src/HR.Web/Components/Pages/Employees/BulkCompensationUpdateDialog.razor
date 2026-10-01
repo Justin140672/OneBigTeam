@@ -7,7 +7,7 @@
         <Content>
             <p class="text-muted">
                 Applying to @Employees.Count selected employee(s):
-                @string.Join(", ", Employees.Select(e => $"{e.FirstName} {e.LastName}"))
+                @string.Join(", ", Employees.Select(e => e.FullName))
             </p>
             <BulkCompensationAdjustmentPanel @ref="_panel"
                                              CompanyId="CompanyId"

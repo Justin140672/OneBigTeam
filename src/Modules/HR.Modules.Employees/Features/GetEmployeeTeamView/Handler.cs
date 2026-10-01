@@ -88,7 +88,7 @@ internal sealed class GetEmployeeTeamViewHandler
                     .FirstOrDefault(),
                 ManagerFullName = _dbContext.Employees
                     .Where(m => m.Id == e.ManagerId)
-                    .Select(m => m.FirstName + " " + m.LastName)
+                    .Select(m => (m.PreferredName ?? m.FirstName) + " " + m.LastName)
                     .FirstOrDefault(),
                 DirectReportsCount = _dbContext.Employees
                     .Count(r => r.ManagerId == e.Id && r.Status != EmploymentStatus.FormerEmployee),
@@ -176,7 +176,7 @@ internal sealed class GetEmployeeTeamViewHandler
         var employees = await _dbContext.Employees
             .AsNoTracking()
             .Where(e => e.CompanyId == companyId)
-            .Select(e => new { e.Id, e.FirstName, e.LastName, e.ManagerId, e.PositionProfileId })
+            .Select(e => new { e.Id, e.FirstName, e.LastName, e.PreferredName, e.ManagerId, e.PositionProfileId })
             .ToDictionaryAsync(e => e.Id, cancellationToken);
 
         var positionTitles = await _dbContext.PositionProfiles
@@ -194,7 +194,7 @@ internal sealed class GetEmployeeTeamViewHandler
                 ? title
                 : null;
 
-            chain.Add(new ReportingChainItem(manager.Id, $"{manager.FirstName} {manager.LastName}", jobTitle));
+            chain.Add(new ReportingChainItem(manager.Id, PersonName.Display(manager.FirstName, manager.LastName, manager.PreferredName), jobTitle));
             currentManagerId = manager.ManagerId;
         }
 

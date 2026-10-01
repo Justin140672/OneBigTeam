@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
@@ -22,7 +23,7 @@ internal sealed class EmployeeNameReader(EmployeesDbContext dbContext) : IEmploy
             .Where(e => e.CompanyId == companyId && ids.Contains(e.Id))
             .ToDictionaryAsync(
                 e => e.Id,
-                e => $"{e.FirstName} {e.LastName}".Trim(),
+                e => PersonName.Display(e.FirstName, e.LastName, e.PreferredName),
                 cancellationToken);
     }
 }

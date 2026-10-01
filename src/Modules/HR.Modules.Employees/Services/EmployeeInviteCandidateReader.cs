@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using HR.Modules.Employees.Contracts;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
@@ -19,6 +20,7 @@ internal sealed class EmployeeInviteCandidateReader(EmployeesDbContext dbContext
                 e.Id,
                 e.FirstName,
                 e.LastName,
+                e.PreferredName,
                 e.WorkEmail,
                 e.PositionProfileId,
             })
@@ -37,7 +39,7 @@ internal sealed class EmployeeInviteCandidateReader(EmployeesDbContext dbContext
         return employees
             .Select(e => new EmployeeInviteCandidate(
                 e.Id,
-                $"{e.FirstName} {e.LastName}".Trim(),
+                PersonName.Display(e.FirstName, e.LastName, e.PreferredName),
                 string.IsNullOrWhiteSpace(e.WorkEmail) ? null : e.WorkEmail,
                 e.PositionProfileId,
                 positionTitles.TryGetValue(e.PositionProfileId, out var title) ? title : null))

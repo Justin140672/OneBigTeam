@@ -18,7 +18,7 @@ internal sealed class RequestPersonalDetailsChangeHandler(
         var employee = await dbContext.Employees
             .AsNoTracking()
             .Where(e => e.Id == request.EmployeeId && e.CompanyId == request.CompanyId)
-            .Select(e => new { e.Id, e.FirstName, e.LastName })
+            .Select(e => new { e.Id, e.FirstName, e.LastName, e.PreferredName })
             .SingleOrDefaultAsync(cancellationToken);
 
         if (employee is null)
@@ -29,7 +29,7 @@ internal sealed class RequestPersonalDetailsChangeHandler(
             return Result.Failure<RequestPersonalDetailsChangeResponse>(
                 Error.Forbidden("You can only request changes for your own profile."));
 
-        var title       = $"Personal Details Change Request: {employee.FirstName} {employee.LastName}";
+        var title       = $"Personal Details Change Request: {PersonName.DisplayWithLegal(employee.FirstName, employee.LastName, employee.PreferredName)}";
         var description = request.Notes.Trim();
 
         var taskId = await taskCreator.CreateAsync(

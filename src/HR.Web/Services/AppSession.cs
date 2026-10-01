@@ -494,7 +494,7 @@ public sealed class AppSession(HrApiHttpClientFactory httpClientFactory, Employe
     private async Task<IReadOnlyDictionary<Guid, string>> LoadEmployeeNamesAsync()
     {
         var employees = (await employeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 200))?.Items ?? [];
-        return employees.ToDictionary(e => e.Id, e => $"{e.FirstName} {e.LastName}");
+        return employees.ToDictionary(e => e.Id, e => e.FullName);
     }
 
     public Task<IReadOnlyDictionary<Guid, string>> GetSicknessCategoryNamesAsync() =>

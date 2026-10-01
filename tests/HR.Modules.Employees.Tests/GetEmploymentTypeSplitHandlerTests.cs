@@ -61,7 +61,7 @@ public class GetEmploymentTypeSplitHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Buckets_Unresolvable_EmploymentType_As_Not_Specified()
+    public async Task HandleAsync_Buckets_Unresolvable_EmploymentType_As_Unknown_Legacy_Value()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
@@ -76,7 +76,7 @@ public class GetEmploymentTypeSplitHandlerTests
 
         var item = Assert.Single(result.Items);
         Assert.Equal(unresolved.EmploymentTypeId, item.EmploymentTypeId);
-        Assert.Equal("Not Specified", item.EmploymentTypeName);
+        Assert.Equal(HR.Modules.Employees.Services.EmploymentTypeGrouping.UnknownLabel, item.EmploymentTypeName);
         Assert.Equal(1, item.EmployeeCount);
     }
 

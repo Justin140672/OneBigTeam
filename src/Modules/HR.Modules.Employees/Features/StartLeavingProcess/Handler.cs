@@ -201,8 +201,8 @@ internal sealed class StartLeavingProcessHandler(
         {
             await notificationWriter.WriteAsync(
                 Guid.NewGuid(), leavingProcess.CompanyId, employee.ManagerId.Value,
-                $"Leaving process started for {employee.FirstName} {employee.LastName}",
-                $"{employee.FirstName} {employee.LastName}'s leaving process has been started. Their last working day is {leavingProcess.LastWorkingDay:d}.",
+                $"Leaving process started for {PersonName.Display(employee.FirstName, employee.LastName, employee.PreferredName)}",
+                $"{PersonName.Display(employee.FirstName, employee.LastName, employee.PreferredName)}'s leaving process has been started. Their last working day is {leavingProcess.LastWorkingDay:d}.",
                 leavingProcess.Id,
                 NotificationType.LeavingProcessStarted,
                 NotificationPriority.Normal,

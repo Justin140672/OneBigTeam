@@ -1728,7 +1728,7 @@
         _employmentTypes = (await employmentTypeTask)?.Items ?? [];
         _hireManagerOptions = ((await managerTask)?.Items ?? [])
             .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")
-            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .Select(e => new ManagerOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)
             .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
             .ToList();
@@ -1791,7 +1791,7 @@
                 var hiringManager = await EmployeeDirectoryService.GetAsync(CompanyId, vacancy.HiringManagerId);
                 if (hiringManager is not null)
                 {
-                    _appointManagerOptions.Insert(1, new ManagerOption(hiringManager.Id, $"{hiringManager.FirstName} {hiringManager.LastName}"));
+                    _appointManagerOptions.Insert(1, new ManagerOption(hiringManager.Id, hiringManager.DisplayName));
                     _appointModel.ManagerId = hiringManager.Id;
                 }
             }
@@ -1804,7 +1804,7 @@
         (employees ?? [])
             .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")
             .Where(e => e.Id != _appointEmployeeId)
-            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .Select(e => new ManagerOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)
             .Prepend(NoManagerOption)
             .ToList();
@@ -1992,7 +1992,7 @@
         var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
         _hireManagerOptions = (result?.Items ?? [])
             .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")
-            .Select(e => new ManagerOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .Select(e => new ManagerOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)
             .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
             .ToList();

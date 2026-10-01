@@ -76,7 +76,7 @@ internal sealed class ImportLookupResolver(
         }
 
         var now = clock.UtcNowOffset();
-        var employmentType = EmploymentType.Create(Guid.NewGuid(), companyId, trimmed, description: null, now);
+        var employmentType = EmploymentType.CreateFromImport(Guid.NewGuid(), companyId, trimmed, now);
 
         dbContext.EmploymentTypes.Add(employmentType);
         await dbContext.SaveChangesAsync(cancellationToken);

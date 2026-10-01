@@ -7,8 +7,6 @@ namespace HR.Modules.Employees.Features.GetEmploymentTypeSplit;
 
 internal sealed class GetEmploymentTypeSplitHandler(EmployeesDbContext dbContext)
 {
-    private const string NotSpecifiedLabel = "Not Specified";
-
     public async Task<GetEmploymentTypeSplitResponse> HandleAsync(
         GetEmploymentTypeSplitRequest request,
         CancellationToken cancellationToken)
@@ -32,19 +30,13 @@ internal sealed class GetEmploymentTypeSplitHandler(EmployeesDbContext dbContext
             .Select(c => c.EmploymentTypeId)
             .ToHashSet();
 
-        var employmentTypeNames = employmentTypeIds.Count > 0
-            ? await dbContext.EmploymentTypes
-                .AsNoTracking()
-                .Where(t => employmentTypeIds.Contains(t.Id))
-                .ToDictionaryAsync(t => t.Id, t => t.Name, cancellationToken)
-            : new Dictionary<Guid, string>();
+        var employmentTypeNames = await EmploymentTypeGrouping.LoadLabelsAsync(
+            dbContext, request.CompanyId, employmentTypeIds, cancellationToken);
 
         var groups = counts
             .Select(c => (
                 EmploymentTypeId: (Guid?)c.EmploymentTypeId,
-                EmploymentTypeName: employmentTypeNames.TryGetValue(c.EmploymentTypeId, out var name)
-                    ? name
-                    : NotSpecifiedLabel,
+                EmploymentTypeName: EmploymentTypeGrouping.Resolve(employmentTypeNames, c.EmploymentTypeId).Label,
                 c.EmployeeCount))
             .OrderBy(g => g.EmploymentTypeName)
             .ToList();

@@ -247,7 +247,7 @@
                 var current = await CompensationService.GetCurrentCompensationAsync(CompanyId, emp.Id);
                 if (current is null)
                 {
-                    excluded.Add($"{emp.FirstName} {emp.LastName}");
+                    excluded.Add(emp.FullName);
                     continue;
                 }
 
@@ -256,7 +256,7 @@
                 rows.Add(new PreviewRow
                 {
                     EmployeeId = emp.Id,
-                    EmployeeName = $"{emp.FirstName} {emp.LastName}",
+                    EmployeeName = emp.FullName,
                     CurrentSalary = current.Salary,
                     SalaryType = current.SalaryType,
                     Currency = current.Currency,

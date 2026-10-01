@@ -129,7 +129,7 @@
         _departments      = departmentsTask.Result?.Items ?? [];
         _locations        = locationsTask.Result?.Items ?? [];
         _positionProfiles = positionProfilesTask.Result?.Items.ToList() ?? [];
-        _employees         = employeesTask.Result?.Items.Select(e => new EmployeeOption(e.Id, $"{e.FirstName} {e.LastName}")).ToList() ?? [];
+        _employees         = employeesTask.Result?.Items.Select(e => new EmployeeOption(e.Id, e.FullName)).ToList() ?? [];
 
         if (Document is not null)
         {

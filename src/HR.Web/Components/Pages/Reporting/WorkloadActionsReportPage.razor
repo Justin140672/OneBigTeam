@@ -329,7 +329,7 @@
         await LoadAsync();
         var employeeItems = (await employeesTask)?.Items ?? [];
         _employeeOptions = employeeItems
-            .Select(e => new EmployeeOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .Select(e => new EmployeeOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)
             .ToList();
         _managerOptions = _employeeOptions;
@@ -482,7 +482,7 @@
         var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
         if (requestId != _employeeFilterRequestId) return;
         _employeeOptions = (result?.Items ?? [])
-            .Select(e => new EmployeeOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .Select(e => new EmployeeOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)
             .ToList();
         await _employeeDropdown.FilterAsync(_employeeOptions, new Syncfusion.Blazor.Data.Query());
@@ -497,7 +497,7 @@
         var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
         if (requestId != _managerFilterRequestId) return;
         _managerOptions = (result?.Items ?? [])
-            .Select(e => new EmployeeOption(e.Id, $"{e.FirstName} {e.LastName}"))
+            .Select(e => new EmployeeOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)
             .ToList();
         await _managerDropdown.FilterAsync(_managerOptions, new Syncfusion.Blazor.Data.Query());

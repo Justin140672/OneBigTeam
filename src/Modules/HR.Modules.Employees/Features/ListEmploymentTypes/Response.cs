@@ -10,4 +10,5 @@ internal sealed record EmploymentTypeItem(
     bool IsActive,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    int Version);
+    int Version,
+    bool RequiresReview = false);

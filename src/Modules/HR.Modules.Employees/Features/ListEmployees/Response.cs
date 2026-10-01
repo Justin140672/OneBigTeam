@@ -28,4 +28,5 @@ internal sealed record EmployeeListItem(
     EmploymentStatus Status,
     DateTimeOffset CreatedAt,
     string? ProfilePhotoUrl,
-    string UserAccountStatus);
+    string UserAccountStatus,
+    string? PreferredName = null);

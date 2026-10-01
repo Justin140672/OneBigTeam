@@ -22,7 +22,7 @@ internal sealed class ManagerChangedHandler(
             : await dbContext.Employees
                 .AsNoTracking()
                 .Where(emp => emp.CompanyId == e.CompanyId && ids.Contains(emp.Id))
-                .ToDictionaryAsync(emp => emp.Id, emp => $"{emp.FirstName} {emp.LastName}", cancellationToken);
+                .ToDictionaryAsync(emp => emp.Id, emp => PersonName.Display(emp.FirstName, emp.LastName, emp.PreferredName), cancellationToken);
 
         var previousName = e.PreviousManagerId.HasValue
             ? names.GetValueOrDefault(e.PreviousManagerId.Value, "a previous manager")

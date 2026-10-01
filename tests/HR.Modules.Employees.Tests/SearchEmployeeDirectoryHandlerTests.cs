@@ -50,6 +50,26 @@ public class SearchEmployeeDirectoryHandlerTests
     }
 
     [Fact]
+    public async Task Matches_By_PreferredName_And_Returns_It()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var sara = NewEmployee(companyId, "Sara", "Chen", "sara@example.com");
+        sara.UpdatePersonalDetails("Sarah", new DateOnly(1990, 1, 1), "British", "Prefer not to say", null, Now);
+        context.Employees.AddRange(sara, NewEmployee(companyId, "Bob", "Jones", "bob@example.com"));
+        await context.SaveChangesAsync();
+
+        var handler = new SearchEmployeeDirectoryHandler(context);
+        var byPreferred = await handler.HandleAsync(Request(companyId, "sarah"), CancellationToken.None);
+        var byPreferredFullName = await handler.HandleAsync(Request(companyId, "sarah chen"), CancellationToken.None);
+        var byLegal = await handler.HandleAsync(Request(companyId, "sara chen"), CancellationToken.None);
+
+        Assert.Equal("Sarah", Assert.Single(byPreferred.Value!.Items).PreferredName);
+        Assert.Single(byPreferredFullName.Value!.Items);
+        Assert.Single(byLegal.Value!.Items);
+    }
+
+    [Fact]
     public async Task Matches_By_LastName()
     {
         await using var context = BuildContext();

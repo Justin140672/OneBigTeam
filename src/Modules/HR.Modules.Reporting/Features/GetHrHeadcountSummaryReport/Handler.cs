@@ -24,6 +24,7 @@ internal sealed class GetHrHeadcountSummaryReportHandler(IHrHeadcountSummaryRead
             result.FutureStarters,
             result.Leavers,
             result.TotalFte,
-            result.OtherEmployees));
+            result.OtherEmployees,
+            result.EmploymentTypeBreakdown));
     }
 }

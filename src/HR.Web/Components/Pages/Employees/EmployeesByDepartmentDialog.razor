@@ -25,7 +25,7 @@
                                 @{
                                     var row = (EmployeeListItemModel)context;
                                 }
-                                <a href="/companies/@CompanyId/employees/@row.Id">@row.FirstName @row.LastName</a>
+                                <a href="/companies/@CompanyId/employees/@row.Id">@row.FullName</a>
                             </Template>
                         </GridColumn>
                         <GridColumn Field="@nameof(EmployeeListItemModel.WorkEmail)" HeaderText="Work Email" Width="220" />

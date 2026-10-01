@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
@@ -40,6 +41,7 @@ internal sealed class HrHeadcountSummaryReader(EmployeesDbContext dbContext) : I
                 e.Id,
                 e.FirstName,
                 e.LastName,
+                e.PreferredName,
                 e.DepartmentId,
                 e.LocationId,
                 e.PositionProfileId,
@@ -77,12 +79,8 @@ internal sealed class HrHeadcountSummaryReader(EmployeesDbContext dbContext) : I
                 .ToDictionaryAsync(p => p.Id, p => p.Title, cancellationToken)
             : new Dictionary<Guid, string>();
 
-        var employmentTypeNames = employmentTypeIds.Count > 0
-            ? await dbContext.EmploymentTypes
-                .AsNoTracking()
-                .Where(t => employmentTypeIds.Contains(t.Id))
-                .ToDictionaryAsync(t => t.Id, t => t.Name, cancellationToken)
-            : new Dictionary<Guid, string>();
+        var employmentTypeLabels = await EmploymentTypeGrouping.LoadLabelsAsync(
+            dbContext, companyId, employmentTypeIds, cancellationToken);
 
         // Current compensation record per employee (FTE lives on Compensation, not Employee — a
         // time-effective record per employee). Sensitive/salary-adjacent data (05-database-standards) —
@@ -113,15 +111,16 @@ internal sealed class HrHeadcountSummaryReader(EmployeesDbContext dbContext) : I
         var items = employees
             .Select(e => new HrHeadcountSummaryItem(
                 e.Id,
-                $"{e.FirstName} {e.LastName}",
+                PersonName.Display(e.FirstName, e.LastName, e.PreferredName),
                 departmentNames.TryGetValue(e.DepartmentId, out var deptName) ? deptName : null,
                 locationNames.TryGetValue(e.LocationId, out var locName) ? locName : null,
                 positionProfileTitles.TryGetValue(e.PositionProfileId, out var posTitle) ? posTitle : null,
-                employmentTypeNames.TryGetValue(e.EmploymentTypeId, out var etName) ? etName : null,
+                EmploymentTypeGrouping.Resolve(employmentTypeLabels, e.EmploymentTypeId).Label,
                 e.Status.ToString(),
                 e.StartDate,
                 e.LeavingDate,
-                currentFteByEmployee.TryGetValue(e.Id, out var fte) ? fte : null))
+                currentFteByEmployee.TryGetValue(e.Id, out var fte) ? fte : null,
+                EmploymentTypeGrouping.Resolve(employmentTypeLabels, e.EmploymentTypeId).IsNonCanonical))
             .ToList();
 
         var categories = employees
@@ -134,6 +133,12 @@ internal sealed class HrHeadcountSummaryReader(EmployeesDbContext dbContext) : I
         var otherEmployees = categories.Count(c => c == HeadcountCategory.Other);
         var totalFte = items.Sum(i => i.Fte ?? 0m);
 
-        return new HrHeadcountSummaryResult(items, totalHeadcount, activeEmployees, futureStarters, leavers, totalFte, otherEmployees);
+        var employmentTypeBreakdown = EmploymentTypeGrouping
+            .Group(employees.Select(e => e.EmploymentTypeId), employmentTypeLabels)
+            .Select(g => new HrHeadcountEmploymentTypeGroup(g.EmploymentTypeId, g.Label, g.IsNonCanonical, g.EmployeeCount))
+            .ToList();
+
+        return new HrHeadcountSummaryResult(
+            items, totalHeadcount, activeEmployees, futureStarters, leavers, totalFte, otherEmployees, employmentTypeBreakdown);
     }
 }

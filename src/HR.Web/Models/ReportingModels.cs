@@ -471,7 +471,14 @@ public record GetHrHeadcountSummaryReportResponse(
     int FutureStarters,
     int Leavers,
     decimal TotalFte,
-    int OtherEmployees = 0);
+    int OtherEmployees = 0,
+    List<HrHeadcountEmploymentTypeGroupModel>? EmploymentTypeBreakdown = null);
+
+public record HrHeadcountEmploymentTypeGroupModel(
+    Guid EmploymentTypeId,
+    string Label,
+    bool IsNonCanonical,
+    int EmployeeCount);
 
 public record HrHeadcountSummaryReportItemModel(
     Guid EmployeeId,
@@ -483,7 +490,8 @@ public record HrHeadcountSummaryReportItemModel(
     string Status,
     DateOnly StartDate,
     DateOnly? LeavingDate,
-    decimal? Fte)
+    decimal? Fte,
+    bool EmploymentTypeNeedsReview = false)
 {
     public string StatusText => HR.SharedKernel.EnumText.Humanize(Status);
 }

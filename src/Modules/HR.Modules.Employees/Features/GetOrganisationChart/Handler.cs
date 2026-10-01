@@ -71,7 +71,7 @@ internal sealed class GetOrganisationChartHandler
         var items = employees
             .Select(e => new OrganisationChartEmployeeItem(
                 e.Id,
-                $"{e.FirstName} {e.LastName}",
+                PersonName.Display(e.FirstName, e.LastName, e.PreferredName),
                 e.EmployeeNumber,
                 positionProfileTitles.TryGetValue(e.PositionProfileId, out var title) ? title : string.Empty,
                 departmentNames.TryGetValue(e.DepartmentId, out var deptName) ? deptName : string.Empty,

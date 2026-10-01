@@ -96,7 +96,7 @@ internal sealed class AssignManagerHandler
                 cursor = allEmployees.TryGetValue(cursor.Value, out var nextManagerId) ? nextManagerId : null;
             }
 
-            managerFullName = $"{manager.FirstName} {manager.LastName}";
+            managerFullName = PersonName.Display(manager.FirstName, manager.LastName, manager.PreferredName);
         }
 
         var now = _clock.UtcNowOffset();

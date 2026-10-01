@@ -1,3 +1,4 @@
+using HR.SharedKernel;
 using HR.Modules.Employees.Contracts;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
@@ -60,8 +61,8 @@ internal sealed class EmployeeAudienceReader(EmployeesDbContext dbContext) : IEm
 
         var managerNames = await dbContext.Employees.AsNoTracking()
             .Where(e => e.CompanyId == companyId && managerIds.Contains(e.Id))
-            .Select(e => new { e.Id, e.FirstName, e.LastName })
-            .ToDictionaryAsync(e => e.Id, e => $"{e.FirstName} {e.LastName}".Trim(), cancellationToken);
+            .Select(e => new { e.Id, e.FirstName, e.LastName, e.PreferredName })
+            .ToDictionaryAsync(e => e.Id, e => PersonName.Display(e.FirstName, e.LastName, e.PreferredName), cancellationToken);
 
         return employees.Select(e => new EmployeeAudienceDetail(
             e.Id,

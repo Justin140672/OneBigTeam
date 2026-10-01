@@ -33,9 +33,12 @@ public record EmployeeListItemModel(
     string Status,
     DateTimeOffset CreatedAt,
     string? ProfilePhotoUrl,
-    string UserAccountStatus)
+    string UserAccountStatus,
+    string? PreferredName = null)
 {
-    public string FullName => $"{FirstName} {LastName}";
+    public string FullName => HR.SharedKernel.PersonName.Display(FirstName, LastName, PreferredName);
+    public string LegalName => HR.SharedKernel.PersonName.Legal(FirstName, LastName);
+    public bool HasDistinctPreferredName => HR.SharedKernel.PersonName.IsPreferredDistinct(FirstName, PreferredName);
 }
 
 
@@ -48,9 +51,10 @@ public record EmployeeDirectorySearchItem(
     string? EmployeeNumber,
     string? PositionProfileTitle,
     string? DepartmentName,
-    string Status)
+    string Status,
+    string? PreferredName = null)
 {
-    public string FullName => $"{FirstName} {LastName}";
+    public string FullName => HR.SharedKernel.PersonName.Display(FirstName, LastName, PreferredName);
 }
 
 
@@ -109,7 +113,11 @@ public record GetEmployeeResponse(
     int EffectiveNoticePeriodLength,
     string EffectiveNoticePeriodSource,
     // Ticket 2: optimistic-concurrency token echoed back on the next employee edit save.
-    int Version = 0);
+    int Version = 0)
+{
+    public string FullName => HR.SharedKernel.PersonName.Display(FirstName, LastName, PreferredName);
+}
+
 
 public sealed record ReportingChainItemModel(Guid EmployeeId, string Name, string? JobTitle);
 
