@@ -66,7 +66,7 @@ public sealed class ReportCatalogPage(IPage page, string baseUrl)
     public async Task<IReadOnlyList<string>> GetCardTitlesInCategoryAsync(string categoryFragment)
     {
         var heading = page.Locator("h5").Filter(new() { HasText = categoryFragment }).First;
-        var row = heading.Locator("xpath=following-sibling::div[contains(@class,'row')][1]");
+        var row = heading.Locator("xpath=following-sibling::div[contains(@class,'report-card-grid')][1]");
         var titles = await row.Locator(".card-title").AllAsync();
         var result = new List<string>();
         foreach (var title in titles)

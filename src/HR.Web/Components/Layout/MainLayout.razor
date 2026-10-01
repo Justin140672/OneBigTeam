@@ -26,20 +26,24 @@ else if (Session.LayoutMode == MainLayoutMode.CompleteProfile)
 else
 {
 
-    <div class="app-shell">
+    <div class="app-shell" data-nav-mode="@_nav.ModeName" data-nav-open="@(_nav.IsOpen ? "true" : "false")">
 
         @if (ShowSidebar)
         {
-            <SfSidebar Width="280px"
-                       Type="SidebarType.Push"
-                       MediaQuery="@("(min-width: 768px)")"
+            <SfSidebar @key="_nav.UsesDrawer"
+                       ID="app-sidebar"
+                       Width="280px"
+                       Type="@(_nav.UsesDrawer ? SidebarType.Over : SidebarType.Push)"
+                       ShowBackdrop="@_nav.UsesDrawer"
+                       CloseOnDocumentClick="@_nav.UsesDrawer"
                        @bind-IsOpen="SidebarOpen"
                        CssClass="app-sidebar">
 
                 <ChildContent>
+                    <div @onkeydown="OnSidebarKeyDown">
                     <div class="sidebar-header">
-                        <button class="sidebar-toggle" @onclick="ToggleSidebar" aria-label="@(SidebarOpen ? "Collapse navigation" : "Expand navigation")">
-                            <i class="fa-solid fa-bars"></i>
+                        <button class="sidebar-toggle" @onclick="ToggleSidebar" aria-label="@(_nav.UsesDrawer ? "Close navigation" : "Collapse navigation")" aria-expanded="true" aria-controls="app-sidebar">
+                            <i class="fa-solid fa-bars" aria-hidden="true"></i>
                         </button>
                         @if (SidebarOpen)
                         {
@@ -116,6 +120,7 @@ else
                             }
                         </MenuItems>
                     </SfMenu>
+                    </div>
 
                 </ChildContent>
 
@@ -127,8 +132,8 @@ else
             <div class="top-bar">
                 @if (ShowSidebar && !SidebarOpen)
                 {
-                    <button class="mobile-menu-button" @onclick="ToggleSidebar" aria-label="Open navigation">
-                        <i class="fa-solid fa-bars"></i>
+                    <button id="nav-open-button" class="mobile-menu-button" @onclick="ToggleSidebar" aria-label="Open navigation" aria-expanded="false" aria-controls="app-sidebar">
+                        <i class="fa-solid fa-bars" aria-hidden="true"></i>
                     </button>
                 }
                 <span class="page-title">@CurrentPageTitle</span>
@@ -137,18 +142,18 @@ else
                     <button class="theme-toggle" @onclick="ToggleTheme" title="@(IsDark ? "Switch to light mode" : "Switch to dark mode")" aria-label="@(IsDark ? "Switch to light mode" : "Switch to dark mode")">
                         @if (IsDark)
                         {
-                            <i class="fa-solid fa-sun"></i>
+                            <i class="fa-solid fa-sun" aria-hidden="true"></i>
                         }
                         else
                         {
-                            <i class="fa-solid fa-moon"></i>
+                            <i class="fa-solid fa-moon" aria-hidden="true"></i>
                         }
                     </button>
                     @if (Session.IsLoaded && Session.EmployeeId.HasValue && (Session.IsHrAdministrator || Session.CanViewOnboarding || Session.CanManageSupport))
                     {
                         <div class="help-menu @(_helpOpen ? "help-open" : "")">
                             <button class="help-btn" @onclick="ToggleHelp" title="Help" aria-label="Help" aria-haspopup="true" aria-expanded="@_helpOpen">
-                                <i class="fa-solid fa-circle-question"></i>
+                                <i class="fa-solid fa-circle-question" aria-hidden="true"></i>
                             </button>
                             @if (_helpOpen)
                             {
@@ -173,7 +178,7 @@ else
                     {
                         <div class="notif-bell @(_notifOpen ? "notif-open" : "")" @onmouseenter="CancelNotifAutoClose" @onmouseleave="ScheduleNotifAutoClose">
                             <button class="notif-btn" @onclick="ToggleNotifications" title="Notifications" aria-label="@(_unreadCount > 0 ? $"Notifications, {_unreadCount} unread" : "Notifications")" aria-haspopup="true" aria-expanded="@_notifOpen">
-                                <i class="fa-solid fa-bell"></i>
+                                <i class="fa-solid fa-bell" aria-hidden="true"></i>
                                 @if (_unreadCount > 0)
                                 {
                                     <span class="notif-badge">@(_unreadCount > 99 ? "99+" : _unreadCount.ToString())</span>
@@ -275,7 +280,7 @@ else
                     @if (Session.IsLoaded)
                     {
                         <button type="button" class="topbar-logout" @onclick="LogoutAsync" title="Log out" aria-label="Log out" data-testid="topbar-logout">
-                            <i class="fa-solid fa-right-from-bracket"></i>
+                            <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
                         </button>
                     }
                     @if (Env.IsDevelopment())
@@ -336,7 +341,22 @@ else
 @code {
     private ErrorBoundary? _errorBoundary;
 
-    private bool SidebarOpen { get; set; } = true;
+    private readonly ShellNavState _nav = new();
+    private DotNetObjectReference<MainLayout>? _shellRef;
+    private string? _pendingFocusSelector;
+
+    private bool SidebarOpen
+    {
+        get => _nav.IsOpen;
+        set
+        {
+            if (value == _nav.IsOpen)
+                return;
+
+            _nav.SetOpen(value);
+            _ = PersistPreferenceAsync();
+        }
+    }
     private bool IsDark { get; set; }
 
     private bool ShowSidebar => Session.IsHrAdministrator || Session.IsRecruiter || Session.CanManageCompany;
@@ -667,7 +687,48 @@ else
 
     protected override void OnParametersSet() => _errorBoundary?.Recover();
 
-    private void ToggleSidebar() => SidebarOpen = !SidebarOpen;
+    private void ToggleSidebar()
+    {
+        var wasOpen = _nav.IsOpen;
+        SidebarOpen = !wasOpen;
+        _pendingFocusSelector = wasOpen ? "#nav-open-button" : ".app-sidebar .sidebar-toggle";
+    }
+
+    private void OnSidebarKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape" && _nav.UsesDrawer && _nav.IsOpen)
+        {
+            SidebarOpen = false;
+            _pendingFocusSelector = "#nav-open-button";
+        }
+    }
+
+    private async Task PersistPreferenceAsync()
+    {
+        if (!_nav.IsWide)
+            return;
+
+        try
+        {
+            await JS.InvokeVoidAsync("hrShell.setExpandedPreference", _nav.PreferenceExpanded);
+        }
+        catch (JSDisconnectedException)
+        {
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnShellModeChanged(string mode)
+    {
+        if (!Enum.TryParse<ShellLayoutMode>(mode, out var parsed))
+            return;
+
+        if (_nav.SetMode(parsed))
+            await InvokeAsync(StateHasChanged);
+    }
 
     private async Task LogoutAsync() => await JS.InvokeVoidAsync("hardNavigate", "/logout");
 
@@ -691,39 +752,38 @@ else
         {
             try
             {
-                // SidebarOpen defaults to true (below), and SfSidebar's own MediaQuery is meant to
-                // correct that responsively for narrow viewports — but on a fresh full-page load
-                // (as opposed to a live window resize, which Syncfusion's own listener handles
-                // fine), the server-rendered first paint shows the sidebar already open and
-                // pushing its full 280px width before any client-side correction has a chance to
-                // run, which is exactly the kind of SSR/hydration-timing gap this Syncfusion
-                // component's own MediaQuery doesn't close on its own. Explicitly check the
-                // viewport here and correct once, the same self-healing "retry until the circuit
-                // is ready" pattern as the theme sync below.
-                var isDesktopWidth = await JS.InvokeAsync<bool>("matchesMediaQuery", "(min-width: 768px)");
+                _shellRef ??= DotNetObjectReference.Create(this);
+                var preference = await JS.InvokeAsync<bool>("hrShell.getExpandedPreference");
+                var mode = await JS.InvokeAsync<string>("hrShell.init", _shellRef, ShellBreakpoints.WideQuery, ShellBreakpoints.CompactQuery);
                 _sidebarSynced = true;
 
-                if (!isDesktopWidth && SidebarOpen)
-                {
-                    SidebarOpen = false;
-                    StateHasChanged();
-                }
+                _nav.RestorePreference(preference);
+                _nav.SetMode(Enum.Parse<ShellLayoutMode>(mode));
+                StateHasChanged();
             }
             catch (JSDisconnectedException)
             {
             }
+            catch (InvalidOperationException)
+            {
+            }
             catch (Exception)
             {
-                // An unhandled exception in OnAfterRenderAsync is fatal to the whole Blazor Server
-                // circuit, and this runs on EVERY page load app-wide via MainLayout — a purely
-                // cosmetic sidebar-width correction must never be allowed to take down the entire
-                // page (or the app's perceived performance/stability, if the circuit has to
-                // reconnect) over something as brittle as a JS interop call's exact exception type.
-                // Unlike the JSDisconnectedException case above (genuinely transient — the circuit
-                // just isn't ready yet), mark this synced anyway so a persistently failing call
-                // (e.g. the JS function itself broken) doesn't retry on every single render for
-                // the rest of the page's lifetime.
                 _sidebarSynced = true;
+                _nav.SetMode(ShellLayoutMode.Wide);
+            }
+        }
+
+        if (_pendingFocusSelector is not null)
+        {
+            var selector = _pendingFocusSelector;
+            _pendingFocusSelector = null;
+            try
+            {
+                await JS.InvokeVoidAsync("hrShell.focus", selector);
+            }
+            catch (JSDisconnectedException)
+            {
             }
         }
 
@@ -755,12 +815,34 @@ else
     private string CurrentPageTitle => PageTitleResolver.Resolve(NavigationManager.Uri);
 
     private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
-        => InvokeAsync(StateHasChanged);
+        => InvokeAsync(async () =>
+        {
+            _nav.CloseDrawer();
+            StateHasChanged();
+            try
+            {
+                await JS.InvokeVoidAsync("hrShell.resetHorizontalScroll");
+            }
+            catch (JSDisconnectedException)
+            {
+            }
+            catch (InvalidOperationException)
+            {
+            }
+        });
 
     private void OnSessionChanged() => InvokeAsync(StateHasChanged);
 
     public void Dispose()
     {
+        _shellRef?.Dispose();
+        try
+        {
+            _ = JS.InvokeVoidAsync("hrShell.dispose").AsTask().ContinueWith(_ => { }, TaskScheduler.Default);
+        }
+        catch (InvalidOperationException)
+        {
+        }
         NavigationManager.LocationChanged -= OnLocationChanged;
         Session.Changed -= OnSessionChanged;
     }

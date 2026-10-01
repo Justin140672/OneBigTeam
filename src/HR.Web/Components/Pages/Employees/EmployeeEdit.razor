@@ -285,17 +285,17 @@
     }
     else
     {
-        <div class="d-flex align-items-center gap-3 mb-1">
+        <div class="employee-profile-header mb-1">
             <h1 class="mb-0">@(_employee is null ? string.Empty : PersonName.Display(_employee.FirstName, _employee.LastName, _employee.PreferredName))</h1>
             @if (_employee is not null)
             {
                 <span class="badge rounded-pill px-3 py-2 fs-6 fw-normal @StatusBadgeClass(_employee.Status)">@StatusDisplayName(_employee.Status)</span>
                 @if (!string.IsNullOrEmpty(_employee.EmployeeNumber))
                 {
-                    <span class="text-muted">#@_employee.EmployeeNumber</span>
+                    <span class="text-muted employee-profile-number">#@_employee.EmployeeNumber</span>
                 }
             }
-            <div class="ms-auto d-flex align-items-center gap-2">
+            <div class="employee-profile-actions">
                 @if (IsViewMode && Session.CanManageEmployees)
                 {
                     <SfButton CssClass="e-small e-primary" data-testid="edit-details-button" Disabled="@Session.IsReadOnly" OnClick="EnterEditMode">
@@ -375,7 +375,7 @@
         }
 
         <div class="employee-profile-tabs">
-        <SfTab @bind-SelectedItem="GroupTab" CssClass="employee-profile-groups">
+        <SfTab OverflowMode="OverflowMode.Scrollable" @bind-SelectedItem="GroupTab" CssClass="employee-profile-groups">
             <TabItems>
 
                 <TabItem>
@@ -388,7 +388,7 @@
                            unsaved edits in the section you just left — and breaks the atomic
                            profile+employment save (Ticket 2 item 5), whose whole point is editing
                            both halves before one combined Save. *@
-                        <SfTab @bind-SelectedItem="OverviewTab" LoadOn="ContentLoad.Init" CssClass="employee-profile-sections mt-2">
+                        <SfTab OverflowMode="OverflowMode.Scrollable" @bind-SelectedItem="OverviewTab" LoadOn="ContentLoad.Init" CssClass="employee-profile-sections mt-2">
                             <TabItems>
 
                 <TabItem>
@@ -557,7 +557,7 @@
                     <ChildContent><TabHeader Text="Career &amp; Pay" /></ChildContent>
                     <ContentTemplate>
                         <div class="employee-profile-section-wrap" role="region" aria-label="Career and Pay sub-sections">
-                        <SfTab @bind-SelectedItem="CareerPayTab" CssClass="employee-profile-sections mt-2">
+                        <SfTab OverflowMode="OverflowMode.Scrollable" @bind-SelectedItem="CareerPayTab" CssClass="employee-profile-sections mt-2">
                             <TabItems>
                                 <TabItem>
                                     <ChildContent><TabHeader Text="Compensation History" /></ChildContent>
@@ -586,7 +586,7 @@
                     <ChildContent><TabHeader Text="Time Off" /></ChildContent>
                     <ContentTemplate>
                         <div class="employee-profile-section-wrap" role="region" aria-label="Time Off sub-sections">
-                        <SfTab @bind-SelectedItem="TimeOffTab" CssClass="employee-profile-sections mt-2">
+                        <SfTab OverflowMode="OverflowMode.Scrollable" @bind-SelectedItem="TimeOffTab" CssClass="employee-profile-sections mt-2">
                             <TabItems>
                                 <TabItem>
                                     <ChildContent><TabHeader Text="Leave" /></ChildContent>
@@ -615,7 +615,7 @@
                     <ChildContent><TabHeader Text="Tasks &amp; Records" /></ChildContent>
                     <ContentTemplate>
                         <div class="employee-profile-section-wrap" role="region" aria-label="Tasks and Records sub-sections">
-                        <SfTab @bind-SelectedItem="TasksRecordsTab" CssClass="employee-profile-sections mt-2">
+                        <SfTab OverflowMode="OverflowMode.Scrollable" @bind-SelectedItem="TasksRecordsTab" CssClass="employee-profile-sections mt-2">
                             <TabItems>
                                 <TabItem>
                                     <ChildContent><TabHeader Text="Tasks" /></ChildContent>
@@ -686,7 +686,7 @@
                     <ChildContent><TabHeader Text="Activity" /></ChildContent>
                     <ContentTemplate>
                         <div class="employee-profile-section-wrap" role="region" aria-label="Activity sub-sections">
-                        <SfTab @bind-SelectedItem="ActivityTab" CssClass="employee-profile-sections mt-2">
+                        <SfTab OverflowMode="OverflowMode.Scrollable" @bind-SelectedItem="ActivityTab" CssClass="employee-profile-sections mt-2">
                             <TabItems>
                                 <TabItem>
                                     <ChildContent><TabHeader Text="Timeline" /></ChildContent>

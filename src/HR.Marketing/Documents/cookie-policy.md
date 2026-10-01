@@ -18,6 +18,7 @@ Cookies are small pieces of information stored by a website in your browser. Sim
 | `obt_supabase_at` | Essential, first-party cookie | Maintains an authenticated session and allows authorised API requests | Until the authentication session expires or you sign out |
 | `theme` | First-party local storage | Remembers the light or dark display preference | Until removed through the browser |
 | `orgChartZoom` | First-party local storage | Remembers the organisation-chart zoom preference | Until removed through the browser |
+| `navExpanded` | First-party local storage | Remembers whether the main navigation sidebar is expanded on wide screens | Until removed through the browser |
 | `lastDashboard` | First-party local storage | Returns an authorised user to their previously selected dashboard | Until removed through the browser |
 | `lastEmployeeTab:*` | First-party local storage | Returns an authorised user to the last tab they selected on an employee record | Until removed through the browser |
 | `scrollPos:*` | First-party session storage | Restores page position during the current browser session | Until the browser tab or session ends |

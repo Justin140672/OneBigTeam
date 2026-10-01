@@ -1966,11 +1966,34 @@ html[data-theme="dark"] .chart-tile .e-accumulationchart text {
     font-size: 0.8rem;
 }
 
-.chart-data-table > summary {
+.chart-data-table > summary,
+.chart-data-table-toggle {
     cursor: pointer;
     color: var(--hr-color-primary);
     font-weight: 600;
     padding: 4px 0;
+}
+
+.chart-data-table-toggle {
+    background: none;
+    border: 0;
+    font: inherit;
+    font-weight: 600;
+    text-align: left;
+}
+
+.chart-data-table-toggle:focus-visible {
+    outline: 2px solid var(--hr-color-primary);
+    outline-offset: 2px;
+    border-radius: var(--hr-radius-sm);
+}
+
+.chart-data-table [hidden] {
+    display: none;
+}
+
+.chart-data-table th[scope="row"] {
+    font-weight: 400;
 }
 
 .chart-data-table table {
@@ -2100,4 +2123,111 @@ html[data-theme="dark"] .chart-tile .e-accumulationchart text {
 .vacancy-detail-dialog.e-dialog .e-dlg-header {
     white-space: normal;
     overflow-wrap: anywhere;
+}
+
+/* ── Responsive shell and content (see specifications/frontend/responsive-shell.md) ──
+   Shell breakpoints: wide desktop >= 1200px (persistent expanded nav), narrow desktop /
+   tablet landscape 768-1199px (nav collapsed, full nav as overlay drawer), tablet portrait
+   and smaller < 768px (overlay-only nav). Content primitives below size themselves from the
+   width actually available to them (auto-fit grids, container queries) instead of assuming
+   the full viewport. */
+
+.content-area {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.page-search-box {
+    width: 100%;
+    max-width: 30rem;
+}
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+    gap: 1rem;
+}
+
+.kpi-grid .kpi-card {
+    min-width: 0;
+}
+
+.kpi-grid .kpi-card .text-muted {
+    overflow-wrap: normal;
+    word-break: normal;
+    hyphens: none;
+}
+
+.report-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+    gap: 1rem;
+}
+
+.report-filter-grid > [class*="col-"] {
+    width: auto;
+    max-width: none;
+    flex: none;
+    padding: 0;
+    margin: 0;
+    min-width: 0;
+}
+
+.report-card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+    gap: 1rem;
+}
+
+.report-card-grid > * {
+    min-width: 0;
+}
+
+.employee-profile-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 1rem;
+}
+
+.employee-profile-header h1 {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.employee-profile-header .employee-profile-number {
+    white-space: nowrap;
+}
+
+.employee-profile-header .employee-profile-actions {
+    margin-left: auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+@media (max-width: 767.98px) {
+    .employee-profile-header .employee-profile-actions {
+        flex: 1 1 100%;
+        margin-left: 0;
+    }
+}
+
+.employee-profile-tabs .e-tab-header {
+    max-width: 100%;
+}
+
+.employee-profile-tabs .e-tab-header .e-toolbar-item .e-tab-text {
+    white-space: nowrap;
+}
+
+.user-admin-toolbar-grid {
+    max-width: 100%;
+}
+
+.row > .saved-views-col {
+    flex: 1 1 100%;
+    width: auto;
+    max-width: 28rem;
 }

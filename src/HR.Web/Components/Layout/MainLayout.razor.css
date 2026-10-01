@@ -497,9 +497,9 @@
 }
 
 
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
     .content-area {
-        padding: 16px;
+        padding: 12px;
     }
 
     /* Below the SfSidebar's MediaQuery breakpoint (see MainLayout.razor) the sidebar switches
@@ -515,13 +515,6 @@
         gap: 4px;
     }
 
-    .top-bar-user-info {
-        display: none;
-    }
-
-    .dev-persona-switcher {
-        display: none;
-    }
 }
 
 #blazor-error-ui {
@@ -544,3 +537,71 @@
         right: 0.75rem;
         top: 0.5rem;
     }
+
+.app-shell,
+.main-content {
+    min-width: 0;
+    max-width: 100%;
+}
+
+@media (max-width: 1199.98px) {
+    .app-shell[data-nav-mode="pending"] ::deep .app-sidebar {
+        display: none;
+    }
+
+    .content-area {
+        padding: 16px;
+    }
+
+    .top-bar-user-info {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+    }
+
+    .page-title {
+        flex: 1 1 0;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        line-height: 1.2;
+        font-size: 1rem;
+    }
+
+    .top-bar {
+        padding: 6px 12px;
+        gap: 8px;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .dev-persona-switcher {
+        display: none;
+    }
+}
+
+.app-shell[data-nav-mode="compact"] ::deep .app-sidebar,
+.app-shell[data-nav-mode="overlay"] ::deep .app-sidebar {
+    z-index: 1200;
+}
+
+.top-bar-user {
+    position: relative;
+}
+
+.sidebar-toggle:focus-visible,
+.mobile-menu-button:focus-visible,
+.theme-toggle:focus-visible,
+.topbar-logout:focus-visible,
+.help-btn:focus-visible {
+    outline: 3px solid #0b5ed7;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 5px #ffffff;
+}
+
+.sidebar-toggle:focus-visible {
+    outline-color: #ffffff;
+    box-shadow: 0 0 0 5px #0b5ed7;
+}

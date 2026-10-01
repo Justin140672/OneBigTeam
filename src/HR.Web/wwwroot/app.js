@@ -222,7 +222,7 @@ function hrFocusFirstInvalid(formSelector) {
         const focusable = 'input, textarea, select, button, [tabindex]';
         const target = marker.matches(focusable)
             ? marker
-            : (marker.closest('.cd-field-group')?.querySelector(focusable) || marker);
+            : (marker.closest('.cd-field-group, .hr-field')?.querySelector(focusable) || marker.querySelector(focusable) || marker);
         if (target && typeof target.focus === 'function') target.focus();
     } catch { }
 }
@@ -260,3 +260,56 @@ function hrScrollIntoView(id) {
         document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch { }
 }
+
+window.hrShell = (function () {
+    let dotnetRef = null;
+    let wideQuery = null;
+    let compactQuery = null;
+    let listener = null;
+
+    function currentMode() {
+        if (wideQuery && wideQuery.matches) return 'Wide';
+        if (compactQuery && compactQuery.matches) return 'Compact';
+        return 'Overlay';
+    }
+
+    return {
+        init: function (ref, wide, compact) {
+            this.dispose();
+            dotnetRef = ref;
+            wideQuery = window.matchMedia(wide);
+            compactQuery = window.matchMedia(compact);
+            listener = function () {
+                if (dotnetRef) dotnetRef.invokeMethodAsync('OnShellModeChanged', currentMode());
+            };
+            wideQuery.addEventListener('change', listener);
+            compactQuery.addEventListener('change', listener);
+            return currentMode();
+        },
+        dispose: function () {
+            if (wideQuery && listener) wideQuery.removeEventListener('change', listener);
+            if (compactQuery && listener) compactQuery.removeEventListener('change', listener);
+            wideQuery = null;
+            compactQuery = null;
+            listener = null;
+            dotnetRef = null;
+        },
+        getExpandedPreference: function () {
+            try {
+                const stored = localStorage.getItem('navExpanded');
+                return stored === null ? true : stored === 'true';
+            } catch { return true; }
+        },
+        setExpandedPreference: function (expanded) {
+            try { localStorage.setItem('navExpanded', expanded ? 'true' : 'false'); } catch { }
+        },
+        focus: function (selector) {
+            const el = document.querySelector(selector);
+            if (el) el.focus();
+        },
+        resetHorizontalScroll: function () {
+            window.scrollTo({ left: 0, top: window.scrollY, behavior: 'instant' });
+            document.querySelectorAll('.main-content, .content-area').forEach(function (el) { el.scrollLeft = 0; });
+        }
+    };
+})();
