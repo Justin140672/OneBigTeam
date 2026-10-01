@@ -238,4 +238,81 @@ public sealed class ReportCatalogTests(HrAdminPersonaFixture fixture) : RoleE2ET
 
         Assert.False(await catalog.IsFavouritedAsync("Employee Starter Report"));
     }
+
+    [Fact]
+    public async Task CatalogCard_IsKeyboardReachable_AndActivatesWithEnter()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var catalog = new ReportCatalogPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+        await catalog.GoToAsync(AcmeId);
+
+        var link = catalog.CardLink("HR Headcount Summary");
+        await link.FocusAsync();
+        await Assertions.Expect(link).ToBeFocusedAsync();
+
+        await _page.Keyboard.PressAsync("Enter");
+        await _page.WaitForURLAsync("**/reporting/hr-headcount-summary", new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
+    }
+
+    [Fact]
+    public async Task CatalogCard_TabOrder_VisitsLinkThenIndependentFavouriteButton()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var catalog = new ReportCatalogPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+        await catalog.GoToAsync(AcmeId);
+
+        var link = catalog.CardLink("HR Headcount Summary");
+        var favourite = catalog.FavouriteButton("HR Headcount Summary");
+
+        await link.FocusAsync();
+        await _page.Keyboard.PressAsync("Tab");
+        await Assertions.Expect(favourite).ToBeFocusedAsync();
+        await Assertions.Expect(favourite).ToHaveAttributeAsync("aria-pressed", new System.Text.RegularExpressions.Regex("true|false"));
+    }
+
+    [Fact]
+    public async Task FavouriteButton_ActivatesWithSpace_WithoutNavigating()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var catalog = new ReportCatalogPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+        await catalog.GoToAsync(AcmeId);
+
+        var favourite = catalog.FavouriteButton("Employee Starter Report");
+        var before = await favourite.GetAttributeAsync("aria-pressed") ?? "false";
+
+        try
+        {
+            await favourite.FocusAsync();
+            await _page.Keyboard.PressAsync("Space");
+            await Assertions.Expect(favourite).Not.ToHaveAttributeAsync("aria-pressed", before);
+            Assert.EndsWith("/reporting", new Uri(_page.Url).AbsolutePath);
+        }
+        finally
+        {
+            if (await favourite.GetAttributeAsync("aria-pressed") != before)
+                await catalog.ClickFavouriteAsync("Employee Starter Report");
+        }
+    }
+
+    [Fact]
+    public async Task Catalog_HasNoSeriousAxeViolations()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var catalog = new ReportCatalogPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+        await catalog.GoToAsync(AcmeId);
+
+        await AccessibilityScan.AssertNoSeriousViolationsAsync(_page, "report catalogue");
+    }
 }

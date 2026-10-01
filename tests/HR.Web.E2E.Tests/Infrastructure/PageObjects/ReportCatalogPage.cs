@@ -78,4 +78,12 @@ public sealed class ReportCatalogPage(IPage page, string baseUrl)
     {
         await Card(nameFragment).ClickAsync();
     }
+
+    public ILocator CardLink(string nameFragment) =>
+        Card(nameFragment).GetByRole(AriaRole.Link);
+
+    public ILocator FavouriteButton(string nameFragment) =>
+        Card(nameFragment).GetByRole(AriaRole.Button);
+
+    public ILocator SearchBox => page.GetByRole(AriaRole.Textbox, new() { Name = "Search reports" });
 }

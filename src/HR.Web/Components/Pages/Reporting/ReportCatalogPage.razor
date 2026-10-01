@@ -6,11 +6,11 @@
 @inject NavigationManager Navigation
 @inject AppSession Session
 
-<PageTitle>Reporting</PageTitle>
+<PageTitle>Reports</PageTitle>
 
 <div class="container-fluid py-4">
     <BackButton />
-    <h1 class="mb-1">Reporting</h1>
+    <h1 class="mb-1">Reports</h1>
     <p class="text-muted mb-3">Browse and run reports available to you.</p>
 
     <div class="mb-3 col-md-4 px-0">
@@ -38,18 +38,27 @@
                 @foreach (var item in category.Items)
                 {
                     <div class="col-md-4">
-                        <div class="card h-100 report-catalog-card @(IsClickable(item) ? "report-catalog-card--clickable" : "")"
-                             @onclick="@(() => OnCardClicked(item))">
+                        <div class="card h-100 position-relative report-catalog-card @(IsClickable(item) ? "report-catalog-card--clickable" : "")">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-start">
-                                    <h6 class="card-title mb-1">@item.DisplayName</h6>
+                                    <h6 class="card-title mb-1">
+                                        @if (IsClickable(item))
+                                        {
+                                            <a class="report-catalog-link stretched-link" href="@ReportHref(item)">@item.DisplayName</a>
+                                        }
+                                        else
+                                        {
+                                            @item.DisplayName
+                                        }
+                                    </h6>
                                     <button type="button"
                                             class="btn btn-link p-0 report-catalog-favourite @(IsFavourite(item.Id) ? "report-catalog-favourite--active" : "")"
-                                            title="@(IsFavourite(item.Id) ? "Remove from favourites" : "Add to favourites")"
+                                            title="@FavouriteLabel(item)"
+                                            aria-label="@FavouriteLabel(item)"
+                                            aria-pressed="@(IsFavourite(item.Id) ? "true" : "false")"
                                             disabled="@Session.IsReadOnly"
-                                            @onclick="@(() => ToggleFavouriteAsync(item.Id))"
-                                            @onclick:stopPropagation="true">
-                                        <i class="@(IsFavourite(item.Id) ? "fa-solid" : "fa-regular") fa-star"></i>
+                                            @onclick="@(() => ToggleFavouriteAsync(item.Id))">
+                                        <i class="@(IsFavourite(item.Id) ? "fa-solid" : "fa-regular") fa-star" aria-hidden="true"></i>
                                     </button>
                                 </div>
                                 <p class="card-text text-muted small mb-0">@item.Description</p>
@@ -121,12 +130,10 @@
 
     private static bool IsClickable(ReportCatalogItemModel item) => ReportRoutes.IsClickable(item.Id);
 
-    private void OnCardClicked(ReportCatalogItemModel item)
-    {
-        var route = ReportRoutes.RouteFor(item.Id);
-        if (route is not null)
-            Navigation.NavigateTo($"/companies/{CompanyId}/reporting/{route}");
-    }
+    private string ReportHref(ReportCatalogItemModel item) =>
+        $"/companies/{CompanyId}/reporting/{ReportRoutes.RouteFor(item.Id)}";
+
+    private static string FavouriteLabel(ReportCatalogItemModel item) => $"Favourite {item.DisplayName}";
 
     private async Task LoadFavouritesAsync()
     {
