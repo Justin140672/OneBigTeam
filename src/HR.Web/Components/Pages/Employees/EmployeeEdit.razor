@@ -54,72 +54,73 @@
                         <div class="card-body">
                             <div class="row g-3">
                                 <div class="col-md-6">
-                                    <label class="form-label">First Name <span class="text-danger">*</span></label>
-                                    <HrTextBox @bind-Value="Model.FirstName" Placeholder="First name" />
-                                    <ValidationMessage For="@(() => Model.FirstName)" />
+                                    <label class="form-label" for="emp-first-name">First Name <span class="text-danger" aria-hidden="true">*</span></label>
+                                    <HrTextBox @bind-Value="Model.FirstName" Placeholder="First name" HtmlAttributes="@Aria("emp-first-name", "FirstName", true)" />
+                                    <ValidationMessage For="@(() => Model.FirstName)" id="emp-first-name-error" />
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Last Name <span class="text-danger">*</span></label>
-                                    <HrTextBox @bind-Value="Model.LastName" Placeholder="Last name" />
-                                    <ValidationMessage For="@(() => Model.LastName)" />
+                                    <label class="form-label" for="emp-last-name">Last Name <span class="text-danger" aria-hidden="true">*</span></label>
+                                    <HrTextBox @bind-Value="Model.LastName" Placeholder="Last name" HtmlAttributes="@Aria("emp-last-name", "LastName", true)" />
+                                    <ValidationMessage For="@(() => Model.LastName)" id="emp-last-name-error" />
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Preferred Name</label>
-                                    <HrTextBox @bind-Value="Model.PreferredName" Placeholder="Defaults to first name" />
+                                    <label class="form-label" for="emp-preferred-name">Preferred Name</label>
+                                    <HrTextBox @bind-Value="Model.PreferredName" Placeholder="Defaults to first name" HtmlAttributes="@Aria("emp-preferred-name", "PreferredName")" />
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Date of Birth <span class="text-danger">*</span></label>
-                                    <SfDatePicker TValue="DateOnly?" @bind-Value="Model.DateOfBirth" Placeholder="dd/mm/yyyy" Format="dd/MM/yyyy" />
-                                    <ValidationMessage For="@(() => Model.DateOfBirth)" />
+                                    <label class="form-label" for="emp-date-of-birth">Date of Birth <span class="text-danger" aria-hidden="true">*</span></label>
+                                    <SfDatePicker TValue="DateOnly?" @bind-Value="Model.DateOfBirth" Placeholder="dd/mm/yyyy" Format="dd/MM/yyyy" HtmlAttributes="@Aria("emp-date-of-birth", "DateOfBirth", true)" />
+                                    <ValidationMessage For="@(() => Model.DateOfBirth)" id="emp-date-of-birth-error" />
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Nationality <span class="text-danger">*</span></label>
+                                    <label class="form-label" for="emp-nationality">Nationality <span class="text-danger" aria-hidden="true">*</span></label>
                                     <SfDropDownList TValue="string"
                                                     TItem="NationalityListItem"
                                                     DataSource="@_nationalities"
                                                     @bind-Value="Model.Nationality"
                                                     Placeholder="Select nationality"
-                                                    AllowFiltering="true">
+                                                    AllowFiltering="true" HtmlAttributes="@Aria("emp-nationality", "Nationality", true)">
                                         <DropDownListFieldSettings Value="Name" Text="Name" />
                                     </SfDropDownList>
-                                    <ValidationMessage For="@(() => Model.Nationality)" />
+                                    <ValidationMessage For="@(() => Model.Nationality)" id="emp-nationality-error" />
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Gender <span class="text-danger">*</span></label>
+                                    <label class="form-label" for="emp-gender">Gender <span class="text-danger" aria-hidden="true">*</span></label>
                                     <SfDropDownList TValue="string"
                                                     TItem="string"
                                                     DataSource="@_genderOptions"
                                                     @bind-Value="Model.Gender"
-                                                    Placeholder="Select gender">
+                                                    Placeholder="Select gender" HtmlAttributes="@Aria("emp-gender", "Gender", true)">
                                     </SfDropDownList>
-                                    <ValidationMessage For="@(() => Model.Gender)" />
+                                    <ValidationMessage For="@(() => Model.Gender)" id="emp-gender-error" />
                                     @if (Model.Gender == "Other")
                                     {
                                         <div class="mt-2">
-                                            <HrTextBox @bind-Value="Model.GenderOther" Placeholder="Please specify" />
+                                            <label class="visually-hidden" for="emp-gender-other">Gender (please specify)</label>
+                                            <HrTextBox @bind-Value="Model.GenderOther" Placeholder="Please specify" HtmlAttributes="@Aria("emp-gender-other", "GenderOther")" />
                                         </div>
                                     }
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Work Email <span class="text-danger">*</span></label>
-                                    <HrTextBox @bind-Value="Model.WorkEmail" Placeholder="work@company.com" />
-                                    <ValidationMessage For="@(() => Model.WorkEmail)" />
+                                    <label class="form-label" for="emp-work-email">Work Email <span class="text-danger" aria-hidden="true">*</span></label>
+                                    <HrTextBox @bind-Value="Model.WorkEmail" Placeholder="work@company.com" HtmlAttributes="@Aria("emp-work-email", "WorkEmail", true)" />
+                                    <ValidationMessage For="@(() => Model.WorkEmail)" id="emp-work-email-error" />
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Personal Email</label>
-                                    <HrTextBox @bind-Value="Model.PersonalEmail" Placeholder="personal@example.com" />
-                                    <ValidationMessage For="@(() => Model.PersonalEmail)" />
+                                    <label class="form-label" for="emp-personal-email">Personal Email</label>
+                                    <HrTextBox @bind-Value="Model.PersonalEmail" Placeholder="personal@example.com" HtmlAttributes="@Aria("emp-personal-email", "PersonalEmail")" />
+                                    <ValidationMessage For="@(() => Model.PersonalEmail)" id="emp-personal-email-error" />
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label">Start Date <span class="text-danger">*</span></label>
-                                    <SfDatePicker TValue="DateOnly" @bind-Value="Model.StartDate" />
+                                    <label class="form-label" for="emp-start-date">Start Date <span class="text-danger" aria-hidden="true">*</span></label>
+                                    <SfDatePicker TValue="DateOnly" @bind-Value="Model.StartDate" HtmlAttributes="@Aria("emp-start-date", "StartDate", true)" />
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label">
+                                    <label class="form-label" for="emp-employee-number">
                                         Employee Number
                                         @if (_companyEmployeeNumberMode != EmployeeNumberMode.Automatic)
                                         {
-                                            <span class="text-danger">*</span>
+                                            <span class="text-danger" aria-hidden="true">*</span>
                                         }
                                     </label>
                                     @if (_companyEmployeeNumberMode == EmployeeNumberMode.Automatic)
@@ -128,70 +129,70 @@
                                     }
                                     else
                                     {
-                                        <HrTextBox @bind-Value="Model.EmployeeNumber" Placeholder="e.g. EMP-001" />
-                                        <ValidationMessage For="@(() => Model.EmployeeNumber)" />
+                                        <HrTextBox @bind-Value="Model.EmployeeNumber" Placeholder="e.g. EMP-001" HtmlAttributes="@Aria("emp-employee-number", "EmployeeNumber", true)" />
+                                        <ValidationMessage For="@(() => Model.EmployeeNumber)" id="emp-employee-number-error" />
                                     }
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label">Employment Type <span class="text-danger">*</span></label>
+                                    <label class="form-label" for="emp-employment-type">Employment Type <span class="text-danger" aria-hidden="true">*</span></label>
                                     <SfDropDownList TValue="Guid?"
                                                     TItem="EmploymentTypeListItemModel"
                                                     DataSource="@_employmentTypes"
                                                     @bind-Value="Model.EmploymentTypeId"
-                                                    Placeholder="Select type">
+                                                    Placeholder="Select type" HtmlAttributes="@Aria("emp-employment-type", "EmploymentTypeId", true)">
                                         <DropDownListFieldSettings Value="Id" Text="Name" />
                                     </SfDropDownList>
-                                    <ValidationMessage For="@(() => Model.EmploymentTypeId)" />
+                                    <ValidationMessage For="@(() => Model.EmploymentTypeId)" id="emp-employment-type-error" />
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label">Department <span class="text-danger">*</span></label>
+                                    <label class="form-label" for="emp-department">Department <span class="text-danger" aria-hidden="true">*</span></label>
                                     <SfDropDownList TValue="Guid?"
                                                     TItem="DepartmentListItemModel"
                                                     DataSource="@_departments"
                                                     @bind-Value="Model.DepartmentId"
                                                     Placeholder="None"
-                                                    AllowFiltering="true">
+                                                    AllowFiltering="true" HtmlAttributes="@Aria("emp-department", "DepartmentId", true)">
                                         <DropDownListFieldSettings Value="Id" Text="Name" />
                                     </SfDropDownList>
-                                    <ValidationMessage For="@(() => Model.DepartmentId)" />
+                                    <ValidationMessage For="@(() => Model.DepartmentId)" id="emp-department-error" />
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label">Position Profile <span class="text-danger">*</span></label>
+                                    <label class="form-label" for="emp-position-profile">Position Profile <span class="text-danger" aria-hidden="true">*</span></label>
                                     <SfDropDownList @ref="_positionProfileDropdown"
                                                     TValue="Guid?"
                                                     TItem="PositionProfileListItemModel"
                                                     DataSource="@_positionProfiles"
                                                     @bind-Value="Model.PositionProfileId"
                                                     Placeholder="None"
-                                                    AllowFiltering="true">
+                                                    AllowFiltering="true" HtmlAttributes="@Aria("emp-position-profile", "PositionProfileId", true)">
                                         <DropDownListFieldSettings Value="Id" Text="DisplayLabel" />
                                         <DropDownListEvents TItem="PositionProfileListItemModel" TValue="Guid?"
                                                             ValueChange="OnPositionProfileChanged"
                                                             Filtering="OnPositionProfileFilteringAsync" />
                                     </SfDropDownList>
-                                    <ValidationMessage For="@(() => Model.PositionProfileId)" />
+                                    <ValidationMessage For="@(() => Model.PositionProfileId)" id="emp-position-profile-error" />
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label">Location <span class="text-danger">*</span></label>
+                                    <label class="form-label" for="emp-location">Location <span class="text-danger" aria-hidden="true">*</span></label>
                                     <SfDropDownList TValue="Guid?"
                                                     TItem="LocationListItemModel"
                                                     DataSource="@_locations"
                                                     @bind-Value="Model.LocationId"
                                                     Placeholder="None"
-                                                    AllowFiltering="true">
+                                                    AllowFiltering="true" HtmlAttributes="@Aria("emp-location", "LocationId", true)">
                                         <DropDownListFieldSettings Value="Id" Text="Name" />
                                     </SfDropDownList>
-                                    <ValidationMessage For="@(() => Model.LocationId)" />
+                                    <ValidationMessage For="@(() => Model.LocationId)" id="emp-location-error" />
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label">Manager</label>
+                                    <label class="form-label" for="emp-manager">Manager</label>
                                     <SfDropDownList @ref="_managerDropdown"
                                                     TValue="Guid?"
                                                     TItem="ManagerOption"
                                                     DataSource="@_managerOptions"
                                                     @bind-Value="Model.ManagerId"
                                                     Placeholder="None"
-                                                    AllowFiltering="true">
+                                                    AllowFiltering="true" HtmlAttributes="@Aria("emp-manager", "ManagerId")">
                                         <DropDownListFieldSettings Value="Id" Text="Name" />
                                         <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnManagerFilteringAsync" />
                                     </SfDropDownList>
@@ -234,35 +235,35 @@
                         <div class="card-body">
                             <div class="row g-3">
                                 <div class="col-12">
-                                    <label class="form-label">Address Line 1</label>
-                                    <HrTextBox @bind-Value="Model.AddressLine1" Placeholder="Street address" />
+                                    <label class="form-label" for="emp-address-line-1">Address Line 1</label>
+                                    <HrTextBox @bind-Value="Model.AddressLine1" Placeholder="Street address" HtmlAttributes="@Aria("emp-address-line-1", "AddressLine1")" />
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label">Address Line 2</label>
-                                    <HrTextBox @bind-Value="Model.AddressLine2" Placeholder="Apartment, suite, etc." />
+                                    <label class="form-label" for="emp-address-line-2">Address Line 2</label>
+                                    <HrTextBox @bind-Value="Model.AddressLine2" Placeholder="Apartment, suite, etc." HtmlAttributes="@Aria("emp-address-line-2", "AddressLine2")" />
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label">City</label>
-                                    <HrTextBox @bind-Value="Model.City" Placeholder="e.g. London" />
+                                    <label class="form-label" for="emp-city">City</label>
+                                    <HrTextBox @bind-Value="Model.City" Placeholder="e.g. London" HtmlAttributes="@Aria("emp-city", "City")" />
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label">County / State</label>
-                                    <HrTextBox @bind-Value="Model.County" Placeholder="e.g. Greater London" />
+                                    <label class="form-label" for="emp-county-state">County / State</label>
+                                    <HrTextBox @bind-Value="Model.County" Placeholder="e.g. Greater London" HtmlAttributes="@Aria("emp-county-state", "County")" />
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label">Post Code</label>
-                                    <HrTextBox @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" />
-                                    <ValidationMessage For="@(() => Model.PostCode)" />
+                                    <label class="form-label" for="emp-post-code">Post Code</label>
+                                    <HrTextBox @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" HtmlAttributes="@Aria("emp-post-code", "PostCode")" />
+                                    <ValidationMessage For="@(() => Model.PostCode)" id="emp-post-code-error" />
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label">Mobile / Work Phone</label>
-                                    <HrTextBox @bind-Value="Model.PhoneNumber" Placeholder="e.g. 07700 900000" />
-                                    <ValidationMessage For="@(() => Model.PhoneNumber)" />
+                                    <label class="form-label" for="emp-mobile-work-phone">Mobile / Work Phone</label>
+                                    <HrTextBox @bind-Value="Model.PhoneNumber" Placeholder="e.g. 07700 900000" HtmlAttributes="@Aria("emp-mobile-work-phone", "PhoneNumber")" />
+                                    <ValidationMessage For="@(() => Model.PhoneNumber)" id="emp-mobile-work-phone-error" />
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label">Home Phone</label>
-                                    <HrTextBox @bind-Value="Model.HomePhone" Placeholder="e.g. 01234 567890" />
-                                    <ValidationMessage For="@(() => Model.HomePhone)" />
+                                    <label class="form-label" for="emp-home-phone">Home Phone</label>
+                                    <HrTextBox @bind-Value="Model.HomePhone" Placeholder="e.g. 01234 567890" HtmlAttributes="@Aria("emp-home-phone", "HomePhone")" />
+                                    <ValidationMessage For="@(() => Model.HomePhone)" id="emp-home-phone-error" />
                                 </div>
                             </div>
                         </div>
@@ -405,26 +406,26 @@
                                         <div class="card-body @(IsViewMode ? "view-mode" : "")">
                                             <div class="row g-3">
                                                 <div class="col-md-6">
-                                                    <label class="form-label">First Name <span class="text-danger">*</span></label>
-                                                    <HrTextBox @bind-Value="Model.FirstName" Placeholder="First name" ReadOnly="@IsViewMode" HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "First Name" })" />
-                                                    <ValidationMessage For="@(() => Model.FirstName)" />
+                                                    <label class="form-label" for="emp-first-name">First Name <span class="text-danger" aria-hidden="true">*</span></label>
+                                                    <HrTextBox @bind-Value="Model.FirstName" Placeholder="First name" ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-first-name", "FirstName", true)" />
+                                                    <ValidationMessage For="@(() => Model.FirstName)" id="emp-first-name-error" />
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <label class="form-label">Last Name <span class="text-danger">*</span></label>
-                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Last Name" })" @bind-Value="Model.LastName" Placeholder="Last name" ReadOnly="@IsViewMode" />
-                                                    <ValidationMessage For="@(() => Model.LastName)" />
+                                                    <label class="form-label" for="emp-last-name">Last Name <span class="text-danger" aria-hidden="true">*</span></label>
+                                                    <HrTextBox @bind-Value="Model.LastName" Placeholder="Last name" ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-last-name", "LastName", true)" />
+                                                    <ValidationMessage For="@(() => Model.LastName)" id="emp-last-name-error" />
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <label class="form-label">Preferred Name</label>
-                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Preferred Name" })" @bind-Value="Model.PreferredName" Placeholder="Defaults to first name" ReadOnly="@IsViewMode" />
+                                                    <label class="form-label" for="emp-preferred-name">Preferred Name</label>
+                                                    <HrTextBox @bind-Value="Model.PreferredName" Placeholder="Defaults to first name" ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-preferred-name", "PreferredName")" />
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <label class="form-label" for="employee-dob">Date of Birth <span class="text-danger">*</span></label>
-                                                    <SfDatePicker ID="employee-dob" TValue="DateOnly?" @bind-Value="Model.DateOfBirth" Placeholder="dd/mm/yyyy" Format="dd/MM/yyyy" Enabled="@(!IsViewMode)" />
-                                                    <ValidationMessage For="@(() => Model.DateOfBirth)" />
+                                                    <label class="form-label" for="employee-dob">Date of Birth <span class="text-danger" aria-hidden="true">*</span></label>
+                                                    <SfDatePicker ID="employee-dob" TValue="DateOnly?" @bind-Value="Model.DateOfBirth" Placeholder="dd/mm/yyyy" Format="dd/MM/yyyy" Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("employee-dob", "DateOfBirth", true, false)" />
+                                                    <ValidationMessage For="@(() => Model.DateOfBirth)" id="employee-dob-error" />
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <label class="form-label" for="employee-nationality">Nationality <span class="text-danger">*</span></label>
+                                                    <label class="form-label" for="employee-nationality">Nationality <span class="text-danger" aria-hidden="true">*</span></label>
                                                     <SfDropDownList ID="employee-nationality"
                                                                     TValue="string"
                                                                     TItem="NationalityListItem"
@@ -432,38 +433,39 @@
                                                                     @bind-Value="Model.Nationality"
                                                                     Placeholder="Select nationality"
                                                                     AllowFiltering="true"
-                                                                    Enabled="@(!IsViewMode)">
+                                                                    Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("employee-nationality", "Nationality", true, false)">
                                                         <DropDownListFieldSettings Value="Name" Text="Name" />
                                                     </SfDropDownList>
-                                                    <ValidationMessage For="@(() => Model.Nationality)" />
+                                                    <ValidationMessage For="@(() => Model.Nationality)" id="employee-nationality-error" />
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <label class="form-label" for="employee-gender">Gender <span class="text-danger">*</span></label>
+                                                    <label class="form-label" for="employee-gender">Gender <span class="text-danger" aria-hidden="true">*</span></label>
                                                     <SfDropDownList ID="employee-gender"
                                                                     TValue="string"
                                                                     TItem="string"
                                                                     DataSource="@_genderOptions"
                                                                     @bind-Value="Model.Gender"
                                                                     Placeholder="Select gender"
-                                                                    Enabled="@(!IsViewMode)">
+                                                                    Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("employee-gender", "Gender", true, false)">
                                                     </SfDropDownList>
-                                                    <ValidationMessage For="@(() => Model.Gender)" />
+                                                    <ValidationMessage For="@(() => Model.Gender)" id="employee-gender-error" />
                                                     @if (Model.Gender == "Other")
                                                     {
                                                         <div class="mt-2">
-                                                            <HrTextBox @bind-Value="Model.GenderOther" Placeholder="Please specify" ReadOnly="@IsViewMode" />
+                                                            <label class="visually-hidden" for="emp-gender-other">Gender (please specify)</label>
+                                                            <HrTextBox @bind-Value="Model.GenderOther" Placeholder="Please specify" ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-gender-other", "GenderOther")" />
                                                         </div>
                                                     }
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <label class="form-label">Work Email <span class="text-danger">*</span></label>
-                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Work Email" })" @bind-Value="Model.WorkEmail" Placeholder="work@company.com" ReadOnly="@IsViewMode" />
-                                                    <ValidationMessage For="@(() => Model.WorkEmail)" />
+                                                    <label class="form-label" for="emp-work-email">Work Email <span class="text-danger" aria-hidden="true">*</span></label>
+                                                    <HrTextBox @bind-Value="Model.WorkEmail" Placeholder="work@company.com" ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-work-email", "WorkEmail", true)" />
+                                                    <ValidationMessage For="@(() => Model.WorkEmail)" id="emp-work-email-error" />
                                                 </div>
                                                 <div class="col-md-6">
-                                                    <label class="form-label">Personal Email</label>
-                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Personal Email" })" @bind-Value="Model.PersonalEmail" Placeholder="personal@example.com" ReadOnly="@IsViewMode" />
-                                                    <ValidationMessage For="@(() => Model.PersonalEmail)" />
+                                                    <label class="form-label" for="emp-personal-email">Personal Email</label>
+                                                    <HrTextBox @bind-Value="Model.PersonalEmail" Placeholder="personal@example.com" ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-personal-email", "PersonalEmail")" />
+                                                    <ValidationMessage For="@(() => Model.PersonalEmail)" id="emp-personal-email-error" />
                                                 </div>
                                             </div>
                                         </div>
@@ -476,35 +478,35 @@
                                         <div class="card-body @(IsViewMode ? "view-mode" : "")">
                                             <div class="row g-3">
                                                 <div class="col-12">
-                                                    <label class="form-label">Address Line 1</label>
-                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Address Line 1" })" @bind-Value="Model.AddressLine1" Placeholder="Street address" ReadOnly="@IsViewMode" />
+                                                    <label class="form-label" for="emp-address-line-1">Address Line 1</label>
+                                                    <HrTextBox @bind-Value="Model.AddressLine1" Placeholder="Street address" ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-address-line-1", "AddressLine1")" />
                                                 </div>
                                                 <div class="col-12">
-                                                    <label class="form-label">Address Line 2</label>
-                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Address Line 2" })" @bind-Value="Model.AddressLine2" Placeholder="Apartment, suite, etc." ReadOnly="@IsViewMode" />
+                                                    <label class="form-label" for="emp-address-line-2">Address Line 2</label>
+                                                    <HrTextBox @bind-Value="Model.AddressLine2" Placeholder="Apartment, suite, etc." ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-address-line-2", "AddressLine2")" />
                                                 </div>
                                                 <div class="col-md-4">
-                                                    <label class="form-label">City</label>
-                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "City" })" @bind-Value="Model.City" Placeholder="e.g. London" ReadOnly="@IsViewMode" />
+                                                    <label class="form-label" for="emp-city">City</label>
+                                                    <HrTextBox @bind-Value="Model.City" Placeholder="e.g. London" ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-city", "City")" />
                                                 </div>
                                                 <div class="col-md-4">
-                                                    <label class="form-label">County / State</label>
-                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "County / State" })" @bind-Value="Model.County" Placeholder="e.g. Greater London" ReadOnly="@IsViewMode" />
+                                                    <label class="form-label" for="emp-county-state">County / State</label>
+                                                    <HrTextBox @bind-Value="Model.County" Placeholder="e.g. Greater London" ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-county-state", "County")" />
                                                 </div>
                                                 <div class="col-md-4">
-                                                    <label class="form-label">Post Code</label>
-                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Post Code" })" @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" ReadOnly="@IsViewMode" />
-                                                    <ValidationMessage For="@(() => Model.PostCode)" />
+                                                    <label class="form-label" for="emp-post-code">Post Code</label>
+                                                    <HrTextBox @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-post-code", "PostCode")" />
+                                                    <ValidationMessage For="@(() => Model.PostCode)" id="emp-post-code-error" />
                                                 </div>
                                                 <div class="col-12">
-                                                    <label class="form-label">Mobile / Work Phone</label>
-                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Mobile / Work Phone" })" @bind-Value="Model.PhoneNumber" Placeholder="e.g. 07700 900000" ReadOnly="@IsViewMode" />
-                                                    <ValidationMessage For="@(() => Model.PhoneNumber)" />
+                                                    <label class="form-label" for="emp-mobile-work-phone">Mobile / Work Phone</label>
+                                                    <HrTextBox @bind-Value="Model.PhoneNumber" Placeholder="e.g. 07700 900000" ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-mobile-work-phone", "PhoneNumber")" />
+                                                    <ValidationMessage For="@(() => Model.PhoneNumber)" id="emp-mobile-work-phone-error" />
                                                 </div>
                                                 <div class="col-12">
-                                                    <label class="form-label">Home Phone</label>
-                                                    <HrTextBox HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Home Phone" })" @bind-Value="Model.HomePhone" Placeholder="e.g. 01234 567890" ReadOnly="@IsViewMode" />
-                                                    <ValidationMessage For="@(() => Model.HomePhone)" />
+                                                    <label class="form-label" for="emp-home-phone">Home Phone</label>
+                                                    <HrTextBox @bind-Value="Model.HomePhone" Placeholder="e.g. 01234 567890" ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-home-phone", "HomePhone")" />
+                                                    <ValidationMessage For="@(() => Model.HomePhone)" id="emp-home-phone-error" />
                                                 </div>
                                             </div>
                                         </div>

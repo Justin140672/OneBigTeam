@@ -39,8 +39,8 @@
                                 <div class="card-body">
                                     <div class="row g-4">
                                         <div class="col-12">
-                                            <label class="form-label fw-semibold"><span>Working Week</span> <span class="text-danger">*</span></label>
-                                            <div class="d-flex flex-wrap gap-3 mt-1">
+                                            <span id="working-week-label" class="form-label fw-semibold d-block"><span>Working Week</span> <span class="text-danger" aria-hidden="true">*</span><span class="visually-hidden">(required)</span></span>
+                                            <div class="d-flex flex-wrap gap-3 mt-1" role="group" aria-labelledby="working-week-label">
                                                 @foreach (var day in AllDays)
                                                 {
                                                     <SfCheckBox TChecked="bool" Disabled="@Session.IsReadOnly" Label="@day"

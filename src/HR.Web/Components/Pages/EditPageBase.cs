@@ -1,9 +1,11 @@
+using HR.Web.Components.Controls;
 using System.Reflection;
 using System.Text.Json;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.JSInterop;
 using HR.SharedKernel.Http;
 using HR.SharedKernel.Idempotency;
 using HR.Web.Services;
@@ -14,6 +16,19 @@ public abstract class EditPageBase : ComponentBase, IDisposable
 {
     [Inject] protected NavigationManager Navigation { get; set; } = default!;
     [Inject] protected AppSession ReadOnlyAppSession { get; set; } = default!;
+    [Inject] protected IJSRuntime FocusJsRuntime { get; set; } = default!;
+
+    protected virtual string? InvalidFieldFocusScope => null;
+
+    private bool _focusInvalidPending;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_focusInvalidPending) return;
+        _focusInvalidPending = false;
+        if (InvalidFieldFocusScope is { } scope)
+            await FocusJsRuntime.InvokeVoidAsync("hrFocusFirstInvalid", scope);
+    }
 
     protected bool IsSubscriptionReadOnly => ReadOnlyAppSession.IsReadOnly;
 
@@ -160,6 +175,7 @@ public abstract class EditPageBase : ComponentBase, IDisposable
         if (!Validate())
         {
             GlobalError = "Please correct the highlighted fields below.";
+            _focusInvalidPending = true;
             return;
         }
 
@@ -307,6 +323,9 @@ public abstract class EditPageBase<TModel> : EditPageBase where TModel : class, 
 {
     protected TModel Model { get; } = new();
     protected EditContext EditContext { get; private set; } = default!;
+
+    protected Dictionary<string, object> Aria(string id, string? property, bool required = false, bool emitId = true) =>
+        FieldAria.Build(EditContext, Model, id, property, required, emitId);
 
     private string? _baselineSnapshot;
 

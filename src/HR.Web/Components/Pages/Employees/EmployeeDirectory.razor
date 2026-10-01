@@ -14,14 +14,18 @@
         <p class="text-muted mb-4">Find colleagues across the organisation.</p>
 
         <div class="directory-filters">
+            <label for="directory-search-input" class="visually-hidden">Search the employee directory</label>
             <SfTextBox @bind-Value="_search"
                        Placeholder="Search by name…"
+                       HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "directory-search-input" })"
                        CssClass="directory-search-box"
                        data-testid="directory-search"
                        ValueChange="OnSearchChanged" />
 
+            <label for="directory-department-filter" class="visually-hidden">Filter by department</label>
             <SfDropDownList TValue="string" TItem="FilterOption"
                             DataSource="_departmentOptions"
+                            HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "directory-department-filter" })"
                             @bind-Value="_departmentValue"
                             AllowFiltering="true"
                             CssClass="directory-filter">
@@ -29,8 +33,10 @@
                 <DropDownListEvents TValue="string" TItem="FilterOption" ValueChange="OnFilterChanged" />
             </SfDropDownList>
 
+            <label for="directory-location-filter" class="visually-hidden">Filter by location</label>
             <SfDropDownList TValue="string" TItem="FilterOption"
                             DataSource="_locationOptions"
+                            HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "directory-location-filter" })"
                             @bind-Value="_locationValue"
                             AllowFiltering="true"
                             CssClass="directory-filter">

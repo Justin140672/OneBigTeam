@@ -1,3 +1,4 @@
+using HR.Web.Components.Controls;
 using System.Reflection;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
@@ -13,6 +14,9 @@ public abstract class EditSectionBase<TModel> : ComponentBase, IDisposable where
 
     protected TModel Model { get; } = new();
     protected EditContext EditContext { get; private set; } = default!;
+
+    protected Dictionary<string, object> Aria(string id, string? property, bool required = false, bool emitId = true) =>
+        FieldAria.Build(EditContext, Model, id, property, required, emitId);
 
     protected bool IsLoading { get; set; } = true;
     protected string? GlobalError { get; set; }

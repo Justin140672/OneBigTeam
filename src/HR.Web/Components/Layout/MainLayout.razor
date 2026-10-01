@@ -77,14 +77,14 @@ else
                                 <MenuItem Text="Recruitment Stages" IconCss="fa-solid fa-gear" Url="@_menuItems["RecruitmentStages"]" />
                                 @if (IsRecruiterOnly && Session.CanViewReporting)
                                 {
-                                    <MenuItem Text="Reporting" IconCss="fa-solid fa-chart-column" Url="@_menuItems["Reporting"]" />
+                                    <MenuItem Text="Reports" IconCss="fa-solid fa-chart-column" Url="@_menuItems["Reporting"]" />
                                 }
                             }
                             @if (!IsRecruiterOnly)
                             {
                                 @foreach (var section in _adminSections)
                                 {
-                                    @if (section.Group == AdminNavGroup.CompanyAdministration)
+                                    @if (section.Group is AdminNavGroup.CompanyAdministration or AdminNavGroup.Reports)
                                     {
                                         @* Company administration never holds more than a couple of destinations
                                            (Company Profile & Addresses, Subscription & Billing) — for a Company
@@ -257,7 +257,7 @@ else
                         <a href="/companies/@Session.CompanyId/employees/@Session.EmployeeId/profile" class="top-bar-user">
                             @if (Session.ProfileImageUrl is not null)
                             {
-                                <img src="@Session.ProfileImageUrl" alt="@Session.DisplayName" class="top-bar-avatar" />
+                                <img src="@Session.ProfileImageUrl" alt="" class="top-bar-avatar" />
                             }
                             else
                             {
@@ -281,8 +281,10 @@ else
                     @if (Env.IsDevelopment())
                     {
                         <div class="dev-persona-switcher">
+                            <label for="dev-persona-select" class="visually-hidden">Switch user</label>
                             <SfDropDownList TValue="string?" TItem="PersonaOption"
                                             CssClass="dev-persona-select"
+                                            HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "dev-persona-select" })"
                                             DataSource="@_personaOptions"
                                             Placeholder="Switch user…"
                                             ValueChanged="OnPersonaSwitchAsync">

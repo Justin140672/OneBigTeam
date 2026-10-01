@@ -15,9 +15,11 @@
     </div>
 
     <div class="mb-3 col-md-4 px-0">
+        <label for="user-admin-search" class="visually-hidden">Search users</label>
         <HrTextBox Value="@SearchTerm"
                    ValueChanged="@OnSearchChanged"
-                   Placeholder="Search by name or email" />
+                   Placeholder="Search by name or email"
+                   HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "user-admin-search" })" />
     </div>
 
     @if (IsLoading)

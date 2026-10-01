@@ -59,10 +59,12 @@
     {
         <div class="employee-list-controls mb-2">
         <div class="employee-search-wrap">
+            <label for="employee-list-search" class="visually-hidden">Search employees</label>
             <HrTextBox Value="@SearchTerm"
                        ValueChanged="@OnSearchChanged"
                        CssClass="employee-search-input"
-                       Placeholder="Search by name, email or employee number" />
+                       Placeholder="Search by name, email or employee number"
+                       HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "employee-list-search" })" />
             @if (!string.IsNullOrEmpty(SearchTerm))
             {
                 <button type="button"
@@ -357,7 +359,7 @@
 
     protected override async Task OnBeforeLoadAsync()
     {
-        if (!Session.CanReadEmployees)
+        if (!Session.CanManageEmployees)
         {
             Navigation.NavigateTo("/access-denied", replace: true);
             return;
