@@ -127,7 +127,7 @@ public sealed class WorkloadActionsReportTests(HrAdminPersonaFixture fixture) : 
         await report.GoToAsync(AcmeId);
 
         await report.SelectGroupByAsync("Action Type");
-        await report.ApplyFiltersAsync();
+        await report.WaitForLoadedAsync();
 
         Assert.False(await report.HasLoadErrorAsync(),
             "Expected the grid to reload without an error banner after applying Group By");

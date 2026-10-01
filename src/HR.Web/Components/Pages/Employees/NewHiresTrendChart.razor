@@ -23,42 +23,41 @@
             }
             else
             {
-                <SfChart Title="" Height="280px" Background="transparent">
-                    <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category">
-                        <ChartAxisLabelStyle FontFamily="Inter, Helvetica Neue, Helvetica, Arial, sans-serif"></ChartAxisLabelStyle>
-                    </ChartPrimaryXAxis>
-                    <ChartPrimaryYAxis Minimum="0">
-                        <ChartAxisLabelStyle FontFamily="Inter, Helvetica Neue, Helvetica, Arial, sans-serif"></ChartAxisLabelStyle>
-                    </ChartPrimaryYAxis>
-                    <ChartTooltipSettings Enable="true"></ChartTooltipSettings>
-                    <ChartSeriesCollection>
-                        <ChartSeries DataSource="@_data"
-                                     XName="@nameof(TrendPoint.MonthLabel)"
-                                     YName="@nameof(TrendPoint.NewHireCount)"
-                                     Type="ChartSeriesType.Column"
-                                     Fill="#0f766e">
-                        </ChartSeries>
-                    </ChartSeriesCollection>
-                </SfChart>
+                <div role="img" aria-label="New hires per month, last six months"
+                     aria-describedby="@_summaryId" data-testid="new-hires-chart">
+                    <SfChart Title="" Height="280px" Background="transparent">
+                        <ChartPrimaryXAxis ValueType="Syncfusion.Blazor.Charts.ValueType.Category">
+                            <ChartAxisLabelStyle FontFamily="Inter, Helvetica Neue, Helvetica, Arial, sans-serif"></ChartAxisLabelStyle>
+                        </ChartPrimaryXAxis>
+                        <ChartPrimaryYAxis Minimum="0">
+                            <ChartAxisLabelStyle FontFamily="Inter, Helvetica Neue, Helvetica, Arial, sans-serif"></ChartAxisLabelStyle>
+                        </ChartPrimaryYAxis>
+                        <ChartTooltipSettings Enable="true"></ChartTooltipSettings>
+                        <ChartSeriesCollection>
+                            <ChartSeries DataSource="@_data"
+                                         XName="@nameof(TrendPoint.MonthLabel)"
+                                         YName="@nameof(TrendPoint.NewHireCount)"
+                                         Type="ChartSeriesType.Column"
+                                         Fill="#0f766e">
+                                <ChartMarker>
+                                    <ChartDataLabel Visible="true" Position="Syncfusion.Blazor.Charts.LabelPosition.Outer">
+                                        <ChartDataLabelFont FontFamily="Inter, Helvetica Neue, Helvetica, Arial, sans-serif" />
+                                    </ChartDataLabel>
+                                </ChartMarker>
+                            </ChartSeries>
+                        </ChartSeriesCollection>
+                    </SfChart>
+                </div>
 
-                @* DSH-07: text alternative for the Syncfusion column chart (SVG has no accessible data). *@
-                <details class="chart-data-table">
-                    <summary>View new-hire trend as a table</summary>
-                    <div class="dashboard-scroll-x">
-                        <table>
-                            <caption>New hires by month (last 6 months)</caption>
-                            <thead>
-                                <tr><th scope="col">Month</th><th scope="col">New hires</th></tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var point in _data)
-                                {
-                                    <tr><td>@point.MonthLabel</td><td>@point.NewHireCount</td></tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                </details>
+                <p id="@_summaryId" class="visually-hidden">@Summary</p>
+
+                <ChartDataTableToggle TestIdPrefix="new-hires"
+                                      ShowText="View new-hire trend as a table"
+                                      HideText="Hide new-hire trend table"
+                                      Caption="New hires by month (last 6 months)"
+                                      CategoryHeader="Month"
+                                      ValueHeader="New hires"
+                                      Rows="@_data.Select(p => new ChartDataTableToggle.ChartDataRow(p.MonthLabel, p.NewHireCount))" />
             }
         </div>
     </div>
@@ -83,6 +82,13 @@
 
         _loading = false;
     }
+
+    private readonly string _summaryId = $"new-hires-summary-{Guid.NewGuid():N}";
+
+    private string Summary =>
+        "New hires per month, last six months: " +
+        string.Join(", ", _data.Select(p => $"{p.MonthLabel} {p.NewHireCount}")) +
+        $". Total {_data.Sum(p => p.NewHireCount)} new hires.";
 
     private sealed record TrendPoint(string MonthLabel, int NewHireCount);
 }

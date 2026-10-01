@@ -103,7 +103,7 @@ public sealed class HrDashboardAttentionQueueSummaryTests(HrAdminPersonaFixture 
 
         var badge = await dashboard.GetAttentionQueueCountBadgeAsync();
         Assert.True(badge > 0, "Expected the count badge to show a positive number when rows are present.");
-        Assert.Equal(rowCount, badge);
+        Assert.True(badge >= rowCount, $"Count badge ({badge}) is the real actionable total and must not be below the rendered rows ({rowCount}); rows are capped per category.");
     }
 
     [Fact]
@@ -113,7 +113,7 @@ public sealed class HrDashboardAttentionQueueSummaryTests(HrAdminPersonaFixture 
         var task      = new TaskViewPage(_page, _fixture.WebBaseUrl);
 
         await LoginAndOpenAsync();
-        await dashboard.ClickTaskBackedAttentionQueueItemAsync("Carlos Rivera");
+        await dashboard.ClickFirstTaskBackedAttentionQueueItemAsync();
 
         await task.WaitForLoadedAsync();
         Assert.Contains("/dashboard/hr", _page.Url);
@@ -288,7 +288,7 @@ public sealed class ManagerDashboardAttentionQueueSummaryTests(ManagerPersonaFix
 
         var badge = await dashboard.GetAttentionQueueCountBadgeAsync();
         Assert.True(badge > 0);
-        Assert.Equal(rowCount, badge);
+        Assert.True(badge >= rowCount, $"Count badge ({badge}) must not be below the rendered rows ({rowCount}).");
     }
 
     [Fact]

@@ -114,7 +114,7 @@ public static class PageTitleResolver
                 return "Task";
             case "reporting":
                 if (s.Length == 1)
-                    return "Reporting";
+                    return "Reports";
                 return ReportTitles.TryGetValue(s[1], out var report) ? report : "Report";
             case "support":
                 if (s.Length == 1)

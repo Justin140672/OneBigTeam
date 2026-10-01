@@ -10,12 +10,12 @@
     <DialogEvents Closed="HandleClosed" />
     <DialogTemplates>
         <Header>Unsaved Changes</Header>
-        <Content>You have unsaved changes. Do you want to save them before leaving?</Content>
+        <Content>@Message</Content>
         <FooterTemplate>
             @* Footer order matches the other shared dialogs: least-committal action first,
                primary/confirming action ("Save") rightmost. *@
-            <SfButton Disabled="_busy" OnClick="HandleCancelClicked">Cancel</SfButton>
-            <SfButton CssClass="e-danger e-outline" Disabled="_busy" OnClick="HandleDiscardClicked">Discard Changes</SfButton>
+            <SfButton Disabled="_busy" OnClick="HandleCancelClicked">@StayText</SfButton>
+            <SfButton CssClass="e-danger e-outline" Disabled="_busy" OnClick="HandleDiscardClicked">@DiscardText</SfButton>
             <SfButton IsPrimary="true" Disabled="_busy" OnClick="HandleSaveClicked">
                 @if (_busy)
                 {
@@ -29,6 +29,9 @@
 
 @code {
     [Parameter] public bool Visible { get; set; }
+    [Parameter] public string Message { get; set; } = "You have unsaved changes. Do you want to save them before leaving?";
+    [Parameter] public string StayText { get; set; } = "Cancel";
+    [Parameter] public string DiscardText { get; set; } = "Discard Changes";
     [Parameter] public EventCallback OnSaveAndClose { get; set; }
     [Parameter] public EventCallback OnDiscard { get; set; }
     [Parameter] public EventCallback OnCancel { get; set; }

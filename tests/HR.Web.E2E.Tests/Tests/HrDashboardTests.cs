@@ -75,7 +75,7 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
 
 
     [Fact]
-    public async Task AttentionQueue_ShowsCarlosRivera_ProbationReview()
+    public async Task WaitingOnOthers_ShowsCarlosRivera_ProbationReview_OwnedByManager()
     {
         var login     = new LoginPage(_page, _fixture.WebBaseUrl);
         var dashboard = new HrDashboardPage(_page, _fixture.WebBaseUrl);
@@ -83,17 +83,15 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
         await dashboard.GoToAsync();
+        await dashboard.WaitForAttentionQueueLoadedAsync();
 
-        var employeeNames = await dashboard.GetAttentionQueueEmployeeNamesAsync();
-
-        Assert.True(
-            employeeNames.Any(n => n.Contains("Carlos", StringComparison.OrdinalIgnoreCase)),
-            $"Expected 'Carlos Rivera' to appear in the attention queue. " +
-            $"Meta text found: [{string.Join(", ", employeeNames)}]");
+        var carlosRow = _page.GetByTestId("waiting-on-others").Locator(".waiting-item").Filter(new() { HasText = "Carlos" });
+        await Assertions.Expect(carlosRow.First).ToBeVisibleAsync();
+        await Assertions.Expect(carlosRow.First.Locator(".waiting-owner")).ToContainTextAsync("Responsible:");
     }
 
     [Fact]
-    public async Task ClickingAttentionQueueProbationReviewItem_OpensReviewTaskDialog()
+    public async Task ClickingAttentionQueueTaskBackedItem_OpensTaskDialog()
     {
         var login     = new LoginPage(_page, _fixture.WebBaseUrl);
         var dashboard = new HrDashboardPage(_page, _fixture.WebBaseUrl);
@@ -103,13 +101,11 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
         await login.LoginAsync(LauraEmail);
         await dashboard.GoToAsync();
 
-        await dashboard.ClickTaskBackedAttentionQueueItemAsync("Carlos Rivera");
+        await dashboard.ClickFirstTaskBackedAttentionQueueItemAsync();
 
         await task.WaitForLoadedAsync();
         Assert.Contains("/dashboard/hr", _page.Url);
-
-        var title = await task.GetTitleAsync();
-        Assert.Contains("Carlos", title, StringComparison.OrdinalIgnoreCase);
+        Assert.False(string.IsNullOrWhiteSpace(await task.GetTitleAsync()));
     }
 
     [Fact]

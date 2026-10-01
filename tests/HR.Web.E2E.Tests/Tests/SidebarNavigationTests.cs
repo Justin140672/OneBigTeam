@@ -36,7 +36,7 @@ public sealed class SidebarNavigationTests(ParallelBlankPersonaFixture fixture)
         Assert.True(await sidebar.HasTopLevelMenuItemAsync("Candidates"));
         Assert.True(await sidebar.HasTopLevelMenuItemAsync("Recruiters"));
         Assert.True(await sidebar.HasTopLevelMenuItemAsync("Recruitment Stages"));
-        Assert.True(await sidebar.HasTopLevelMenuItemAsync("Reporting"));
+        Assert.True(await sidebar.HasTopLevelMenuItemAsync("Reports"));
         Assert.False(await sidebar.HasTopLevelMenuItemAsync("People and users"));
         Assert.False(await sidebar.HasTopLevelMenuItemAsync("Company"));
         Assert.False(await sidebar.HasTopLevelMenuItemAsync("HR configuration"));

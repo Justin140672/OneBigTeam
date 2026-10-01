@@ -10,7 +10,17 @@
     <HubBreadcrumb CompanyId="@CompanyId" CurrentPage="Recruitment Stages" />
     <a href="/dashboard/recruitment" class="text-decoration-none text-muted small">← Recruitment Dashboard</a>
     <h1 class="mb-1">Recruitment Stages</h1>
-    <p class="text-muted mb-3">Configure the pipeline stages candidates move through, and mark which stages represent a Hired or Rejected outcome.</p>
+    <p class="text-muted mb-3">Set up the steps candidates move through, including when they are hired or rejected.</p>
+
+    <div class="mb-3 col-md-4 px-0">
+        <label for="recruitment-stage-search" class="visually-hidden">Search recruitment stages</label>
+        <HrTextBox Value="@SearchTerm"
+                   ValueChanged="@OnSearchChanged"
+                   Placeholder="Search recruitment stages"
+                   HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "recruitment-stage-search", ["aria-label"] = "Search recruitment stages" })"
+                   data-testid="recruitment-stage-search" />
+        <SearchResultsAnnouncer Count="@Items.Count" Noun="stage" />
+    </div>
 
     @if (IsLoading)
     {
@@ -24,9 +34,9 @@
     {
         @if (ActionError is not null)
         {
-            <div class="alert alert-danger alert-dismissible">
+            <div class="alert alert-danger alert-dismissible" role="alert">
                 @ActionError
-                <button type="button" class="btn-close" @onclick="ClearActionError"></button>
+                <button type="button" class="btn-close" aria-label="Dismiss error" @onclick="ClearActionError"></button>
             </div>
         }
 
@@ -86,14 +96,16 @@
                             var row = (context as RecruitmentStageListItem)!;
                         }
                         <SfButton CssClass="e-outline e-small me-1"
-                                Disabled="@(row.DisplayOrder <= 1 || Session.IsReadOnly)"
-                                OnClick="() => MoveUpAsync(row)" title="Move up">
-                            <i class="fa-solid fa-arrow-up"></i>
+                                  Disabled="@(row.DisplayOrder <= 1 || Session.IsReadOnly)"
+                                  OnClick="() => MoveUpAsync(row)"
+                                  HtmlAttributes="@MoveAttributes(row, "up")">
+                            <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
                         </SfButton>
                         <SfButton CssClass="e-outline e-small"
-                                Disabled="@(row.DisplayOrder >= Items.Count || Session.IsReadOnly)"
-                                OnClick="() => MoveDownAsync(row)" title="Move down">
-                            <i class="fa-solid fa-arrow-down"></i>
+                                  Disabled="@(row.DisplayOrder >= Items.Count || Session.IsReadOnly)"
+                                  OnClick="() => MoveDownAsync(row)"
+                                  HtmlAttributes="@MoveAttributes(row, "down")">
+                            <i class="fa-solid fa-arrow-down" aria-hidden="true"></i>
                         </SfButton>
                     </Template>
                 </GridColumn>
@@ -146,6 +158,12 @@
                  OnCancelled="@(() => _simpleDeactivateTarget = null)" />
 
 @code {
+    private static Dictionary<string, object> MoveAttributes(RecruitmentStageListItem row, string direction) => new()
+    {
+        ["aria-label"] = $"Move {row.Name} {direction}",
+        ["title"] = $"Move {direction}",
+    };
+
     private bool _deactivateConfirmOpen;
     private bool _deactivating;
     private RecruitmentStageListItem? _deactivateTarget;
@@ -192,7 +210,10 @@
         if (items is null) return null;
 
         var ordered = items.OrderBy(i => i.DisplayOrder).ToList();
-        return ShowInactive ? ordered : ordered.Where(i => i.IsActive).ToList();
+        var visible = ShowInactive ? ordered : ordered.Where(i => i.IsActive).ToList();
+        return string.IsNullOrWhiteSpace(search)
+            ? visible
+            : visible.Where(i => i.Name.Contains(search.Trim(), StringComparison.OrdinalIgnoreCase)).ToList();
     }
 
     protected override string LoadErrorMessage => "Failed to load recruitment stages.";

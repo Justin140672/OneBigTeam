@@ -32,7 +32,8 @@ internal static class ReportCatalog
         ReportAccessGate AccessGate,
         Type RequestType,
         ReportSensitivity Sensitivity,
-        IReadOnlyDictionary<string, IReadOnlyCollection<string>?>? FieldOverrides = null);
+        IReadOnlyDictionary<string, IReadOnlyCollection<string>?>? FieldOverrides = null,
+        bool ManagerReport = false);
 
     private static readonly IReadOnlyList<Entry> Entries =
     [
@@ -58,7 +59,8 @@ internal static class ReportCatalog
 
         new("leave-summary", "Leave Summary Report", ReportCategory.Hr,
             "Entitlement, booked, approved, remaining balance and pending requests, grouped by employee, department or leave type.",
-            ReportAccessGate.LeaveSummary, typeof(GetLeaveSummaryReportRequest), ReportSensitivity.Sensitive),
+            ReportAccessGate.LeaveSummary, typeof(GetLeaveSummaryReportRequest), ReportSensitivity.Sensitive,
+            ManagerReport: true),
 
         new("leave-calendar", "Leave Calendar Export", ReportCategory.Hr,
             "Employee leave calendar for a given month, filterable by department — export-oriented.",
@@ -78,11 +80,13 @@ internal static class ReportCatalog
 
         new("probation-report", "Probation Report", ReportCategory.Hr,
             "Current probation, due and overdue reviews, passed and extended, visible to HR company-wide and to Managers for their complete reporting hierarchy.",
-            ReportAccessGate.Probation, typeof(GetProbationReportRequest), ReportSensitivity.Sensitive),
+            ReportAccessGate.Probation, typeof(GetProbationReportRequest), ReportSensitivity.Sensitive,
+            ManagerReport: true),
 
         new("onboarding-progress", "Onboarding Progress Report", ReportCategory.Hr,
             "Onboarding plan status and outstanding tasks per employee, visible to HR company-wide and to Managers for their complete reporting hierarchy.",
-            ReportAccessGate.Onboarding, typeof(GetOnboardingProgressReportRequest), ReportSensitivity.Sensitive),
+            ReportAccessGate.Onboarding, typeof(GetOnboardingProgressReportRequest), ReportSensitivity.Sensitive,
+            ManagerReport: true),
 
         new("offboarding-progress", "Offboarding Progress Report", ReportCategory.Hr,
             "Offboarding plan status, outstanding tasks, access and asset return status per employee.",
@@ -107,10 +111,11 @@ internal static class ReportCatalog
         new("workload-actions", "Workload & HR Actions Report", ReportCategory.Hr,
             "Consolidated outstanding people-related actions across leave, sickness, probation, onboarding, offboarding, documents, assets, identity, recruitment and tasks, scoped to what the caller is permitted to see.",
             ReportAccessGate.WorkloadActions, typeof(GetWorkloadActionsRequest), ReportSensitivity.Sensitive,
-            new Dictionary<string, IReadOnlyCollection<string>?>(StringComparer.OrdinalIgnoreCase)
+            FieldOverrides: new Dictionary<string, IReadOnlyCollection<string>?>(StringComparer.OrdinalIgnoreCase)
             {
                 ["GroupBy"] = WorkloadActionsGroupByValues,
-            }),
+            },
+            ManagerReport: true),
     ];
 
     public static readonly IReadOnlyDictionary<string, ReportDefinition> Definitions =
@@ -152,6 +157,6 @@ internal static class ReportCatalog
                 : null;
         }
 
-        return new ReportDefinition(entry.Id, entry.DisplayName, entry.Category, entry.Description, entry.AccessGate, fields, entry.Sensitivity);
+        return new ReportDefinition(entry.Id, entry.DisplayName, entry.Category, entry.Description, entry.AccessGate, fields, entry.Sensitivity, entry.ManagerReport);
     }
 }

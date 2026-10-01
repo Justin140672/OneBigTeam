@@ -17,11 +17,14 @@
         <p class="text-muted mb-4">Open roles currently advertised to employees.</p>
 
         <div class="vacancy-filters">
+            <label for="internal-vacancy-search" class="visually-hidden">Search internal vacancies by title</label>
             <SfTextBox @bind-Value="_search"
                        Placeholder="Search by title…"
                        CssClass="vacancy-search-box"
                        data-testid="internal-vacancy-search"
+                       HtmlAttributes="@_searchAttributes"
                        ValueChange="OnSearchChanged" />
+            <SearchResultsAnnouncer Count="@_items.Count" Noun="vacancy" PluralNoun="vacancies" />
         </div>
 
         @if (_loading)
@@ -251,6 +254,12 @@
     private static readonly HashSet<string> _allowedCvExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".pdf"
+    };
+
+    private static readonly Dictionary<string, object> _searchAttributes = new()
+    {
+        ["id"] = "internal-vacancy-search",
+        ["aria-label"] = "Search internal vacancies by title",
     };
 
     private bool _authorized;

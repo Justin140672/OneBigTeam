@@ -164,4 +164,25 @@ public class GetReportCatalogHandlerTests
         Assert.True(result.IsSuccess);
         Assert.DoesNotContain(result.Value!.Items, i => i.Id == "equality-diversity");
     }
+
+    [Fact]
+    public async Task HandleAsync_Flags_Manager_Reports_And_Not_Hr_Only_Reports_When_Full_Access()
+    {
+        var result = await _handler.HandleAsync(
+            new GetReportCatalogRequest(Guid.NewGuid()),
+            canViewRecruitment: true,
+            canViewHr: true,
+            canViewEmployeeStarter: true,
+            canViewLeaveSummary: true,
+            canViewProbation: true,
+            canViewOnboarding: true,
+            canViewWorkloadActions: true,
+            canViewEqualityDiversity: true,
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var flagged = result.Value!.Items.Where(i => i.ManagerReport).Select(i => i.Id).OrderBy(x => x).ToList();
+        Assert.Equal(["leave-summary", "onboarding-progress", "probation-report", "workload-actions"], flagged);
+        Assert.Contains(result.Value.Items, i => i.Id == "employee-directory" && !i.ManagerReport);
+    }
 }

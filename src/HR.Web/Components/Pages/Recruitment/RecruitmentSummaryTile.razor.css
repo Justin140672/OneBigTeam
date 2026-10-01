@@ -1,0 +1,19 @@
+.recruitment-summary-tile {
+    flex: 1;
+    display: flex;
+    min-width: 0;
+}
+
+.recruitment-summary-tile .widget-kpi {
+    width: 100%;
+}
+
+button.widget-kpi {
+    border: 0;
+    font: inherit;
+    color: inherit;
+}
+
+button.widget-kpi:not(:hover) {
+    background: transparent;
+}

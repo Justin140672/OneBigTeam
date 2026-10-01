@@ -24,26 +24,26 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="mb-0">Applications</h5>
         <SfButton IsPrimary="true" Disabled="@Session.IsReadOnly" OnClick="OpenAddDialog" data-testid="add-application-btn">
-            <i class="fa-solid fa-plus me-1"></i>Add Candidate
+            <i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Add Candidate
         </SfButton>
     </div>
 
     @if (!string.IsNullOrEmpty(_actionError))
     {
-        <div class="alert alert-danger alert-dismissible">
+        <div class="alert alert-danger alert-dismissible" role="alert">
             @_actionError
-            <button type="button" class="btn-close" @onclick="() => _actionError = null"></button>
+            <button type="button" class="btn-close" aria-label="Dismiss error" @onclick="() => _actionError = null"></button>
         </div>
     }
     @if (!string.IsNullOrEmpty(_actionSuccess))
     {
-        <div class="alert alert-success">@_actionSuccess</div>
+        <div class="alert alert-success" role="status">@_actionSuccess</div>
     }
     @if (_appointSuccess is not null)
     {
         @* Internal recruitment Ticket 7: an internal appointment updates the EXISTING employee record,
            so link to that profile rather than reporting a new employee id. *@
-        <div class="alert alert-success alert-dismissible appoint-success" data-testid="appoint-success">
+        <div class="alert alert-success alert-dismissible appoint-success" role="status" data-testid="appoint-success">
             <span>
                 Internal appointment completed@(_appointSuccess.IsApplied ? "" : $" — the change takes effect on {FormatUkDate(_appointSuccess.EffectiveDate)}").
             </span>
@@ -68,11 +68,13 @@
     <div class="application-type-filter" data-testid="application-type-filter">
         <label class="form-label mb-0" for="application-type-filter">Application type</label>
         <SfDropDownList TValue="ApplicationTypeFilter" TItem="ApplicationTypeFilterOption"
-                        ID="application-type-filter" Width="180px"
+                        Width="180px"
                         DataSource="@_applicationTypeOptions"
-                        Value="@_applicationType" ValueChanged="OnApplicationTypeChangedAsync">
+                        Value="@_applicationType" ValueChanged="OnApplicationTypeChangedAsync"
+                        HtmlAttributes="@_applicationTypeFilterAttributes">
             <DropDownListFieldSettings Value="Value" Text="Label" />
         </SfDropDownList>
+        <SearchResultsAnnouncer Count="@_applications.Count" Noun="application" />
     </div>
 
     @if (_loading)
@@ -200,25 +202,26 @@
                               Disabled="_adding"
                               OnClick="() => SetAddMode(AddCandidateMode.Existing)"
                               data-testid="add-candidate-mode-existing">
-                        <i class="fa-solid fa-user-check me-1"></i>Select existing candidate
+                        <i class="fa-solid fa-user-check me-1" aria-hidden="true"></i>Select existing candidate
                     </SfButton>
                     <SfButton IsPrimary="@(_addModel.Mode == AddCandidateMode.New)"
                               aria-pressed="@(_addModel.Mode == AddCandidateMode.New ? "true" : "false")"
                               Disabled="_adding"
                               OnClick="() => SetAddMode(AddCandidateMode.New)"
                               data-testid="add-candidate-mode-new">
-                        <i class="fa-solid fa-user-plus me-1"></i>Create new candidate
+                        <i class="fa-solid fa-user-plus me-1" aria-hidden="true"></i>Create new candidate
                     </SfButton>
                 </div>
                 @if (_addModel.Mode == AddCandidateMode.Existing)
                 {
                     <div class="mb-3" data-testid="add-application-candidate-field">
-                        <label class="form-label">Candidate <span class="text-danger">*</span></label>
+                        <label id="add-application-candidate-label" for="add-application-candidate" class="form-label">Candidate <span class="text-danger">*</span></label>
                         <SfDropDownList @ref="_candidateDropdown"
                                         TValue="Guid?" TItem="CandidateListItemModel"
                                         DataSource="@_candidates"
                                         @bind-Value="_addModel.CandidateId" @bind-Value:after="OnCandidateSelectedAsync"
-                                        Placeholder="Select a candidate" AllowFiltering="true">
+                                        Placeholder="Select a candidate" AllowFiltering="true"
+                                        HtmlAttributes="@Aria(_addEditContext, _addModel, "add-application-candidate", nameof(AddApplicationFormModel.CandidateId), "Candidate", required: true)">
                             <DropDownListFieldSettings Value="Id" Text="FullName" />
                             <DropDownListEvents TValue="Guid?" TItem="CandidateListItemModel" Filtering="OnCandidateFilteringAsync" />
                             <DropDownListTemplates TItem="CandidateListItemModel">
@@ -228,15 +231,17 @@
                                 </ItemTemplate>
                             </DropDownListTemplates>
                         </SfDropDownList>
-                        <ValidationMessage For="@(() => _addModel.CandidateId)" />
+                        <div id="add-application-candidate-error" role="alert">
+                            <ValidationMessage For="@(() => _addModel.CandidateId)" />
+                        </div>
                     </div>
                     @if (CurrentCvForSelection is { } currentCv)
                     {
                         <div class="mb-3" data-testid="attach-current-cv">
-                            <SfCheckBox TChecked="bool" ID="attach-current-cv-input"
-                                        Label="@($"Attach current CV ({currentCv.FileName})")"
-                                        @bind-Checked="_attachCurrentCv"
-                                        Disabled="_adding" />
+                            <HrCheckBoxField Id="attach-current-cv-input"
+                                             Label="@($"Attach current CV ({currentCv.FileName})")"
+                                             @bind-Checked="_attachCurrentCv"
+                                             Disabled="_adding" />
                         </div>
                     }
                 }
@@ -244,71 +249,77 @@
                 {
                     <div class="row g-3 mb-3" data-testid="new-candidate-fields">
                         <div class="col-md-6">
-                            <label class="form-label" for="new-candidate-first-name">First name <span class="text-danger">*</span></label>
-                            <HrTextBox ID="new-candidate-first-name" @bind-Value="_addModel.FirstName" Maxlength="100"
-                                       data-testid="new-candidate-first-name" />
-                            <ValidationMessage For="@(() => _addModel.FirstName)" />
+                            <HrTextField Label="First name" Required="true" Id="new-candidate-first-name"
+                                         @bind-Value="_addModel.FirstName" Maxlength="100" Autocomplete="given-name"
+                                         HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "new-candidate-first-name" })" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label" for="new-candidate-last-name">Last name <span class="text-danger">*</span></label>
-                            <HrTextBox ID="new-candidate-last-name" @bind-Value="_addModel.LastName" Maxlength="100"
-                                       data-testid="new-candidate-last-name" />
-                            <ValidationMessage For="@(() => _addModel.LastName)" />
+                            <HrTextField Label="Last name" Required="true" Id="new-candidate-last-name"
+                                         @bind-Value="_addModel.LastName" Maxlength="100" Autocomplete="family-name"
+                                         HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "new-candidate-last-name" })" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label" for="new-candidate-email">Email <span class="text-danger">*</span></label>
-                            <HrTextBox ID="new-candidate-email" @bind-Value="_addModel.Email" Maxlength="256"
-                                       data-testid="new-candidate-email" />
-                            <ValidationMessage For="@(() => _addModel.Email)" />
+                            <HrTextField Label="Email" Required="true" Id="new-candidate-email" Type="InputType.Email"
+                                         @bind-Value="_addModel.Email" Maxlength="256" Autocomplete="email"
+                                         HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "new-candidate-email" })" />
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label" for="new-candidate-phone">Phone (optional)</label>
-                            <HrTextBox ID="new-candidate-phone" @bind-Value="_addModel.Phone" Maxlength="30"
-                                       data-testid="new-candidate-phone" />
-                            <ValidationMessage For="@(() => _addModel.Phone)" />
+                            <HrTextField Label="Phone (optional)" Id="new-candidate-phone" Type="InputType.Tel"
+                                         @bind-Value="_addModel.Phone" Maxlength="30" Autocomplete="tel"
+                                         HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "new-candidate-phone" })" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label" for="new-candidate-cv-input">CV (optional)</label>
+                            <label class="form-label" for="new-candidate-cv-input">CV file (PDF) <span class="text-muted">(optional)</span></label>
                             @* Kept rendered while a file is selected — Blazor Server streams the file from
                                this input element at submit time, so it must stay in the DOM. *@
                             <InputFile @key="_newCvInputKey" id="new-candidate-cv-input" class="form-control"
                                        OnChange="OnNewCvSelected" accept=".pdf,application/pdf" disabled="@_adding"
+                                       aria-describedby="@NewCvDescribedBy" aria-invalid="@(_newCvError is not null ? "true" : null)"
+                                       aria-busy="@(_adding && _newCvFile is not null ? "true" : null)"
                                        data-testid="new-candidate-cv-input" />
-                            <div class="form-text">PDF, up to 20 MB. Uploaded as the candidate's current CV and submitted with this application.</div>
+                            <div id="new-candidate-cv-help" class="form-text">PDF, up to 20 MB. Uploaded as the candidate's current CV and submitted with this application.</div>
+                            <div class="visually-hidden" role="status" aria-live="polite" aria-atomic="true">@(_newCvFile is null ? "" : $"Selected CV: {_newCvFile.Name}, {FormatFileSize(_newCvFile.Size)}")</div>
                             @if (_newCvFile is not null)
                             {
                                 <div class="add-candidate-cv-selected" data-testid="new-candidate-cv-selected">
-                                    <i class="fa-solid fa-file-lines"></i>
+                                    <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
                                     <span data-testid="new-candidate-cv-file-name">@_newCvFile.Name</span>
                                     <span class="text-muted small">(@FormatFileSize(_newCvFile.Size))</span>
                                     <SfButton CssClass="e-flat e-small" Disabled="_adding" OnClick="RemoveNewCv"
+                                              aria-label="@($"Remove selected CV {_newCvFile.Name}")"
                                               data-testid="new-candidate-cv-remove">
-                                        <i class="fa-solid fa-xmark me-1"></i>Remove
+                                        <i class="fa-solid fa-xmark me-1" aria-hidden="true"></i>Remove
                                     </SfButton>
                                 </div>
+                                @if (_adding)
+                                {
+                                    <div class="small text-muted" role="status" data-testid="new-candidate-cv-busy">Uploading CV...</div>
+                                }
                             }
                             @if (_newCvError is not null)
                             {
-                                <div class="text-danger small mt-1" data-testid="new-candidate-cv-error">@_newCvError</div>
+                                <div id="new-candidate-cv-error" class="text-danger small mt-1" role="alert" data-testid="new-candidate-cv-error">@_newCvError</div>
                             }
                         </div>
                     </div>
                 }
                 <div class="mb-3" data-testid="add-application-source-field">
-                    <label class="form-label">Source (optional)</label>
+                    <label id="add-application-source-label" for="add-application-source" class="form-label">Source (optional)</label>
                     <SfDropDownList TValue="string" TItem="SourceOption" DataSource="@_sourceOptions"
                                     @bind-Value="_addModel.Source" Placeholder="Select a source"
-                                    ValueChange="OnSourceChanged">
+                                    ValueChange="OnSourceChanged"
+                                    HtmlAttributes="@Aria(_addEditContext, _addModel, "add-application-source", nameof(AddApplicationFormModel.Source), "Source")">
                         <DropDownListFieldSettings Value="Value" Text="Label" />
                     </SfDropDownList>
                 </div>
                 @if (_addModel.Source == "ExternalRecruiter")
                 {
                     <div class="mb-3" data-testid="add-application-recruiter-field">
-                        <label class="form-label">Recruiter <span class="text-danger">*</span></label>
+                        <label id="add-application-recruiter-label" for="add-application-recruiter" class="form-label">Recruiter <span class="text-danger">*</span></label>
                         <SfDropDownList TValue="Guid?" TItem="ExternalRecruiterListItemModel"
                                         DataSource="@_activeRecruitersForSource" @bind-Value="_addModel.SourceRecruiterId"
-                                        Placeholder="Select a recruiter" AllowFiltering="true">
+                                        Placeholder="Select a recruiter" AllowFiltering="true"
+                                        HtmlAttributes="@Aria(_addEditContext, _addModel, "add-application-recruiter", nameof(AddApplicationFormModel.SourceRecruiterId), "Recruiter", required: true, help: _recruiterNotAssignedWarning ? "add-application-recruiter-help" : null)">
                             <DropDownListFieldSettings Value="Id" Text="AgencyName" />
                             <DropDownListTemplates TItem="ExternalRecruiterListItemModel">
                                 <ItemTemplate Context="ddItem">
@@ -323,19 +334,20 @@
                                 </ItemTemplate>
                             </DropDownListTemplates>
                         </SfDropDownList>
-                        <ValidationMessage For="@(() => _addModel.SourceRecruiterId)" />
+                        <div id="add-application-recruiter-error" role="alert">
+                            <ValidationMessage For="@(() => _addModel.SourceRecruiterId)" />
+                        </div>
                         @if (_recruiterNotAssignedWarning)
                         {
-                            <div class="form-text text-warning-emphasis" data-testid="recruiter-not-assigned-warning">
-                                <i class="fa-solid fa-triangle-exclamation me-1"></i>This recruiter isn't currently assigned to this vacancy.
+                            <div id="add-application-recruiter-help" class="form-text text-warning-emphasis" data-testid="recruiter-not-assigned-warning">
+                                <i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i>This recruiter isn't currently assigned to this vacancy.
                             </div>
                         }
                     </div>
                 }
                 <div class="mb-3">
-                    <label class="form-label">Notes (optional)</label>
-                    <HrTextBox @bind-Value="_addModel.Notes" Multiline="true" Rows="2" />
-                    <ValidationMessage For="@(() => _addModel.Notes)" />
+                    <HrTextField Label="Notes (optional)" Id="add-application-notes"
+                                 @bind-Value="_addModel.Notes" Multiline="true" Rows="2" />
                 </div>
                 @if (_duplicateCandidate is { } duplicate)
                 {
@@ -392,10 +404,11 @@
             <EditForm EditContext="_scheduleEditContext">
                 <DataAnnotationsValidator />
                 <div class="mb-3">
-                    <label class="form-label">Interviewer <span class="text-danger">*</span></label>
+                    <label id="schedule-interviewer-label" for="schedule-interviewer" class="form-label">Interviewer <span class="text-danger">*</span></label>
                     <SfDropDownList TValue="Guid?" TItem="EmployeeListItemModel"
                                     DataSource="@_employees" @bind-Value="_scheduleModel.InterviewerId"
-                                    Placeholder="Select interviewer" AllowFiltering="true">
+                                    Placeholder="Select interviewer" AllowFiltering="true"
+                                    HtmlAttributes="@Aria(_scheduleEditContext, _scheduleModel, "schedule-interviewer", nameof(ScheduleInterviewFormModel.InterviewerId), "Interviewer", required: true)">
                         <DropDownListFieldSettings Value="Id" Text="FullName" />
                         <DropDownListTemplates TItem="EmployeeListItemModel">
                             <ItemTemplate Context="employeeItem">
@@ -404,25 +417,30 @@
                             </ItemTemplate>
                         </DropDownListTemplates>
                     </SfDropDownList>
-                    <ValidationMessage For="@(() => _scheduleModel.InterviewerId)" />
+                    <div id="schedule-interviewer-error" role="alert">
+                        <ValidationMessage For="@(() => _scheduleModel.InterviewerId)" />
+                    </div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Scheduled At <span class="text-danger">*</span></label>
-                    <SfDateTimePicker TValue="DateTime?" @bind-Value="_scheduleModel.ScheduledAt" Format="dd/MM/yyyy HH:mm" />
-                    <ValidationMessage For="@(() => _scheduleModel.ScheduledAt)" />
+                    <label id="schedule-scheduled-at-label" for="schedule-scheduled-at" class="form-label">Scheduled At <span class="text-danger">*</span></label>
+                    <SfDateTimePicker TValue="DateTime?" @bind-Value="_scheduleModel.ScheduledAt" Format="dd/MM/yyyy HH:mm"
+                                      HtmlAttributes="@Aria(_scheduleEditContext, _scheduleModel, "schedule-scheduled-at", nameof(ScheduleInterviewFormModel.ScheduledAt), "Scheduled at", required: true)" />
+                    <div id="schedule-scheduled-at-error" role="alert">
+                        <ValidationMessage For="@(() => _scheduleModel.ScheduledAt)" />
+                    </div>
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Duration (minutes)</label>
-                    <SfNumericTextBox TValue="int?" @bind-Value="_scheduleModel.DurationMinutes" ShowSpinButton="false" />
+                    <HrNumericField TValue="int?" Label="Duration (minutes)" Id="schedule-duration"
+                                    @bind-Value="_scheduleModel.DurationMinutes" />
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Location</label>
-                    <HrTextBox @bind-Value="_scheduleModel.Location" Placeholder="e.g. Remote" />
+                    <HrTextField Label="Location" Id="schedule-location"
+                                 @bind-Value="_scheduleModel.Location" Placeholder="e.g. Remote" />
                 </div>
             </EditForm>
             @if (_dialogError is not null)
             {
-                <div class="alert alert-danger py-2">@_dialogError</div>
+                <div class="alert alert-danger py-2" role="alert">@_dialogError</div>
             }
         </Content>
     </DialogTemplates>
@@ -436,12 +454,12 @@
     <DialogTemplates>
         <Content>
             <div class="mb-3">
-                <label class="form-label">Reason (optional)</label>
-                <HrTextBox @bind-Value="_rejectionReason" Multiline="true" Rows="2" />
+                <HrTextField Label="Reason (optional)" Id="reject-reason"
+                             Value="_rejectionReason" ValueChanged="@(v => _rejectionReason = v)" Multiline="true" Rows="2" />
             </div>
             @if (_dialogError is not null)
             {
-                <div class="alert alert-danger py-2">@_dialogError</div>
+                <div class="alert alert-danger py-2" role="alert">@_dialogError</div>
             }
         </Content>
     </DialogTemplates>
@@ -458,123 +476,112 @@
                 <DataAnnotationsValidator />
                 @if (_hireOfferAccepted)
                 {
-                    <div class="alert alert-info py-2" data-testid="hire-offer-accepted-context">
+                    <div class="alert alert-info py-2" role="status" data-testid="hire-offer-accepted-context">
                         Offer accepted: @FormatOfferedSalary(_hireOfferedSalary, _hireOfferedSalaryFrequency) – will seed first compensation record.
                     </div>
                 }
                 @if (_hireOfferBlockedMessage is not null)
                 {
-                    <div class="alert alert-warning py-2" data-testid="hire-offer-blocked">@_hireOfferBlockedMessage</div>
+                    <div class="alert alert-warning py-2" role="alert" data-testid="hire-offer-blocked">@_hireOfferBlockedMessage</div>
                 }
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <label class="form-label">Start Date @if (!_hireStartDateOptional) {<span class="text-danger">*</span>}</label>
-                        <SfDatePicker TValue="DateOnly?" @bind-Value="_hireModel.StartDate" data-testid="hire-start-date" />
-                        <ValidationMessage For="@(() => _hireModel.StartDate)" />
-                        @if (_hireStartDateOptional)
-                        {
-                            <div class="form-text">Leave blank to use the accepted offer's proposed start date.</div>
-                        }
+                        <HrDateField TValue="DateOnly?" Label="Start Date" Required="@(!_hireStartDateOptional)" Id="hire-start-date"
+                                     @bind-Value="_hireModel.StartDate"
+                                     HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "hire-start-date" })"
+                                     HelpText="@(_hireStartDateOptional ? "Leave blank to use the accepted offer's proposed start date." : null)" />
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Date of Birth <span class="text-danger">*</span></label>
-                        <SfDatePicker TValue="DateOnly?" @bind-Value="_hireModel.DateOfBirth" Format="dd/MM/yyyy" />
-                        <ValidationMessage For="@(() => _hireModel.DateOfBirth)" />
+                        <HrDateField TValue="DateOnly?" Label="Date of Birth" Required="true" Id="hire-date-of-birth"
+                                     @bind-Value="_hireModel.DateOfBirth" Format="dd/MM/yyyy" />
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Nationality <span class="text-danger">*</span></label>
-                        <SfDropDownList TValue="string" TItem="NationalityListItem"
-                                        DataSource="@_nationalities" @bind-Value="_hireModel.Nationality"
-                                        Placeholder="Select nationality" AllowFiltering="true">
-                            <DropDownListFieldSettings Value="Name" Text="Name" />
-                        </SfDropDownList>
-                        <ValidationMessage For="@(() => _hireModel.Nationality)" />
+                        <HrDropDownField TValue="string" TItem="NationalityListItem" Label="Nationality" Required="true" Id="hire-nationality"
+                                         DataSource="@_nationalities" @bind-Value="_hireModel.Nationality"
+                                         ValueField="Name" TextField="Name" Placeholder="Select nationality" />
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Gender <span class="text-danger">*</span></label>
-                        <SfDropDownList TValue="string" TItem="string" DataSource="@_genderOptions" @bind-Value="_hireModel.Gender" Placeholder="Select gender" />
-                        <ValidationMessage For="@(() => _hireModel.Gender)" />
+                        <label id="hire-gender-label" for="hire-gender" class="form-label">Gender <span class="text-danger">*</span></label>
+                        <SfDropDownList TValue="string" TItem="string" DataSource="@_genderOptions" @bind-Value="_hireModel.Gender" Placeholder="Select gender"
+                                        HtmlAttributes="@Aria(_hireEditContext, _hireModel, "hire-gender", nameof(HireCandidateFormModel.Gender), "Gender", required: true)" />
+                        <div id="hire-gender-error" role="alert">
+                            <ValidationMessage For="@(() => _hireModel.Gender)" />
+                        </div>
                         @if (_hireModel.Gender == "Other")
                         {
                             <div class="mt-2">
-                                <HrTextBox @bind-Value="_hireModel.GenderOther" Placeholder="Please specify" />
-                                <ValidationMessage For="@(() => _hireModel.GenderOther)" />
+                                <HrTextField Label="Please specify gender" Id="hire-gender-other"
+                                             @bind-Value="_hireModel.GenderOther" Placeholder="Please specify" />
                             </div>
                         }
                     </div>
                     @if (_hireEmployeeNumberMode == EmployeeNumberMode.Automatic)
                     {
                         <div class="col-md-6">
-                            <label class="form-label">Employee Number</label>
+                            <span class="form-label d-block">Employee Number</span>
                             <p class="text-muted small mb-0">An employee number will be assigned automatically when this candidate is hired.</p>
                         </div>
                     }
                     else
                     {
                         <div class="col-md-6">
-                            <label class="form-label">Employee Number <span class="text-danger">*</span></label>
-                            <HrTextBox @bind-Value="_hireModel.EmployeeNumber" Placeholder="e.g. EMP-001" />
-                            <ValidationMessage For="@(() => _hireModel.EmployeeNumber)" />
+                            <HrTextField Label="Employee Number" Required="true" Id="hire-employee-number"
+                                         @bind-Value="_hireModel.EmployeeNumber" Placeholder="e.g. EMP-001" />
                         </div>
                     }
                     <div class="col-md-6">
-                        <label class="form-label">Employment Type <span class="text-danger">*</span></label>
-                        <SfDropDownList TValue="Guid?"
-                                        TItem="EmploymentTypeListItemModel"
-                                        DataSource="@_employmentTypes"
-                                        @bind-Value="_hireModel.EmploymentTypeId"
-                                        Placeholder="Select type">
-                            <DropDownListFieldSettings Value="Id" Text="Name" />
-                        </SfDropDownList>
-                        <ValidationMessage For="@(() => _hireModel.EmploymentTypeId)" />
+                        <HrDropDownField TValue="Guid?" TItem="EmploymentTypeListItemModel" Label="Employment Type" Required="true" Id="hire-employment-type"
+                                         DataSource="@_employmentTypes" @bind-Value="_hireModel.EmploymentTypeId"
+                                         ValueField="Id" TextField="Name" Placeholder="Select type" AllowFiltering="false" />
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Position Profile</label>
-                        <div class="p-2 rounded border bg-light" data-testid="hire-derived-position-profile">@_derivedPositionProfileName</div>
-                        <div class="form-text">Derived from the vacancy — the employee is assigned to this profile (and its department/location) automatically.</div>
+                        <span id="hire-derived-position-profile-label" class="form-label d-block">Position Profile</span>
+                        <div class="p-2 rounded border bg-light" role="group" aria-labelledby="hire-derived-position-profile-label" aria-describedby="hire-derived-position-profile-help" data-testid="hire-derived-position-profile">@_derivedPositionProfileName</div>
+                        <div id="hire-derived-position-profile-help" class="form-text">Derived from the vacancy — the employee is assigned to this profile (and its department/location) automatically.</div>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Location</label>
-                        <div class="p-2 rounded border bg-light" data-testid="hire-derived-location">@_derivedLocationName</div>
-                        <div class="form-text">Derived from the vacancy's position profile.</div>
+                        <span id="hire-derived-location-label" class="form-label d-block">Location</span>
+                        <div class="p-2 rounded border bg-light" role="group" aria-labelledby="hire-derived-location-label" aria-describedby="hire-derived-location-help" data-testid="hire-derived-location">@_derivedLocationName</div>
+                        <div id="hire-derived-location-help" class="form-text">Derived from the vacancy's position profile.</div>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Manager</label>
+                        <label id="hire-manager-label" for="hire-manager" class="form-label">Manager</label>
                         <SfDropDownList @ref="_hireManagerDropdown"
                                         TValue="Guid?"
                                         TItem="ManagerOption"
                                         DataSource="@_hireManagerOptions"
                                         @bind-Value="_hireModel.ManagerId"
                                         Placeholder="None"
-                                        AllowFiltering="true">
+                                        AllowFiltering="true"
+                                        HtmlAttributes="@Aria(_hireEditContext, _hireModel, "hire-manager", nameof(HireCandidateFormModel.ManagerId), "Manager")">
                             <DropDownListFieldSettings Value="Id" Text="Name" />
                             <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnHireManagerFilteringAsync" />
                         </SfDropDownList>
                     </div>
                     <div class="col-12">
-                        <label class="form-label">Address Line 1</label>
-                        <HrTextBox @bind-Value="_hireModel.AddressLine1" Placeholder="Street address" />
+                        <HrTextField Label="Address Line 1" Id="hire-address-line-1" Autocomplete="address-line1"
+                                     @bind-Value="_hireModel.AddressLine1" Placeholder="Street address" />
                     </div>
                     <div class="col-12">
-                        <label class="form-label">Address Line 2</label>
-                        <HrTextBox @bind-Value="_hireModel.AddressLine2" Placeholder="Apartment, suite, etc." />
+                        <HrTextField Label="Address Line 2" Id="hire-address-line-2" Autocomplete="address-line2"
+                                     @bind-Value="_hireModel.AddressLine2" Placeholder="Apartment, suite, etc." />
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">City</label>
-                        <HrTextBox @bind-Value="_hireModel.City" Placeholder="e.g. London" />
+                        <HrTextField Label="City" Id="hire-city" Autocomplete="address-level2"
+                                     @bind-Value="_hireModel.City" Placeholder="e.g. London" />
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">County / State</label>
-                        <HrTextBox @bind-Value="_hireModel.County" Placeholder="e.g. Greater London" />
+                        <HrTextField Label="County / State" Id="hire-county" Autocomplete="address-level1"
+                                     @bind-Value="_hireModel.County" Placeholder="e.g. Greater London" />
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">Post Code</label>
-                        <HrTextBox @bind-Value="_hireModel.PostCode" Placeholder="e.g. SW1A 1AA" />
+                        <HrTextField Label="Post Code" Id="hire-post-code" Autocomplete="postal-code"
+                                     @bind-Value="_hireModel.PostCode" Placeholder="e.g. SW1A 1AA" />
                     </div>
                 </div>
                 @if (_dialogError is not null)
                 {
-                    <div class="alert alert-danger py-2 mt-3">@_dialogError</div>
+                    <div class="alert alert-danger py-2 mt-3" role="alert">@_dialogError</div>
                 }
             </EditForm>
         </Content>
@@ -605,31 +612,31 @@
                     }
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label">Position Profile</label>
-                            <div class="p-2 rounded border bg-light" data-testid="appoint-derived-position-profile">@_derivedPositionProfileName</div>
+                            <span id="appoint-derived-position-profile-label" class="form-label d-block">Position Profile</span>
+                            <div class="p-2 rounded border bg-light" role="group" aria-labelledby="appoint-derived-position-profile-label" aria-describedby="appoint-derived-help" data-testid="appoint-derived-position-profile">@_derivedPositionProfileName</div>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Department</label>
-                            <div class="p-2 rounded border bg-light" data-testid="appoint-derived-department">@_derivedDepartmentName</div>
+                            <span id="appoint-derived-department-label" class="form-label d-block">Department</span>
+                            <div class="p-2 rounded border bg-light" role="group" aria-labelledby="appoint-derived-department-label" aria-describedby="appoint-derived-help" data-testid="appoint-derived-department">@_derivedDepartmentName</div>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Location</label>
-                            <div class="p-2 rounded border bg-light" data-testid="appoint-derived-location">@_derivedLocationName</div>
+                            <span id="appoint-derived-location-label" class="form-label d-block">Location</span>
+                            <div class="p-2 rounded border bg-light" role="group" aria-labelledby="appoint-derived-location-label" aria-describedby="appoint-derived-help" data-testid="appoint-derived-location">@_derivedLocationName</div>
                         </div>
                         <div class="col-12">
-                            <div class="form-text mt-0">Derived from the vacancy's position profile — the employee is moved to this profile, department and location.</div>
+                            <div id="appoint-derived-help" class="form-text mt-0">Derived from the vacancy's position profile — the employee is moved to this profile, department and location.</div>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Effective Date <span class="text-danger">*</span></label>
-                            <SfDatePicker TValue="DateOnly?" @bind-Value="_appointModel.EffectiveDate" Format="dd/MM/yyyy" data-testid="appoint-effective-date" />
-                            <ValidationMessage For="@(() => _appointModel.EffectiveDate)" />
+                            <HrDateField TValue="DateOnly?" Label="Effective Date" Required="true" Id="appoint-effective-date"
+                                         @bind-Value="_appointModel.EffectiveDate" Format="dd/MM/yyyy"
+                                         HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "appoint-effective-date" })" />
                             @if (_appointModel.IsFutureDated)
                             {
-                                <div class="form-text" data-testid="appoint-future-date-hint">The change will be applied automatically on this date.</div>
+                                <div class="form-text" role="status" data-testid="appoint-future-date-hint">The change will be applied automatically on this date.</div>
                             }
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Manager <span class="text-danger">*</span></label>
+                            <label id="appoint-manager-label" for="appoint-manager" class="form-label">Manager <span class="text-danger">*</span></label>
                             <SfDropDownList @ref="_appointManagerDropdown"
                                             TValue="Guid?"
                                             TItem="ManagerOption"
@@ -637,55 +644,62 @@
                                             @bind-Value="_appointModel.ManagerId"
                                             Placeholder="Select a manager"
                                             AllowFiltering="true"
-                                            data-testid="appoint-manager">
+                                            HtmlAttributes="@Aria(_appointEditContext, _appointModel, "appoint-manager", nameof(AppointFormModel.ManagerId), "Manager", required: true, testId: "appoint-manager")">
                                 <DropDownListFieldSettings Value="Id" Text="Name" />
                                 <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnAppointManagerFilteringAsync" />
                             </SfDropDownList>
-                            <ValidationMessage For="@(() => _appointModel.ManagerId)" />
+                            <div id="appoint-manager-error" role="alert">
+                                <ValidationMessage For="@(() => _appointModel.ManagerId)" />
+                            </div>
                         </div>
                         @if (_appointModel.IsBackdated)
                         {
                             <div class="col-12" data-testid="appoint-confirm-backdated">
-                                <SfCheckBox TChecked="bool" @bind-Checked="_appointModel.ConfirmBackdated"
-                                            Label="I confirm this backdated appointment should apply immediately" />
-                                <ValidationMessage For="@(() => _appointModel.ConfirmBackdated)" />
+                                <HrCheckBoxField Label="I confirm this backdated appointment should apply immediately" Id="appoint-confirm-backdated-input"
+                                                 Value="_appointModel.ConfirmBackdated"
+                                                 ValueChanged="@(v => _appointModel.ConfirmBackdated = v)"
+                                                 ValueExpression="@(() => _appointModel.ConfirmBackdated)" />
                             </div>
                         }
                         <div class="col-12" data-testid="appoint-change-compensation">
-                            <SfCheckBox TChecked="bool" @bind-Checked="_appointModel.ChangeCompensation" Label="Change compensation" />
+                            <HrCheckBoxField Label="Change compensation" Id="appoint-change-compensation-input"
+                                             @bind-Checked="_appointModel.ChangeCompensation" />
                         </div>
                         @if (_appointModel.ChangeCompensation)
                         {
                             <div class="col-md-4">
-                                <label class="form-label">Salary Type <span class="text-danger">*</span></label>
+                                <label id="appoint-salary-type-label" for="appoint-salary-type" class="form-label">Salary Type <span class="text-danger">*</span></label>
                                 <SfDropDownList TValue="string" TItem="string" DataSource="@_appointSalaryTypeOptions"
-                                                @bind-Value="_appointModel.SalaryType" data-testid="appoint-salary-type" />
-                                <ValidationMessage For="@(() => _appointModel.SalaryType)" />
+                                                @bind-Value="_appointModel.SalaryType"
+                                                HtmlAttributes="@Aria(_appointEditContext, _appointModel, "appoint-salary-type", nameof(AppointFormModel.SalaryType), "Salary type", required: true, testId: "appoint-salary-type")" />
+                                <div id="appoint-salary-type-error" role="alert">
+                                    <ValidationMessage For="@(() => _appointModel.SalaryType)" />
+                                </div>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label">Salary <span class="text-danger">*</span></label>
-                                <SfNumericTextBox TValue="decimal?" @bind-Value="_appointModel.Salary" Format="n2" Min="0" ShowSpinButton="false" data-testid="appoint-salary" />
-                                <ValidationMessage For="@(() => _appointModel.Salary)" />
+                                <HrNumericField TValue="decimal?" Label="Salary" Required="true" Id="appoint-salary"
+                                                @bind-Value="_appointModel.Salary" Format="n2" Min="0"
+                                                HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "appoint-salary" })" />
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label">Currency <span class="text-danger">*</span></label>
-                                <HrTextBox @bind-Value="_appointModel.Currency" Placeholder="e.g. GBP" data-testid="appoint-currency" />
-                                <ValidationMessage For="@(() => _appointModel.Currency)" />
+                                <HrTextField Label="Currency" Required="true" Id="appoint-currency"
+                                             @bind-Value="_appointModel.Currency" Placeholder="e.g. GBP"
+                                             HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "appoint-currency" })" />
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">Hours per Week</label>
-                                <SfNumericTextBox TValue="decimal?" @bind-Value="_appointModel.HoursPerWeek" Format="n2" Min="0" ShowSpinButton="false" data-testid="appoint-hours-per-week" />
-                                <ValidationMessage For="@(() => _appointModel.HoursPerWeek)" />
+                                <HrNumericField TValue="decimal?" Label="Hours per Week" Id="appoint-hours-per-week"
+                                                @bind-Value="_appointModel.HoursPerWeek" Format="n2" Min="0"
+                                                HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "appoint-hours-per-week" })" />
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label">FTE</label>
-                                <SfNumericTextBox TValue="decimal?" @bind-Value="_appointModel.Fte" Format="n2" Min="0" Max="1" Step="0.1m" ShowSpinButton="false" data-testid="appoint-fte" />
-                                <ValidationMessage For="@(() => _appointModel.Fte)" />
+                                <HrNumericField TValue="decimal?" Label="FTE" Id="appoint-fte"
+                                                @bind-Value="_appointModel.Fte" Format="n2" Min="0" Max="1" Step="0.1"
+                                                HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "appoint-fte" })" />
                             </div>
                             <div class="col-12">
-                                <label class="form-label">Compensation Notes</label>
-                                <HrTextBox @bind-Value="_appointModel.CompensationNotes" Multiline="true" Rows="2" data-testid="appoint-compensation-notes" />
-                                <ValidationMessage For="@(() => _appointModel.CompensationNotes)" />
+                                <HrTextField Label="Compensation Notes" Id="appoint-compensation-notes"
+                                             @bind-Value="_appointModel.CompensationNotes" Multiline="true" Rows="2"
+                                             HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "appoint-compensation-notes" })" />
                             </div>
                         }
                     </div>
@@ -732,33 +746,38 @@
                 </div>
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <label class="form-label">Offered Salary</label>
-                        <SfNumericTextBox TValue="decimal?" @bind-Value="_offerModel.OfferedSalary" Format="c0" Min="0" ShowSpinButton="false" data-testid="offer-salary" />
-                        <ValidationMessage For="@(() => _offerModel.OfferedSalary)" />
+                        <HrNumericField TValue="decimal?" Label="Offered Salary" Id="offer-salary"
+                                        @bind-Value="_offerModel.OfferedSalary" Format="c0" Min="0"
+                                        HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "offer-salary" })" />
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Salary Frequency</label>
+                        <label id="offer-salary-frequency-label" for="offer-salary-frequency" class="form-label">Salary Frequency</label>
                         <SfDropDownList TValue="string" TItem="string" DataSource="@_salaryFrequencyOptions"
-                                        @bind-Value="_offerModel.OfferedSalaryFrequency" data-testid="offer-salary-frequency" />
-                        <ValidationMessage For="@(() => _offerModel.OfferedSalaryFrequency)" />
+                                        @bind-Value="_offerModel.OfferedSalaryFrequency"
+                                        HtmlAttributes="@Aria(_offerEditContext, _offerModel, "offer-salary-frequency", nameof(OfferFormModel.OfferedSalaryFrequency), "Salary frequency", testId: "offer-salary-frequency")" />
+                        <div id="offer-salary-frequency-error" role="alert">
+                            <ValidationMessage For="@(() => _offerModel.OfferedSalaryFrequency)" />
+                        </div>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Proposed Start Date</label>
-                        <SfDatePicker TValue="DateOnly?" @bind-Value="_offerModel.ProposedStartDate" data-testid="offer-proposed-start-date" />
+                        <HrDateField TValue="DateOnly?" Label="Proposed Start Date" Id="offer-proposed-start-date"
+                                     @bind-Value="_offerModel.ProposedStartDate"
+                                     HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "offer-proposed-start-date" })" />
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Offer Date</label>
-                        <SfDatePicker TValue="DateOnly?" @bind-Value="_offerModel.OfferDate" data-testid="offer-date" />
+                        <HrDateField TValue="DateOnly?" Label="Offer Date" Id="offer-date"
+                                     @bind-Value="_offerModel.OfferDate"
+                                     HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "offer-date" })" />
                     </div>
                     <div class="col-12">
-                        <label class="form-label">Offer Notes</label>
-                        <HrTextBox @bind-Value="_offerModel.OfferNotes" Multiline="true" Rows="3" data-testid="offer-notes" />
-                        <ValidationMessage For="@(() => _offerModel.OfferNotes)" />
+                        <HrTextField Label="Offer Notes" Id="offer-notes"
+                                     @bind-Value="_offerModel.OfferNotes" Multiline="true" Rows="3"
+                                     HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "offer-notes" })" />
                     </div>
                 </div>
                 @if (_dialogError is not null)
                 {
-                    <div class="alert alert-danger py-2 mt-3">@_dialogError</div>
+                    <div class="alert alert-danger py-2 mt-3" role="alert">@_dialogError</div>
                 }
             </EditForm>
         </Content>
@@ -775,15 +794,17 @@
             <EditForm EditContext="_offerResponseEditContext">
                 <DataAnnotationsValidator />
                 <div class="mb-3">
-                    <label class="form-label">Response <span class="text-danger">*</span></label>
+                    <label id="offer-response-status-label" for="offer-response-status" class="form-label">Response <span class="text-danger">*</span></label>
                     <SfDropDownList TValue="string" TItem="string" DataSource="@_offerResponseOptions"
                                     @bind-Value="_offerResponseModel.Status" Placeholder="Select a response"
-                                    data-testid="offer-response-status" />
-                    <ValidationMessage For="@(() => _offerResponseModel.Status)" />
+                                    HtmlAttributes="@Aria(_offerResponseEditContext, _offerResponseModel, "offer-response-status", nameof(OfferResponseFormModel.Status), "Offer response", required: true, testId: "offer-response-status")" />
+                    <div id="offer-response-status-error" role="alert">
+                        <ValidationMessage For="@(() => _offerResponseModel.Status)" />
+                    </div>
                 </div>
                 @if (_dialogError is not null)
                 {
-                    <div class="alert alert-danger py-2">@_dialogError</div>
+                    <div class="alert alert-danger py-2" role="alert">@_dialogError</div>
                 }
             </EditForm>
         </Content>
@@ -806,6 +827,31 @@
     private string? _actionError;
     private string? _actionSuccess;
     private string? _dialogError;
+
+    private static readonly Dictionary<string, object> _applicationTypeFilterAttributes = new()
+    {
+        ["id"] = "application-type-filter",
+        ["aria-label"] = "Application type",
+    };
+
+    private static Dictionary<string, object> Aria(
+        EditContext context, object model, string id, string property, string label,
+        bool required = false, string? help = null, string? testId = null)
+    {
+        var attributes = FieldAria.Build(context, model, id, property, required);
+        attributes["aria-label"] = label;
+        attributes["aria-labelledby"] = $"{id}-label";
+
+        var describedBy = new List<string>(2);
+        if (help is not null) describedBy.Add(help);
+        if (attributes.TryGetValue("aria-describedby", out var existing)) describedBy.Add((string)existing);
+        if (describedBy.Count > 0) attributes["aria-describedby"] = string.Join(' ', describedBy);
+
+        if (testId is not null) attributes["data-testid"] = testId;
+        return attributes;
+    }
+
+    private string NewCvDescribedBy => _newCvError is null ? "new-candidate-cv-help" : "new-candidate-cv-help new-candidate-cv-error";
 
     private bool _showAddDialog;
     private SfDropDownList<Guid?, CandidateListItemModel> _candidateDropdown = default!;

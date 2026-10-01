@@ -123,9 +123,7 @@ public sealed class ResponsiveShellTests(HrAdminPersonaFixture fixture) : RoleE2
         await Assertions.Expect(_page.Locator(".app-shell")).ToHaveAttributeAsync("data-nav-open", "true");
         var contentWhileOpen = await _page.Locator(".main-content").BoundingBoxAsync();
         Assert.Equal(contentBefore.Width, contentWhileOpen!.Width, 1);
-        Assert.True(
-            await _page.EvaluateAsync<bool>("() => !!document.activeElement && !!document.activeElement.closest('#app-sidebar')"),
-            "Keyboard focus must move into the opened drawer");
+        await Assertions.Expect(sidebar.Locator(":focus")).ToHaveCountAsync(1, new() { Timeout = 10_000 });
 
         await _page.Keyboard.PressAsync("Escape");
 

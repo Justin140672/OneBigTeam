@@ -129,6 +129,11 @@
     line-height: 1.5;
 }
 
+.recruitment-dashboard-view-toggle-btn:focus-visible {
+    outline: 2px solid var(--hr-color-primary);
+    outline-offset: 2px;
+}
+
 .recruitment-dashboard-view-toggle-btn.active {
     background: var(--hr-color-primary);
     color: #fff;

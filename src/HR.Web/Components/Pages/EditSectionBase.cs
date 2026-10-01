@@ -15,8 +15,8 @@ public abstract class EditSectionBase<TModel> : ComponentBase, IDisposable where
     protected TModel Model { get; } = new();
     protected EditContext EditContext { get; private set; } = default!;
 
-    protected Dictionary<string, object> Aria(string id, string? property, bool required = false, bool emitId = true) =>
-        FieldAria.Build(EditContext, Model, id, property, required, emitId);
+    protected Dictionary<string, object> Aria(string id, string? property, bool required = false, bool emitId = true, string? label = null) =>
+        FieldAria.Build(EditContext, Model, id, property, required, emitId, label);
 
     protected bool IsLoading { get; set; } = true;
     protected string? GlobalError { get; set; }

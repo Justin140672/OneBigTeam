@@ -25,11 +25,11 @@
             <div class="recruitment-dashboard-actions">
                 <SfButton IsPrimary="true" CssClass="recruitment-dashboard-action-btn"
                           Disabled="@Session.IsReadOnly" OnClick="NavigateToNewVacancy" data-testid="recruitment-dashboard-create-vacancy-btn">
-                    <i class="fa-solid fa-plus me-1"></i>Create vacancy
+                    <i class="fa-solid fa-plus me-1" aria-hidden="true"></i>Create vacancy
                 </SfButton>
                 <SfButton CssClass="recruitment-dashboard-action-btn"
                           Disabled="@Session.IsReadOnly" OnClick="NavigateToNewCandidate" data-testid="recruitment-dashboard-add-candidate-btn">
-                    <i class="fa-solid fa-user-plus me-1"></i>Add candidate
+                    <i class="fa-solid fa-user-plus me-1" aria-hidden="true"></i>Add candidate
                 </SfButton>
             </div>
         </div>
@@ -95,7 +95,7 @@
                             tabindex="@(selected ? "0" : "-1")"
                             data-testid="@($"recruitment-tab-{name}")"
                             @onclick="() => SetTab(t)">
-                        <i class="fa-solid @TabIcon(t) me-1"></i>@t.ToString()
+                        <i class="fa-solid @TabIcon(t) me-1" aria-hidden="true"></i>@t.ToString()
                     </button>
                 </li>
             }
@@ -113,17 +113,18 @@
                     {
                         <div class="recruitment-dashboard-toolbar-group">
                             <div class="recruitment-dashboard-vacancy-picker">
-                                <SfDropDownList TValue="Guid?" TItem="VacancyListItemModel"
-                                                DataSource="@_vacancies" @bind-Value="_selectedVacancyId"
-                                                Placeholder="Select a vacancy" AllowFiltering="true"
-                                                data-testid="recruitment-board-vacancy-picker">
-                                    <DropDownListFieldSettings Value="Id" Text="EffectiveTitle" />
-                                </SfDropDownList>
+                                <HrDropDownField TValue="Guid?" TItem="VacancyListItemModel"
+                                                 Label="Selected vacancy" Id="recruitment-board-vacancy-picker" LabelClass="visually-hidden"
+                                                 DataSource="@_vacancies" ValueField="Id" TextField="EffectiveTitle"
+                                                 Value="@_selectedVacancyId" ValueChanged="OnVacancyChanged"
+                                                 Placeholder="Select a vacancy" AllowFiltering="true"
+                                                 HtmlAttributes="@VacancyPickerAttributes" />
                             </div>
                             <HrTextBox Placeholder="Search by name or email…"
                                        Value="@_boardSearchText"
                                        ValueChange="OnBoardSearchChanged"
                                        CssClass="recruitment-dashboard-search"
+                                       HtmlAttributes="@SearchAttributes"
                                        data-testid="kanban-search-box" />
                             <div class="form-check recruitment-dashboard-terminal-toggle">
                                 <input class="form-check-input" type="checkbox" id="show-terminal-stages"
@@ -141,16 +142,18 @@
                                 @onclick="() => SetView(PipelineView.Board)"
                                 aria-pressed="@(_view == PipelineView.Board ? "true" : "false")"
                                 data-testid="recruitment-view-board-btn">
-                            <i class="fa-solid fa-table-columns me-1"></i>Board
+                            <i class="fa-solid fa-table-columns me-1" aria-hidden="true"></i>Board
                         </button>
                         <button type="button"
                                 class="@("recruitment-dashboard-view-toggle-btn" + (_view == PipelineView.List ? " active" : ""))"
                                 @onclick="() => SetView(PipelineView.List)"
                                 aria-pressed="@(_view == PipelineView.List ? "true" : "false")"
                                 data-testid="recruitment-view-list-btn">
-                            <i class="fa-solid fa-list me-1"></i>List
+                            <i class="fa-solid fa-list me-1" aria-hidden="true"></i>List
                         </button>
                     </div>
+                    <div class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"
+                         data-testid="recruitment-view-announcer">@_viewAnnouncement</div>
                 </div>
 
                 @if (_view == PipelineView.Board)
@@ -162,7 +165,7 @@
                     else if (_vacancies.Count == 0)
                     {
                         <div class="widget-empty">
-                            <i class="fa-solid fa-user-tie fa-lg mb-2"></i>
+                            <i class="fa-solid fa-user-tie fa-lg mb-2" aria-hidden="true"></i>
                             <p class="mb-0">No open vacancies to show on the board yet.</p>
                         </div>
                     }
@@ -446,7 +449,26 @@
 
     private void SetTab(DashboardTab tab) => _tab = tab;
 
-    private void SetView(PipelineView view) => _view = view;
+    private string _viewAnnouncement = string.Empty;
+
+    private static readonly Dictionary<string, object> VacancyPickerAttributes = new()
+    {
+        ["data-testid"] = "recruitment-board-vacancy-picker",
+    };
+
+    private static readonly Dictionary<string, object> SearchAttributes = new()
+    {
+        ["aria-label"] = "Search pipeline candidates",
+    };
+
+    private void OnVacancyChanged(Guid? id) => _selectedVacancyId = id;
+
+    private void SetView(PipelineView view)
+    {
+        if (_view == view) return;
+        _view = view;
+        _viewAnnouncement = view == PipelineView.Board ? "Board view selected" : "List view selected";
+    }
 
     private void OnShowTerminalStagesChanged(Microsoft.AspNetCore.Components.ChangeEventArgs args) =>
         _showTerminalStages = args.Value is bool b && b;

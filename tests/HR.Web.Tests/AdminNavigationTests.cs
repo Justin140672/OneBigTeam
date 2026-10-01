@@ -36,7 +36,7 @@ public class AdminNavigationTests
     private static readonly string[] DenyListForCompanyAdmin =
     {
         "Employees", "User Administration", "Leave Policies", "Compliance Centre",
-        "Reporting", "HR Settings", "Administration Home", "Support Requests",
+        "Reports", "HR Settings", "Administration Home", "Support Requests",
     };
 
     [Fact]
@@ -46,7 +46,6 @@ public class AdminNavigationTests
     }
 
     [Theory]
-    [InlineData("canReadEmployees")]
     [InlineData("canManageEmployees")]
     [InlineData("canManageRecruitment")]
     [InlineData("canManageLeavePolicies")]
@@ -60,7 +59,6 @@ public class AdminNavigationTests
     {
         var caps = flag switch
         {
-            "canReadEmployees" => Caps(canReadEmployees: true),
             "canManageEmployees" => Caps(canManageEmployees: true),
             "canManageRecruitment" => Caps(canManageRecruitment: true),
             "canManageLeavePolicies" => Caps(canManageLeavePolicies: true),
@@ -74,6 +72,15 @@ public class AdminNavigationTests
         };
 
         Assert.True(caps.HasAnyAdministrativeAccess);
+    }
+
+    [Fact]
+    public void ReadOnlyEmployeeAccess_GrantsNoAdministrativeAccess()
+    {
+        var caps = Caps(canReadEmployees: true);
+
+        Assert.False(caps.HasAnyAdministrativeAccess);
+        Assert.Empty(AdminNavigation.Build(caps, CompanyId));
     }
 
     [Fact]
@@ -192,7 +199,8 @@ public class AdminNavigationTests
     public void CompanyAdministratorPlusHrAdministrator_Nav_HasEmployeesDestination()
     {
         Assert.Contains(AdminNavigation.Build(HrPlusCompanyAdmin(), CompanyId), d => d.Key == "employees");
-        Assert.Contains(AdminNavigation.Build(Caps(canReadEmployees: true), CompanyId), d => d.Key == "employees");
+        Assert.DoesNotContain(AdminNavigation.Build(Caps(canReadEmployees: true), CompanyId), d => d.Key == "employees");
+        Assert.Contains(AdminNavigation.Build(Caps(canManageEmployees: true), CompanyId), d => d.Key == "employees");
     }
 
     [Fact]

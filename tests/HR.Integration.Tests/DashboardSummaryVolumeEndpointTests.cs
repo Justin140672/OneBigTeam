@@ -68,11 +68,15 @@ public class DashboardSummaryVolumeEndpointTests
             c.Items.Count <= CategoryDisplayCap,
             $"category '{c.Category}' returned {c.Items.Count} items, expected <= {CategoryDisplayCap}"));
 
+        Assert.All(payload.Categories, c => Assert.True(
+            c.WaitingItems.Count <= CategoryDisplayCap,
+            $"category '{c.Category}' returned {c.WaitingItems.Count} waiting items, expected <= {CategoryDisplayCap}"));
+
         var leave = payload.Categories.Single(c => c.Category == "Pending Leave Approvals");
-        Assert.Equal(expectedPendingLeave, leave.ActionableCount);
+        Assert.Equal(expectedPendingLeave, leave.ActionableCount + leave.WaitingOnOthersCount);
 
         var tasks = payload.Categories.Single(c => c.Category == "Manager Tasks Overdue");
-        Assert.Equal(expectedOverdueTasks, tasks.ActionableCount);
+        Assert.Equal(expectedOverdueTasks, tasks.ActionableCount + tasks.WaitingOnOthersCount);
 
         Assert.True(
             stopwatch.Elapsed < TimeSpan.FromSeconds(10),
@@ -137,7 +141,9 @@ public class DashboardSummaryVolumeEndpointTests
         bool Required,
         int ActionableCount,
         bool IsTruncated,
-        List<ActionItemPayload> Items);
+        List<ActionItemPayload> Items,
+        List<ActionItemPayload> WaitingItems,
+        int WaitingOnOthersCount);
 
     private sealed record ActionItemPayload(
         Guid? EmployeeId,

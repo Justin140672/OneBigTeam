@@ -29,50 +29,74 @@
                 @* HiringPipelineChart mitigation: a chart-only ErrorBoundary keeps a Syncfusion
                    legend-measurement failure from taking down the whole dashboard circuit for the
                    user, in addition to the explicit AccumulationChartLegendFont fix below. *@
-                <ErrorBoundary>
-                    <ChildContent>
-                        <SfAccumulationChart Title="" Height="280px" Background="transparent">
-                            <AccumulationChartLegendSettings Visible="true" Position="LegendPosition.Right">
-                                <AccumulationChartLegendFont FontFamily="Inter, Helvetica Neue, Helvetica, Arial, sans-serif" />
-                            </AccumulationChartLegendSettings>
-                            <AccumulationChartSeriesCollection>
-                                <AccumulationChartSeries DataSource="@_data"
-                                                          XName="@nameof(FunnelStage.Label)"
-                                                          YName="@nameof(FunnelStage.Value)"
-                                                          PointColorMapping="@nameof(FunnelStage.Fill)"
-                                                          Type="AccumulationType.Funnel">
-                                    <AccumulationDataLabelSettings Visible="true" Name="@nameof(FunnelStage.Value)" />
-                                </AccumulationChartSeries>
-                            </AccumulationChartSeriesCollection>
-                            <AccumulationChartEvents OnPointClick="OnStageClicked" />
-                        </SfAccumulationChart>
-                    </ChildContent>
-                    <ErrorContent>
-                        <div class="widget-empty">
-                            <i class="fa-solid fa-triangle-exclamation fa-lg mb-2"></i>
-                            <p class="mb-0">Unable to display the pipeline chart. See the table below.</p>
-                        </div>
-                    </ErrorContent>
-                </ErrorBoundary>
+                <ul class="pipeline-legend" aria-label="Pipeline stages shown in chart" data-testid="hiring-pipeline-legend">
+                    @foreach (var stage in _data)
+                    {
+                        var s = stage;
+                        var shown = !_hidden.Contains(s.StageId);
+                        <li>
+                            <button type="button"
+                                    class="@("pipeline-legend-item" + (shown ? "" : " is-hidden"))"
+                                    aria-label="@($"Show {s.Label}")"
+                                    aria-pressed="@(shown ? "true" : "false")"
+                                    data-testid="hiring-pipeline-legend-item"
+                                    data-stage="@s.Label"
+                                    @onclick="() => ToggleStage(s.StageId)">
+                                <span class="pipeline-legend-swatch" aria-hidden="true" style="@($"background-color:{s.Fill}")"></span>
+                                <span class="pipeline-legend-text">@s.Label</span>
+                            </button>
+                        </li>
+                    }
+                </ul>
 
-                @* DSH-07: text alternative for the Syncfusion funnel (SVG has no accessible data). *@
-                <details class="chart-data-table">
-                    <summary>View pipeline as a table</summary>
-                    <div class="dashboard-scroll-x">
-                        <table>
-                            <caption>Applications by pipeline stage</caption>
-                            <thead>
-                                <tr><th scope="col">Stage</th><th scope="col">Applications</th></tr>
-                            </thead>
-                            <tbody>
-                                @foreach (var stage in _data)
-                                {
-                                    <tr><td>@stage.Label</td><td>@stage.Value</td></tr>
-                                }
-                            </tbody>
-                        </table>
-                    </div>
-                </details>
+                <div role="img" aria-label="Hiring pipeline: applications by stage"
+                     aria-describedby="@_summaryId" data-testid="hiring-pipeline-chart">
+                    @if (_visible.Count == 0)
+                    {
+                        <div class="widget-empty">
+                            <p class="mb-0">All stages are hidden. Select a stage above to show it.</p>
+                        </div>
+                    }
+                    else
+                    {
+                        <ErrorBoundary>
+                            <ChildContent>
+                                <SfAccumulationChart Title="" Height="280px" Background="transparent">
+                                    <AccumulationChartLegendSettings Visible="false" />
+                                    <AccumulationChartSeriesCollection>
+                                        <AccumulationChartSeries DataSource="@_visible"
+                                                                  XName="@nameof(FunnelStage.Label)"
+                                                                  YName="@nameof(FunnelStage.Value)"
+                                                                  PointColorMapping="@nameof(FunnelStage.Fill)"
+                                                                  Type="AccumulationType.Funnel">
+                                            <AccumulationDataLabelSettings Visible="true" Name="@nameof(FunnelStage.LabelText)"
+                                                                           Position="AccumulationLabelPosition.Outside">
+                                                <AccumulationChartDataLabelFont FontFamily="Inter, Helvetica Neue, Helvetica, Arial, sans-serif" />
+                                            </AccumulationDataLabelSettings>
+                                        </AccumulationChartSeries>
+                                    </AccumulationChartSeriesCollection>
+                                    <AccumulationChartEvents OnPointClick="OnStageClicked" />
+                                </SfAccumulationChart>
+                            </ChildContent>
+                            <ErrorContent>
+                                <div class="widget-empty">
+                                    <i class="fa-solid fa-triangle-exclamation fa-lg mb-2" aria-hidden="true"></i>
+                                    <p class="mb-0">Unable to display the pipeline chart. See the table below.</p>
+                                </div>
+                            </ErrorContent>
+                        </ErrorBoundary>
+                    }
+                </div>
+
+                <p id="@_summaryId" class="visually-hidden">@Summary</p>
+
+                <ChartDataTableToggle TestIdPrefix="hiring-pipeline"
+                                      ShowText="View pipeline as a table"
+                                      HideText="Hide pipeline table"
+                                      Caption="Applications by pipeline stage"
+                                      CategoryHeader="Stage"
+                                      ValueHeader="Applications"
+                                      Rows="@_data.Select(d => new ChartDataTableToggle.ChartDataRow(d.Label, d.Value))" />
             }
         </div>
     </div>
@@ -115,18 +139,37 @@
                 item.ApplicationCount,
                 Palette[index % Palette.Length]))
             .ToList();
+        _visible = [.. _data];
 
         _loading = false;
     }
 
     private void OnStageClicked(AccumulationPointEventArgs args)
     {
-        if (args.PointIndex < 0 || args.PointIndex >= _data.Count) return;
+        if (args.PointIndex < 0 || args.PointIndex >= _visible.Count) return;
 
-        _selectedStageId = _data[args.PointIndex].StageId;
-        _selectedStageName = _data[args.PointIndex].Label;
+        _selectedStageId = _visible[args.PointIndex].StageId;
+        _selectedStageName = _visible[args.PointIndex].Label;
         _dialogOpen = true;
     }
 
-    private sealed record FunnelStage(Guid StageId, string Label, int Value, string Fill);
+    private readonly HashSet<Guid> _hidden = [];
+    private readonly string _summaryId = $"hiring-pipeline-summary-{Guid.NewGuid():N}";
+
+    private List<FunnelStage> _visible = [];
+
+    private string Summary =>
+        string.Join(", ", _data.Select(d => $"{d.Label} {d.Value}")) +
+        $". Total {_data.Sum(d => d.Value)} applications.";
+
+    private void ToggleStage(Guid stageId)
+    {
+        if (!_hidden.Remove(stageId)) _hidden.Add(stageId);
+        _visible = _data.Where(d => !_hidden.Contains(d.StageId)).ToList();
+    }
+
+    private sealed record FunnelStage(Guid StageId, string Label, int Value, string Fill)
+    {
+        public string LabelText => $"{Label}: {Value}";
+    }
 }

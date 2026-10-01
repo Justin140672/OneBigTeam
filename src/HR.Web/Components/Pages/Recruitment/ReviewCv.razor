@@ -90,7 +90,7 @@
                             <SfButton IsPrimary="true" Disabled="@(_busy || _app.WithdrawnAt is not null || Session.IsReadOnly)" OnClick="SaveNotesAsync" data-testid="review-cv-save-notes">Save Notes</SfButton>
                             <SfButton Disabled="@(Session.IsReadOnly || _busy || _app.WithdrawnAt is not null)" OnClick="MoveForwardAsync" data-testid="review-cv-move-forward">Advance to Next Stage</SfButton>
                             <SfButton CssClass="e-danger" Disabled="@(Session.IsReadOnly || _busy || _app.WithdrawnAt is not null)" OnClick="@(() => _showRejectDialog = true)" data-testid="review-cv-reject">Reject</SfButton>
-                            <SfButton Disabled="@_busy" OnClick="Close" data-testid="review-cv-close">Close</SfButton>
+                            <SfButton Disabled="@_busy" OnClick="Close" data-testid="review-cv-close">Back to applications</SfButton>
                         </div>
                     </div>
                 </div>

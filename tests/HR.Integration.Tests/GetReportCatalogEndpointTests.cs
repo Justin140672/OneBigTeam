@@ -84,6 +84,21 @@ public class GetReportCatalogEndpointTests
     }
 
     [Fact]
+    public async Task Get_Catalog_Flags_Every_Report_As_ManagerReport_For_Manager()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Manager);
+        using var client = await ClientFor(userId, companyId);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/reporting/catalog");
+
+        var payload = await response.Content.ReadFromJsonAsync<CatalogPayload>();
+        Assert.NotNull(payload);
+        Assert.All(payload!.Items, i => Assert.True(i.ManagerReport));
+    }
+
+    [Fact]
     public async Task Get_Catalog_Includes_WorkloadActions_For_Manager()
     {
         var userId = Guid.NewGuid();
@@ -116,6 +131,23 @@ public class GetReportCatalogEndpointTests
         var payload = await response.Content.ReadFromJsonAsync<CatalogPayload>();
         Assert.NotNull(payload);
         Assert.DoesNotContain(payload!.Items, i => i.Id == "workload-actions");
+    }
+
+    [Fact]
+    public async Task Get_Catalog_Flags_Exactly_The_Four_Manager_Reports_For_HrAdministrator()
+    {
+        var userId = Guid.NewGuid();
+        var companyId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator);
+        using var client = await ClientFor(userId, companyId);
+
+        var response = await client.GetAsync($"/api/companies/{companyId}/reporting/catalog");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<CatalogPayload>();
+        Assert.NotNull(payload);
+        var flagged = payload!.Items.Where(i => i.ManagerReport).Select(i => i.Id).OrderBy(x => x).ToList();
+        Assert.Equal(["leave-summary", "onboarding-progress", "probation-report", "workload-actions"], flagged);
     }
 
     [Fact]
@@ -228,5 +260,5 @@ public class GetReportCatalogEndpointTests
 
     private sealed record CatalogPayload(List<CatalogItemPayload> Items);
 
-    private sealed record CatalogItemPayload(string Id, string DisplayName, string Category, string Description);
+    private sealed record CatalogItemPayload(string Id, string DisplayName, string Category, string Description, bool ManagerReport = false);
 }

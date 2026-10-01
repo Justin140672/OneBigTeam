@@ -16,7 +16,7 @@
         }
     </label>
 
-    <SfComboBox TValue="TValue" TItem="TItem"
+    <SfComboBox ID="@FieldId" TValue="TValue" TItem="TItem"
                 DataSource="@DataSource"
                 Value="@Value"
                 ValueChanged="@(EventCallback.Factory.Create<TValue>(this, OnValueChanged))"
@@ -35,7 +35,7 @@
     }
     @if (ValueExpression is not null)
     {
-        <div id="@ErrorId">
+        <div id="@ErrorId" role="alert">
             <ValidationMessage For="@ValueExpression" class="@ValidationClass" />
         </div>
     }

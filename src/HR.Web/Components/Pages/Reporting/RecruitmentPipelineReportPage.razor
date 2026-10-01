@@ -17,9 +17,9 @@
 
     @if (_exportError is not null)
     {
-        <div class="alert alert-danger alert-dismissible">
+        <div class="alert alert-danger alert-dismissible" role="alert">
             @_exportError
-            <button type="button" class="btn-close" @onclick="@(() => _exportError = null)"></button>
+            <button type="button" class="btn-close" aria-label="Dismiss error" @onclick="@(() => _exportError = null)"></button>
         </div>
     }
 
@@ -37,21 +37,23 @@
                         DateRangeEndLabel="Start Date To" />
 
     <div class="d-flex align-items-center gap-2 mb-3">
-        <label class="form-label mb-0">Group by</label>
+        <label class="form-label mb-0" for="report-group-by">Group by</label>
         <SfDropDownList TValue="RecruitmentPipelineGroupBy" TItem="GroupByOption" DataSource="@_groupByOptions"
-                        Width="180px"
+                        Width="180px" HtmlAttributes="@_groupByAttributes"
                         Value="@_groupBy" ValueChanged="OnGroupByChangedAsync">
             <DropDownListFieldSettings Value="Value" Text="Label" />
         </SfDropDownList>
         <div class="d-flex align-items-center gap-2 ms-3" data-testid="report-application-type-filter">
             <label class="form-label mb-0" for="report-application-type-filter">Applications</label>
             <SfDropDownList TValue="ApplicationTypeFilter" TItem="ApplicationTypeFilterOption" DataSource="@_applicationTypeOptions"
-                            ID="report-application-type-filter" Width="180px"
+                            Width="180px" HtmlAttributes="@_applicationTypeFilterAttributes"
                             Value="@_applicationType" ValueChanged="OnApplicationTypeChangedAsync">
                 <DropDownListFieldSettings Value="Value" Text="Label" />
             </SfDropDownList>
         </div>
     </div>
+
+    <SearchResultsAnnouncer Count="@_items.Count" Noun="row" />
 
     @if (_isLoading)
     {
@@ -59,7 +61,7 @@
     }
     else if (_error is not null)
     {
-        <div class="alert alert-danger">@_error</div>
+        <div class="alert alert-danger" role="alert">@_error</div>
     }
     else
     {
@@ -127,6 +129,18 @@
     // Internal recruitment Ticket 6: Internal/External application filter (explicit "All applications"
     // item rather than a clear button). Applied to both the view and the export.
     private ApplicationTypeFilter _applicationType = ApplicationTypeFilter.All;
+
+    private static readonly Dictionary<string, object> _groupByAttributes = new()
+    {
+        ["id"] = "report-group-by",
+        ["aria-label"] = "Group by",
+    };
+
+    private static readonly Dictionary<string, object> _applicationTypeFilterAttributes = new()
+    {
+        ["id"] = "report-application-type-filter",
+        ["aria-label"] = "Applications",
+    };
 
     private static readonly ApplicationTypeFilterOption[] _applicationTypeOptions =
     [

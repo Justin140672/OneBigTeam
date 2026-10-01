@@ -15,7 +15,7 @@
         }
     </label>
 
-    <SfDatePicker TValue="TValue"
+    <SfDatePicker ID="@FieldId" TValue="TValue"
                   Value="@Value"
                   ValueChanged="@(EventCallback.Factory.Create<TValue>(this, OnValueChanged))"
                   ValueExpression="@ValueExpression"
@@ -32,7 +32,7 @@
     }
     @if (ValueExpression is not null)
     {
-        <div id="@ErrorId">
+        <div id="@ErrorId" role="alert">
             <ValidationMessage For="@ValueExpression" class="@ValidationClass" />
         </div>
     }

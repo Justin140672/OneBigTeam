@@ -6,11 +6,14 @@
    badge) is still shown since that status is not otherwise visible once a card leaves the "current
    stage" column context. *@
 <div class="kanban-candidate-card @StageCssClass" @onclick="() => OnOpen.InvokeAsync(Candidate)"
+     role="group" aria-label="@($"{Candidate.CandidateFullName}, {Candidate.StageName}")"
      data-testid="kanban-candidate-card" data-application-id="@Candidate.ApplicationId">
     <div class="kanban-candidate-card__top">
         <ProfilePhotoAvatar PhotoUrl="@Candidate.CandidatePhotoUrl" Initials="@Initials" SizePx="36" />
         <div class="kanban-candidate-card__name-block">
-            <div class="kanban-candidate-card__name">@Candidate.CandidateFullName</div>
+            <button type="button" class="kanban-candidate-card__name"
+                    aria-label="@($"Open {Candidate.CandidateFullName}, {Candidate.StageName}")"
+                    @onclick="() => OnOpen.InvokeAsync(Candidate)" @onclick:stopPropagation="true">@Candidate.CandidateFullName</button>
             @if (Candidate.IsInternal)
             {
                 <div class="kanban-candidate-card__internal">
@@ -25,15 +28,15 @@
         }
         <div class="kanban-candidate-card__actions">
             <button type="button" class="kanban-candidate-card__move-btn"
-                    title="Move to stage…" aria-label="Move to stage…" aria-haspopup="true"
+                    title="Move to stage…" aria-label="@($"Move {Candidate.CandidateFullName} to stage…")" aria-haspopup="true"
                     aria-expanded="@(_menuOpen ? "true" : "false")"
                     data-testid="kanban-card-move-stage-btn"
                     @onclick="ToggleMenu" @onclick:stopPropagation="true">
-                <i class="fa-solid fa-ellipsis-vertical"></i>
+                <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
             </button>
             @if (_menuOpen)
             {
-                <div class="kanban-candidate-card__move-menu" role="menu" aria-label="Move to stage"
+                <div class="kanban-candidate-card__move-menu" role="menu" aria-label="@($"Move {Candidate.CandidateFullName} to stage")"
                      data-testid="kanban-card-move-stage-menu">
                     <button type="button" role="menuitem" data-testid="kanban-card-review-cv"
                             @onclick="ReviewCv" @onclick:stopPropagation="true">
@@ -59,8 +62,8 @@
         </div>
     </div>
     <div class="kanban-candidate-card__meta">
-        <span><i class="fa-regular fa-calendar me-1"></i>Applied @Candidate.AppliedAt.ToString("d MMM yyyy")</span>
-        <span><i class="fa-regular fa-user me-1"></i>@RecruiterName</span>
+        <span><i class="fa-regular fa-calendar me-1" aria-hidden="true"></i>Applied @Candidate.AppliedAt.ToString("d MMM yyyy")</span>
+        <span><i class="fa-regular fa-user me-1" aria-hidden="true"></i>@RecruiterName</span>
     </div>
 </div>
 

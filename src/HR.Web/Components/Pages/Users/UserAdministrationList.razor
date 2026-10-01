@@ -19,7 +19,7 @@
         <HrTextBox Value="@SearchTerm"
                    ValueChanged="@OnSearchChanged"
                    Placeholder="Search by name or email"
-                   HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "user-admin-search" })" />
+                   HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "user-admin-search", ["aria-label"] = "Search users" })" />
     </div>
 
     @if (IsLoading)

@@ -180,7 +180,13 @@ public sealed class ExternalRecruiterDetailPage(IPage page, string baseUrl)
     private ILocator UnsavedChangesDialog => page.Locator("[role='dialog']:has-text('Unsaved Changes')");
 
     public Task ClickCloseAsync() =>
-        page.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
+        page.GetByRole(AriaRole.Button, new() { NameRegex = new System.Text.RegularExpressions.Regex("^(Cancel|Back to external recruiters)$") }).ClickAsync();
 
     public Task<bool> IsUnsavedChangesDialogVisibleAsync() => UnsavedChangesDialog.WaitUntilVisibleAsync();
+
+    public Task CancelUnsavedChangesDialogAsync() =>
+        UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Stay on page" }).ClickAsync();
+
+    public Task ConfirmDiscardChangesAsync() =>
+        UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Discard changes" }).ClickAsync();
 }

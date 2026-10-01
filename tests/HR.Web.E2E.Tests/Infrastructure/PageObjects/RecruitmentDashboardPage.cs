@@ -58,7 +58,7 @@ public sealed class RecruitmentDashboardPage(IPage page, string baseUrl)
 
     public async Task FillBoardSearchAsync(string text)
     {
-        var input = page.Locator("input[data-testid='kanban-search-box'], [data-testid='kanban-search-box'] input").First;
+        var input = page.Locator("input[aria-label='Search pipeline candidates'], input[data-testid='kanban-search-box'], [data-testid='kanban-search-box'] input").First;
         await input.FillAsync(text);
         await input.PressAsync("Tab");
         await page.WaitForTimeoutAsync(400);

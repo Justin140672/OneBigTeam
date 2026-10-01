@@ -51,7 +51,7 @@ public sealed class AddCandidateDialog(IPage page)
     private ILocator DuplicateInactive => DuplicateAlert.Locator("[data-testid='duplicate-candidate-inactive']");
     private ILocator DuplicateDetailsLink => DuplicateAlert.Locator("[data-testid='duplicate-candidate-details-link']");
 
-    private ILocator ValidationMessages => Dialog.Locator(".validation-message");
+    private ILocator ValidationMessages => Dialog.Locator(".validation-message, [role='alert']");
 
 
     /// <summary>

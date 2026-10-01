@@ -9,6 +9,7 @@
 @inject LocationService LocationService
 @inject ExternalRecruiterService ExternalRecruiterService
 @inject AppSession Session
+@inject IJSRuntime JS
 
 @inherits EditPageBase<VacancyEditModel, Guid>
 
@@ -33,7 +34,7 @@
 
         @if (!string.IsNullOrEmpty(GlobalError))
         {
-            <div class="alert alert-danger">@GlobalError</div>
+            <div class="alert alert-danger" role="alert">@GlobalError</div>
         }
 
         <EditForm EditContext="EditContext">
@@ -47,7 +48,7 @@
                     }
                     Save
                 </SfButton>
-                <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+                <SfButton OnClick="RequestClose" Disabled="@Saving">@(IsViewMode ? "Back to vacancies" : "Cancel")</SfButton>
             </div>
         </EditForm>
     }
@@ -59,32 +60,35 @@
             {
                 <StatusBadge Variant="@StatusVariant(_vacancy.Status)">@EnumDisplay.Humanize(_vacancy.Status)</StatusBadge>
             }
-            @if (CanPublish)
-            {
-                <SfButton CssClass="ms-auto" IsPrimary="true" OnClick="PublishVacancyAsync" Disabled="@(_publishing || Session.IsReadOnly)">
-                    @if (_publishing)
-                    {
-                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                    }
-                    Publish Vacancy
-                </SfButton>
-            }
-            @if (CanClose)
-            {
-                <SfButton CssClass="@(CanPublish ? null : "ms-auto")" OnClick="CloseVacancyAsync" Disabled="@(_closing || Session.IsReadOnly)">
-                    @if (_closing)
-                    {
-                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                    }
-                    Close Vacancy
-                </SfButton>
-            }
-            @if (Session.CanManageRecruitment && _vacancy is not null && _vacancy.Status != "Draft")
-            {
-                <SfButton CssClass="@(CanPublish || CanClose ? null : "ms-auto")" OnClick="@(() => Navigation.NavigateTo($"/companies/{CompanyId}/vacancies/{Id}/kanban"))">
-                    View Kanban Board
-                </SfButton>
-            }
+            <div class="vacancy-header-actions">
+                @if (CanPublish)
+                {
+                    <SfButton IsPrimary="true" OnClick="PublishVacancyAsync" Disabled="@(_publishing || Session.IsReadOnly)">
+                        @if (_publishing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Publish Vacancy
+                    </SfButton>
+                }
+                @if (Session.CanManageRecruitment && _vacancy is not null && _vacancy.Status != "Draft")
+                {
+                    <SfButton OnClick="@(() => Navigation.NavigateTo($"/companies/{CompanyId}/vacancies/{Id}/kanban"))">
+                        View Kanban Board
+                    </SfButton>
+                }
+                @if (CanClose)
+                {
+                    <SfButton CssClass="e-danger e-outline close-vacancy-btn" OnClick="@(() => _showCloseConfirm = true)" Disabled="@(_closing || Session.IsReadOnly)"
+                              HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "close-vacancy-btn", ["data-testid"] = "close-vacancy-btn" })">
+                        @if (_closing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Close Vacancy
+                    </SfButton>
+                }
+            </div>
         </div>
         <p class="text-muted mb-3">Manage this vacancy's details, applications, and interviews.</p>
 
@@ -92,15 +96,15 @@
                             Message="Someone else changed this vacancy while you were editing. Your changes have not been saved." />
         @if (!SaveConflict && !string.IsNullOrEmpty(GlobalError))
         {
-            <div class="alert alert-danger mb-3">@GlobalError</div>
+            <div class="alert alert-danger mb-3" role="alert">@GlobalError</div>
         }
         @if (!string.IsNullOrEmpty(_closeError))
         {
-            <div class="alert alert-danger mb-3">@_closeError</div>
+            <div class="alert alert-danger mb-3" role="alert">@_closeError</div>
         }
         @if (!string.IsNullOrEmpty(_publishError))
         {
-            <div class="alert alert-danger mb-3">@_publishError</div>
+            <div class="alert alert-danger mb-3" role="alert">@_publishError</div>
         }
 
         <SfTab @bind-SelectedItem="_selectedTabIndex">
@@ -123,7 +127,7 @@
                                             Save
                                         </SfButton>
                                     }
-                                    <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+                                    <SfButton OnClick="RequestClose" Disabled="@Saving">@(IsViewMode ? "Back to vacancies" : "Cancel")</SfButton>
                                 </div>
                             </div>
                         </EditForm>
@@ -156,7 +160,22 @@
 
     <NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges" />
 
+    <div data-testid="close-vacancy-confirm-dialog">
+        <HrConfirmDialog Visible="_showCloseConfirm"
+                         Title="Close vacancy"
+                         Message="Closing this vacancy sets its status to Closed and records today as the closing date, so it stops accepting new applications. Existing applications, interviews and pipeline activity are not changed or deleted and stay available to view. This cannot be undone from this page."
+                         ConfirmText="Close vacancy"
+                         CancelText="Cancel"
+                         DangerConfirm="true"
+                         Busy="_closing"
+                         OnConfirmed="ConfirmCloseVacancyAsync"
+                         OnCancelled="CancelCloseVacancyAsync" />
+    </div>
+
     <UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                          Message="You have unsaved changes. Save them, discard them, or stay on this page to keep editing."
+                          StayText="Stay on page"
+                          DiscardText="Discard changes"
                           OnSaveAndClose="ConfirmSaveAndCloseAsync"
                           OnDiscard="DiscardChangesAndClose"
                           OnCancel="CancelCloseDialog" />
@@ -186,6 +205,7 @@
     private List<ExternalRecruiterListItemModel> _externalRecruiters = [];
     private GetPositionProfileResponse? _selectedProfileDefaults;
     private bool _closing;
+    private bool _showCloseConfirm;
     private string? _closeError;
     private bool _publishing;
     private string? _publishError;
@@ -302,6 +322,18 @@
 
     protected override string? ListUrl => $"/companies/{CompanyId}/vacancies";
 
+    private async Task CancelCloseVacancyAsync()
+    {
+        _showCloseConfirm = false;
+        await JS.InvokeVoidAsync("hrFocusById", "close-vacancy-btn");
+    }
+
+    private async Task ConfirmCloseVacancyAsync()
+    {
+        await CloseVacancyAsync();
+        _showCloseConfirm = false;
+    }
+
     private async Task CloseVacancyAsync()
     {
         if (_vacancy is null) return;
@@ -358,16 +390,35 @@
     // vacancy-level department or location to populate here anymore. AdvertTitle is a deliberate,
     // genuinely-optional override, so it's intentionally left untouched here — it should stay empty
     // unless the user explicitly types something.
-    private async Task OnPositionProfileChanged(ChangeEventArgs<Guid?, PositionProfileListItemModel> args)
+    private async Task OnPositionProfileChangedAsync(Guid? value)
     {
-        Model.PositionProfileId = args.Value;
+        Model.PositionProfileId = value;
         _selectedProfileDefaults = null;
 
-        if (args.Value is Guid profileId)
+        if (value is Guid profileId)
         {
             _selectedProfileDefaults = await PositionProfileService.GetPositionProfileAsync(CompanyId, profileId);
         }
     }
+
+    private string? PositionProfileHelpText =>
+        IsNew ? "Select the position profile first — it sets defaults for the fields below."
+        : _vacancy is not null && !_vacancy.CanChangePositionProfile
+            ? "Position Profile cannot be changed after the vacancy has applications or has moved past Draft status" + (CanRequestCorrection ? ", unless you request an authorised correction below." : ".")
+        : null;
+
+    private Dictionary<string, object> HiringManagerAttributes
+    {
+        get
+        {
+            var attrs = FieldAria.Build(EditContext, Model, "vacancy-hiring-manager", nameof(Model.HiringManagerId), required: true);
+            attrs["aria-label"] = "Hiring Manager";
+            attrs["aria-labelledby"] = "vacancy-hiring-manager-label";
+            return attrs;
+        }
+    }
+
+    protected override string? InvalidFieldFocusScope => "form";
 
     private void OnAuthorisedCorrectionToggled(bool value)
     {
@@ -414,26 +465,16 @@
                 <div class="card-body @(IsViewMode ? "view-mode" : "")">
                     <div class="row g-3">
                         <div class="col-md-8">
-                            <label class="form-label">Position Profile <span class="text-danger">*</span></label>
-                            <SfDropDownList TValue="Guid?"
-                                            TItem="PositionProfileListItemModel"
-                                            DataSource="@_positionProfiles"
-                                            @bind-Value="Model.PositionProfileId"
-                                            Placeholder="Select position profile"
-                                            AllowFiltering="true"
-                                            Enabled="@CanEditPositionProfile">
-                                <DropDownListFieldSettings Value="Id" Text="DisplayLabel" />
-                                <DropDownListEvents TItem="PositionProfileListItemModel" TValue="Guid?" ValueChange="OnPositionProfileChanged" />
-                            </SfDropDownList>
-                            <ValidationMessage For="@(() => Model.PositionProfileId)" />
-                            @if (IsNew)
-                            {
-                                <div class="form-text">Select the position profile first — it sets defaults for the fields below.</div>
-                            }
-                            else if (_vacancy is not null && !_vacancy.CanChangePositionProfile)
-                            {
-                                <div class="form-text">Position Profile cannot be changed after the vacancy has applications or has moved past Draft status@(CanRequestCorrection ? ", unless you request an authorised correction below." : ".")</div>
-                            }
+                            <HrDropDownField TValue="Guid?" TItem="PositionProfileListItemModel"
+                                             Label="Position Profile" Required="true" Id="vacancy-position-profile"
+                                             DataSource="@_positionProfiles"
+                                             Value="Model.PositionProfileId"
+                                             ValueChanged="OnPositionProfileChangedAsync"
+                                             ValueExpression="@(() => Model.PositionProfileId)"
+                                             ValueField="Id" TextField="DisplayLabel"
+                                             Placeholder="Select position profile"
+                                             Disabled="@(!CanEditPositionProfile || IsViewMode)"
+                                             HelpText="@PositionProfileHelpText" />
                         </div>
                     </div>
 
@@ -441,17 +482,15 @@
                     {
                         <div class="row g-3 mt-1" data-testid="position-profile-correction-section">
                             <div class="col-12">
-                                <SfCheckBox TChecked="bool" ID="isAuthorisedCorrection"
-                                            Label="This is an authorised correction"
-                                            Checked="Model.IsAuthorisedCorrection"
-                                            CheckedChanged="OnAuthorisedCorrectionToggled" />
+                                <HrCheckBoxField Label="This is an authorised correction" Id="isAuthorisedCorrection"
+                                                 Checked="Model.IsAuthorisedCorrection"
+                                                 CheckedChanged="OnAuthorisedCorrectionToggled" />
                             </div>
                             @if (Model.IsAuthorisedCorrection)
                             {
                                 <div class="col-md-8">
-                                    <label class="form-label">Correction Reason <span class="text-danger">*</span></label>
-                                    <HrTextBox @bind-Value="Model.CorrectionReason" Placeholder="Explain why this correction is required" />
-                                    <ValidationMessage For="@(() => Model.CorrectionReason)" />
+                                    <HrTextField Label="Correction Reason" Required="true" Id="vacancy-correction-reason"
+                                                 @bind-Value="Model.CorrectionReason" Placeholder="Explain why this correction is required" />
                                 </div>
                             }
                         </div>
@@ -521,19 +560,21 @@
                     <div class="form-text mb-3">The role itself (title, department, location, job description) is defined by the Position Profile above. These fields are only for recruitment-specific advert wording — e.g. a tailored posting title/description.</div>
                     <div class="row g-3">
                         <div class="col-md-8">
-                            <label class="form-label">Advert Title</label>
-                            <HrTextBox @bind-Value="Model.AdvertTitle" Placeholder="e.g. Senior Software Engineer" />
-                            <ValidationMessage For="@(() => Model.AdvertTitle)" />
+                            <HrTextField Label="Advert Title" Id="vacancy-advert-title"
+                                         @bind-Value="Model.AdvertTitle" Placeholder="e.g. Senior Software Engineer"
+                                         ReadOnly="@IsViewMode" />
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Hiring Manager <span class="text-danger">*</span></label>
+                            <label id="vacancy-hiring-manager-label" for="vacancy-hiring-manager" class="form-label">Hiring Manager <span class="text-danger">*</span></label>
                             <SfDropDownList @ref="_hiringManagerDropdown"
                                             TValue="Guid?"
                                             TItem="EmployeeListItemModel"
                                             DataSource="@_employees"
                                             @bind-Value="Model.HiringManagerId"
                                             Placeholder="Select hiring manager"
-                                            AllowFiltering="true">
+                                            AllowFiltering="true"
+                                            Enabled="@(!IsViewMode)"
+                                            HtmlAttributes="@HiringManagerAttributes">
                                 <DropDownListFieldSettings Value="Id" Text="FullName" />
                                 <DropDownListEvents TValue="Guid?" TItem="EmployeeListItemModel" Filtering="OnHiringManagerFilteringAsync" />
                                 <DropDownListTemplates TItem="EmployeeListItemModel">
@@ -545,31 +586,29 @@
                                     </ItemTemplate>
                                 </DropDownListTemplates>
                             </SfDropDownList>
-                            <ValidationMessage For="@(() => Model.HiringManagerId)" />
+                            <div id="vacancy-hiring-manager-error" role="alert">
+                                <ValidationMessage For="@(() => Model.HiringManagerId)" />
+                            </div>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label">Recruitment Agency</label>
-                            <SfDropDownList TValue="Guid"
-                                            TItem="ExternalRecruiterListItemModel"
-                                            DataSource="@_externalRecruiters"
-                                            @bind-Value="Model.AssignedRecruiterId"
-                                            Placeholder="Not assigned"
-                                            AllowFiltering="true"
-                                            Enabled="@(!IsViewMode)">
-                                <DropDownListFieldSettings Value="Id" Text="AgencyName" />
-                            </SfDropDownList>
+                            <HrDropDownField TValue="Guid" TItem="ExternalRecruiterListItemModel"
+                                             Label="Recruitment Agency" Id="vacancy-recruitment-agency"
+                                             DataSource="@_externalRecruiters"
+                                             @bind-Value="Model.AssignedRecruiterId"
+                                             ValueField="Id" TextField="AgencyName"
+                                             Placeholder="Not assigned"
+                                             Disabled="@IsViewMode" />
                         </div>
                         <div class="col-12">
-                            <label class="form-label">Advert Description</label>
-                            <HrTextBox @bind-Value="Model.AdvertDescription" Multiline="true" Rows="4" Readonly="@IsViewMode" />
+                            <HrTextField Label="Advert Description" Id="vacancy-advert-description"
+                                         @bind-Value="Model.AdvertDescription" Multiline="true" Rows="4" ReadOnly="@IsViewMode" />
                         </div>
                         <div class="col-12">
-                            <SfCheckBox TChecked="bool" ID="isAdvertisedInternally"
-                                        data-testid="vacancy-advertise-internally"
-                                        Label="Advertise this vacancy to employees"
-                                        @bind-Checked="Model.IsAdvertisedInternally"
-                                        Disabled="@IsViewMode" />
-                            <div class="form-text">Shows the vacancy in the internal vacancy list</div>
+                            <HrCheckBoxField Label="Advertise this vacancy to employees" Id="isAdvertisedInternally"
+                                             HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "vacancy-advertise-internally" })"
+                                             @bind-Checked="Model.IsAdvertisedInternally"
+                                             Disabled="@IsViewMode"
+                                             HelpText="Shows the vacancy in the internal vacancy list" />
                         </div>
                     </div>
                 </div>

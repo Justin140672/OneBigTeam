@@ -19,9 +19,25 @@ public class HrTextBox : SfTextBox
             FloatLabelType = FloatLabelType.Never;
         }
 
+        if (!parameters.TryGetValue<AutoComplete>(nameof(Autocomplete), out _))
+        {
+            Autocomplete = AutoComplete.Off;
+        }
+
         CssClass = parameters.TryGetValue<string>(nameof(CssClass), out var cssClass) && !string.IsNullOrWhiteSpace(cssClass)
             ? $"hr-textbox {cssClass}"
             : "hr-textbox";
+
+        if (!parameters.TryGetValue<string>(nameof(ID), out var explicitId) || string.IsNullOrWhiteSpace(explicitId))
+        {
+            if (parameters.TryGetValue<Dictionary<string, object>>(nameof(HtmlAttributes), out var attributes)
+                && attributes is not null
+                && attributes.TryGetValue("id", out var idValue)
+                && idValue is string { Length: > 0 } id)
+            {
+                ID = id;
+            }
+        }
 
         return base.SetParametersAsync(parameters);
     }

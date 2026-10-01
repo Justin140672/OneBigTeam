@@ -14,15 +14,15 @@
 
 <PageTitle>Workload &amp; HR Actions Report</PageTitle>
 
-<div class="container-fluid py-4">
+<div class="container-fluid py-4" data-load-version="@_loadVersion">
     <h1 class="mb-1">Workload &amp; HR Actions Report</h1>
     <p class="text-muted mb-3">Outstanding HR actions across the company, grouped and filtered by type, department, due date, urgency and status.</p>
 
     @if (_exportError is not null)
     {
-        <div class="alert alert-danger alert-dismissible">
+        <div class="alert alert-danger alert-dismissible" role="alert">
             @_exportError
-            <button type="button" class="btn-close" @onclick="@(() => _exportError = null)"></button>
+            <button type="button" class="btn-close" aria-label="Dismiss error" @onclick="@(() => _exportError = null)"></button>
         </div>
     }
 
@@ -32,7 +32,7 @@
     }
     else if (_error is not null)
     {
-        <div class="alert alert-danger">@_error</div>
+        <div class="alert alert-danger" role="alert">@_error</div>
     }
     else
     {
@@ -55,13 +55,14 @@
             <div class="card-body">
                 <div class="row g-3 align-items-end mb-2">
                     <div class="col-md-4">
-                        <label class="form-label">Saved Views</label>
+                        <label class="form-label" for="wl-saved-view">Saved Views</label>
                         <SfDropDownList TValue="Guid?"
                                         TItem="SavedViewOption"
                                         DataSource="@_savedViewOptions"
                                         Value="@_selectedViewId"
                                         ValueChanged="OnSavedViewSelectedAsync"
                                         Placeholder="Select a saved view"
+                                        HtmlAttributes="@Attr("wl-saved-view", "Saved Views")"
                                         AllowFiltering="true"
                                         ShowClearButton="true">
                             <DropDownListFieldSettings Value="Id" Text="DisplayText" />
@@ -83,7 +84,7 @@
                 {
                     <div class="row g-3 align-items-end mb-2">
                         <div class="col-md-4">
-                            <HrTextBox @bind-Value="_newViewName" Placeholder="View name" />
+                            <HrTextBox @bind-Value="_newViewName" Placeholder="View name" HtmlAttributes="@Attr("wl-new-view-name", "View name")" />
                         </div>
                         <div class="col-md-auto pb-1 d-flex gap-2">
                             <SfButton IsPrimary="true" Disabled="@(string.IsNullOrWhiteSpace(_newViewName))" OnClick="SaveCurrentAsViewAsync">Save</SfButton>
@@ -95,7 +96,7 @@
                 {
                     <div class="row g-3 align-items-end mb-2">
                         <div class="col-md-4">
-                            <HrTextBox @bind-Value="_renameViewName" Placeholder="View name" />
+                            <HrTextBox @bind-Value="_renameViewName" Placeholder="View name" HtmlAttributes="@Attr("wl-rename-view-name", "Rename saved view")" />
                         </div>
                         <div class="col-md-auto pb-1 d-flex gap-2">
                             <SfButton IsPrimary="true" Disabled="@(string.IsNullOrWhiteSpace(_renameViewName))" OnClick="ConfirmRenameAsync">Save Name</SfButton>
@@ -105,106 +106,114 @@
                 }
                 @if (_savedViewError is not null)
                 {
-                    <div class="alert alert-danger alert-dismissible py-2">
+                    <div class="alert alert-danger alert-dismissible py-2" role="alert">
                         @_savedViewError
-                        <button type="button" class="btn-close" @onclick="@(() => _savedViewError = null)"></button>
+                        <button type="button" class="btn-close" aria-label="Dismiss error" @onclick="@(() => _savedViewError = null)"></button>
                     </div>
                 }
                 <div class="row g-3">
                     <div class="col-md-3">
-                        <label class="form-label">Action Type</label>
+                        <label class="form-label" for="wl-action-type">Action Type</label>
                         <SfDropDownList TValue="string?"
                                         TItem="string"
                                         DataSource="@_actionTypeOptions"
                                         @bind-Value="_actionType"
                                         Placeholder="All Action Types"
+                                        HtmlAttributes="@Attr("wl-action-type", "Action Type")"
                                         AllowFiltering="true" />
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label">Department</label>
+                        <label class="form-label" for="wl-department">Department</label>
                         <SfDropDownList TValue="string?"
                                         TItem="string"
                                         DataSource="@_departmentOptions"
                                         @bind-Value="_department"
                                         Placeholder="All Departments"
+                                        HtmlAttributes="@Attr("wl-department", "Department")"
                                         AllowFiltering="true" />
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label">Urgency</label>
+                        <label class="form-label" for="wl-urgency">Urgency</label>
                         <SfDropDownList TValue="string?"
                                         TItem="UrgencyOption"
                                         DataSource="@_urgencyOptions"
                                         @bind-Value="_urgency"
-                                        Placeholder="All Urgencies">
+                                        Placeholder="All Urgencies"
+                                        HtmlAttributes="@Attr("wl-urgency", "Urgency")">
                             <DropDownListFieldSettings Value="Value" Text="Label" />
                         </SfDropDownList>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label">Status</label>
+                        <label class="form-label" for="wl-status">Status</label>
                         <SfDropDownList TValue="string?"
                                         TItem="string"
                                         DataSource="@_statusOptions"
                                         @bind-Value="_status"
                                         Placeholder="All Statuses"
+                                        HtmlAttributes="@Attr("wl-status", "Status")"
                                         AllowFiltering="true" />
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label">Employee</label>
+                        <label class="form-label" for="wl-employee">Employee</label>
                         <SfDropDownList @ref="_employeeDropdown"
                                         TValue="Guid?"
                                         TItem="EmployeeOption"
                                         DataSource="@_employeeOptions"
                                         @bind-Value="_employeeId"
                                         Placeholder="All Employees"
+                                        HtmlAttributes="@Attr("wl-employee", "Employee")"
                                         AllowFiltering="true">
                             <DropDownListFieldSettings Value="Id" Text="Name" />
                             <DropDownListEvents TValue="Guid?" TItem="EmployeeOption" Filtering="OnEmployeeFilteringAsync" />
                         </SfDropDownList>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label">Due Date From</label>
-                        <SfDatePicker TValue="DateOnly?" @bind-Value="_dueDateStart" Format="dd/MM/yyyy" Placeholder="dd/mm/yyyy" />
+                        <label id="wl-due-from-label" class="form-label" for="wl-due-from">Due Date From</label>
+                        <SfDatePicker TValue="DateOnly?" @bind-Value="_dueDateStart" Format="dd/MM/yyyy" Placeholder="dd/mm/yyyy" HtmlAttributes="@DateAttr("wl-due-from", "Due Date From")" />
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label">Due Date To</label>
-                        <SfDatePicker TValue="DateOnly?" @bind-Value="_dueDateEnd" Format="dd/MM/yyyy" Placeholder="dd/mm/yyyy" />
+                        <label id="wl-due-to-label" class="form-label" for="wl-due-to">Due Date To</label>
+                        <SfDatePicker TValue="DateOnly?" @bind-Value="_dueDateEnd" Format="dd/MM/yyyy" Placeholder="dd/mm/yyyy" HtmlAttributes="@DateAttr("wl-due-to", "Due Date To")" />
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label">Manager</label>
+                        <label class="form-label" for="wl-manager">Manager</label>
                         <SfDropDownList @ref="_managerDropdown"
                                         TValue="Guid?"
                                         TItem="EmployeeOption"
                                         DataSource="@_managerOptions"
                                         @bind-Value="_managerId"
                                         Placeholder="All Managers"
+                                        HtmlAttributes="@Attr("wl-manager", "Manager")"
                                         AllowFiltering="true">
                             <DropDownListFieldSettings Value="Id" Text="Name" />
                             <DropDownListEvents TValue="Guid?" TItem="EmployeeOption" Filtering="OnManagerFilteringAsync" />
                         </SfDropDownList>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label">Location</label>
+                        <label class="form-label" for="wl-location">Location</label>
                         <SfDropDownList TValue="Guid?"
                                         TItem="LocationListItemModel"
                                         DataSource="@_locationOptions"
                                         @bind-Value="_locationId"
                                         Placeholder="All Locations"
+                                        HtmlAttributes="@Attr("wl-location", "Location")"
                                         AllowFiltering="true">
                             <DropDownListFieldSettings Value="Id" Text="Name" />
                         </SfDropDownList>
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label">Recruitment User</label>
-                        <HrTextBox @bind-Value="_recruitmentUser" Placeholder="All Recruiters" />
+                        <label class="form-label" for="wl-recruitment-user">Recruitment User</label>
+                        <HrTextBox @bind-Value="_recruitmentUser" Placeholder="All Recruiters" HtmlAttributes="@Attr("wl-recruitment-user", "Recruitment User")" />
                     </div>
                     <div class="col-md-3">
-                        <label class="form-label">Group By</label>
+                        <label class="form-label" for="wl-group-by">Group By</label>
                         <SfDropDownList TValue="WorkloadActionsGroupBy?"
                                         TItem="GroupByOption"
                                         DataSource="@_groupByOptions"
                                         Value="@_groupBy"
                                         ValueChanged="OnGroupByChangedAsync"
-                                        Placeholder="No Grouping">
+                                        Placeholder="No Grouping"
+                                        HtmlAttributes="@Attr("wl-group-by", "Group By")">
                             <DropDownListFieldSettings Value="Value" Text="Label" />
                         </SfDropDownList>
                     </div>
@@ -248,6 +257,7 @@
     private int _totalItemCount;
 
     private bool _isLoading = true;
+    private int _loadVersion;
     private string? _error;
 
     private string? _actionType;
@@ -540,6 +550,12 @@
 
     private RenderFragment ExportMenuTemplate => @<ExportMenu OnItemSelected="HandleExportItemSelected" />;
 
+    private static Dictionary<string, object> DateAttr(string id, string label) =>
+        new() { ["id"] = id, ["aria-label"] = label, ["aria-labelledby"] = id + "-label" };
+
+    private static Dictionary<string, object> Attr(string id, string label) =>
+        new() { ["id"] = id, ["aria-label"] = label };
+
     private IEnumerable<object> Toolbar => new List<object>
     {
         "Print",
@@ -601,6 +617,7 @@
         }
 
         _isLoading = false;
+        _loadVersion++;
         StateHasChanged();
     }
 
@@ -709,7 +726,7 @@
                     }
                     @if (item.IsOwnerActionable)
                     {
-                        <SfButton OnClick="@(() => GoToAction(item))">Go</SfButton>
+                        <SfButton OnClick="@(() => GoToAction(item))" HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = $"Go to {item.ActionType} for {item.EmployeeName}" })">Go</SfButton>
                     }
                     else
                     {

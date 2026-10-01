@@ -15,7 +15,7 @@
 
     <div class="mb-3 page-search-box">
         <label for="report-catalog-search" class="visually-hidden">Search reports</label>
-        <HrTextBox Value="@_searchTerm" ValueChanged="@OnSearchChanged" Placeholder="Search reports by name or description" HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "report-catalog-search" })" />
+        <HrTextBox Value="@_searchTerm" ValueChanged="@OnSearchChanged" Placeholder="Search reports by name or description" HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "report-catalog-search", ["aria-label"] = "Search reports" })" />
     </div>
 
     @if (_isLoading)

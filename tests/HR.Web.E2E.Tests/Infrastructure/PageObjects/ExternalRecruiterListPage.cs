@@ -97,6 +97,6 @@ public sealed class ExternalRecruiterListPage(IPage page, string baseUrl)
         await page.RevealGridRowAsync(agencyNameFragment);
         var link = page.Locator(".e-rowcell a").Filter(new() { HasText = agencyNameFragment }).First;
         await link.ClickAsync();
-        await page.WaitForSelectorAsync("button:has-text('Save'), button:has-text('Close')", new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync("button:has-text('Save'), button:has-text('Back to external recruiters')", new() { Timeout = 20_000 });
     }
 }

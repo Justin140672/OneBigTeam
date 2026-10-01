@@ -11,7 +11,7 @@
                 Checked="@Value"
                 CheckedChanged="@(EventCallback.Factory.Create<bool>(this, OnCheckedChanged))"
                 Disabled="@Disabled"
-                HtmlAttributes="@BuildInputAttributes()" />
+                HtmlAttributes="@CheckBoxAttributes" />
 
     @if (HasHelp)
     {
@@ -19,7 +19,7 @@
     }
     @if (ValueExpression is not null)
     {
-        <div id="@ErrorId">
+        <div id="@ErrorId" role="alert">
             <ValidationMessage For="@ValueExpression" class="@ValidationClass" />
         </div>
     }
@@ -30,6 +30,16 @@
 
     [Parameter] public bool Checked { get => Value; set => Value = value; }
     [Parameter] public EventCallback<bool> CheckedChanged { get; set; }
+
+    private Dictionary<string, object> CheckBoxAttributes
+    {
+        get
+        {
+            var attrs = BuildInputAttributes();
+            attrs["id"] = FieldId;
+            return attrs;
+        }
+    }
 
     private async Task OnCheckedChanged(bool value)
     {

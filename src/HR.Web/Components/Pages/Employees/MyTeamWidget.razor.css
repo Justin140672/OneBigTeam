@@ -12,7 +12,7 @@
    Widened the minimum card width (120px -> 150px) so cards have more breathing room. */
 .team-card-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: 10px;
     padding: 14px 16px;
 }
@@ -107,9 +107,19 @@ html[data-theme="dark"] .team-card-alert-badge {
     color: var(--hr-color-danger);
 }
 
-.team-card-notify-btn {
+.team-card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
     margin-top: 8px;
     width: 100%;
+}
+
+.team-card-actions ::deep .e-btn {
+    flex: 0 1 auto;
+    white-space: nowrap;
+    margin: 0;
 }
 
 .team-card-name {
@@ -187,4 +197,25 @@ html[data-theme="dark"] .team-card-title {
 html[data-theme="dark"] .team-card-contact-link {
     background: var(--hr-gray-800);
     color: var(--hr-gray-400);
+}
+
+.team-card-profile-link {
+    align-self: flex-start;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 100%;
+    min-width: 0;
+}
+
+.team-card-profile-link .team-card-name {
+    margin-top: 0;
+    text-align: left;
+}
+
+.team-card-title {
+    align-self: stretch;
+    padding-left: 58px;
+    margin-top: -14px;
+    text-align: left;
 }

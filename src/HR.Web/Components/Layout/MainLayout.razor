@@ -289,7 +289,7 @@ else
                             <label for="dev-persona-select" class="visually-hidden">Switch user</label>
                             <SfDropDownList TValue="string?" TItem="PersonaOption"
                                             CssClass="dev-persona-select"
-                                            HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "dev-persona-select" })"
+                                            HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "dev-persona-select", ["aria-label"] = "Switch user" })"
                                             DataSource="@_personaOptions"
                                             Placeholder="Switch user…"
                                             ValueChanged="OnPersonaSwitchAsync">
@@ -691,7 +691,7 @@ else
     {
         var wasOpen = _nav.IsOpen;
         SidebarOpen = !wasOpen;
-        _pendingFocusSelector = wasOpen ? "#nav-open-button" : ".app-sidebar .sidebar-toggle";
+        _pendingFocusSelector = wasOpen ? "#nav-open-button" : "#app-sidebar .sidebar-toggle";
     }
 
     private void OnSidebarKeyDown(KeyboardEventArgs e)

@@ -15,17 +15,15 @@
 
         <div class="directory-filters">
             <label for="directory-search-input" class="visually-hidden">Search the employee directory</label>
-            <SfTextBox @bind-Value="_search"
+            <SfTextBox ID="directory-search-input" HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Search the employee directory" })" @bind-Value="_search"
                        Placeholder="Search by name…"
-                       HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "directory-search-input" })"
                        CssClass="directory-search-box"
                        data-testid="directory-search"
                        ValueChange="OnSearchChanged" />
 
             <label for="directory-department-filter" class="visually-hidden">Filter by department</label>
-            <SfDropDownList TValue="string" TItem="FilterOption"
+            <SfDropDownList ID="directory-department-filter" HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Filter by department" })" TValue="string" TItem="FilterOption"
                             DataSource="_departmentOptions"
-                            HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "directory-department-filter" })"
                             @bind-Value="_departmentValue"
                             AllowFiltering="true"
                             CssClass="directory-filter">
@@ -34,9 +32,8 @@
             </SfDropDownList>
 
             <label for="directory-location-filter" class="visually-hidden">Filter by location</label>
-            <SfDropDownList TValue="string" TItem="FilterOption"
+            <SfDropDownList ID="directory-location-filter" HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = "Filter by location" })" TValue="string" TItem="FilterOption"
                             DataSource="_locationOptions"
-                            HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "directory-location-filter" })"
                             @bind-Value="_locationValue"
                             AllowFiltering="true"
                             CssClass="directory-filter">

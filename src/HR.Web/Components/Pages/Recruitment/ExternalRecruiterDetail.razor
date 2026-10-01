@@ -57,31 +57,29 @@
                         <div class="card-body @(IsViewMode ? "view-mode" : "")">
                             <div class="row g-3">
                                 <div class="col-md-8">
-                                    <label class="form-label">Agency Name <span class="text-danger">*</span></label>
-                                    <HrTextBox @bind-Value="Model.AgencyName" Placeholder="e.g. Acme Recruiting"
-                                               Blur="@(() => OnAgencyNameBlurAsync())" />
-                                    <ValidationMessage For="@(() => Model.AgencyName)" />
+                                    <HrTextField Label="Agency Name" Required="true" Id="recruiter-agency-name"
+                                                 @bind-Value="Model.AgencyName" Placeholder="e.g. Acme Recruiting"
+                                                 Blur="@(() => OnAgencyNameBlurAsync())" />
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label">Contact Name</label>
-                                    <HrTextBox @bind-Value="Model.ContactName" Placeholder="Primary contact" />
+                                    <HrTextField Label="Contact Name" Id="recruiter-contact-name"
+                                                 @bind-Value="Model.ContactName" Placeholder="Primary contact" />
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Contact Email</label>
-                                    <HrTextBox @bind-Value="Model.ContactEmail" Placeholder="contact@agency.com" />
-                                    <ValidationMessage For="@(() => Model.ContactEmail)" />
+                                    <HrTextField Label="Contact Email" Id="recruiter-contact-email" Type="InputType.Email"
+                                                 @bind-Value="Model.ContactEmail" Placeholder="contact@agency.com" />
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Contact Telephone</label>
-                                    <HrTextBox @bind-Value="Model.ContactTelephone" Placeholder="e.g. 07700 900000" />
+                                    <HrTextField Label="Contact Telephone" Id="recruiter-contact-telephone" Type="InputType.Tel"
+                                                 @bind-Value="Model.ContactTelephone" Placeholder="e.g. 07700 900000" />
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Website</label>
-                                    <HrTextBox @bind-Value="Model.Website" Placeholder="https://…" />
+                                    <HrTextField Label="Website" Id="recruiter-website"
+                                                 @bind-Value="Model.Website" Placeholder="https://…" />
                                 </div>
                                 <div class="col-12">
-                                    <label class="form-label">Notes</label>
-                                    <HrTextBox @bind-Value="Model.Notes" Multiline="true" Rows="3" Readonly="@IsViewMode" />
+                                    <HrTextField Label="Notes" Id="recruiter-notes" @bind-Value="Model.Notes"
+                                                 Multiline="true" Rows="3" ReadOnly="@IsViewMode" />
                                 </div>
                             </div>
                         </div>
@@ -98,7 +96,7 @@
                                 Save
                             </SfButton>
                         }
-                        <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+                        <SfButton OnClick="RequestClose" Disabled="@Saving">@(IsViewMode ? "Back to external recruiters" : "Cancel")</SfButton>
                     </div>
                 </div>
             </div>
@@ -176,6 +174,9 @@
     <NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges" />
 
     <UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                          Message="You have unsaved changes. Save them, discard them, or stay on this page to keep editing."
+                          StayText="Stay on page"
+                          DiscardText="Discard changes"
                           OnSaveAndClose="ConfirmSaveAndCloseAsync"
                           OnDiscard="DiscardChangesAndClose"
                           OnCancel="CancelCloseDialog" />
@@ -217,6 +218,8 @@
     }
 
     protected override string? ListUrl => $"/companies/{CompanyId}/external-recruiters";
+
+    protected override string? InvalidFieldFocusScope => "form";
 
     private async Task OnAgencyNameBlurAsync()
     {

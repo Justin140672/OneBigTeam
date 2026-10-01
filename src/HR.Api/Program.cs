@@ -402,6 +402,7 @@ if (runStagingSeed)
 		await sp.SeedStagingCompanyAsync(stagingSeedOptions);
 		await sp.SeedStagingEmployeesAsync(stagingSeedOptions);
 		await sp.SeedStagingLeaveAsync(EmployeesModule.GetStagingSeedLeaveEnrolments());
+		await sp.SeedStagingProfilePhotosAsync(StagingSeedOptions.CompanyId, EmployeesModule.GetStagingSeedEmployeeIdsByNumber());
 		await sp.SeedStagingRecruitmentAsync(
 			EmployeesModule.GetStagingSeedPositionProfileIds(), EmployeesModule.GetStagingSeedEmployeeIds());
 		await sp.SeedStagingUsersAsync(stagingSeedOptions, EmployeesModule.GetStagingSeedIdentities(stagingSeedOptions));

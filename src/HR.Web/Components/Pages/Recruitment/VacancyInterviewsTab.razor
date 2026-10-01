@@ -7,14 +7,14 @@
 
     @if (!string.IsNullOrEmpty(_actionError))
     {
-        <div class="alert alert-danger alert-dismissible">
+        <div class="alert alert-danger alert-dismissible" role="alert">
             @_actionError
-            <button type="button" class="btn-close" @onclick="() => _actionError = null"></button>
+            <button type="button" class="btn-close" aria-label="Dismiss error" @onclick="() => _actionError = null"></button>
         </div>
     }
     @if (!string.IsNullOrEmpty(_actionSuccess))
     {
-        <div class="alert alert-success">@_actionSuccess</div>
+        <div class="alert alert-success" role="status">@_actionSuccess</div>
     }
 
     @if (_loading)
@@ -58,7 +58,7 @@
                         }
                         @if (row.Outcome == "Pending")
                         {
-                            <SfButton CssClass="e-small" IsPrimary="true" Disabled="@Session.IsReadOnly" OnClick="() => OpenOutcomeDialog(row)">Record Outcome</SfButton>
+                            <SfButton CssClass="e-small" IsPrimary="true" Disabled="@Session.IsReadOnly" OnClick="() => OpenOutcomeDialog(row)" HtmlAttributes="@(new Dictionary<string, object> { ["aria-label"] = $"Record outcome for {row.CandidateFirstName} {row.CandidateLastName}" })">Record Outcome</SfButton>
                         }
                     </Template>
                 </GridColumn>
@@ -73,20 +73,17 @@
             <EditForm EditContext="_editContext">
                 <DataAnnotationsValidator />
                 <div class="mb-3">
-                    <label class="form-label">Outcome <span class="text-danger">*</span></label>
-                    <SfDropDownList TValue="string" TItem="OutcomeOption" DataSource="@_outcomeOptions" @bind-Value="_model.Outcome" Placeholder="Select outcome">
-                        <DropDownListFieldSettings Value="Value" Text="Label" />
-                    </SfDropDownList>
-                    <ValidationMessage For="@(() => _model.Outcome)" />
+                    <HrDropDownField TValue="string" TItem="OutcomeOption" Label="Outcome" Required="true" Id="interview-outcome"
+                                     DataSource="@_outcomeOptions" @bind-Value="_model.Outcome" ValueField="Value" TextField="Label"
+                                     Placeholder="Select outcome" />
                 </div>
                 <div class="mb-3">
-                    <label class="form-label">Notes (optional)</label>
-                    <HrTextBox @bind-Value="_model.Notes" Multiline="true" Rows="3" />
-                    <ValidationMessage For="@(() => _model.Notes)" />
+                    <HrTextField Label="Notes (optional)" Id="interview-outcome-notes"
+                                 @bind-Value="_model.Notes" Multiline="true" Rows="3" />
                 </div>
                 @if (_dialogError is not null)
                 {
-                    <div class="alert alert-danger py-2">@_dialogError</div>
+                    <div class="alert alert-danger py-2" role="alert">@_dialogError</div>
                 }
             </EditForm>
         </Content>

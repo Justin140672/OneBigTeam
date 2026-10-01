@@ -1,0 +1,28 @@
+<div class="visually-hidden" role="status" aria-live="polite" aria-atomic="true" data-testid="search-results-announcer">@_message</div>
+
+@code {
+    [Parameter] public int Count { get; set; }
+    [Parameter, EditorRequired] public string Noun { get; set; } = "result";
+    [Parameter] public string? PluralNoun { get; set; }
+
+    private int? _lastCount;
+    private string _message = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        if (_lastCount == Count) return;
+
+        if (_lastCount is not null)
+        {
+            var plural = PluralNoun ?? Noun + "s";
+            _message = Count switch
+            {
+                0 => $"No {plural} found",
+                1 => $"1 {Noun} found",
+                _ => $"{Count} {plural} found",
+            };
+        }
+
+        _lastCount = Count;
+    }
+}

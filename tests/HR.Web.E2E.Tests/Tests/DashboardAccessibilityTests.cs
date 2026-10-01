@@ -147,18 +147,19 @@ public sealed class DashboardAccessibilityTests(CrossUserFixture fixture) : Role
         await _page.Locator("[data-testid='recruitment-tab-insights']").ClickAsync();
 
         var panel = _page.Locator("#recruitment-tabpanel-insights");
-        var details = panel.Locator("details", new() { HasText = "as a table" }).First;
-        await details.WaitForAsync(new() { Timeout = 20_000 });
+        var toggle = panel.GetByTestId("hiring-pipeline-table-toggle");
+        await Assertions.Expect(toggle).ToBeVisibleAsync(new() { Timeout = 20_000 });
 
-        await Assertions.Expect(details.Locator("summary")).ToContainTextAsync(new Regex("View .* as a table"));
-        await Assertions.Expect(details.Locator("table")).ToHaveCountAsync(1);
+        await Assertions.Expect(toggle).ToContainTextAsync(new Regex("View .* as a table"));
+        await Assertions.Expect(toggle).ToHaveAttributeAsync("aria-expanded", "false");
+        await Assertions.Expect(panel.GetByTestId("hiring-pipeline-table").Locator("table")).ToHaveCountAsync(1);
     }
 
     // NOTE: there is no "…ProvideAccessibleTableAlternative" test for the HR dashboard — its
     // insight tiles (Headcount by Department, Gender Split, Employment Type Split) render as
     // accessible HTML bar components (HorizontalBarChart / the custom headcount bars) with
     // aria-labels and visible values, not SVG/canvas Syncfusion charts, so there is no chart
-    // needing a separate <details>/<table> alternative. The recruitment "Insights" tab still
+    // needing a separate table alternative. The recruitment "Insights" tab still
     // uses a real SfChart — see RecruitmentInsightsCharts_ProvideAccessibleTableAlternative above.
 
 

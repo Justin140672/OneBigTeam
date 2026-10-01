@@ -23,7 +23,7 @@
     else
     {
         <h1 class="mb-1">@PageTitle</h1>
-        <p class="text-muted mb-4">Set the name and, if this is a final pipeline stage, which outcome it represents.</p>
+        <p class="text-muted mb-4">Set the stage name and choose whether it marks a candidate as hired or rejected.</p>
 
         <SaveConflictBanner Visible="SaveConflict" Disabled="@Saving" OnReload="ReloadLatestValuesAsync"
                             Message="Someone else changed this recruitment stage while you were editing. Your changes have not been saved." />
@@ -43,36 +43,26 @@
                         </div>
                         <div class="card-body @(IsViewMode ? "view-mode" : "")">
                             <div class="mb-3">
-                                <label class="form-label">Name <span class="text-danger">*</span></label>
-                                <HrTextBox @bind-Value="Model.Name" Placeholder="e.g. Screening, Interview, Offered" />
-                                <ValidationMessage For="@(() => Model.Name)" />
+                                <HrTextField Label="Name" Required="true" Id="stage-name" @bind-Value="Model.Name"
+                                             Placeholder="e.g. Screening, Interview, Offered" />
                             </div>
                             <div class="mb-3">
-                                <label class="form-label">Terminal Outcome <span class="text-danger">*</span></label>
-                                <SfDropDownList TValue="RecruitmentStageTerminalOutcome" TItem="Option"
-                                                DataSource="@_terminalOutcomeOptions"
-                                                @bind-Value="Model.TerminalOutcome">
-                                    <DropDownListFieldSettings Value="Value" Text="Label" />
-                                </SfDropDownList>
-                                <div class="form-text">
-                                    Non-terminal stages should stay "None". Exactly one active stage must be marked
-                                    "Hired" and exactly one active stage must be marked "Rejected".
-                                </div>
+                                <HrDropDownField TValue="RecruitmentStageTerminalOutcome" TItem="Option"
+                                                 Label="Terminal Outcome" Required="true" Id="stage-terminal-outcome"
+                                                 DataSource="@_terminalOutcomeOptions"
+                                                 @bind-Value="Model.TerminalOutcome"
+                                                 ValueField="Value" TextField="Label"
+                                                 HelpText="Non-terminal stages should stay &quot;None&quot;. Exactly one active stage must be marked &quot;Hired&quot; and exactly one active stage must be marked &quot;Rejected&quot;." />
                             </div>
                             @if (!Model.IsTerminal)
                             {
                                 <div class="mb-3">
-                                    <label class="form-label">Purpose</label>
-                                    <SfDropDownList TValue="RecruitmentStagePurpose?" TItem="PurposeOption"
-                                                    DataSource="@_purposeOptions"
-                                                    @bind-Value="Model.Purpose">
-                                        <DropDownListFieldSettings Value="Value" Text="Label" />
-                                    </SfDropDownList>
-                                    <div class="form-text">
-                                        Tags this stage as the one recruitment dashboard metrics count for
-                                        new applications, interviews or offers. Optional; more than one stage
-                                        may share a purpose. Terminal stages cannot have a purpose.
-                                    </div>
+                                    <HrDropDownField TValue="RecruitmentStagePurpose?" TItem="PurposeOption"
+                                                     Label="Purpose" Id="stage-purpose"
+                                                     DataSource="@_purposeOptions"
+                                                     @bind-Value="Model.Purpose"
+                                                     ValueField="Value" TextField="Label"
+                                                     HelpText="Tags this stage as the one recruitment dashboard metrics count for new applications, interviews or offers. Optional; more than one stage may share a purpose. Terminal stages cannot have a purpose." />
                                 </div>
                             }
                         </div>
@@ -89,7 +79,7 @@
                                 Save
                             </SfButton>
                         }
-                        <SfButton OnClick="RequestClose" Disabled="@Saving">Close</SfButton>
+                        <SfButton OnClick="RequestClose" Disabled="@Saving">@(IsViewMode ? "Back to recruitment stages" : "Cancel")</SfButton>
                     </div>
                 </div>
             </div>
@@ -99,6 +89,9 @@
     <NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges" />
 
     <UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                          Message="You have unsaved changes. Save them, discard them, or stay on this page to keep editing."
+                          StayText="Stay on page"
+                          DiscardText="Discard changes"
                           OnSaveAndClose="ConfirmSaveAndCloseAsync"
                           OnDiscard="DiscardChangesAndClose"
                           OnCancel="CancelCloseDialog" />
@@ -133,6 +126,8 @@
     protected override Guid? GetId() => Id;
 
     protected override string? ListUrl => $"/companies/{CompanyId}/recruitment-stages";
+
+    protected override string? InvalidFieldFocusScope => "form";
 
     protected override Task OnLoadedAsync()
     {

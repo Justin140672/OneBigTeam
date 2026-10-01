@@ -1,0 +1,10 @@
+.vacancy-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+}
+
+.vacancy-header-actions ::deep .close-vacancy-btn {
+    margin-left: 1.5rem;
+}

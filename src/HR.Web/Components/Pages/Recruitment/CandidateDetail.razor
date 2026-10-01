@@ -35,7 +35,7 @@
 
         @if (!SaveConflict && !string.IsNullOrEmpty(GlobalError))
         {
-            <div class="alert alert-danger">@GlobalError</div>
+            <div class="alert alert-danger" role="alert">@GlobalError</div>
         }
 
         @* Internal recruitment Ticket 6: internal applicants are linked to their employee record at
@@ -80,9 +80,9 @@
 
         @if (_actionError is not null)
         {
-            <div class="alert alert-danger alert-dismissible">
+            <div class="alert alert-danger alert-dismissible" role="alert">
                 @_actionError
-                <button type="button" class="btn-close" @onclick="@(() => _actionError = null)"></button>
+                <button type="button" class="btn-close" aria-label="Dismiss error" @onclick="@(() => _actionError = null)"></button>
             </div>
         }
 
@@ -99,52 +99,60 @@
                             <div class="card-body">
                                 <div class="row g-3 mb-3" data-testid="new-candidate-fields">
                                     <div class="col-md-6">
-                                        <label class="form-label" for="new-candidate-first-name">First name <span class="text-danger">*</span></label>
-                                        <HrTextBox ID="new-candidate-first-name" @bind-Value="Model.FirstName" Maxlength="100" Placeholder="First name"
-                                                   data-testid="new-candidate-first-name" />
-                                        <ValidationMessage For="@(() => Model.FirstName)" />
+                                        <HrTextField Label="First name" Required="true" Id="new-candidate-first-name"
+                                                     @bind-Value="Model.FirstName" Maxlength="100" Placeholder="First name"
+                                                     Autocomplete="given-name"
+                                                     HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "new-candidate-first-name" })" />
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label" for="new-candidate-last-name">Last name <span class="text-danger">*</span></label>
-                                        <HrTextBox ID="new-candidate-last-name" @bind-Value="Model.LastName" Maxlength="100" Placeholder="Last name"
-                                                   data-testid="new-candidate-last-name" />
-                                        <ValidationMessage For="@(() => Model.LastName)" />
+                                        <HrTextField Label="Last name" Required="true" Id="new-candidate-last-name"
+                                                     @bind-Value="Model.LastName" Maxlength="100" Placeholder="Last name"
+                                                     Autocomplete="family-name"
+                                                     HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "new-candidate-last-name" })" />
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label" for="new-candidate-email">Email <span class="text-danger">*</span></label>
-                                        <HrTextBox ID="new-candidate-email" @bind-Value="Model.Email" Maxlength="256" Placeholder="candidate@example.com"
-                                                   data-testid="new-candidate-email" />
-                                        <ValidationMessage For="@(() => Model.Email)" />
+                                        <HrTextField Label="Email" Required="true" Id="new-candidate-email" Type="InputType.Email"
+                                                     @bind-Value="Model.Email" Maxlength="256" Placeholder="candidate@example.com"
+                                                     Autocomplete="email"
+                                                     HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "new-candidate-email" })" />
                                     </div>
                                     <div class="col-md-6">
-                                        <label class="form-label" for="new-candidate-phone">Phone (optional)</label>
-                                        <HrTextBox ID="new-candidate-phone" @bind-Value="Model.Phone" Maxlength="30" Placeholder="e.g. 07700 900000"
-                                                   data-testid="new-candidate-phone" />
-                                        <ValidationMessage For="@(() => Model.Phone)" />
+                                        <HrTextField Label="Phone (optional)" Id="new-candidate-phone" Type="InputType.Tel"
+                                                     @bind-Value="Model.Phone" Maxlength="30" Placeholder="e.g. 07700 900000"
+                                                     Autocomplete="tel"
+                                                     HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "new-candidate-phone" })" />
                                     </div>
                                     <div class="col-12">
-                                        <label class="form-label" for="new-candidate-cv-input">CV (optional)</label>
+                                        <label class="form-label" for="new-candidate-cv-input">CV file (PDF) <span class="text-muted">(optional)</span></label>
                                         @* Kept rendered while a file is selected — Blazor Server streams the file from
                                            this input element at submit time, so it must stay in the DOM. *@
                                         <InputFile @key="_newCvInputKey" id="new-candidate-cv-input" class="form-control"
                                                    OnChange="OnNewCvSelected" accept=".pdf,application/pdf" disabled="@Saving"
+                                                   aria-describedby="@NewCvDescribedBy" aria-invalid="@(_newCvError is not null ? "true" : null)"
+                                                   aria-busy="@(Saving && _newCvFile is not null ? "true" : null)"
                                                    data-testid="new-candidate-cv-input" />
-                                        <div class="form-text">PDF, up to 20 MB. Uploaded as the candidate's current CV.</div>
+                                        <div id="new-candidate-cv-help" class="form-text">@CvPolicyText Uploaded as the candidate's current CV.</div>
+                                        <div class="visually-hidden" role="status" aria-live="polite" aria-atomic="true">@(_newCvFile is null ? "" : $"Selected CV: {_newCvFile.Name}, {FormatFileSize(_newCvFile.Size)}")</div>
                                         @if (_newCvFile is not null)
                                         {
                                             <div class="add-candidate-cv-selected" data-testid="new-candidate-cv-selected">
-                                                <i class="fa-solid fa-file-lines"></i>
+                                                <i class="fa-solid fa-file-lines" aria-hidden="true"></i>
                                                 <span data-testid="new-candidate-cv-file-name">@_newCvFile.Name</span>
                                                 <span class="text-muted small">(@FormatFileSize(_newCvFile.Size))</span>
                                                 <SfButton CssClass="e-flat e-small" Disabled="@Saving" OnClick="RemoveNewCv"
+                                                          aria-label="@($"Remove selected CV {_newCvFile.Name}")"
                                                           data-testid="new-candidate-cv-remove">
-                                                    <i class="fa-solid fa-xmark me-1"></i>Remove
+                                                    <i class="fa-solid fa-xmark me-1" aria-hidden="true"></i>Remove
                                                 </SfButton>
                                             </div>
+                                            @if (Saving)
+                                            {
+                                                <div class="small text-muted" role="status" data-testid="new-candidate-cv-busy">Uploading CV...</div>
+                                            }
                                         }
                                         @if (_newCvError is not null)
                                         {
-                                            <div class="text-danger small mt-1" data-testid="new-candidate-cv-error">@_newCvError</div>
+                                            <div id="new-candidate-cv-error" class="text-danger small mt-1" role="alert" data-testid="new-candidate-cv-error">@_newCvError</div>
                                         }
                                     </div>
                                 </div>
@@ -160,23 +168,20 @@
                         <div class="card-body @(IsViewMode ? "view-mode" : "")">
                             <div class="row g-3">
                                 <div class="col-md-6">
-                                    <label class="form-label">First Name <span class="text-danger">*</span></label>
-                                    <HrTextBox @bind-Value="Model.FirstName" Placeholder="First name" />
-                                    <ValidationMessage For="@(() => Model.FirstName)" />
+                                    <HrTextField Label="First Name" Required="true" Id="candidate-first-name"
+                                                 @bind-Value="Model.FirstName" Placeholder="First name" Autocomplete="given-name" />
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Last Name <span class="text-danger">*</span></label>
-                                    <HrTextBox @bind-Value="Model.LastName" Placeholder="Last name" />
-                                    <ValidationMessage For="@(() => Model.LastName)" />
+                                    <HrTextField Label="Last Name" Required="true" Id="candidate-last-name"
+                                                 @bind-Value="Model.LastName" Placeholder="Last name" Autocomplete="family-name" />
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Email <span class="text-danger">*</span></label>
-                                    <HrTextBox @bind-Value="Model.Email" Placeholder="candidate@example.com" />
-                                    <ValidationMessage For="@(() => Model.Email)" />
+                                    <HrTextField Label="Email" Required="true" Id="candidate-email" Type="InputType.Email"
+                                                 @bind-Value="Model.Email" Placeholder="candidate@example.com" Autocomplete="email" />
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Phone</label>
-                                    <HrTextBox @bind-Value="Model.Phone" Placeholder="e.g. 07700 900000" />
+                                    <HrTextField Label="Phone" Id="candidate-phone" Type="InputType.Tel"
+                                                 @bind-Value="Model.Phone" Placeholder="e.g. 07700 900000" Autocomplete="tel" />
                                 </div>
                             </div>
                         </div>
@@ -209,7 +214,7 @@
                                 @(IsNew ? "Add" : "Save")
                             </SfButton>
                         }
-                        <SfButton OnClick="RequestClose" Disabled="@Saving">@(IsNew ? "Cancel" : "Close")</SfButton>
+                        <SfButton OnClick="RequestClose" Disabled="@Saving">@(IsViewMode ? "Back to candidates" : "Cancel")</SfButton>
                     </div>
                 </EditForm>
 
@@ -224,11 +229,11 @@
                         <div class="card-body">
                             @if (_cvError is not null)
                             {
-                                <div class="alert alert-danger" data-testid="candidate-cv-error">@_cvError</div>
+                                <div class="alert alert-danger" role="alert" data-testid="candidate-cv-error">@_cvError</div>
                             }
                             @if (_cvSuccess is not null)
                             {
-                                <div class="alert alert-success" data-testid="candidate-cv-success">@_cvSuccess</div>
+                                <div class="alert alert-success" role="status" data-testid="candidate-cv-success">@_cvSuccess</div>
                             }
 
                             @if (_cvDocuments is null)
@@ -287,12 +292,25 @@
 
                             @if (CanUploadCv)
                             {
-                                <div class="mt-3">
-                                    <InputFile @key="_cvFileInputKey" class="form-control" OnChange="OnCvFileSelected"
-                                               accept=".pdf,application/pdf" data-testid="candidate-cv-file-input" />
+                                <div class="mt-3" aria-busy="@(_cvBusy ? "true" : null)">
+                                    <label class="form-label" for="candidate-cv-file-input">@(CurrentCvDocument is not null ? "Upload replacement CV file" : "CV file (PDF)")</label>
+                                    <InputFile @key="_cvFileInputKey" id="candidate-cv-file-input" class="form-control" OnChange="OnCvFileSelected"
+                                               accept=".pdf,application/pdf" disabled="@_cvBusy"
+                                               aria-describedby="@CvDescribedBy" aria-invalid="@(_cvSelectionError is not null ? "true" : null)"
+                                               data-testid="candidate-cv-file-input" />
+                                    <div id="candidate-cv-help" class="form-text">@CvPolicyText</div>
+                                    <div class="visually-hidden" role="status" aria-live="polite" aria-atomic="true">@(_selectedCvFile is null ? "" : $"Selected CV: {_selectedCvFile.Name}, {FormatFileSize(_selectedCvFile.Size)}")</div>
+                                    @if (_selectedCvFile is not null)
+                                    {
+                                        <div class="small text-muted mt-1" data-testid="candidate-cv-selected">Selected: @_selectedCvFile.Name (@FormatFileSize(_selectedCvFile.Size))</div>
+                                    }
                                     @if (_cvSelectionError is not null)
                                     {
-                                        <div class="text-danger small mt-1" data-testid="candidate-cv-input-error">@_cvSelectionError</div>
+                                        <div id="candidate-cv-input-error" class="text-danger small mt-1" role="alert" data-testid="candidate-cv-input-error">@_cvSelectionError</div>
+                                    }
+                                    @if (_cvBusy)
+                                    {
+                                        <div class="small text-muted mt-1" role="status" data-testid="candidate-cv-busy">Uploading CV...</div>
                                     }
                                     <div class="mt-2">
                                         <SfButton IsPrimary="true" Disabled="@(_cvBusy || _selectedCvFile is null || Session.IsReadOnly)"
@@ -334,7 +352,18 @@
                                             data-internal="@(application.IsInternal ? "true" : "false")">
                                             <div class="candidate-application__header">
                                                 <span class="candidate-application__vacancy"
-                                                      data-testid="candidate-application-vacancy">@application.VacancyTitle</span>
+                                                      data-testid="candidate-application-vacancy">
+                                                    @if (HasVacancyLink(application))
+                                                    {
+                                                        <a href="@VacancyHref(application)"
+                                                           aria-label="@($"View vacancy {application.VacancyTitle}")"
+                                                           data-testid="candidate-application-vacancy-link">@application.VacancyTitle</a>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span data-testid="candidate-application-vacancy-unavailable">Vacancy unavailable</span>
+                                                    }
+                                                </span>
                                                 <InternalApplicationBadge IsInternal="@application.IsInternal" />
                                                 @if (application.IsWithdrawn)
                                                 {
@@ -361,6 +390,9 @@
     <NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges" />
 
     <UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                          Message="You have unsaved changes. Save them, discard them, or stay on this page to keep editing."
+                          StayText="Stay on page"
+                          DiscardText="Discard changes"
                           OnSaveAndClose="ConfirmSaveAndCloseAsync"
                           OnDiscard="DiscardChangesAndClose"
                           OnCancel="CancelCloseDialog" />
@@ -374,10 +406,10 @@
                     <p>Are you sure you want to deactivate @Model.FirstName @Model.LastName?</p>
                     <EditForm EditContext="_deactivateEditContext">
                         <DataAnnotationsValidator />
-                        <label class="form-label">Reason <span class="text-danger">*</span></label>
-                        <HrTextBox @bind-Value="_deactivateModel.Reason" Multiline="true" Rows="3"
-                                   Maxlength="1000" Placeholder="Explain why this candidate is being deactivated" />
-                        <ValidationMessage For="@(() => _deactivateModel.Reason)" class="text-danger small" />
+                        <HrTextField Label="Reason" Required="true" Id="deactivate-candidate-reason"
+                                     @bind-Value="_deactivateModel.Reason" Multiline="true" Rows="3"
+                                     Maxlength="1000" Placeholder="Explain why this candidate is being deactivated"
+                                     ValidationClass="text-danger small" />
                     </EditForm>
                 </Content>
                 <FooterTemplate>
@@ -428,6 +460,35 @@
         CandidateReturnDestination.Dashboard => "/dashboard/recruitment",
         _ => $"/companies/{CompanyId}/candidates"
     };
+
+    protected override string? InvalidFieldFocusScope => "form";
+
+    private bool _focusDeactivateInvalid;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+        if (_focusDeactivateInvalid)
+        {
+            _focusDeactivateInvalid = false;
+            await FocusJsRuntime.InvokeVoidAsync("hrFocusFirstInvalid", ".e-dialog form");
+        }
+    }
+
+    private static string CvPolicyText =>
+        $"PDF, up to {CandidateService.MaxCandidateDocumentBytes / (1024 * 1024)} MB.";
+
+    private string NewCvDescribedBy =>
+        "new-candidate-cv-help" + (_newCvError is not null ? " new-candidate-cv-error" : "");
+
+    private string CvDescribedBy =>
+        "candidate-cv-help" + (_cvSelectionError is not null ? " candidate-cv-input-error" : "");
+
+    private static bool HasVacancyLink(ApplicationSearchItemModel application) =>
+        application.VacancyId != Guid.Empty && !string.IsNullOrWhiteSpace(application.VacancyTitle);
+
+    private string VacancyHref(ApplicationSearchItemModel application) =>
+        $"/companies/{CompanyId}/vacancies/{application.VacancyId}/view?returnUrl={Uri.EscapeDataString("/" + Navigation.ToBaseRelativePath(Navigation.Uri))}";
 
     private GetCandidateResponse? _candidate;
     private string? _actionError;
@@ -743,7 +804,10 @@
     private async Task ConfirmDeactivateAsync()
     {
         if (!_deactivateEditContext.Validate())
+        {
+            _focusDeactivateInvalid = true;
             return;
+        }
 
         _actionError = null;
         _actionBusy = true;

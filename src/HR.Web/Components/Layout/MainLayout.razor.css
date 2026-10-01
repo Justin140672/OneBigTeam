@@ -605,3 +605,21 @@
     outline-color: #ffffff;
     box-shadow: 0 0 0 5px #0b5ed7;
 }
+
+@media (max-width: 479.98px) {
+    .top-bar {
+        flex-wrap: wrap;
+    }
+
+    .top-bar-actions {
+        flex-shrink: 1;
+        flex-wrap: wrap;
+        margin-left: 0;
+        max-width: 100%;
+    }
+
+    .content-area {
+        min-width: 0;
+        overflow-x: auto;
+    }
+}

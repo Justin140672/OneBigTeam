@@ -1,0 +1,45 @@
+.pipeline-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    list-style: none;
+    margin: 0 0 0.5rem;
+    padding: 0;
+}
+
+.pipeline-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    max-width: 100%;
+    padding: 4px 10px;
+    border: 1px solid var(--hr-gray-200);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--hr-gray-900);
+    font-size: 0.8rem;
+    text-align: left;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.pipeline-legend-item.is-hidden {
+    color: var(--hr-gray-500);
+    text-decoration: line-through;
+}
+
+.pipeline-legend-item.is-hidden .pipeline-legend-swatch {
+    opacity: 0.35;
+}
+
+.pipeline-legend-item:focus-visible {
+    outline: 2px solid var(--hr-color-primary);
+    outline-offset: 2px;
+}
+
+.pipeline-legend-swatch {
+    flex: 0 0 auto;
+    width: 0.8rem;
+    height: 0.8rem;
+    border-radius: 2px;
+}

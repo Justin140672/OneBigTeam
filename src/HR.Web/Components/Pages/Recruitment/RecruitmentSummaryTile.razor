@@ -6,23 +6,35 @@
    metric is currently at zero. *@
 @inject NavigationManager Navigation
 
-@if (Failed)
-{
-    <div role="listitem" class="widget-kpi text-muted" aria-label="@($"{Label}: could not be loaded")">
-        <span class="widget-kpi-value">—</span>
-        <span class="widget-kpi-label">@Label</span>
-    </div>
-}
-else
-{
-    <a href="@Href" role="listitem" title="@Title"
-       class="widget-kpi widget-kpi--link @(IsZero ? "text-muted" : "")"
-       aria-label="@($"{Label}: {Value}")"
-       @onclick="HandleClick" @onclick:preventDefault="true">
-        <span class="widget-kpi-value">@Value</span>
-        <span class="widget-kpi-label">@Label</span>
-    </a>
-}
+<div role="listitem" class="recruitment-summary-tile">
+    @if (Failed)
+    {
+        <div class="widget-kpi text-muted">
+            <span class="widget-kpi-value" aria-hidden="true">—</span>
+            <span class="widget-kpi-label">@Label<span class="visually-hidden">: could not be loaded</span></span>
+        </div>
+    }
+    else if (IsAction)
+    {
+        <button type="button" title="@Title"
+                class="widget-kpi widget-kpi--link @(IsZero ? "text-muted" : "")"
+                aria-label="@($"{Label}: {Value}")"
+                @onclick="HandleClick">
+            <span class="widget-kpi-value">@Value</span>
+            <span class="widget-kpi-label">@Label</span>
+        </button>
+    }
+    else
+    {
+        <a href="@Href" title="@Title"
+           class="widget-kpi widget-kpi--link @(IsZero ? "text-muted" : "")"
+           aria-label="@($"{Label}: {Value}")"
+           @onclick="HandleClick" @onclick:preventDefault="true">
+            <span class="widget-kpi-value">@Value</span>
+            <span class="widget-kpi-label">@Label</span>
+        </a>
+    }
+</div>
 
 @code {
     [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
@@ -34,6 +46,8 @@ else
     [Parameter] public EventCallback OnClick { get; set; }
 
     private bool IsZero => Muted || Value == 0;
+
+    private bool IsAction => OnClick.HasDelegate;
 
     private async Task HandleClick()
     {

@@ -197,7 +197,6 @@ public sealed class AdministrativeRoleSeparationRecruiterTests(RecruiterPersonaF
     [InlineData(AdminRoutes.Candidates)]
     [InlineData(AdminRoutes.Vacancies)]
     [InlineData(AdminRoutes.Reporting)]
-    [InlineData(AdminRoutes.Employees)]
     public async Task Recruiter_IsAllowed(string route)
     {
         await LoginAsync();
@@ -205,6 +204,7 @@ public sealed class AdministrativeRoleSeparationRecruiterTests(RecruiterPersonaF
     }
 
     [Theory]
+    [InlineData(AdminRoutes.Employees)]
     [InlineData(AdminRoutes.UserAdministration)]
     [InlineData(AdminRoutes.HrSettings)]
     [InlineData(AdminRoutes.LeavePolicies)]
@@ -243,7 +243,6 @@ public sealed class AdministrativeRoleSeparationManagerTests(ManagerPersonaFixtu
     }
 
     [Theory]
-    [InlineData(AdminRoutes.Employees)]
     [InlineData(AdminRoutes.Reporting)]
     public async Task Manager_IsAllowed(string route)
     {
@@ -252,6 +251,7 @@ public sealed class AdministrativeRoleSeparationManagerTests(ManagerPersonaFixtu
     }
 
     [Theory]
+    [InlineData(AdminRoutes.Employees)]
     [InlineData(AdminRoutes.UserAdministration)]
     [InlineData(AdminRoutes.HrSettings)]
     [InlineData(AdminRoutes.Candidates)]

@@ -17,7 +17,7 @@
         }
     </label>
 
-    <SfNumericTextBox TValue="TValue"
+    <SfNumericTextBox ID="@FieldId" TValue="TValue"
                       Value="@Value"
                       ValueChanged="@(EventCallback.Factory.Create<TValue>(this, OnValueChanged))"
                       ValueExpression="@ValueExpression"
@@ -34,7 +34,7 @@
     }
     @if (ValueExpression is not null)
     {
-        <div id="@ErrorId">
+        <div id="@ErrorId" role="alert">
             <ValidationMessage For="@ValueExpression" class="@ValidationClass" />
         </div>
     }
@@ -70,7 +70,7 @@
             if (_minSet && Min is not null) d["Min"] = Min;
             if (_maxSet && Max is not null) d["Max"] = Max;
             if (Step is double step)
-                d["Step"] = (TValue)Convert.ChangeType(step, typeof(TValue), System.Globalization.CultureInfo.InvariantCulture);
+                d["Step"] = (TValue)Convert.ChangeType(step, Nullable.GetUnderlyingType(typeof(TValue)) ?? typeof(TValue), System.Globalization.CultureInfo.InvariantCulture);
             if (Format is not null) d["Format"] = Format;
             return d;
         }

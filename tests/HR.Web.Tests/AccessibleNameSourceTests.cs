@@ -25,7 +25,8 @@ public class AccessibleNameSourceTests
         var source = File.ReadAllText(Path.Combine(FindRepoRoot(), relativePath));
 
         var hasAssociatedLabel = source.Contains($"for=\"{idOrName}\"", StringComparison.Ordinal)
-            && source.Contains($"[\"id\"] = \"{idOrName}\"", StringComparison.Ordinal);
+            && (source.Contains($"[\"id\"] = \"{idOrName}\"", StringComparison.Ordinal)
+                || source.Contains($"ID=\"{idOrName}\"", StringComparison.Ordinal));
         var hasAriaLabel = source.Contains($"aria-label=\"{idOrName}\"", StringComparison.Ordinal);
 
         Assert.True(hasAssociatedLabel || hasAriaLabel,

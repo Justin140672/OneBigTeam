@@ -60,7 +60,6 @@ public abstract class AccessibleFieldBase<TValue> : ComponentBase
     {
         var attrs = new Dictionary<string, object>
         {
-            ["id"] = FieldId,
             ["aria-label"] = Label,
             ["aria-labelledby"] = LabelId,
         };

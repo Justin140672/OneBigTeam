@@ -23,10 +23,21 @@
         </div>
     }
 
+    @if (_openOnly)
+    {
+        <div class="alert alert-info d-flex justify-content-between align-items-center" data-testid="vacancy-list-open-banner">
+            <span>Showing open vacancies only.</span>
+            <a href="/companies/@CompanyId/vacancies">Show all vacancies</a>
+        </div>
+    }
+
     <div class="mb-3 col-md-4 px-0">
+        <label for="vacancy-search" class="visually-hidden">Search vacancies by title or position</label>
         <HrTextBox Value="@SearchTerm"
                    ValueChanged="@OnSearchChanged"
-                   Placeholder="Search by title or position profile" />
+                   Placeholder="Search by title or position profile"
+                   HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "vacancy-search", ["aria-label"] = "Search vacancies by title or position" })" />
+        <SearchResultsAnnouncer Count="@Items.Count" Noun="vacancy" PluralNoun="vacancies" />
     </div>
 
     @if (IsLoading)
@@ -35,15 +46,15 @@
     }
     else if (Error is not null)
     {
-        <div class="alert alert-danger">@Error</div>
+        <div class="alert alert-danger" role="alert">@Error</div>
     }
     else
     {
         @if (ActionError is not null)
         {
-            <div class="alert alert-danger alert-dismissible">
+            <div class="alert alert-danger alert-dismissible" role="alert">
                 @ActionError
-                <button type="button" class="btn-close" @onclick="ClearActionError"></button>
+                <button type="button" class="btn-close" aria-label="Dismiss error" @onclick="ClearActionError"></button>
             </div>
         }
 
@@ -93,7 +104,6 @@
 
     private bool _staleOnly;
     private bool _openOnly;
-    private object? _openFilteredGrid;
     private HashSet<Guid>? _staleIds;
 
     protected override void OnInitialized()
@@ -114,15 +124,6 @@
         }
     }
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (_openOnly && Grid is not null && !ReferenceEquals(_openFilteredGrid, Grid))
-        {
-            _openFilteredGrid = Grid;
-            await Grid.FilterByColumnAsync(nameof(VacancyListItemModel.Status), "equal", "Open");
-        }
-    }
-
     protected override async Task OnBeforeLoadAsync()
     {
         if (!Session.CanManageRecruitment)
@@ -140,7 +141,7 @@
 
     protected override async Task<IReadOnlyList<VacancyListItemModel>?> FetchItemsAsync(string? search)
     {
-        var result = await VacancyService.ListVacanciesAsync(CompanyId, excludeClosed: !ShowInactive, search: search);
+        var result = await VacancyService.ListVacanciesAsync(CompanyId, excludeClosed: !ShowInactive, status: _openOnly ? "Open" : null, search: search);
         if (_staleIds is null) return result?.Items;
         return result?.Items.Where(i => _staleIds.Contains(i.Id)).ToList();
     }

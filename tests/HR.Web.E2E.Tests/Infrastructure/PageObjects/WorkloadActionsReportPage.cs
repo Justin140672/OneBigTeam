@@ -70,19 +70,24 @@ public sealed class WorkloadActionsReportPage(IPage page, string baseUrl)
         await page.Keyboard.PressAsync("Escape");
     }
 
-    public async Task ApplyFiltersAsync()
+    private ILocator LoadRoot => page.Locator("[data-load-version]").First;
+
+    private async Task ClickAndWaitForReloadAsync(ILocator button)
     {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Apply Filters" }).ClickAsync();
+        var versionBefore = await LoadRoot.GetAttributeAsync("data-load-version");
+        await button.ClickAsync();
+        await Assertions.Expect(LoadRoot).Not.ToHaveAttributeAsync("data-load-version", versionBefore ?? string.Empty, new() { Timeout = 20_000 });
         await page.WaitForSelectorAsync(LoadedSelector, new() { Timeout = 15_000 });
-        await page.WaitForTimeoutAsync(300);
     }
 
-    public async Task ClearFiltersAsync()
-    {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Clear" }).ClickAsync();
-        await page.WaitForSelectorAsync(LoadedSelector, new() { Timeout = 15_000 });
-        await page.WaitForTimeoutAsync(300);
-    }
+    public Task WaitForLoadedAsync() =>
+        page.WaitForSelectorAsync(LoadedSelector, new() { Timeout = 20_000 });
+
+    public Task ApplyFiltersAsync() =>
+        ClickAndWaitForReloadAsync(page.GetByRole(AriaRole.Button, new() { Name = "Apply Filters" }));
+
+    public Task ClearFiltersAsync() =>
+        ClickAndWaitForReloadAsync(page.GetByRole(AriaRole.Button, new() { Name = "Clear", Exact = true }));
 
 
     public async Task<int> GetRowCountAsync()

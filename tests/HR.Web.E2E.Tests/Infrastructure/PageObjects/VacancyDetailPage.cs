@@ -411,14 +411,14 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     private ILocator UnsavedChangesDialog => page.Locator("[role='dialog']:has-text('Unsaved Changes')");
 
     public Task ClickCloseAsync() =>
-        page.GetByRole(AriaRole.Button, new() { Name = "Close", Exact = true }).ClickAsync();
+        page.GetByRole(AriaRole.Button, new() { NameRegex = new System.Text.RegularExpressions.Regex("^(Cancel|Back to vacancies)$") }).ClickAsync();
 
     public Task<bool> IsUnsavedChangesDialogVisibleAsync() =>
         UnsavedChangesDialog.WaitUntilVisibleAsync();
 
     public async Task ConfirmDiscardChangesAsync()
     {
-        await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Discard Changes" }).ClickAsync();
+        await UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Discard changes" }).ClickAsync();
         await page.WaitForURLAsync("**/vacancies", new() { Timeout = 30_000 });
         await page.WaitForSelectorAsync(".e-grid", new() { Timeout = 20_000 });
     }
@@ -431,7 +431,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     }
 
     public Task CancelUnsavedChangesDialogAsync() =>
-        UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Cancel" }).ClickAsync();
+        UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Stay on page" }).ClickAsync();
 
     public async Task CloseAndWaitForListAsync()
     {
@@ -1039,7 +1039,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
 
     public async Task FillOfferNotesAsync(string value)
     {
-        var textarea = page.Locator("[data-testid='offer-notes'] textarea, .offer-candidate-dialog textarea.e-input").First;
+        var textarea = page.Locator(".offer-candidate-dialog textarea#offer-notes");
         await textarea.FillAsync(value);
         await page.Keyboard.PressAsync("Tab");
     }

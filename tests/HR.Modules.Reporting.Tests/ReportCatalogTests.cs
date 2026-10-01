@@ -139,4 +139,12 @@ public class ReportCatalogTests
 
         Assert.Equal(classifiedIds.OrderBy(x => x), actualIds.OrderBy(x => x));
     }
+
+    [Fact]
+    public void ManagerReport_Flag_Is_Set_On_Exactly_The_Four_Manager_Reports()
+    {
+        var flagged = ReportCatalog.All.Where(d => d.ManagerReport).Select(d => d.Id).OrderBy(x => x).ToList();
+
+        Assert.Equal(["leave-summary", "onboarding-progress", "probation-report", "workload-actions"], flagged);
+    }
 }

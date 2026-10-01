@@ -9,4 +9,5 @@ internal sealed record ReportDefinition(
     string Description,
     ReportAccessGate AccessGate,
     IReadOnlyDictionary<string, IReadOnlyCollection<string>?> Fields,
-    ReportSensitivity Sensitivity);
+    ReportSensitivity Sensitivity,
+    bool ManagerReport = false);

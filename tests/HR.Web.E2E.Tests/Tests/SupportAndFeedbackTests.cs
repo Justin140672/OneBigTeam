@@ -130,10 +130,10 @@ public sealed class SupportAndFeedbackTests(HrAdminPersonaFixture fixture) : Rol
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await _page.Locator("button.help-btn").ClickAsync();
+        await new HelpMenu(_page).OpenAsync();
 
-        Assert.True(await _page.Locator("a.help-item", new() { HasText = "Help & Feedback" }).IsVisibleAsync(),
-            "Expected the Help & Feedback link in the help menu for an HR Administrator");
+        await Assertions.Expect(_page.Locator("a.help-item", new() { HasText = "Help & Feedback" }))
+            .ToBeVisibleAsync(new() { Timeout = 10_000 });
     }
 
     [Fact]

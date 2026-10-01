@@ -33,7 +33,7 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
     // the blur so the filter actually applies before the caller asserts on it.
     public async Task FillSearchAsync(string text)
     {
-        var input = page.Locator("input[data-testid='kanban-search-box'], [data-testid='kanban-search-box'] input").First;
+        var input = page.Locator("input[aria-label='Search pipeline candidates'], input[data-testid='kanban-search-box'], [data-testid='kanban-search-box'] input").First;
         await input.FillAsync(text);
         await input.PressAsync("Tab");
 

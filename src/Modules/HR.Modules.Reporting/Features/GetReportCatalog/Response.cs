@@ -6,4 +6,5 @@ internal sealed record ReportCatalogItem(
     string Id,
     string DisplayName,
     string Category,
-    string Description);
+    string Description,
+    bool ManagerReport = false);

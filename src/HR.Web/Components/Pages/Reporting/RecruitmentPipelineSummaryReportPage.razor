@@ -17,23 +17,26 @@
 
     @if (_exportError is not null)
     {
-        <div class="alert alert-danger alert-dismissible">
+        <div class="alert alert-danger alert-dismissible" role="alert">
             @_exportError
-            <button type="button" class="btn-close" @onclick="@(() => _exportError = null)"></button>
+            <button type="button" class="btn-close" aria-label="Dismiss error" @onclick="@(() => _exportError = null)"></button>
         </div>
     }
 
     <div class="d-flex align-items-center gap-2 mb-3">
-        <SfCheckBox TChecked="bool" Label="Include closed vacancies" Checked="@_includeClosed" CheckedChanged="OnIncludeClosedChangedAsync" />
+        <HrCheckBoxField Label="Include closed vacancies" Id="report-include-closed" FieldClass="mb-0"
+                         Checked="@_includeClosed" CheckedChanged="OnIncludeClosedChangedAsync" />
         <div class="d-flex align-items-center gap-2 ms-3" data-testid="report-application-type-filter">
             <label class="form-label mb-0" for="report-application-type-filter">Applications</label>
             <SfDropDownList TValue="ApplicationTypeFilter" TItem="ApplicationTypeFilterOption" DataSource="@_applicationTypeOptions"
-                            ID="report-application-type-filter" Width="180px"
+                            ID="report-application-type-filter" Width="180px" HtmlAttributes="@_applicationTypeFilterAttributes"
                             Value="@_applicationType" ValueChanged="OnApplicationTypeChangedAsync">
                 <DropDownListFieldSettings Value="Value" Text="Label" />
             </SfDropDownList>
         </div>
     </div>
+
+    <SearchResultsAnnouncer Count="@_items.Count" Noun="vacancy" PluralNoun="vacancies" />
 
     @if (_isLoading)
     {
@@ -41,7 +44,7 @@
     }
     else if (_error is not null)
     {
-        <div class="alert alert-danger">@_error</div>
+        <div class="alert alert-danger" role="alert">@_error</div>
     }
     else
     {
@@ -112,6 +115,11 @@
     // Internal recruitment Ticket 6: Internal/External application filter (explicit "All applications"
     // item rather than a clear button). Applied to both the view and the export.
     private ApplicationTypeFilter _applicationType = ApplicationTypeFilter.All;
+
+    private static readonly Dictionary<string, object> _applicationTypeFilterAttributes = new()
+    {
+        ["aria-label"] = "Applications",
+    };
 
     private static readonly ApplicationTypeFilterOption[] _applicationTypeOptions =
     [

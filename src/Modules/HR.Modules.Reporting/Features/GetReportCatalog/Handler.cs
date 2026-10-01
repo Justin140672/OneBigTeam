@@ -30,7 +30,7 @@ internal sealed class GetReportCatalogHandler
         var items = ReportCatalog.All
             .Where(definition => gates.IsAuthorized(definition.AccessGate))
             .Select(definition => new ReportCatalogItem(
-                definition.Id, definition.DisplayName, definition.Category.ToString(), definition.Description))
+                definition.Id, definition.DisplayName, definition.Category.ToString(), definition.Description, definition.ManagerReport))
             .ToList();
 
         return Task.FromResult(Result.Success(new GetReportCatalogResponse(items)));

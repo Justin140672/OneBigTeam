@@ -64,7 +64,7 @@
                        ValueChanged="@OnSearchChanged"
                        CssClass="employee-search-input"
                        Placeholder="Search by name, email or employee number"
-                       HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "employee-list-search" })" />
+                       HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "employee-list-search", ["aria-label"] = "Search employees" })" />
             @if (!string.IsNullOrEmpty(SearchTerm))
             {
                 <button type="button"

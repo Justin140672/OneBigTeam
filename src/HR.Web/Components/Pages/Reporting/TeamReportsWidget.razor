@@ -65,7 +65,7 @@ else
         var catalog = (await ReportingService.GetReportCatalogAsync(Session.CompanyId))?.Items ?? [];
 
         _reports = catalog
-            .Where(c => ReportRoutes.IsClickable(c.Id))
+            .Where(c => c.ManagerReport && ReportRoutes.IsClickable(c.Id))
             .OrderBy(c => c.DisplayName)
             .ToList();
 

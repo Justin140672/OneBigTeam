@@ -69,6 +69,19 @@ public sealed class RecruitmentStageEditPage(IPage page, string baseUrl)
         await page.WaitForTimeoutAsync(300);
     }
 
+    private ILocator UnsavedChangesDialog => page.Locator("[role='dialog']:has-text('Unsaved Changes')");
+
+    public Task ClickCloseAsync() =>
+        page.GetByRole(AriaRole.Button, new() { NameRegex = new System.Text.RegularExpressions.Regex("^(Cancel|Back to recruitment stages)$") }).ClickAsync();
+
+    public Task<bool> IsUnsavedChangesDialogVisibleAsync() => UnsavedChangesDialog.WaitUntilVisibleAsync();
+
+    public Task CancelUnsavedChangesDialogAsync() =>
+        UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Stay on page" }).ClickAsync();
+
+    public Task ConfirmDiscardChangesAsync() =>
+        UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Discard changes" }).ClickAsync();
+
     /// <summary>Selects the Terminal Outcome value ("None", "Hired" or "Rejected") via the shared DropDownSelector.</summary>
     public Task SelectTerminalOutcomeAsync(string outcome)
     {

@@ -1,0 +1,48 @@
+@* Text alternative for a chart: a real disclosure button controlling a data table region. The
+   Rows passed here must be the same list the chart iterates so the two never diverge. *@
+
+<div class="chart-data-table" data-testid="@($"{TestIdPrefix}-table-region")">
+    <button type="button" class="chart-data-table-toggle"
+            aria-expanded="@(_open ? "true" : "false")"
+            aria-controls="@_regionId"
+            data-testid="@($"{TestIdPrefix}-table-toggle")"
+            @onclick="Toggle">@(_open ? HideText : ShowText)</button>
+
+    <div id="@_regionId" class="dashboard-scroll-x" hidden="@(!_open)" data-testid="@($"{TestIdPrefix}-table")">
+        <table>
+            <caption>@Caption</caption>
+            <thead>
+                <tr>
+                    <th scope="col">@CategoryHeader</th>
+                    <th scope="col">@ValueHeader</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Rows)
+                {
+                    <tr>
+                        <th scope="row">@row.Category</th>
+                        <td>@row.Value</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    public sealed record ChartDataRow(string Category, int Value);
+
+    [Parameter, EditorRequired] public string TestIdPrefix { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string ShowText { get; set; } = "View as a table";
+    [Parameter, EditorRequired] public string HideText { get; set; } = "Hide table";
+    [Parameter, EditorRequired] public string Caption { get; set; } = string.Empty;
+    [Parameter] public string CategoryHeader { get; set; } = "Category";
+    [Parameter] public string ValueHeader { get; set; } = "Value";
+    [Parameter, EditorRequired] public IEnumerable<ChartDataRow> Rows { get; set; } = [];
+
+    private readonly string _regionId = $"chart-table-{Guid.NewGuid():N}";
+    private bool _open;
+
+    private void Toggle() => _open = !_open;
+}

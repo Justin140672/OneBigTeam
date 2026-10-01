@@ -6,6 +6,7 @@
 <AdminBreadcrumb Trail="@(new (string, string?)[] { ("Customers", "/customers"), ("Customer details", null) })" />
 
 <h1>Customer details</h1>
+<p class="admin-actions-intro">View key company, subscription and support information for this customer.</p>
 
 @if (_loading)
 {
@@ -21,8 +22,7 @@ else if (_details is null)
 else
 {
     <p class="admin-actions-intro">
-        <a href="/customers/@CompanyId/support">Open support view</a> — a condensed,
-        troubleshooting-optimised summary of this customer.
+        <a href="/customers/@CompanyId/support">Open support view</a>
     </p>
     <p class="admin-actions-intro">
         <a href="/customers/@CompanyId/support-requests">Open support requests</a> — this

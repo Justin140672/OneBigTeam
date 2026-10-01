@@ -11,6 +11,16 @@
     <h1 class="mb-1">Candidates</h1>
     <p class="text-muted mb-3">Manage candidates across all your open vacancies.</p>
 
+    <div class="mb-3 col-md-4 px-0">
+        <label for="candidate-search" class="visually-hidden">Search candidates</label>
+        <HrTextBox Value="@SearchTerm"
+                   ValueChanged="@OnSearchChanged"
+                   Placeholder="Search candidates"
+                   HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "candidate-search", ["aria-label"] = "Search candidates" })"
+                   data-testid="candidate-search" />
+        <SearchResultsAnnouncer Count="@Items.Count" Noun="candidate" />
+    </div>
+
     @if (IsLoading)
     {
         <HrLoadingIndicator Label="Loading candidates…" />
@@ -23,9 +33,9 @@
     {
         @if (ActionError is not null)
         {
-            <div class="alert alert-danger alert-dismissible">
+            <div class="alert alert-danger alert-dismissible" role="alert">
                 @ActionError
-                <button type="button" class="btn-close" @onclick="ClearActionError"></button>
+                <button type="button" class="btn-close" aria-label="Dismiss error" @onclick="ClearActionError"></button>
             </div>
         }
 

@@ -20,7 +20,7 @@
         }
     </label>
 
-    <HrTextBox Value="@Value"
+    <HrTextBox ID="@FieldId" Value="@Value"
                ValueChanged="@(EventCallback.Factory.Create<string>(this, OnValueChanged))"
                ValueExpression="@ValueExpression"
                Placeholder="@Placeholder"
@@ -30,7 +30,9 @@
                Enabled="@(!Disabled)"
                Maxlength="@(Maxlength ?? -1)"
                Input="@Input"
-               HtmlAttributes="@BuildInputAttributes()" />
+               Blur="@Blur"
+               @attributes="@RowsSplat"
+               HtmlAttributes="@BuildInputAttributes(ExtraAttributes)" />
 
     @if (HasHelp)
     {
@@ -38,7 +40,7 @@
     }
     @if (ValueExpression is not null)
     {
-        <div id="@ErrorId">
+        <div id="@ErrorId" role="alert">
             <ValidationMessage For="@ValueExpression" class="@ValidationClass" />
         </div>
     }
@@ -51,8 +53,16 @@
     [Parameter] public bool ReadOnly { get; set; }
     [Parameter] public bool Disabled { get; set; }
     [Parameter] public int? Maxlength { get; set; }
+    [Parameter] public int? Rows { get; set; }
+    [Parameter] public string? Autocomplete { get; set; }
 
     [Parameter] public EventCallback<Syncfusion.Blazor.Inputs.InputEventArgs> Input { get; set; }
+    [Parameter] public EventCallback<Syncfusion.Blazor.Inputs.FocusOutEventArgs> Blur { get; set; }
+
+    private IEnumerable<KeyValuePair<string, object>>? ExtraAttributes =>
+        string.IsNullOrWhiteSpace(Autocomplete) ? null : [new("autocomplete", Autocomplete)];
+
+    private Dictionary<string, object>? RowsSplat => Rows is { } r ? new() { ["Rows"] = r } : null;
 
     private Task OnValueChanged(string value) => NotifyValueChanged(value);
 }

@@ -35,12 +35,25 @@
 }
 
 .kanban-candidate-card__name {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: none;
+    text-align: left;
     font-weight: 600;
     font-size: 0.875rem;
     color: var(--hr-gray-900);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.kanban-candidate-card__name:focus-visible,
+.kanban-candidate-card__move-btn:focus-visible,
+.kanban-candidate-card__move-menu button:focus-visible {
+    outline: 2px solid var(--hr-color-primary);
+    outline-offset: 2px;
 }
 
 .kanban-candidate-card__internal {

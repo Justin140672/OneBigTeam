@@ -59,7 +59,7 @@ public sealed record AdminNavCapabilities(
         session.CanViewUsers);
 
     public bool HasAnyAdministrativeAccess =>
-        CanReadEmployees || CanManageEmployees || CanManageRecruitment || CanManageLeavePolicies ||
+        CanManageEmployees || CanManageRecruitment || CanManageLeavePolicies ||
         CanManageSharedDocuments || CanViewReporting ||
         CanManageCompany || CanManageCompanyConfiguration || CanManageHrSettings || CanViewUsers;
 }
@@ -73,7 +73,7 @@ public static class AdminNavigation
 
         var all = new List<(bool Visible, AdminDestination Destination)>
         {
-            (caps.CanReadEmployees || caps.CanManageEmployees, new("employees", "Employees", AdminNavGroup.PeopleAndUsers,
+            (caps.CanManageEmployees, new("employees", "Employees", AdminNavGroup.PeopleAndUsers,
                 Co("employees"), "fa-solid fa-users", ["people", "staff", "directory", "colleagues", "team"])),
             (caps.CanManageEmployees, new("departments", "Departments", AdminNavGroup.PeopleAndUsers,
                 Co("departments"), "fa-solid fa-sitemap", ["teams", "org", "structure", "division"])),
@@ -122,8 +122,8 @@ public static class AdminNavigation
             (caps.CanManageRecruitment, new("external-recruiters", "External Recruiters", AdminNavGroup.HrConfiguration,
                 Co("external-recruiters"), "fa-solid fa-people-arrows", ["agencies", "recruitment partners"])),
 
-            (caps.CanViewReporting, new("reporting", "Reporting", AdminNavGroup.Reports,
-                Co("reporting"), "fa-solid fa-chart-column", ["reports", "analytics", "saved views", "exports"])),
+            (caps.CanViewReporting, new("reporting", "Reports", AdminNavGroup.Reports,
+                Co("reporting"), "fa-solid fa-chart-column", ["reporting", "analytics", "saved views", "exports"])),
         };
 
         return all.Where(x => x.Visible).Select(x => x.Destination)

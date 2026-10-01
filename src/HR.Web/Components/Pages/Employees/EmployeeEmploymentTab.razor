@@ -39,7 +39,7 @@ else
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label" for="emp-employment-employee-number">Employee Number <span class="text-danger" aria-hidden="true">*</span></label>
-                                <HrTextBox @bind-Value="Model.EmployeeNumber" Placeholder="e.g. EMP-001" ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-employment-employee-number", "EmployeeNumber", true)" />
+                                <HrTextBox @bind-Value="Model.EmployeeNumber" Placeholder="e.g. EMP-001" ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-employment-employee-number", "EmployeeNumber", true, label: "Employee Number")" />
                                 <ValidationMessage For="@(() => Model.EmployeeNumber)" id="emp-employment-employee-number-error" />
                             </div>
                             <div class="col-md-6">
@@ -49,7 +49,7 @@ else
                                                 DataSource="@_statusOptions"
                                                 @bind-Value="Model.Status"
                                                 Placeholder="Select status"
-                                                Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-employment-status", "Status")">
+                                                Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-employment-status", "Status", label: "Employment Status")">
                                     <DropDownListFieldSettings Value="Value" Text="Label" />
                                 </SfDropDownList>
                             </div>
@@ -60,7 +60,7 @@ else
                                                 DataSource="@_employmentTypes"
                                                 @bind-Value="Model.EmploymentTypeId"
                                                 Placeholder="Select type"
-                                                Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-employment-type", "EmploymentTypeId", true)">
+                                                Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-employment-type", "EmploymentTypeId", true, label: "Employment Type")">
                                     <DropDownListFieldSettings Value="Id" Text="Name" />
                                 </SfDropDownList>
                                 <ValidationMessage For="@(() => Model.EmploymentTypeId)" id="emp-employment-employment-type-error" />
@@ -116,7 +116,7 @@ else
                                                 @bind-Value="Model.PositionProfileId"
                                                 Placeholder="None"
                                                 AllowFiltering="true"
-                                                Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-position-profile", "PositionProfileId", true)">
+                                                Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-position-profile", "PositionProfileId", true, label: "Position Profile")">
                                     <DropDownListFieldSettings Value="Id" Text="DisplayLabel" />
                                     <DropDownListEvents TItem="PositionProfileListItemModel" TValue="Guid?"
                                                          ValueChange="OnPositionProfileChanged"
@@ -132,7 +132,7 @@ else
                                                 @bind-Value="Model.DepartmentId"
                                                 Placeholder="None"
                                                 AllowFiltering="true"
-                                                Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-department", "DepartmentId", true)">
+                                                Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-department", "DepartmentId", true, label: "Department")">
                                     <DropDownListFieldSettings Value="Id" Text="Name" />
                                 </SfDropDownList>
                                 <ValidationMessage For="@(() => Model.DepartmentId)" id="emp-employment-department-error" />
@@ -145,7 +145,7 @@ else
                                                 @bind-Value="Model.LocationId"
                                                 Placeholder="None"
                                                 AllowFiltering="true"
-                                                Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-location", "LocationId", true)">
+                                                Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-location", "LocationId", true, label: "Location")">
                                     <DropDownListFieldSettings Value="Id" Text="Name" />
                                 </SfDropDownList>
                                 <ValidationMessage For="@(() => Model.LocationId)" id="emp-employment-location-error" />
@@ -159,7 +159,7 @@ else
                                                 @bind-Value="Model.ManagerId"
                                                 Placeholder="None"
                                                 AllowFiltering="true"
-                                                Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-manager", "ManagerId")">
+                                                Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-manager", "ManagerId", label: "Manager")">
                                     <DropDownListFieldSettings Value="Id" Text="Name" />
                                     <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnManagerFilteringAsync" />
                                 </SfDropDownList>
@@ -176,19 +176,19 @@ else
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label" for="emp-employment-start-date">Start Date <span class="text-danger" aria-hidden="true">*</span></label>
-                                <SfDatePicker TValue="DateOnly" @bind-Value="Model.StartDate" Format="dd/MM/yyyy" Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-start-date", "StartDate", true)" />
+                                <SfDatePicker TValue="DateOnly" @bind-Value="Model.StartDate" Format="dd/MM/yyyy" Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-start-date", "StartDate", true, label: "Start Date")" />
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label" for="emp-employment-continuous-service-date">Continuous Service Date</label>
-                                <SfDatePicker TValue="DateOnly?" @bind-Value="Model.ContinuousServiceDate" Format="dd/MM/yyyy" ShowClearButton="true" Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-continuous-service-date", "ContinuousServiceDate")" />
+                                <SfDatePicker TValue="DateOnly?" @bind-Value="Model.ContinuousServiceDate" Format="dd/MM/yyyy" ShowClearButton="true" Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-continuous-service-date", "ContinuousServiceDate", label: "Continuous Service Date")" />
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label" for="emp-employment-probation-end-date">Probation End Date</label>
-                                <SfDatePicker TValue="DateOnly?" @bind-Value="Model.ProbationEndDate" Format="dd/MM/yyyy" ShowClearButton="true" Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-probation-end-date", "ProbationEndDate")" />
+                                <SfDatePicker TValue="DateOnly?" @bind-Value="Model.ProbationEndDate" Format="dd/MM/yyyy" ShowClearButton="true" Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-probation-end-date", "ProbationEndDate", label: "Probation End Date")" />
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label" for="emp-employment-leaving-date">Leaving Date</label>
-                                <SfDatePicker TValue="DateOnly?" @bind-Value="Model.LeavingDate" Format="dd/MM/yyyy" ShowClearButton="true" Enabled="false" HtmlAttributes="@Aria("emp-employment-leaving-date", "LeavingDate")" />
+                                <SfDatePicker TValue="DateOnly?" @bind-Value="Model.LeavingDate" Format="dd/MM/yyyy" ShowClearButton="true" Enabled="false" HtmlAttributes="@Aria("emp-employment-leaving-date", "LeavingDate", label: "Leaving Date")" />
                                 <div class="form-text">Handled via Start Leaving Process.</div>
                             </div>
                         </div>
@@ -210,7 +210,7 @@ else
                                             <SfNumericTextBox TValue="int" @bind-Value="Model.NoticePeriodLength"
                                                               ShowSpinButton="false"
                                                               Min="1"
-                                                              Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-length", "NoticePeriodLength")" />
+                                                              Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-length", "NoticePeriodLength", label: "Length")" />
                                             <ValidationMessage For="@(() => Model.NoticePeriodLength)" id="emp-employment-length-error" />
                                         </div>
                                         <div class="col-md-6">
@@ -219,7 +219,7 @@ else
                                                             DataSource="@NoticePeriodUnitOptions"
                                                             @bind-Value="Model.NoticePeriodUnit"
                                                             Placeholder="Unit"
-                                                            Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-unit", "NoticePeriodUnit")">
+                                                            Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-unit", "NoticePeriodUnit", label: "Unit")">
                                                 <DropDownListFieldSettings Value="Value" Text="Label" />
                                             </SfDropDownList>
                                         </div>
@@ -288,7 +288,7 @@ else
                                    Rows="4"
                                    Placeholder="Optional internal notes visible to HR only"
                                    Maxlength="4000"
-                                   ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-employment-hr-notes", "Notes")" />
+                                   ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-employment-hr-notes", "Notes", label: "HR Notes")" />
                         @if (!string.IsNullOrEmpty(Model.Notes))
                         {
                             <div class="text-muted small mt-1">@Model.Notes.Length / 4000</div>

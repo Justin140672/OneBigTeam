@@ -304,8 +304,16 @@ window.hrShell = (function () {
             try { localStorage.setItem('navExpanded', expanded ? 'true' : 'false'); } catch { }
         },
         focus: function (selector) {
-            const el = document.querySelector(selector);
-            if (el) el.focus();
+            let attempts = 0;
+            const attempt = function () {
+                const el = document.querySelector(selector);
+                if (el) {
+                    el.focus();
+                    if (document.activeElement === el) return;
+                }
+                if (++attempts < 30) setTimeout(attempt, 50);
+            };
+            attempt();
         },
         resetHorizontalScroll: function () {
             window.scrollTo({ left: 0, top: window.scrollY, behavior: 'instant' });

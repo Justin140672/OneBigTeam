@@ -1,0 +1,9 @@
+button.widget-kpi {
+    border: 0;
+    font: inherit;
+    color: inherit;
+}
+
+button.widget-kpi:not(:hover) {
+    background: transparent;
+}

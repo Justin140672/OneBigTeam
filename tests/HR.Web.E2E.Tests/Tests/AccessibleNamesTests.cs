@@ -33,7 +33,7 @@ public sealed class AccessibleNamesTests(HrAdminPersonaFixture fixture) : RoleE2
 
         var search = _page.GetByRole(AriaRole.Textbox, new() { Name = accessibleName });
         await Assertions.Expect(search).ToBeVisibleAsync();
-        await Assertions.Expect(_page.GetByLabel(accessibleName)).ToHaveCountAsync(1);
+        await Assertions.Expect(_page.GetByRole(AriaRole.Textbox, new() { Name = accessibleName })).ToHaveCountAsync(1);
     }
 
     [Fact]

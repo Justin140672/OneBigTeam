@@ -185,6 +185,20 @@ public sealed class HrDashboardPage(IPage page, string baseUrl)
             .ClickAsync();
     }
 
+    public async Task ClickFirstTaskBackedAttentionQueueItemAsync()
+    {
+        await WaitForAttentionQueueLoadedAsync();
+        var taskBackedAction = page.Locator(".attention-queue-action").Filter(new()
+        {
+            HasTextRegex = new System.Text.RegularExpressions.Regex(
+                @"^\s*(Open task|Review leave request|Review probation|Complete return-to-work review|View evidence request)\s*$"),
+        });
+        await AttentionQueueWidget.Locator(".attention-queue-item")
+            .Filter(new() { Has = taskBackedAction })
+            .First
+            .ClickAsync();
+    }
+
     public async Task ClickAttentionQueueItemAsync(string subjectFragment)
     {
         await WaitForAttentionQueueLoadedAsync();

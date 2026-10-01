@@ -22,8 +22,22 @@ public sealed class HelpMenu(IPage page)
 
     public async Task OpenAsync()
     {
-        await HelpButton.ClickAsync();
-        await HelpDropdown.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        const int attempts = 5;
+        for (var attempt = 1; attempt <= attempts; attempt++)
+        {
+            if (await HelpDropdown.IsVisibleAsync())
+                return;
+
+            await HelpButton.ClickAsync();
+            try
+            {
+                await HelpDropdown.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = attempt < attempts ? 4_000 : 10_000 });
+                return;
+            }
+            catch (TimeoutException) when (attempt < attempts)
+            {
+            }
+        }
     }
 
     public Task ClickGettingStartedAsync() =>

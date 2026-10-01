@@ -4,11 +4,12 @@
 
 @if (_options.Count > 1)
 {
-    <div class="dashboard-switcher mb-3">
+    <div class="dashboard-switcher mb-3" role="group" aria-label="Switch dashboard">
         @foreach (var option in _options)
         {
             var opt = option;
             <SfButton CssClass="@("dashboard-switcher-item " + (IsCurrent(opt.Key) ? "dashboard-switcher-item--active" : ""))"
+                      HtmlAttributes="@(IsCurrent(opt.Key) ? CurrentAttributes : null)"
                       OnClick="() => SwitchToAsync(opt.Key, opt.Url)">
                 @opt.Label
             </SfButton>
@@ -18,6 +19,8 @@
 
 @code {
     private sealed record DashboardOption(string Key, string Label, string Url);
+
+    private static readonly Dictionary<string, object> CurrentAttributes = new() { ["aria-current"] = "page" };
 
     private List<DashboardOption> _options = [];
 
